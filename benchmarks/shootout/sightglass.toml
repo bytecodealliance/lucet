@@ -1,0 +1,28 @@
+# Test suites to run
+test_suites = [
+  { name = "Reference", library_path = "./build/native/implementation.so" },
+  { name = "lucet", library_path = "./build/lucet/implementation.so" },
+]
+
+# Pin the process to a single CPU core (Linux only)
+single_core = true
+
+# Supported output formats: Text, JSON and CSV
+# Outputs to stdout if no file name is provided
+output = [
+  { format = "Text" },
+  { format = "JSON", file = "/tmp/results-latest.json" },
+  { format = "CSV", file = "/tmp/results-latest.csv" }
+]
+
+# Minimum number of rounds to perform for each test
+initial_round_size = 1
+
+# Minimum number of samples to collect for each test
+min_sample_size = 10
+
+# Minimum time for a test has to run, in milliseconds, to record a sample
+min_run_time_ms = 100
+
+# Maximum time for a test to run
+max_run_time_ms = 2000

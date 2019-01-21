@@ -1,0 +1,60 @@
+digraph G {
+        // States
+        0 [shape=box];
+        0 -> lucet_instance_create;
+
+        lucet_state_ready [shape=box];
+        lucet_state_ready -> lucet_instance_run;
+        lucet_state_ready -> lucet_instance_release;
+
+        lucet_state_running [shape=box];
+        lucet_state_running -> return;
+        lucet_state_running -> fault;
+//        lucet_state_running -> lucet_instance_yield;
+        lucet_state_running -> lucet_instance_terminate;
+
+
+//        lucet_state_yield [shape=box];
+//        lucet_state_yield -> lucet_instance_resume;
+//        lucet_state_yield -> lucet_instance_reset;
+//        lucet_state_yield -> lucet_instance_release;
+
+        lucet_state_fault [shape=box];
+        lucet_state_fault -> lucet_instance_reset;
+        lucet_state_fault -> lucet_instance_release;
+
+        lucet_state_terminated [shape=box];
+        lucet_state_terminated -> lucet_instance_reset;
+        lucet_state_terminated -> lucet_instance_release;
+
+        released [shape=box];
+
+        // Transitions
+        lucet_instance_create [shape=diamond];
+        lucet_instance_create -> lucet_state_ready;
+
+        lucet_instance_run [shape=diamond];
+        lucet_instance_run -> lucet_state_running;
+
+//        lucet_instance_yield [shape=diamond];
+//        lucet_instance_yield -> lucet_state_yield;
+
+//        lucet_instance_resume [shape=diamond];
+//        lucet_instance_resume -> lucet_state_running;
+
+        return [shape=diamond, label="<return>"];
+        return -> lucet_state_ready;
+
+        fault [shape=diamond, label="<runtime fault>"];
+        fault -> lucet_state_fault;
+
+        lucet_instance_terminate [shape=diamond];
+        lucet_instance_terminate -> lucet_state_terminated;
+
+        lucet_instance_release [shape=diamond];
+        lucet_instance_release -> released;
+
+        lucet_instance_reset [shape=diamond];
+        lucet_instance_reset -> lucet_state_ready;
+
+}

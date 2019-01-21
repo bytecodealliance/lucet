@@ -1,0 +1,2 @@
+[build]
+rustflags = ["-C", "link-args=-Wl,-rpath,/isolation/lib/lucet-runtime-c/build,-rpath,/isolation/lib/lucet-libc/build/lib"]

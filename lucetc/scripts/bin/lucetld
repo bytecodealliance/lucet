@@ -1,0 +1,41 @@
+#!/usr/bin/python
+import argparse
+from os import path
+import sys
+
+# Insert the relative path to lib
+lib_path = path.realpath(path.abspath(path.join(path.dirname(__file__), '..', 'lib')))
+sys.path.insert(0, lib_path)
+from wrapper import *
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+
+    # Linker Options
+    p.add_argument('-shared', action='store_true')
+
+    # Output Options
+    p.add_argument('-emit-llvm', action='store_true')
+    p.add_argument('-emit-wasm', action='store_true')
+    p.add_argument('-emit-wat', action='store_true')
+    p.add_argument('-emit-clif', action='store_true')
+    p.add_argument('-emit-obj', action='store_true')
+    p.add_argument('-emit-ar', action='store_true')
+    p.add_argument('-emit-so', action='store_true')
+
+    # Input/Output
+    p.add_argument('-o', dest='output_file')
+    p.add_argument('input_files', type=str, nargs='+', help='input files')
+
+    # lucetc Options
+    p.add_argument('--bindings', dest='bindings', action='append')
+
+    # Debug Options
+    p.add_argument('--verbose', '-v', action='store_true')
+
+    args, unknown_args = p.parse_known_args()
+
+    steps = linker_workflow(args)
+    for (step_fn, in_filename, out_filename)  in steps:
+        step_fn(in_filename, out_filename, args, unknown_args)
+

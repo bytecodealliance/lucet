@@ -1,0 +1,21 @@
+[package]
+name = "wasmonkey"
+version = "0.1.4"
+authors = ["Frank Denis <github@pureftpd.org>"]
+description = "Patch a WASM object file to replace a set of exported functions with imported functions from another library"
+license = "ISC"
+homepage = "https://github.com/jedisct1/wasmonkey"
+repository = "https://github.com/jedisct1/wasmonkey"
+categories = ["wasm"]
+
+[dependencies]
+clap = "2.32"
+failure = "0.1"
+goblin = "0.0.19"
+lazy_static = "1.2"
+parity-wasm = "0.35"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+siphasher = "0.2"
+xfailure = "0.1"

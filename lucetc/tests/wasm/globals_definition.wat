@@ -1,0 +1,13 @@
+(module
+  (global $x (mut i32) (i32.const 4))
+  (global $y (mut i32) (i32.const 5))
+  (global $z (export "z") i32 (i32.const 6))
+  (memory 1)
+  (func $main (export "main")
+    (i32.store (i32.const 0) (get_global $x))
+    (i32.store (i32.const 4) (get_global $y))
+    (i32.store (i32.const 8) (get_global $z))
+    (set_global $x (i32.const 3))
+    (set_global $y (i32.const 2))
+  )
+)

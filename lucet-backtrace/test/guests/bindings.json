@@ -1,0 +1,5 @@
+{
+	"env": {
+		"hostcall_fault": "hostcall_fault"
+	}
+}

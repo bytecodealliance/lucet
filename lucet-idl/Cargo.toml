@@ -1,0 +1,11 @@
+[package]
+name = "lucet-idl"
+version = "0.1.0"
+authors = ["Pat Hickey <phickey@fastly.com>"]
+repository = "https://github.com/fastly/isolation"
+edition = "2018"
+
+[lib]
+crate-type=["rlib"]
+
+[dependencies]

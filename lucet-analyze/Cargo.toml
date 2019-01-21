@@ -1,0 +1,10 @@
+[package]
+name = "lucet-analyze"
+version = "0.1.0"
+authors = ["tyler <tyler@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+goblin="0.0.17"
+byteorder="1.2.1"
+colored="1.6.1"

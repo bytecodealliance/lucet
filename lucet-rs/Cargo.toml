@@ -1,0 +1,14 @@
+[package]
+name = "lucet"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+failure = "0.1"
+libc = "0.2"
+lucet-sys = { path = "lucet-sys" }
+xfailure = "0.1"
+nix = "0.11.0"
+
+[profile.test]
+rpath = true

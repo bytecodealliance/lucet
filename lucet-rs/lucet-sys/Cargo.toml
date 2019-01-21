@@ -1,0 +1,15 @@
+[package]
+name = "lucet-sys"
+version = "0.1.0"
+edition = "2018"
+
+build = "build.rs"
+
+[lib]
+crate-type=["rlib"]
+
+[build-dependencies]
+bindgen = "0.45"
+
+[profile.test]
+rpath = true

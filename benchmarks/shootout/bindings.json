@@ -1,0 +1,6 @@
+{
+    "env": {
+        "sg_log": "sg_log",
+	"sg_black_box": "sg_black_box"
+    }
+}

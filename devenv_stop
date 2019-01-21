@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -e
+if [ -f .devenv_container_id ]; then
+	docker stop $(cat .devenv_container_id)
+	rm .devenv_container_id
+else
+	echo "container not running"
+	exit 1
+fi

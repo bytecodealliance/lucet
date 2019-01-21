@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -e
+docker build -t lucet-dev:latest .
+if [ -f .devenv_container_id ]; then
+	echo "restarting container"
+	./devenv_stop
+	./devenv_start
+fi

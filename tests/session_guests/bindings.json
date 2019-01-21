@@ -1,0 +1,6 @@
+{
+    "env": {
+        "session_hostcall_get_header": "session_hostcall_get_header",
+	"session_hostcall_send": "session_hostcall_send"
+    }
+}

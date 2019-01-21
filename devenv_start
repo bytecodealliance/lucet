@@ -1,0 +1,9 @@
+#/usr/bin/env sh
+set -e
+if [ ! -f .devenv_container_id ]; then
+	docker run --detach --mount type=bind,src=$PWD,target=/lucet \
+		lucet-dev:latest /bin/sleep 99999999 > .devenv_container_id
+else
+	echo "container is already running"
+	exit 1
+fi
