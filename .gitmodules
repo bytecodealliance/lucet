@@ -1,3 +1,6 @@
 [submodule "cranelift"]
 	path = cranelift
 	url = https://github.com/cranestation/cranelift
+[submodule "faerie"]
+	path = faerie
+	url = https://github.com/m4b/faerie
