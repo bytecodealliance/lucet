@@ -10,3 +10,6 @@
 [submodule "lucet-libc/src/musl"]
 	path = lucet-libc/src/musl
 	url = git://git.musl-libc.org/musl
+[submodule "lucet-spectest/spec"]
+	path = lucet-spectest/spec
+	url = https://github.com/webassembly/spec
