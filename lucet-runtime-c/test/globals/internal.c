@@ -8,6 +8,7 @@
 
 DEFINE_DEFAULT_HEAP_SPEC;
 DEFINE_DEFAULT_DATA_SEGMENTS;
+DEFINE_DEFAULT_SPARSE_PAGE_DATA;
 
 // Note: we can't use the struct initializers from lucet_globals_private.h here
 // because the serialization scheme requires the spec header and the

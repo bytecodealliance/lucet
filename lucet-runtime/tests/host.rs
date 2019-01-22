@@ -1,0 +1,131 @@
+#[macro_use]
+mod test_helpers;
+
+use crate::test_helpers::DlModuleExt;
+use libc::c_void;
+use lucet_runtime::instance::State;
+use lucet_runtime::region::mmap::MmapRegion;
+use lucet_runtime::region::Region;
+use lucet_runtime::{DlModule, Limits, Vmctx};
+
+const NULL_MOD_PATH: &'static str = "tests/build/host_guests/null.so";
+const HELLO_MOD_PATH: &'static str = "tests/build/host_guests/hello.so";
+const HOSTCALL_ERROR_MOD_PATH: &'static str = "tests/build/host_guests/hostcall_error.so";
+const FPE_MOD_PATH: &'static str = "tests/build/host_guests/fpe.so";
+
+#[test]
+fn load_module() {
+    let _module = DlModule::load_test(NULL_MOD_PATH).expect("module loads");
+}
+
+#[test]
+fn load_nonexistent_module() {
+    let module = DlModule::load_test("nonexistent_sandbox");
+    assert!(module.is_err());
+}
+
+#[no_mangle]
+extern "C" fn hostcall_test_func_hello(vmctx: *mut c_void, hello_ptr: u32, hello_len: u32) {
+    unsafe {
+        let mut vmctx = Vmctx::from_raw(vmctx);
+        let confirmed_hello = vmctx.embed_ctx() as *mut bool;
+        let heap = vmctx.heap();
+        let hello = heap.as_ptr() as usize + hello_ptr as usize;
+        if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
+            vmctx.terminate(std::ptr::null_mut());
+        }
+        let hello = std::slice::from_raw_parts(hello as *const u8, hello_len as usize);
+        if hello.starts_with(b"hello") {
+            *confirmed_hello = true;
+        }
+    }
+}
+
+const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
+#[no_mangle]
+extern "C" fn hostcall_test_func_hostcall_error(vmctx: *mut c_void) {
+    let info = Box::new(ERROR_MESSAGE);
+    unsafe { Vmctx::from_raw(vmctx).terminate(Box::into_raw(info) as *mut c_void) }
+}
+
+#[test]
+fn instantiate_null() {
+    let module = DlModule::load_test(NULL_MOD_PATH).expect("module loads");
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+    let inst = region
+        .new_instance(Box::new(module))
+        .expect("instance can be created");
+    assert!(inst.is_ready());
+}
+
+#[test]
+fn run_null() {
+    let module = DlModule::load_test(NULL_MOD_PATH).expect("module loads");
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+    let mut inst = region
+        .new_instance(Box::new(module))
+        .expect("instance can be created");
+    assert!(inst.is_ready());
+    inst.run(b"main", &[]).expect("instance runs");
+    assert!(inst.is_ready());
+}
+
+#[test]
+fn run_hello() {
+    let module = DlModule::load_test(HELLO_MOD_PATH).expect("module loads");
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+
+    let mut confirm_hello = false;
+
+    let mut inst = region
+        .new_instance_with_ctx(
+            Box::new(module),
+            (&mut confirm_hello) as *mut bool as *mut c_void,
+        )
+        .expect("instance can be created");
+
+    inst.run(b"main", &[]).expect("instance runs");
+    assert!(inst.is_ready());
+
+    assert!(confirm_hello);
+}
+
+#[test]
+fn run_hostcall_error() {
+    let module = DlModule::load_test(HOSTCALL_ERROR_MOD_PATH).expect("module loads");
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+    let mut inst = region
+        .new_instance(Box::new(module))
+        .expect("instance can be created");
+
+    inst.run(b"main", &[]).expect("instance runs");
+
+    match &inst.state {
+        State::Terminated { info } => {
+            let info = unsafe { Box::from_raw(*info as *mut &'static str) };
+            assert_eq!(*info, ERROR_MESSAGE);
+        }
+        st => panic!("unexpected state: {}", st),
+    }
+}
+
+#[test]
+fn run_fpe() {
+    let module = DlModule::load_test(FPE_MOD_PATH).expect("module loads");
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+    let mut inst = region
+        .new_instance(Box::new(module))
+        .expect("instance can be created");
+
+    inst.run(b"trigger_div_error", &[0u64.into()])
+        .expect("instance runs");
+
+    match &inst.state {
+        State::Fault { .. } => {
+            eprintln!("{}", inst.state);
+        }
+        st => {
+            panic!("unexpected state: {}", st);
+        }
+    }
+}

@@ -9,6 +9,7 @@
 DEFINE_DEFAULT_HEAP_SPEC;
 DEFINE_DEFAULT_GLOBAL_SPEC;
 DEFINE_DEFAULT_DATA_SEGMENTS;
+DEFINE_DEFAULT_SPARSE_PAGE_DATA;
 
 uint64_t guest_func_add_2(struct lucet_vmctx *ctx, uint64_t arg0, uint64_t arg1)
 {

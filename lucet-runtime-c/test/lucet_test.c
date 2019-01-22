@@ -10,6 +10,7 @@ SUITE_EXTERN(stats_suite);
 SUITE_EXTERN(alloc_suite);
 SUITE_EXTERN(alloc_context_suite);
 SUITE_EXTERN(globals_suite);
+SUITE_EXTERN(sparse_page_data_suite);
 
 GREATEST_MAIN_DEFS();
 
@@ -28,6 +29,7 @@ int main(int argc, char **argv)
     RUN_SUITE(alloc_suite);
     RUN_SUITE(alloc_context_suite);
     RUN_SUITE(globals_suite);
+    RUN_SUITE(sparse_page_data_suite);
 
     GREATEST_MAIN_END(); /* display results */
 }

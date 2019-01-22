@@ -28,7 +28,7 @@ fi
 
 C_DIRS="lucet-runtime-c lucet-backtrace tests"
 C_FILES=$(find ${C_DIRS} -type f \( -name '*.h' -or -name '*.c' \) -and -not \( -name 'greatest.h' -or -path '*/target/*' \) -print)
-RUST_DIRS=$(find lucet-analyze lucet-idl lucet-libc-rs lucet-rs lucet-spectest lucetc -type f -name 'Cargo.toml' -print)
+RUST_DIRS=$(find lucet-analyze lucet-idl lucet-libc-rs lucet-rs lucet-spectest lucetc lucet-runtime -type f -name 'Cargo.toml' -print)
 
 if [[ $ARG == "check" ]]; then
 	for C_FILE in ${C_FILES}; do

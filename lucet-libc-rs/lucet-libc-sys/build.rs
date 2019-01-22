@@ -29,7 +29,9 @@ fn main() {
 
     println!("cargo:rustc-link-lib=dylib=lucet_libc");
 
-    liblucet_runtime_dependency();
+    if env::var("CARGO_FEATURE_LUCET_RUNTIME_C").is_ok() {
+        liblucet_runtime_dependency();
+    }
 
     let mut lucet_libc_include_dir = lucet_libc_base_dir.clone();
     lucet_libc_include_dir.push("src");

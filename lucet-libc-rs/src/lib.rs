@@ -1,3 +1,5 @@
+pub use lucet_libc_sys::lucet_libc;
+
 use lucet_libc_sys::*;
 use std::ffi::CStr;
 
@@ -5,6 +7,13 @@ use std::ffi::CStr;
 pub struct LucetLibc {
     libc: lucet_libc,
 }
+
+type StdioHandler = extern "C" fn(
+    libc: *mut lucet_libc,
+    fd: libc::c_int,
+    str_ptr: *const libc::c_char,
+    str_len: libc::size_t,
+);
 
 /// the stdio_handler is not supported right now, because nothing will burn to the ground without
 /// it. support will have to be added at some point.
@@ -37,6 +46,12 @@ impl LucetLibc {
                 Some(TerminationReason::InvalidAddress(rstr.to_owned()))
             }
             _ => panic!("invalid lucet_libc.term_reason"),
+        }
+    }
+
+    pub fn set_stdio_handler(&mut self, handler: StdioHandler) {
+        unsafe {
+            lucet_libc_set_stdio_handler(&mut self.libc as *mut lucet_libc, Some(handler));
         }
     }
 }

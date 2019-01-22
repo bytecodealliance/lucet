@@ -5,6 +5,7 @@ use std::env;
 use std::fs::File;
 use std::io::Cursor;
 use std::io::Read;
+use std::mem::size_of;
 
 #[derive(Debug)]
 struct ArtifactSummary<'a> {
@@ -14,6 +15,7 @@ struct ArtifactSummary<'a> {
     heap_spec: Option<HeapSpec>,
     globals_spec: Option<GlobalsSpec>,
     data_segments: Option<DataSegments>,
+    sparse_page_data: Option<SparsePageData>,
     trap_manifest: Option<TrapManifest>,
     exported_functions: Vec<&'a str>,
     imported_symbols: Vec<&'a str>,
@@ -27,6 +29,7 @@ struct StandardSymbols {
     wasm_data_segments_len: Option<elf::sym::Sym>,
     lucet_heap_spec: Option<elf::sym::Sym>,
     lucet_globals_spec: Option<elf::sym::Sym>,
+    guest_sparse_page_data: Option<elf::sym::Sym>,
 }
 
 #[derive(Debug)]
@@ -62,6 +65,11 @@ struct DataSegment {
 }
 
 #[derive(Debug)]
+struct SparsePageData {
+    pages: Vec<*const u8>,
+}
+
+#[derive(Debug)]
 struct HeapSpec {
     reserved_size: u64,
     guard_size: u64,
@@ -86,10 +94,12 @@ impl<'a> ArtifactSummary<'a> {
                 wasm_data_segments_len: None,
                 lucet_heap_spec: None,
                 lucet_globals_spec: None,
+                guest_sparse_page_data: None,
             },
             heap_spec: None,
             globals_spec: None,
             data_segments: None,
+            sparse_page_data: None,
             trap_manifest: None,
             exported_functions: Vec::new(),
             imported_symbols: Vec::new(),
@@ -143,6 +153,7 @@ impl<'a> ArtifactSummary<'a> {
                 "wasm_data_segments_len" => self.symbols.wasm_data_segments_len = Some(sym.clone()),
                 "lucet_heap_spec" => self.symbols.lucet_heap_spec = Some(sym.clone()),
                 "lucet_globals_spec" => self.symbols.lucet_globals_spec = Some(sym.clone()),
+                "guest_sparse_page_data" => self.symbols.guest_sparse_page_data = Some(sym.clone()),
                 _ => {
                     if sym.st_bind() == elf::sym::STB_GLOBAL {
                         if sym.is_function() {
@@ -159,6 +170,7 @@ impl<'a> ArtifactSummary<'a> {
         self.globals_spec = self.parse_globals_spec();
         self.data_segments = self.parse_data_segments();
         self.trap_manifest = self.parse_trap_manifest();
+        self.sparse_page_data = self.parse_sparse_page_data();
     }
 
     fn parse_heap_spec(&self) -> Option<HeapSpec> {
@@ -251,6 +263,30 @@ impl<'a> ArtifactSummary<'a> {
                 Some(data_segments)
             } else {
                 None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn parse_sparse_page_data(&self) -> Option<SparsePageData> {
+        if let Some(ref sparse_sym) = self.symbols.guest_sparse_page_data {
+            let mut sparse_page_data = SparsePageData { pages: Vec::new() };
+            let buffer = self
+                .read_memory(sparse_sym.st_value, sparse_sym.st_size)
+                .unwrap();
+            let buffer_len = buffer.len();
+            let mut rdr = Cursor::new(buffer);
+            let num_pages = rdr.read_u64::<LittleEndian>().unwrap();
+            if buffer_len != size_of::<u64>() + num_pages as usize * size_of::<u64>() {
+                eprintln!("size of sparse page data doesn't match the number of pages specified");
+                None
+            } else {
+                for _ in 0..num_pages {
+                    let ptr = rdr.read_u64::<LittleEndian>().unwrap() as *const u8;
+                    sparse_page_data.pages.push(ptr);
+                }
+                Some(sparse_page_data)
             }
         } else {
             None
@@ -389,6 +425,11 @@ fn print_summary(summary: ArtifactSummary) {
     );
     println!(
         "  {:25}: {}",
+        "guest_sparse_page_data",
+        exists_to_str(&summary.symbols.guest_sparse_page_data)
+    );
+    println!(
+        "  {:25}: {}",
         "lucet_heap_spec",
         exists_to_str(&summary.symbols.lucet_heap_spec)
     );
@@ -442,6 +483,26 @@ fn print_summary(summary: ArtifactSummary) {
                 "  {:7}: {:6}  {:6}: {:6}",
                 "Offset", segment.offset, "Length", segment.len,
             );
+        }
+    } else {
+        println!("  {}", "MISSING!".red().bold());
+    }
+
+    println!("");
+    println!("Sparse page data:");
+    if let Some(sparse_page_data) = summary.sparse_page_data {
+        println!("  {:6}: {}", "Count", sparse_page_data.pages.len());
+        let mut allempty = true;
+        for (i, page) in sparse_page_data.pages.iter().enumerate() {
+            if !page.is_null() {
+                allempty = false;
+                println!("  Page[{}]: {:p}", i, *page);
+            }
+        }
+        if allempty {
+            println!("  (all pages empty)");
+        } else {
+            println!("  (empty pages omitted)");
         }
     } else {
         println!("  {}", "MISSING!".red().bold());

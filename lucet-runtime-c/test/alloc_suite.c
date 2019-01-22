@@ -683,7 +683,7 @@ TEST initial_empty_expand_heap_once(void)
 
 struct lucet_alloc_heap_spec h_initial_empty_guardless_heap = {
     .reserved_size  = SPEC_HEAP_RESERVED_SIZE,
-    .guard_size     = SPEC_HEAP_GUARD_SIZE,
+    .guard_size     = 0,
     .initial_size   = 0,
     .max_size       = 0,
     .max_size_valid = 0,

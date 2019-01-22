@@ -26,4 +26,6 @@
     const char     wasm_data_segments[]   = "\00\00\00\00"; \
     const uint32_t wasm_data_segments_len = sizeof(wasm_data_segments)
 
+#define DEFINE_DEFAULT_SPARSE_PAGE_DATA const uint64_t guest_sparse_page_data[] = { 0 };
+
 #endif

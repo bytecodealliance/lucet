@@ -15,9 +15,10 @@ guests: $(FEATURES_GUESTS)
 guests: $(ENTRYPOINT_GUESTS)
 guests: $(STATS_GUESTS)
 guests: $(GLOBALS_GUESTS)
+guests: $(SPARSE_PAGE_DATA_GUESTS)
 
 check: guests build/lucet_test
-	./build/lucet_test
+	./build/lucet_test -x sparse_data
 
 %.so: %.o
 	$(CC) -shared $< -o $@
@@ -44,6 +45,10 @@ build/entrypoints/%.o: entrypoints/%.c
 build/stats/%.o: stats/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -I$(LIBLUCET_RUNTIME_C)/include --std=gnu99 -c $< -o $@
+
+build/sparse_page_data/%.o: sparse_page_data/%.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -I$(LIBLUCET_RUNTIME_C)/include  -c $< -o $@
 
 build/%.o: %.c
 	@mkdir -p $(@D)

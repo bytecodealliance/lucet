@@ -2,6 +2,7 @@
 .PHONY: build
 build:
 	cd lucetc && cargo build
+	make -C lucet-runtime
 	make -C lucet-runtime-c
 	make -C lucet-backtrace
 	make -C lucet-libc
@@ -18,6 +19,7 @@ build-test-deps:
 
 .PHONY: test
 test: build-test-deps
+	make -C lucet-runtime test
 	make -C lucet-runtime-c test
 	make -C lucet-backtrace test
 	make -C lucet-rs test
@@ -35,6 +37,7 @@ bench:
 clean:
 	rm -rf lucetc/target
 	rm -rf lucet-idl/target
+	make -C lucet-runtime clean
 	make -C lucet-runtime-c clean
 	make -C lucet-backtrace clean
 	make -C lucet-rs clean
