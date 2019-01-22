@@ -7,3 +7,6 @@
 [submodule "lucet-libc/src/compiler-rt"]
 	path = lucet-libc/src/compiler-rt
 	url = https://github.com/llvm-mirror/compiler-rt
+[submodule "lucet-libc/src/musl"]
+	path = lucet-libc/src/musl
+	url = git://git.musl-libc.org/musl
