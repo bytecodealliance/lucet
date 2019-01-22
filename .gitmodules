@@ -4,3 +4,6 @@
 [submodule "faerie"]
 	path = faerie
 	url = https://github.com/m4b/faerie
+[submodule "lucet-libc/src/compiler-rt"]
+	path = lucet-libc/src/compiler-rt
+	url = https://github.com/llvm-mirror/compiler-rt
