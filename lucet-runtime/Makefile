@@ -6,6 +6,7 @@ default: build
 LIBLUCET_RUNTIME_C:=../lucet-runtime-c
 .PHONY: $(LIBLUCET_RUNTIME_C)
 $(LIBLUCET_RUNTIME_C):
+	make -C $(LIBLUCET_RUNTIME_C)
 	make -C $(LIBLUCET_RUNTIME_C)/test guests
 
 LUCET_TESTS:=../tests
@@ -22,3 +23,7 @@ build:
 .PHONY: test
 test: build $(TEST_DEPS)
 	cargo test
+
+.PHONY: clean
+clean:
+	cargo clean
