@@ -1,0 +1,13 @@
+dist: xenial
+
+services:
+  - docker
+
+before_install:
+  - ./devenv_build_container
+
+script:
+  - ./devenv_run make test
+
+notifications:
+  email: false
