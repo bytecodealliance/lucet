@@ -1,6 +1,8 @@
 [package]
 name = "lucet-analyze"
 version = "0.1.0"
+description = "Analyze binaries emitted by lucetc"
+repository = "https://github.com/fastly/lucet"
 authors = ["tyler <tyler@fastly.com>"]
 license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"

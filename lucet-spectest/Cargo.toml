@@ -1,6 +1,8 @@
 [package]
 name = "lucet-spectest"
 version = "0.1.0"
+description = "Test harness to run WebAssembly spec tests (.wast) against the Lucet toolchain"
+repository = "https://github.com/fastly/lucet"
 authors = ["Pat Hickey <phickey@fastly.com>"]
 license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"
