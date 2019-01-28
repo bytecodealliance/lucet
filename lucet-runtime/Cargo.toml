@@ -2,6 +2,7 @@
 name = "lucet-runtime"
 version = "0.1.0"
 authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
+license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"
 
 [dependencies]

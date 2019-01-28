@@ -1,5 +1,8 @@
 [package]
 name = "lucet-libc-sys"
+description = "Bindgen-generated bindings to lucet-libc C library"
+authors = ["Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>", "Adam C. Foltzer <acfoltzer@fastly.com>"]
+license = "Apache-2.0 WITH LLVM-exception"
 version = "0.1.0"
 edition = "2018"
 
