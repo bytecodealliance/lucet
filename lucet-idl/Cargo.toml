@@ -1,8 +1,10 @@
 [package]
 name = "lucet-idl"
 version = "0.1.0"
-authors = ["Pat Hickey <phickey@fastly.com>"]
-repository = "https://github.com/fastly/isolation"
+description = "Describe interfaces between WebAssembly guest programs and lucet-runtime hosts"
+authors = ["Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>"]
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"
 
 [lib]
