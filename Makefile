@@ -43,6 +43,10 @@ clean:
 	make -C lucet-rs clean
 	make -C lucet-libc-rs clean
 	make -C tests clean
+	cd lucetc && cargo clean
+	cd lucet-idl && cargo clean
+	cd lucet-analyze && cargo clean
+	cd lucet-spectest && cargo clean
 
 .PHONY: indent
 indent:

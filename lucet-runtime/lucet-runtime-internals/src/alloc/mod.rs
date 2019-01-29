@@ -83,7 +83,6 @@ pub struct Slot {
     pub region: Weak<dyn Region>,
 }
 
-#[cfg(test)]
 impl Slot {
     pub fn stack_top(&self) -> *mut c_void {
         (self.stack as usize + self.limits.stack_size) as *mut c_void
@@ -304,6 +303,4 @@ impl Limits {
     }
 }
 
-#[macro_use]
-#[cfg(test)]
 pub mod tests;

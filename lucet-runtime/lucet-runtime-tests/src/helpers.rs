@@ -1,6 +1,6 @@
 use failure::Error;
 use lazy_static::lazy_static;
-use lucet_runtime::module::DlModule;
+use lucet_runtime_internals::module::DlModule;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
