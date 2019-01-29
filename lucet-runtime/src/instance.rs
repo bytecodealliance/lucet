@@ -24,8 +24,8 @@ use std::mem;
 use std::ptr::{self, NonNull};
 use std::sync::Mutex;
 
-pub(crate) const LUCET_INSTANCE_MAGIC: u64 = 746932922;
-pub(crate) const INSTANCE_PADDING: usize = 2296;
+pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
+pub const INSTANCE_PADDING: usize = 2296;
 
 pub const WASM_PAGE_SIZE: u32 = 64 * 1024;
 
@@ -56,7 +56,7 @@ pub struct InstanceHandle {
 }
 
 impl InstanceHandle {
-    pub(crate) fn new(
+    pub fn new(
         instance: *mut Instance,
         module: Box<dyn Module>,
         alloc: Alloc,
@@ -120,13 +120,13 @@ impl Drop for InstanceHandle {
 #[repr(C)]
 pub struct Instance {
     /// Used to catch bugs in pointer math used to find the address of the instance
-    pub(crate) magic: u64,
+    pub magic: u64,
 
     /// The embedding context is a pointer from the embedder that is used to implement hostcalls
     pub embed_ctx: *mut c_void,
 
     /// The program (WebAssembly module) that is the entrypoint for the instance.
-    pub(crate) module: Box<dyn Module>,
+    pub module: Box<dyn Module>,
 
     /// The `Context` in which the guest program runs
     ctx: Context,
@@ -135,7 +135,7 @@ pub struct Instance {
     pub state: State,
 
     /// The memory allocated for this instance
-    pub(crate) alloc: Alloc,
+    pub alloc: Alloc,
 
     /// Handler for when the instance exits in a fatal state
     pub fatal_handler: fn(&Instance) -> !,
@@ -159,7 +159,7 @@ pub struct Instance {
     ///
     /// This is accessed through the `vmctx` pointer, which points to the heap that begins
     /// immediately after this struct, so it has to come at the very end.
-    pub(crate) globals_ptr: *const i64,
+    pub globals_ptr: *const i64,
 }
 
 impl Instance {
@@ -185,7 +185,7 @@ impl Instance {
     /// Get an Instance from the `vmctx` pointer.
     ///
     /// Only safe to call from within the guest context.
-    pub(crate) unsafe fn from_vmctx<'a>(vmctx: *const c_void) -> &'a mut Instance {
+    pub unsafe fn from_vmctx<'a>(vmctx: *const c_void) -> &'a mut Instance {
         assert!(!vmctx.is_null(), "vmctx is not null");
 
         let inst_ptr = (vmctx as usize - instance_heap_offset()) as *mut Instance;
@@ -213,7 +213,7 @@ impl Instance {
         inst
     }
 
-    pub(crate) fn valid_magic(&self) -> bool {
+    pub fn valid_magic(&self) -> bool {
         self.magic == LUCET_INSTANCE_MAGIC
     }
 
@@ -396,7 +396,7 @@ impl Instance {
     }
 
     // must only be called from within the guest context
-    pub(crate) unsafe fn terminate(&mut self, info: *mut c_void) -> ! {
+    pub unsafe fn terminate(&mut self, info: *mut c_void) -> ! {
         self.state = State::Terminated { info };
         HOST_CTX.with(|host_ctx| Context::set(&*host_ctx.get()))
     }
@@ -702,7 +702,7 @@ impl std::fmt::Display for TrapCode {
 }
 
 impl TrapCode {
-    pub(crate) fn try_from_u32(trapcode_bin: u32) -> Option<TrapCode> {
+    pub fn try_from_u32(trapcode_bin: u32) -> Option<TrapCode> {
         let trapcode_type = (trapcode_bin & 0x0000FFFF) as u16;
         TrapCodeType::from_u16(trapcode_type).map(|ty| {
             let tag = (trapcode_bin >> 16) as u16;

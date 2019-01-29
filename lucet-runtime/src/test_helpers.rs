@@ -12,7 +12,7 @@ fn guest_module_path<P: AsRef<Path>>(path: P) -> PathBuf {
 }
 
 impl DlModule {
-    pub(crate) fn load_test<P: AsRef<Path>>(so_path: P) -> Result<Self, Error> {
+    pub fn load_test<P: AsRef<Path>>(so_path: P) -> Result<Self, Error> {
         DlModule::load(guest_module_path(so_path))
     }
 }

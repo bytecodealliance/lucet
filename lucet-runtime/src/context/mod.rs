@@ -112,7 +112,7 @@ impl FpRegs {
 /// their stack, which in turn contains a pointer back to the context. If the context gets moved,
 /// that pointer becomes invalid, and the behavior of returning from that context becomes undefined.
 #[repr(C, align(64))]
-pub(crate) struct Context {
+pub struct Context {
     gpr: GpRegs,
     fpr: FpRegs,
     retvals_gp: [u64; 2],
@@ -122,7 +122,7 @@ pub(crate) struct Context {
 
 impl Context {
     /// Create an all-zeroed `Context`.
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Context {
             gpr: GpRegs::new(),
             fpr: FpRegs::new(),
@@ -158,7 +158,7 @@ impl Context {
 /// Foreign code accesses the `internal` pointer in tests, so it is important that it is the first
 /// member, and that the struct is `repr(C)`.
 #[repr(C)]
-pub(crate) struct ContextHandle {
+pub struct ContextHandle {
     internal: NonNull<Context>,
 }
 
