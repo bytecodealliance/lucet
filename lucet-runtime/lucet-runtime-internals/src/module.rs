@@ -1,12 +1,9 @@
-// temporary until the exported API is fleshed out
-#![allow(dead_code)]
-
 mod globals;
 mod sparse_page_data;
 
-use crate::instance::{TrapCode, TrapCodeType};
 use crate::module::globals::GlobalsSpec;
 use crate::probestack::{lucet_probestack, lucet_probestack_size};
+use crate::trapcode::{TrapCode, TrapCodeType};
 use failure::{bail, format_err, Error};
 use libc::{c_void, uint64_t};
 use libloading::{Library, Symbol};

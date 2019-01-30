@@ -2,8 +2,7 @@
 macro_rules! host_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
-        use lucet_runtime::instance::State;
-        use lucet_runtime::{DlModule, Limits, Region, Vmctx};
+        use lucet_runtime::{DlModule, Limits, Region, State, Vmctx};
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 

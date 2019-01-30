@@ -2,8 +2,7 @@
 macro_rules! strcmp_tests {
     ( $TestRegion:path ) => {
         use libc::{c_char, c_int, c_void, strcmp, uint64_t};
-        use lucet_runtime::instance::State;
-        use lucet_runtime::{DlModule, Limits, Region, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::{DlModule, Limits, Region, State, Val, WASM_PAGE_SIZE};
         use std::ffi::CString;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;

@@ -3,9 +3,10 @@ macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, siginfo_t, SIGSEGV};
-        use lucet_runtime::instance::{SignalBehavior, State, TrapCode, TrapCodeType};
-        use lucet_runtime::module::MockModule;
-        use lucet_runtime::{DlModule, Instance, Limits, Region, Vmctx};
+        use lucet_runtime::{
+            DlModule, Instance, Limits, Region, SignalBehavior, State, TrapCode, TrapCodeType,
+            Vmctx,
+        };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
         use nix::sys::wait::{waitpid, WaitStatus};
@@ -13,7 +14,7 @@ macro_rules! guest_fault_tests {
         use std::ptr;
         use std::sync::Mutex;
         use $TestRegion as TestRegion;
-        use $crate::helpers::{guest_module_path, test_ex, test_nonex, DlModuleExt};
+        use $crate::helpers::{guest_module_path, test_ex, test_nonex, DlModuleExt, MockModule};
 
         const TRAPS_SANDBOX_PATH: &'static str = "lucet-runtime-c/test/build/guest_faults/traps.so";
         const HOSTCALL_ERROR_SANDBOX_PATH: &'static str =

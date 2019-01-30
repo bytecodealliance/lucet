@@ -1,7 +1,4 @@
 #![allow(improper_ctypes)]
-// TODO: remove this once we have client code within this library that
-// uses these APIs
-#![allow(dead_code)]
 
 #[cfg(test)]
 mod tests;

@@ -178,8 +178,6 @@ impl Alloc {
         std::slice::from_raw_parts(self.slot().heap as *mut u64, self.heap_accessible_size / 8)
     }
 
-    // TODO: remove annotation once API stabilizes
-    #[allow(dead_code)]
     /// Return the heap as a mutable slice of 64-bit words.
     pub unsafe fn heap_u64_mut(&mut self) -> &mut [u64] {
         assert!(self.slot().heap as usize % 8 == 0, "heap is 8-byte aligned");
@@ -248,18 +246,18 @@ impl Alloc {
     }
 }
 
-/// Limits for the various memories managed by an `Alloc`.
+/// Runtime limits for the various memories that back a Lucet instance.
 ///
 /// Each value is specified in bytes, and must be evenly divisible by the host page size (4K).
 #[derive(Clone, Debug)]
 pub struct Limits {
-    /// Max size of the heap, which can be backed by real memory.
+    /// Max size of the heap, which can be backed by real memory. (default 1M)
     pub heap_memory_size: usize,
-    /// Size of total virtual memory.
+    /// Size of total virtual memory. (default 8M)
     pub heap_address_space_size: usize,
-    /// Size of the guest stack.
+    /// Size of the guest stack. (default 128K)
     pub stack_size: usize,
-    /// Size of the globals region in bytes; each global uses 8 bytes.
+    /// Size of the globals region in bytes; each global uses 8 bytes. (default 4K)
     pub globals_size: usize,
 }
 

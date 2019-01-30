@@ -3,8 +3,7 @@ macro_rules! memory_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use lucet_libc::LucetLibc;
-        use lucet_runtime::instance::State;
-        use lucet_runtime::{DlModule, Limits, Region};
+        use lucet_runtime::{DlModule, Limits, Region, State};
         use std::sync::Mutex;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;

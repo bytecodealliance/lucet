@@ -37,8 +37,7 @@
 //! values from those functions, and even access the linear memory of the guest.
 //!
 //! ```no_run
-//! use lucet_runtime::instance::State;
-//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
+//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region, State};
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
 //! let mut inst = region.new_instance(Box::new(module)).unwrap();
@@ -54,9 +53,10 @@
 //! ```
 
 pub use lucet_runtime_internals::alloc::Limits;
-pub use lucet_runtime_internals::instance::{self, Instance, WASM_PAGE_SIZE};
-pub use lucet_runtime_internals::module::{self, DlModule, Module};
+pub use lucet_runtime_internals::instance::{Instance, SignalBehavior, State, WASM_PAGE_SIZE};
+pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::Region;
+pub use lucet_runtime_internals::trapcode::{TrapCode, TrapCodeType};
 pub use lucet_runtime_internals::val::Val;
 pub use lucet_runtime_internals::vmctx::Vmctx;

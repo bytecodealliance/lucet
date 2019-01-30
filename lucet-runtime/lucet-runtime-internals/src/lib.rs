@@ -15,5 +15,6 @@ pub mod instance;
 pub mod module;
 pub mod probestack;
 pub mod region;
+pub mod trapcode;
 pub mod val;
 pub mod vmctx;

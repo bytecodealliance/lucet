@@ -1,28 +1,20 @@
-// temporary until the exported API is fleshed out
-#![allow(dead_code)]
-
 mod siginfo_ext;
-mod signals;
+pub mod signals;
+
+pub use crate::instance::signals::{signal_handler_none, SignalBehavior};
 
 use crate::alloc::{instance_heap_offset, Alloc};
 use crate::context::Context;
 use crate::instance::siginfo_ext::SiginfoExt;
-use crate::instance::signals::{sigaltstack, SigStack, SigStackFlags};
 use crate::module::{self, Module};
+use crate::trapcode::{TrapCode, TrapCodeType};
 use crate::val::{UntypedRetVal, Val};
 use failure::{bail, ensure, format_err, Error, ResultExt};
-use lazy_static::lazy_static;
-use libc::{c_int, c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
-use nix::sys::signal::{
-    pthread_sigmask, raise, sigaction, SaFlags, SigAction, SigHandler, SigSet, SigmaskHow, Signal,
-};
-use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
+use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
 use std::cell::{RefCell, UnsafeCell};
 use std::ffi::{CStr, CString};
 use std::mem;
 use std::ptr::{self, NonNull};
-use std::sync::Mutex;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
 pub const INSTANCE_PADDING: usize = 2296;
@@ -44,11 +36,6 @@ thread_local! {
     /// runtime borrowing constraints for a `RefCell` are therefore too strict for this variable.
     static HOST_CTX: UnsafeCell<Context> = UnsafeCell::new(Context::new());
     static CURRENT_INSTANCE: RefCell<Option<NonNull<Instance>>> = RefCell::new(None);
-}
-
-lazy_static! {
-    // TODO: work out an alternative to this that is signal-safe for `reraise_host_signal_in_handler`
-    static ref LUCET_SIGNAL_STATE: Mutex<Option<SignalState>> = Mutex::new(None);
 }
 
 pub struct InstanceHandle {
@@ -291,54 +278,6 @@ impl Instance {
         Ok(&self.state)
     }
 
-    fn with_signals_on<F, R>(&mut self, f: F) -> Result<R, Error>
-    where
-        F: FnOnce(&mut Instance) -> Result<R, Error>,
-    {
-        // setup signal stack for this thread
-        let guest_sigstack = SigStack::new(
-            self.alloc.slot().sigstack,
-            SigStackFlags::empty(),
-            libc::SIGSTKSZ,
-        );
-        let saved_sigstack = unsafe { sigaltstack(&guest_sigstack).expect("sigaltstack succeeds") };
-
-        let mut ostate = LUCET_SIGNAL_STATE.lock().unwrap();
-        if let Some(ref mut state) = *ostate {
-            state.counter += 1;
-        } else {
-            unsafe {
-                setup_guest_signal_state(&mut ostate);
-            }
-        }
-        drop(ostate);
-
-        // run the body
-        let res = f(self);
-
-        let mut ostate = LUCET_SIGNAL_STATE.lock().unwrap();
-        let counter_zero = if let Some(ref mut state) = *ostate {
-            state.counter -= 1;
-            if state.counter == 0 {
-                unsafe {
-                    // restore the host signal stack
-                    sigaltstack(&saved_sigstack).expect("sigaltstack succeeds");
-                    restore_host_signal_state(state);
-                }
-                true
-            } else {
-                false
-            }
-        } else {
-            panic!("signal handlers weren't installed at instance exit");
-        };
-        if counter_zero {
-            *ostate = None;
-        }
-
-        res
-    }
-
     pub fn reset(&mut self) -> Result<(), Error> {
         self.alloc.reset_heap(self.module.as_ref())?;
         let globals = unsafe { self.alloc.globals_mut() };
@@ -441,119 +380,6 @@ impl Instance {
                 })
             }
             st => Ok(st.clone()),
-        }
-    }
-}
-
-struct SignalState {
-    counter: usize,
-    saved_sigbus: SigAction,
-    saved_sigfpe: SigAction,
-    saved_sigill: SigAction,
-    saved_sigsegv: SigAction,
-}
-
-// raw pointers in the saved types
-unsafe impl Send for SignalState {}
-
-unsafe fn setup_guest_signal_state(ostate: &mut Option<SignalState>) {
-    let mut masked_signals = SigSet::empty();
-    masked_signals.add(Signal::SIGBUS);
-    masked_signals.add(Signal::SIGFPE);
-    masked_signals.add(Signal::SIGILL);
-    masked_signals.add(Signal::SIGSEGV);
-
-    // setup signal handlers
-    let sa = SigAction::new(
-        SigHandler::SigAction(handle_signal),
-        SaFlags::SA_RESTART | SaFlags::SA_SIGINFO | SaFlags::SA_ONSTACK,
-        masked_signals,
-    );
-    let saved_sigbus = sigaction(Signal::SIGBUS, &sa).expect("sigaction succeeds");
-    let saved_sigfpe = sigaction(Signal::SIGFPE, &sa).expect("sigaction succeeds");
-    let saved_sigill = sigaction(Signal::SIGILL, &sa).expect("sigaction succeeds");
-    let saved_sigsegv = sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds");
-
-    *ostate = Some(SignalState {
-        counter: 1,
-        saved_sigbus,
-        saved_sigfpe,
-        saved_sigill,
-        saved_sigsegv,
-    });
-}
-
-unsafe fn restore_host_signal_state(state: &mut SignalState) {
-    // restore signal handlers
-    sigaction(Signal::SIGBUS, &state.saved_sigbus).expect("sigaction succeeds");
-    sigaction(Signal::SIGFPE, &state.saved_sigfpe).expect("sigaction succeeds");
-    sigaction(Signal::SIGILL, &state.saved_sigill).expect("sigaction succeeds");
-    sigaction(Signal::SIGSEGV, &state.saved_sigsegv).expect("sigaction succeeds");
-}
-
-unsafe fn reraise_host_signal_in_handler(
-    sig: Signal,
-    signum: libc::c_int,
-    siginfo_ptr: *mut libc::siginfo_t,
-    ucontext_ptr: *mut c_void,
-) {
-    let saved_handler = {
-        // TODO: avoid taking a mutex here, probably by having some static muts just for this
-        // function
-        if let Some(ref state) = *LUCET_SIGNAL_STATE.lock().unwrap() {
-            match sig {
-                Signal::SIGBUS => state.saved_sigbus.clone(),
-                Signal::SIGFPE => state.saved_sigfpe.clone(),
-                Signal::SIGILL => state.saved_sigill.clone(),
-                Signal::SIGSEGV => state.saved_sigsegv.clone(),
-                sig => panic!(
-                    "unexpected signal in reraise_host_signal_in_handler: {:?}",
-                    sig
-                ),
-            }
-        } else {
-            // this case is very fishy; it can arise when the last lucet instance spins down and
-            // uninstalls the lucet handlers while a signal handler is running on this thread, but
-            // before taking the mutex above. The theory is that if this has happened, the host
-            // handler has been reinstalled, so we shouldn't end up back here if we reraise
-
-            // unmask the signal to reraise; we don't have to restore it because the handler will return
-            // after this. If it signals again between here and now, that's a double fault and the
-            // process is going to die anyway
-            let mut unmask = SigSet::empty();
-            unmask.add(sig);
-            pthread_sigmask(SigmaskHow::SIG_UNBLOCK, Some(&unmask), None)
-                .expect("pthread_sigmask succeeds");
-            // if there's no current signal state, just re-raise and hope for the best
-            raise(sig).expect("raise succeeds");
-            return;
-        }
-    };
-
-    match saved_handler.handler() {
-        SigHandler::SigDfl => {
-            // reinstall default signal handler and reraise the signal; this should terminate the
-            // program
-            sigaction(sig, &saved_handler).expect("sigaction succeeds");
-            let mut unmask = SigSet::empty();
-            unmask.add(sig);
-            pthread_sigmask(SigmaskHow::SIG_UNBLOCK, Some(&unmask), None)
-                .expect("pthread_sigmask succeeds");
-            raise(sig).expect("raise succeeds");
-        }
-        SigHandler::SigIgn => {
-            // don't do anything; if we hit this case, whatever program is hosting us is almost
-            // certainly doing something wrong, because our set of signals requires intervention to
-            // proceed
-            return;
-        }
-        SigHandler::Handler(f) => {
-            // call the saved handler directly so there is no altstack confusion
-            f(signum)
-        }
-        SigHandler::SigAction(f) => {
-            // call the saved handler directly so there is no altstack confusion
-            f(signum, siginfo_ptr, ucontext_ptr)
         }
     }
 }
@@ -685,171 +511,8 @@ impl State {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct TrapCode {
-    pub ty: TrapCodeType,
-    pub tag: u16,
-}
-
-impl std::fmt::Display for TrapCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if self.ty == TrapCodeType::User {
-            write!(f, "{:?}({})", self.ty, self.tag)
-        } else {
-            write!(f, "{:?}", self.ty)
-        }
-    }
-}
-
-impl TrapCode {
-    pub fn try_from_u32(trapcode_bin: u32) -> Option<TrapCode> {
-        let trapcode_type = (trapcode_bin & 0x0000FFFF) as u16;
-        TrapCodeType::from_u16(trapcode_type).map(|ty| {
-            let tag = (trapcode_bin >> 16) as u16;
-            TrapCode { ty, tag }
-        })
-    }
-}
-
-#[repr(u16)]
-#[derive(Copy, Clone, Debug, FromPrimitive, PartialEq)]
-pub enum TrapCodeType {
-    StackOverflow = 0,
-    HeapOutOfBounds = 1,
-    OutOfBounds = 2,
-    IndirectCallToNull = 3,
-    BadSignature = 4,
-    IntegerOverflow = 5,
-    IntegerDivByZero = 6,
-    BadConversionToInteger = 7,
-    Interrupt = 8,
-    TableOutOfBounds = 9,
-    User = 0xFFFF,
-    Unknown = 0xFFFE,
-}
-
-pub enum SignalBehavior {
-    /// Use default behavior
-    None,
-    /// Override default behavior and cause the instance to continue
-    Continue,
-    /// Override default behavior and cause the instance to terminate
-    Terminate,
-}
-
 fn default_fatal_handler(inst: &Instance) -> ! {
     panic!("> instance {:p} had fatal error: {}", inst, inst.state);
-}
-
-fn signal_handler_none(
-    _inst: &Instance,
-    _trapcode: &TrapCode,
-    _signum: libc::c_int,
-    _siginfo_ptr: *const siginfo_t,
-    _ucontext_ptr: *const c_void,
-) -> SignalBehavior {
-    SignalBehavior::None
-}
-
-/// Signal handler installed during instance execution.
-///
-/// This function is only designed to handle signals that are the direct result of execution of a
-/// hardware instruction from the faulting WASM thread. It thus safely assumes the signal is
-/// directed specifically at this thread (i.e. not a different thread or the process as a whole).
-extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext_ptr: *mut c_void) {
-    let signal = Signal::from_c_int(signum).expect("signum is a valid signal");
-    if !(signal == Signal::SIGBUS
-        || signal == Signal::SIGSEGV
-        || signal == Signal::SIGILL
-        || signal == Signal::SIGFPE)
-    {
-        panic!("unexpected signal in guest signal handler: {:?}", signal);
-    }
-    assert!(!siginfo_ptr.is_null(), "siginfo must not be null");
-
-    // Safety: when using a SA_SIGINFO sigaction, the third argument can be cast to a `ucontext_t`
-    // pointer per the manpage
-    let ctx = unsafe {
-        (ucontext_ptr as *mut libc::ucontext_t)
-            .as_ref()
-            .expect("ucontext must not be null")
-    };
-    let rip = ctx.uc_mcontext.gregs[libc::REG_RIP as usize] as *const c_void;
-
-    let switch_to_host = CURRENT_INSTANCE.with(|current_instance| {
-        let mut current_instance = current_instance.borrow_mut();
-
-        if current_instance.is_none() {
-            // If there is no current instance, we've caught a signal raised by a thread that's not
-            // running a lucet instance. Restore the host signal handler and reraise the signal,
-            // then return if the host handler returns
-            unsafe {
-                reraise_host_signal_in_handler(signal, signum, siginfo_ptr, ucontext_ptr);
-            }
-            // don't try context-switching
-            return false;
-        }
-
-        // Safety: the memory pointed to by CURRENT_INSTANCE should be a valid instance. This is not
-        // a trivial property, but relies on the compiler not emitting guest programs that can
-        // overwrite the instance.
-        let inst = unsafe {
-            current_instance
-                .as_mut()
-                .expect("current instance exists")
-                .as_mut()
-        };
-
-        let trapcode = inst
-            .module
-            .lookup_trapcode(rip)
-            // if we couldn't find a code in the manifest, return an unknown trapcode that will be
-            // converted to a fatal trap when we switch back to the host
-            .unwrap_or(TrapCode {
-                ty: TrapCodeType::Unknown,
-                tag: 0,
-            });
-
-        let behavior = (inst.signal_handler)(inst, &trapcode, signum, siginfo_ptr, ucontext_ptr);
-        match behavior {
-            SignalBehavior::Continue => {
-                // return to the guest context without making any modifications to the instance
-                false
-            }
-            SignalBehavior::Terminate => {
-                // set the state before jumping back to the host context
-                inst.state = State::Terminated {
-                    info: ptr::null_mut(),
-                };
-                true
-            }
-            SignalBehavior::None => {
-                // record the fault and jump back to the host context
-                inst.state = State::Fault {
-                    // fatal field is set false here by default - have to wait until
-                    // `verify_trap_safety` to have enough information to determine whether trap was
-                    // fatal. It is not signal safe to access some of the required information.
-                    fatal: false,
-                    trapcode: trapcode,
-                    rip_addr: rip as usize,
-                    rip_addr_details: None,
-                    // safety: pointer is checked for null at the top of the function, and the
-                    // manpage guarantees that a siginfo_t will be passed as the second argument
-                    siginfo: unsafe { *siginfo_ptr },
-                    context: *ctx,
-                };
-                true
-            }
-        }
-    });
-
-    if switch_to_host {
-        HOST_CTX.with(|host_ctx| unsafe {
-            Context::set_from_signal(&*host_ctx.get())
-                .expect("can successfully switch back to the host context");
-        });
-        unreachable!()
-    }
 }
 
 // TODO: figure out where to put all of these
