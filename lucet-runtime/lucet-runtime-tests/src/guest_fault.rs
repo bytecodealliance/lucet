@@ -40,7 +40,6 @@ macro_rules! guest_fault_tests {
         }
 
         unsafe fn recoverable_ptr_make_accessible() {
-            use lucet_runtime::region::mmap::mprotect;
             use nix::sys::mman::ProtFlags;
 
             mprotect(
@@ -605,6 +604,15 @@ macro_rules! guest_fault_tests {
                     }
                 }
             })
+        }
+
+        // TODO: remove this once `nix` PR https://github.com/nix-rust/nix/pull/991 is merged
+        pub unsafe fn mprotect(
+            addr: *mut c_void,
+            length: libc::size_t,
+            prot: ProtFlags,
+        ) -> nix::Result<()> {
+            nix::errno::Errno::result(libc::mprotect(addr, length, prot.bits())).map(drop)
         }
     };
 }

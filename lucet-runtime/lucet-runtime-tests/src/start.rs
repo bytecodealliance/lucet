@@ -1,8 +1,7 @@
 #[macro_export]
 macro_rules! start_tests {
     ( $TestRegion:path ) => {
-        use lucet_runtime::region::Region;
-        use lucet_runtime::{DlModule, Limits};
+        use lucet_runtime::{DlModule, Limits, Region};
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 

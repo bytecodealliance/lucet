@@ -1,3 +1,3 @@
 use lucet_runtime_tests::guest_fault_tests;
 
-guest_fault_tests!(lucet_runtime::region::mmap::MmapRegion);
+guest_fault_tests!(lucet_runtime::MmapRegion);

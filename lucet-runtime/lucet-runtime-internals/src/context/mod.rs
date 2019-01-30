@@ -241,14 +241,16 @@ impl Context {
     /// void entrypoint(uint64_t x, float y);
     /// ```
     ///
-    /// ```ignore
+    /// ```no_run
+    /// # use lucet_runtime_internals::context::Context;
+    /// # use lucet_runtime_internals::val::Val;
     /// extern "C" { fn entrypoint(x: u64, y: f32); }
     /// // allocating an even number of `u64`s seems to reliably yield
     /// // properly aligned stacks, but TODO do better
     /// let mut stack = vec![0u64; 1024].into_boxed_slice();
     /// let mut parent = Context::new();
     /// let mut child = Context::new();
-    /// let res = init(
+    /// let res = Context::init(
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
@@ -264,14 +266,16 @@ impl Context {
     /// first swapped to. Note that we mark `entrypoint` as `extern "C"` to make sure it is compiled
     /// with C calling conventions.
     ///
-    /// ```ignore
+    /// ```no_run
+    /// # use lucet_runtime_internals::context::{Context, ContextHandle};
+    /// # use lucet_runtime_internals::val::Val;
     /// extern "C" fn entrypoint(x: u64, y: f32) { }
     /// // allocating an even number of `u64`s seems to reliably yield
     /// // properly aligned stacks, but TODO do better
     /// let mut stack = vec![0u64; 1024].into_boxed_slice();
     /// let mut parent = ContextHandle::new();
     /// let mut child = Context::new();
-    /// let res = init(
+    /// let res = Context::init(
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
@@ -405,7 +409,8 @@ impl Context {
     /// If `from` is never returned to, `swap`ped to, or `set` to, resources could leak due to
     /// implicit `drop`s never being called:
     ///
-    /// ```ignore
+    /// ```no_run
+    /// # use lucet_runtime_internals::context::Context;
     /// fn f(x: Box<u64>, child: &Context) {
     ///     let mut xs = vec![187; 410757864530];
     ///     xs[0] += *x;
@@ -425,7 +430,10 @@ impl Context {
     /// The typical case is to initialize a new child context, and then swap to it from a zeroed
     /// parent context.
     ///
-    /// ```ignore
+    /// ```no_run
+    /// # use lucet_runtime_internals::context::Context;
+    /// # extern "C" fn entrypoint() {}
+    /// # let mut stack = vec![0u64; 1024].into_boxed_slice();
     /// let mut parent = Context::new();
     /// let mut child = Context::new();
     /// Context::init(
@@ -433,7 +441,7 @@ impl Context {
     ///     &mut parent,
     ///     &mut child,
     ///     entrypoint as *const extern "C" fn(),
-    ///     &args,
+    ///     &[],
     /// ).unwrap();
     ///
     /// unsafe { Context::swap(&mut parent, &child); }
@@ -485,7 +493,8 @@ impl Context {
     /// any resources owned by the calling context are manually dropped. The implicit `drop`s
     /// inserted by Rust at the end of the calling scope will not be reached:
     ///
-    /// ```ignore
+    /// ```no_run
+    /// # use lucet_runtime_internals::context::Context;
     /// fn f(x: Box<u64>, child: &Context) {
     ///     let mut xs = vec![187; 410757864530];
     ///     xs[0] += *x;

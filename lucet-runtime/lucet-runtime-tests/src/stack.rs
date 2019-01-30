@@ -2,8 +2,7 @@
 macro_rules! stack_tests {
     ( $TestRegion:path ) => {
         use lucet_runtime::instance::{InstanceHandle, State, TrapCodeType};
-        use lucet_runtime::region::Region;
-        use lucet_runtime::{DlModule, Limits, Val};
+        use lucet_runtime::{DlModule, Limits, Region, Val};
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 

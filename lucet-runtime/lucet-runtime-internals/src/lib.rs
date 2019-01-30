@@ -17,10 +17,3 @@ pub mod probestack;
 pub mod region;
 pub mod val;
 pub mod vmctx;
-
-pub use crate::alloc::Limits;
-pub use crate::instance::{Instance, WASM_PAGE_SIZE};
-pub use crate::module::{DlModule, Module};
-pub use crate::region::Region;
-pub use crate::val::Val;
-pub use crate::vmctx::Vmctx;
