@@ -1,3 +1,4 @@
 .devenv_container_id
-**/target/
-**/*.rs.bk
+target/
+*.rs.bk
+*.pyc

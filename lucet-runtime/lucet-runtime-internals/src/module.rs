@@ -42,13 +42,13 @@ impl TrapManifestRecord {
         addr >= self.func_addr && addr <= self.func_addr + self.func_len
     }
 
-    pub(crate) fn trapsites(&self) -> &[TrapSite] {
+    pub fn trapsites(&self) -> &[TrapSite] {
         let table_addr = self.table_addr as *const TrapSite;
         assert!(!table_addr.is_null());
         unsafe { from_raw_parts(table_addr, self.table_len as usize) }
     }
 
-    pub(crate) fn lookup_addr(&self, addr: *const c_void) -> Option<TrapCode> {
+    pub fn lookup_addr(&self, addr: *const c_void) -> Option<TrapCode> {
         if !self.contains_addr(addr) {
             return None;
         }
@@ -70,13 +70,13 @@ impl TrapManifestRecord {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct TrapSite {
+pub struct TrapSite {
     offset: u32,
     trapcode: u32,
 }
 
 #[repr(C)]
-pub(crate) struct SparsePageData {
+pub struct SparsePageData {
     num_pages: u64,
     pages: *const c_void,
 }

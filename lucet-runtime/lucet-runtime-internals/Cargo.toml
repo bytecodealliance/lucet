@@ -1,0 +1,26 @@
+[package]
+name = "lucet-runtime-internals"
+version = "0.1.0"
+authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+bitflags = "1.0"
+failure = "0.1"
+lazy_static = "1.1"
+libc = "0.2.47"
+libloading = "0.5"
+nix = "0.13"
+num-traits = "0.2"
+num-derive = "0.2"
+xfailure = "0.1"
+
+[dev-dependencies]
+byteorder = "1.2"
+# default-features = false means it doesn't link against lucet-runtime-c, but instead lets us link
+# this runtime instead
+lucet-libc = { path = "../../lucet-libc-rs", default-features = false }
+memoffset = "0.2"
+
+[build-dependencies]
+cc = "1.0"

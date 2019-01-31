@@ -90,7 +90,7 @@ pub enum RegVal {
 impl Val {
     /// Convert a `Val` to its representation when stored in an
     /// argument register.
-    pub(crate) fn to_reg(&self) -> RegVal {
+    pub fn to_reg(&self) -> RegVal {
         use self::RegVal::*;
         use self::Val::*;
         match *self {
@@ -125,7 +125,7 @@ impl Val {
 
     /// Convert a `Val` to its representation when spilled onto the
     /// stack.
-    pub(crate) fn to_stack(&self) -> u64 {
+    pub fn to_stack(&self) -> u64 {
         use self::Val::*;
         match *self {
             CPtr(v) => v as u64,
@@ -166,7 +166,7 @@ pub struct UntypedRetVal {
 }
 
 impl UntypedRetVal {
-    pub(crate) fn new(gp: u64, fp: __m128) -> UntypedRetVal {
+    pub fn new(gp: u64, fp: __m128) -> UntypedRetVal {
         UntypedRetVal { gp, fp }
     }
 }

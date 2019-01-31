@@ -1,0 +1,10 @@
+[package]
+name = "lucet-runtime-tests"
+version = "0.1.0"
+authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+failure = "0.1"
+lazy_static = "1.1"
+lucet-runtime-internals = { path = "../lucet-runtime-internals" }

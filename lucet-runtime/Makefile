@@ -19,11 +19,17 @@ TEST_DEPS:= $(LIBLUCET_RUNTIME_C) $(LUCET_TESTS)
 .PHONY: build
 build:
 	cargo build
+	cd lucet-runtime-internals && cargo build
+	cd lucet-runtime-tests && cargo build
 
 .PHONY: test
 test: build $(TEST_DEPS)
 	cargo test
+	cd lucet-runtime-internals && cargo test
+	cd lucet-runtime-tests && cargo test
 
 .PHONY: clean
 clean:
 	cargo clean
+	cd lucet-runtime-internals && cargo clean
+	cd lucet-runtime-tests && cargo clean

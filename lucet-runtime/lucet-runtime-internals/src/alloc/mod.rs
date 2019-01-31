@@ -12,7 +12,7 @@ static HOST_PAGE_SIZE_INIT: Once = Once::new();
 /// Our host is Linux x86_64, which should always use a 4K page.
 ///
 /// We double check the expected value using `sysconf` at runtime.
-pub(crate) fn host_page_size() -> usize {
+pub fn host_page_size() -> usize {
     unsafe {
         HOST_PAGE_SIZE_INIT.call_once(|| match sysconf(SysconfVar::PAGE_SIZE) {
             Ok(Some(sz)) => {
@@ -31,7 +31,7 @@ pub(crate) fn host_page_size() -> usize {
     }
 }
 
-pub(crate) fn instance_heap_offset() -> usize {
+pub fn instance_heap_offset() -> usize {
     1 * host_page_size()
 }
 
@@ -51,41 +51,40 @@ pub struct Slot {
     ///
     /// The first part of this memory, pointed to by `start`, is always backed by real memory, and
     /// is used to store the lucet_instance structure.
-    pub(crate) start: *mut c_void,
+    pub start: *mut c_void,
 
     /// The next part of memory contains the heap and its guard pages.
     ///
     /// The heap is backed by real memory according to the `HeapSpec`. Guard pages trigger a sigsegv
     /// when accessed.
-    pub(crate) heap: *mut c_void,
+    pub heap: *mut c_void,
 
     /// The stack comes after the heap.
     ///
     /// Because the stack grows downwards, we get the added safety of ensuring that stack overflows
     /// go into the guard pages, if the `Limits` specify guard pages. The stack is always the size
     /// given by `Limits.stack_pages`.
-    pub(crate) stack: *mut c_void,
+    pub stack: *mut c_void,
 
     /// The WebAssembly Globals follow the stack and a single guard page.
-    pub(crate) globals: *mut c_void,
+    pub globals: *mut c_void,
 
     /// The signal handler stack follows the globals.
     ///
     /// Having a separate signal handler stack allows the signal handler to run in situations where
     /// the normal stack has grown into the guard page.
-    pub(crate) sigstack: *mut c_void,
+    pub sigstack: *mut c_void,
 
     /// Limits of the memory.
     ///
     /// Should not change through the lifetime of the `Alloc`.
-    pub(crate) limits: Limits,
+    pub limits: Limits,
 
-    pub(crate) region: Weak<dyn Region>,
+    pub region: Weak<dyn Region>,
 }
 
-#[cfg(test)]
 impl Slot {
-    pub(crate) fn stack_top(&self) -> *mut c_void {
+    pub fn stack_top(&self) -> *mut c_void {
         (self.stack as usize + self.limits.stack_size) as *mut c_void
     }
 }
@@ -95,11 +94,11 @@ impl Slot {
 /// `Alloc`s are not to be created directly, but rather are created by `Region`s during instance
 /// creation.
 pub struct Alloc {
-    pub(crate) heap_accessible_size: usize,
-    pub(crate) heap_inaccessible_size: usize,
-    pub(crate) runtime_spec: RuntimeSpec,
-    pub(crate) slot: Option<Slot>,
-    pub(crate) region: Arc<dyn Region>,
+    pub heap_accessible_size: usize,
+    pub heap_inaccessible_size: usize,
+    pub runtime_spec: RuntimeSpec,
+    pub slot: Option<Slot>,
+    pub region: Arc<dyn Region>,
 }
 
 impl Drop for Alloc {
@@ -110,7 +109,7 @@ impl Drop for Alloc {
 }
 
 impl Alloc {
-    pub(crate) fn addr_in_heap_guard(&self, addr: *const c_void) -> bool {
+    pub fn addr_in_heap_guard(&self, addr: *const c_void) -> bool {
         let heap = self.slot().heap as usize;
         let guard_start = heap + self.heap_accessible_size;
         let guard_end = heap + self.slot().limits.heap_address_space_size;
@@ -133,7 +132,7 @@ impl Alloc {
         self.heap_accessible_size
     }
 
-    pub(crate) fn slot(&self) -> &Slot {
+    pub fn slot(&self) -> &Slot {
         self.slot
             .as_ref()
             .expect("alloc missing its slot before drop")
@@ -276,7 +275,7 @@ impl Default for Limits {
 }
 
 impl Limits {
-    pub(crate) fn total_memory_size(&self) -> usize {
+    pub fn total_memory_size(&self) -> usize {
         // Memory is laid out as follows:
         // * the instance (up to instance_heap_offset)
         // * the heap, followed by guard pages
@@ -304,6 +303,4 @@ impl Limits {
     }
 }
 
-#[macro_use]
-#[cfg(test)]
-pub(crate) mod tests;
+pub mod tests;

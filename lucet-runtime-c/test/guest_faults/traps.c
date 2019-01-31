@@ -57,13 +57,13 @@ void guest_func_oob(struct lucet_vmctx *ctx)
 void guest_func_fatal(void *ctx)
 {
     char *heap = lucet_vmctx_get_heap(ctx);
-    // According to lucet_heap_spec above, the initial and max size of this
-    // guest's heap is 64k, with a 4m guard size. After the guard there will
-    // be no globals, and then a stack (not specified above).
-    // Empirically, at the 4m + 128k point, memory is unmapped. This may change
-    // as the library, test configuration, linker, phase of moon, etc change,
-    // but for now it works.
-    heap[(4 * 1024 * 1024) + (128 * 1024)] = '\0';
+    // According to lucet_heap_spec above, the initial and max size of this guest's heap is 64k,
+    // with a 4m guard size. After the guard there will be no globals, and then a stack (not
+    // specified above, but defaults to 128k). So each concurrent instance takes up ~4m + 192k. We
+    // want to access a point beyond all the instances, so that memory is unmapped. We assume no
+    // more than 16 instances are mapped concurrently. This may change as the library, test
+    // configuration, linker, phase of moon, etc change, but for now it works.
+    heap[((4 * 1024 * 1024) + (192 * 1024)) * 16] = '\0';
 }
 
 extern char *guest_recoverable_get_ptr(void);
