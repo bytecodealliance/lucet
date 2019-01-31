@@ -38,6 +38,7 @@
 //!
 //! ```no_run
 //! use lucet_runtime::{DlModule, Limits, MmapRegion, Region, State};
+//!
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
 //! let mut inst = region.new_instance(Box::new(module)).unwrap();
@@ -51,9 +52,106 @@
 //!     _ => panic!("unexpected final state: {}", inst.state),
 //! }
 //! ```
+//!
+//! ## Embedding With Hostcalls
+//!
+//! A "hostcall" is a function called by WebAssembly that is not defined in WebAssembly. Since
+//! WebAssembly is such a minimal language, hostcalls are required for Lucet programs to do anything
+//! interesting with the outside world. For example, in Fastly's [Terrarium
+//! demo](https://wasm.fastly-labs.com/), hostcalls are provided for manipulating HTTP requests,
+//! accessing a key/value store, etc.
+//!
+//! Some simple hostcalls can be implemented simply as an exported C function that takes an opaque
+//! pointer argument (usually called `vmctx`). Hostcalls that require access to some underlying
+//! state, such as the key/value store in Terrarium, can access a custom embedder context through
+//! `vmctx`. For example, `lucet-libc` uses the embedder context to keep track of stdio and
+//! termination info.
+//!
+//! ```no_run
+//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
+//! use lucet_libc::LucetLibc;
+//!
+//! let module = DlModule::load("/my/lucet/module.so").unwrap();
+//! let region = MmapRegion::create(1, &Limits::default()).unwrap();
+//! let mut libc = Box::new(LucetLibc::new());
+//! let mut inst = region
+//!     .new_instance_with_ctx(Box::new(module), Box::into_raw(libc) as *mut libc::c_void)
+//!     .unwrap();
+//!
+//! inst.run(b"main", &[]).unwrap();
+//! ```
+//!
+//! ## Custom Signal Handlers
+//!
+//! Since Lucet programs are run as native machine code, signals such as `SIGSEGV` and `SIGFPE` can
+//! arise during execution. Rather than letting these signals bring down the entire process, the
+//! Lucet runtime installs alternate signal handlers that limit the effects to just the instance
+//! that raised the signal.
+//!
+//! By default, the signal handler sets the instance state to `State::Fault` and returns early from
+//! the call to `Instance::run()`. You can, however, implement custom error recovery and logging
+//! behavior by defining new signal handlers on a per-instance basis. For example, the following
+//! signal handler increments a counter of signals it has seen before setting the fault state:
+//!
+//! ```no_run
+//! use lucet_runtime::{
+//!     DlModule, Instance, Limits, MmapRegion, Region, SignalBehavior, State, TrapCode
+//! };
+//! use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+//!
+//! static SIGNAL_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
+//!
+//! fn signal_handler_count(
+//!     _inst: &Instance,
+//!     _trapcode: &TrapCode,
+//!     _signum: libc::c_int,
+//!     _siginfo_ptr: *const libc::siginfo_t,
+//!     _ucontext_ptr: *const libc::c_void,
+//! ) -> SignalBehavior {
+//!     SIGNAL_COUNT.fetch_add(1, Ordering::SeqCst);
+//!     SignalBehavior::Default
+//! }
+//!
+//! let module = DlModule::load("/my/lucet/module.so").unwrap();
+//! let region = MmapRegion::create(1, &Limits::default()).unwrap();
+//! let mut inst = region.new_instance(Box::new(module)).unwrap();
+//!
+//! // install the handler
+//! inst.signal_handler = signal_handler_count;
+//!
+//! inst.run(b"raise_a_signal", &[]).unwrap();
+//!
+//! match &inst.state {
+//!     State::Fault { .. } => {
+//!         println!("I've now handled {} signals!", SIGNAL_COUNT.load(Ordering::SeqCst));
+//!     }
+//!     _ => panic!("unexpected final state: {}", inst.state),
+//! }
+//! ```
+//!
+//! When implementing custom signal handlers for the Lucet runtime, the usual caveats about signal
+//! safety apply: see
+//! [`signal-safety(7)`](http://man7.org/linux/man-pages/man7/signal-safety.7.html).
+//!
+//! ## Interaction With Host Signal Handlers
+//!
+//! Great care must be taken if host application installs or otherwise modifies signal handlers
+//! anywhere in the process. Lucet installs handlers for `SIGBUS`, `SIGFPE`, `SIGILL`, and `SIGSEGV`
+//! when the first Lucet instance begins running, and restores the preëxisting handlers when the
+//! last Lucet instance terminates. During this time, other threads in the host process *must not*
+//! modify those signal handlers, since signal handlers can only be installed on a process-wide
+//! basis.
+//!
+//! Despite this limitation, Lucet is designed to compose with other signal handlers in the host
+//! program. If one of the above signals is caught by the Lucet signal handler, but that thread is
+//! not currently running a Lucet instance, the saved host signal handler is called. This means
+//! that, for example, a `SIGSEGV` on a non-Lucet thread of a host program will still likely abort
+//! the entire process.
 
 pub use lucet_runtime_internals::alloc::Limits;
-pub use lucet_runtime_internals::instance::{Instance, SignalBehavior, State, WASM_PAGE_SIZE};
+pub use lucet_runtime_internals::instance::{
+    Instance, InstanceHandle, SignalBehavior, State, WASM_PAGE_SIZE,
+};
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::Region;

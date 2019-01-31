@@ -41,6 +41,7 @@ clean:
 	make -C lucet-runtime-c clean
 	make -C lucet-backtrace clean
 	make -C lucet-rs clean
+	make -C lucet-libc clean
 	make -C lucet-libc-rs clean
 	make -C tests clean
 	cd lucetc && cargo clean

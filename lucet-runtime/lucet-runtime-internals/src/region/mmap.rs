@@ -1,5 +1,5 @@
 use crate::alloc::{host_page_size, instance_heap_offset, Alloc, Limits, Slot};
-use crate::instance::{Instance, InstanceHandle};
+use crate::instance::{new_instance_handle, Instance, InstanceHandle};
 use crate::module::Module;
 use crate::region::Region;
 use failure::{bail, format_err, Error};
@@ -91,7 +91,7 @@ impl Region for MmapRegion {
             region,
         };
 
-        let inst = InstanceHandle::new(inst_ptr, module, alloc, embed_ctx)?;
+        let inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
 
         Ok(inst)
     }

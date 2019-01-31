@@ -6,6 +6,7 @@ macro_rules! alloc_tests {
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
         use $crate::context::{Context, ContextHandle};
+        use $crate::instance::InstanceInternal;
         use $crate::module::{HeapSpec, MockModule};
         use $crate::region::Region;
         use $crate::val::Val;
@@ -57,10 +58,10 @@ macro_rules! alloc_tests {
                 .new_instance(MockModule::boxed_with_heap(&ONE_PAGE_HEAP))
                 .expect("new_instance succeeds");
 
-            let heap_len = inst.alloc.heap_len();
+            let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, ONEPAGE_INITIAL_SIZE as usize);
 
-            let heap = unsafe { inst.alloc.heap_mut() };
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
 
             assert_eq!(heap[0], 0);
             heap[0] = 0xFF;
@@ -70,7 +71,7 @@ macro_rules! alloc_tests {
             heap[heap_len - 1] = 0xFF;
             assert_eq!(heap[heap_len - 1], 0xFF);
 
-            let stack = unsafe { inst.alloc.stack_mut() };
+            let stack = unsafe { inst.alloc_mut().stack_mut() };
             assert_eq!(stack.len(), LIMITS_STACK_SIZE);
 
             assert_eq!(stack[0], 0);
@@ -94,19 +95,19 @@ macro_rules! alloc_tests {
                 .new_instance(MockModule::boxed_with_heap(heap_spec))
                 .expect("new_instance succeeds");
 
-            let heap_len = inst.alloc.heap_len();
+            let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, heap_spec.initial_size as usize);
 
             let new_heap_area = inst
-                .alloc
+                .alloc_mut()
                 .expand_heap(64 * 1024)
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
-            let new_heap_len = inst.alloc.heap_len();
+            let new_heap_len = inst.alloc().heap_len();
             assert_eq!(new_heap_len, heap_len + (64 * 1024));
 
-            let heap = unsafe { inst.alloc.heap_mut() };
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
             assert_eq!(heap[new_heap_len - 1], 0);
             heap[new_heap_len - 1] = 0xFF;
             assert_eq!(heap[new_heap_len - 1], 0xFF);
@@ -120,28 +121,28 @@ macro_rules! alloc_tests {
                 .new_instance(MockModule::boxed_with_heap(&THREE_PAGE_MAX_HEAP))
                 .expect("new_instance succeeds");
 
-            let heap_len = inst.alloc.heap_len();
+            let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
             let new_heap_area = inst
-                .alloc
+                .alloc_mut()
                 .expand_heap(64 * 1024)
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
-            let new_heap_len = inst.alloc.heap_len();
+            let new_heap_len = inst.alloc().heap_len();
             assert_eq!(new_heap_len, heap_len + (64 * 1024));
 
             let second_new_heap_area = inst
-                .alloc
+                .alloc_mut()
                 .expand_heap(64 * 1024)
                 .expect("expand_heap succeeds");
             assert_eq!(new_heap_len, second_new_heap_area as usize);
 
-            let second_new_heap_len = inst.alloc.heap_len();
+            let second_new_heap_len = inst.alloc().heap_len();
             assert_eq!(second_new_heap_len as u64, THREEPAGE_MAX_SIZE);
 
-            let heap = unsafe { inst.alloc.heap_mut() };
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
             assert_eq!(heap[new_heap_len - 1], 0);
             heap[new_heap_len - 1] = 0xFF;
             assert_eq!(heap[new_heap_len - 1], 0xFF);
@@ -157,16 +158,16 @@ macro_rules! alloc_tests {
                 .new_instance(MockModule::boxed_with_heap(&THREE_PAGE_MAX_HEAP))
                 .expect("new_instance succeeds");
 
-            let heap_len = inst.alloc.heap_len();
+            let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
-            let new_heap_area = inst.alloc.expand_heap(THREEPAGE_MAX_SIZE as u32);
+            let new_heap_area = inst.alloc_mut().expand_heap(THREEPAGE_MAX_SIZE as u32);
             assert!(new_heap_area.is_err(), "heap expansion past spec fails");
 
-            let new_heap_len = inst.alloc.heap_len();
+            let new_heap_len = inst.alloc().heap_len();
             assert_eq!(new_heap_len, heap_len);
 
-            let heap = unsafe { inst.alloc.heap_mut() };
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
             assert_eq!(heap[new_heap_len - 1], 0);
             heap[new_heap_len - 1] = 0xFF;
             assert_eq!(heap[new_heap_len - 1], 0xFF);
@@ -192,28 +193,28 @@ macro_rules! alloc_tests {
                 .new_instance(MockModule::boxed_with_heap(&EXPAND_PAST_LIMIT_SPEC))
                 .expect("new_instance succeeds");
 
-            let heap_len = inst.alloc.heap_len();
+            let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, EXPANDPASTLIMIT_INITIAL_SIZE as usize);
 
             let new_heap_area = inst
-                .alloc
+                .alloc_mut()
                 .expand_heap(64 * 1024)
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
-            let new_heap_len = inst.alloc.heap_len();
+            let new_heap_len = inst.alloc().heap_len();
             assert_eq!(new_heap_len, LIMITS_HEAP_MEM_SIZE);
 
-            let past_limit_heap_area = inst.alloc.expand_heap(64 * 1024);
+            let past_limit_heap_area = inst.alloc_mut().expand_heap(64 * 1024);
             assert!(
                 past_limit_heap_area.is_err(),
                 "heap expansion past limit fails"
             );
 
-            let still_heap_len = inst.alloc.heap_len();
+            let still_heap_len = inst.alloc().heap_len();
             assert_eq!(still_heap_len, LIMITS_HEAP_MEM_SIZE);
 
-            let heap = unsafe { inst.alloc.heap_mut() };
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
             assert_eq!(heap[new_heap_len - 1], 0);
             heap[new_heap_len - 1] = 0xFF;
             assert_eq!(heap[new_heap_len - 1], 0xFF);
@@ -281,10 +282,10 @@ macro_rules! alloc_tests {
                     .new_instance(MockModule::boxed_with_heap(&ONE_PAGE_HEAP))
                     .expect("new_instance succeeds");
 
-                let heap_len = inst.alloc.heap_len();
+                let heap_len = inst.alloc().heap_len();
                 assert_eq!(heap_len, ONEPAGE_INITIAL_SIZE as usize);
 
-                let heap = unsafe { inst.alloc.heap_mut() };
+                let heap = unsafe { inst.alloc_mut().heap_mut() };
 
                 assert_eq!(heap[0], 0);
                 heap[0] = 0xFF;
@@ -294,7 +295,7 @@ macro_rules! alloc_tests {
                 heap[heap_len - 1] = 0xFF;
                 assert_eq!(heap[heap_len - 1], 0xFF);
 
-                let stack = unsafe { inst.alloc.stack_mut() };
+                let stack = unsafe { inst.alloc_mut().stack_mut() };
                 assert_eq!(stack.len(), LIMITS_STACK_SIZE);
 
                 assert_eq!(stack[0], 0);
@@ -305,7 +306,7 @@ macro_rules! alloc_tests {
                 stack[LIMITS_STACK_SIZE - 1] = 0xFF;
                 assert_eq!(stack[LIMITS_STACK_SIZE - 1], 0xFF);
 
-                let globals = unsafe { inst.alloc.globals_mut() };
+                let globals = unsafe { inst.alloc_mut().globals_mut() };
                 assert_eq!(globals.len(), LIMITS_GLOBALS_SIZE / 8);
 
                 assert_eq!(globals[0], 0);
@@ -316,7 +317,7 @@ macro_rules! alloc_tests {
                 globals[globals.len() - 1] = 0xFF;
                 assert_eq!(globals[globals.len() - 1], 0xFF);
 
-                let sigstack = unsafe { inst.alloc.sigstack_mut() };
+                let sigstack = unsafe { inst.alloc_mut().sigstack_mut() };
                 assert_eq!(sigstack.len(), libc::SIGSTKSZ);
 
                 assert_eq!(sigstack[0], 0);
@@ -344,10 +345,10 @@ macro_rules! alloc_tests {
                 .new_instance(MockModule::boxed_with_heap(&THREE_PAGE_MAX_HEAP))
                 .expect("new_instance succeeds");
 
-            let heap_len = inst.alloc.heap_len();
+            let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
-            let heap = unsafe { inst.alloc.heap_mut() };
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
 
             assert_eq!(heap[0], 0);
             heap[0] = 0xFF;
@@ -358,25 +359,25 @@ macro_rules! alloc_tests {
             assert_eq!(heap[heap_len - 1], 0xFF);
 
             let new_heap_area = inst
-                .alloc
+                .alloc_mut()
                 .expand_heap((THREEPAGE_MAX_SIZE - THREEPAGE_INITIAL_SIZE) as u32)
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
-            let new_heap_len = inst.alloc.heap_len();
+            let new_heap_len = inst.alloc().heap_len();
             assert_eq!(new_heap_len, THREEPAGE_MAX_SIZE as usize);
 
             // Making a new mock module here because the borrow checker doesn't like referencing
-            // `inst.module` while `inst.alloc` is borrowed mutably. The `Instance` tests don't have
+            // `inst.module` while `inst.alloc()` is borrowed mutably. The `Instance` tests don't have
             // this weirdness
-            inst.alloc
+            inst.alloc_mut()
                 .reset_heap(MockModule::boxed_with_heap(&THREE_PAGE_MAX_HEAP).as_ref())
                 .expect("reset succeeds");
 
-            let reset_heap_len = inst.alloc.heap_len();
+            let reset_heap_len = inst.alloc().heap_len();
             assert_eq!(reset_heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
-            let heap = unsafe { inst.alloc.heap_mut() };
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
 
             assert_eq!(heap[0], 0);
             heap[0] = 0xFF;
@@ -403,10 +404,10 @@ macro_rules! alloc_tests {
                 .new_instance(MockModule::boxed_with_heap(&GUARDLESS_HEAP))
                 .expect("new_instance succeeds");
 
-            let heap_len = inst.alloc.heap_len();
+            let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, ONEPAGE_INITIAL_SIZE as usize);
 
-            let heap = unsafe { inst.alloc.heap_mut() };
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
 
             assert_eq!(heap[0], 0);
             heap[0] = 0xFF;
@@ -416,7 +417,7 @@ macro_rules! alloc_tests {
             heap[heap_len - 1] = 0xFF;
             assert_eq!(heap[heap_len - 1], 0xFF);
 
-            let stack = unsafe { inst.alloc.stack_mut() };
+            let stack = unsafe { inst.alloc_mut().stack_mut() };
             assert_eq!(stack.len(), LIMITS_STACK_SIZE);
 
             assert_eq!(stack[0], 0);
@@ -497,17 +498,17 @@ macro_rules! alloc_tests {
 
             let mut parent = ContextHandle::new();
             unsafe {
-                let heap_ptr = inst.alloc.heap_mut().as_ptr() as *mut c_void;
+                let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
                 let child = ContextHandle::create_and_init(
-                    inst.alloc.stack_u64_mut(),
+                    inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
                     heap_touching_child as *const extern "C" fn(),
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
                 Context::swap(&mut parent, &child);
-                assert_eq!(inst.alloc.heap()[0], 123);
-                assert_eq!(inst.alloc.heap()[4095], 45);
+                assert_eq!(inst.alloc().heap()[0], 123);
+                assert_eq!(inst.alloc().heap()[4095], 45);
             }
         }
 
@@ -535,9 +536,9 @@ macro_rules! alloc_tests {
 
             let mut parent = ContextHandle::new();
             unsafe {
-                let heap_ptr = inst.alloc.heap_mut().as_ptr() as *mut c_void;
+                let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
                 let child = ContextHandle::create_and_init(
-                    inst.alloc.stack_u64_mut(),
+                    inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
                     stack_pattern_child as *const extern "C" fn(),
                     &[Val::CPtr(heap_ptr)],
@@ -545,10 +546,10 @@ macro_rules! alloc_tests {
                 .expect("context init succeeds");
                 Context::swap(&mut parent, &child);
 
-                let stack_pattern = inst.alloc.heap_u64()[0] as usize;
-                assert!(stack_pattern > inst.alloc.slot().stack as usize);
+                let stack_pattern = inst.alloc().heap_u64()[0] as usize;
+                assert!(stack_pattern > inst.alloc().slot().stack as usize);
                 assert!(
-                    stack_pattern + STACK_PATTERN_LENGTH < inst.alloc.slot().stack_top() as usize
+                    stack_pattern + STACK_PATTERN_LENGTH < inst.alloc().slot().stack_top() as usize
                 );
                 let stack_pattern =
                     std::slice::from_raw_parts(stack_pattern as *const u8, STACK_PATTERN_LENGTH);

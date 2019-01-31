@@ -8,5 +8,11 @@ failure = "0.1"
 libc = "0.2.47"
 lucet-libc-sys = { path = "lucet-libc-sys" }
 
+[features]
+default = []
+# used to conditionally link against liblucet-runtime-c.so for testing; eventually this should just
+# depend on `lucet-runtime`
+no-lucet-runtime-c = ["lucet-libc-sys/no-lucet-runtime-c"]
+
 [profile.test]
 rpath = true

@@ -1,9 +1,9 @@
 #[macro_export]
 macro_rules! stack_tests {
     ( $TestRegion:path ) => {
-        use lucet_runtime::{DlModule, Limits, Region, State, TrapCodeType, Val};
+        use lucet_runtime::{DlModule, InstanceHandle, Limits, Region, State, TrapCodeType, Val};
         use $TestRegion as TestRegion;
-        use $crate::helpers::{DlModuleExt, InstanceHandle};
+        use $crate::helpers::DlModuleExt;
 
         const LOCALS64_SANDBOX_PATH: &'static str = "tests/build/stack_guests/locals_64.so";
         const LOCALS_1PAGE_SANDBOX_PATH: &'static str = "tests/build/stack_guests/locals_1page.so";

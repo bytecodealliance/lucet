@@ -87,7 +87,7 @@ macro_rules! globals_tests {
     ( $TestRegion:path ) => {
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
-        use $crate::instance::State;
+        use $crate::instance::{InstanceInternal, State};
         use $crate::module::{DlModule, Module};
         use $crate::region::Region;
 
@@ -206,7 +206,7 @@ macro_rules! globals_tests {
             // [4] = 5
             // [8] = 6
 
-            let heap_u32 = unsafe { inst.alloc.heap_u32() };
+            let heap_u32 = unsafe { inst.alloc().heap_u32() };
             assert_eq!(heap_u32[0..=2], [4, 5, 6]);
 
             inst.run(b"main", &[]).expect("instance runs");
@@ -217,7 +217,7 @@ macro_rules! globals_tests {
             // [4] = 2
             // [8] = 6
 
-            let heap_u32 = unsafe { inst.alloc.heap_u32() };
+            let heap_u32 = unsafe { inst.alloc().heap_u32() };
             assert_eq!(heap_u32[0..=2], [3, 2, 6]);
         }
     };

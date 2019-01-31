@@ -29,7 +29,7 @@ fn main() {
 
     println!("cargo:rustc-link-lib=dylib=lucet_libc");
 
-    if env::var("CARGO_FEATURE_LUCET_RUNTIME_C").is_ok() {
+    if !env::var("CARGO_FEATURE_NO_LUCET_RUNTIME_C").is_ok() {
         liblucet_runtime_dependency();
     }
 

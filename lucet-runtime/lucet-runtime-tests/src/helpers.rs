@@ -1,5 +1,4 @@
 // re-export types that should only be used for testing
-pub use lucet_runtime_internals::instance::InstanceHandle;
 pub use lucet_runtime_internals::module::MockModule;
 
 use failure::Error;

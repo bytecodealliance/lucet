@@ -3,7 +3,7 @@ pub mod signals;
 
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior};
 
-use crate::alloc::{instance_heap_offset, Alloc};
+use crate::alloc::Alloc;
 use crate::context::Context;
 use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, Module};
@@ -14,6 +14,7 @@ use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
 use std::cell::{RefCell, UnsafeCell};
 use std::ffi::{CStr, CString};
 use std::mem;
+use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
@@ -34,60 +35,72 @@ thread_local! {
     /// the swap. Meanwhile, the signal handler can run at any point during the guest function, and
     /// so it also must be able to immutably borrow the host context if it needs to swap back. The
     /// runtime borrowing constraints for a `RefCell` are therefore too strict for this variable.
-    static HOST_CTX: UnsafeCell<Context> = UnsafeCell::new(Context::new());
-    static CURRENT_INSTANCE: RefCell<Option<NonNull<Instance>>> = RefCell::new(None);
+    pub(crate) static HOST_CTX: UnsafeCell<Context> = UnsafeCell::new(Context::new());
+
+    /// The currently-running `Instance`, if one exists.
+    pub(crate) static CURRENT_INSTANCE: RefCell<Option<NonNull<Instance>>> = RefCell::new(None);
 }
 
+/// A smart pointer to an [`Instance`](struct.Instance.html) that properly manages cleanup when dropped.
+///
+/// Instances are always stored in memory backed by a `Region`; we never want to create one directly
+/// with the Rust allocator. This type allows us to abide by that rule while also having an owned
+/// type that cleans up the instance when we are done with it.
+///
+/// Since this type implements `Deref` and `DerefMut` to `Instance`, it can usually be treated as
+/// though it were a `&mut Instance`.
 pub struct InstanceHandle {
     inst: NonNull<Instance>,
 }
 
-impl InstanceHandle {
-    pub fn new(
-        instance: *mut Instance,
-        module: Box<dyn Module>,
-        alloc: Alloc,
-        embed_ctx: *mut c_void,
-    ) -> Result<Self, Error> {
-        let inst = NonNull::new(instance).ok_or(format_err!("instance pointer is null"))?;
+/// Create a new `InstanceHandle`.
+///
+/// This is not meant for public consumption, but rather is used to make implementations of
+/// `Region`.
+pub fn new_instance_handle(
+    instance: *mut Instance,
+    module: Box<dyn Module>,
+    alloc: Alloc,
+    embed_ctx: *mut c_void,
+) -> Result<InstanceHandle, Error> {
+    let inst = NonNull::new(instance).ok_or(format_err!("instance pointer is null"))?;
 
-        // do this check first so we don't run `InstanceHandle::drop()` for a failure
-        ensure!(
-            unsafe { inst.as_ref().magic } != LUCET_INSTANCE_MAGIC,
-            "created a new instance handle in memory with existing instance magic"
-        );
+    // do this check first so we don't run `InstanceHandle::drop()` for a failure
+    ensure!(
+        unsafe { inst.as_ref().magic } != LUCET_INSTANCE_MAGIC,
+        "created a new instance handle in memory with existing instance magic"
+    );
 
-        let mut handle = InstanceHandle { inst };
+    let mut handle = InstanceHandle { inst };
 
-        let inst = Instance::new(alloc, module, embed_ctx);
+    let inst = Instance::new(alloc, module, embed_ctx);
 
-        unsafe {
-            // this is wildly unsafe! you must be very careful to not let the drop impls run on the
-            // uninitialized fields; see
-            // <https://doc.rust-lang.org/std/mem/fn.forget.html#use-case-1>
+    unsafe {
+        // this is wildly unsafe! you must be very careful to not let the drop impls run on the
+        // uninitialized fields; see
+        // <https://doc.rust-lang.org/std/mem/fn.forget.html#use-case-1>
 
-            // write the whole struct into place over the uninitialized page
-            ptr::write(&mut *handle, inst);
-        };
+        // write the whole struct into place over the uninitialized page
+        ptr::write(&mut *handle, inst);
+    };
 
-        handle.reset()?;
+    handle.reset()?;
 
-        Ok(handle)
-    }
+    Ok(handle)
 }
 
 // Safety argument for these deref impls: the instance's `Alloc` field contains an `Arc` to the
 // region that backs this memory, keeping the page containing the `Instance` alive as long as the
 // region exists
 
-impl std::ops::Deref for InstanceHandle {
+impl Deref for InstanceHandle {
     type Target = Instance;
     fn deref(&self) -> &Self::Target {
         unsafe { self.inst.as_ref() }
     }
 }
 
-impl std::ops::DerefMut for InstanceHandle {
+impl DerefMut for InstanceHandle {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.inst.as_mut() }
     }
@@ -107,13 +120,13 @@ impl Drop for InstanceHandle {
 #[repr(C)]
 pub struct Instance {
     /// Used to catch bugs in pointer math used to find the address of the instance
-    pub magic: u64,
+    magic: u64,
 
     /// The embedding context is a pointer from the embedder that is used to implement hostcalls
-    pub embed_ctx: *mut c_void,
+    pub(crate) embed_ctx: *mut c_void,
 
     /// The program (WebAssembly module) that is the entrypoint for the instance.
-    pub module: Box<dyn Module>,
+    module: Box<dyn Module>,
 
     /// The `Context` in which the guest program runs
     ctx: Context,
@@ -122,7 +135,7 @@ pub struct Instance {
     pub state: State,
 
     /// The memory allocated for this instance
-    pub alloc: Alloc,
+    alloc: Alloc,
 
     /// Handler for when the instance exits in a fatal state
     pub fatal_handler: fn(&Instance) -> !,
@@ -146,7 +159,105 @@ pub struct Instance {
     ///
     /// This is accessed through the `vmctx` pointer, which points to the heap that begins
     /// immediately after this struct, so it has to come at the very end.
-    pub globals_ptr: *const i64,
+    globals_ptr: *const i64,
+}
+
+/// APIs that are internal, but useful to implementors of extension modules; you probably don't want
+/// this trait!
+///
+/// This is a trait rather than inherent `impl`s in order to keep the `lucet-runtime` API clean and
+/// safe.
+pub trait InstanceInternal {
+    fn alloc(&self) -> &Alloc;
+    fn alloc_mut(&mut self) -> &mut Alloc;
+    fn module(&self) -> &dyn Module;
+    fn valid_magic(&self) -> bool;
+}
+
+impl InstanceInternal for Instance {
+    /// Get a reference to the instance's `Alloc`.
+    fn alloc(&self) -> &Alloc {
+        &self.alloc
+    }
+
+    /// Get a mutable reference to the instance's `Alloc`.
+    fn alloc_mut(&mut self) -> &mut Alloc {
+        &mut self.alloc
+    }
+
+    /// Get a reference to the instance's `Module`.
+    fn module(&self) -> &dyn Module {
+        self.module.deref()
+    }
+
+    /// Check whether the instance magic is valid.
+    fn valid_magic(&self) -> bool {
+        self.magic == LUCET_INSTANCE_MAGIC
+    }
+}
+
+// Public API
+impl Instance {
+    // TODO: richer error types for this whole family of functions
+    pub fn run(&mut self, entrypoint: &[u8], args: &[Val]) -> Result<&State, Error> {
+        let func = self.module.get_export_func(entrypoint)?;
+        self.run_func(func, &args)
+    }
+
+    pub fn reset(&mut self) -> Result<(), Error> {
+        self.alloc.reset_heap(self.module.as_ref())?;
+        let globals = unsafe { self.alloc.globals_mut() };
+        let mod_globals = self.module.globals();
+        for (i, v) in mod_globals.iter().enumerate() {
+            globals[i] = *v;
+        }
+
+        self.state = State::Ready {
+            retval: UntypedRetVal::default(),
+        };
+
+        self.run_start()?;
+
+        Ok(())
+    }
+
+    /// Grow the guest memory by the given number of WebAssembly pages.
+    ///
+    /// On success, returns the number of pages that existed before the call.
+    pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
+        let orig_len = self.alloc.expand_heap(additional_pages * WASM_PAGE_SIZE)?;
+        Ok(orig_len / WASM_PAGE_SIZE)
+    }
+
+    pub fn heap(&self) -> &[u8] {
+        unsafe { self.alloc.heap() }
+    }
+
+    pub fn heap_mut(&mut self) -> &mut [u8] {
+        unsafe { self.alloc.heap_mut() }
+    }
+
+    pub fn heap_u32(&self) -> &[u32] {
+        unsafe { self.alloc.heap_u32() }
+    }
+
+    pub fn heap_u32_mut(&mut self) -> &mut [u32] {
+        unsafe { self.alloc.heap_u32_mut() }
+    }
+
+    /// Check if a memory region is inside the instance heap.
+    pub fn check_heap(&self, ptr: *const c_void, len: usize) -> bool {
+        self.alloc.mem_in_heap(ptr, len)
+    }
+
+    // TODO: replace this with a richer `run` interface?
+    pub fn is_ready(&self) -> bool {
+        self.state.is_ready()
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        self.state.is_terminated()
+    }
 }
 
 impl Instance {
@@ -167,47 +278,6 @@ impl Instance {
             _reserved: [0; INSTANCE_PADDING],
             globals_ptr,
         }
-    }
-
-    /// Get an Instance from the `vmctx` pointer.
-    ///
-    /// Only safe to call from within the guest context.
-    pub unsafe fn from_vmctx<'a>(vmctx: *const c_void) -> &'a mut Instance {
-        assert!(!vmctx.is_null(), "vmctx is not null");
-
-        let inst_ptr = (vmctx as usize - instance_heap_offset()) as *mut Instance;
-
-        // We shouldn't actually need to access the thread local, only the exception handler should
-        // need to. But, as long as the thread local exists, we should make sure that the guest
-        // hasn't pulled any shenanigans and passed a bad vmctx. (Codegen should ensure the guest
-        // cant pull any shenanigans but there have been bugs before.)
-        CURRENT_INSTANCE.with(|current_instance| {
-            if let Some(current_inst_ptr) = current_instance.borrow().map(|nn| nn.as_ptr()) {
-                assert!(
-                    inst_ptr == current_inst_ptr,
-                    "vmctx corresponds to current instance"
-                );
-            } else {
-                panic!(
-                    "current instance is not set; thread local storage failure can indicate \
-                     dynamic linking issues"
-                );
-            }
-        });
-
-        let inst = inst_ptr.as_mut().unwrap();
-        assert!(inst.valid_magic());
-        inst
-    }
-
-    pub fn valid_magic(&self) -> bool {
-        self.magic == LUCET_INSTANCE_MAGIC
-    }
-
-    // TODO: richer error types for this whole family of functions
-    pub fn run(&mut self, entrypoint: &[u8], args: &[Val]) -> Result<&State, Error> {
-        let func = self.module.get_export_func(entrypoint)?;
-        self.run_func(func, &args)
     }
 
     fn run_func(&mut self, func: *const extern "C" fn(), args: &[Val]) -> Result<&State, Error> {
@@ -278,23 +348,6 @@ impl Instance {
         Ok(&self.state)
     }
 
-    pub fn reset(&mut self) -> Result<(), Error> {
-        self.alloc.reset_heap(self.module.as_ref())?;
-        let globals = unsafe { self.alloc.globals_mut() };
-        let mod_globals = self.module.globals();
-        for (i, v) in mod_globals.iter().enumerate() {
-            globals[i] = *v;
-        }
-
-        self.state = State::Ready {
-            retval: UntypedRetVal::default(),
-        };
-
-        self.run_start()?;
-
-        Ok(())
-    }
-
     fn run_start(&mut self) -> Result<(), Error> {
         if let Some(start) = self.module.get_start_func()? {
             self.run_func(start, &[]).context("module start")?;
@@ -303,50 +356,6 @@ impl Instance {
             }
         }
         Ok(())
-    }
-
-    /// Grow the guest memory by the given number of WebAssembly pages.
-    ///
-    /// On success, returns the number of pages that existed before the call.
-    pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
-        let orig_len = self.alloc.expand_heap(additional_pages * WASM_PAGE_SIZE)?;
-        Ok(orig_len / WASM_PAGE_SIZE)
-    }
-
-    pub fn heap(&self) -> &[u8] {
-        unsafe { self.alloc.heap() }
-    }
-
-    pub fn heap_mut(&mut self) -> &mut [u8] {
-        unsafe { self.alloc.heap_mut() }
-    }
-
-    pub fn heap_u32(&self) -> &[u32] {
-        unsafe { self.alloc.heap_u32() }
-    }
-
-    pub fn heap_u32_mut(&mut self) -> &mut [u32] {
-        unsafe { self.alloc.heap_u32_mut() }
-    }
-
-    /// Check if a memory region is inside the instance heap.
-    pub fn check_heap(&self, ptr: *const c_void, len: usize) -> bool {
-        self.alloc.mem_in_heap(ptr, len)
-    }
-
-    // must only be called from within the guest context
-    pub unsafe fn terminate(&mut self, info: *mut c_void) -> ! {
-        self.state = State::Terminated { info };
-        HOST_CTX.with(|host_ctx| Context::set(&*host_ctx.get()))
-    }
-
-    // TODO: replace this with a richer `run` interface?
-    pub fn is_ready(&self) -> bool {
-        self.state.is_ready()
-    }
-
-    pub fn is_terminated(&self) -> bool {
-        self.state.is_terminated()
     }
 
     fn populate_fault_detail(&mut self) -> Result<State, Error> {
@@ -513,61 +522,6 @@ impl State {
 
 fn default_fatal_handler(inst: &Instance) -> ! {
     panic!("> instance {:p} had fatal error: {}", inst, inst.state);
-}
-
-// TODO: figure out where to put all of these
-
-#[no_mangle]
-pub unsafe extern "C" fn lucet_vmctx_get_heap(vmctx: *const c_void) -> *mut u8 {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.alloc.slot().heap as *mut u8
-}
-
-/// Get the number of WebAssembly pages currently in the heap.
-#[no_mangle]
-pub unsafe extern "C" fn lucet_vmctx_current_memory(vmctx: *const c_void) -> libc::uint32_t {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.alloc.heap_len() as u32 / WASM_PAGE_SIZE
-}
-
-#[no_mangle]
-/// Grows the guest heap by the given number of WebAssembly pages.
-///
-/// On success, returns the number of pages that existed before the call. On failure, returns `-1`.
-pub unsafe extern "C" fn lucet_vmctx_grow_memory(
-    vmctx: *const c_void,
-    additional_pages: libc::uint32_t,
-) -> libc::int32_t {
-    let inst = Instance::from_vmctx(vmctx);
-    if let Ok(old_pages) = inst.grow_memory(additional_pages) {
-        old_pages as libc::int32_t
-    } else {
-        -1
-    }
-}
-
-#[no_mangle]
-/// Check if a memory region is inside the instance heap.
-pub unsafe extern "C" fn lucet_vmctx_check_heap(
-    vmctx: *const c_void,
-    ptr: *mut c_void,
-    len: libc::size_t,
-) -> bool {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.check_heap(ptr, len)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lucet_vmctx_terminate(vmctx: *const c_void, info: *mut c_void) {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.terminate(info);
-}
-
-#[no_mangle]
-/// Get the delegate object for the current instance.
-pub unsafe extern "C" fn lucet_vmctx_get_delegate(vmctx: *const c_void) -> *mut c_void {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.embed_ctx
 }
 
 // TODO: PR into `libc`

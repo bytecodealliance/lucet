@@ -15,8 +15,8 @@ lazy_static! {
 }
 
 pub enum SignalBehavior {
-    /// Use default behavior
-    None,
+    /// Use default behavior, which switches back to the host with `State::Fault` populated
+    Default,
     /// Override default behavior and cause the instance to continue
     Continue,
     /// Override default behavior and cause the instance to terminate
@@ -30,11 +30,11 @@ pub fn signal_handler_none(
     _siginfo_ptr: *const siginfo_t,
     _ucontext_ptr: *const c_void,
 ) -> SignalBehavior {
-    SignalBehavior::None
+    SignalBehavior::Default
 }
 
 impl Instance {
-    pub fn with_signals_on<F, R>(&mut self, f: F) -> Result<R, Error>
+    pub(crate) fn with_signals_on<F, R>(&mut self, f: F) -> Result<R, Error>
     where
         F: FnOnce(&mut Instance) -> Result<R, Error>,
     {
@@ -155,7 +155,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 };
                 true
             }
-            SignalBehavior::None => {
+            SignalBehavior::Default => {
                 // record the fault and jump back to the host context
                 inst.state = State::Fault {
                     // fatal field is set false here by default - have to wait until
