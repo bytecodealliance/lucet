@@ -24,6 +24,10 @@ build:
 test: build $(TEST_DEPS)
 	cargo test
 
+.PHONY: audit
+audit:
+	cargo audit
+
 .PHONY: clean
 clean:
 	cargo clean

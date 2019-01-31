@@ -25,6 +25,10 @@ $(BUILD_DEPS):
 $(TEST_DEPS):
 	make -C $(LIBLUCET_RUNTIME_C) test
 
+.PHONY: audit
+audit:
+	cargo audit
+
 .PHONY: clean
 clean:
 	-rm -fr target lucet-sys/target
