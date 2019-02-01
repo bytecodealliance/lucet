@@ -88,7 +88,7 @@ macro_rules! globals_tests {
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
         use $crate::instance::{InstanceInternal, State};
-        use $crate::module::{DlModule, Module};
+        use $crate::module::{DlModule, ModuleInternal};
         use $crate::region::Region;
 
         const INTERNAL_MOD_PATH: &'static str = "lucet-runtime-c/test/build/globals/internal.so";

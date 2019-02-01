@@ -1,7 +1,7 @@
 use crate::alloc::{host_page_size, instance_heap_offset, Alloc, Limits, Slot};
 use crate::instance::{new_instance_handle, Instance, InstanceHandle};
 use crate::module::Module;
-use crate::region::Region;
+use crate::region::{Region, RegionInternal};
 use failure::{bail, format_err, Error};
 use libc::{c_void, SIGSTKSZ};
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
@@ -95,7 +95,9 @@ impl Region for MmapRegion {
 
         Ok(inst)
     }
+}
 
+impl RegionInternal for MmapRegion {
     fn drop_alloc(&self, alloc: &mut Alloc) {
         let slot = alloc
             .slot
@@ -329,7 +331,7 @@ impl MmapRegion {
             globals: globals as *mut c_void,
             sigstack: sigstack as *mut c_void,
             limits: region.limits.clone(),
-            region: Arc::downgrade(region) as Weak<dyn Region>,
+            region: Arc::downgrade(region) as Weak<dyn RegionInternal>,
         })
     }
 

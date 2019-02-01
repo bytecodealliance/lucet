@@ -1,5 +1,5 @@
 use crate::module::{Module, RuntimeSpec};
-use crate::region::Region;
+use crate::region::RegionInternal;
 use failure::Error;
 use libc::{c_void, SIGSTKSZ};
 use nix::unistd::{sysconf, SysconfVar};
@@ -80,7 +80,7 @@ pub struct Slot {
     /// Should not change through the lifetime of the `Alloc`.
     pub limits: Limits,
 
-    pub region: Weak<dyn Region>,
+    pub region: Weak<dyn RegionInternal>,
 }
 
 impl Slot {
@@ -98,7 +98,7 @@ pub struct Alloc {
     pub heap_inaccessible_size: usize,
     pub runtime_spec: RuntimeSpec,
     pub slot: Option<Slot>,
-    pub region: Arc<dyn Region>,
+    pub region: Arc<dyn RegionInternal>,
 }
 
 impl Drop for Alloc {

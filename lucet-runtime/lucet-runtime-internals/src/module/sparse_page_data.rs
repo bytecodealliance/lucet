@@ -1,10 +1,16 @@
+#[repr(C)]
+pub struct SparsePageData {
+    pub num_pages: u64,
+    pub pages: *const libc::c_void,
+}
+
 #[macro_export]
 macro_rules! sparse_page_data_tests {
     ( $TestRegion:path ) => {
         use $TestRegion as TestRegion;
         use $crate::alloc::{host_page_size, Limits};
         use $crate::instance::InstanceInternal;
-        use $crate::module::{DlModule, Module};
+        use $crate::module::{DlModule, ModuleInternal};
         use $crate::region::Region;
 
         const VALID_SANDBOX_PATH: &'static str =

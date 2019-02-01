@@ -11,25 +11,30 @@
 //! to ensure that any attempts by guest programs to access memory past the end of the guest heap are
 //! safely caught.
 //!
+//! The runtime is also extensible, and some of the key types are defined as traits for
+//! flexibility. See the `lucet-runtime-internals` crate for details.
+//!
 //! ## Running a Lucet Program
 //!
 //! There are a few essential types for using the runtime:
 //!
-//! - `Instance`: a Lucet program, together with its dedicated memory and signal handlers.
+//! - [`Instance`](struct.Instance.html): a Lucet program, together with its dedicated memory and
+//! signal handlers. Users of this API never own an `Instance` directly, but can own the
+//! [`InstanceHandle`](struct.InstanceHandle.html) smart pointer.
 //!
-//! - `Region`: the memory from which instances are created. This crate includes an implementation
-//! backed by `mmap`.
+//! - [`Region`](trait.Region.html): the memory from which instances are created. This crate
+//! includes [`MmapRegion`](struct.MmapRegion.html), an implementation backed by `mmap`.
 //!
-//! - `Limits`: upper bounds for the resources a Lucet instance may consume. These may be larger or
-//! smaller than the limits described in the WebAssembly module itself; the smaller limit is always
-//! enforced.
+//! - [`Limits`](struct.Limits.html): upper bounds for the resources a Lucet instance may
+//! consume. These may be larger or smaller than the limits described in the WebAssembly module
+//! itself; the smaller limit is always enforced.
 //!
-//! - `Module`: the read-only parts of a Lucet program, including its code and initial heap
-//! configuration. This crate includes an implementation backed by dynamic loading of shared
-//! objects.
+//! - [`Module`](trait.Module.html): the read-only parts of a Lucet program, including its code and
+//! initial heap configuration. This crate includes [`DlModule`](struct.DlModule.html), an
+//! implementation backed by dynamic loading of shared objects.
 //!
-//! - `Val`: an enum describing values in WebAssembly, used to provide arguments and read return
-//! vavlues.
+//! - [`Val`](enum.Val.html): an enum describing values in WebAssembly, used to provide arguments
+//! and read return values.
 //!
 //! To run a Lucet program, you start by creating a region, capable of backing a number of
 //! instances. You then load a module and then create a new instance using the region and the
