@@ -7,7 +7,7 @@ before_install:
   - ./devenv_build_container
 
 script:
-  - ./devenv_run make test
+  - ./devenv_run make test audit
 
 notifications:
   email: false

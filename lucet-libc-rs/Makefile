@@ -24,5 +24,9 @@ clean: sys-clean
 sys-clean:
 	make -C lucet-libc-sys clean
 
+.PHONY: audit
+audit:
+	cargo audit
+
 $(LUCET_LIBC)/build/lib/liblucet-libc.so:
 	make -C $(LUCET_LIBC)

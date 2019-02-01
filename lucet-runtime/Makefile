@@ -28,6 +28,10 @@ test: build $(TEST_DEPS)
 	cd lucet-runtime-internals && cargo test
 	cd lucet-runtime-tests && cargo test
 
+.PHONY: audit
+audit:
+	cargo audit
+
 .PHONY: clean
 clean:
 	cargo clean
