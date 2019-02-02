@@ -1,8 +1,8 @@
 // re-export types that should only be used for testing
 pub use lucet_runtime_internals::module::MockModule;
 
-use failure::Error;
 use lazy_static::lazy_static;
+use lucet_runtime_internals::error::Error;
 use lucet_runtime_internals::module::DlModule;
 use std::env;
 use std::path::{Path, PathBuf};

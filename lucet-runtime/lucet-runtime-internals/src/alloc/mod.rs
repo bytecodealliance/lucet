@@ -1,6 +1,6 @@
+use crate::error::Error;
 use crate::module::{Module, RuntimeSpec};
 use crate::region::RegionInternal;
-use failure::Error;
 use libc::{c_void, SIGSTKSZ};
 use nix::unistd::{sysconf, SysconfVar};
 use std::sync::{Arc, Once, Weak};

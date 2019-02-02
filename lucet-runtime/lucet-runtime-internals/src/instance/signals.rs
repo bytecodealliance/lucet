@@ -1,5 +1,7 @@
 use crate::context::Context;
-use crate::instance::{Instance, State, CURRENT_INSTANCE, HOST_CTX};
+use crate::instance::{
+    FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
+};
 use crate::trapcode::{TrapCode, TrapCodeType};
 use failure::Error;
 use lazy_static::lazy_static;
@@ -151,20 +153,24 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             SignalBehavior::Terminate => {
                 // set the state before jumping back to the host context
                 inst.state = State::Terminated {
-                    info: std::ptr::null_mut(),
+                    details: TerminationDetails {
+                        info: std::ptr::null_mut(),
+                    },
                 };
                 true
             }
             SignalBehavior::Default => {
                 // record the fault and jump back to the host context
                 inst.state = State::Fault {
-                    // fatal field is set false here by default - have to wait until
-                    // `verify_trap_safety` to have enough information to determine whether trap was
-                    // fatal. It is not signal safe to access some of the required information.
-                    fatal: false,
-                    trapcode: trapcode,
-                    rip_addr: rip as usize,
-                    rip_addr_details: None,
+                    details: FaultDetails {
+                        // fatal field is set false here by default - have to wait until
+                        // `verify_trap_safety` to have enough information to determine whether trap was
+                        // fatal. It is not signal safe to access some of the required information.
+                        fatal: false,
+                        trapcode: trapcode,
+                        rip_addr: rip as usize,
+                        rip_addr_details: None,
+                    },
                     // safety: pointer is checked for null at the top of the function, and the
                     // manpage guarantees that a siginfo_t will be passed as the second argument
                     siginfo: unsafe { *siginfo_ptr },

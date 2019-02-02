@@ -1,9 +1,9 @@
+use crate::error::Error;
 use crate::module::globals::{self, GlobalsSpec};
 use crate::module::sparse_page_data::SparsePageData;
 use crate::module::{
     AddrDetails, HeapSpec, Module, ModuleInternal, RuntimeSpec, TableElement, TrapManifestRecord,
 };
-use failure::{bail, format_err, Error};
 use libc::c_void;
 use libloading::{Library, Symbol};
 use std::ffi::{CStr, OsStr};
@@ -36,7 +36,7 @@ impl DlModule {
         let heap: HeapSpec = unsafe {
             heap_ptr
                 .as_ref()
-                .ok_or(format_err!("null wasm memory spec"))?
+                .ok_or(lucet_format_err!("null wasm memory spec"))?
                 .clone()
         };
 
@@ -61,7 +61,7 @@ impl DlModule {
                 let records = lib
                     .get::<*const TrapManifestRecord>(b"lucet_trap_manifest")?
                     .as_ref()
-                    .ok_or(format_err!("null trap manifest records"))?;
+                    .ok_or(lucet_format_err!("null trap manifest records"))?;
                 from_raw_parts(records, *len as usize)
             } else {
                 &[]
@@ -88,10 +88,10 @@ impl ModuleInternal for DlModule {
         let len = unsafe { **p_table_segment_len };
         let elem_size = mem::size_of::<TableElement>();
         if len > std::u32::MAX as usize * elem_size {
-            bail!("table segment too long: {}", len);
+            lucet_bail!("table segment too long: {}", len);
         }
         if len % elem_size != 0 {
-            bail!(
+            lucet_bail!(
                 "table segment length not a multiple of table element size: {}",
                 len
             );
@@ -105,7 +105,7 @@ impl ModuleInternal for DlModule {
                 .lib
                 .get::<*const SparsePageData>(b"guest_sparse_page_data")?
                 .as_ref()
-                .ok_or(format_err!("null wasm sparse page data"))?;
+                .ok_or(lucet_format_err!("null wasm sparse page data"))?;
             Ok(from_raw_parts(&spd.pages, spd.num_pages as usize))
         }
     }
@@ -117,9 +117,33 @@ impl ModuleInternal for DlModule {
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {
         let mut guest_sym: Vec<u8> = b"guest_func_".to_vec();
         guest_sym.extend_from_slice(sym);
-        let f = unsafe { self.lib.get::<*const extern "C" fn()>(&guest_sym)? };
-        // eprintln!("{} at {:p}", String::from_utf8_lossy(sym), *f);
-        Ok(*f)
+        match unsafe { self.lib.get::<*const extern "C" fn()>(&guest_sym) } {
+            Err(e) => {
+                if format!("{}", e).contains("undefined symbol") {
+                    Err(Error::SymbolNotFound(
+                        String::from_utf8_lossy(sym).into_owned(),
+                    ))
+                } else {
+                    Err(e.into())
+                }
+            }
+            Ok(f) => Ok(*f),
+        }
+    }
+
+    fn get_export_func_from_id(
+        &self,
+        table_id: u32,
+        func_id: u32,
+    ) -> Result<*const extern "C" fn(), Error> {
+        if table_id != 0 {
+            return Err(Error::FuncNotFound(table_id, func_id));
+        }
+        let table = self.table_elements()?;
+        table
+            .get(func_id as usize)
+            .map(|element| element.rf as *const extern "C" fn())
+            .ok_or(Error::FuncNotFound(table_id, func_id))
     }
 
     fn get_start_func(&self) -> Result<Option<*const extern "C" fn()>, Error> {
@@ -131,7 +155,7 @@ impl ModuleInternal for DlModule {
                 .get::<*const *const extern "C" fn()>(b"guest_start")
         } {
             if start_func.is_null() {
-                bail!("guest_start symbol exists but contains a null pointer");
+                lucet_bail!("guest_start symbol exists but contains a null pointer");
             }
             Ok(Some(unsafe { **start_func }))
         } else {

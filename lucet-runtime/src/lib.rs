@@ -42,20 +42,14 @@
 //! values from those functions, and even access the linear memory of the guest.
 //!
 //! ```no_run
-//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region, State};
+//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
 //!
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
 //! let mut inst = region.new_instance(Box::new(module)).unwrap();
 //!
-//! inst.run(b"factorial", &[5u64.into()]).unwrap();
-//!
-//! match &inst.state {
-//!     State::Ready { retval } => {
-//!         assert_eq!(u64::from(retval), 120u64);
-//!     }
-//!     _ => panic!("unexpected final state: {}", inst.state),
-//! }
+//! let retval = inst.run(b"factorial", &[5u64.into()]).unwrap();
+//! assert_eq!(u64::from(retval), 120u64);
 //! ```
 //!
 //! ## Embedding With Hostcalls
@@ -100,7 +94,7 @@
 //!
 //! ```no_run
 //! use lucet_runtime::{
-//!     DlModule, Instance, Limits, MmapRegion, Region, SignalBehavior, State, TrapCode
+//!     DlModule, Error, Instance, Limits, MmapRegion, Region, SignalBehavior, TrapCode
 //! };
 //! use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 //!
@@ -124,13 +118,11 @@
 //! // install the handler
 //! inst.signal_handler = signal_handler_count;
 //!
-//! inst.run(b"raise_a_signal", &[]).unwrap();
-//!
-//! match &inst.state {
-//!     State::Fault { .. } => {
+//! match inst.run(b"raise_a_signal", &[]) {
+//!     Err(Error::RuntimeFault(_)) => {
 //!         println!("I've now handled {} signals!", SIGNAL_COUNT.load(Ordering::SeqCst));
 //!     }
-//!     _ => panic!("unexpected final state: {}", inst.state),
+//!     res => panic!("unexpected result: {:?}", res),
 //! }
 //! ```
 //!
@@ -154,12 +146,13 @@
 //! the entire process.
 
 pub use lucet_runtime_internals::alloc::Limits;
+pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::{
-    Instance, InstanceHandle, SignalBehavior, State, WASM_PAGE_SIZE,
+    FaultDetails, Instance, InstanceHandle, SignalBehavior, TerminationDetails, WASM_PAGE_SIZE,
 };
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::Region;
 pub use lucet_runtime_internals::trapcode::{TrapCode, TrapCodeType};
-pub use lucet_runtime_internals::val::Val;
+pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
 pub use lucet_runtime_internals::vmctx::Vmctx;

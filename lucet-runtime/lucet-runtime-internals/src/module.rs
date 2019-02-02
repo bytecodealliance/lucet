@@ -6,9 +6,9 @@ mod sparse_page_data;
 pub use crate::module::dl::DlModule;
 pub use crate::module::mock::MockModule;
 
+use crate::error::Error;
 use crate::probestack::{lucet_probestack, lucet_probestack_size};
 use crate::trapcode::{TrapCode, TrapCodeType};
-use failure::Error;
 use libc::{c_void, uint64_t};
 use std::slice::from_raw_parts;
 
@@ -174,6 +174,12 @@ pub trait ModuleInternal {
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error>;
+
+    fn get_export_func_from_id(
+        &self,
+        table_id: u32,
+        func_id: u32,
+    ) -> Result<*const extern "C" fn(), Error>;
 
     fn get_start_func(&self) -> Result<Option<*const extern "C" fn()>, Error>;
 

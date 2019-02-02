@@ -1,9 +1,9 @@
 pub mod mmap;
 
 use crate::alloc::Alloc;
+use crate::error::Error;
 use crate::instance::InstanceHandle;
 use crate::module::Module;
-use failure::Error;
 use libc::c_void;
 
 /// A memory region in which Lucet instances are created and run.

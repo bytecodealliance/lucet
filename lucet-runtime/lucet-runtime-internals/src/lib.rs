@@ -6,6 +6,9 @@
 #![deny(bare_trait_objects)]
 
 #[macro_use]
+pub mod error;
+
+#[macro_use]
 #[cfg(test)]
 pub mod test_helpers;
 

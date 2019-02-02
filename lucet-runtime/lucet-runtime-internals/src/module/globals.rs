@@ -1,5 +1,5 @@
+use crate::error::Error;
 use bitflags::bitflags;
-use failure::{bail, Error};
 use libc::{c_char, int64_t, uint64_t};
 use std::ffi::CStr;
 
@@ -64,7 +64,7 @@ pub unsafe fn read_from_module(spec: *const GlobalsSpec) -> Result<Vec<i64>, Err
                     CStr::from_bytes_with_nul_unchecked(b"<unknown>\0")
                 }
             };
-            bail!(
+            lucet_bail!(
                 "import globals are not supported; found import `{}`",
                 name.to_string_lossy()
             );
@@ -87,7 +87,7 @@ macro_rules! globals_tests {
     ( $TestRegion:path ) => {
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
-        use $crate::instance::{InstanceInternal, State};
+        use $crate::instance::InstanceInternal;
         use $crate::module::{DlModule, ModuleInternal};
         use $crate::region::Region;
 
@@ -123,14 +123,8 @@ macro_rules! globals_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"get_global0", &[]).expect("instance runs");
-
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(i64::from(retval), -1);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            let retval = inst.run(b"get_global0", &[]).expect("instance runs");
+            assert_eq!(i64::from(retval), -1);
         }
 
         #[test]
@@ -141,23 +135,11 @@ macro_rules! globals_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"get_global0", &[]).expect("instance runs");
+            let retval = inst.run(b"get_global0", &[]).expect("instance runs");
+            assert_eq!(i64::from(retval), -1);
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(i64::from(retval), -1);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
-
-            inst.run(b"get_global1", &[]).expect("instance runs");
-
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(i64::from(retval), 420);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            let retval = inst.run(b"get_global1", &[]).expect("instance runs");
+            assert_eq!(i64::from(retval), 420);
         }
 
         #[test]
@@ -171,19 +153,8 @@ macro_rules! globals_tests {
             inst.run(b"set_global0", &[666i64.into()])
                 .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { .. } => (),
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
-
-            inst.run(b"get_global0", &[]).expect("instance runs");
-
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(i64::from(retval), 666);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            let retval = inst.run(b"get_global0", &[]).expect("instance runs");
+            assert_eq!(i64::from(retval), 666);
         }
 
         #[test]
@@ -195,7 +166,6 @@ macro_rules! globals_tests {
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
-            assert!(inst.is_ready());
 
             // Now the globals should be:
             // $x = 3
@@ -210,7 +180,6 @@ macro_rules! globals_tests {
             assert_eq!(heap_u32[0..=2], [4, 5, 6]);
 
             inst.run(b"main", &[]).expect("instance runs");
-            assert!(inst.is_ready());
 
             // now heap should be:
             // [0] = 3

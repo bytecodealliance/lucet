@@ -1,14 +1,15 @@
 use crate::alloc::{host_page_size, instance_heap_offset, Alloc, Limits, Slot};
+use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle};
 use crate::module::Module;
 use crate::region::{Region, RegionInternal};
-use failure::{bail, format_err, Error};
 use libc::{c_void, SIGSTKSZ};
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::mem;
 use std::ptr;
 use std::sync::{Arc, Mutex, Weak};
 
+/// A [`Region`](trait.Region.html) backed by `mmap`.
 pub struct MmapRegion {
     freelist: Mutex<Vec<Slot>>,
     limits: Limits,
@@ -25,7 +26,7 @@ impl Region for MmapRegion {
             .lock()
             .unwrap()
             .pop()
-            .ok_or(format_err!("no available slots on region"))?;
+            .ok_or(lucet_format_err!("no available slots on region"))?;
 
         if slot.heap as usize % host_page_size() != 0 {
             panic!("heap is not page-aligned");
@@ -39,7 +40,7 @@ impl Region for MmapRegion {
         if runtime_spec.heap.reserved_size > std::u32::MAX as u64 + 1
             || runtime_spec.heap.guard_size > std::u32::MAX as u64 + 1
         {
-            bail!("spec over limits");
+            lucet_bail!("spec over limits");
         }
 
         let limits = &slot.limits;
@@ -47,15 +48,15 @@ impl Region for MmapRegion {
         if runtime_spec.heap.reserved_size as usize + runtime_spec.heap.guard_size as usize
             > limits.heap_address_space_size
         {
-            bail!("spec over limits");
+            lucet_bail!("spec over limits");
         }
 
         if runtime_spec.heap.initial_size as usize > limits.heap_memory_size {
-            bail!("spec over limits");
+            lucet_bail!("spec over limits");
         }
 
         if runtime_spec.globals.len() * mem::size_of::<u64>() > limits.globals_size {
-            bail!("globals exceed limits");
+            lucet_bail!("globals exceed limits");
         }
 
         for (ptr, len) in [
@@ -81,7 +82,7 @@ impl Region for MmapRegion {
         let region = slot
             .region
             .upgrade()
-            .ok_or(format_err!("backing region of slot has been dropped"))?;
+            .ok_or(lucet_format_err!("backing region of slot has been dropped"))?;
 
         let alloc = Alloc {
             heap_accessible_size: runtime_spec.heap.initial_size as usize,
@@ -143,7 +144,7 @@ impl RegionInternal for MmapRegion {
         }
 
         if expand_bytes > std::u32::MAX - host_page_size - 1 {
-            bail!("expanded heap would overflow address space");
+            lucet_bail!("expanded heap would overflow address space");
         }
 
         // round the expansion up to a page boundary
@@ -153,7 +154,7 @@ impl RegionInternal for MmapRegion {
         // `heap_inaccessible_size` tracks the size of the allocation that is addressible but not
         // accessible. We cannot perform an expansion larger than this size.
         if expand_pagealigned as usize > alloc.heap_inaccessible_size {
-            bail!("expanded heap would overflow addressable memory");
+            lucet_bail!("expanded heap would overflow addressable memory");
         }
 
         // the above makes sure this expression does not underflow
@@ -165,7 +166,7 @@ impl RegionInternal for MmapRegion {
         // end of the accessible memory. We cannot perform an expansion that would make this region
         // smaller than the compiler expected it to be.
         if guard_remaining < rt_spec.heap.guard_size as usize {
-            bail!("expansion would leave guard memory too small");
+            lucet_bail!("expansion would leave guard memory too small");
         }
 
         // The compiler indicates that the module has specified a maximum memory size. Don't let
@@ -174,13 +175,13 @@ impl RegionInternal for MmapRegion {
             && alloc.heap_accessible_size + expand_pagealigned as usize
                 > rt_spec.heap.max_size as usize
         {
-            bail!("expansion would exceed compiler-specified heap limit");
+            lucet_bail!("expansion would exceed compiler-specified heap limit");
         }
 
         // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let
         // the heap expand beyond that:
         if alloc.heap_accessible_size + expand_pagealigned as usize > slot.limits.heap_memory_size {
-            bail!("expansion would exceed runtime-specified heap limit");
+            lucet_bail!("expansion would exceed runtime-specified heap limit");
         }
 
         let newly_accessible = alloc.heap_accessible_size;
@@ -236,13 +237,13 @@ impl RegionInternal for MmapRegion {
         let heap = unsafe { alloc.heap_mut() };
         let initial_pages = initial_size
             .checked_div(host_page_size())
-            .ok_or(format_err!(
+            .ok_or(lucet_format_err!(
                 "initial heap size must be divisible by host page size"
             ))?;
         for page_num in 0..initial_pages {
             let page_base = page_num * host_page_size();
             if heap.len() < page_base {
-                bail!("sparse page data exceeded initial heap size");
+                lucet_bail!("sparse page data exceeded initial heap size");
             }
             let contents_ptr = sparse_page_data.get(page_num).unwrap_or(&ptr::null());
             if contents_ptr.is_null() {
@@ -272,22 +273,27 @@ impl Drop for MmapRegion {
 }
 
 impl MmapRegion {
-    pub fn create(num_slots: usize, limits: &Limits) -> Result<Arc<Self>, Error> {
+    /// Create a new `MmapRegion` that can support a given number instances, each subject to the
+    /// same runtime limits.
+    ///
+    /// The region is returned in an `Arc`, because any instances created from it carry a reference
+    /// back to the region.
+    pub fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error> {
         assert!(
             SIGSTKSZ % host_page_size() == 0,
             "signal stack size is a multiple of host page size"
         );
         if !limits.validate() {
-            bail!("invalid limits");
+            lucet_bail!("invalid limits");
         }
 
         let region = Arc::new(MmapRegion {
-            freelist: Mutex::new(Vec::with_capacity(num_slots)),
+            freelist: Mutex::new(Vec::with_capacity(instance_capacity)),
             limits: limits.clone(),
         });
         {
             let mut freelist = region.freelist.lock().unwrap();
-            for _ in 0..num_slots {
+            for _ in 0..instance_capacity {
                 freelist.push(MmapRegion::create_slot(&region)?);
             }
         }
@@ -347,10 +353,6 @@ impl MmapRegion {
 }
 
 // TODO: remove this once `nix` PR https://github.com/nix-rust/nix/pull/991 is merged
-pub unsafe fn mprotect(
-    addr: *mut c_void,
-    length: libc::size_t,
-    prot: ProtFlags,
-) -> nix::Result<()> {
+unsafe fn mprotect(addr: *mut c_void, length: libc::size_t, prot: ProtFlags) -> nix::Result<()> {
     nix::errno::Errno::result(libc::mprotect(addr, length, prot.bits())).map(drop)
 }

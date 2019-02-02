@@ -165,6 +165,12 @@ pub struct UntypedRetVal {
     gp: u64,
 }
 
+impl std::fmt::Display for UntypedRetVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "<untyped return value>")
+    }
+}
+
 impl UntypedRetVal {
     pub fn new(gp: u64, fp: __m128) -> UntypedRetVal {
         UntypedRetVal { gp, fp }

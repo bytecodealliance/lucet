@@ -2,7 +2,7 @@
 macro_rules! strcmp_tests {
     ( $TestRegion:path ) => {
         use libc::{c_char, c_int, c_void, strcmp, uint64_t};
-        use lucet_runtime::{DlModule, Limits, Region, State, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::{DlModule, Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use std::ffi::CString;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
@@ -41,21 +41,17 @@ macro_rules! strcmp_tests {
             heap[s1_ptr..s2_ptr].copy_from_slice(&s1);
             heap[s2_ptr..s2_ptr + s2.len()].copy_from_slice(&s2);
 
-            inst.run(
-                b"run_strcmp",
-                &[
-                    Val::GuestPtr(s1_ptr as u32),
-                    Val::GuestPtr(s2_ptr as u32),
-                    Val::GuestPtr(res_ptr as u32),
-                ],
-            )
-            .expect("instance runs");
-            assert!(inst.is_ready());
-
-            let res = match &inst.state {
-                State::Ready { retval } => c_int::from(retval),
-                st => panic!("unexpected final state: {}", st),
-            };
+            let res = c_int::from(
+                inst.run(
+                    b"run_strcmp",
+                    &[
+                        Val::GuestPtr(s1_ptr as u32),
+                        Val::GuestPtr(s2_ptr as u32),
+                        Val::GuestPtr(res_ptr as u32),
+                    ],
+                )
+                .expect("instance runs"),
+            );
 
             let host_strcmp_res =
                 unsafe { strcmp(s1.as_ptr() as *const c_char, s2.as_ptr() as *const c_char) };
@@ -90,10 +86,10 @@ macro_rules! strcmp_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            assert!(inst
-                .run(b"wasm_fault", &[])
-                .expect("instance runs")
-                .is_fault());
+            match inst.run(b"wasm_fault", &[]) {
+                Err(Error::RuntimeFault { .. }) => (),
+                res => panic!("unexpected result: {:?}", res),
+            }
         }
     };
 }

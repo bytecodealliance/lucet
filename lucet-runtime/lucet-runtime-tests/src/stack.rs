@@ -1,7 +1,9 @@
 #[macro_export]
 macro_rules! stack_tests {
     ( $TestRegion:path ) => {
-        use lucet_runtime::{DlModule, InstanceHandle, Limits, Region, State, TrapCodeType, Val};
+        use lucet_runtime::{
+            DlModule, Error, InstanceHandle, Limits, Region, TrapCodeType, UntypedRetVal, Val,
+        };
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
@@ -10,7 +12,7 @@ macro_rules! stack_tests {
         const LOCALS_MULTIPAGE_SANDBOX_PATH: &'static str =
             "tests/build/stack_guests/locals_multipage.so";
 
-        fn run(path: &str, recursion_depth: libc::c_int) -> InstanceHandle {
+        fn run(path: &str, recursion_depth: libc::c_int) -> Result<UntypedRetVal, Error> {
             let module = DlModule::load_test(path).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
@@ -18,30 +20,24 @@ macro_rules! stack_tests {
                 .expect("instance can be created");
 
             inst.run(b"localpalooza", &[Val::CInt(recursion_depth)])
-                .expect("instance runs");
-            inst
         }
 
         fn expect_ok(path: &str, recursion_depth: libc::c_int) {
-            let inst = run(path, recursion_depth);
-            assert!(inst.is_ready());
+            assert!(run(path, recursion_depth).is_ok());
         }
 
         fn expect_stack_overflow(path: &str, recursion_depth: libc::c_int, probestack: bool) {
-            let inst = run(path, recursion_depth);
-            match &inst.state {
-                // We should get a nonfatal trap due to the stack overflow.
-                State::Fault {
-                    fatal, trapcode, ..
-                } => {
-                    assert_eq!(*fatal, false);
-                    assert_eq!(trapcode.ty, TrapCodeType::StackOverflow);
+            match run(path, recursion_depth) {
+                Err(Error::RuntimeFault(details)) => {
+                    // We should get a nonfatal trap due to the stack overflow.
+                    assert_eq!(details.fatal, false);
+                    assert_eq!(details.trapcode.ty, TrapCodeType::StackOverflow);
                     if probestack {
                         // When the runtime catches probestack, it puts this special tag in the trapcode
-                        assert_eq!(trapcode.tag, std::u16::MAX);
+                        assert_eq!(details.trapcode.tag, std::u16::MAX);
                     }
                 }
-                st => panic!("unexpected state: {}", st),
+                res => panic!("unexpected result: {:?}", res),
             }
         }
 

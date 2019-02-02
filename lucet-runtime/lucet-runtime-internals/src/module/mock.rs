@@ -1,7 +1,7 @@
+use crate::error::Error;
 use crate::module::{
     AddrDetails, HeapSpec, Module, ModuleInternal, RuntimeSpec, TableElement, TrapManifestRecord,
 };
-use failure::{format_err, Error};
 use libc::c_void;
 use std::collections::HashMap;
 
@@ -10,6 +10,7 @@ pub struct MockModule {
     pub sparse_page_data: Vec<*const c_void>,
     pub runtime_spec: RuntimeSpec,
     pub export_funcs: HashMap<Vec<u8>, *const extern "C" fn()>,
+    pub func_table: HashMap<(u32, u32), *const extern "C" fn()>,
     pub start_func: Option<extern "C" fn()>,
     pub trap_manifest: Vec<TrapManifestRecord>,
 }
@@ -21,6 +22,7 @@ impl MockModule {
             sparse_page_data: vec![],
             runtime_spec: RuntimeSpec::default(),
             export_funcs: HashMap::new(),
+            func_table: HashMap::new(),
             start_func: None,
             trap_manifest: vec![],
         }
@@ -53,12 +55,23 @@ impl ModuleInternal for MockModule {
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {
-        let func = self.export_funcs.get(sym).ok_or(format_err!(
-            "export func not found: {}",
-            String::from_utf8_lossy(sym)
-        ))?;
-        // eprintln!("{} at {:p}", String::from_utf8_lossy(sym), *func);
-        Ok(*func)
+        self.export_funcs
+            .get(sym)
+            .cloned()
+            .ok_or(Error::SymbolNotFound(
+                String::from_utf8_lossy(sym).into_owned(),
+            ))
+    }
+
+    fn get_export_func_from_id(
+        &self,
+        table_id: u32,
+        func_id: u32,
+    ) -> Result<*const extern "C" fn(), Error> {
+        self.func_table
+            .get(&(table_id, func_id))
+            .cloned()
+            .ok_or(Error::FuncNotFound(table_id, func_id))
     }
 
     fn get_start_func(&self) -> Result<Option<*const extern "C" fn()>, Error> {

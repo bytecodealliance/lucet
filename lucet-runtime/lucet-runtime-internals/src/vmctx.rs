@@ -1,7 +1,8 @@
 use crate::alloc::instance_heap_offset;
 use crate::context::Context;
 use crate::instance::{
-    Instance, InstanceInternal, State, CURRENT_INSTANCE, HOST_CTX, WASM_PAGE_SIZE,
+    Instance, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
+    WASM_PAGE_SIZE,
 };
 use libc::c_void;
 use std::sync::Once;
@@ -81,7 +82,9 @@ impl Instance {
     ///
     /// Only safe to call from within the guest context.
     unsafe fn terminate(&mut self, info: *mut c_void) -> ! {
-        self.state = State::Terminated { info };
+        self.state = State::Terminated {
+            details: TerminationDetails { info },
+        };
         HOST_CTX.with(|host_ctx| Context::set(&*host_ctx.get()))
     }
 }

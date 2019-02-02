@@ -5,11 +5,11 @@ pub use crate::instance::signals::{signal_handler_none, SignalBehavior};
 
 use crate::alloc::Alloc;
 use crate::context::Context;
+use crate::error::Error;
 use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, Module};
 use crate::trapcode::{TrapCode, TrapCodeType};
 use crate::val::{UntypedRetVal, Val};
-use failure::{bail, ensure, format_err, Error, ResultExt};
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
 use std::cell::{RefCell, UnsafeCell};
 use std::ffi::{CStr, CString};
@@ -18,7 +18,7 @@ use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
-pub const INSTANCE_PADDING: usize = 2296;
+pub const INSTANCE_PADDING: usize = 2280;
 
 pub const WASM_PAGE_SIZE: u32 = 64 * 1024;
 
@@ -63,10 +63,10 @@ pub fn new_instance_handle(
     alloc: Alloc,
     embed_ctx: *mut c_void,
 ) -> Result<InstanceHandle, Error> {
-    let inst = NonNull::new(instance).ok_or(format_err!("instance pointer is null"))?;
+    let inst = NonNull::new(instance).ok_or(lucet_format_err!("instance pointer is null"))?;
 
     // do this check first so we don't run `InstanceHandle::drop()` for a failure
-    ensure!(
+    lucet_ensure!(
         unsafe { inst.as_ref().magic } != LUCET_INSTANCE_MAGIC,
         "created a new instance handle in memory with existing instance magic"
     );
@@ -117,6 +117,16 @@ impl Drop for InstanceHandle {
     }
 }
 
+/// A Lucet program, together with its dedicated memory and signal handlers.
+///
+/// This is the primary interface for running programs, examining return values, and accessing the
+/// WebAssembly heap.
+///
+/// `Instance`s are never created by runtime users directly, but rather are acquired from
+/// [`Region`](trait.Region.html)s and often accessed through
+/// [`InstanceHandle`](struct.InstanceHandle.html) smart pointers. This guarantees that instances
+/// and their fields are never moved in memory, otherwise raw pointers in the metadata could be
+/// unsafely invalidated.
 #[repr(C)]
 pub struct Instance {
     /// Used to catch bugs in pointer math used to find the address of the instance
@@ -132,7 +142,7 @@ pub struct Instance {
     ctx: Context,
 
     /// Instance state and error information
-    pub state: State,
+    pub(crate) state: State,
 
     /// The memory allocated for this instance
     alloc: Alloc,
@@ -171,6 +181,7 @@ pub trait InstanceInternal {
     fn alloc(&self) -> &Alloc;
     fn alloc_mut(&mut self) -> &mut Alloc;
     fn module(&self) -> &dyn Module;
+    fn state(&self) -> &State;
     fn valid_magic(&self) -> bool;
 }
 
@@ -190,6 +201,11 @@ impl InstanceInternal for Instance {
         self.module.deref()
     }
 
+    /// Get a reference to the instance's `State`.
+    fn state(&self) -> &State {
+        &self.state
+    }
+
     /// Check whether the instance magic is valid.
     fn valid_magic(&self) -> bool {
         self.magic == LUCET_INSTANCE_MAGIC
@@ -199,11 +215,14 @@ impl InstanceInternal for Instance {
 // Public API
 impl Instance {
     // TODO: richer error types for this whole family of functions
-    pub fn run(&mut self, entrypoint: &[u8], args: &[Val]) -> Result<&State, Error> {
+    pub fn run(&mut self, entrypoint: &[u8], args: &[Val]) -> Result<UntypedRetVal, Error> {
         let func = self.module.get_export_func(entrypoint)?;
         self.run_func(func, &args)
     }
 
+    /// Reset the instance's heap and global variables to their initial state.
+    ///
+    /// The WebAssembly `start` section will also be run, if one exists.
     pub fn reset(&mut self) -> Result<(), Error> {
         self.alloc.reset_heap(self.module.as_ref())?;
         let globals = unsafe { self.alloc.globals_mut() };
@@ -229,37 +248,33 @@ impl Instance {
         Ok(orig_len / WASM_PAGE_SIZE)
     }
 
+    /// Return the WebAssembly heap as a slice of bytes.
     pub fn heap(&self) -> &[u8] {
         unsafe { self.alloc.heap() }
     }
 
+    /// Return the WebAssembly heap as a mutable slice of bytes.
     pub fn heap_mut(&mut self) -> &mut [u8] {
         unsafe { self.alloc.heap_mut() }
     }
 
+    /// Return the WebAssembly heap as a slice of `u32`s.
     pub fn heap_u32(&self) -> &[u32] {
         unsafe { self.alloc.heap_u32() }
     }
 
+    /// Return the WebAssembly heap as a mutable slice of `u32`s.
     pub fn heap_u32_mut(&mut self) -> &mut [u32] {
         unsafe { self.alloc.heap_u32_mut() }
     }
 
-    /// Check if a memory region is inside the instance heap.
+    /// Check if a host memory region intersects the instance heap.
     pub fn check_heap(&self, ptr: *const c_void, len: usize) -> bool {
         self.alloc.mem_in_heap(ptr, len)
     }
-
-    // TODO: replace this with a richer `run` interface?
-    pub fn is_ready(&self) -> bool {
-        self.state.is_ready()
-    }
-
-    pub fn is_terminated(&self) -> bool {
-        self.state.is_terminated()
-    }
 }
 
+// Private API
 impl Instance {
     fn new(alloc: Alloc, module: Box<dyn Module>, embed_ctx: *mut c_void) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
@@ -280,8 +295,13 @@ impl Instance {
         }
     }
 
-    fn run_func(&mut self, func: *const extern "C" fn(), args: &[Val]) -> Result<&State, Error> {
-        ensure!(!func.is_null(), "func cannot be null");
+    fn run_func(
+        &mut self,
+        func: *const extern "C" fn(),
+        args: &[Val],
+    ) -> Result<UntypedRetVal, Error> {
+        lucet_ensure!(self.state.is_ready(), "instance must be ready");
+        lucet_ensure!(!func.is_null(), "func cannot be null");
         self.entrypoint = func;
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
@@ -328,32 +348,45 @@ impl Instance {
         //
         // * trapped, or called hostcall_error: state tag changed to something other than `Running`
         // * function body returned: set state back to `Ready` with return value
-        if self.state.is_running() {
-            let retval = self.ctx.get_untyped_retval();
-            self.state = State::Ready { retval };
-        }
 
-        // Sandbox is no longer runnable. It's unsafe to determine all error details in the signal
-        // handler, so we fill in extra details here.
-        if self.state.is_fault() {
-            self.state = self.populate_fault_detail()?;
+        match self.state {
+            State::Running => {
+                let retval = self.ctx.get_untyped_retval();
+                self.state = State::Ready { retval };
+                Ok(retval)
+            }
+            State::Terminated { details, .. } => {
+                // Sandbox is no longer runnable due to termination in hostcall
+                Err(Error::RuntimeTerminated(details))
+            }
+            State::Fault { .. } => {
+                // Sandbox is no longer runnable. It's unsafe to determine all error details in the signal
+                // handler, so we fill in extra details here.
+                self.state = self.populate_fault_detail()?;
+                if let State::Fault { ref details, .. } = self.state {
+                    if details.fatal {
+                        // Some errors indicate that the guest is not functioning correctly or that
+                        // the loaded code violated some assumption, so bail out via the fatal
+                        // handler.
+                        (self.fatal_handler)(self)
+                    } else {
+                        // leave the full fault details in the instance state, and return the
+                        // higher-level info to the user
+                        Err(Error::RuntimeFault(details.clone()))
+                    }
+                } else {
+                    panic!("state remains Fault after populate_fault_detail()")
+                }
+            }
+            State::Ready { .. } => {
+                panic!("instance in Ready state after returning from guest context")
+            }
         }
-
-        // Some errors indicate that the guest is not functioning correctly or that the loaded code
-        // violated some assumption, so bail out via the fatal handler.
-        if self.state.is_fatal() {
-            (self.fatal_handler)(self);
-        }
-
-        Ok(&self.state)
     }
 
     fn run_start(&mut self) -> Result<(), Error> {
         if let Some(start) = self.module.get_start_func()? {
-            self.run_func(start, &[]).context("module start")?;
-            if !self.is_ready() {
-                bail!("unexpected state after module start: {}", self.state);
-            }
+            self.run_func(start, &[])?;
         }
         Ok(())
     }
@@ -361,8 +394,9 @@ impl Instance {
     fn populate_fault_detail(&mut self) -> Result<State, Error> {
         match &self.state {
             State::Fault {
-                rip_addr,
-                trapcode,
+                details: FaultDetails {
+                    rip_addr, trapcode, ..
+                },
                 siginfo,
                 context,
                 ..
@@ -380,10 +414,12 @@ impl Instance {
                     && !self.alloc.addr_in_heap_guard(siginfo.si_addr());
 
                 Ok(State::Fault {
-                    fatal: unknown_fault || outside_guard,
-                    trapcode: *trapcode,
-                    rip_addr: *rip_addr,
-                    rip_addr_details,
+                    details: FaultDetails {
+                        fatal: unknown_fault || outside_guard,
+                        trapcode: *trapcode,
+                        rip_addr: *rip_addr,
+                        rip_addr_details,
+                    },
                     siginfo: *siginfo,
                     context: *context,
                 })
@@ -400,17 +436,30 @@ pub enum State {
     },
     Running,
     Fault {
-        fatal: bool,
-        trapcode: TrapCode,
-        rip_addr: uintptr_t,
-        rip_addr_details: Option<module::AddrDetails>,
+        details: FaultDetails,
         siginfo: libc::siginfo_t,
         context: libc::ucontext_t,
     },
     Terminated {
-        info: *mut c_void,
+        details: TerminationDetails,
     },
 }
+
+#[derive(Clone, Debug)]
+pub struct FaultDetails {
+    pub fatal: bool,
+    pub trapcode: TrapCode,
+    pub rip_addr: uintptr_t,
+    pub rip_addr_details: Option<module::AddrDetails>,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct TerminationDetails {
+    pub info: *mut c_void,
+}
+
+unsafe impl Send for TerminationDetails {}
+unsafe impl Sync for TerminationDetails {}
 
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -418,11 +467,14 @@ impl std::fmt::Display for State {
             State::Ready { .. } => write!(f, "ready"),
             State::Running => write!(f, "running"),
             State::Fault {
-                fatal,
-                rip_addr,
-                rip_addr_details,
+                details:
+                    FaultDetails {
+                        fatal,
+                        trapcode,
+                        rip_addr,
+                        rip_addr_details,
+                    },
                 siginfo,
-                trapcode,
                 ..
             } => {
                 // TODO: finish implementing this
@@ -504,7 +556,11 @@ impl State {
     }
 
     pub fn is_fatal(&self) -> bool {
-        if let State::Fault { fatal, .. } = self {
+        if let State::Fault {
+            details: FaultDetails { fatal, .. },
+            ..
+        } = self
+        {
             *fatal
         } else {
             false
