@@ -3,9 +3,10 @@ macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, siginfo_t, SIGSEGV};
+        use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             DlModule, Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TrapCode,
-            TrapCodeType, Vmctx,
+            TrapCodeType,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -64,7 +65,7 @@ macro_rules! guest_fault_tests {
         static HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
 
         #[no_mangle]
-        unsafe extern "C" fn hostcall_test(vmctx: *mut c_void) {
+        unsafe extern "C" fn hostcall_test(vmctx: *mut lucet_vmctx) {
             Vmctx::from_raw(vmctx).terminate(HOSTCALL_TEST_ERROR.as_ptr() as *mut c_void);
         }
 
@@ -427,7 +428,7 @@ macro_rules! guest_fault_tests {
                 *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = true;
             }
 
-            extern "C" fn sleepy_guest(_vmctx: *const c_void) {
+            extern "C" fn sleepy_guest(_vmctx: *const lucet_vmctx) {
                 std::thread::sleep(std::time::Duration::from_millis(20));
             }
 

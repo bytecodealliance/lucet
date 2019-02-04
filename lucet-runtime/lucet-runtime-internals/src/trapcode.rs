@@ -1,9 +1,12 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
+/// The details associated with a WebAssembly
+/// [trap](http://webassembly.github.io/spec/core/intro/overview.html#trap).
 #[derive(Copy, Clone, Debug)]
 pub struct TrapCode {
     pub ty: TrapCodeType,
+    /// Mainly for internal testing, this field will likely be deprecated soon.
     pub tag: u16,
 }
 
@@ -27,6 +30,8 @@ impl TrapCode {
     }
 }
 
+/// The type of a WebAssembly
+/// [trap](http://webassembly.github.io/spec/core/intro/overview.html#trap).
 #[repr(u16)]
 #[derive(Copy, Clone, Debug, FromPrimitive, PartialEq)]
 pub enum TrapCodeType {

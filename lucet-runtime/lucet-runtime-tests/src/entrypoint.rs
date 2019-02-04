@@ -2,12 +2,13 @@
 macro_rules! entrypoint_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
+        use lucet_runtime::vmctx::lucet_vmctx;
         use lucet_runtime::{DlModule, Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
         #[no_mangle]
-        extern "C" fn black_box(_vmctx: *mut c_void, _val: *mut c_void) {}
+        extern "C" fn black_box(_vmctx: *mut lucet_vmctx, _val: *mut c_void) {}
 
         const C_CALCULATOR_MOD_PATH: &'static str =
             "lucet-runtime-c/test/build/entrypoint/calculator.so";

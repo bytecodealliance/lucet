@@ -2,7 +2,8 @@
 macro_rules! host_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
-        use lucet_runtime::{DlModule, Error, Limits, Region, TrapCodeType, Vmctx};
+        use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
+        use lucet_runtime::{DlModule, Error, Limits, Region, TrapCodeType};
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
@@ -23,7 +24,11 @@ macro_rules! host_tests {
         }
 
         #[no_mangle]
-        extern "C" fn hostcall_test_func_hello(vmctx: *mut c_void, hello_ptr: u32, hello_len: u32) {
+        extern "C" fn hostcall_test_func_hello(
+            vmctx: *mut lucet_vmctx,
+            hello_ptr: u32,
+            hello_len: u32,
+        ) {
             unsafe {
                 let mut vmctx = Vmctx::from_raw(vmctx);
                 let confirmed_hello = vmctx.embed_ctx() as *mut bool;
@@ -41,7 +46,7 @@ macro_rules! host_tests {
 
         const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
         #[no_mangle]
-        extern "C" fn hostcall_test_func_hostcall_error(vmctx: *mut c_void) {
+        extern "C" fn hostcall_test_func_hostcall_error(vmctx: *mut lucet_vmctx) {
             let info = Box::new(ERROR_MESSAGE);
             unsafe { Vmctx::from_raw(vmctx).terminate(Box::into_raw(info) as *mut c_void) }
         }

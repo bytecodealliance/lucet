@@ -268,8 +268,19 @@ impl Instance {
         unsafe { self.alloc.heap_u32_mut() }
     }
 
-    /// Check if a host memory region intersects the instance heap.
-    pub fn check_heap(&self, ptr: *const c_void, len: usize) -> bool {
+    /// Return the WebAssembly globals as a slice of `i64`s.
+    pub fn globals(&self) -> &[i64] {
+        unsafe { self.alloc.globals() }
+    }
+
+    /// Return the WebAssembly globals as a mutable slice of `i64`s.
+    pub fn globals_mut(&mut self) -> &mut [i64] {
+        unsafe { self.alloc.globals_mut() }
+    }
+
+    /// Check whether a given range in the host address space overlaps with the memory that backs
+    /// the instance heap.
+    pub fn check_heap<T>(&self, ptr: *const T, len: usize) -> bool {
         self.alloc.mem_in_heap(ptr, len)
     }
 }
@@ -445,16 +456,63 @@ pub enum State {
     },
 }
 
+/// Information about a runtime fault.
+///
+/// Runtime faults are raised implictly by signal handlers that return `SignalBehavior::Default` in
+/// response to signals arising while a guest is running.
 #[derive(Clone, Debug)]
 pub struct FaultDetails {
+    /// If true, the instance's `fatal_handler` will be called.
     pub fatal: bool,
+    /// Information about the type of fault that occurred.
     pub trapcode: TrapCode,
+    /// The instruction pointer where the fault occurred.
     pub rip_addr: uintptr_t,
+    /// Extra information about the instruction pointer's location, if available.
     pub rip_addr_details: Option<module::AddrDetails>,
 }
 
+impl std::fmt::Display for FaultDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if self.fatal {
+            write!(f, "fault FATAL ")?;
+        } else {
+            write!(f, "fault ")?;
+        }
+
+        self.trapcode.fmt(f)?;
+
+        write!(f, "code at address {:p}", self.rip_addr as *const c_void)?;
+
+        if let Some(ref addr_details) = self.rip_addr_details {
+            if let Some(ref fname) = addr_details.file_name {
+                let sname = addr_details
+                    .sym_name
+                    .as_ref()
+                    .map(String::as_str)
+                    .unwrap_or("<unknown>");
+                write!(f, " (symbol {}:{})", fname, sname)?;
+            }
+            if addr_details.in_module_code {
+                write!(f, " (inside module code)")
+            } else {
+                write!(f, " (not inside module code)")
+            }
+        } else {
+            write!(f, " (unknown whether in module)")
+        }
+    }
+}
+
+/// Information about a terminated guest.
+///
+/// Guests are terminated either explicitly by `Vmctx::terminate()`, or implicitly by signal
+/// handlers that return `SignalBehavior::Terminate`. It usually indicates that an unrecoverable
+/// error has occurred in a hostcall, rather than in WebAssembly code.
 #[derive(Copy, Clone, Debug)]
 pub struct TerminationDetails {
+    /// Calls to `Vmctx::terminate()` may attach an arbitrary pointer for extra debugging
+    /// information.
     pub info: *mut c_void,
 }
 
@@ -467,25 +525,9 @@ impl std::fmt::Display for State {
             State::Ready { .. } => write!(f, "ready"),
             State::Running => write!(f, "running"),
             State::Fault {
-                details:
-                    FaultDetails {
-                        fatal,
-                        trapcode,
-                        rip_addr,
-                        rip_addr_details,
-                    },
-                siginfo,
-                ..
+                details, siginfo, ..
             } => {
-                // TODO: finish implementing this
-                if *fatal {
-                    write!(f, "fault FATAL ")?;
-                } else {
-                    write!(f, "fault ")?;
-                }
-
-                trapcode.fmt(f)?;
-
+                write!(f, "{}", details)?;
                 write!(
                     f,
                     " triggered by {}: ",
@@ -493,26 +535,6 @@ impl std::fmt::Display for State {
                         .into_string()
                         .expect("strsignal returns valid UTF-8")
                 )?;
-
-                write!(f, "code at address {:p}", *rip_addr as *const c_void)?;
-
-                if let Some(addr_details) = rip_addr_details {
-                    if let Some(ref fname) = addr_details.file_name {
-                        let sname = addr_details
-                            .sym_name
-                            .as_ref()
-                            .map(String::as_str)
-                            .unwrap_or("<unknown>");
-                        write!(f, " (symbol {}:{})", fname, sname)?;
-                    }
-                    if addr_details.in_module_code {
-                        write!(f, " (inside module code)")?;
-                    } else {
-                        write!(f, " (not inside module code)")?;
-                    }
-                } else {
-                    write!(f, " (unknown whether in module)")?;
-                }
 
                 if siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS {
                     // We know this is inside the heap guard, because by the time we get here,

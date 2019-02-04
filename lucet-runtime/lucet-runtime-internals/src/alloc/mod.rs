@@ -217,6 +217,14 @@ impl Alloc {
         )
     }
 
+    /// Return the globals as a slice.
+    pub unsafe fn globals(&self) -> &[i64] {
+        std::slice::from_raw_parts(
+            self.slot().globals as *const i64,
+            self.slot().limits.globals_size / 8,
+        )
+    }
+
     /// Return the globals as a mutable slice.
     pub unsafe fn globals_mut(&mut self) -> &mut [i64] {
         std::slice::from_raw_parts_mut(
@@ -230,7 +238,7 @@ impl Alloc {
         std::slice::from_raw_parts_mut(self.slot().sigstack as *mut u8, libc::SIGSTKSZ)
     }
 
-    pub fn mem_in_heap(&self, ptr: *const c_void, len: usize) -> bool {
+    pub fn mem_in_heap<T>(&self, ptr: *const T, len: usize) -> bool {
         let start = ptr as usize;
         let end = start + len;
 

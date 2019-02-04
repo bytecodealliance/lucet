@@ -63,7 +63,7 @@ impl ModuleInternal for MockModule {
             ))
     }
 
-    fn get_export_func_from_id(
+    fn get_func_from_idx(
         &self,
         table_id: u32,
         func_id: u32,

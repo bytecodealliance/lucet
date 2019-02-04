@@ -2,6 +2,7 @@
 macro_rules! strcmp_tests {
     ( $TestRegion:path ) => {
         use libc::{c_char, c_int, c_void, strcmp, uint64_t};
+        use lucet_runtime::vmctx::lucet_vmctx;
         use lucet_runtime::{DlModule, Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use std::ffi::CString;
         use $TestRegion as TestRegion;
@@ -10,7 +11,7 @@ macro_rules! strcmp_tests {
         const FAULT_MOD_PATH: &'static str = "tests/build/strcmp_guests/fault_guest.so";
 
         #[no_mangle]
-        unsafe extern "C" fn hostcall_host_fault(_vmctx: *const c_void) {
+        unsafe extern "C" fn hostcall_host_fault(_vmctx: *const lucet_vmctx) {
             let oob = (-1isize) as *mut c_char;
             *oob = 'x' as c_char;
         }

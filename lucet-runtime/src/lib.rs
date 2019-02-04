@@ -155,4 +155,19 @@ pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::Region;
 pub use lucet_runtime_internals::trapcode::{TrapCode, TrapCodeType};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
-pub use lucet_runtime_internals::vmctx::Vmctx;
+
+pub mod vmctx {
+    //! Functions for manipulating instances from hostcalls.
+    //!
+    //! The Lucet compiler inserts an extra `*mut lucet_vmctx` argument to all functions defined and
+    //! called by WebAssembly code. Through this pointer, code running in the guest context can
+    //! access and manipulate the instance and its structures. These functions are intended for use
+    //! in hostcall implementations, and must only be used from within a running guest.
+    //!
+    //! # Panics
+    //!
+    //! All of the `Vmctx` methods will panic if the `Vmctx` was not created from a valid pointer
+    //! associated with a running instance. This should never occur if run in guest code on the
+    //! pointer argument inserted by the compiler.
+    pub use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
+}

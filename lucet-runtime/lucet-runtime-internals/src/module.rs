@@ -175,7 +175,7 @@ pub trait ModuleInternal {
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error>;
 
-    fn get_export_func_from_id(
+    fn get_func_from_idx(
         &self,
         table_id: u32,
         func_id: u32,
