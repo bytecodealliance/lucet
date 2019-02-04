@@ -160,7 +160,10 @@ macro_rules! guest_fault_tests {
 
                 match inst.run(b"main", &[]) {
                     Err(Error::RuntimeTerminated(details)) => {
-                        assert_eq!(details.info, HOSTCALL_TEST_ERROR.as_ptr() as *mut c_void);
+                        assert_eq!(
+                            details.unwrap().info,
+                            HOSTCALL_TEST_ERROR.as_ptr() as *mut c_void
+                        );
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }

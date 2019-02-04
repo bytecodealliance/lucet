@@ -1,6 +1,6 @@
 pub mod mmap;
 
-use crate::alloc::Alloc;
+use crate::alloc::{Alloc, Slot};
 use crate::error::Error;
 use crate::instance::InstanceHandle;
 use crate::module::Module;
@@ -32,9 +32,8 @@ pub trait RegionInternal {
     /// ranges in its `Slot`.
     fn drop_alloc(&self, alloc: &mut Alloc);
 
-    /// Expand the heap by some number of bytes, returning the offset in the heap at which the new
-    /// space begins.
-    fn expand_heap(&self, alloc: &mut Alloc, expand_bytes: u32) -> Result<u32, Error>;
+    /// Expand the heap for the given slot to include the given range.
+    fn expand_heap(&self, slot: &Slot, start: u32, len: u32) -> Result<(), Error>;
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error>;
 }

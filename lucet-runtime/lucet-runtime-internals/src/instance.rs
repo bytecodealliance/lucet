@@ -63,12 +63,13 @@ pub fn new_instance_handle(
     alloc: Alloc,
     embed_ctx: *mut c_void,
 ) -> Result<InstanceHandle, Error> {
-    let inst = NonNull::new(instance).ok_or(lucet_format_err!("instance pointer is null"))?;
+    let inst = NonNull::new(instance)
+        .ok_or(lucet_format_err!("instance pointer is null; this is a bug"))?;
 
     // do this check first so we don't run `InstanceHandle::drop()` for a failure
     lucet_ensure!(
         unsafe { inst.as_ref().magic } != LUCET_INSTANCE_MAGIC,
-        "created a new instance handle in memory with existing instance magic"
+        "created a new instance handle in memory with existing instance magic; this is a bug"
     );
 
     let mut handle = InstanceHandle { inst };
@@ -311,8 +312,15 @@ impl Instance {
         func: *const extern "C" fn(),
         args: &[Val],
     ) -> Result<UntypedRetVal, Error> {
-        lucet_ensure!(self.state.is_ready(), "instance must be ready");
-        lucet_ensure!(!func.is_null(), "func cannot be null");
+        lucet_ensure!(
+            self.state.is_ready(),
+            "instance must be ready; this is a bug"
+        );
+        if func.is_null() {
+            return Err(Error::InvalidArgument(
+                "entrypoint function cannot be null; this is probably a malformed module",
+            ));
+        }
         self.entrypoint = func;
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
@@ -368,6 +376,11 @@ impl Instance {
             }
             State::Terminated { details, .. } => {
                 // Sandbox is no longer runnable due to termination in hostcall
+                let details = if details.info.is_null() {
+                    None
+                } else {
+                    Some(details)
+                };
                 Err(Error::RuntimeTerminated(details))
             }
             State::Fault { .. } => {

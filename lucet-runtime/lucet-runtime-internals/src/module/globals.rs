@@ -64,10 +64,10 @@ pub unsafe fn read_from_module(spec: *const GlobalsSpec) -> Result<Vec<i64>, Err
                     CStr::from_bytes_with_nul_unchecked(b"<unknown>\0")
                 }
             };
-            lucet_bail!(
+            return Err(Error::Unsupported(format!(
                 "import globals are not supported; found import `{}`",
                 name.to_string_lossy()
-            );
+            )));
         } else {
             // non-import globals always have an initial value
             // eprintln!("globals[{}] = {}", i, desc.initial_value);

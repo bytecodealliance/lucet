@@ -6,6 +6,7 @@ mod sparse_page_data;
 pub use crate::module::dl::DlModule;
 pub use crate::module::mock::MockModule;
 
+use crate::alloc::Limits;
 use crate::error::Error;
 use crate::probestack::{lucet_probestack, lucet_probestack_size};
 use crate::trapcode::{TrapCode, TrapCodeType};
@@ -113,6 +114,39 @@ impl Default for HeapSpec {
             max_size: 64 * 1024,
             max_size_valid: 1,
         }
+    }
+}
+
+impl RuntimeSpec {
+    /// Check that a spec is valid given certain `Limit`s.
+    pub fn validate(&self, limits: &Limits) -> Result<(), Error> {
+        // Assure that the total reserved + guard regions fit in the address space.
+        // First check makes sure they fit our 32-bit model, and ensures the second
+        // check doesn't overflow.
+        if self.heap.reserved_size > std::u32::MAX as u64 + 1
+            || self.heap.guard_size > std::u32::MAX as u64 + 1
+        {
+            return Err(lucet_incorrect_module!(
+                "heap spec sizes would overflow: {:?}",
+                self.heap
+            ));
+        }
+
+        if self.heap.reserved_size as usize + self.heap.guard_size as usize
+            > limits.heap_address_space_size
+        {
+            lucet_limits_exceeded!("heap spec reserved and guard size: {:?}", self.heap);
+        }
+
+        if self.heap.initial_size as usize > limits.heap_memory_size {
+            lucet_limits_exceeded!("heap spec initial size: {:?}", self.heap);
+        }
+
+        if self.globals.len() * std::mem::size_of::<u64>() > limits.globals_size {
+            lucet_limits_exceeded!("globals exceed limits");
+        }
+
+        Ok(())
     }
 }
 

@@ -99,7 +99,7 @@ macro_rules! host_tests {
 
             match inst.run(b"main", &[]) {
                 Err(Error::RuntimeTerminated(details)) => {
-                    let info = unsafe { Box::from_raw(details.info as *mut &'static str) };
+                    let info = unsafe { Box::from_raw(details.unwrap().info as *mut &'static str) };
                     assert_eq!(*info, ERROR_MESSAGE);
                 }
                 res => panic!("unexpected result: {:?}", res),

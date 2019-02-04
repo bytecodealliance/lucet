@@ -121,7 +121,76 @@ impl Alloc {
     }
 
     pub fn expand_heap(&mut self, expand_bytes: u32) -> Result<u32, Error> {
-        self.region.clone().expand_heap(self, expand_bytes)
+        let slot = self.slot();
+
+        if expand_bytes == 0 {
+            // no expansion takes place, which is not an error
+            return Ok(self.heap_accessible_size as u32);
+        }
+
+        let host_page_size = host_page_size() as u32;
+
+        if self.heap_accessible_size as u32 % host_page_size != 0 {
+            lucet_bail!("heap is not page-aligned; this is a bug");
+        }
+
+        if expand_bytes > std::u32::MAX - host_page_size - 1 {
+            lucet_limits_exceeded!("expanded heap would overflow address space");
+        }
+
+        // round the expansion up to a page boundary
+        let expand_pagealigned =
+            ((expand_bytes + host_page_size - 1) / host_page_size) * host_page_size;
+
+        // `heap_inaccessible_size` tracks the size of the allocation that is addressible but not
+        // accessible. We cannot perform an expansion larger than this size.
+        if expand_pagealigned as usize > self.heap_inaccessible_size {
+            lucet_limits_exceeded!("expanded heap would overflow addressable memory");
+        }
+
+        // the above makes sure this expression does not underflow
+        let guard_remaining = self.heap_inaccessible_size - expand_pagealigned as usize;
+
+        let rt_spec = &self.runtime_spec;
+
+        // The compiler specifies how much guard (memory which traps on access) must be beyond the
+        // end of the accessible memory. We cannot perform an expansion that would make this region
+        // smaller than the compiler expected it to be.
+        if guard_remaining < rt_spec.heap.guard_size as usize {
+            lucet_limits_exceeded!("expansion would leave guard memory too small");
+        }
+
+        // The compiler indicates that the module has specified a maximum memory size. Don't let
+        // the heap expand beyond that:
+        if rt_spec.heap.max_size_valid == 1
+            && self.heap_accessible_size + expand_pagealigned as usize
+                > rt_spec.heap.max_size as usize
+        {
+            lucet_limits_exceeded!(
+                "expansion would exceed module-specified heap limit: {:?}",
+                rt_spec.heap
+            );
+        }
+
+        // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let
+        // the heap expand beyond that:
+        if self.heap_accessible_size + expand_pagealigned as usize > slot.limits.heap_memory_size {
+            lucet_limits_exceeded!(
+                "expansion would exceed runtime-specified heap limit: {:?}",
+                slot.limits
+            );
+        }
+
+        let newly_accessible = self.heap_accessible_size;
+
+        self.region
+            .clone()
+            .expand_heap(slot, newly_accessible as u32, expand_pagealigned)?;
+
+        self.heap_accessible_size += expand_pagealigned as usize;
+        self.heap_inaccessible_size -= expand_pagealigned as usize;
+
+        Ok(newly_accessible as u32)
     }
 
     pub fn reset_heap(&mut self, module: &dyn Module) -> Result<(), Error> {
@@ -300,12 +369,31 @@ impl Limits {
     }
 
     /// Validate that the limits are aligned to page sizes, and that the stack is not empty.
-    pub fn validate(&self) -> bool {
-        self.heap_memory_size % host_page_size() == 0
-            && self.heap_address_space_size % host_page_size() == 0
-            && self.stack_size % host_page_size() == 0
-            && self.globals_size % host_page_size() == 0
-            && self.stack_size > 0
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.heap_memory_size % host_page_size() != 0 {
+            return Err(Error::InvalidArgument(
+                "memory size must be a multiple of host page size",
+            ));
+        }
+        if self.heap_address_space_size % host_page_size() != 0 {
+            return Err(Error::InvalidArgument(
+                "address space size must be a multiple of host page size",
+            ));
+        }
+        if self.stack_size % host_page_size() != 0 {
+            return Err(Error::InvalidArgument(
+                "stack size must be a multiple of host page size",
+            ));
+        }
+        if self.globals_size % host_page_size() != 0 {
+            return Err(Error::InvalidArgument(
+                "globals size must be a multiple of host page size",
+            ));
+        }
+        if self.stack_size <= 0 {
+            return Err(Error::InvalidArgument("stack size must be greater than 0"));
+        }
+        Ok(())
     }
 }
 

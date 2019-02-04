@@ -5,12 +5,12 @@ use crate::module::Module;
 use crate::region::{Region, RegionInternal};
 use libc::{c_void, SIGSTKSZ};
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
-use std::mem;
 use std::ptr;
 use std::sync::{Arc, Mutex, Weak};
 
 /// A [`Region`](trait.Region.html) backed by `mmap`.
 pub struct MmapRegion {
+    capacity: usize,
     freelist: Mutex<Vec<Slot>>,
     limits: Limits,
 }
@@ -26,38 +26,15 @@ impl Region for MmapRegion {
             .lock()
             .unwrap()
             .pop()
-            .ok_or(lucet_format_err!("no available slots on region"))?;
+            .ok_or(Error::RegionFull(self.capacity))?;
 
         if slot.heap as usize % host_page_size() != 0 {
-            panic!("heap is not page-aligned");
+            lucet_bail!("heap is not page-aligned; this is a bug");
         }
 
         let runtime_spec = module.runtime_spec();
-
-        // Assure that the total reserved + guard regions fit in the address space.
-        // First check makes sure they fit our 32-bit model, and ensures the second
-        // check doesn't overflow.
-        if runtime_spec.heap.reserved_size > std::u32::MAX as u64 + 1
-            || runtime_spec.heap.guard_size > std::u32::MAX as u64 + 1
-        {
-            lucet_bail!("spec over limits");
-        }
-
         let limits = &slot.limits;
-
-        if runtime_spec.heap.reserved_size as usize + runtime_spec.heap.guard_size as usize
-            > limits.heap_address_space_size
-        {
-            lucet_bail!("spec over limits");
-        }
-
-        if runtime_spec.heap.initial_size as usize > limits.heap_memory_size {
-            lucet_bail!("spec over limits");
-        }
-
-        if runtime_spec.globals.len() * mem::size_of::<u64>() > limits.globals_size {
-            lucet_bail!("globals exceed limits");
-        }
+        runtime_spec.validate(limits)?;
 
         for (ptr, len) in [
             // make the heap read/writable and record its initial size
@@ -82,7 +59,9 @@ impl Region for MmapRegion {
         let region = slot
             .region
             .upgrade()
-            .ok_or(lucet_format_err!("backing region of slot has been dropped"))?;
+            // if this precondition isn't met, something is deeply wrong as some other region's slot
+            // ended up in our freelist
+            .expect("backing region of slot (`self`) exists");
 
         let alloc = Alloc {
             heap_accessible_size: runtime_spec.heap.initial_size as usize,
@@ -129,73 +108,15 @@ impl RegionInternal for MmapRegion {
         self.freelist.lock().unwrap().push(slot);
     }
 
-    fn expand_heap(&self, alloc: &mut Alloc, expand_bytes: u32) -> Result<u32, Error> {
-        let slot = alloc.slot();
-
-        if expand_bytes == 0 {
-            // no expansion takes place, which is not an error
-            return Ok(alloc.heap_accessible_size as u32);
-        }
-
-        let host_page_size = host_page_size() as u32;
-
-        if alloc.heap_accessible_size as u32 % host_page_size != 0 {
-            panic!("heap is not page-aligned");
-        }
-
-        if expand_bytes > std::u32::MAX - host_page_size - 1 {
-            lucet_bail!("expanded heap would overflow address space");
-        }
-
-        // round the expansion up to a page boundary
-        let expand_pagealigned =
-            ((expand_bytes + host_page_size - 1) / host_page_size) * host_page_size;
-
-        // `heap_inaccessible_size` tracks the size of the allocation that is addressible but not
-        // accessible. We cannot perform an expansion larger than this size.
-        if expand_pagealigned as usize > alloc.heap_inaccessible_size {
-            lucet_bail!("expanded heap would overflow addressable memory");
-        }
-
-        // the above makes sure this expression does not underflow
-        let guard_remaining = alloc.heap_inaccessible_size - expand_pagealigned as usize;
-
-        let rt_spec = &alloc.runtime_spec;
-
-        // The compiler specifies how much guard (memory which traps on access) must be beyond the
-        // end of the accessible memory. We cannot perform an expansion that would make this region
-        // smaller than the compiler expected it to be.
-        if guard_remaining < rt_spec.heap.guard_size as usize {
-            lucet_bail!("expansion would leave guard memory too small");
-        }
-
-        // The compiler indicates that the module has specified a maximum memory size. Don't let
-        // the heap expand beyond that:
-        if rt_spec.heap.max_size_valid == 1
-            && alloc.heap_accessible_size + expand_pagealigned as usize
-                > rt_spec.heap.max_size as usize
-        {
-            lucet_bail!("expansion would exceed compiler-specified heap limit");
-        }
-
-        // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let
-        // the heap expand beyond that:
-        if alloc.heap_accessible_size + expand_pagealigned as usize > slot.limits.heap_memory_size {
-            lucet_bail!("expansion would exceed runtime-specified heap limit");
-        }
-
-        let newly_accessible = alloc.heap_accessible_size;
+    fn expand_heap(&self, slot: &Slot, start: u32, len: u32) -> Result<(), Error> {
         unsafe {
             mprotect(
-                (slot.heap as usize + newly_accessible) as *mut c_void,
-                expand_pagealigned as usize,
+                (slot.heap as usize + start as usize) as *mut c_void,
+                len as usize,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-            )?
-        };
-        alloc.heap_accessible_size += expand_pagealigned as usize;
-        alloc.heap_inaccessible_size -= expand_pagealigned as usize;
-
-        Ok(newly_accessible as u32)
+            )?;
+        }
+        Ok(())
     }
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error> {
@@ -235,15 +156,20 @@ impl RegionInternal for MmapRegion {
         // is NULL, or because the sparse data has fewer pages than the initial heap, are zeroed.
         let sparse_page_data = module.sparse_page_data()?;
         let heap = unsafe { alloc.heap_mut() };
-        let initial_pages = initial_size
-            .checked_div(host_page_size())
-            .ok_or(lucet_format_err!(
-                "initial heap size must be divisible by host page size"
-            ))?;
+        let initial_pages =
+            initial_size
+                .checked_div(host_page_size())
+                .ok_or(lucet_incorrect_module!(
+                    "initial heap size {} is not divisible by host page size ({})",
+                    initial_size,
+                    host_page_size()
+                ))?;
         for page_num in 0..initial_pages {
             let page_base = page_num * host_page_size();
             if heap.len() < page_base {
-                lucet_bail!("sparse page data exceeded initial heap size");
+                return Err(lucet_incorrect_module!(
+                    "sparse page data length exceeded initial heap size"
+                ));
             }
             let contents_ptr = sparse_page_data.get(page_num).unwrap_or(&ptr::null());
             if contents_ptr.is_null() {
@@ -283,11 +209,10 @@ impl MmapRegion {
             SIGSTKSZ % host_page_size() == 0,
             "signal stack size is a multiple of host page size"
         );
-        if !limits.validate() {
-            lucet_bail!("invalid limits");
-        }
+        limits.validate()?;
 
         let region = Arc::new(MmapRegion {
+            capacity: instance_capacity,
             freelist: Mutex::new(Vec::with_capacity(instance_capacity)),
             limits: limits.clone(),
         });
