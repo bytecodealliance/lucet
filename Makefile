@@ -33,6 +33,14 @@ bench:
 	make -C benchmarks/shootout clean
 	make -C benchmarks/shootout bench
 
+.PHONY: audit
+audit:
+	make -C lucet-runtime audit
+	make -C lucet-rs audit
+	make -C lucet-libc-rs audit
+	cd lucetc && cargo audit
+	cd lucet-idl && cargo audit
+
 .PHONY: clean
 clean:
 	rm -rf lucetc/target

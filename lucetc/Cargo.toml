@@ -1,8 +1,10 @@
 [package]
 name = "lucetc"
 version = "0.1.0"
-authors = ["Pat Hickey <phickey@fastly.com>"]
+description = "Compile WebAssembly to native code"
 repository = "https://github.com/fastly/lucet"
+authors = ["Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>", "Adam C. Foltzer <acfoltzer@fastly.com>", "Tyler McMullen <tyler@fastly.com>"]
+license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"
 
 build = "build.rs"

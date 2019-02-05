@@ -1,6 +1,9 @@
 [package]
 name = "lucet-libc"
 version = "0.1.0"
+description = "A libc implementation for lucet-runtime"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"
 
 [dependencies]

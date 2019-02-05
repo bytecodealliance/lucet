@@ -1,5 +1,7 @@
 # lucet
 
+Lucet is a WebAssembly compiler and runtime designed for embedding.
+
 ## Contents
 
 ### lucetc
@@ -33,7 +35,7 @@ Backtrace functionality for `liblucet-runtime-c`: makes its best effort to
 determine the call stack that led to `liblucet-runtime-c` terminating the guest
 with a fault.
 
-Depends on libunwind 1.2.
+Depends on libunwind 1.3.
 
 ### lucet-analyze
 
@@ -156,4 +158,9 @@ arguments to `devenv_run` to run them as a command in the container.
 `devenv_run` will automatically start the container if it is not running. You
 can manually start and stop the container with `devenv_start` and `devenv_stop`.
 
+## Reporting Security Issues
+
+The Lucet maintainers are committed to providing a prompt response to security
+issues. Reporters may make a public report [on GitHub](https://github.com/fastly/lucet),
+or make a private report [via Fastly's security reporting system](https://www.fastly.com/security/report-security-issue)
 

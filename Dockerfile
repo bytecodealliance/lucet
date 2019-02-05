@@ -13,6 +13,8 @@ RUN apt-get update \
 	ninja-build \
 	ca-certificates \
 	software-properties-common \
+	libssl-dev \
+	pkg-config \
  && curl https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
  && add-apt-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main" \
  && apt-get update \
@@ -41,5 +43,4 @@ ENV LD_LIBRARY_PATH=/usr/local/lib
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=1.31.0 -y
 ENV PATH=/root/.cargo/bin:$PATH
 RUN rustup component add rustfmt
-
-
+RUN cargo install cargo-audit
