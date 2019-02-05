@@ -1,4 +1,4 @@
-//! # Runtime for Sandboxed WebAssembly Applications
+//! # Lucet Runtime for Sandboxed WebAssembly Applications
 //!
 //! This crate runs programs that were compiled with the `lucetc` WebAssembly to native code
 //! compiler. It provides an interface for modules to be loaded from shared object files (see
@@ -33,13 +33,18 @@
 //! initial heap configuration. This crate includes [`DlModule`](struct.DlModule.html), an
 //! implementation backed by dynamic loading of shared objects.
 //!
-//! - [`Val`](enum.Val.html): an enum describing values in WebAssembly, used to provide arguments
-//! and read return values.
+//! - [`Val`](enum.Val.html): an enum describing values in WebAssembly, used to provide
+//! arguments. These can be created using `From` implementations of primitive types, for example
+//! `5u64.into()` in the example below.
+//!
+//! - [`UntypedRetVal`](struct.UntypedRetVal.html): values returned from WebAssembly
+//! functions. These must be interpreted at the correct type by the user via `From` implementations
+//! or `retval.as_T()` methods, for example `u64::from(retval)` in the example below.
 //!
 //! To run a Lucet program, you start by creating a region, capable of backing a number of
 //! instances. You then load a module and then create a new instance using the region and the
 //! module. You can then run any of the functions that the Lucet program exports, retrieve return
-//! values from those functions, and even access the linear memory of the guest.
+//! values from those functions, and access the linear memory of the guest.
 //!
 //! ```no_run
 //! use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
@@ -148,13 +153,14 @@
 pub use lucet_runtime_internals::alloc::Limits;
 pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::{
-    FaultDetails, Instance, InstanceHandle, SignalBehavior, TerminationDetails, WASM_PAGE_SIZE,
+    FaultDetails, Instance, InstanceHandle, SignalBehavior, TerminationDetails,
 };
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::Region;
 pub use lucet_runtime_internals::trapcode::{TrapCode, TrapCodeType};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
+pub use lucet_runtime_internals::WASM_PAGE_SIZE;
 
 pub mod vmctx {
     //! Functions for manipulating instances from hostcalls.

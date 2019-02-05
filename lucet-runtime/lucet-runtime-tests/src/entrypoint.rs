@@ -333,9 +333,9 @@ macro_rules! entrypoint_tests {
                 b"create_and_memset",
                 &[
                     // int init_as
-                    Val::CInt(TEST_REGION_INIT_VAL),
+                    TEST_REGION_INIT_VAL.into(),
                     // size_t size
-                    Val::USize(TEST_REGION_SIZE),
+                    TEST_REGION_SIZE.into(),
                     // char** ptr_outval
                     Val::GuestPtr(loc_outval),
                 ],
@@ -383,9 +383,9 @@ macro_rules! entrypoint_tests {
                 b"create_and_memset",
                 &[
                     // int init_as
-                    Val::CInt(TEST_REGION_INIT_VAL),
+                    TEST_REGION_INIT_VAL.into(),
                     // size_t size
-                    Val::USize(TEST_REGION_SIZE),
+                    TEST_REGION_SIZE.into(),
                     // char** ptr_outval
                     Val::GuestPtr(loc_outval),
                 ],
@@ -457,9 +457,9 @@ macro_rules! entrypoint_tests {
                 b"create_and_memset",
                 &[
                     // int init_as
-                    Val::CInt(TEST_REGION_INIT_VAL),
+                    TEST_REGION_INIT_VAL.into(),
                     // size_t size
-                    Val::USize(TEST_REGION_SIZE),
+                    TEST_REGION_SIZE.into(),
                     // char** ptr_outval
                     Val::GuestPtr(loc_outval),
                 ],
@@ -477,9 +477,9 @@ macro_rules! entrypoint_tests {
                 b"create_and_memset",
                 &[
                     // int init_as
-                    Val::CInt(TEST_REGION2_INIT_VAL),
+                    TEST_REGION2_INIT_VAL.into(),
                     // size_t size
-                    Val::USize(TEST_REGION2_SIZE),
+                    TEST_REGION2_SIZE.into(),
                     // char** ptr_outval
                     Val::GuestPtr(loc_outval),
                 ],

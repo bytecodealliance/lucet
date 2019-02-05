@@ -19,7 +19,7 @@ macro_rules! stack_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"localpalooza", &[Val::CInt(recursion_depth)])
+            inst.run(b"localpalooza", &[recursion_depth.into()])
         }
 
         fn expect_ok(path: &str, recursion_depth: libc::c_int) {

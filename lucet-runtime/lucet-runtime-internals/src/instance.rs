@@ -10,6 +10,7 @@ use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, Module};
 use crate::trapcode::{TrapCode, TrapCodeType};
 use crate::val::{UntypedRetVal, Val};
+use crate::WASM_PAGE_SIZE;
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
 use std::cell::{RefCell, UnsafeCell};
 use std::ffi::{CStr, CString};
@@ -19,8 +20,6 @@ use std::ptr::{self, NonNull};
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
 pub const INSTANCE_PADDING: usize = 2280;
-
-pub const WASM_PAGE_SIZE: u32 = 64 * 1024;
 
 thread_local! {
     /// The host context.
@@ -148,10 +147,26 @@ pub struct Instance {
     /// The memory allocated for this instance
     alloc: Alloc,
 
-    /// Handler for when the instance exits in a fatal state
+    /// Handler run for signals that do not arise from a known WebAssembly trap, or that involve
+    /// memory outside of the current instance.
+    ///
+    /// Fatal signals are not only unrecoverable for the instance that raised them, but may
+    /// compromise the correctness of the rest of the process if unhandled.
+    ///
+    /// The default fatal handler calls `panic!()`.
     pub fatal_handler: fn(&Instance) -> !,
 
-    /// Signal handler used to interpret signals that aren't otherwise handled by the WebAssembly trap table
+    /// Handler run when `SIGBUS`, `SIGFPE`, `SIGILL`, or `SIGSEGV` are caught by the instance thread.
+    ///
+    /// In most cases, these signals are unrecoverable for the instance that raised them, but do not
+    /// affect the rest of the process.
+    ///
+    /// The default signal handler returns
+    /// [`SignalBehavior::Default`](enum.SignalBehavior.html#variant.Default), which yields a
+    /// runtime fault error.
+    ///
+    /// The signal handler must be
+    /// [signal-safe](http://man7.org/linux/man-pages/man7/signal-safety.7.html).
     pub signal_handler: fn(
         &Instance,
         &TrapCode,

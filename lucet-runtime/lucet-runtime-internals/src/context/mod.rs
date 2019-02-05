@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::val::{RegVal, UntypedRetVal, Val};
+use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 use failure::Fail;
 use nix;
 use nix::sys::signal;
@@ -298,7 +298,7 @@ impl Context {
         let mut spilled_args = vec![];
 
         for arg in args {
-            match arg.to_reg() {
+            match val_to_reg(arg) {
                 RegVal::GpReg(v) => {
                     if gp_args_ix >= 6 {
                         spilled_args.push(arg);
@@ -333,7 +333,7 @@ impl Context {
         // If there are more additional args to the guest function than available registers, they
         // have to be pushed on the stack underneath the return address.
         for arg in spilled_args {
-            let v = arg.to_stack();
+            let v = val_to_stack(arg);
             stack[sp + stack_args_ix - stack_start] = v;
             stack_args_ix += 1;
         }

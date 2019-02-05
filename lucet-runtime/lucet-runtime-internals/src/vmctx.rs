@@ -8,8 +8,8 @@ use crate::context::Context;
 use crate::error::Error;
 use crate::instance::{
     Instance, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
-    WASM_PAGE_SIZE,
 };
+use crate::WASM_PAGE_SIZE;
 use libc::c_void;
 use std::sync::Once;
 

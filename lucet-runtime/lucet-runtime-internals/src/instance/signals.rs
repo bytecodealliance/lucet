@@ -16,12 +16,15 @@ lazy_static! {
     static ref LUCET_SIGNAL_STATE: Mutex<Option<SignalState>> = Mutex::new(None);
 }
 
+/// The value returned by
+/// [`Instance.signal_handler`](struct.Instance.html#structfield.signal_handler) to determine the
+/// outcome of a handled signal.
 pub enum SignalBehavior {
-    /// Use default behavior, which switches back to the host with `State::Fault` populated
+    /// Use default behavior, which switches back to the host with `State::Fault` populated.
     Default,
-    /// Override default behavior and cause the instance to continue
+    /// Override default behavior and cause the instance to continue.
     Continue,
-    /// Override default behavior and cause the instance to terminate
+    /// Override default behavior and cause the instance to terminate.
     Terminate,
 }
 

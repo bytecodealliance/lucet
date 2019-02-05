@@ -21,3 +21,6 @@ pub mod region;
 pub mod trapcode;
 pub mod val;
 pub mod vmctx;
+
+/// The size of a page in WebAssembly heaps.
+pub const WASM_PAGE_SIZE: u32 = 64 * 1024;
