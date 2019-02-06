@@ -342,7 +342,9 @@ macro_rules! alloc_tests {
         fn alloc_reset() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let module = MockModule::arced_with_heap(&THREE_PAGE_MAX_HEAP);
-            let mut inst = region.new_instance(module.clone()).expect("new_instance succeeds");
+            let mut inst = region
+                .new_instance(module.clone())
+                .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);

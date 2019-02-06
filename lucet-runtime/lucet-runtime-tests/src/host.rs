@@ -79,10 +79,7 @@ macro_rules! host_tests {
             let mut confirm_hello = false;
 
             let mut inst = region
-                .new_instance_with_ctx(
-                    module,
-                    (&mut confirm_hello) as *mut bool as *mut c_void,
-                )
+                .new_instance_with_ctx(module, (&mut confirm_hello) as *mut bool as *mut c_void)
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");

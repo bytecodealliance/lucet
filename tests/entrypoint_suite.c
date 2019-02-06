@@ -468,7 +468,7 @@ TEST test_ctype(void)
 uint64_t callback_hostcall(void *vmctx, uint32_t cb_id, uint64_t x)
 {
     void *func = lucet_vmctx_get_func_from_id(vmctx, 0, cb_id);
-    return (*(uint64_t (*)(void *, uint64_t))func)(vmctx, x) + 1;
+    return (*(uint64_t(*)(void *, uint64_t)) func)(vmctx, x) + 1;
 }
 
 TEST test_callback(void)
