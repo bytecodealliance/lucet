@@ -1,5 +1,5 @@
+use crate::error::Error;
 use crate::module::DlModule;
-use failure::Error;
 use std::env;
 use std::path::{Path, PathBuf};
 

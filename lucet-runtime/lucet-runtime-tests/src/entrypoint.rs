@@ -2,14 +2,13 @@
 macro_rules! entrypoint_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
-        use lucet_runtime::instance::State;
-        use lucet_runtime::region::Region;
-        use lucet_runtime::{DlModule, Limits, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::vmctx::lucet_vmctx;
+        use lucet_runtime::{DlModule, Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
         #[no_mangle]
-        extern "C" fn black_box(_vmctx: *mut c_void, _val: *mut c_void) {}
+        extern "C" fn black_box(_vmctx: *mut lucet_vmctx, _val: *mut c_void) {}
 
         const C_CALCULATOR_MOD_PATH: &'static str =
             "lucet-runtime-c/test/build/entrypoint/calculator.so";
@@ -35,15 +34,11 @@ macro_rules! entrypoint_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"add_2", &[123u64.into(), 456u64.into()])
+            let retval = inst
+                .run(b"add_2", &[123u64.into(), 456u64.into()])
                 .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(u64::from(retval), 123u64 + 456);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            assert_eq!(u64::from(retval), 123u64 + 456);
         }
 
         #[test]
@@ -64,29 +59,25 @@ macro_rules! entrypoint_tests {
             //
             // A better test might be to use an operation that doesn't commute, so we can verify that the
             // order is correct.
-            inst.run(
-                b"add_10",
-                &[
-                    1u64.into(),
-                    2u64.into(),
-                    3u64.into(),
-                    4u64.into(),
-                    5u64.into(),
-                    6u64.into(),
-                    7u64.into(),
-                    8u64.into(),
-                    9u64.into(),
-                    10u64.into(),
-                ],
-            )
-            .expect("instance runs");
+            let retval = inst
+                .run(
+                    b"add_10",
+                    &[
+                        1u64.into(),
+                        2u64.into(),
+                        3u64.into(),
+                        4u64.into(),
+                        5u64.into(),
+                        6u64.into(),
+                        7u64.into(),
+                        8u64.into(),
+                        9u64.into(),
+                        10u64.into(),
+                    ],
+                )
+                .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(u64::from(retval), 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            assert_eq!(u64::from(retval), 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10);
         }
 
         #[test]
@@ -101,15 +92,11 @@ macro_rules! entrypoint_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"mul_2", &[123u64.into(), 456u64.into()])
+            let retval = inst
+                .run(b"mul_2", &[123u64.into(), 456u64.into()])
                 .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(u64::from(retval), 123 * 456);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            assert_eq!(u64::from(retval), 123 * 456);
         }
 
         #[test]
@@ -124,25 +111,17 @@ macro_rules! entrypoint_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"add_2", &[111u64.into(), 222u64.into()])
+            let retval = inst
+                .run(b"add_2", &[111u64.into(), 222u64.into()])
                 .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(u64::from(retval), 111 + 222);
-                }
-                _ => panic!("unexpected intermediate state: {}", inst.state),
-            }
+            assert_eq!(u64::from(retval), 111 + 222);
 
-            inst.run(b"mul_2", &[333u64.into(), 444u64.into()])
+            let retval = inst
+                .run(b"mul_2", &[333u64.into(), 444u64.into()])
                 .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(u64::from(retval), 333 * 444);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            assert_eq!(u64::from(retval), 333 * 444);
         }
 
         #[test]
@@ -157,15 +136,9 @@ macro_rules! entrypoint_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            assert!(inst
-                .run(b"invalid", &[123u64.into(), 456u64.into()])
-                .is_err());
-
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(u64::from(retval), 0);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
+            match inst.run(b"invalid", &[123u64.into(), 456u64.into()]) {
+                Err(Error::SymbolNotFound(sym)) => assert_eq!(sym, "invalid"),
+                res => panic!("unexpected result: {:?}", res),
             }
         }
 
@@ -177,15 +150,11 @@ macro_rules! entrypoint_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"add_f32_2", &[(-6.9f32).into(), 4.2f32.into()])
+            let retval = inst
+                .run(b"add_f32_2", &[(-6.9f32).into(), 4.2f32.into()])
                 .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(f32::from(retval), -6.9 + 4.2);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            assert_eq!(f32::from(retval), -6.9 + 4.2);
         }
 
         #[test]
@@ -196,15 +165,11 @@ macro_rules! entrypoint_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"add_f64_2", &[(-6.9f64).into(), 4.2f64.into()])
+            let retval = inst
+                .run(b"add_f64_2", &[(-6.9f64).into(), 4.2f64.into()])
                 .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(f64::from(retval), -6.9 + 4.2);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            assert_eq!(f64::from(retval), -6.9 + 4.2);
         }
 
         #[test]
@@ -215,32 +180,28 @@ macro_rules! entrypoint_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(
-                b"add_f32_10",
-                &[
-                    0.1f32.into(),
-                    0.2f32.into(),
-                    0.3f32.into(),
-                    0.4f32.into(),
-                    0.5f32.into(),
-                    0.6f32.into(),
-                    0.7f32.into(),
-                    0.8f32.into(),
-                    0.9f32.into(),
-                    1.0f32.into(),
-                ],
-            )
-            .expect("instance runs");
+            let retval = inst
+                .run(
+                    b"add_f32_10",
+                    &[
+                        0.1f32.into(),
+                        0.2f32.into(),
+                        0.3f32.into(),
+                        0.4f32.into(),
+                        0.5f32.into(),
+                        0.6f32.into(),
+                        0.7f32.into(),
+                        0.8f32.into(),
+                        0.9f32.into(),
+                        1.0f32.into(),
+                    ],
+                )
+                .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(
-                        f32::from(retval),
-                        0.1 + 0.2 + 0.3 + 0.4 + 0.5 + 0.6 + 0.7 + 0.8 + 0.9 + 1.0
-                    );
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            assert_eq!(
+                f32::from(retval),
+                0.1 + 0.2 + 0.3 + 0.4 + 0.5 + 0.6 + 0.7 + 0.8 + 0.9 + 1.0
+            );
         }
 
         #[test]
@@ -251,32 +212,28 @@ macro_rules! entrypoint_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(
-                b"add_f64_10",
-                &[
-                    0.1f64.into(),
-                    0.2f64.into(),
-                    0.3f64.into(),
-                    0.4f64.into(),
-                    0.5f64.into(),
-                    0.6f64.into(),
-                    0.7f64.into(),
-                    0.8f64.into(),
-                    0.9f64.into(),
-                    1.0f64.into(),
-                ],
-            )
-            .expect("instance runs");
+            let retval = inst
+                .run(
+                    b"add_f64_10",
+                    &[
+                        0.1f64.into(),
+                        0.2f64.into(),
+                        0.3f64.into(),
+                        0.4f64.into(),
+                        0.5f64.into(),
+                        0.6f64.into(),
+                        0.7f64.into(),
+                        0.8f64.into(),
+                        0.9f64.into(),
+                        1.0f64.into(),
+                    ],
+                )
+                .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(
-                        f64::from(retval),
-                        0.1 + 0.2 + 0.3 + 0.4 + 0.5 + 0.6 + 0.7 + 0.8 + 0.9 + 1.0
-                    );
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            assert_eq!(
+                f64::from(retval),
+                0.1 + 0.2 + 0.3 + 0.4 + 0.5 + 0.6 + 0.7 + 0.8 + 0.9 + 1.0
+            );
         }
 
         #[test]
@@ -287,61 +244,57 @@ macro_rules! entrypoint_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(
-                b"add_mixed_20",
-                &[
-                    (-1.1f64).into(),
-                    1u8.into(),
-                    2.1f32.into(),
-                    3.1f64.into(),
-                    4u16.into(),
-                    5.1f32.into(),
-                    6.1f64.into(),
-                    7u32.into(),
-                    8.1f32.into(),
-                    9.1f64.into(),
-                    true.into(),
-                    11.1f32.into(),
-                    12.1f64.into(),
-                    13u32.into(),
-                    14.1f32.into(),
-                    15.1f64.into(),
-                    16u64.into(),
-                    17.1f32.into(),
-                    18.1f64.into(),
-                    19u64.into(),
-                ],
-            )
-            .expect("instance runs");
+            let retval = inst
+                .run(
+                    b"add_mixed_20",
+                    &[
+                        (-1.1f64).into(),
+                        1u8.into(),
+                        2.1f32.into(),
+                        3.1f64.into(),
+                        4u16.into(),
+                        5.1f32.into(),
+                        6.1f64.into(),
+                        7u32.into(),
+                        8.1f32.into(),
+                        9.1f64.into(),
+                        true.into(),
+                        11.1f32.into(),
+                        12.1f64.into(),
+                        13u32.into(),
+                        14.1f32.into(),
+                        15.1f64.into(),
+                        16u64.into(),
+                        17.1f32.into(),
+                        18.1f64.into(),
+                        19u64.into(),
+                    ],
+                )
+                .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(
-                        f64::from(retval),
-                        -1.1f64
-                            + 1u8 as f64
-                            + 2.1f32 as f64
-                            + 3.1f64
-                            + 4u16 as f64
-                            + 5.1f32 as f64
-                            + 6.1f64
-                            + 7u32 as f64
-                            + 8.1f32 as f64
-                            + 9.1f64
-                            + 1 as f64
-                            + 11.1f32 as f64
-                            + 12.1f64
-                            + 13u32 as f64
-                            + 14.1f32 as f64
-                            + 15.1f64
-                            + 16u64 as f64
-                            + 17.1f32 as f64
-                            + 18.1f64
-                            + 19u64 as f64
-                    );
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            assert_eq!(
+                f64::from(retval),
+                -1.1f64
+                    + 1u8 as f64
+                    + 2.1f32 as f64
+                    + 3.1f64
+                    + 4u16 as f64
+                    + 5.1f32 as f64
+                    + 6.1f64
+                    + 7u32 as f64
+                    + 8.1f32 as f64
+                    + 9.1f64
+                    + 1 as f64
+                    + 11.1f32 as f64
+                    + 12.1f64
+                    + 13u32 as f64
+                    + 14.1f32 as f64
+                    + 15.1f64
+                    + 16u64 as f64
+                    + 17.1f32 as f64
+                    + 18.1f64
+                    + 19u64 as f64
+            );
         }
 
         // Guests which use an allocator fail if we don't at least link in lucet-libc, but it works whether
@@ -380,19 +333,14 @@ macro_rules! entrypoint_tests {
                 b"create_and_memset",
                 &[
                     // int init_as
-                    Val::CInt(TEST_REGION_INIT_VAL),
+                    TEST_REGION_INIT_VAL.into(),
                     // size_t size
-                    Val::USize(TEST_REGION_SIZE),
+                    TEST_REGION_SIZE.into(),
                     // char** ptr_outval
                     Val::GuestPtr(loc_outval),
                 ],
             )
             .expect("instance runs");
-
-            match &inst.state {
-                State::Ready { .. } => (),
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
 
             // The location of the created region should be in a new page that the allocator grabbed from
             // the runtime. That page will be above the one we got above.
@@ -435,19 +383,14 @@ macro_rules! entrypoint_tests {
                 b"create_and_memset",
                 &[
                     // int init_as
-                    Val::CInt(TEST_REGION_INIT_VAL),
+                    TEST_REGION_INIT_VAL.into(),
                     // size_t size
-                    Val::USize(TEST_REGION_SIZE),
+                    TEST_REGION_SIZE.into(),
                     // char** ptr_outval
                     Val::GuestPtr(loc_outval),
                 ],
             )
             .expect("instance runs");
-
-            match &inst.state {
-                State::Ready { .. } => (),
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
 
             // The location of the created region should be in a new page that the allocator grabbed from
             // the runtime. That page will be above the one we got above.
@@ -469,11 +412,6 @@ macro_rules! entrypoint_tests {
             // Then increment the first location in the region
             inst.run(b"increment_ptr", &[Val::GuestPtr(loc_region_1)])
                 .expect("instance runs");
-
-            match &inst.state {
-                State::Ready { .. } => (),
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
 
             let heap = inst.heap();
             // Just the first location in the region should be incremented
@@ -519,19 +457,14 @@ macro_rules! entrypoint_tests {
                 b"create_and_memset",
                 &[
                     // int init_as
-                    Val::CInt(TEST_REGION_INIT_VAL),
+                    TEST_REGION_INIT_VAL.into(),
                     // size_t size
-                    Val::USize(TEST_REGION_SIZE),
+                    TEST_REGION_SIZE.into(),
                     // char** ptr_outval
                     Val::GuestPtr(loc_outval),
                 ],
             )
             .expect("instance runs");
-
-            match &inst.state {
-                State::Ready { .. } => (),
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
 
             let heap = inst.heap();
             let loc_region_1 = (&heap[loc_outval as usize..])
@@ -544,19 +477,14 @@ macro_rules! entrypoint_tests {
                 b"create_and_memset",
                 &[
                     // int init_as
-                    Val::CInt(TEST_REGION2_INIT_VAL),
+                    TEST_REGION2_INIT_VAL.into(),
                     // size_t size
-                    Val::USize(TEST_REGION2_SIZE),
+                    TEST_REGION2_SIZE.into(),
                     // char** ptr_outval
                     Val::GuestPtr(loc_outval),
                 ],
             )
             .expect("instance runs");
-
-            match &inst.state {
-                State::Ready { .. } => (),
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
 
             // The allocator should pick a spot *after* the first region for the second one. (It doesn't
             // have to, but it will.) This shows that the allocator's metadata (free list) is preserved
@@ -613,11 +541,6 @@ macro_rules! entrypoint_tests {
             )
             .expect("instance runs");
 
-            match &inst.state {
-                State::Ready { .. } => (),
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
-
             // Grab the value of the pointer that the setup routine wrote
             let heap = inst.heap();
             let ctxstar = (&heap[loc_ctxstar as usize..])
@@ -628,11 +551,6 @@ macro_rules! entrypoint_tests {
             // Run the body routine
             inst.run(b"ctype_body", &[Val::GuestPtr(ctxstar)])
                 .expect("instance runs");
-
-            match &inst.state {
-                State::Ready { .. } => (),
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
         }
     };
 }

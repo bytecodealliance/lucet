@@ -2,9 +2,8 @@
 macro_rules! host_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
-        use lucet_runtime::instance::State;
-        use lucet_runtime::region::Region;
-        use lucet_runtime::{DlModule, Limits, Vmctx};
+        use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
+        use lucet_runtime::{DlModule, Error, Limits, Region, TrapCodeType};
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
@@ -25,7 +24,11 @@ macro_rules! host_tests {
         }
 
         #[no_mangle]
-        extern "C" fn hostcall_test_func_hello(vmctx: *mut c_void, hello_ptr: u32, hello_len: u32) {
+        extern "C" fn hostcall_test_func_hello(
+            vmctx: *mut lucet_vmctx,
+            hello_ptr: u32,
+            hello_len: u32,
+        ) {
             unsafe {
                 let mut vmctx = Vmctx::from_raw(vmctx);
                 let confirmed_hello = vmctx.embed_ctx() as *mut bool;
@@ -43,7 +46,7 @@ macro_rules! host_tests {
 
         const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
         #[no_mangle]
-        extern "C" fn hostcall_test_func_hostcall_error(vmctx: *mut c_void) {
+        extern "C" fn hostcall_test_func_hostcall_error(vmctx: *mut lucet_vmctx) {
             let info = Box::new(ERROR_MESSAGE);
             unsafe { Vmctx::from_raw(vmctx).terminate(Box::into_raw(info) as *mut c_void) }
         }
@@ -55,7 +58,6 @@ macro_rules! host_tests {
             let inst = region
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
-            assert!(inst.is_ready());
         }
 
         #[test]
@@ -65,9 +67,7 @@ macro_rules! host_tests {
             let mut inst = region
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
-            assert!(inst.is_ready());
             inst.run(b"main", &[]).expect("instance runs");
-            assert!(inst.is_ready());
         }
 
         #[test]
@@ -85,7 +85,6 @@ macro_rules! host_tests {
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
-            assert!(inst.is_ready());
 
             assert!(confirm_hello);
         }
@@ -98,14 +97,12 @@ macro_rules! host_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"main", &[]).expect("instance runs");
-
-            match &inst.state {
-                State::Terminated { info } => {
-                    let info = unsafe { Box::from_raw(*info as *mut &'static str) };
+            match inst.run(b"main", &[]) {
+                Err(Error::RuntimeTerminated(details)) => {
+                    let info = unsafe { Box::from_raw(details.unwrap().info as *mut &'static str) };
                     assert_eq!(*info, ERROR_MESSAGE);
                 }
-                st => panic!("unexpected state: {}", st),
+                res => panic!("unexpected result: {:?}", res),
             }
         }
 
@@ -117,15 +114,12 @@ macro_rules! host_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"trigger_div_error", &[0u64.into()])
-                .expect("instance runs");
-
-            match &inst.state {
-                State::Fault { .. } => {
-                    eprintln!("{}", inst.state);
+            match inst.run(b"trigger_div_error", &[0u64.into()]) {
+                Err(Error::RuntimeFault(details)) => {
+                    assert_eq!(details.trapcode.ty, TrapCodeType::IntegerDivByZero);
                 }
-                st => {
-                    panic!("unexpected state: {}", st);
+                res => {
+                    panic!("unexpected result: {:?}", res);
                 }
             }
         }

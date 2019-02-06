@@ -1,20 +1,13 @@
 //! Typed values for passing into and returning from sandboxed
 //! programs.
 
-use libc::{
-    c_char, c_int, c_long, c_longlong, c_short, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort,
-    c_void,
-};
+use libc::c_void;
 use std::arch::x86_64::{
     __m128, _mm_castpd_ps, _mm_castps_pd, _mm_load_pd1, _mm_load_ps1, _mm_setzero_ps,
     _mm_storeu_pd, _mm_storeu_ps,
 };
 
-/// Typed values used for passing arguments into new contexts, and for
-/// reading return values from completed contexts.
-///
-/// TODO: Why do we have a set of both Rust and C integers, but only
-/// Rust floats? When should one or the other be used?
+/// Typed values used for passing arguments into guest functions.
 #[derive(Clone, Copy, Debug)]
 pub enum Val {
     CPtr(*const c_void),
@@ -30,19 +23,26 @@ pub enum Val {
     I64(i64),
     USize(usize),
     ISize(isize),
-    CUChar(c_uchar),
-    CUShort(c_ushort),
-    CUInt(c_uint),
-    CULong(c_ulong),
-    CULongLong(c_ulonglong),
-    CChar(c_char),
-    CShort(c_short),
-    CInt(c_int),
-    CLong(c_long),
-    CLongLong(c_longlong),
     Bool(bool),
     F32(f32),
     F64(f64),
+}
+
+// the pointer variant is just a wrapper; the caller will know they're still responsible for their
+// safety
+unsafe impl Send for Val {}
+unsafe impl Sync for Val {}
+
+impl<T> From<*const T> for Val {
+    fn from(x: *const T) -> Val {
+        Val::CPtr(x as *const c_void)
+    }
+}
+
+impl<T> From<*mut T> for Val {
+    fn from(x: *mut T) -> Val {
+        Val::CPtr(x as *mut c_void)
+    }
 }
 
 macro_rules! impl_from_scalars {
@@ -58,10 +58,8 @@ macro_rules! impl_from_scalars {
 }
 
 // Since there is overlap in these enum variants, we can't have instances for all of them, such as
-// GuestPtr and the C type aliases
+// GuestPtr
 impl_from_scalars!({
-    CPtr: *const c_void,
-    CPtr: *mut c_void,
     U8: u8,
     U16: u16,
     U32: u32,
@@ -87,92 +85,79 @@ pub enum RegVal {
     FpReg(__m128),
 }
 
-impl Val {
-    /// Convert a `Val` to its representation when stored in an
-    /// argument register.
-    pub fn to_reg(&self) -> RegVal {
-        use self::RegVal::*;
-        use self::Val::*;
-        match *self {
-            CPtr(v) => GpReg(v as u64),
-            GuestPtr(v) => GpReg(v as u64),
-            U8(v) => GpReg(v as u64),
-            U16(v) => GpReg(v as u64),
-            U32(v) => GpReg(v as u64),
-            U64(v) => GpReg(v as u64),
-            I8(v) => GpReg(v as u64),
-            I16(v) => GpReg(v as u64),
-            I32(v) => GpReg(v as u64),
-            I64(v) => GpReg(v as u64),
-            USize(v) => GpReg(v as u64),
-            ISize(v) => GpReg(v as u64),
-            CUChar(v) => GpReg(v as u64),
-            CUShort(v) => GpReg(v as u64),
-            CUInt(v) => GpReg(v as u64),
-            CULong(v) => GpReg(v as u64),
-            CULongLong(v) => GpReg(v as u64),
-            CChar(v) => GpReg(v as u64),
-            CShort(v) => GpReg(v as u64),
-            CInt(v) => GpReg(v as u64),
-            CLong(v) => GpReg(v as u64),
-            CLongLong(v) => GpReg(v as u64),
-            Bool(false) => GpReg(0u64),
-            Bool(true) => GpReg(1u64),
-            Val::F32(v) => FpReg(unsafe { _mm_load_ps1(&v as *const f32) }),
-            Val::F64(v) => FpReg(unsafe { _mm_castpd_ps(_mm_load_pd1(&v as *const f64)) }),
-        }
-    }
-
-    /// Convert a `Val` to its representation when spilled onto the
-    /// stack.
-    pub fn to_stack(&self) -> u64 {
-        use self::Val::*;
-        match *self {
-            CPtr(v) => v as u64,
-            GuestPtr(v) => v as u64,
-            U8(v) => v as u64,
-            U16(v) => v as u64,
-            U32(v) => v as u64,
-            U64(v) => v as u64,
-            I8(v) => v as u64,
-            I16(v) => v as u64,
-            I32(v) => v as u64,
-            I64(v) => v as u64,
-            USize(v) => v as u64,
-            ISize(v) => v as u64,
-            CUChar(v) => v as u64,
-            CUShort(v) => v as u64,
-            CUInt(v) => v as u64,
-            CULong(v) => v as u64,
-            CULongLong(v) => v as u64,
-            CChar(v) => v as u64,
-            CShort(v) => v as u64,
-            CInt(v) => v as u64,
-            CLong(v) => v as u64,
-            CLongLong(v) => v as u64,
-            Bool(false) => 0u64,
-            Bool(true) => 1u64,
-            F32(v) => v.to_bits() as u64,
-            F64(v) => v.to_bits(),
-        }
+/// Convert a `Val` to its representation when stored in an
+/// argument register.
+pub fn val_to_reg(val: &Val) -> RegVal {
+    use self::RegVal::*;
+    use self::Val::*;
+    match *val {
+        CPtr(v) => GpReg(v as u64),
+        GuestPtr(v) => GpReg(v as u64),
+        U8(v) => GpReg(v as u64),
+        U16(v) => GpReg(v as u64),
+        U32(v) => GpReg(v as u64),
+        U64(v) => GpReg(v as u64),
+        I8(v) => GpReg(v as u64),
+        I16(v) => GpReg(v as u64),
+        I32(v) => GpReg(v as u64),
+        I64(v) => GpReg(v as u64),
+        USize(v) => GpReg(v as u64),
+        ISize(v) => GpReg(v as u64),
+        Bool(false) => GpReg(0u64),
+        Bool(true) => GpReg(1u64),
+        Val::F32(v) => FpReg(unsafe { _mm_load_ps1(&v as *const f32) }),
+        Val::F64(v) => FpReg(unsafe { _mm_castpd_ps(_mm_load_pd1(&v as *const f64)) }),
     }
 }
 
-/// An untyped value returned by guest function calls.
+/// Convert a `Val` to its representation when spilled onto the
+/// stack.
+pub fn val_to_stack(val: &Val) -> u64 {
+    use self::Val::*;
+    match *val {
+        CPtr(v) => v as u64,
+        GuestPtr(v) => v as u64,
+        U8(v) => v as u64,
+        U16(v) => v as u64,
+        U32(v) => v as u64,
+        U64(v) => v as u64,
+        I8(v) => v as u64,
+        I16(v) => v as u64,
+        I32(v) => v as u64,
+        I64(v) => v as u64,
+        USize(v) => v as u64,
+        ISize(v) => v as u64,
+        Bool(false) => 0u64,
+        Bool(true) => 1u64,
+        F32(v) => v.to_bits() as u64,
+        F64(v) => v.to_bits(),
+    }
+}
+
+/// A value returned by a guest function.
+///
+/// Since the Rust type system cannot know the type of the returned value, the user must use the
+/// appropriate `From` implementation or `as_T` method.
 #[derive(Clone, Copy, Debug)]
 pub struct UntypedRetVal {
     fp: __m128,
     gp: u64,
 }
 
+impl std::fmt::Display for UntypedRetVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "<untyped return value>")
+    }
+}
+
 impl UntypedRetVal {
-    pub fn new(gp: u64, fp: __m128) -> UntypedRetVal {
+    pub(crate) fn new(gp: u64, fp: __m128) -> UntypedRetVal {
         UntypedRetVal { gp, fp }
     }
 }
 
 macro_rules! impl_from_fp {
-    ( $ty:ty, $f:ident ) => {
+    ( $ty:ty, $f:ident, $as:ident ) => {
         impl From<UntypedRetVal> for $ty {
             fn from(retval: UntypedRetVal) -> $ty {
                 $f(retval.fp)
@@ -184,14 +169,20 @@ macro_rules! impl_from_fp {
                 $f(retval.fp)
             }
         }
+
+        impl UntypedRetVal {
+            pub fn $as(&self) -> $ty {
+                $f(self.fp)
+            }
+        }
     };
 }
 
-impl_from_fp!(f32, __m128_as_f32);
-impl_from_fp!(f64, __m128_as_f64);
+impl_from_fp!(f32, __m128_as_f32, as_f32);
+impl_from_fp!(f64, __m128_as_f64, as_f64);
 
 macro_rules! impl_from_gp {
-    ( $ty:ty ) => {
+    ( $ty:ty, $as:ident ) => {
         impl From<UntypedRetVal> for $ty {
             fn from(retval: UntypedRetVal) -> $ty {
                 retval.gp as $ty
@@ -203,18 +194,24 @@ macro_rules! impl_from_gp {
                 retval.gp as $ty
             }
         }
+
+        impl UntypedRetVal {
+            pub fn $as(&self) -> $ty {
+                self.gp as $ty
+            }
+        }
     };
 }
 
-impl_from_gp!(u8);
-impl_from_gp!(u16);
-impl_from_gp!(u32);
-impl_from_gp!(u64);
+impl_from_gp!(u8, as_u8);
+impl_from_gp!(u16, as_u16);
+impl_from_gp!(u32, as_u32);
+impl_from_gp!(u64, as_u64);
 
-impl_from_gp!(i8);
-impl_from_gp!(i16);
-impl_from_gp!(i32);
-impl_from_gp!(i64);
+impl_from_gp!(i8, as_i8);
+impl_from_gp!(i16, as_i16);
+impl_from_gp!(i32, as_i32);
+impl_from_gp!(i64, as_i64);
 
 impl From<UntypedRetVal> for bool {
     fn from(retval: UntypedRetVal) -> bool {
@@ -225,6 +222,20 @@ impl From<UntypedRetVal> for bool {
 impl From<&UntypedRetVal> for bool {
     fn from(retval: &UntypedRetVal) -> bool {
         retval.gp != 0
+    }
+}
+
+impl UntypedRetVal {
+    pub fn as_bool(&self) -> bool {
+        self.gp != 0
+    }
+
+    pub fn as_ptr<T>(&self) -> *const T {
+        self.gp as *const T
+    }
+
+    pub fn as_mut<T>(&self) -> *mut T {
+        self.gp as *mut T
     }
 }
 

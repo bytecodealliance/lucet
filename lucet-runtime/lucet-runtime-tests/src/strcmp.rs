@@ -2,9 +2,8 @@
 macro_rules! strcmp_tests {
     ( $TestRegion:path ) => {
         use libc::{c_char, c_int, c_void, strcmp, uint64_t};
-        use lucet_runtime::instance::State;
-        use lucet_runtime::region::Region;
-        use lucet_runtime::{DlModule, Limits, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::vmctx::lucet_vmctx;
+        use lucet_runtime::{DlModule, Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use std::ffi::CString;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
@@ -12,7 +11,7 @@ macro_rules! strcmp_tests {
         const FAULT_MOD_PATH: &'static str = "tests/build/strcmp_guests/fault_guest.so";
 
         #[no_mangle]
-        unsafe extern "C" fn hostcall_host_fault(_vmctx: *const c_void) {
+        unsafe extern "C" fn hostcall_host_fault(_vmctx: *const lucet_vmctx) {
             let oob = (-1isize) as *mut c_char;
             *oob = 'x' as c_char;
         }
@@ -43,21 +42,17 @@ macro_rules! strcmp_tests {
             heap[s1_ptr..s2_ptr].copy_from_slice(&s1);
             heap[s2_ptr..s2_ptr + s2.len()].copy_from_slice(&s2);
 
-            inst.run(
-                b"run_strcmp",
-                &[
-                    Val::GuestPtr(s1_ptr as u32),
-                    Val::GuestPtr(s2_ptr as u32),
-                    Val::GuestPtr(res_ptr as u32),
-                ],
-            )
-            .expect("instance runs");
-            assert!(inst.is_ready());
-
-            let res = match &inst.state {
-                State::Ready { retval } => c_int::from(retval),
-                st => panic!("unexpected final state: {}", st),
-            };
+            let res = c_int::from(
+                inst.run(
+                    b"run_strcmp",
+                    &[
+                        Val::GuestPtr(s1_ptr as u32),
+                        Val::GuestPtr(s2_ptr as u32),
+                        Val::GuestPtr(res_ptr as u32),
+                    ],
+                )
+                .expect("instance runs"),
+            );
 
             let host_strcmp_res =
                 unsafe { strcmp(s1.as_ptr() as *const c_char, s2.as_ptr() as *const c_char) };
@@ -92,10 +87,10 @@ macro_rules! strcmp_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            assert!(inst
-                .run(b"wasm_fault", &[])
-                .expect("instance runs")
-                .is_fault());
+            match inst.run(b"wasm_fault", &[]) {
+                Err(Error::RuntimeFault { .. }) => (),
+                res => panic!("unexpected result: {:?}", res),
+            }
         }
     };
 }

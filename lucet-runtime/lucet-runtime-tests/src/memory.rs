@@ -3,9 +3,7 @@ macro_rules! memory_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use lucet_libc::LucetLibc;
-        use lucet_runtime::instance::State;
-        use lucet_runtime::region::Region;
-        use lucet_runtime::{DlModule, Limits};
+        use lucet_runtime::{DlModule, Limits, Region};
         use std::sync::Mutex;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
@@ -23,15 +21,8 @@ macro_rules! memory_tests {
                 .new_instance(Box::new(module))
                 .expect("instance can be created");
 
-            inst.run(b"main", &[]).expect("instance runs");
-
-            match &inst.state {
-                State::Ready { retval } => {
-                    // WebAssembly module requires 4 pages of memory in import
-                    assert_eq!(u32::from(retval), 4);
-                }
-                st => panic!("unexpected state: {}", st),
-            }
+            let retval = inst.run(b"main", &[]).expect("instance runs");
+            assert_eq!(u32::from(retval), 4);
         }
 
         #[test]
@@ -43,7 +34,6 @@ macro_rules! memory_tests {
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
-            assert!(inst.is_ready());
 
             let heap = inst.heap_u32();
             // guest puts the result of the grow_memory(1) call in heap[0]; based on the current settings,
@@ -96,7 +86,6 @@ macro_rules! memory_tests {
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
-            assert!(inst.is_ready());
 
             assert_output_eq!("this is a string located in the heap: hello from musl_alloc.c!\n\n");
         }

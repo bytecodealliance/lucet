@@ -3,9 +3,11 @@ macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, siginfo_t, SIGSEGV};
-        use lucet_runtime::instance::{SignalBehavior, State, TrapCode, TrapCodeType};
-        use lucet_runtime::module::MockModule;
-        use lucet_runtime::{DlModule, Instance, Limits, Region, Vmctx};
+        use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
+        use lucet_runtime::{
+            DlModule, Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TrapCode,
+            TrapCodeType,
+        };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
         use nix::sys::wait::{waitpid, WaitStatus};
@@ -13,7 +15,7 @@ macro_rules! guest_fault_tests {
         use std::ptr;
         use std::sync::Mutex;
         use $TestRegion as TestRegion;
-        use $crate::helpers::{guest_module_path, test_ex, test_nonex, DlModuleExt};
+        use $crate::helpers::{guest_module_path, test_ex, test_nonex, DlModuleExt, MockModule};
 
         const TRAPS_SANDBOX_PATH: &'static str = "lucet-runtime-c/test/build/guest_faults/traps.so";
         const HOSTCALL_ERROR_SANDBOX_PATH: &'static str =
@@ -40,7 +42,6 @@ macro_rules! guest_fault_tests {
         }
 
         unsafe fn recoverable_ptr_make_accessible() {
-            use lucet_runtime::region::mmap::mprotect;
             use nix::sys::mman::ProtFlags;
 
             mprotect(
@@ -64,19 +65,13 @@ macro_rules! guest_fault_tests {
         static HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
 
         #[no_mangle]
-        unsafe extern "C" fn hostcall_test(vmctx: *mut c_void) {
+        unsafe extern "C" fn hostcall_test(vmctx: *mut lucet_vmctx) {
             Vmctx::from_raw(vmctx).terminate(HOSTCALL_TEST_ERROR.as_ptr() as *mut c_void);
         }
 
         fn run_onetwothree(inst: &mut Instance) {
-            inst.run(b"onetwothree", &[]).expect("instance runs");
-
-            match &inst.state {
-                State::Ready { retval } => {
-                    assert_eq!(libc::c_int::from(retval), 123);
-                }
-                _ => panic!("unexpected final state: {}", inst.state),
-            }
+            let retval = inst.run(b"onetwothree", &[]).expect("instance runs");
+            assert_eq!(libc::c_int::from(retval), 123);
         }
 
         #[test]
@@ -89,28 +84,30 @@ macro_rules! guest_fault_tests {
                     .new_instance(Box::new(module))
                     .expect("instance can be created");
 
-                inst.run(b"illegal_instr", &[]).expect("instance runs");
-
-                match &inst.state {
-                    State::Fault { trapcode, .. } => {
-                        assert_eq!(trapcode.ty, TrapCodeType::BadSignature);
+                match inst.run(b"illegal_instr", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode.ty, TrapCodeType::BadSignature);
+                        let addr_details = details.rip_addr_details.unwrap();
+                        assert!(addr_details.in_module_code);
+                        assert_eq!(
+                            addr_details.file_name,
+                            Some(
+                                guest_module_path(TRAPS_SANDBOX_PATH)
+                                    .to_string_lossy()
+                                    .into_owned()
+                            )
+                        );
+                        assert_eq!(
+                            addr_details.sym_name,
+                            Some(format!("guest_func_illegal_instr"))
+                        );
                     }
-                    st => panic!("unexpected state: {}", st),
+                    res => panic!("unexpected result: {:?}", res),
                 }
-
-                let state_str = format!("{}", inst.state);
-                assert!(state_str.starts_with(
-                    "fault BadSignature triggered by Illegal instruction: code at address"
-                ));
-                let display_symbol = format!(
-                    "(symbol {}:guest_func_illegal_instr) (inside module code)",
-                    guest_module_path(TRAPS_SANDBOX_PATH).to_string_lossy()
-                );
-                assert!(state_str.contains(display_symbol.as_str()));
 
                 // after a fault, can reset and run a normal function
                 inst.reset().expect("instance resets");
-                assert!(inst.is_ready());
+
                 run_onetwothree(&mut inst);
             })
         }
@@ -125,26 +122,27 @@ macro_rules! guest_fault_tests {
                     .new_instance(Box::new(module))
                     .expect("instance can be created");
 
-                inst.run(b"oob", &[]).expect("instance runs");
-
-                match &inst.state {
-                    State::Fault { trapcode, .. } => {
-                        assert_eq!(trapcode.ty, TrapCodeType::HeapOutOfBounds);
+                match inst.run(b"oob", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode.ty, TrapCodeType::HeapOutOfBounds);
+                        let addr_details = details.rip_addr_details.unwrap();
+                        assert!(addr_details.in_module_code);
+                        assert_eq!(
+                            addr_details.file_name,
+                            Some(
+                                guest_module_path(TRAPS_SANDBOX_PATH)
+                                    .to_string_lossy()
+                                    .into_owned()
+                            )
+                        );
+                        assert_eq!(addr_details.sym_name, Some(format!("guest_func_oob")));
                     }
-                    st => panic!("unexpected state: {}", st),
+                    res => panic!("unexpected result: {:?}", res),
                 }
-
-                let state_str = format!("{}", inst.state);
-                assert!(state_str.starts_with("fault HeapOutOfBounds triggered"));
-                let display_symbol = format!(
-                    "(symbol {}:guest_func_oob) (inside module code)",
-                    guest_module_path(TRAPS_SANDBOX_PATH).to_string_lossy()
-                );
-                assert!(state_str.contains(display_symbol.as_str()));
 
                 // after a fault, can reset and run a normal function
                 inst.reset().expect("instance resets");
-                assert!(inst.is_ready());
+
                 run_onetwothree(&mut inst);
             });
         }
@@ -160,21 +158,19 @@ macro_rules! guest_fault_tests {
                     .new_instance(Box::new(module))
                     .expect("instance can be created");
 
-                inst.run(b"main", &[]).expect("instance runs");
-
-                match &inst.state {
-                    State::Terminated { info } => {
-                        assert_eq!(*info, HOSTCALL_TEST_ERROR.as_ptr() as *mut c_void);
+                match inst.run(b"main", &[]) {
+                    Err(Error::RuntimeTerminated(details)) => {
+                        assert_eq!(
+                            details.unwrap().info,
+                            HOSTCALL_TEST_ERROR.as_ptr() as *mut c_void
+                        );
                     }
-                    st => panic!("unexpected state: {}", st),
+                    res => panic!("unexpected result: {:?}", res),
                 }
-
-                let state_str = format!("{}", inst.state);
-                assert_eq!(state_str, "terminated");
 
                 // after a fault, can reset and run a normal function
                 inst.reset().expect("instance resets");
-                assert!(inst.is_ready());
+
                 run_onetwothree(&mut inst);
             });
         }
@@ -220,7 +216,6 @@ macro_rules! guest_fault_tests {
                 // from the segfault, map the page to read/write, and then return to the child
                 // code. The child code will then succeed, and the instance will exit successfully.
                 inst.run(b"recoverable_fatal", &[]).expect("instance runs");
-                assert!(inst.is_ready());
 
                 unsafe { recoverable_ptr_teardown() };
                 drop(lock);
@@ -265,8 +260,10 @@ macro_rules! guest_fault_tests {
                         // returns. This will initially cause a segfault. The signal handler will recover
                         // from the segfault, map the page to read/write, and then return to the child
                         // code. The child code will then succeed, and the instance will exit successfully.
-                        inst.run(b"recoverable_fatal", &[]).expect("instance runs");
-                        assert!(inst.is_terminated());
+                        match inst.run(b"recoverable_fatal", &[]) {
+                            Err(Error::RuntimeTerminated(_)) => (),
+                            res => panic!("unexpected result: {:?}", res),
+                        }
 
                         unsafe { recoverable_ptr_teardown() };
                         // don't want this child continuing to test harness code
@@ -318,24 +315,26 @@ macro_rules! guest_fault_tests {
                 );
                 unsafe { sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds") };
 
-                inst.run(b"illegal_instr", &[]).expect("instance runs");
-
-                match &inst.state {
-                    State::Fault { trapcode, .. } => {
-                        assert_eq!(trapcode.ty, TrapCodeType::BadSignature);
+                match inst.run(b"illegal_instr", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode.ty, TrapCodeType::BadSignature);
+                        let addr_details = details.rip_addr_details.unwrap();
+                        assert!(addr_details.in_module_code);
+                        assert_eq!(
+                            addr_details.file_name,
+                            Some(
+                                guest_module_path(TRAPS_SANDBOX_PATH)
+                                    .to_string_lossy()
+                                    .into_owned()
+                            )
+                        );
+                        assert_eq!(
+                            addr_details.sym_name,
+                            Some(format!("guest_func_illegal_instr"))
+                        );
                     }
-                    st => panic!("unexpected state: {}", st),
+                    res => panic!("unexpected result: {:?}", res),
                 }
-
-                let state_str = format!("{}", inst.state);
-                assert!(state_str.starts_with(
-                    "fault BadSignature triggered by Illegal instruction: code at address"
-                ));
-                let display_symbol = format!(
-                    "(symbol {}:guest_func_illegal_instr) (inside module code)",
-                    guest_module_path(TRAPS_SANDBOX_PATH).to_string_lossy()
-                );
-                assert!(state_str.contains(display_symbol.as_str()));
 
                 // now make sure that the host sigaction has been restored
                 unsafe {
@@ -432,7 +431,7 @@ macro_rules! guest_fault_tests {
                 *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = true;
             }
 
-            extern "C" fn sleepy_guest(_vmctx: *const c_void) {
+            extern "C" fn sleepy_guest(_vmctx: *const lucet_vmctx) {
                 std::thread::sleep(std::time::Duration::from_millis(20));
             }
 
@@ -465,7 +464,6 @@ macro_rules! guest_fault_tests {
                         .expect("instance can be created");
 
                     inst.run(b"sleepy_guest", &[]).expect("instance runs");
-                    assert!(inst.is_ready());
                 });
 
                 // now trigger a segfault in the middle of running the guest
@@ -605,6 +603,15 @@ macro_rules! guest_fault_tests {
                     }
                 }
             })
+        }
+
+        // TODO: remove this once `nix` PR https://github.com/nix-rust/nix/pull/991 is merged
+        pub unsafe fn mprotect(
+            addr: *mut c_void,
+            length: libc::size_t,
+            prot: ProtFlags,
+        ) -> nix::Result<()> {
+            nix::errno::Errno::result(libc::mprotect(addr, length, prot.bits())).map(drop)
         }
     };
 }

@@ -1,6 +1,6 @@
+use crate::error::Error;
 use crate::module::{Module, RuntimeSpec};
-use crate::region::Region;
-use failure::Error;
+use crate::region::RegionInternal;
 use libc::{c_void, SIGSTKSZ};
 use nix::unistd::{sysconf, SysconfVar};
 use std::sync::{Arc, Once, Weak};
@@ -80,7 +80,7 @@ pub struct Slot {
     /// Should not change through the lifetime of the `Alloc`.
     pub limits: Limits,
 
-    pub region: Weak<dyn Region>,
+    pub region: Weak<dyn RegionInternal>,
 }
 
 impl Slot {
@@ -98,7 +98,7 @@ pub struct Alloc {
     pub heap_inaccessible_size: usize,
     pub runtime_spec: RuntimeSpec,
     pub slot: Option<Slot>,
-    pub region: Arc<dyn Region>,
+    pub region: Arc<dyn RegionInternal>,
 }
 
 impl Drop for Alloc {
@@ -121,7 +121,76 @@ impl Alloc {
     }
 
     pub fn expand_heap(&mut self, expand_bytes: u32) -> Result<u32, Error> {
-        self.region.clone().expand_heap(self, expand_bytes)
+        let slot = self.slot();
+
+        if expand_bytes == 0 {
+            // no expansion takes place, which is not an error
+            return Ok(self.heap_accessible_size as u32);
+        }
+
+        let host_page_size = host_page_size() as u32;
+
+        if self.heap_accessible_size as u32 % host_page_size != 0 {
+            lucet_bail!("heap is not page-aligned; this is a bug");
+        }
+
+        if expand_bytes > std::u32::MAX - host_page_size - 1 {
+            bail_limits_exceeded!("expanded heap would overflow address space");
+        }
+
+        // round the expansion up to a page boundary
+        let expand_pagealigned =
+            ((expand_bytes + host_page_size - 1) / host_page_size) * host_page_size;
+
+        // `heap_inaccessible_size` tracks the size of the allocation that is addressible but not
+        // accessible. We cannot perform an expansion larger than this size.
+        if expand_pagealigned as usize > self.heap_inaccessible_size {
+            bail_limits_exceeded!("expanded heap would overflow addressable memory");
+        }
+
+        // the above makes sure this expression does not underflow
+        let guard_remaining = self.heap_inaccessible_size - expand_pagealigned as usize;
+
+        let rt_spec = &self.runtime_spec;
+
+        // The compiler specifies how much guard (memory which traps on access) must be beyond the
+        // end of the accessible memory. We cannot perform an expansion that would make this region
+        // smaller than the compiler expected it to be.
+        if guard_remaining < rt_spec.heap.guard_size as usize {
+            bail_limits_exceeded!("expansion would leave guard memory too small");
+        }
+
+        // The compiler indicates that the module has specified a maximum memory size. Don't let
+        // the heap expand beyond that:
+        if rt_spec.heap.max_size_valid == 1
+            && self.heap_accessible_size + expand_pagealigned as usize
+                > rt_spec.heap.max_size as usize
+        {
+            bail_limits_exceeded!(
+                "expansion would exceed module-specified heap limit: {:?}",
+                rt_spec.heap
+            );
+        }
+
+        // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let
+        // the heap expand beyond that:
+        if self.heap_accessible_size + expand_pagealigned as usize > slot.limits.heap_memory_size {
+            bail_limits_exceeded!(
+                "expansion would exceed runtime-specified heap limit: {:?}",
+                slot.limits
+            );
+        }
+
+        let newly_accessible = self.heap_accessible_size;
+
+        self.region
+            .clone()
+            .expand_heap(slot, newly_accessible as u32, expand_pagealigned)?;
+
+        self.heap_accessible_size += expand_pagealigned as usize;
+        self.heap_inaccessible_size -= expand_pagealigned as usize;
+
+        Ok(newly_accessible as u32)
     }
 
     pub fn reset_heap(&mut self, module: &dyn Module) -> Result<(), Error> {
@@ -178,8 +247,6 @@ impl Alloc {
         std::slice::from_raw_parts(self.slot().heap as *mut u64, self.heap_accessible_size / 8)
     }
 
-    // TODO: remove annotation once API stabilizes
-    #[allow(dead_code)]
     /// Return the heap as a mutable slice of 64-bit words.
     pub unsafe fn heap_u64_mut(&mut self) -> &mut [u64] {
         assert!(self.slot().heap as usize % 8 == 0, "heap is 8-byte aligned");
@@ -219,6 +286,14 @@ impl Alloc {
         )
     }
 
+    /// Return the globals as a slice.
+    pub unsafe fn globals(&self) -> &[i64] {
+        std::slice::from_raw_parts(
+            self.slot().globals as *const i64,
+            self.slot().limits.globals_size / 8,
+        )
+    }
+
     /// Return the globals as a mutable slice.
     pub unsafe fn globals_mut(&mut self) -> &mut [i64] {
         std::slice::from_raw_parts_mut(
@@ -232,7 +307,7 @@ impl Alloc {
         std::slice::from_raw_parts_mut(self.slot().sigstack as *mut u8, libc::SIGSTKSZ)
     }
 
-    pub fn mem_in_heap(&self, ptr: *const c_void, len: usize) -> bool {
+    pub fn mem_in_heap<T>(&self, ptr: *const T, len: usize) -> bool {
         let start = ptr as usize;
         let end = start + len;
 
@@ -248,18 +323,18 @@ impl Alloc {
     }
 }
 
-/// Limits for the various memories managed by an `Alloc`.
+/// Runtime limits for the various memories that back a Lucet instance.
 ///
 /// Each value is specified in bytes, and must be evenly divisible by the host page size (4K).
 #[derive(Clone, Debug)]
 pub struct Limits {
-    /// Max size of the heap, which can be backed by real memory.
+    /// Max size of the heap, which can be backed by real memory. (default 1M)
     pub heap_memory_size: usize,
-    /// Size of total virtual memory.
+    /// Size of total virtual memory. (default 8M)
     pub heap_address_space_size: usize,
-    /// Size of the guest stack.
+    /// Size of the guest stack. (default 128K)
     pub stack_size: usize,
-    /// Size of the globals region in bytes; each global uses 8 bytes.
+    /// Size of the globals region in bytes; each global uses 8 bytes. (default 4K)
     pub globals_size: usize,
 }
 
@@ -294,12 +369,31 @@ impl Limits {
     }
 
     /// Validate that the limits are aligned to page sizes, and that the stack is not empty.
-    pub fn validate(&self) -> bool {
-        self.heap_memory_size % host_page_size() == 0
-            && self.heap_address_space_size % host_page_size() == 0
-            && self.stack_size % host_page_size() == 0
-            && self.globals_size % host_page_size() == 0
-            && self.stack_size > 0
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.heap_memory_size % host_page_size() != 0 {
+            return Err(Error::InvalidArgument(
+                "memory size must be a multiple of host page size",
+            ));
+        }
+        if self.heap_address_space_size % host_page_size() != 0 {
+            return Err(Error::InvalidArgument(
+                "address space size must be a multiple of host page size",
+            ));
+        }
+        if self.stack_size % host_page_size() != 0 {
+            return Err(Error::InvalidArgument(
+                "stack size must be a multiple of host page size",
+            ));
+        }
+        if self.globals_size % host_page_size() != 0 {
+            return Err(Error::InvalidArgument(
+                "globals size must be a multiple of host page size",
+            ));
+        }
+        if self.stack_size <= 0 {
+            return Err(Error::InvalidArgument("stack size must be greater than 0"));
+        }
+        Ok(())
     }
 }
 

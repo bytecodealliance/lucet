@@ -1,8 +1,7 @@
 #[macro_export]
 macro_rules! start_tests {
     ( $TestRegion:path ) => {
-        use lucet_runtime::region::Region;
-        use lucet_runtime::{DlModule, Limits};
+        use lucet_runtime::{DlModule, Limits, Region};
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
@@ -20,7 +19,6 @@ macro_rules! start_tests {
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
-            assert!(inst.is_ready());
 
             // Now the globals should be:
             // $flossie = 17
@@ -40,7 +38,6 @@ macro_rules! start_tests {
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
-            assert!(inst.is_ready());
 
             // Now the globals should be:
             // $flossie = 17
@@ -60,7 +57,6 @@ macro_rules! start_tests {
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
-            assert!(inst.is_ready());
 
             // Now the globals should be:
             // $flossie = 17
