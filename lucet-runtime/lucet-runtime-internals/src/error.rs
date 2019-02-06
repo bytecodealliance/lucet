@@ -115,6 +115,6 @@ macro_rules! lucet_incorrect_module {
 }
 
 #[macro_export]
-macro_rules! lucet_limits_exceeded {
+macro_rules! bail_limits_exceeded {
     ($($arg:tt)*) => { return Err($crate::error::Error::LimitsExceeded(format!($($arg)*))); }
 }

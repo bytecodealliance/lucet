@@ -135,15 +135,15 @@ impl RuntimeSpec {
         if self.heap.reserved_size as usize + self.heap.guard_size as usize
             > limits.heap_address_space_size
         {
-            lucet_limits_exceeded!("heap spec reserved and guard size: {:?}", self.heap);
+            bail_limits_exceeded!("heap spec reserved and guard size: {:?}", self.heap);
         }
 
         if self.heap.initial_size as usize > limits.heap_memory_size {
-            lucet_limits_exceeded!("heap spec initial size: {:?}", self.heap);
+            bail_limits_exceeded!("heap spec initial size: {:?}", self.heap);
         }
 
         if self.globals.len() * std::mem::size_of::<u64>() > limits.globals_size {
-            lucet_limits_exceeded!("globals exceed limits");
+            bail_limits_exceeded!("globals exceed limits");
         }
 
         Ok(())

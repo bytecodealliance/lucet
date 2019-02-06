@@ -135,7 +135,7 @@ impl Alloc {
         }
 
         if expand_bytes > std::u32::MAX - host_page_size - 1 {
-            lucet_limits_exceeded!("expanded heap would overflow address space");
+            bail_limits_exceeded!("expanded heap would overflow address space");
         }
 
         // round the expansion up to a page boundary
@@ -145,7 +145,7 @@ impl Alloc {
         // `heap_inaccessible_size` tracks the size of the allocation that is addressible but not
         // accessible. We cannot perform an expansion larger than this size.
         if expand_pagealigned as usize > self.heap_inaccessible_size {
-            lucet_limits_exceeded!("expanded heap would overflow addressable memory");
+            bail_limits_exceeded!("expanded heap would overflow addressable memory");
         }
 
         // the above makes sure this expression does not underflow
@@ -157,7 +157,7 @@ impl Alloc {
         // end of the accessible memory. We cannot perform an expansion that would make this region
         // smaller than the compiler expected it to be.
         if guard_remaining < rt_spec.heap.guard_size as usize {
-            lucet_limits_exceeded!("expansion would leave guard memory too small");
+            bail_limits_exceeded!("expansion would leave guard memory too small");
         }
 
         // The compiler indicates that the module has specified a maximum memory size. Don't let
@@ -166,7 +166,7 @@ impl Alloc {
             && self.heap_accessible_size + expand_pagealigned as usize
                 > rt_spec.heap.max_size as usize
         {
-            lucet_limits_exceeded!(
+            bail_limits_exceeded!(
                 "expansion would exceed module-specified heap limit: {:?}",
                 rt_spec.heap
             );
@@ -175,7 +175,7 @@ impl Alloc {
         // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let
         // the heap expand beyond that:
         if self.heap_accessible_size + expand_pagealigned as usize > slot.limits.heap_memory_size {
-            lucet_limits_exceeded!(
+            bail_limits_exceeded!(
                 "expansion would exceed runtime-specified heap limit: {:?}",
                 slot.limits
             );
