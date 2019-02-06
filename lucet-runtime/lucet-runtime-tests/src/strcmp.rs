@@ -5,6 +5,7 @@ macro_rules! strcmp_tests {
         use lucet_runtime::vmctx::lucet_vmctx;
         use lucet_runtime::{DlModule, Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use std::ffi::CString;
+        use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
@@ -30,7 +31,7 @@ macro_rules! strcmp_tests {
             let module = DlModule::load_test(FAULT_MOD_PATH).expect("module loads");
             let region = TestRegion::create(10, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let newpage_start = inst.grow_memory(1).expect("grow_memory succeeds");
@@ -84,7 +85,7 @@ macro_rules! strcmp_tests {
             let module = DlModule::load_test(FAULT_MOD_PATH).expect("module loads");
             let region = TestRegion::create(10, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             match inst.run(b"wasm_fault", &[]) {

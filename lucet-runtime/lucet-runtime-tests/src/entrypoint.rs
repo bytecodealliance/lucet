@@ -2,8 +2,9 @@
 macro_rules! entrypoint_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
-        use lucet_runtime::vmctx::lucet_vmctx;
+        use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{DlModule, Error, Limits, Region, Val, WASM_PAGE_SIZE};
+        use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
@@ -16,6 +17,7 @@ macro_rules! entrypoint_tests {
         const USE_ALLOCATOR_SANDBOX_PATH: &'static str =
             "tests/build/entrypoint_guests/use_allocator.so";
         const CTYPE_SANDBOX_PATH: &'static str = "tests/build/entrypoint_guests/ctype.so";
+        const CALLBACK_SANDBOX_PATH: &'static str = "tests/build/entrypoint_guests/callback.so";
 
         #[test]
         fn c_calc_add_2() {
@@ -31,7 +33,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(mod_path).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst
@@ -50,7 +52,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(mod_path).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             // Add all 10 arguments. Why 10? Because its more than will fit in registers to be passed to
@@ -89,7 +91,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(mod_path).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst
@@ -108,7 +110,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(mod_path).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst
@@ -133,7 +135,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(mod_path).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             match inst.run(b"invalid", &[123u64.into(), 456u64.into()]) {
@@ -147,7 +149,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst
@@ -162,7 +164,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst
@@ -177,7 +179,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst
@@ -209,7 +211,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst
@@ -241,7 +243,7 @@ macro_rules! entrypoint_tests {
             let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst
@@ -317,7 +319,7 @@ macro_rules! entrypoint_tests {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             // First, we need to get an unused location in linear memory for the pointer that will be passed
@@ -368,7 +370,7 @@ macro_rules! entrypoint_tests {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             // First, we need to get an unused location in linear memory for the pointer that will be passed
@@ -443,7 +445,7 @@ macro_rules! entrypoint_tests {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             // same as above
@@ -521,7 +523,7 @@ macro_rules! entrypoint_tests {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             // First, we need to get an unused location in linear memory for the pointer that will be passed
@@ -551,6 +553,31 @@ macro_rules! entrypoint_tests {
             // Run the body routine
             inst.run(b"ctype_body", &[Val::GuestPtr(ctxstar)])
                 .expect("instance runs");
+        }
+
+        #[no_mangle]
+        extern "C" fn callback_hostcall(vmctx: *mut lucet_vmctx, cb_idx: u32, x: u64) -> u64 {
+            let vmctx = unsafe { Vmctx::from_raw(vmctx) };
+            let func = vmctx
+                .get_func_from_idx(0, cb_idx)
+                .expect("can get function by index");
+            let func = func as *const extern "C" fn(*mut lucet_vmctx, u64) -> u64;
+            unsafe { (*func)(vmctx.as_raw(), x) + 1 }
+        }
+
+        #[test]
+        fn callback() {
+            let module = DlModule::load_test(CALLBACK_SANDBOX_PATH).expect("module loads");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            let retval = inst
+                .run(b"callback_entrypoint", &[0u64.into()])
+                .expect("instance runs");
+            assert_eq!(u64::from(retval), 3);
         }
     };
 }

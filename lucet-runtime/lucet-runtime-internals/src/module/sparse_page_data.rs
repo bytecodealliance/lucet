@@ -50,7 +50,7 @@ macro_rules! sparse_page_data_tests {
             let module = DlModule::load_test(VALID_SANDBOX_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             // The test data initializers result in two strings getting copied into linear memory; see

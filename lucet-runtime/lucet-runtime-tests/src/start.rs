@@ -2,6 +2,7 @@
 macro_rules! start_tests {
     ( $TestRegion:path ) => {
         use lucet_runtime::{DlModule, Limits, Region};
+        use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
@@ -15,7 +16,7 @@ macro_rules! start_tests {
             let module = DlModule::load_test(GLOBAL_INIT_SANDBOX_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
@@ -34,7 +35,7 @@ macro_rules! start_tests {
             let module = DlModule::load_test(START_AND_CALL_SANDBOX_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
@@ -53,7 +54,7 @@ macro_rules! start_tests {
             let module = DlModule::load_test(NO_START_SANDBOX_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");

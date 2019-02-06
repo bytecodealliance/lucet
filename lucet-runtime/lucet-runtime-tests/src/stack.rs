@@ -4,6 +4,7 @@ macro_rules! stack_tests {
         use lucet_runtime::{
             DlModule, Error, InstanceHandle, Limits, Region, TrapCodeType, UntypedRetVal, Val,
         };
+        use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
@@ -16,7 +17,7 @@ macro_rules! stack_tests {
             let module = DlModule::load_test(path).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             inst.run(b"localpalooza", &[recursion_depth.into()])

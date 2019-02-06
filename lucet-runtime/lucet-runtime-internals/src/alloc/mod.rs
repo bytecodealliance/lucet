@@ -83,6 +83,10 @@ pub struct Slot {
     pub region: Weak<dyn RegionInternal>,
 }
 
+// raw pointers require unsafe impl
+unsafe impl Send for Slot {}
+unsafe impl Sync for Slot {}
+
 impl Slot {
     pub fn stack_top(&self) -> *mut c_void {
         (self.stack as usize + self.limits.stack_size) as *mut c_void

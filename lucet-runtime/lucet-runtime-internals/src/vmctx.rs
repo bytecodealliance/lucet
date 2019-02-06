@@ -7,7 +7,8 @@ use crate::alloc::instance_heap_offset;
 use crate::context::Context;
 use crate::error::Error;
 use crate::instance::{
-    Instance, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
+    Instance, InstanceHandle, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE,
+    HOST_CTX,
 };
 use crate::WASM_PAGE_SIZE;
 use libc::c_void;
@@ -59,7 +60,7 @@ impl Vmctx {
     }
 
     /// Return the WebAssembly heap as a mutable slice of bytes.
-    pub fn heap_mut(&mut self) -> &[u8] {
+    pub fn heap_mut(&mut self) -> &mut [u8] {
         self.instance_mut().heap_mut()
     }
 
@@ -179,6 +180,21 @@ impl Instance {
         };
         HOST_CTX.with(|host_ctx| Context::set(&*host_ctx.get()))
     }
+}
+
+/// Unsafely get a `Vmctx` from an `InstanceHandle`, and fake a current instance TLS variable.
+///
+/// This is provided for compatibility with the Terrarium memory management test suite, but should
+/// absolutely not be used in newer code.
+#[deprecated]
+pub unsafe fn vmctx_from_mock_instance(inst: &InstanceHandle) -> Vmctx {
+    CURRENT_INSTANCE.with(|current_instance| {
+        let mut current_instance = current_instance.borrow_mut();
+        *current_instance = Some(std::ptr::NonNull::new_unchecked(
+            inst.alloc().slot().start as *mut Instance,
+        ));
+    });
+    Vmctx::from_raw(inst.alloc().slot().heap as *mut lucet_vmctx)
 }
 
 static VMCTX_CAPI_INIT: Once = Once::new();

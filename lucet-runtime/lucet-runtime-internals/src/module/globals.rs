@@ -120,7 +120,7 @@ macro_rules! globals_tests {
             let module = DlModule::load_test(INTERNAL_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst.run(b"get_global0", &[]).expect("instance runs");
@@ -132,7 +132,7 @@ macro_rules! globals_tests {
             let module = DlModule::load_test(INTERNAL_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst.run(b"get_global0", &[]).expect("instance runs");
@@ -147,7 +147,7 @@ macro_rules! globals_tests {
             let module = DlModule::load_test(INTERNAL_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             inst.run(b"set_global0", &[666i64.into()])
@@ -162,7 +162,7 @@ macro_rules! globals_tests {
             let module = DlModule::load_test(DEFINITION_SANDBOX_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");

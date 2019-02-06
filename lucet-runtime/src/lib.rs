@@ -51,7 +51,7 @@
 //!
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
-//! let mut inst = region.new_instance(Box::new(module)).unwrap();
+//! let mut inst = region.new_instance(module).unwrap();
 //!
 //! let retval = inst.run(b"factorial", &[5u64.into()]).unwrap();
 //! assert_eq!(u64::from(retval), 120u64);
@@ -79,7 +79,7 @@
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
 //! let mut libc = Box::new(LucetLibc::new());
 //! let mut inst = region
-//!     .new_instance_with_ctx(Box::new(module), Box::into_raw(libc) as *mut libc::c_void)
+//!     .new_instance_with_ctx(module, Box::into_raw(libc) as *mut libc::c_void)
 //!     .unwrap();
 //!
 //! inst.run(b"main", &[]).unwrap();
@@ -118,7 +118,7 @@
 //!
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
-//! let mut inst = region.new_instance(Box::new(module)).unwrap();
+//! let mut inst = region.new_instance(module).unwrap();
 //!
 //! // install the handler
 //! inst.signal_handler = signal_handler_count;

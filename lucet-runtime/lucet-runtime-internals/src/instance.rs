@@ -17,6 +17,7 @@ use std::ffi::{CStr, CString};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
+use std::sync::Arc;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
 pub const INSTANCE_PADDING: usize = 2280;
@@ -58,7 +59,7 @@ pub struct InstanceHandle {
 /// `Region`.
 pub fn new_instance_handle(
     instance: *mut Instance,
-    module: Box<dyn Module>,
+    module: Arc<dyn Module>,
     alloc: Alloc,
     embed_ctx: *mut c_void,
 ) -> Result<InstanceHandle, Error> {
@@ -136,7 +137,7 @@ pub struct Instance {
     pub(crate) embed_ctx: *mut c_void,
 
     /// The program (WebAssembly module) that is the entrypoint for the instance.
-    module: Box<dyn Module>,
+    module: Arc<dyn Module>,
 
     /// The `Context` in which the guest program runs
     ctx: Context,
@@ -303,7 +304,7 @@ impl Instance {
 
 // Private API
 impl Instance {
-    fn new(alloc: Alloc, module: Box<dyn Module>, embed_ctx: *mut c_void) -> Self {
+    fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: *mut c_void) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
         Instance {
             magic: LUCET_INSTANCE_MAGIC,

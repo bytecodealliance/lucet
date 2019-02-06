@@ -1,12 +1,14 @@
 // re-export types that should only be used for testing
-pub use lucet_runtime_internals::module::MockModule;
+pub use lucet_runtime_internals::module::{HeapSpec, MockModule};
+#[allow(deprecated)]
+pub use lucet_runtime_internals::vmctx::vmctx_from_mock_instance;
 
 use lazy_static::lazy_static;
 use lucet_runtime_internals::error::Error;
 use lucet_runtime_internals::module::DlModule;
 use std::env;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 lazy_static! {
     static ref EXCLUSIVE_TEST: RwLock<()> = RwLock::default();
@@ -49,11 +51,11 @@ pub fn guest_module_path<P: AsRef<Path>>(path: P) -> PathBuf {
 }
 
 pub trait DlModuleExt {
-    fn load_test<P: AsRef<Path>>(so_path: P) -> Result<DlModule, Error>;
+    fn load_test<P: AsRef<Path>>(so_path: P) -> Result<Arc<DlModule>, Error>;
 }
 
 impl DlModuleExt for DlModule {
-    fn load_test<P: AsRef<Path>>(so_path: P) -> Result<DlModule, Error> {
+    fn load_test<P: AsRef<Path>>(so_path: P) -> Result<Arc<DlModule>, Error> {
         DlModule::load(guest_module_path(so_path))
     }
 }

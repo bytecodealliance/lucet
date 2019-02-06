@@ -5,6 +5,7 @@
 #define CALCULATOR_SANDBOX_PATH "entrypoint_guests/calculator.so"
 #define USE_ALLOCATOR_SANDBOX_PATH "entrypoint_guests/use_allocator.so"
 #define CTYPE_SANDBOX_PATH "entrypoint_guests/ctype.so"
+#define CALLBACK_SANDBOX_PATH "entrypoint_guests/callback.so"
 
 TEST test_calc_add_2(void)
 {
@@ -464,6 +465,45 @@ TEST test_ctype(void)
     PASS();
 }
 
+uint64_t callback_hostcall(void *vmctx, uint32_t cb_id, uint64_t x)
+{
+    void *func = lucet_vmctx_get_func_from_id(vmctx, 0, cb_id);
+    return (*(uint64_t(*)(void *, uint64_t)) func)(vmctx, x) + 1;
+}
+
+TEST test_callback(void)
+{
+    struct lucet_module *mod;
+    mod = lucet_module_load(guest_module_path(CALLBACK_SANDBOX_PATH));
+    ASSERT(mod != NULL);
+
+    struct lucet_pool *pool;
+    pool = lucet_pool_create(1, NULL);
+
+    struct lucet_instance *inst;
+    inst = lucet_instance_create(pool, mod, NULL);
+    ASSERT(inst != NULL);
+
+    // Add the two arguments
+    enum lucet_run_stat const stat =
+        lucet_instance_run(inst, "callback_entrypoint", 1, LUCET_VAL_U64(0));
+    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+
+    const struct lucet_state *state;
+    state = lucet_instance_get_state(inst);
+
+    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+
+    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state->u.ready.untyped_retval);
+    ASSERT_EQ(3, res);
+
+    lucet_instance_release(inst);
+    lucet_module_unload(mod);
+    lucet_pool_decref(pool);
+
+    PASS();
+}
+
 SUITE(entrypoint_suite)
 {
     RUN_TEST(test_calc_add_2);
@@ -475,4 +515,5 @@ SUITE(entrypoint_suite)
     RUN_TEST(allocator_create_region_and_increment);
     RUN_TEST(allocator_create_two_regions);
     RUN_TEST(test_ctype);
+    RUN_TEST(test_callback);
 }

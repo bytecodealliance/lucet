@@ -5,6 +5,7 @@ use crate::error::Error;
 use crate::instance::InstanceHandle;
 use crate::module::Module;
 use libc::c_void;
+use std::sync::Arc;
 
 /// A memory region in which Lucet instances are created and run.
 ///
@@ -16,18 +17,18 @@ pub trait Region: RegionInternal {
     /// context](index.html#embedding-with-hostcalls).
     fn new_instance_with_ctx(
         &self,
-        module: Box<dyn Module>,
+        module: Arc<dyn Module>,
         embed_ctx: *mut c_void,
     ) -> Result<InstanceHandle, Error>;
 
     /// Create a new instance within the region.
-    fn new_instance(&self, module: Box<dyn Module>) -> Result<InstanceHandle, Error> {
+    fn new_instance(&self, module: Arc<dyn Module>) -> Result<InstanceHandle, Error> {
         self.new_instance_with_ctx(module, std::ptr::null_mut())
     }
 }
 
 /// A `RegionInternal` is a collection of `Slot`s which are managed as a whole.
-pub trait RegionInternal {
+pub trait RegionInternal: Send + Sync {
     /// Unmaps the heap, stack, and globals of an `Alloc`, while retaining the virtual address
     /// ranges in its `Slot`.
     fn drop_alloc(&self, alloc: &mut Alloc);

@@ -4,6 +4,7 @@ macro_rules! host_tests {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{DlModule, Error, Limits, Region, TrapCodeType};
+        use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
 
@@ -56,7 +57,7 @@ macro_rules! host_tests {
             let module = DlModule::load_test(NULL_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
         }
 
@@ -65,7 +66,7 @@ macro_rules! host_tests {
             let module = DlModule::load_test(NULL_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
             inst.run(b"main", &[]).expect("instance runs");
         }
@@ -78,10 +79,7 @@ macro_rules! host_tests {
             let mut confirm_hello = false;
 
             let mut inst = region
-                .new_instance_with_ctx(
-                    Box::new(module),
-                    (&mut confirm_hello) as *mut bool as *mut c_void,
-                )
+                .new_instance_with_ctx(module, (&mut confirm_hello) as *mut bool as *mut c_void)
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
@@ -94,7 +92,7 @@ macro_rules! host_tests {
             let module = DlModule::load_test(HOSTCALL_ERROR_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             match inst.run(b"main", &[]) {
@@ -111,7 +109,7 @@ macro_rules! host_tests {
             let module = DlModule::load_test(FPE_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             match inst.run(b"trigger_div_error", &[0u64.into()]) {

@@ -9,6 +9,7 @@ use libloading::{Library, Symbol};
 use std::ffi::{CStr, OsStr};
 use std::mem;
 use std::slice::from_raw_parts;
+use std::sync::Arc;
 
 /// A Lucet module backed by a dynamically-loaded shared object.
 pub struct DlModule {
@@ -23,9 +24,13 @@ pub struct DlModule {
     trap_manifest: &'static [TrapManifestRecord],
 }
 
+// for the one raw pointer only
+unsafe impl Send for DlModule {}
+unsafe impl Sync for DlModule {}
+
 impl DlModule {
     /// Create a module, loading code from a shared object on the filesystem.
-    pub fn load<P: AsRef<OsStr>>(so_path: P) -> Result<Self, Error> {
+    pub fn load<P: AsRef<OsStr>>(so_path: P) -> Result<Arc<Self>, Error> {
         // Load the dynamic library. The undefined symbols corresponding to the lucet_syscall_
         // functions will be provided by the current executable.  We trust our wasm->dylib compiler
         // to make sure these function calls are the way the dylib can touch memory outside of its
@@ -92,12 +97,12 @@ impl DlModule {
             }
         };
 
-        Ok(DlModule {
+        Ok(Arc::new(DlModule {
             lib,
             fbase,
             runtime_spec,
             trap_manifest,
-        })
+        }))
     }
 }
 
@@ -174,10 +179,11 @@ impl ModuleInternal for DlModule {
             return Err(Error::FuncNotFound(table_id, func_id));
         }
         let table = self.table_elements()?;
-        table
+        let func: extern "C" fn() = table
             .get(func_id as usize)
-            .map(|element| element.rf as *const extern "C" fn())
-            .ok_or(Error::FuncNotFound(table_id, func_id))
+            .map(|element| unsafe { std::mem::transmute(element.rf) })
+            .ok_or(Error::FuncNotFound(table_id, func_id))?;
+        Ok(&func as *const extern "C" fn())
     }
 
     fn get_start_func(&self) -> Result<Option<*const extern "C" fn()>, Error> {
