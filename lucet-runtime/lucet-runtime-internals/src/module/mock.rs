@@ -4,10 +4,12 @@ use crate::module::{
 };
 use libc::c_void;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub struct MockModule {
     pub table_elements: Vec<TableElement>,
-    pub sparse_page_data: Vec<*const c_void>,
+    sparse_page_data: Vec<Vec<u8>>,
+    sparse_page_data_ptrs: Vec<*const c_void>,
     pub runtime_spec: RuntimeSpec,
     pub export_funcs: HashMap<Vec<u8>, *const extern "C" fn()>,
     pub func_table: HashMap<(u32, u32), *const extern "C" fn()>,
@@ -15,11 +17,15 @@ pub struct MockModule {
     pub trap_manifest: Vec<TrapManifestRecord>,
 }
 
+unsafe impl Send for MockModule {}
+unsafe impl Sync for MockModule {}
+
 impl MockModule {
     pub fn new() -> Self {
         MockModule {
             table_elements: vec![],
             sparse_page_data: vec![],
+            sparse_page_data_ptrs: vec![],
             runtime_spec: RuntimeSpec::default(),
             export_funcs: HashMap::new(),
             func_table: HashMap::new(),
@@ -28,14 +34,25 @@ impl MockModule {
         }
     }
 
-    pub fn boxed() -> Box<dyn Module> {
-        Box::new(MockModule::new())
+    pub fn arced() -> Arc<dyn Module> {
+        Arc::new(MockModule::new())
     }
 
-    pub fn boxed_with_heap(heap: &HeapSpec) -> Box<dyn Module> {
+    pub fn arced_with_heap(heap: &HeapSpec) -> Arc<dyn Module> {
         let mut module = MockModule::new();
         module.runtime_spec.heap = heap.clone();
-        Box::new(module)
+        Arc::new(module)
+    }
+
+    pub fn set_initial_heap(&mut self, heap: &[u8]) {
+        self.sparse_page_data.clear();
+        self.sparse_page_data_ptrs.clear();
+        for page in heap.chunks(4096) {
+            let page = page.to_vec();
+            self.sparse_page_data_ptrs
+                .push(page.as_ptr() as *const c_void);
+            self.sparse_page_data.push(page);
+        }
     }
 }
 
@@ -47,7 +64,7 @@ impl ModuleInternal for MockModule {
     }
 
     fn sparse_page_data(&self) -> Result<&[*const c_void], Error> {
-        Ok(&self.sparse_page_data)
+        Ok(&self.sparse_page_data_ptrs)
     }
 
     fn runtime_spec(&self) -> &RuntimeSpec {

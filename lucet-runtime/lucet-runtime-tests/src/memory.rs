@@ -18,7 +18,7 @@ macro_rules! memory_tests {
             let module = DlModule::load_test(CURRENT_MEMORY_SANDBOX_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             let retval = inst.run(b"main", &[]).expect("instance runs");
@@ -30,7 +30,7 @@ macro_rules! memory_tests {
             let module = DlModule::load_test(GROW_MEMORY_SANDBOX_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
-                .new_instance(Box::new(module))
+                .new_instance(module)
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");
@@ -82,7 +82,7 @@ macro_rules! memory_tests {
             libc.set_stdio_handler(debug_handler);
 
             let mut inst = region
-                .new_instance_with_ctx(Box::new(module), Box::into_raw(libc) as *mut libc::c_void)
+                .new_instance_with_ctx(module, Box::into_raw(libc) as *mut libc::c_void)
                 .expect("instance can be created");
 
             inst.run(b"main", &[]).expect("instance runs");

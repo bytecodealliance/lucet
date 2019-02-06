@@ -30,6 +30,7 @@ ENTRYPOINT_GUEST_OBJECTS:= $(addprefix build/entrypoint_guests/, \
 	calculator.so \
 	use_allocator.so \
 	ctype.so \
+	callback.so \
 	)
 
 ENTRYPOINT_GUEST_BINDINGS := --bindings=entrypoint_guests/bindings.json

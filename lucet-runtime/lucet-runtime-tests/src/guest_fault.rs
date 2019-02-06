@@ -13,7 +13,7 @@ macro_rules! guest_fault_tests {
         use nix::sys::wait::{waitpid, WaitStatus};
         use nix::unistd::{fork, ForkResult};
         use std::ptr;
-        use std::sync::Mutex;
+        use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::helpers::{guest_module_path, test_ex, test_nonex, DlModuleExt, MockModule};
 
@@ -81,7 +81,7 @@ macro_rules! guest_fault_tests {
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
-                    .new_instance(Box::new(module))
+                    .new_instance(module)
                     .expect("instance can be created");
 
                 match inst.run(b"illegal_instr", &[]) {
@@ -119,7 +119,7 @@ macro_rules! guest_fault_tests {
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
-                    .new_instance(Box::new(module))
+                    .new_instance(module)
                     .expect("instance can be created");
 
                 match inst.run(b"oob", &[]) {
@@ -155,7 +155,7 @@ macro_rules! guest_fault_tests {
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
-                    .new_instance(Box::new(module))
+                    .new_instance(module)
                     .expect("instance can be created");
 
                 match inst.run(b"main", &[]) {
@@ -201,7 +201,7 @@ macro_rules! guest_fault_tests {
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
-                    .new_instance(Box::new(module))
+                    .new_instance(module)
                     .expect("instance can be created");
 
                 // Install a signal handler that will override the fatal error and tell the sandbox to
@@ -246,7 +246,7 @@ macro_rules! guest_fault_tests {
                         let region = TestRegion::create(1, &Limits::default())
                             .expect("region can be created");
                         let mut inst = region
-                            .new_instance(Box::new(module))
+                            .new_instance(module)
                             .expect("instance can be created");
 
                         // Install a signal handler that will override the fatal error and tell the sandbox to
@@ -305,7 +305,7 @@ macro_rules! guest_fault_tests {
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
-                    .new_instance(Box::new(module))
+                    .new_instance(module)
                     .expect("instance can be created");
 
                 let sa = SigAction::new(
@@ -374,7 +374,7 @@ macro_rules! guest_fault_tests {
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
-                    .new_instance(Box::new(module))
+                    .new_instance(module)
                     .expect("instance can be created");
 
                 inst.fatal_handler = fatal_handler_exit;
@@ -460,7 +460,7 @@ macro_rules! guest_fault_tests {
                     let region =
                         TestRegion::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
-                        .new_instance(Box::new(module))
+                        .new_instance(Arc::new(module))
                         .expect("instance can be created");
 
                     inst.run(b"sleepy_guest", &[]).expect("instance runs");
@@ -511,7 +511,7 @@ macro_rules! guest_fault_tests {
                             let region = TestRegion::create(1, &Limits::default())
                                 .expect("region can be created");
                             let mut inst = region
-                                .new_instance(Box::new(module))
+                                .new_instance(module)
                                 .expect("instance can be created");
 
                             inst.run(b"infinite_loop", &[]).expect("instance runs");
@@ -546,7 +546,7 @@ macro_rules! guest_fault_tests {
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
-                    .new_instance(Box::new(module))
+                    .new_instance(module)
                     .expect("instance can be created");
 
                 match fork().expect("can fork") {
@@ -581,7 +581,7 @@ macro_rules! guest_fault_tests {
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
-                    .new_instance(Box::new(module))
+                    .new_instance(module)
                     .expect("instance can be created");
 
                 match fork().expect("can fork") {

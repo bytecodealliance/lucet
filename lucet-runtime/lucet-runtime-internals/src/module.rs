@@ -62,6 +62,7 @@ pub struct TrapSite {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct TableElement {
     ty: u64,
     rf: u64,
@@ -176,7 +177,7 @@ pub struct AddrDetails {
 /// [`Region::new_instance()`](trait.Region.html#method.new_instance).
 pub trait Module: ModuleInternal {}
 
-pub trait ModuleInternal {
+pub trait ModuleInternal: Send + Sync {
     /// Get the table elements from the module.
     fn table_elements(&self) -> Result<&[TableElement], Error>;
 
