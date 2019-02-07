@@ -11,7 +11,7 @@ pub mod types;
 pub use self::data::{module_data, DataInit};
 pub use self::function::{Function, FunctionDef, FunctionImport, FunctionRuntime};
 pub use self::globals::{Global, GlobalDef, GlobalImport};
-pub use self::memory::{HeapSettings, HeapSpec, MemorySpec};
+pub use self::memory::{HeapSettings, HeapSpec, create_heap_spec, empty_heap_spec, MemorySpec};
 pub use self::names::{module_names, ModuleNames};
 pub use self::runtime::Runtime;
 pub use self::table::{TableBuilder, TableDef};
@@ -120,11 +120,11 @@ impl Program {
 
     pub fn heap_spec(&self) -> HeapSpec {
         if let Some(ref mem_spec) = self.import_memory {
-            HeapSpec::new(mem_spec, &self.heap_settings)
+            create_heap_spec(mem_spec, &self.heap_settings)
         } else if let Some(ref mem_spec) = self.defined_memory {
-            HeapSpec::new(mem_spec, &self.heap_settings)
+            create_heap_spec(mem_spec, &self.heap_settings)
         } else {
-            HeapSpec::empty()
+            empty_heap_spec()
         }
     }
 

@@ -119,7 +119,10 @@ pub mod writer {
 
     use crate::lucet_module_data_capnp::{heap_spec, module_data, sparse_data};
     use failure::Error;
+    use std::io::{self, Write};
+    use capnp::serialize_packed;
 
+    #[derive(Debug, PartialEq, Eq)]
     pub struct ModuleData {
         pub heap_spec: HeapSpec,
         pub sparse_data: SparseData,
@@ -133,7 +136,7 @@ pub mod writer {
             }
         }
 
-        pub fn build(&self) -> capnp::message::Builder<capnp::message::HeapAllocator> {
+        fn build(&self) -> capnp::message::Builder<capnp::message::HeapAllocator> {
             let mut message = capnp::message::Builder::new_default();
             {
                 let mut module_data = message.init_root::<module_data::Builder>();
@@ -143,8 +146,14 @@ pub mod writer {
             }
             message
         }
+
+        pub fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
+            let message = self.build();
+            serialize_packed::write_message(w, &message)
+        }
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     pub struct HeapSpec {
         pub reserved_size: u64,
         pub guard_size: u64,
@@ -179,6 +188,7 @@ pub mod writer {
         }
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     pub struct SparseData {
         chunks: Vec<Option<Vec<u8>>>,
     }

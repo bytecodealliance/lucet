@@ -7,6 +7,7 @@ pub mod opcode;
 pub mod state;
 pub mod table;
 pub mod traps;
+pub mod module_data;
 
 mod name;
 

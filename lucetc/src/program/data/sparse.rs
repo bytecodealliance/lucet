@@ -3,13 +3,9 @@ use crate::program::memory::HeapSpec;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
-const PAGE_SIZE: usize = 4096;
+pub use lucet_module_data::writer::SparseData;
 
-#[derive(Debug)]
-pub enum SparseData {
-    Empty,
-    Full(Vec<u8>), // Exactly 4096 bytes
-}
+const PAGE_SIZE: usize = 4096;
 
 fn split<'m>(di: &DataInit<'m>) -> Vec<(usize, DataInit<'m>)> {
     let start = di.offset as usize;
@@ -35,7 +31,7 @@ fn split<'m>(di: &DataInit<'m>) -> Vec<(usize, DataInit<'m>)> {
     out
 }
 
-pub fn make_sparse<'m>(data: &[DataInit<'m>], heap: HeapSpec) -> Vec<SparseData> {
+pub fn make_sparse<'m>(data: &[DataInit<'m>], heap: HeapSpec) -> SparseData {
     let mut m: HashMap<usize, Vec<u8>> = HashMap::new();
 
     for d in data {
@@ -69,11 +65,11 @@ pub fn make_sparse<'m>(data: &[DataInit<'m>], heap: HeapSpec) -> Vec<SparseData>
     for page_ix in 0..highest_page {
         if let Some(chunk) = m.remove(&page_ix) {
             assert!(chunk.len() == 4096);
-            out.push(SparseData::Full(chunk))
+            out.push(Some(chunk))
         } else {
-            out.push(SparseData::Empty)
+            out.push(None)
         }
     }
     assert_eq!(out.len() * 4096, heap.initial_size as usize);
-    out
+    SparseData::new(out).expect("sparse data invariants held")
 }
