@@ -15,6 +15,11 @@ use std::sync::Arc;
 pub trait Region: RegionInternal {
     /// Create a new instance within the region with an [embedding
     /// context](index.html#embedding-with-hostcalls).
+    ///
+    /// # Safety
+    ///
+    /// This function runs the guest code for the WebAssembly `start` section, and running any guest
+    /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     fn new_instance_with_ctx(
         &self,
         module: Arc<dyn Module>,
@@ -22,6 +27,11 @@ pub trait Region: RegionInternal {
     ) -> Result<InstanceHandle, Error>;
 
     /// Create a new instance within the region.
+    ///
+    /// # Safety
+    ///
+    /// This function runs the guest code for the WebAssembly `start` section, and running any guest
+    /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     fn new_instance(&self, module: Arc<dyn Module>) -> Result<InstanceHandle, Error> {
         self.new_instance_with_ctx(module, std::ptr::null_mut())
     }
