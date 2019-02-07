@@ -1,0 +1,14 @@
+[package]
+name = "lucet-module"
+version = "0.1.0"
+authors = ["Pat Hickey <phickey@fastly.com>"]
+repository = "https://github.com/fastly/lucet"
+edition = "2018"
+build = "build.rs"
+
+[dependencies]
+failure = "0.1"
+capnp = "*"
+
+[build-dependencies]
+capnpc = "*"

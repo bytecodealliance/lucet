@@ -30,7 +30,7 @@ RUN apt-get update \
  && update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-7 100
 
 # Xenial ships with libunwind 1.1, we need 1.2
-RUN curl -L http://download.savannah.nongnu.org/releases/libunwind/libunwind-1.2.1.tar.gz > libunwind-1.2.1.tar.gz \
+RUN curl -L -O http://download.savannah.nongnu.org/releases/libunwind/libunwind-1.2.1.tar.gz \
 	&& tar xzf libunwind-1.2.1.tar.gz \
 	&& cd libunwind-1.2.1 \
 	&& ./configure \
@@ -44,3 +44,12 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=1.31.0 -y
 ENV PATH=/root/.cargo/bin:$PATH
 RUN rustup component add rustfmt
 RUN cargo install cargo-audit
+
+RUN curl -L -O https://capnproto.org/capnproto-c++-0.7.0.tar.gz \
+	&& tar xzf capnproto-c++-0.7.0.tar.gz \
+	&& cd capnproto-c++-0.7.0 \
+	&& ./configure \
+	&& make \
+	&& make install \
+	&& cd .. \
+	&& rm -rf capnproto-c++-0.7.0 capnproto-c++-0.7.0.tar.gz
