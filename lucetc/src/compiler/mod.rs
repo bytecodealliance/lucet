@@ -210,15 +210,17 @@ impl<'p> Compiler<'p> {
     }
 
     pub fn cranelift_funcs(self) -> CraneliftFuncs {
+        let isa = self.isa();
         CraneliftFuncs {
             funcs: self.funcs,
-            isa: self.isa(),
+            isa: isa,
         }
     }
 
     pub fn codegen(self) -> Result<ObjectFile, Error> {
         use cranelift_codegen::Context;
 
+        let isa = &*self.isa();
         let mut ctx = Context::new();
         let mut module = self.module;
 
@@ -235,7 +237,7 @@ impl<'p> Compiler<'p> {
                     {
                         format_err!(
                             "code generation error:\n{}",
-                            pretty_error(func, Some(&*self.isa()), ce)
+                            pretty_error(func, Some(isa), ce)
                         )
                     }
                     _ => ModuleError::Compilation(ce).into(),
