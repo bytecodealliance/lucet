@@ -70,7 +70,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     }
 
     let prog = Program::new(module, bindings, opts.heap.clone())?;
-    let comp = lucetc::compile(&prog, &name)?;
+    let comp = lucetc::compile(&prog, &name, opts.opt_level)?;
 
     if opts.print_isa {
         println!("{}", comp.isa())
