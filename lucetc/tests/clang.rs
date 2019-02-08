@@ -105,6 +105,7 @@ mod programs {
     use cranelift_module::Linkage;
     use lucetc::bindings::Bindings;
     use lucetc::compile;
+    use lucetc::compiler::OptLevel;
     use lucetc::program::{HeapSettings, Program};
 
     fn num_import_globals(p: &Program) -> usize {
@@ -132,7 +133,7 @@ mod programs {
         assert_eq!(p.import_functions().len(), 0, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
         assert_eq!(num_export_functions(&p), 0, "export functions");
-        let _c = compile(&p, "empty".into()).expect("compile empty");
+        let _c = compile(&p, "empty".into(), OptLevel::Best).expect("compile empty");
     }
 
     #[test]
@@ -144,7 +145,7 @@ mod programs {
         assert_eq!(p.import_functions().len(), 0, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
         assert_eq!(num_export_functions(&p), 1, "export functions");
-        let _c = compile(&p, "a_only".into()).expect("compile a");
+        let _c = compile(&p, "a_only".into(), OptLevel::Best).expect("compile a");
     }
 
     #[test]
@@ -156,7 +157,7 @@ mod programs {
         assert_eq!(p.import_functions().len(), 1, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
         assert_eq!(num_export_functions(&p), 1, "export functions");
-        let _c = compile(&p, "b_only".into()).expect("compile b");
+        let _c = compile(&p, "b_only".into(), OptLevel::Best).expect("compile b");
     }
 
     #[test]
@@ -168,7 +169,7 @@ mod programs {
         assert_eq!(p.import_functions().len(), 0, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
         assert_eq!(num_export_functions(&p), 2, "export functions");
-        let _c = compile(&p, "a_and_b".into()).expect("compile a & b");
+        let _c = compile(&p, "a_and_b".into(), OptLevel::Best).expect("compile a & b");
     }
 
 }
