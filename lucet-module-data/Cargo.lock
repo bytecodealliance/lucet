@@ -82,7 +82,7 @@ version = "0.2.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "lucet-module"
+name = "lucet-module-data"
 version = "0.1.0"
 dependencies = [
  "capnp 0.9.4 (registry+https://github.com/rust-lang/crates.io-index)",
