@@ -74,11 +74,12 @@ pub fn compile_data_initializers(compiler: &mut Compiler) -> Result<(), Error> {
 use std::io::Cursor;
 
 pub fn compile_sparse_page_data(compiler: &mut Compiler) -> Result<(), Error> {
-    use crate::program::data::sparse::make_sparse;
-    let sparse_data = make_sparse(
+    use crate::program::data::sparse::CompiledSparseData;
+    let compiled_data = CompiledSparseData::new(
         &compiler.prog.data_initializers()?,
         compiler.prog.heap_spec(),
     );
+    let sparse_data = compiled_data.sparse_data();
 
     let mut table_ctx = DataContext::new();
     let mut table_data: Cursor<Vec<u8>> =
@@ -101,7 +102,7 @@ pub fn compile_sparse_page_data(compiler: &mut Compiler) -> Result<(), Error> {
                 false,
             )?;
             let mut seg_ctx = DataContext::new();
-            seg_ctx.define(vs.clone().into_boxed_slice());
+            seg_ctx.define(vs.to_vec().into_boxed_slice());
             compiler.module.define_data(seg_decl, &seg_ctx)?;
 
             // Put a relocation to that array into the table:

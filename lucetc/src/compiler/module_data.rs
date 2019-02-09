@@ -1,18 +1,19 @@
 use cranelift_module::{DataContext, Linkage};
 use failure::Error;
-use lucet_module_data::writer::ModuleData;
+use lucet_module_data::ModuleData;
 
 use crate::compiler::Compiler;
-use crate::program::data::sparse::make_sparse;
+use crate::program::data::sparse::CompiledSparseData;
 
 pub fn compile_module_data(compiler: &mut Compiler) -> Result<(), Error> {
     let mut module_data_serialized: Vec<u8> = Vec::new();
     {
         let heap_spec = compiler.prog.heap_spec();
-        let sparse_data = make_sparse(
+        let compiled_data = CompiledSparseData::new(
             &compiler.prog.data_initializers()?,
             compiler.prog.heap_spec(),
         );
+        let sparse_data = compiled_data.sparse_data();
         let module_data = ModuleData::new(heap_spec, sparse_data);
         module_data.serialize(&mut module_data_serialized)?;
     }

@@ -3,7 +3,7 @@ use crate::program::memory::HeapSpec;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
-pub use lucet_module_data::writer::SparseData;
+pub use lucet_module_data::SparseData;
 
 const PAGE_SIZE: usize = 4096;
 
@@ -31,45 +31,55 @@ fn split<'m>(di: &DataInit<'m>) -> Vec<(usize, DataInit<'m>)> {
     out
 }
 
-pub fn make_sparse<'m>(data: &[DataInit<'m>], heap: HeapSpec) -> SparseData {
-    let mut m: HashMap<usize, Vec<u8>> = HashMap::new();
+pub struct CompiledSparseData {
+    pagemap: HashMap<usize, Vec<u8>>,
+    heap: HeapSpec,
+}
 
-    for d in data {
-        let chunks = split(d);
-        for (pagenumber, chunk) in chunks {
-            let base = chunk.offset as usize;
-            match m.entry(pagenumber) {
-                Entry::Occupied(occ) => {
-                    let occ = occ.into_mut();
-                    for (offs, data) in chunk.data.iter().enumerate() {
-                        occ[base + offs] = *data;
+impl CompiledSparseData {
+    pub fn new<'m>(data: &[DataInit<'m>], heap: HeapSpec) -> Self {
+        let mut pagemap: HashMap<usize, Vec<u8>> = HashMap::new();
+
+        for d in data {
+            let chunks = split(d);
+            for (pagenumber, chunk) in chunks {
+                let base = chunk.offset as usize;
+                match pagemap.entry(pagenumber) {
+                    Entry::Occupied(occ) => {
+                        let occ = occ.into_mut();
+                        for (offs, data) in chunk.data.iter().enumerate() {
+                            occ[base + offs] = *data;
+                        }
+                        assert!(occ.len() == PAGE_SIZE);
                     }
-                    assert!(occ.len() == PAGE_SIZE);
-                }
-                Entry::Vacant(vac) => {
-                    let vac = vac.insert(Vec::new());
-                    vac.resize(PAGE_SIZE, 0);
-                    for (offs, data) in chunk.data.iter().enumerate() {
-                        vac[base + offs] = *data;
+                    Entry::Vacant(vac) => {
+                        let vac = vac.insert(Vec::new());
+                        vac.resize(PAGE_SIZE, 0);
+                        for (offs, data) in chunk.data.iter().enumerate() {
+                            vac[base + offs] = *data;
+                        }
+                        assert!(vac.len() == PAGE_SIZE);
                     }
-                    assert!(vac.len() == PAGE_SIZE);
                 }
             }
         }
+        Self { pagemap, heap }
     }
 
-    assert_eq!(heap.initial_size as usize % PAGE_SIZE, 0);
-    let highest_page = heap.initial_size as usize / PAGE_SIZE;
+    pub fn sparse_data(&self) -> SparseData {
+        assert_eq!(self.heap.initial_size as usize % PAGE_SIZE, 0);
+        let highest_page = self.heap.initial_size as usize / PAGE_SIZE;
 
-    let mut out = Vec::new();
-    for page_ix in 0..highest_page {
-        if let Some(chunk) = m.remove(&page_ix) {
-            assert!(chunk.len() == 4096);
-            out.push(Some(chunk))
-        } else {
-            out.push(None)
+        let mut out = Vec::new();
+        for page_ix in 0..highest_page {
+            if let Some(chunk) = self.pagemap.get(&page_ix) {
+                assert!(chunk.len() == 4096);
+                out.push(Some(chunk.as_slice()))
+            } else {
+                out.push(None)
+            }
         }
+        assert_eq!(out.len() * 4096, self.heap.initial_size as usize);
+        SparseData::new(out).expect("sparse data invariants held")
     }
-    assert_eq!(out.len() * 4096, heap.initial_size as usize);
-    SparseData::new(out).expect("sparse data invariants held")
 }
