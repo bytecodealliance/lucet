@@ -10,7 +10,36 @@ use crate::lucet_module_data_capnp::{heap_spec, module_data, sparse_chunk, spars
 use failure::Error;
 use std::io::{self, Write};
 
-#[derive(Debug, Clone)]
+pub struct ModuleDataReader<'a> {
+    buf: &'a [capnp::Word],
+    message: capnp::message::Reader<capnp::serialize::SliceSegments<'static>>,
+    module_data: ModuleData<'static>,
+}
+
+impl<'a> ModuleDataReader<'a> {
+    pub fn new(buf: &'a [capnp::Word]) -> Result<Self, Error> {
+        use capnp::message::Reader;
+        use capnp::serialize::SliceSegments;
+        unsafe {
+            let message: Reader<SliceSegments<'static>> = capnp::serialize::read_message_from_words(
+                buf,
+                capnp::message::ReaderOptions::default(),
+            )?;
+            let module_data = ModuleData::deserialize(&message as &'static Reader<_>)?;
+            Ok(Self {
+                buf,
+                message,
+                module_data,
+            })
+        }
+    }
+
+    pub fn module_data(&self) -> &ModuleData {
+        &self.module_data
+    }
+}
+
+#[derive(Debug)]
 pub struct ModuleData<'a> {
     heap_spec: HeapSpec,
     sparse_data: SparseData<'a>,
@@ -24,19 +53,17 @@ impl<'a> ModuleData<'a> {
         }
     }
 
-    pub fn from_message(
-        message: &'a capnp::message::Reader<capnp::serialize::OwnedSegments>,
-    ) -> Result<Self, Error> {
-        let module_reader = message.get_root::<module_data::Reader>()?;
-        Self::read(module_reader)
-    }
-
     pub fn heap_spec(&self) -> &HeapSpec {
         &self.heap_spec
     }
 
     pub fn sparse_data(&self) -> &SparseData<'a> {
         &self.sparse_data
+    }
+
+    pub fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        let message = self.build();
+        capnp::serialize::write_message(w, &message)
     }
 
     fn build(&self) -> capnp::message::Builder<capnp::message::HeapAllocator> {
@@ -50,12 +77,11 @@ impl<'a> ModuleData<'a> {
         message
     }
 
-    pub fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        let message = self.build();
-        capnp::serialize_packed::write_message(w, &message)
-    }
+    pub fn deserialize(
+        message: &'a capnp::message::Reader<capnp::serialize::SliceSegments<'a>>,
+    ) -> Result<Self, Error> {
+        let reader = message.get_root::<module_data::Reader>()?;
 
-    fn read(reader: module_data::Reader<'a>) -> Result<Self, Error> {
         let heap_spec = HeapSpec::read(
             reader
                 .get_heap_spec()
