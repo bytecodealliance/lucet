@@ -277,13 +277,14 @@ mod compile {
     // Tests for compilation completion
     use super::load;
     use lucetc::compile;
+    use lucetc::compiler::OptLevel;
     use lucetc::program::{HeapSettings, Program};
     fn run_compile_test(file: &str) {
         let m = load(file);
         let b = super::test_bindings();
         let h = HeapSettings::default();
         let p = Program::new(m, b, h).expect(&format!("make program for {}", file));
-        compile(&p, file.into()).expect(&format!("compile {}", file));
+        compile(&p, file.into(), OptLevel::Best).expect(&format!("compile {}", file));
     }
     macro_rules! compile_test {
         ($base_name:ident) => {
@@ -319,6 +320,7 @@ mod execute {
     // Tests for compilation correctness
     use super::load;
     use lucetc::compile;
+    use lucetc::compiler::OptLevel;
     use lucetc::program::{HeapSettings, Program};
     use std::process::Command;
     use std::str;
@@ -330,7 +332,7 @@ mod execute {
         let b = super::test_bindings();
         let h = HeapSettings::default();
         let p = Program::new(m, b, h).expect(&format!("make program for {}", file));
-        let comp = compile(&p, file).expect(&format!("compile test for {}", file));
+        let comp = compile(&p, file, OptLevel::Best).expect(&format!("compile test for {}", file));
 
         // Set up output fils
         let tmp_dir = TempDir::new("execute_test_out").expect("Failed to create temp dir");

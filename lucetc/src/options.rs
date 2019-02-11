@@ -1,6 +1,7 @@
 use clap::{App, Arg, ArgMatches};
 use failure::{Error, ResultExt};
 use lucetc::program::memory::HeapSettings;
+use lucetc::compiler::OptLevel;
 use std::path::PathBuf;
 
 include!(concat!(env!("OUT_DIR"), "/paths.rs"));
@@ -41,6 +42,7 @@ pub struct Options {
     pub binding_files: Vec<PathBuf>,
     pub builtins_path: Option<PathBuf>,
     pub heap: HeapSettings,
+    pub opt_level: OptLevel,
 }
 
 impl Options {
@@ -82,6 +84,14 @@ impl Options {
             .unwrap_or(Ok(HeapSettings::default().guard_size))
             .context("parsing guard-size argument")?;
 
+        let opt_level = match m.value_of("opt_level") {
+            None => OptLevel::Default,
+            Some("default") => OptLevel::Default,
+            Some("best") => OptLevel::Best,
+            Some("fastest") => OptLevel::Fastest,
+            Some(_) => panic!("unknown value for opt-level"),
+        };
+
         Ok(Options {
             output,
             input,
@@ -94,6 +104,7 @@ impl Options {
                 reserved_size,
                 guard_size,
             },
+            opt_level,
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -169,6 +180,13 @@ impl Options {
                     .multiple(false)
                     .required(true)
                     .help("input file"),
+            )
+            .arg(
+                Arg::with_name("opt_level")
+                    .long("--opt-level")
+                    .takes_value(true)
+                    .possible_values(&["default", "fastest", "best"])
+                    .help("optimization level (default: 'default')"),
             )
             .get_matches();
 

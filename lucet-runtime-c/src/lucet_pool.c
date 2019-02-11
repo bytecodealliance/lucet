@@ -47,12 +47,7 @@ struct lucet_pool *lucet_pool_create(int num_entries, struct lucet_alloc_limits 
     if (limits) {
         pool->limits = *limits;
     } else {
-        pool->limits = (struct lucet_alloc_limits){
-            .heap_memory_size        = 16 * 64 * 1024,  // 16 wasm pages
-            .heap_address_space_size = 8 * 1024 * 1024, // 8mb total (4mb reserved + 4mb guard)
-            .stack_size              = 128 * 1024,
-            .globals_size            = 4096,
-        };
+        pool->limits = lucet_alloc_limits_default;
     }
 
     if (pthread_mutex_init(&pool->lock, NULL) != 0) {

@@ -25,4 +25,6 @@ struct lucet_alloc_limits {
     uint32_t globals_size;
 };
 
+extern const struct lucet_alloc_limits lucet_alloc_limits_default;
+
 #endif // LUCET_ALLOC_H

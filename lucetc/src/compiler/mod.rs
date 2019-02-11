@@ -27,11 +27,29 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-fn isa() -> Box<isa::TargetIsa> {
+#[derive(Debug, Clone, Copy)]
+pub enum OptLevel {
+    Default,
+    Best,
+    Fastest,
+}
+
+impl OptLevel {
+    fn to_flag(&self) -> &str {
+        match self {
+            OptLevel::Default => "default",
+            OptLevel::Best => "best",
+            OptLevel::Fastest => "fastest",
+        }
+    }
+}
+
+fn isa(opt_level: OptLevel) -> Box<isa::TargetIsa> {
     let mut flags_builder = settings::builder();
     let isa_builder = cranelift_native::builder().expect("host machine is not a supported target");
     flags_builder.enable("enable_verifier").unwrap();
     flags_builder.enable("is_pic").unwrap();
+    flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
     isa_builder.finish(settings::Flags::new(flags_builder))
 }
 
@@ -39,10 +57,11 @@ pub struct Compiler<'p> {
     pub prog: &'p Program,
     funcs: HashMap<Name, ir::Function>,
     module: Module<FaerieBackend>,
+    opt_level: OptLevel,
 }
 
 impl<'p> Compiler<'p> {
-    pub fn new(name: String, prog: &'p Program) -> Result<Self, Error> {
+    pub fn new(name: String, prog: &'p Program, opt_level: OptLevel) -> Result<Self, Error> {
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => "lucet_probestack".to_owned(),
             _ => (FaerieBuilder::default_libcall_names())(libcall),
@@ -51,12 +70,13 @@ impl<'p> Compiler<'p> {
         let mut compiler = Self {
             funcs: HashMap::new(),
             module: Module::new(FaerieBuilder::new(
-                isa(),
+                isa(opt_level),
                 name,
                 FaerieTrapCollection::Enabled,
                 libcalls,
             )?),
             prog: prog,
+            opt_level: opt_level,
         };
 
         for f in prog.import_functions() {
@@ -82,7 +102,7 @@ impl<'p> Compiler<'p> {
     }
 
     pub fn isa(&self) -> Box<isa::TargetIsa> {
-        isa()
+        isa(self.opt_level)
     }
 
     /// Add a `guest_start` data symbol pointing to the `start` section.
@@ -190,15 +210,17 @@ impl<'p> Compiler<'p> {
     }
 
     pub fn cranelift_funcs(self) -> CraneliftFuncs {
+        let isa = self.isa();
         CraneliftFuncs {
             funcs: self.funcs,
-            isa: isa(),
+            isa: isa,
         }
     }
 
     pub fn codegen(self) -> Result<ObjectFile, Error> {
         use cranelift_codegen::Context;
 
+        let isa = &*self.isa();
         let mut ctx = Context::new();
         let mut module = self.module;
 
@@ -215,7 +237,7 @@ impl<'p> Compiler<'p> {
                     {
                         format_err!(
                             "code generation error:\n{}",
-                            pretty_error(func, Some(&*isa()), ce)
+                            pretty_error(func, Some(isa), ce)
                         )
                     }
                     _ => ModuleError::Compilation(ce).into(),

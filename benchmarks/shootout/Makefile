@@ -18,6 +18,7 @@ SHOOTOUT_SRCS:=$(shell ls $(SHOOTOUT)/*.c)
 SHOOTOUT_NATIVE_OBJS:=
 SHOOTOUT_LUCET_OBJS:=
 
+LUCETC_FLAGS:=--opt-level best --reserved-size 4294967296
 COMMON_CFLAGS:=--std=c99 -Ofast -Wall -W -I$(SIGHTGLASS)/include
 
 SHOOTOUT_NATIVE_CFLAGS:=-march=native -fPIC \
@@ -69,11 +70,11 @@ build/lucet/module.wasm: $(patsubst %.c, %.o, $(addprefix build/lucet/shootout/,
 # Don't emit the shared object, we need a saparate link step below.
 build/lucet/module.o: build/lucet/module.wasm $(LIBBUILTINS)
 	@mkdir -p $(@D)
-	$(LUCETC) --emit=obj --bindings=bindings.json --builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
+	$(LUCETC) $(LUCETC_FLAGS) --emit=obj --bindings=bindings.json --builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
 
 build/lucet/module.clif: build/lucet/module.wasm $(LIBBUILTINS)
 	@mkdir -p $(@D)
-	$(LUCETC) --emit=clif --bindings=bindings.json --builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
+	$(LUCETC) $(LUCETC_FLAGS) --emit=clif --bindings=bindings.json --builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
 
 # Because liblucet-runtime-c is dynamically loaded (transitively) by implementation.so, we
 # need to link the wasm object to the same libraries.

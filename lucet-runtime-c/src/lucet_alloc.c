@@ -21,6 +21,13 @@ _Static_assert((sizeof(struct lucet_instance)) == INSTANCE_HEAP_OFFSET,
                "instance size is heap offset");
 const size_t lucet_alloc_instance_heap_offset = INSTANCE_HEAP_OFFSET;
 
+const struct lucet_alloc_limits lucet_alloc_limits_default = (struct lucet_alloc_limits) {
+	.heap_memory_size        = 16 * 64 * 1024,  // 16 wasm pages
+	.heap_address_space_size = 0x200000000, // 8gb total (4gb reserved + 4gb guard)
+	.stack_size              = 128 * 1024,
+	.globals_size            = 4096,
+};
+
 static void lucet_alloc_create(struct lucet_alloc *a, struct lucet_alloc_region *region);
 static void lucet_alloc_free(struct lucet_alloc *a);
 

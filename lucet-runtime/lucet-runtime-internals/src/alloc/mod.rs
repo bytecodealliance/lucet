@@ -334,7 +334,7 @@ impl Alloc {
 pub struct Limits {
     /// Max size of the heap, which can be backed by real memory. (default 1M)
     pub heap_memory_size: usize,
-    /// Size of total virtual memory. (default 8M)
+    /// Size of total virtual memory. (default 8G)
     pub heap_address_space_size: usize,
     /// Size of the guest stack. (default 128K)
     pub stack_size: usize,
@@ -346,7 +346,7 @@ impl Default for Limits {
     fn default() -> Limits {
         Limits {
             heap_memory_size: 16 * 64 * 1024,
-            heap_address_space_size: 8 * 1024 * 1024,
+            heap_address_space_size: 0x200000000,
             stack_size: 128 * 1024,
             globals_size: 4096,
         }

@@ -10,13 +10,13 @@ use crate::compiler::function::compile_function;
 use crate::compiler::globals::compile_global_specs;
 use crate::compiler::memory::compile_memory_specs;
 use crate::compiler::table::compile_table;
-use crate::compiler::Compiler;
+use crate::compiler::{Compiler, OptLevel};
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::program::Program;
 use failure::ResultExt;
 
-pub fn compile<'p>(program: &'p Program, name: &str) -> Result<Compiler<'p>, LucetcError> {
-    let mut compiler = Compiler::new(name.to_owned(), &program)?;
+pub fn compile<'p>(program: &'p Program, name: &str, opt_level: OptLevel) -> Result<Compiler<'p>, LucetcError> {
+    let mut compiler = Compiler::new(name.to_owned(), &program, opt_level)?;
 
     compile_data_initializers(&mut compiler).context(LucetcErrorKind::DataInitializers)?;
     compile_sparse_page_data(&mut compiler).context(LucetcErrorKind::DataInitializers)?;

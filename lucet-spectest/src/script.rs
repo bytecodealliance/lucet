@@ -5,6 +5,7 @@ use lucet;
 use lucet::{UntypedRetval, Val};
 use lucetc::{
     compile,
+    compiler::OptLevel,
     error::{LucetcError, LucetcErrorKind},
     program::{HeapSettings, Program},
 };
@@ -90,8 +91,12 @@ impl ScriptEnv {
         let sofile_path = dir.path().join("a.so");
 
         {
-            let compiler = compile(&program, &name.clone().unwrap_or("default".to_owned()))
-                .map_err(ScriptError::CompileError)?;
+            let compiler = compile(
+                &program,
+                &name.clone().unwrap_or("default".to_owned()),
+                OptLevel::Default,
+            )
+            .map_err(ScriptError::CompileError)?;
 
             let object = compiler.codegen().map_err(ScriptError::CodegenError)?;
 
