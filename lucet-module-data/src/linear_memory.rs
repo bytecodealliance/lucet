@@ -1,5 +1,4 @@
 
-use crate::lucet_module_data_capnp::{heap_spec, sparse_chunk, sparse_data};
 use failure::Error;
 use serde::{Serialize, Deserialize};
 
@@ -54,34 +53,6 @@ impl HeapSpec {
             max_size: None,
         }
     }
-
-    pub (crate) fn read<'a>(reader: heap_spec::Reader<'a>) -> Result<Self, Error> {
-        let reserved_size = reader.get_reserved_size();
-        let guard_size = reader.get_guard_size();
-        let initial_size = reader.get_initial_size();
-        let max_size = match reader.get_max_size().which() {
-            Ok(heap_spec::max_size::MaxSize(ms)) => Some(ms),
-            Ok(heap_spec::max_size::None(_)) => None,
-            Err(_) => Err(format_err!("max_size missing from heap_spec"))?,
-        };
-        Ok(Self {
-            reserved_size,
-            guard_size,
-            initial_size,
-            max_size,
-        })
-    }
-
-    pub (crate) fn build<'a>(&self, mut builder: heap_spec::Builder<'a>) {
-        builder.set_reserved_size(self.reserved_size);
-        builder.set_guard_size(self.guard_size);
-        builder.set_initial_size(self.initial_size);
-        let mut ms_builder = builder.reborrow().init_max_size();
-        match self.max_size {
-            Some(max_size) => ms_builder.set_max_size(max_size),
-            None => ms_builder.set_none(()),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,51 +82,6 @@ impl<'a> SparseData<'a> {
 
     pub fn get_chunk(&self, offset: usize) -> &Option<&'a [u8]> {
         self.chunks.get(offset).unwrap_or(&None)
-    }
-
-    pub (crate) fn read(reader: sparse_data::Reader<'a>) -> Result<Self, Error> {
-        let mut chunks = Vec::new();
-        for chunk in reader
-            .get_chunks()
-            .map_err(|_| format_err!("sparse_data missing required field chunks"))?
-            .iter()
-        {
-            match chunk.get_contents().which() {
-                Ok(sparse_chunk::contents::Which::Empty(_)) => {
-                    chunks.push(None);
-                }
-                Ok(sparse_chunk::contents::Which::Full(data_reader)) => {
-                    let data = data_reader.map_err(|_| format_err!("XXX"))?;
-                    if data.len() == 4096 {
-                        chunks.push(Some(data));
-                    } else {
-                        Err(format_err!(
-                            "sparse_chunk contents are invalid length: {}",
-                            data.len(),
-                        ))?
-                    }
-                }
-                Err(_) => Err(format_err!("sparse_chunk missing required field contents"))?,
-            }
-        }
-        Ok(Self { chunks })
-    }
-
-    pub (crate) fn build<'b>(&self, builder: sparse_data::Builder<'b>) {
-        let mut list_builder = builder.init_chunks(self.chunks.len() as u32);
-        for (ix, chunk) in self.chunks.iter().enumerate() {
-            let mut contents_builder = list_builder.reborrow().get(ix as u32).init_contents();
-            match chunk {
-                Some(contents) => {
-                    let len: u32 = contents.len() as u32;
-                    assert_eq!(len, 4096);
-                    contents_builder.init_full(len).copy_from_slice(&contents);
-                }
-                None => {
-                    contents_builder.set_empty(());
-                }
-            }
-        }
     }
 }
 
