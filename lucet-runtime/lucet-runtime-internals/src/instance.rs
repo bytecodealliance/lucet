@@ -20,7 +20,7 @@ use std::ptr::{self, NonNull};
 use std::sync::Arc;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
-pub const INSTANCE_PADDING: usize = 2280;
+pub const INSTANCE_PADDING: usize = 2344;
 
 thread_local! {
     /// The host context.
@@ -261,7 +261,7 @@ impl Instance {
     ///
     /// On success, returns the number of pages that existed before the call.
     pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
-        let orig_len = self.alloc.expand_heap(additional_pages * WASM_PAGE_SIZE)?;
+        let orig_len = self.alloc.expand_heap(additional_pages * WASM_PAGE_SIZE, self.module.heap_spec())?;
         Ok(orig_len / WASM_PAGE_SIZE)
     }
 

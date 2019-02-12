@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::module::{
-    AddrDetails, HeapSpec, Module, ModuleInternal, RuntimeSpec, TableElement, TrapManifestRecord,
+    AddrDetails, HeapSpec, Module, ModuleInternal, TableElement, TrapManifestRecord,
 };
 use libc::c_void;
 use std::collections::HashMap;
@@ -10,7 +10,8 @@ pub struct MockModule {
     pub table_elements: Vec<TableElement>,
     sparse_page_data: Vec<Vec<u8>>,
     sparse_page_data_ptrs: Vec<*const c_void>,
-    pub runtime_spec: RuntimeSpec,
+    heap_spec: HeapSpec,
+    globals_spec: Vec<i64>,
     pub export_funcs: HashMap<Vec<u8>, *const extern "C" fn()>,
     pub func_table: HashMap<(u32, u32), *const extern "C" fn()>,
     pub start_func: Option<extern "C" fn()>,
@@ -26,7 +27,13 @@ impl MockModule {
             table_elements: vec![],
             sparse_page_data: vec![],
             sparse_page_data_ptrs: vec![],
-            runtime_spec: RuntimeSpec::default(),
+            heap_spec: HeapSpec {
+                reserved_size: 0,
+                guard_size: 0,
+                initial_size: 0,
+                max_size: None,
+            },
+            globals_spec: vec![],
             export_funcs: HashMap::new(),
             func_table: HashMap::new(),
             start_func: None,
@@ -40,7 +47,7 @@ impl MockModule {
 
     pub fn arced_with_heap(heap: &HeapSpec) -> Arc<dyn Module> {
         let mut module = MockModule::new();
-        module.runtime_spec.heap = heap.clone();
+        module.heap_spec = heap.clone();
         Arc::new(module)
     }
 
@@ -67,8 +74,12 @@ impl ModuleInternal for MockModule {
         Ok(&self.sparse_page_data_ptrs)
     }
 
-    fn runtime_spec(&self) -> &RuntimeSpec {
-        &self.runtime_spec
+    fn heap_spec(&self) -> &HeapSpec {
+        &self.heap_spec
+    }
+
+    fn globals_spec(&self) -> &[i64] {
+        &self.globals_spec
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {

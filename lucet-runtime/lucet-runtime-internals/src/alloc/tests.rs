@@ -34,8 +34,7 @@ macro_rules! alloc_tests {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: SPEC_HEAP_GUARD_SIZE,
             initial_size: ONEPAGE_INITIAL_SIZE,
-            max_size: ONEPAGE_MAX_SIZE,
-            max_size_valid: 1,
+            max_size: Some(ONEPAGE_MAX_SIZE),
         };
 
         const THREEPAGE_INITIAL_SIZE: u64 = 64 * 1024;
@@ -45,8 +44,7 @@ macro_rules! alloc_tests {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: 0,
             initial_size: THREEPAGE_INITIAL_SIZE,
-            max_size: THREEPAGE_MAX_SIZE,
-            max_size_valid: 1,
+            max_size: Some(THREEPAGE_MAX_SIZE),
         };
 
         /// This test shows an `AllocHandle` passed to `Region::allocate_runtime` will have its heap
@@ -98,9 +96,10 @@ macro_rules! alloc_tests {
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, heap_spec.initial_size as usize);
 
+            let heap_spec = inst.module().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
-                .expand_heap(64 * 1024)
+                .expand_heap(64 * 1024, &heap_spec)
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
@@ -124,9 +123,10 @@ macro_rules! alloc_tests {
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
+            let heap_spec = inst.module().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
-                .expand_heap(64 * 1024)
+                .expand_heap(64 * 1024, &heap_spec)
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
@@ -135,7 +135,7 @@ macro_rules! alloc_tests {
 
             let second_new_heap_area = inst
                 .alloc_mut()
-                .expand_heap(64 * 1024)
+                .expand_heap(64 * 1024, &heap_spec)
                 .expect("expand_heap succeeds");
             assert_eq!(new_heap_len, second_new_heap_area as usize);
 
@@ -161,7 +161,8 @@ macro_rules! alloc_tests {
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
-            let new_heap_area = inst.alloc_mut().expand_heap(THREEPAGE_MAX_SIZE as u32);
+            let heap_spec = inst.module().heap_spec().clone();
+            let new_heap_area = inst.alloc_mut().expand_heap(THREEPAGE_MAX_SIZE as u32, &heap_spec);
             assert!(new_heap_area.is_err(), "heap expansion past spec fails");
 
             let new_heap_len = inst.alloc().heap_len();
@@ -179,8 +180,7 @@ macro_rules! alloc_tests {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: SPEC_HEAP_GUARD_SIZE,
             initial_size: EXPANDPASTLIMIT_INITIAL_SIZE,
-            max_size: EXPANDPASTLIMIT_MAX_SIZE,
-            max_size_valid: 1,
+            max_size: Some(EXPANDPASTLIMIT_MAX_SIZE),
         };
 
         /// This test shows that a heap refuses to grow past the alloc limits, even if the runtime
@@ -196,16 +196,17 @@ macro_rules! alloc_tests {
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, EXPANDPASTLIMIT_INITIAL_SIZE as usize);
 
+            let heap_spec = inst.module().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
-                .expand_heap(64 * 1024)
+                .expand_heap(64 * 1024, &heap_spec)
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
             let new_heap_len = inst.alloc().heap_len();
             assert_eq!(new_heap_len, LIMITS_HEAP_MEM_SIZE);
 
-            let past_limit_heap_area = inst.alloc_mut().expand_heap(64 * 1024);
+            let past_limit_heap_area = inst.alloc_mut().expand_heap(64 * 1024, &heap_spec);
             assert!(
                 past_limit_heap_area.is_err(),
                 "heap expansion past limit fails"
@@ -224,8 +225,7 @@ macro_rules! alloc_tests {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: SPEC_HEAP_GUARD_SIZE,
             initial_size: SPEC_HEAP_RESERVED_SIZE + (64 * 1024),
-            max_size: 0,
-            max_size_valid: 0,
+            max_size: None,
         };
 
         /// This test shows that a heap refuses to grow past the alloc limits, even if the runtime
@@ -242,8 +242,7 @@ macro_rules! alloc_tests {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: SPEC_HEAP_GUARD_SIZE - 1,
             initial_size: LIMITS_HEAP_MEM_SIZE as u64,
-            max_size: 0,
-            max_size_valid: 0,
+            max_size: None,
         };
 
         /// This test shows that a heap spec with a guard size smaller than the limits is
@@ -260,8 +259,7 @@ macro_rules! alloc_tests {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: SPEC_HEAP_GUARD_SIZE + 1,
             initial_size: ONEPAGE_INITIAL_SIZE,
-            max_size: 0,
-            max_size_valid: 0,
+            max_size: None,
         };
 
         /// This test shows that a `HeapSpec` with a guard size larger than the limits is not
@@ -359,9 +357,10 @@ macro_rules! alloc_tests {
             heap[heap_len - 1] = 0xFF;
             assert_eq!(heap[heap_len - 1], 0xFF);
 
+            let heap_spec = inst.module().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
-                .expand_heap((THREEPAGE_MAX_SIZE - THREEPAGE_INITIAL_SIZE) as u32)
+                .expand_heap((THREEPAGE_MAX_SIZE - THREEPAGE_INITIAL_SIZE) as u32, &heap_spec)
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
@@ -393,8 +392,7 @@ macro_rules! alloc_tests {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: 0,
             initial_size: ONEPAGE_INITIAL_SIZE,
-            max_size: 0,
-            max_size_valid: 0,
+            max_size: None,
         };
 
         /// This test shows the alloc works even with a zero guard size.
@@ -440,8 +438,7 @@ macro_rules! alloc_tests {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: SPEC_HEAP_GUARD_SIZE,
             initial_size: 0,
-            max_size: 0,
-            max_size_valid: 0,
+            max_size: None,
         };
 
         /// This test shows an initially-empty heap works properly after a single expand.
@@ -454,8 +451,7 @@ macro_rules! alloc_tests {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: 0,
             initial_size: 0,
-            max_size: 0,
-            max_size_valid: 0,
+            max_size: None,
         };
 
         /// This test shows an initially-empty, guardless heap works properly after a single
@@ -476,8 +472,7 @@ macro_rules! alloc_tests {
             reserved_size: 4096,
             guard_size: 4096,
             initial_size: CONTEXT_TEST_INITIAL_SIZE,
-            max_size: 4096,
-            max_size_valid: 1,
+            max_size: Some(4096),
         };
 
         /// This test shows that alloced memory will create a heap and a stack that child context

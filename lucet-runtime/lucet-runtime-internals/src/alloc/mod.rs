@@ -1,6 +1,7 @@
 use crate::error::Error;
-use crate::module::{Module, RuntimeSpec};
+use crate::module::Module;
 use crate::region::RegionInternal;
+use lucet_module_data::HeapSpec;
 use libc::{c_void, SIGSTKSZ};
 use nix::unistd::{sysconf, SysconfVar};
 use std::sync::{Arc, Once, Weak};
@@ -100,7 +101,6 @@ impl Slot {
 pub struct Alloc {
     pub heap_accessible_size: usize,
     pub heap_inaccessible_size: usize,
-    pub runtime_spec: RuntimeSpec,
     pub slot: Option<Slot>,
     pub region: Arc<dyn RegionInternal>,
 }
@@ -124,7 +124,11 @@ impl Alloc {
         (addr as usize >= guard_start) && ((addr as usize) < guard_end)
     }
 
-    pub fn expand_heap(&mut self, expand_bytes: u32) -> Result<u32, Error> {
+    pub fn expand_heap<'m>(
+        &mut self,
+        expand_bytes: u32,
+        heap_spec: &HeapSpec,
+    ) -> Result<u32, Error> {
         let slot = self.slot();
 
         if expand_bytes == 0 {
@@ -155,25 +159,22 @@ impl Alloc {
         // the above makes sure this expression does not underflow
         let guard_remaining = self.heap_inaccessible_size - expand_pagealigned as usize;
 
-        let rt_spec = &self.runtime_spec;
-
         // The compiler specifies how much guard (memory which traps on access) must be beyond the
         // end of the accessible memory. We cannot perform an expansion that would make this region
         // smaller than the compiler expected it to be.
-        if guard_remaining < rt_spec.heap.guard_size as usize {
+        if guard_remaining < heap_spec.guard_size as usize {
             bail_limits_exceeded!("expansion would leave guard memory too small");
         }
 
         // The compiler indicates that the module has specified a maximum memory size. Don't let
         // the heap expand beyond that:
-        if rt_spec.heap.max_size_valid == 1
-            && self.heap_accessible_size + expand_pagealigned as usize
-                > rt_spec.heap.max_size as usize
-        {
-            bail_limits_exceeded!(
-                "expansion would exceed module-specified heap limit: {:?}",
-                rt_spec.heap
-            );
+        if let Some(max_size) = heap_spec.max_size {
+            if self.heap_accessible_size + expand_pagealigned as usize > max_size as usize {
+                bail_limits_exceeded!(
+                    "expansion would exceed module-specified heap limit: {:?}",
+                    max_size
+                );
+            }
         }
 
         // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let

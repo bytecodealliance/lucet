@@ -2,12 +2,15 @@ use crate::error::Error;
 use crate::module::globals::{self, GlobalsSpec};
 use crate::module::sparse_page_data::SparsePageData;
 use crate::module::{
-    AddrDetails, HeapSpec, Module, ModuleInternal, RuntimeSpec, TableElement, TrapManifestRecord,
+    AddrDetails, Module, ModuleInternal, TableElement, TrapManifestRecord,
 };
+use capnp;
 use libc::c_void;
 use libloading::{Library, Symbol};
+use lucet_module_data::{HeapSpec, ModuleDataBox};
 use std::ffi::{CStr, OsStr};
 use std::mem;
+use std::slice;
 use std::slice::from_raw_parts;
 use std::sync::Arc;
 
@@ -18,8 +21,10 @@ pub struct DlModule {
     /// Base address of the dynamically-loaded module
     fbase: *const c_void,
 
-    /// Spec for heap and globals required by the module
-    runtime_spec: RuntimeSpec,
+    /// Metadata decoded from inside the module
+    module_data: ModuleDataBox<'static>,
+
+    globals: Vec<i64>,
 
     trap_manifest: &'static [TrapManifestRecord],
 }
@@ -37,25 +42,33 @@ impl DlModule {
         // stack and heap.
         let lib = Library::new(so_path).map_err(Error::DlError)?;
 
-        let heap_ptr = unsafe {
-            lib.get::<*const HeapSpec>(b"lucet_heap_spec")
-                .map_err(|e| {
-                    lucet_incorrect_module!(
-                        "error loading required symbol `lucet_heap_spec`: {}",
-                        e
-                    )
-                })?
-        };
-        let heap: HeapSpec = unsafe {
-            heap_ptr
-                .as_ref()
-                .ok_or(lucet_incorrect_module!(
-                    "`lucet_heap_spec` is defined but null"
-                ))?
-                .clone()
+        let module_data_ptr = unsafe {
+            lib.get::<*const capnp::Word>(b"lucet_module_data").map_err(|e| {
+                lucet_incorrect_module!("error loading required symbol `lucet_module_data`: {}", e)
+            })?
         };
 
-        let fbase = if let Some(dli) = dladdr(*heap_ptr as *const c_void) {
+        let module_data_len = unsafe {
+            lib.get::<usize>(b"lucet_module_data_len").map_err(|e| {
+                lucet_incorrect_module!(
+                    "error loading required symbol `lucet_module_data_len`: {}",
+                    e
+                )
+            })?
+        };
+
+        // ModuleData should be serialized into a word-aligned section in the object file.
+        // Make sure this is correct, or else the slice::from_raw_parts is UB and will probably
+        // crash
+        assert_eq!((*module_data_ptr as usize) % 8, 0, "lucet_module_data word alignment");
+        let module_data_slice: &'static [capnp::Word] =
+            unsafe { slice::from_raw_parts(*module_data_ptr, *module_data_len) };
+
+        // Deserialize ModuleData. ModuleDataBox holds onto the deserializing machinery,
+        // which must have the same lifetime.
+        let module_data = ModuleDataBox::deserialize(&module_data_slice)?;
+
+        let fbase = if let Some(dli) = dladdr(*module_data_ptr as *const c_void) {
             dli.dli_fbase
         } else {
             std::ptr::null()
@@ -75,7 +88,6 @@ impl DlModule {
                 spec_raw
             })?
         };
-        let runtime_spec = RuntimeSpec { heap, globals };
 
         let trap_manifest = unsafe {
             if let Ok(len_ptr) = lib.get::<*const u32>(b"lucet_trap_manifest_len") {
@@ -100,7 +112,8 @@ impl DlModule {
         Ok(Arc::new(DlModule {
             lib,
             fbase,
-            runtime_spec,
+            module_data,
+            globals,
             trap_manifest,
         }))
     }
@@ -154,8 +167,12 @@ impl ModuleInternal for DlModule {
         }
     }
 
-    fn runtime_spec(&self) -> &RuntimeSpec {
-        &self.runtime_spec
+    fn heap_spec(&self) -> &HeapSpec {
+        self.module_data.heap_spec()
+    }
+
+    fn globals_spec(&self) -> &[i64] {
+        &self.globals
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {

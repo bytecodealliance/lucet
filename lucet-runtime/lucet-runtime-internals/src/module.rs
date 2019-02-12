@@ -3,14 +3,14 @@ mod globals;
 mod mock;
 mod sparse_page_data;
 
-pub use crate::module::dl::DlModule;
-pub use crate::module::mock::MockModule;
-
 use crate::alloc::Limits;
 use crate::error::Error;
+pub use crate::module::dl::DlModule;
+pub use crate::module::mock::MockModule;
 use crate::probestack::{lucet_probestack, lucet_probestack_size};
 use crate::trapcode::{TrapCode, TrapCodeType};
-use libc::{c_void, uint64_t};
+use libc::c_void;
+pub use lucet_module_data::{HeapSpec, ModuleData};
 use std::slice::from_raw_parts;
 
 #[repr(C)]
@@ -68,57 +68,14 @@ pub struct TableElement {
     rf: u64,
 }
 
-/// Specifications from the WebAssembly module about its heap.
-///
-/// The `reserved_size` and `guard_size`, when added together, must not exceed the
-/// `heap_address_space_size` given in the corresponding `Limits`. The `initial_size` and `max_size`
-/// (if given) must fit into the `heap_memory_size` given in the corresponding `Limits`.
-///
-/// This is serialized into the object file by the compiler, so we need to take care not to change
-/// the layout.
-#[repr(C)]
+/// Specifications from the compiled WebAssembly module about its heap and globals.
 #[derive(Clone, Debug)]
-pub struct HeapSpec {
-    /// A region of the heap that is addressable, but only a subset of it is accessible.
-    ///
-    /// Specified in bytes, and must be evenly divisible by the host page size (4K).
-    pub reserved_size: uint64_t,
-
-    /// A region of the heap that is addressable, but never accessible.
-    ///
-    /// Specified in bytes, and must be evenly divisible by the host page size (4K).
-    pub guard_size: uint64_t,
-
-    /// The amount of heap that is accessible upon initialization.
-    ///
-    /// Specified in bytes, must be evenly divisible by the WebAssembly page size (64K), and must be less than or equal to `reserved_size`.
-    pub initial_size: uint64_t,
-
-    /// The maximum amount of the heap that the program will request; only valid if `max_size_valid == 1`.
-    ///
-    /// This comes directly from the WebAssembly program's memory definition.
-    pub max_size: uint64_t,
-
-    /// Set to `1` when `max_size` is valid, and `0` when it is not.
-    ///
-    /// This will eventually be nicer once we are using an IDL.
-    pub max_size_valid: uint64_t,
+pub struct RuntimeSpec<'a> {
+    pub heap: &'a HeapSpec,
+    pub globals: &'a [i64],
 }
 
-impl Default for HeapSpec {
-    fn default() -> HeapSpec {
-        // from the lucet tests' `helpers.h`
-        HeapSpec {
-            reserved_size: 4 * 1024 * 1024,
-            guard_size: 4 * 1024 * 1024,
-            initial_size: 64 * 1024,
-            max_size: 64 * 1024,
-            max_size_valid: 1,
-        }
-    }
-}
-
-impl RuntimeSpec {
+impl<'a> RuntimeSpec<'a> {
     /// Check that a spec is valid given certain `Limit`s.
     pub fn validate(&self, limits: &Limits) -> Result<(), Error> {
         // Assure that the total reserved + guard regions fit in the address space.
@@ -151,12 +108,22 @@ impl RuntimeSpec {
     }
 }
 
-/// Specifications from the compiled WebAssembly module about its heap and globals.
-#[derive(Clone, Debug, Default)]
-pub struct RuntimeSpec {
-    pub heap: HeapSpec,
-    pub globals: Vec<i64>,
+/*
+impl Default for RuntimeSpec {
+    /// Some small test cases which don't use the heap or globals need a default implementation
+    fn default() -> Self {
+        Self {
+            heap: HeapSpec {
+                reserved_size: 0,
+                guard_size: 0,
+                initial_size: 0,
+                max_size: None,
+            },
+            globals: Vec::new(),
+        }
+    }
 }
+*/
 
 /// Details about a program address.
 ///
@@ -193,11 +160,15 @@ pub trait ModuleInternal: Send + Sync {
     /// `lucetc`'s output.
     fn sparse_page_data(&self) -> Result<&[*const c_void], Error>;
 
-    fn runtime_spec(&self) -> &RuntimeSpec;
+    fn heap_spec(&self) -> &HeapSpec;
 
-    /// Get the heap specification encoded into the module by `lucetc`.
-    fn heap_spec(&self) -> &HeapSpec {
-        &self.runtime_spec().heap
+    fn globals_spec(&self) -> &[i64];
+
+    fn runtime_spec(&self) -> RuntimeSpec {
+        RuntimeSpec {
+            heap: self.heap_spec(),
+            globals: self.globals_spec(),
+        }
     }
 
     /// Get the WebAssembly globals of the module.

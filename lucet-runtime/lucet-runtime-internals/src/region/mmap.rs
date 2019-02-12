@@ -66,7 +66,6 @@ impl Region for MmapRegion {
         let alloc = Alloc {
             heap_accessible_size: runtime_spec.heap.initial_size as usize,
             heap_inaccessible_size: slot.limits.heap_address_space_size,
-            runtime_spec: runtime_spec.clone(),
             slot: Some(slot),
             region,
         };
@@ -120,8 +119,7 @@ impl RegionInternal for MmapRegion {
     }
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error> {
-        let heap_spec = &alloc.runtime_spec.heap;
-        let initial_size = heap_spec.initial_size as usize;
+        let initial_size = module.runtime_spec().heap.initial_size as usize;
 
         // reset the heap to the initial size
         if alloc.heap_accessible_size != initial_size {
