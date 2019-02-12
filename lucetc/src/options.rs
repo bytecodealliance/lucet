@@ -1,7 +1,7 @@
 use clap::{App, Arg, ArgMatches};
 use failure::{Error, ResultExt};
-use lucetc::program::memory::HeapSettings;
 use lucetc::compiler::OptLevel;
+use lucetc::program::memory::HeapSettings;
 use std::path::PathBuf;
 
 include!(concat!(env!("OUT_DIR"), "/paths.rs"));
