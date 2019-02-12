@@ -9,6 +9,7 @@ build = "build.rs"
 [dependencies]
 failure = "0.1"
 capnp = "*"
+serde = { version = "1.0", features = ["derive"] }
 
 [build-dependencies]
 capnpc = "*"

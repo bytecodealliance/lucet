@@ -13,6 +13,7 @@ use failure::Error;
 use std::io::{self, Write};
 use std::mem;
 use std::ops::Deref;
+use serde::{Serialize, Deserialize};
 
 /// Encapsulates details about reading ModuleData out of a serialized message.
 pub struct ModuleDataBox<'a> {
@@ -49,10 +50,12 @@ impl<'a> Deref for ModuleDataBox<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ModuleData<'a> {
     heap_spec: HeapSpec,
+    #[serde(borrow)]
     sparse_data: SparseData<'a>,
+    #[serde(borrow)]
     globals_spec: Vec<GlobalSpec<'a>>,
 }
 

@@ -1,8 +1,10 @@
 use crate::lucet_module_data_capnp::{global_def, global_import, global_spec};
 use failure::Error;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GlobalSpec<'a> {
+    #[serde(borrow)]
     global: Global<'a>,
     export: Option<&'a str>,
 }
@@ -34,9 +36,10 @@ impl<'a> GlobalSpec<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Global<'a> {
     Def(GlobalDef),
+    #[serde(borrow)]
     Import(GlobalImport<'a>),
 }
 
@@ -60,7 +63,7 @@ impl<'a> Global<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GlobalDef {
     init_val: u64,
 }
@@ -79,7 +82,7 @@ impl GlobalDef {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GlobalImport<'a> {
     module: &'a str,
     field: &'a str,

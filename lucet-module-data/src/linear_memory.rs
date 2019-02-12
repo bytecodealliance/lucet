@@ -1,8 +1,9 @@
 
 use crate::lucet_module_data_capnp::{heap_spec, sparse_chunk, sparse_data};
 use failure::Error;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeapSpec {
     /// Total bytes of memory for the heap to possibly expand into, as told to Cretonne.  All of
     /// this memory is addressable. Only some part of it is accessible - from 0 to the initial
@@ -83,8 +84,9 @@ impl HeapSpec {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SparseData<'a> {
+    #[serde(borrow)]
     chunks: Vec<Option<&'a [u8]>>,
 }
 
