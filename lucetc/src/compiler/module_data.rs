@@ -6,17 +6,16 @@ use failure::Error;
 use lucet_module_data::ModuleData;
 
 pub fn compile_module_data(compiler: &mut Compiler) -> Result<(), Error> {
-    let mut module_data_serialized: Vec<u8> = Vec::new();
-    {
+    let module_data_serialized: Vec<u8> = {
         let heap_spec = compiler.prog.heap_spec();
         let compiled_data = CompiledSparseData::new(
             &compiler.prog.data_initializers()?,
             compiler.prog.heap_spec(),
         );
         let sparse_data = compiled_data.sparse_data();
-        let module_data = ModuleData::new(heap_spec, sparse_data);
-        module_data.serialize(&mut module_data_serialized)?;
-    }
+        let module_data = ModuleData::new(heap_spec, sparse_data, Vec::new());
+        module_data.serialize_bincode()?
+    };
 
     {
         let mut serialized_len: Vec<u8> = Vec::new();
