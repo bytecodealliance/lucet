@@ -89,6 +89,15 @@ impl<'a> ModuleData<'a> {
         write_message(w, &message)
     }
 
+    pub fn serialize_bincode(&self) -> Result<Vec<u8>, Error> {
+        bincode::serialize(self).map_err(|e| format_err!("serialization error: {}", e))
+    }
+
+
+    pub fn deserialize_bincode(buf: &'a [u8]) -> Result<ModuleData<'a>, Error> {
+        bincode::deserialize(buf).map_err(|e| format_err!("deserialization error: {}", e))
+    }
+
     fn build(&self) -> message::Builder<message::HeapAllocator> {
         let mut message = message::Builder::new_default();
         {
