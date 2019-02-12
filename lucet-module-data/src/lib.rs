@@ -7,36 +7,47 @@ mod lucet_module_data_capnp {
 }
 
 use crate::lucet_module_data_capnp::{heap_spec, module_data, sparse_chunk, sparse_data};
+use capnp::{
+    Word,
+    message,
+    serialize::{read_message_from_words, write_message, SliceSegments},
+};
 use failure::Error;
 use std::io::{self, Write};
+use std::mem;
+use std::ops::Deref;
 
-pub struct ModuleDataReader<'a> {
-    buf: &'a [capnp::Word],
-    message: capnp::message::Reader<capnp::serialize::SliceSegments<'static>>,
-    module_data: ModuleData<'static>,
+/// Encapsulates details about reading ModuleData out of a serialized message.
+pub struct ModuleDataBox<'a> {
+    /// Capnproto requires we keep a message::Reader alive for as long as module_data.
+    _message: message::Reader<SliceSegments<'static>>,
+    /// The user only cares about ModuleData
+    module_data: ModuleData<'a>,
 }
 
-impl<'a> ModuleDataReader<'a> {
-    pub fn new(buf: &'a [capnp::Word]) -> Result<ModuleDataReader<'a>, Error> {
-        use capnp::message::Reader;
-        use capnp::serialize::SliceSegments;
+impl<'a> ModuleDataBox<'a> {
+    pub fn deserialize(buf: &'a [Word]) -> Result<ModuleDataBox<'a>, Error> {
         unsafe {
-            let message: Reader<SliceSegments<'a>> = capnp::serialize::read_message_from_words(
-                buf,
-                capnp::message::ReaderOptions::default(),
-            )?;
-            let message: Reader<SliceSegments<'static>> = std::mem::transmute(message);
+            let message: message::Reader<SliceSegments<'a>> =
+                read_message_from_words(buf, message::ReaderOptions::default())?;
+            let message: message::Reader<SliceSegments<'static>> = mem::transmute(message);
             let module_data = ModuleData::deserialize(&message)?;
-            let module_data: ModuleData<'static> = std::mem::transmute(module_data);
+            let module_data: ModuleData<'a> = mem::transmute(module_data);
             Ok(Self {
-                buf,
-                message,
+                _message: message,
                 module_data,
             })
         }
     }
 
-    pub fn module_data(&self) -> &ModuleData {
+    pub fn data(&self) -> &ModuleData {
+        &self.module_data
+    }
+}
+
+impl<'a> Deref for ModuleDataBox<'a> {
+    type Target = ModuleData<'a>;
+    fn deref(&self) -> &ModuleData<'a> {
         &self.module_data
     }
 }
@@ -65,11 +76,11 @@ impl<'a> ModuleData<'a> {
 
     pub fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
         let message = self.build();
-        capnp::serialize::write_message(w, &message)
+        write_message(w, &message)
     }
 
-    fn build(&self) -> capnp::message::Builder<capnp::message::HeapAllocator> {
-        let mut message = capnp::message::Builder::new_default();
+    fn build(&self) -> message::Builder<message::HeapAllocator> {
+        let mut message = message::Builder::new_default();
         {
             let mut module_data = message.init_root::<module_data::Builder>();
             self.heap_spec
@@ -80,7 +91,7 @@ impl<'a> ModuleData<'a> {
     }
 
     pub fn deserialize(
-        message: &'a capnp::message::Reader<capnp::serialize::SliceSegments<'static>>,
+        message: &'a message::Reader<SliceSegments<'static>>,
     ) -> Result<Self, Error> {
         let reader = message.get_root::<module_data::Reader>()?;
 
