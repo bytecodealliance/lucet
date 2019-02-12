@@ -15,7 +15,11 @@ use crate::error::{LucetcError, LucetcErrorKind};
 use crate::program::Program;
 use failure::ResultExt;
 
-pub fn compile<'p>(program: &'p Program, name: &str, opt_level: OptLevel) -> Result<Compiler<'p>, LucetcError> {
+pub fn compile<'p>(
+    program: &'p Program,
+    name: &str,
+    opt_level: OptLevel,
+) -> Result<Compiler<'p>, LucetcError> {
     let mut compiler = Compiler::new(name.to_owned(), &program, opt_level)?;
 
     compile_data_initializers(&mut compiler).context(LucetcErrorKind::DataInitializers)?;
