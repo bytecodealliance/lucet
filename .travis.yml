@@ -7,7 +7,7 @@ before_install:
   - ./devenv_build_container
 
 script:
-  - ./devenv_run make test audit
+  - ./devenv_run make indent-check test audit
 
 notifications:
   email: false
