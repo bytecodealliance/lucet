@@ -57,6 +57,11 @@ pub struct InstanceHandle {
 ///
 /// This is not meant for public consumption, but rather is used to make implementations of
 /// `Region`.
+///
+/// # Safety
+///
+/// This function runs the guest code for the WebAssembly `start` section, and running any guest
+/// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
 pub fn new_instance_handle(
     instance: *mut Instance,
     module: Arc<dyn Module>,
@@ -231,7 +236,36 @@ impl InstanceInternal for Instance {
 
 // Public API
 impl Instance {
-    // TODO: richer error types for this whole family of functions
+    /// Run a function with arguments in the guest context at the given entrypoint.
+    ///
+    /// ```no_run
+    /// # use lucet_runtime_internals::instance::InstanceHandle;
+    /// # let instance = unimplemented!();
+    /// // regular execution yields `Ok(UntypedRetVal)`
+    /// let retval = instance.run(b"factorial", &[5u64.into()]).unwrap();
+    /// assert_eq!(u64::from(retval), 120u64);
+    ///
+    /// // runtime faults yield `Err(Error)`
+    /// let result = instance.run(b"faulting_function", &[]);
+    /// assert!(result.is_err());
+    /// ```
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe in two ways:
+    ///
+    /// - The type of the entrypoint might not be correct. It might take a different number or
+    /// different types of arguments than are provided to `args`. It might not even point to a
+    /// function! We will likely add type information to `lucetc` output so we can dynamically check
+    /// the type in the future.
+    ///
+    /// - The entrypoint is foreign code. While we may be convinced that WebAssembly compiled to
+    /// native code by `lucetc` is safe, we do not have the same guarantee for the hostcalls that a
+    /// guest may invoke. They might be implemented in an unsafe language, so we must treat this
+    /// call as unsafe, just like any other FFI call.
+    ///
+    /// For the moment, we do not mark this as `unsafe` in the Rust type system, but that may change
+    /// in the future.
     pub fn run(&mut self, entrypoint: &[u8], args: &[Val]) -> Result<UntypedRetVal, Error> {
         let func = self.module.get_export_func(entrypoint)?;
         self.run_func(func, &args)
@@ -240,6 +274,11 @@ impl Instance {
     /// Reset the instance's heap and global variables to their initial state.
     ///
     /// The WebAssembly `start` section will also be run, if one exists.
+    ///
+    /// # Safety
+    ///
+    /// This function runs the guest code for the WebAssembly `start` section, and running any guest
+    /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     pub fn reset(&mut self) -> Result<(), Error> {
         self.alloc.reset_heap(self.module.as_ref())?;
         let globals = unsafe { self.alloc.globals_mut() };
@@ -323,6 +362,7 @@ impl Instance {
         }
     }
 
+    /// Run a function in guest context at the given entrypoint.
     fn run_func(
         &mut self,
         func: *const extern "C" fn(),
