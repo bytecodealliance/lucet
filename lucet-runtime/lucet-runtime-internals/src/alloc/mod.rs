@@ -363,13 +363,19 @@ impl Limits {
         // * globals
         // * one guard page (to catch signal stack overflow)
         // * the signal stack (size given by signal.h SIGSTKSZ macro)
-        instance_heap_offset()
-            + self.heap_address_space_size as usize
-            + self.stack_size as usize
-            + host_page_size()
-            + self.globals_size as usize
-            + host_page_size()
-            + SIGSTKSZ
+
+        [
+            instance_heap_offset(),
+            self.heap_address_space_size,
+            self.stack_size,
+            host_page_size(),
+            self.globals_size,
+            host_page_size(),
+            SIGSTKSZ,
+        ]
+        .iter()
+        .try_fold(0usize, |acc, &x| acc.checked_add(x))
+        .expect("total_memory_size doesn't overflow")
     }
 
     /// Validate that the limits are aligned to page sizes, and that the stack is not empty.
