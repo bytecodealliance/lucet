@@ -8,6 +8,8 @@ mod lucet_module_data_capnp {
 
 pub mod module_data;
 pub mod linear_memory;
+pub mod globals;
 
 pub use crate::module_data::{ModuleData, ModuleDataBox};
 pub use crate::linear_memory::{HeapSpec, SparseData};
+pub use crate::globals::{GlobalSpec, Global, GlobalDef, GlobalImport};

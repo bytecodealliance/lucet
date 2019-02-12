@@ -1,11 +1,13 @@
-
-use crate::lucet_module_data_capnp::module_data;
-use crate::linear_memory::{HeapSpec, SparseData};
+use crate::{
+    globals::GlobalSpec,
+    linear_memory::{HeapSpec, SparseData},
+    lucet_module_data_capnp::module_data,
+};
 
 use capnp::{
-    Word,
     message,
     serialize::{read_message_from_words, write_message, SliceSegments},
+    Word,
 };
 use failure::Error;
 use std::io::{self, Write};
@@ -51,13 +53,19 @@ impl<'a> Deref for ModuleDataBox<'a> {
 pub struct ModuleData<'a> {
     heap_spec: HeapSpec,
     sparse_data: SparseData<'a>,
+    globals_spec: Vec<GlobalSpec<'a>>,
 }
 
 impl<'a> ModuleData<'a> {
-    pub fn new(heap_spec: HeapSpec, sparse_data: SparseData<'a>) -> Self {
+    pub fn new(
+        heap_spec: HeapSpec,
+        sparse_data: SparseData<'a>,
+        globals_spec: Vec<GlobalSpec<'a>>,
+    ) -> Self {
         Self {
             heap_spec,
             sparse_data,
+            globals_spec,
         }
     }
 
@@ -67,6 +75,10 @@ impl<'a> ModuleData<'a> {
 
     pub fn sparse_data(&self) -> &SparseData<'a> {
         &self.sparse_data
+    }
+
+    pub fn globals_spec(&self) -> &[GlobalSpec<'a>] {
+        &self.globals_spec
     }
 
     pub fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
@@ -90,20 +102,24 @@ impl<'a> ModuleData<'a> {
     ) -> Result<Self, Error> {
         let reader = message.get_root::<module_data::Reader>()?;
 
-        let heap_spec = HeapSpec::read(
-            reader
-                .get_heap_spec()
-                .map_err(|_| format_err!("module_data missing required field heap_spec"))?,
-        )?;
-        let sparse_data = SparseData::read(
-            reader
-                .get_sparse_data()
-                .map_err(|_| format_err!("module_data missing required field sparse_data"))?,
-        )?;
-        Ok(Self {
-            heap_spec,
-            sparse_data,
-        })
+        let heap_spec =
+            HeapSpec::read(reader.get_heap_spec().map_err(|e| {
+                format_err!("module_data missing required field heap_spec: {}", e)
+            })?)?;
+        let sparse_data =
+            SparseData::read(reader.get_sparse_data().map_err(|e| {
+                format_err!("module_data missing required field sparse_data: {}", e)
+            })?)?;
+
+        let mut globals_spec = Vec::new();
+        for gs in reader
+            .get_globals_spec()
+            .map_err(|e| format_err!("module_data missing required field globals_spec: {}", e))?
+            .iter()
+        {
+            globals_spec.push(GlobalSpec::read(gs)?)
+        }
+
+        Ok(Self::new(heap_spec, sparse_data, globals_spec))
     }
 }
-
