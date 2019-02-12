@@ -3,6 +3,7 @@
 struct ModuleData {
   heapSpec @0 :HeapSpec;
   sparseData @1 :SparseData;
+  globalsSpec @2 :List(GlobalSpec);
 }
 
 struct HeapSpec {
@@ -16,12 +17,33 @@ struct HeapSpec {
 }
 
 struct SparseData {
-  chunks @0: List(SparseChunk);
+  chunks @0 :List(SparseChunk);
 }
 
 struct SparseChunk {
   contents :union {
-    empty @0: Void;
-    full @1: Data; # will be exactly 4k
+    empty @0 :Void;
+    full @1 :Data; # will be exactly 4k
   }
+}
+
+
+struct GlobalSpec {
+  global :union {
+    def @0 :GlobalDef;
+    import @1 :GlobalImport;
+  }
+  export :union {
+    name @2 :Text;
+    none @3 :Void;
+  }
+}
+
+struct GlobalDef {
+  initVal @0 :UInt64;
+}
+
+struct GlobalImport {
+   module @0 :Text;
+   field @1 :Text;
 }
