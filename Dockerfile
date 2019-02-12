@@ -44,12 +44,3 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=1.31.0 -y
 ENV PATH=/root/.cargo/bin:$PATH
 RUN rustup component add rustfmt
 RUN cargo install cargo-audit
-
-RUN curl -L -O https://capnproto.org/capnproto-c++-0.7.0.tar.gz \
-	&& tar xzf capnproto-c++-0.7.0.tar.gz \
-	&& cd capnproto-c++-0.7.0 \
-	&& ./configure \
-	&& make \
-	&& make install \
-	&& cd .. \
-	&& rm -rf capnproto-c++-0.7.0 capnproto-c++-0.7.0.tar.gz
