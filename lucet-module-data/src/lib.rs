@@ -17,15 +17,17 @@ pub struct ModuleDataReader<'a> {
 }
 
 impl<'a> ModuleDataReader<'a> {
-    pub fn new(buf: &'a [capnp::Word]) -> Result<Self, Error> {
+    pub fn new(buf: &'a [capnp::Word]) -> Result<ModuleDataReader<'a>, Error> {
         use capnp::message::Reader;
         use capnp::serialize::SliceSegments;
         unsafe {
-            let message: Reader<SliceSegments<'static>> = capnp::serialize::read_message_from_words(
+            let message: Reader<SliceSegments<'a>> = capnp::serialize::read_message_from_words(
                 buf,
                 capnp::message::ReaderOptions::default(),
             )?;
-            let module_data = ModuleData::deserialize(&message as &'static Reader<_>)?;
+            let message: Reader<SliceSegments<'static>> = std::mem::transmute(message);
+            let module_data = ModuleData::deserialize(&message)?;
+            let module_data: ModuleData<'static> = std::mem::transmute(module_data);
             Ok(Self {
                 buf,
                 message,
@@ -78,7 +80,7 @@ impl<'a> ModuleData<'a> {
     }
 
     pub fn deserialize(
-        message: &'a capnp::message::Reader<capnp::serialize::SliceSegments<'a>>,
+        message: &'a capnp::message::Reader<capnp::serialize::SliceSegments<'static>>,
     ) -> Result<Self, Error> {
         let reader = message.get_root::<module_data::Reader>()?;
 
