@@ -7,7 +7,7 @@ use crate::module::{
 use capnp;
 use libc::c_void;
 use libloading::{Library, Symbol};
-use lucet_module_data::{HeapSpec, ModuleDataBox};
+use lucet_module_data::{HeapSpec, ModuleData};
 use std::ffi::{CStr, OsStr};
 use std::mem;
 use std::slice;
@@ -22,7 +22,7 @@ pub struct DlModule {
     fbase: *const c_void,
 
     /// Metadata decoded from inside the module
-    module_data: ModuleDataBox<'static>,
+    module_data: ModuleData<'static>,
 
     globals: Vec<i64>,
 
@@ -43,7 +43,7 @@ impl DlModule {
         let lib = Library::new(so_path).map_err(Error::DlError)?;
 
         let module_data_ptr = unsafe {
-            lib.get::<*const capnp::Word>(b"lucet_module_data").map_err(|e| {
+            lib.get::<*const u8>(b"lucet_module_data").map_err(|e| {
                 lucet_incorrect_module!("error loading required symbol `lucet_module_data`: {}", e)
             })?
         };
@@ -57,16 +57,14 @@ impl DlModule {
             })?
         };
 
-        // ModuleData should be serialized into a word-aligned section in the object file.
-        // Make sure this is correct, or else the slice::from_raw_parts is UB and will probably
-        // crash
-        assert_eq!((*module_data_ptr as usize) % 8, 0, "lucet_module_data word alignment");
-        let module_data_slice: &'static [capnp::Word] =
+        let module_data_slice: &'static [u8] =
             unsafe { slice::from_raw_parts(*module_data_ptr, *module_data_len) };
 
-        // Deserialize ModuleData. ModuleDataBox holds onto the deserializing machinery,
-        // which must have the same lifetime.
-        let module_data = ModuleDataBox::deserialize(&module_data_slice)?;
+        // Deserialize the slice into ModuleData, which will hold refs into the loaded
+        // shared object file in `module_data_slice`.
+        // The exposed lifetime of ModuleData will be the same as the lifetime of the
+        // dynamically loaded library
+        let module_data = ModuleData::deserialize(module_data_slice)?;
 
         let fbase = if let Some(dli) = dladdr(*module_data_ptr as *const c_void) {
             dli.dli_fbase

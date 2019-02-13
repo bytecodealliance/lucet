@@ -13,8 +13,9 @@ pub fn compile_module_data(compiler: &mut Compiler) -> Result<(), Error> {
             compiler.prog.heap_spec(),
         );
         let sparse_data = compiled_data.sparse_data();
-        let module_data = ModuleData::new(heap_spec, sparse_data, Vec::new());
-        module_data.serialize_bincode()?
+        let globals_spec = Vec::new(); // FIXME
+        let module_data = ModuleData::new(heap_spec, sparse_data, globals_spec);
+        module_data.serialize()?
     };
 
     {
