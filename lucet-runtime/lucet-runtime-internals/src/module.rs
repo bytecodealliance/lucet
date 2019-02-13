@@ -10,7 +10,7 @@ pub use crate::module::mock::MockModule;
 use crate::probestack::{lucet_probestack, lucet_probestack_size};
 use crate::trapcode::{TrapCode, TrapCodeType};
 use libc::c_void;
-pub use lucet_module_data::{HeapSpec, ModuleData};
+pub use lucet_module_data::{HeapSpec, ModuleData, GlobalSpec, Global, GlobalDef, GlobalImport};
 use std::slice::from_raw_parts;
 
 #[repr(C)]
@@ -72,7 +72,7 @@ pub struct TableElement {
 #[derive(Clone, Debug)]
 pub struct RuntimeSpec<'a> {
     pub heap: &'a HeapSpec,
-    pub globals: &'a [i64],
+    pub globals: &'a [GlobalSpec<'a>],
 }
 
 impl<'a> RuntimeSpec<'a> {
@@ -162,7 +162,7 @@ pub trait ModuleInternal: Send + Sync {
 
     fn heap_spec(&self) -> &HeapSpec;
 
-    fn globals_spec(&self) -> &[i64];
+    fn globals_spec(&self) -> &[GlobalSpec];
 
     fn runtime_spec(&self) -> RuntimeSpec {
         RuntimeSpec {
@@ -175,7 +175,7 @@ pub trait ModuleInternal: Send + Sync {
     ///
     /// The indices into the returned slice correspond to the WebAssembly indices of the globals
     /// (<https://webassembly.github.io/spec/core/syntax/modules.html#syntax-globalidx>)
-    fn globals(&self) -> &[i64] {
+    fn globals(&self) -> &[GlobalSpec] {
         &self.runtime_spec().globals
     }
 

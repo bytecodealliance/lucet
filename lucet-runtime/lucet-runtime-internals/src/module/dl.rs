@@ -1,13 +1,12 @@
 use crate::error::Error;
-use crate::module::globals::{self, GlobalsSpec};
 use crate::module::sparse_page_data::SparsePageData;
 use crate::module::{
-    AddrDetails, Module, ModuleInternal, TableElement, TrapManifestRecord,
+    AddrDetails, GlobalSpec, HeapSpec, Module, ModuleData, ModuleInternal, TableElement,
+    TrapManifestRecord,
 };
 use capnp;
 use libc::c_void;
 use libloading::{Library, Symbol};
-use lucet_module_data::{HeapSpec, ModuleData};
 use std::ffi::{CStr, OsStr};
 use std::mem;
 use std::slice;
@@ -23,8 +22,6 @@ pub struct DlModule {
 
     /// Metadata decoded from inside the module
     module_data: ModuleData<'static>,
-
-    globals: Vec<i64>,
 
     trap_manifest: &'static [TrapManifestRecord],
 }
@@ -72,21 +69,6 @@ impl DlModule {
             std::ptr::null()
         };
 
-        let globals = unsafe {
-            globals::read_from_module({
-                let spec = lib
-                    .get::<*const GlobalsSpec>(b"lucet_globals_spec")
-                    .map_err(|e| {
-                        lucet_incorrect_module!(
-                            "error loading required symbol `lucet_globals_spec`: {}",
-                            e
-                        )
-                    })?;
-                let spec_raw: *const GlobalsSpec = *spec;
-                spec_raw
-            })?
-        };
-
         let trap_manifest = unsafe {
             if let Ok(len_ptr) = lib.get::<*const u32>(b"lucet_trap_manifest_len") {
                 let len = len_ptr.as_ref().ok_or(lucet_incorrect_module!(
@@ -111,7 +93,6 @@ impl DlModule {
             lib,
             fbase,
             module_data,
-            globals,
             trap_manifest,
         }))
     }
@@ -169,8 +150,8 @@ impl ModuleInternal for DlModule {
         self.module_data.heap_spec()
     }
 
-    fn globals_spec(&self) -> &[i64] {
-        &self.globals
+    fn globals_spec(&self) -> &[GlobalSpec] {
+        self.module_data.globals_spec()
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {

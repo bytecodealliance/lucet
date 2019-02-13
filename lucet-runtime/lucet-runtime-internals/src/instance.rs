@@ -7,7 +7,7 @@ use crate::alloc::Alloc;
 use crate::context::Context;
 use crate::error::Error;
 use crate::instance::siginfo_ext::SiginfoExt;
-use crate::module::{self, Module};
+use crate::module::{self, Global, Module};
 use crate::trapcode::{TrapCode, TrapCodeType};
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
@@ -245,7 +245,10 @@ impl Instance {
         let globals = unsafe { self.alloc.globals_mut() };
         let mod_globals = self.module.globals();
         for (i, v) in mod_globals.iter().enumerate() {
-            globals[i] = *v;
+            globals[i] = match v.global() {
+                Global::Import(i) => Err(lucet_format_err!("unsupported global import: {:?}", i))?,
+                Global::Def(d) => d.init_val(),
+            };
         }
 
         self.state = State::Ready {
@@ -261,7 +264,9 @@ impl Instance {
     ///
     /// On success, returns the number of pages that existed before the call.
     pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
-        let orig_len = self.alloc.expand_heap(additional_pages * WASM_PAGE_SIZE, self.module.heap_spec())?;
+        let orig_len = self
+            .alloc
+            .expand_heap(additional_pages * WASM_PAGE_SIZE, self.module.heap_spec())?;
         Ok(orig_len / WASM_PAGE_SIZE)
     }
 

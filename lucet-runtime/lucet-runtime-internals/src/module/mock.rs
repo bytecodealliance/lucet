@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::module::{
-    AddrDetails, HeapSpec, Module, ModuleInternal, TableElement, TrapManifestRecord,
+    AddrDetails, HeapSpec, GlobalSpec, Module, ModuleInternal, TableElement, TrapManifestRecord,
 };
 use libc::c_void;
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ pub struct MockModule {
     sparse_page_data: Vec<Vec<u8>>,
     sparse_page_data_ptrs: Vec<*const c_void>,
     heap_spec: HeapSpec,
-    globals_spec: Vec<i64>,
+    globals_spec: Vec<GlobalSpec<'static>>,
     pub export_funcs: HashMap<Vec<u8>, *const extern "C" fn()>,
     pub func_table: HashMap<(u32, u32), *const extern "C" fn()>,
     pub start_func: Option<extern "C" fn()>,
@@ -78,7 +78,7 @@ impl ModuleInternal for MockModule {
         &self.heap_spec
     }
 
-    fn globals_spec(&self) -> &[i64] {
+    fn globals_spec(&self) -> &[GlobalSpec] {
         &self.globals_spec
     }
 
