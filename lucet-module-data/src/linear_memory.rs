@@ -57,6 +57,14 @@ impl HeapSpec {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SparseData<'a> {
+    /// Indices into the vector correspond to the offset, in host page (4k) increments, from the
+    /// base of the instance heap.
+    ///
+    /// If the option at a given index is None, the page is initialized as zeros. Otherwise,
+    /// the contents of the page are given as a slice of exactly 4k bytes.
+    ///
+    /// The deserializer of this datastructure does not make sure the 4k invariant holds,
+    /// but the constructor on the serializier side does.
     #[serde(borrow)]
     chunks: Vec<Option<&'a [u8]>>,
 }
@@ -82,6 +90,32 @@ impl<'a> SparseData<'a> {
 
     pub fn get_chunk(&self, offset: usize) -> &Option<&'a [u8]> {
         self.chunks.get(offset).unwrap_or(&None)
+    }
+}
+
+pub struct OwnedSparseData {
+    chunks: Vec<Option<Vec<u8>>>,
+}
+
+impl OwnedSparseData {
+    pub fn new(chunks: Vec<Option<Vec<u8>>>) -> Result<Self, Error> {
+        for c in &chunks {
+            if let Some(chunk) = c {
+                if chunk.len() != 4096 {
+                    return Err(format_err!(
+                        "when creating OwnedSparseData, got chunk len {}, only 4096 is allowed",
+                        chunk.len()
+                    ));
+                }
+            }
+        }
+        Ok(Self { chunks })
+    }
+    pub fn get_ref(&self) -> SparseData {
+        SparseData::new(self.chunks.iter().map(|c| match c {
+            Some(data) => Some(data.as_slice()),
+            None => None,
+        }).collect()).expect("sparsedata invariant enforced by ownedsparsedata constructor")
     }
 }
 

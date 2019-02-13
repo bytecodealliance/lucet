@@ -2,8 +2,8 @@ use crate::{
     globals::GlobalSpec,
     linear_memory::{HeapSpec, SparseData},
 };
-use serde::{Serialize, Deserialize};
 use failure::Error;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ModuleData<'a> {
@@ -42,8 +42,44 @@ impl<'a> ModuleData<'a> {
         bincode::serialize(self).map_err(|e| format_err!("serialization error: {}", e))
     }
 
-
     pub fn deserialize(buf: &'a [u8]) -> Result<ModuleData<'a>, Error> {
         bincode::deserialize(buf).map_err(|e| format_err!("deserialization error: {}", e))
+    }
+}
+
+use crate::{globals::OwnedGlobalSpec, linear_memory::OwnedSparseData};
+
+pub struct OwnedModuleData {
+    heap_spec: HeapSpec,
+    sparse_data: OwnedSparseData,
+    globals_spec: Vec<OwnedGlobalSpec>,
+}
+
+impl OwnedModuleData {
+    pub fn new(
+        heap_spec: HeapSpec,
+        sparse_data: OwnedSparseData,
+        globals_spec: Vec<OwnedGlobalSpec>,
+    ) -> Self {
+        Self {
+            heap_spec,
+            sparse_data,
+            globals_spec,
+        }
+    }
+    pub fn get_ref(&self) -> ModuleData {
+        ModuleData::new(
+            self.heap_spec.clone(),
+            self.sparse_data.get_ref(),
+            self.globals_spec.iter().map(|gs| gs.get_ref()).collect(),
+        )
+    }
+
+    pub fn empty() -> Self {
+        Self::new(
+            HeapSpec::new(0, 0, 0, None),
+            OwnedSparseData::new(vec![]).unwrap(),
+            vec![],
+        )
     }
 }
