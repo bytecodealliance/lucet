@@ -240,7 +240,7 @@ impl Instance {
     ///
     /// ```no_run
     /// # use lucet_runtime_internals::instance::InstanceHandle;
-    /// # let instance = unimplemented!();
+    /// # let instance: InstanceHandle = unimplemented!();
     /// // regular execution yields `Ok(UntypedRetVal)`
     /// let retval = instance.run(b"factorial", &[5u64.into()]).unwrap();
     /// assert_eq!(u64::from(retval), 120u64);
