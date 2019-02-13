@@ -9,14 +9,16 @@ pub struct GlobalImport {
     module: String,
     field: String,
     pub global_type: GlobalType,
+    export: Option<String>,
 }
 
 impl GlobalImport {
-    pub fn new(importentry: &ImportEntry, global_type: GlobalType) -> Self {
+    pub fn new(importentry: &ImportEntry, global_type: GlobalType, export: Option<String>) -> Self {
         Self {
             module: String::from(importentry.module()),
             field: String::from(importentry.field()),
-            global_type: global_type,
+            global_type,
+            export,
         }
     }
 
@@ -30,6 +32,13 @@ impl GlobalImport {
 
     pub fn field(&self) -> &str {
         self.field.as_str()
+    }
+
+    pub fn export(&self) -> Option<&str> {
+        match self.export {
+            Some(ref ex) => Some(ex.as_str()),
+            None => None,
+        }
     }
 }
 
@@ -59,8 +68,11 @@ impl GlobalDef {
     pub fn value(&self) -> i64 {
         self.value
     }
-    pub fn export(&self) -> Option<String> {
-        self.export.clone()
+    pub fn export(&self) -> Option<&str> {
+        match self.export {
+            Some(ref ex) => Some(ex.as_str()),
+            None => None,
+        }
     }
 }
 
@@ -89,5 +101,27 @@ impl Global {
             Global::Import(_) => None,
             Global::Def(d) => Some(d),
         }
+    }
+
+    pub fn export(&self) -> Option<&str> {
+        match self {
+            Global::Import(i) => i.export(),
+            Global::Def(d) => d.export(),
+        }
+    }
+}
+
+use lucet_module_data::{
+    Global as GlobalData, GlobalDef as GlobalDefData, GlobalImport as GlobalImportData, GlobalSpec,
+};
+
+impl Global {
+    pub fn to_spec(&self) -> GlobalSpec {
+        let global = match self {
+            Global::Import(i) => GlobalData::Import(GlobalImportData::new(i.module(), i.field())),
+            Global::Def(d) => GlobalData::Def(GlobalDefData::new(d.value() as u64)),
+        };
+        let export = self.export();
+        GlobalSpec::new(global, export)
     }
 }

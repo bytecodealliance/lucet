@@ -13,7 +13,10 @@ pub fn compile_module_data(compiler: &mut Compiler) -> Result<(), Error> {
             compiler.prog.heap_spec(),
         );
         let sparse_data = compiled_data.sparse_data();
-        let globals_spec = Vec::new(); // FIXME
+
+        let globals = compiler.prog.globals();
+        let globals_spec = globals.iter().map(|g| g.to_spec()).collect();
+
         let module_data = ModuleData::new(heap_spec, sparse_data, globals_spec);
         module_data.serialize()?
     };
