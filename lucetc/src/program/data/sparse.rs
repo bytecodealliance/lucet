@@ -31,12 +31,12 @@ fn split<'m>(di: &DataInit<'m>) -> Vec<(usize, DataInit<'m>)> {
     out
 }
 
-pub struct CompiledSparseData {
+pub struct OwnedSparseData {
     pagemap: HashMap<usize, Vec<u8>>,
     heap: HeapSpec,
 }
 
-impl CompiledSparseData {
+impl OwnedSparseData {
     pub fn new<'m>(data: &[DataInit<'m>], heap: HeapSpec) -> Self {
         let mut pagemap: HashMap<usize, Vec<u8>> = HashMap::new();
 

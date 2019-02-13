@@ -5,6 +5,8 @@ use cranelift_module::{DataContext, Linkage};
 use failure::Error;
 use std::io::Cursor;
 
+
+
 pub fn compile_global_specs(compiler: &mut Compiler) -> Result<(), Error> {
     let globals = compiler.prog.globals();
     let len = globals.len();

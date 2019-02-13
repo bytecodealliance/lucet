@@ -1,5 +1,5 @@
 use crate::compiler::Compiler;
-use crate::program::data::sparse::CompiledSparseData;
+use crate::program::data::sparse::OwnedSparseData;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_module::{DataContext, Linkage};
 use failure::Error;
@@ -8,7 +8,7 @@ use lucet_module_data::ModuleData;
 pub fn compile_module_data(compiler: &mut Compiler) -> Result<(), Error> {
     let module_data_serialized: Vec<u8> = {
         let heap_spec = compiler.prog.heap_spec();
-        let compiled_data = CompiledSparseData::new(
+        let compiled_data = OwnedSparseData::new(
             &compiler.prog.data_initializers()?,
             compiler.prog.heap_spec(),
         );

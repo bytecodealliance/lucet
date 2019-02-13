@@ -74,12 +74,12 @@ pub fn compile_data_initializers(compiler: &mut Compiler) -> Result<(), Error> {
 use std::io::Cursor;
 
 pub fn compile_sparse_page_data(compiler: &mut Compiler) -> Result<(), Error> {
-    use crate::program::data::sparse::CompiledSparseData;
-    let compiled_data = CompiledSparseData::new(
+    use crate::program::data::sparse::OwnedSparseData;
+    let owned_data = OwnedSparseData::new(
         &compiler.prog.data_initializers()?,
         compiler.prog.heap_spec(),
     );
-    let sparse_data = compiled_data.sparse_data();
+    let sparse_data = owned_data.sparse_data();
 
     let mut table_ctx = DataContext::new();
     let mut table_data: Cursor<Vec<u8>> =
