@@ -1,2 +1,2 @@
 [build]
-rustflags = ["-C", "link-args=-Wl,--export-dynamic,-rpath,/isolation/public/lucet-libc/build/lib"]
+rustflags = ["-C", "link-args=-Wl,--export-dynamic"]

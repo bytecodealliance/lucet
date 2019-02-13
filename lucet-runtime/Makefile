@@ -23,6 +23,7 @@ build:
 
 .PHONY: test
 test: build $(TEST_DEPS)
+	export LD_LIBRARY_PATH=$(abspath ../lucet-libc/build/lib):$(LD_LIBRARY_PATH)
 	cd lucet-runtime-internals && cargo test
 	cargo test
 
