@@ -15,7 +15,6 @@ nix = "0.13"
 num-traits = "0.2"
 num-derive = "0.2"
 xfailure = "0.1"
-capnp = "*"
 
 [dev-dependencies]
 byteorder = "1.2"

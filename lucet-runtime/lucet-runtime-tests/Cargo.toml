@@ -8,3 +8,4 @@ edition = "2018"
 failure = "0.1"
 lazy_static = "1.1"
 lucet-runtime-internals = { path = "../lucet-runtime-internals" }
+lucet-module-data = { path = "../../lucet-module-data" }
