@@ -119,7 +119,7 @@ impl RegionInternal for MmapRegion {
     }
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error> {
-        let initial_size = module.runtime_spec().heap.initial_size as usize;
+        let initial_size = module.module_data().heap_spec().initial_size as usize;
 
         // reset the heap to the initial size
         if alloc.heap_accessible_size != initial_size {
