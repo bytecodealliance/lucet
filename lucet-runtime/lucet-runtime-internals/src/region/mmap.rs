@@ -169,7 +169,7 @@ impl RegionInternal for MmapRegion {
                     "sparse page data length exceeded initial heap size"
                 ));
             }
-            if let Some(Some(contents)) = sparse_page_data.chunks().get(page_num) {
+            if let Some(Some(contents)) = sparse_page_data.pages().get(page_num) {
                 // otherwise copy in the page data
                 heap[page_base..page_base + host_page_size()].copy_from_slice(contents);
             } else {

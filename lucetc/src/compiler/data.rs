@@ -83,7 +83,7 @@ pub fn compile_sparse_page_data(compiler: &mut Compiler) -> Result<(), Error> {
 
     let mut table_ctx = DataContext::new();
     let mut table_data: Cursor<Vec<u8>> =
-        Cursor::new(Vec::with_capacity(sparse_data.chunks().len() * 8 + 8));
+        Cursor::new(Vec::with_capacity(sparse_data.pages().len() * 8 + 8));
 
     // The table is an array of 64-bit elements:
     //  [0] the number subsequent elements
@@ -91,9 +91,9 @@ pub fn compile_sparse_page_data(compiler: &mut Compiler) -> Result<(), Error> {
     //        or null if it is initialized as zero.
 
     table_data
-        .write_u64::<LittleEndian>(sparse_data.chunks().len() as u64)
+        .write_u64::<LittleEndian>(sparse_data.pages().len() as u64)
         .unwrap();
-    for (dix, d) in sparse_data.chunks().iter().enumerate() {
+    for (dix, d) in sparse_data.pages().iter().enumerate() {
         if let Some(vs) = d {
             // Define the 4096-byte array for the contents of the page
             let seg_decl = compiler.module.declare_data(

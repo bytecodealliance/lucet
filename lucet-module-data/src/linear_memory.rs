@@ -1,22 +1,21 @@
-
 use failure::Error;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeapSpec {
-    /// Total bytes of memory for the heap to possibly expand into, as told to Cretonne.  All of
-    /// this memory is addressable. Only some part of it is accessible - from 0 to the initial
-    /// size, guaranteed, and up to the max_size.  This size allows Cretonne to elide checks of the
-    /// *base pointer*. At the moment that just means checking if it is greater than 4gb, in which
-    /// case it can elide the base pointer check completely. In the future, Cretonne could use a
-    /// solver to elide more base pointer checks if it can prove the calculation will always be
-    /// less than this bound.
+    /// Total bytes of memory for the heap to possibly expand into, as configured for Cranelift
+    /// codegen.  All of this memory is addressable. Only some part of it is accessible - from 0 to
+    /// the initial size, guaranteed, and up to the max_size.  This size allows Cranelift to elide
+    /// checks of the *base pointer*. At the moment that just means checking if it is greater than
+    /// 4gb, in which case it can elide the base pointer check completely. In the future, Cranelift
+    /// could use a solver to elide more base pointer checks if it can prove the calculation will
+    /// always be less than this bound.
     pub reserved_size: u64,
-    /// Total bytes of memory *after* the reserved area, as told to Cretonne. All of this memory is
-    /// addressable, but it is never accessible - it is guaranteed to trap if an access happens in
-    /// this region. This size allows Cretonne to use *common subexpression elimination* to reduce
-    /// checks of the *sum of base pointer and offset* (where the offset is always rounded up to a
-    /// multiple of the guard size, to be friendly to CSE).
+    /// Total bytes of memory *after* the reserved area, as configured for Cranelift codegen. All
+    /// of this memory is addressable, but it is never accessible - it is guaranteed to trap if an
+    /// access happens in this region. This size allows Cranelift to use *common subexpression
+    /// elimination* to reduce checks of the *sum of base pointer and offset* (where the offset is
+    /// always rounded up to a multiple of the guard size, to be friendly to CSE).
     pub guard_size: u64,
     /// Total bytes of memory for the WebAssembly program's linear memory, on initialization.
     pub initial_size: u64,
@@ -66,56 +65,58 @@ pub struct SparseData<'a> {
     /// The deserializer of this datastructure does not make sure the 4k invariant holds,
     /// but the constructor on the serializier side does.
     #[serde(borrow)]
-    chunks: Vec<Option<&'a [u8]>>,
+    pages: Vec<Option<&'a [u8]>>,
 }
 
 impl<'a> SparseData<'a> {
-    pub fn new(chunks: Vec<Option<&'a [u8]>>) -> Result<Self, Error> {
-        for c in &chunks {
-            if let Some(chunk) = c {
-                if chunk.len() != 4096 {
-                    return Err(format_err!(
-                        "when creating SparseData, got chunk len {}, only 4096 is allowed",
-                        chunk.len()
-                    ));
-                }
-            }
+    pub fn new(pages: Vec<Option<&'a [u8]>>) -> Result<Self, Error> {
+        if !pages.iter().all(|page| match page {
+            Some(contents) => contents.len() == 4096,
+            None => true,
+        }) {
+            Err(format_err!(
+                "when creating SparseData, got page with len != 4k"
+            ))?
         }
-        Ok(Self { chunks })
+
+        Ok(Self { pages })
     }
 
-    pub fn chunks(&self) -> &[Option<&'a [u8]>] {
-        &self.chunks
+    pub fn pages(&self) -> &[Option<&'a [u8]>] {
+        &self.pages
     }
 
-    pub fn get_chunk(&self, offset: usize) -> &Option<&'a [u8]> {
-        self.chunks.get(offset).unwrap_or(&None)
+    pub fn get_page(&self, offset: usize) -> &Option<&'a [u8]> {
+        self.pages.get(offset).unwrap_or(&None)
     }
 }
 
 pub struct OwnedSparseData {
-    chunks: Vec<Option<Vec<u8>>>,
+    pages: Vec<Option<Vec<u8>>>,
 }
 
 impl OwnedSparseData {
-    pub fn new(chunks: Vec<Option<Vec<u8>>>) -> Result<Self, Error> {
-        for c in &chunks {
-            if let Some(chunk) = c {
-                if chunk.len() != 4096 {
-                    return Err(format_err!(
-                        "when creating OwnedSparseData, got chunk len {}, only 4096 is allowed",
-                        chunk.len()
-                    ));
-                }
-            }
+    pub fn new(pages: Vec<Option<Vec<u8>>>) -> Result<Self, Error> {
+        if !pages.iter().all(|page| match page {
+            Some(contents) => contents.len() == 4096,
+            None => true,
+        }) {
+            Err(format_err!(
+                "when creating OwnedSparseData, got page with len != 4k"
+            ))?
         }
-        Ok(Self { chunks })
+        Ok(Self { pages })
     }
     pub fn get_ref(&self) -> SparseData {
-        SparseData::new(self.chunks.iter().map(|c| match c {
-            Some(data) => Some(data.as_slice()),
-            None => None,
-        }).collect()).expect("sparsedata invariant enforced by ownedsparsedata constructor")
+        SparseData::new(
+            self.pages
+                .iter()
+                .map(|c| match c {
+                    Some(data) => Some(data.as_slice()),
+                    None => None,
+                })
+                .collect(),
+        )
+        .expect("sparsedata invariant enforced by ownedsparsedata constructor")
     }
 }
-
