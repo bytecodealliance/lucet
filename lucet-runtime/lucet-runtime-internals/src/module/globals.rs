@@ -14,7 +14,8 @@ macro_rules! globals_tests {
         //const WAT_IMPORT_MOD_PATH: &'static str = "tests/build/globals_guests/import.so";
         //const DEFINITION_SANDBOX_PATH: &'static str = "tests/build/globals_guests/definition.so";
 
-        /* replace with instantiation of module with import global, assert failure
+        /* XXX use OwnedModuleData to write a globals spec, and instantiate a with MockModule
+         * replace with instantiation of module with import global, assert failure
         #[test]
         fn wat_reject_import() {
             let module = DlModule::load_test(WAT_IMPORT_MOD_PATH);
