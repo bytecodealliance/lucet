@@ -8,6 +8,7 @@ macro_rules! guest_fault_tests {
             DlModule, Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TrapCode,
             TrapCodeType,
         };
+        use lucet_module_data::module_data::OwnedModuleData;
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
         use nix::sys::wait::{waitpid, WaitStatus};
@@ -452,7 +453,7 @@ macro_rules! guest_fault_tests {
                 // pointer after a delay. This should lead to a sigsegv while the guest is running,
                 // therefore testing that the host signal gets re-raised.
                 let child = std::thread::spawn(|| {
-                    let mut module = MockModule::new();
+                    let mut module = MockModule::new(OwnedModuleData::empty());
                     module.export_funcs.insert(
                         b"sleepy_guest".to_vec(),
                         sleepy_guest as *const extern "C" fn(),
