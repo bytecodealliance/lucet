@@ -51,13 +51,16 @@ impl DlModule {
             })?
         };
 
-        let module_data_slice: &'static [u8] =
-            unsafe { slice::from_raw_parts(*module_data_ptr, *module_data_len) };
 
         // Deserialize the slice into ModuleData, which will hold refs into the loaded
-        // shared object file in `module_data_slice`.
+        // shared object file in `module_data_slice`. Both of these get a 'static lifetime because
+        // Rust doesn't have a safe way to describe that their lifetime matches the containing
+        // struct (and the dll).
+        //
         // The exposed lifetime of ModuleData will be the same as the lifetime of the
-        // dynamically loaded library
+        // dynamically loaded library. This makes the interface safe.
+        let module_data_slice: &'static [u8] =
+            unsafe { slice::from_raw_parts(*module_data_ptr, *module_data_len) };
         let module_data = ModuleData::deserialize(module_data_slice)?;
 
         let fbase = if let Some(dli) = dladdr(*module_data_ptr as *const c_void) {
