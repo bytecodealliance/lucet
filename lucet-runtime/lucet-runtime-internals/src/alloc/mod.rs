@@ -1,7 +1,6 @@
 use crate::error::Error;
 use crate::module::Module;
 use crate::region::RegionInternal;
-use lucet_module_data::HeapSpec;
 use libc::{c_void, SIGSTKSZ};
 use nix::unistd::{sysconf, SysconfVar};
 use std::sync::{Arc, Once, Weak};
@@ -124,10 +123,10 @@ impl Alloc {
         (addr as usize >= guard_start) && ((addr as usize) < guard_end)
     }
 
-    pub fn expand_heap<'m>(
+    pub fn expand_heap(
         &mut self,
         expand_bytes: u32,
-        heap_spec: &HeapSpec,
+        module: &dyn Module,
     ) -> Result<u32, Error> {
         let slot = self.slot();
 
@@ -159,6 +158,7 @@ impl Alloc {
         // the above makes sure this expression does not underflow
         let guard_remaining = self.heap_inaccessible_size - expand_pagealigned as usize;
 
+        let heap_spec = module.module_data().heap_spec();
         // The compiler specifies how much guard (memory which traps on access) must be beyond the
         // end of the accessible memory. We cannot perform an expansion that would make this region
         // smaller than the compiler expected it to be.

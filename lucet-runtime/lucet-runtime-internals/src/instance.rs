@@ -266,7 +266,7 @@ impl Instance {
     pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
         let orig_len = self
             .alloc
-            .expand_heap(additional_pages * WASM_PAGE_SIZE, self.module.module_data().heap_spec())?;
+            .expand_heap(additional_pages * WASM_PAGE_SIZE, self.module.as_ref())?;
         Ok(orig_len / WASM_PAGE_SIZE)
     }
 

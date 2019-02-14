@@ -94,22 +94,20 @@ macro_rules! alloc_tests {
 
         fn expand_heap_once_template(heap_spec: &HeapSpec) {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let module = OwnedModuleData::empty()
+                .with_heap_spec(heap_spec.clone())
+                .into_mock()
+                .arced();
             let mut inst = region
-                .new_instance(
-                    OwnedModuleData::empty()
-                        .with_heap_spec(heap_spec.clone())
-                        .into_mock()
-                        .arced(),
-                )
+                .new_instance(module.clone())
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, heap_spec.initial_size as usize);
 
-            let heap_spec = inst.module().module_data().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
-                .expand_heap(64 * 1024, &heap_spec)
+                .expand_heap(64 * 1024, module.as_ref())
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
@@ -126,22 +124,20 @@ macro_rules! alloc_tests {
         #[test]
         fn expand_heap_twice() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let module = OwnedModuleData::empty()
+                .with_heap_spec(THREE_PAGE_MAX_HEAP.clone())
+                .into_mock()
+                .arced();
             let mut inst = region
-                .new_instance(
-                    OwnedModuleData::empty()
-                        .with_heap_spec(THREE_PAGE_MAX_HEAP.clone())
-                        .into_mock()
-                        .arced(),
-                )
+                .new_instance(module.clone())
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
-            let heap_spec = inst.module().module_data().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
-                .expand_heap(64 * 1024, &heap_spec)
+                .expand_heap(64 * 1024, module.as_ref())
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
@@ -150,7 +146,7 @@ macro_rules! alloc_tests {
 
             let second_new_heap_area = inst
                 .alloc_mut()
-                .expand_heap(64 * 1024, &heap_spec)
+                .expand_heap(64 * 1024, module.as_ref())
                 .expect("expand_heap succeeds");
             assert_eq!(new_heap_len, second_new_heap_area as usize);
 
@@ -169,22 +165,23 @@ macro_rules! alloc_tests {
         #[test]
         fn expand_past_spec_max() {
             let region = TestRegion::create(10, &LIMITS).expect("region created");
-            let mut inst = region
-                .new_instance(
+            let module = 
                     OwnedModuleData::empty()
                         .with_heap_spec(THREE_PAGE_MAX_HEAP.clone())
                         .into_mock()
-                        .arced(),
+                        .arced();
+            let mut inst = region
+                .new_instance(
+                    module.clone()
                 )
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
-            let heap_spec = inst.module().module_data().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
-                .expand_heap(THREEPAGE_MAX_SIZE as u32, &heap_spec);
+                .expand_heap(THREEPAGE_MAX_SIZE as u32, module.as_ref());
             assert!(new_heap_area.is_err(), "heap expansion past spec fails");
 
             let new_heap_len = inst.alloc().heap_len();
@@ -211,29 +208,29 @@ macro_rules! alloc_tests {
         #[test]
         fn expand_past_heap_limit() {
             let region = TestRegion::create(10, &LIMITS).expect("region created");
-            let mut inst = region
-                .new_instance(
+            let module = 
                     OwnedModuleData::empty()
                         .with_heap_spec(EXPAND_PAST_LIMIT_SPEC.clone())
                         .into_mock()
-                        .arced(),
+                        .arced();
+            let mut inst = region
+                .new_instance( module.clone()
                 )
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, EXPANDPASTLIMIT_INITIAL_SIZE as usize);
 
-            let heap_spec = inst.module().module_data().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
-                .expand_heap(64 * 1024, &heap_spec)
+                .expand_heap(64 * 1024, module.as_ref())
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
             let new_heap_len = inst.alloc().heap_len();
             assert_eq!(new_heap_len, LIMITS_HEAP_MEM_SIZE);
 
-            let past_limit_heap_area = inst.alloc_mut().expand_heap(64 * 1024, &heap_spec);
+            let past_limit_heap_area = inst.alloc_mut().expand_heap(64 * 1024, module.as_ref());
             assert!(
                 past_limit_heap_area.is_err(),
                 "heap expansion past limit fails"
@@ -407,12 +404,11 @@ macro_rules! alloc_tests {
             heap[heap_len - 1] = 0xFF;
             assert_eq!(heap[heap_len - 1], 0xFF);
 
-            let heap_spec = inst.module().module_data().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
                 .expand_heap(
                     (THREEPAGE_MAX_SIZE - THREEPAGE_INITIAL_SIZE) as u32,
-                    &heap_spec,
+                    module.as_ref(),
                 )
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
