@@ -1,10 +1,7 @@
 use crate::error::Error;
-use crate::module::sparse_page_data::SparsePageData;
 use crate::module::{
-    AddrDetails, GlobalSpec, HeapSpec, Module, ModuleData, ModuleInternal, TableElement,
-    TrapManifestRecord,
+    AddrDetails, Module, ModuleData, ModuleInternal, TableElement, TrapManifestRecord,
 };
-use capnp;
 use libc::c_void;
 use libloading::{Library, Symbol};
 use std::ffi::{CStr, OsStr};
@@ -127,31 +124,8 @@ impl ModuleInternal for DlModule {
         Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize / elem_size) })
     }
 
-    fn sparse_page_data(&self) -> Result<&[*const c_void], Error> {
-        unsafe {
-            let spd = self
-                .lib
-                .get::<*const SparsePageData>(b"guest_sparse_page_data")
-                .map_err(|e| {
-                    lucet_incorrect_module!(
-                        "error loading required symbol `guest_sparse_page_data`: {}",
-                        e
-                    )
-                })?
-                .as_ref()
-                .ok_or(lucet_incorrect_module!(
-                    "`guest_sparse_page_data` is defined but null"
-                ))?;
-            Ok(from_raw_parts(&spd.pages, spd.num_pages as usize))
-        }
-    }
-
-    fn heap_spec(&self) -> &HeapSpec {
-        self.module_data.heap_spec()
-    }
-
-    fn globals_spec(&self) -> &[GlobalSpec] {
-        self.module_data.globals_spec()
+    fn module_data(&self) -> &ModuleData {
+        &self.module_data
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {
