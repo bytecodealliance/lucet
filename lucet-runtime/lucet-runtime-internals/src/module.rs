@@ -6,7 +6,7 @@ mod sparse_page_data;
 use crate::alloc::Limits;
 use crate::error::Error;
 pub use crate::module::dl::DlModule;
-pub use crate::module::mock::MockModule;
+pub use crate::module::mock::{MockModule, OwnedModuleData, ToMockModule};
 use crate::probestack::{lucet_probestack, lucet_probestack_size};
 use crate::trapcode::{TrapCode, TrapCodeType};
 use libc::c_void;
@@ -108,23 +108,6 @@ impl<'a> RuntimeSpec<'a> {
     }
 }
 
-/*
-impl Default for RuntimeSpec {
-    /// Some small test cases which don't use the heap or globals need a default implementation
-    fn default() -> Self {
-        Self {
-            heap: HeapSpec {
-                reserved_size: 0,
-                guard_size: 0,
-                initial_size: 0,
-                max_size: None,
-            },
-            globals: Vec::new(),
-        }
-    }
-}
-*/
-
 /// Details about a program address.
 ///
 /// It is possible to determine whether an address lies within the module code if the module is
@@ -148,26 +131,12 @@ pub trait ModuleInternal: Send + Sync {
     /// Get the table elements from the module.
     fn table_elements(&self) -> Result<&[TableElement], Error>;
 
-    /// Returns the sparse page data encoded into the module object.
-    ///
-    /// Indices into the returned slice correspond to the offset, in host page increments, from the
-    /// base of the instance heap.
-    ///
-    /// If the pointer at a given index is null, there is no data for that page. Otherwise, it
-    /// should be a pointer to the base of a host page-sized area of data.
-    ///
-    /// This method does no checking to ensure the above is valid; it relies on the correctness of
-    /// `lucetc`'s output.
-    fn sparse_page_data(&self) -> Result<&[*const c_void], Error>;
-
-    fn heap_spec(&self) -> &HeapSpec;
-
-    fn globals_spec(&self) -> &[GlobalSpec];
+    fn module_data(&self) -> &ModuleData;
 
     fn runtime_spec(&self) -> RuntimeSpec {
         RuntimeSpec {
-            heap: self.heap_spec(),
-            globals: self.globals_spec(),
+            heap: self.module_data().heap_spec(),
+            globals: self.module_data().globals_spec(),
         }
     }
 
