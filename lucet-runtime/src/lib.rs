@@ -177,3 +177,5 @@ pub mod vmctx {
     //! pointer argument inserted by the compiler.
     pub use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
 }
+
+mod c_api;

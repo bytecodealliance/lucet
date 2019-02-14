@@ -328,6 +328,7 @@ impl Alloc {
 ///
 /// Each value is specified in bytes, and must be evenly divisible by the host page size (4K).
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct Limits {
     /// Max size of the heap, which can be backed by real memory. (default 1M)
     pub heap_memory_size: usize,
