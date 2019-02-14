@@ -147,12 +147,12 @@ impl RegionInternal for MmapRegion {
         // Initialize the heap using the module sparse page data. There cannot be more pages in the
         // sparse page data than will fit in the initial heap size.
         //
-        // Pages with a corresponding non-null entry in the sparse page data are initialized with
+        // Pages with a corresponding Some entry in the sparse page data are initialized with
         // the contents of that data.
         //
         // Any pages which don't have an entry in the sparse page data, either because their entry
-        // is NULL, or because the sparse data has fewer pages than the initial heap, are zeroed.
-        let sparse_page_data = module.sparse_page_data()?;
+        // is None, or because the sparse data has fewer pages than the initial heap, are zeroed.
+        let sparse_page_data = module.module_data().sparse_data();
         let heap = unsafe { alloc.heap_mut() };
         let initial_pages =
             initial_size
@@ -169,18 +169,15 @@ impl RegionInternal for MmapRegion {
                     "sparse page data length exceeded initial heap size"
                 ));
             }
-            let contents_ptr = sparse_page_data.get(page_num).unwrap_or(&ptr::null());
-            if contents_ptr.is_null() {
+            if let Some(Some(contents)) = sparse_page_data.chunks().get(page_num) {
+                // otherwise copy in the page data
+                heap[page_base..page_base + host_page_size()].copy_from_slice(contents);
+            } else {
                 // zero this page
+                // TODO would using a memset primitive be better here?
                 for b in heap[page_base..page_base + host_page_size()].iter_mut() {
                     *b = 0x00;
                 }
-            } else {
-                // otherwise copy in the page data
-                let contents = unsafe {
-                    std::slice::from_raw_parts(*contents_ptr as *const u8, host_page_size())
-                };
-                heap[page_base..page_base + host_page_size()].copy_from_slice(contents);
             }
         }
 
