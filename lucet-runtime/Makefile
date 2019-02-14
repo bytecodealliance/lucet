@@ -1,6 +1,9 @@
 # This Makefile exists primarily to keep all of the test guest sources in one place. They should
 # probably be factored out of the C runtime eventually into a standalone test support package.
 
+LD_LIBRARY_PATH:=$(abspath ../lucet-libc/build/lib):$(LD_LIBRARY_PATH)
+GUEST_MODULE_PREFIX=$(abspath $(CURDIR)/..)
+
 default: build
 
 LIBLUCET_RUNTIME_C:=../lucet-runtime-c
@@ -23,9 +26,9 @@ build:
 
 .PHONY: test
 test: build $(TEST_DEPS)
-	export LD_LIBRARY_PATH=$(abspath ../lucet-libc/build/lib):$(LD_LIBRARY_PATH)
-	cd lucet-runtime-internals && cargo test
-	cargo test
+	
+	cd lucet-runtime-internals && LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) GUEST_MODULE_PREFIX=$(GUEST_MODULE_PREFIX) cargo test
+	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) GUEST_MODULE_PREFIX=$(GUEST_MODULE_PREFIX) cargo test
 
 .PHONY: audit
 audit:
