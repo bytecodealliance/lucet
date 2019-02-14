@@ -119,7 +119,7 @@ impl Global {
     pub fn to_spec(&self) -> GlobalSpec {
         let global = match self {
             Global::Import(i) => GlobalData::Import(GlobalImportData::new(i.module(), i.field())),
-            Global::Def(d) => GlobalData::Def(GlobalDefData::new(d.value() as u64)),
+            Global::Def(d) => GlobalData::Def(GlobalDefData::new(d.value())),
         };
         let export = self.export();
         GlobalSpec::new(global, export)
