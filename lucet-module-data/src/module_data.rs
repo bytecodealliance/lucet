@@ -82,4 +82,9 @@ impl OwnedModuleData {
             vec![],
         )
     }
+
+    pub fn with_heap_spec(mut self, heap_spec: HeapSpec) -> Self {
+        self.heap_spec = heap_spec;
+        self
+    }
 }
