@@ -1,17 +1,24 @@
 use crate::error::Error;
 use crate::module::{
-    AddrDetails, HeapSpec, GlobalSpec, Module, ModuleInternal, TableElement, TrapManifestRecord,
+    AddrDetails, Module, ModuleData, ModuleInternal, TableElement, TrapManifestRecord,
 };
 use libc::c_void;
+pub use lucet_module_data::module_data::OwnedModuleData;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct MockModule {
+    // Need to have OwnedModuleData, the memory backing the ModuleData refs inside this structure.
+    // It is only used through the module_data structure.
+    #[allow(dead_code)]
+    owned_module_data: OwnedModuleData,
+    // module_data has the same lifetime as this struct. We
+    // mark it as static because MockModule can't have a lifetime
+    // parameter (because it needs to be castable into a `&dyn Module`
+    // trait object)
+    module_data: ModuleData<'static>,
+
     pub table_elements: Vec<TableElement>,
-    sparse_page_data: Vec<Vec<u8>>,
-    sparse_page_data_ptrs: Vec<*const c_void>,
-    heap_spec: HeapSpec,
-    globals_spec: Vec<GlobalSpec<'static>>,
     pub export_funcs: HashMap<Vec<u8>, *const extern "C" fn()>,
     pub func_table: HashMap<(u32, u32), *const extern "C" fn()>,
     pub start_func: Option<extern "C" fn()>,
@@ -22,18 +29,12 @@ unsafe impl Send for MockModule {}
 unsafe impl Sync for MockModule {}
 
 impl MockModule {
-    pub fn new() -> Self {
+    pub fn new(owned_module_data: OwnedModuleData) -> Self {
+        let module_data = unsafe { std::mem::transmute(owned_module_data.get_ref()) };
         MockModule {
+            module_data,
+            owned_module_data,
             table_elements: vec![],
-            sparse_page_data: vec![],
-            sparse_page_data_ptrs: vec![],
-            heap_spec: HeapSpec {
-                reserved_size: 0,
-                guard_size: 0,
-                initial_size: 0,
-                max_size: None,
-            },
-            globals_spec: vec![],
             export_funcs: HashMap::new(),
             func_table: HashMap::new(),
             start_func: None,
@@ -41,25 +42,8 @@ impl MockModule {
         }
     }
 
-    pub fn arced() -> Arc<dyn Module> {
-        Arc::new(MockModule::new())
-    }
-
-    pub fn arced_with_heap(heap: &HeapSpec) -> Arc<dyn Module> {
-        let mut module = MockModule::new();
-        module.heap_spec = heap.clone();
-        Arc::new(module)
-    }
-
-    pub fn set_initial_heap(&mut self, heap: &[u8]) {
-        self.sparse_page_data.clear();
-        self.sparse_page_data_ptrs.clear();
-        for page in heap.chunks(4096) {
-            let page = page.to_vec();
-            self.sparse_page_data_ptrs
-                .push(page.as_ptr() as *const c_void);
-            self.sparse_page_data.push(page);
-        }
+    pub fn arced(self) -> Arc<dyn Module> {
+        Arc::new(self)
     }
 }
 
@@ -70,16 +54,8 @@ impl ModuleInternal for MockModule {
         Ok(&self.table_elements)
     }
 
-    fn sparse_page_data(&self) -> Result<&[*const c_void], Error> {
-        Ok(&self.sparse_page_data_ptrs)
-    }
-
-    fn heap_spec(&self) -> &HeapSpec {
-        &self.heap_spec
-    }
-
-    fn globals_spec(&self) -> &[GlobalSpec] {
-        &self.globals_spec
+    fn module_data(&self) -> &ModuleData {
+        &self.module_data
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {
@@ -113,5 +89,15 @@ impl ModuleInternal for MockModule {
     fn addr_details(&self, _addr: *const c_void) -> Result<Option<AddrDetails>, Error> {
         // TODO: possible to reflect on size of Rust functions?
         Ok(None)
+    }
+}
+
+pub trait ToMockModule {
+    fn into_mock(self) -> MockModule;
+}
+
+impl ToMockModule for OwnedModuleData {
+    fn into_mock(self) -> MockModule {
+        MockModule::new(self)
     }
 }
