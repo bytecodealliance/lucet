@@ -7,7 +7,7 @@ macro_rules! alloc_tests {
         use $crate::alloc::Limits;
         use $crate::context::{Context, ContextHandle};
         use $crate::instance::InstanceInternal;
-        use $crate::module::{HeapSpec, MockModule};
+        use $crate::module::{HeapSpec, OwnedModuleData, ToMockModule};
         use $crate::region::Region;
         use $crate::val::Val;
 
@@ -53,7 +53,12 @@ macro_rules! alloc_tests {
         fn allocate_runtime_works() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let mut inst = region
-                .new_instance(MockModule::arced_with_heap(&ONE_PAGE_HEAP))
+                .new_instance(
+                    OwnedModuleData::empty()
+                        .with_heap_spec(ONE_PAGE_HEAP.clone())
+                        .into_mock()
+                        .arced(),
+                )
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
@@ -90,13 +95,18 @@ macro_rules! alloc_tests {
         fn expand_heap_once_template(heap_spec: &HeapSpec) {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let mut inst = region
-                .new_instance(MockModule::arced_with_heap(heap_spec))
+                .new_instance(
+                    OwnedModuleData::empty()
+                        .with_heap_spec(heap_spec.clone())
+                        .into_mock()
+                        .arced(),
+                )
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, heap_spec.initial_size as usize);
 
-            let heap_spec = inst.module().heap_spec().clone();
+            let heap_spec = inst.module().module_data().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
                 .expand_heap(64 * 1024, &heap_spec)
@@ -117,13 +127,18 @@ macro_rules! alloc_tests {
         fn expand_heap_twice() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let mut inst = region
-                .new_instance(MockModule::arced_with_heap(&THREE_PAGE_MAX_HEAP))
+                .new_instance(
+                    OwnedModuleData::empty()
+                        .with_heap_spec(THREE_PAGE_MAX_HEAP.clone())
+                        .into_mock()
+                        .arced(),
+                )
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
-            let heap_spec = inst.module().heap_spec().clone();
+            let heap_spec = inst.module().module_data().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
                 .expand_heap(64 * 1024, &heap_spec)
@@ -155,14 +170,21 @@ macro_rules! alloc_tests {
         fn expand_past_spec_max() {
             let region = TestRegion::create(10, &LIMITS).expect("region created");
             let mut inst = region
-                .new_instance(MockModule::arced_with_heap(&THREE_PAGE_MAX_HEAP))
+                .new_instance(
+                    OwnedModuleData::empty()
+                        .with_heap_spec(THREE_PAGE_MAX_HEAP.clone())
+                        .into_mock()
+                        .arced(),
+                )
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
-            let heap_spec = inst.module().heap_spec().clone();
-            let new_heap_area = inst.alloc_mut().expand_heap(THREEPAGE_MAX_SIZE as u32, &heap_spec);
+            let heap_spec = inst.module().module_data().heap_spec().clone();
+            let new_heap_area = inst
+                .alloc_mut()
+                .expand_heap(THREEPAGE_MAX_SIZE as u32, &heap_spec);
             assert!(new_heap_area.is_err(), "heap expansion past spec fails");
 
             let new_heap_len = inst.alloc().heap_len();
@@ -190,13 +212,18 @@ macro_rules! alloc_tests {
         fn expand_past_heap_limit() {
             let region = TestRegion::create(10, &LIMITS).expect("region created");
             let mut inst = region
-                .new_instance(MockModule::arced_with_heap(&EXPAND_PAST_LIMIT_SPEC))
+                .new_instance(
+                    OwnedModuleData::empty()
+                        .with_heap_spec(EXPAND_PAST_LIMIT_SPEC.clone())
+                        .into_mock()
+                        .arced(),
+                )
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, EXPANDPASTLIMIT_INITIAL_SIZE as usize);
 
-            let heap_spec = inst.module().heap_spec().clone();
+            let heap_spec = inst.module().module_data().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
                 .expand_heap(64 * 1024, &heap_spec)
@@ -234,7 +261,12 @@ macro_rules! alloc_tests {
         #[test]
         fn reject_initial_oversize_heap() {
             let region = TestRegion::create(10, &LIMITS).expect("region created");
-            let res = region.new_instance(MockModule::arced_with_heap(&INITIAL_OVERSIZE_HEAP));
+            let res = region.new_instance(
+                OwnedModuleData::empty()
+                    .with_heap_spec(INITIAL_OVERSIZE_HEAP.clone())
+                    .into_mock()
+                    .arced(),
+            );
             assert!(res.is_err(), "new_instance fails");
         }
 
@@ -251,7 +283,12 @@ macro_rules! alloc_tests {
         fn accept_small_guard_heap() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let _inst = region
-                .new_instance(MockModule::arced_with_heap(&SMALL_GUARD_HEAP))
+                .new_instance(
+                    OwnedModuleData::empty()
+                        .with_heap_spec(SMALL_GUARD_HEAP.clone())
+                        .into_mock()
+                        .arced(),
+                )
                 .expect("new_instance succeeds");
         }
 
@@ -267,7 +304,12 @@ macro_rules! alloc_tests {
         #[test]
         fn reject_large_guard_heap() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
-            let res = region.new_instance(MockModule::arced_with_heap(&LARGE_GUARD_HEAP));
+            let res = region.new_instance(
+                OwnedModuleData::empty()
+                    .with_heap_spec(LARGE_GUARD_HEAP.clone())
+                    .into_mock()
+                    .arced(),
+            );
             assert!(res.is_err(), "new_instance fails");
         }
 
@@ -277,7 +319,12 @@ macro_rules! alloc_tests {
         fn reuse_slot_works() {
             fn peek_n_poke(region: &Arc<TestRegion>) {
                 let mut inst = region
-                    .new_instance(MockModule::arced_with_heap(&ONE_PAGE_HEAP))
+                    .new_instance(
+                        OwnedModuleData::empty()
+                            .with_heap_spec(ONE_PAGE_HEAP.clone())
+                            .into_mock()
+                            .arced(),
+                    )
                     .expect("new_instance succeeds");
 
                 let heap_len = inst.alloc().heap_len();
@@ -339,7 +386,10 @@ macro_rules! alloc_tests {
         #[test]
         fn alloc_reset() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
-            let module = MockModule::arced_with_heap(&THREE_PAGE_MAX_HEAP);
+            let module = OwnedModuleData::empty()
+                .with_heap_spec(THREE_PAGE_MAX_HEAP.clone())
+                .into_mock()
+                .arced();
             let mut inst = region
                 .new_instance(module.clone())
                 .expect("new_instance succeeds");
@@ -357,10 +407,13 @@ macro_rules! alloc_tests {
             heap[heap_len - 1] = 0xFF;
             assert_eq!(heap[heap_len - 1], 0xFF);
 
-            let heap_spec = inst.module().heap_spec().clone();
+            let heap_spec = inst.module().module_data().heap_spec().clone();
             let new_heap_area = inst
                 .alloc_mut()
-                .expand_heap((THREEPAGE_MAX_SIZE - THREEPAGE_INITIAL_SIZE) as u32, &heap_spec)
+                .expand_heap(
+                    (THREEPAGE_MAX_SIZE - THREEPAGE_INITIAL_SIZE) as u32,
+                    &heap_spec,
+                )
                 .expect("expand_heap succeeds");
             assert_eq!(heap_len, new_heap_area as usize);
 
@@ -400,7 +453,12 @@ macro_rules! alloc_tests {
         fn guardless_heap_create() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let mut inst = region
-                .new_instance(MockModule::arced_with_heap(&GUARDLESS_HEAP))
+                .new_instance(
+                    OwnedModuleData::empty()
+                        .with_heap_spec(GUARDLESS_HEAP.clone())
+                        .into_mock()
+                        .arced(),
+                )
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
@@ -489,7 +547,12 @@ macro_rules! alloc_tests {
 
             let region = TestRegion::create(1, &CONTEXT_TEST_LIMITS).expect("region created");
             let mut inst = region
-                .new_instance(MockModule::arced_with_heap(&CONTEXT_TEST_HEAP))
+                .new_instance(
+                    OwnedModuleData::empty()
+                        .with_heap_spec(CONTEXT_TEST_HEAP.clone())
+                        .into_mock()
+                        .arced(),
+                )
                 .expect("new_instance succeeds");
 
             let mut parent = ContextHandle::new();
@@ -527,7 +590,12 @@ macro_rules! alloc_tests {
 
             let region = TestRegion::create(1, &CONTEXT_TEST_LIMITS).expect("region created");
             let mut inst = region
-                .new_instance(MockModule::arced_with_heap(&CONTEXT_TEST_HEAP))
+                .new_instance(
+                    OwnedModuleData::empty()
+                        .with_heap_spec(CONTEXT_TEST_HEAP.clone())
+                        .into_mock()
+                        .arced(),
+                )
                 .expect("new_instance succeeds");
 
             let mut parent = ContextHandle::new();
