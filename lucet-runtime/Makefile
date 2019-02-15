@@ -26,9 +26,8 @@ build:
 
 .PHONY: test
 test: build $(TEST_DEPS)
-	
-	cd lucet-runtime-internals && LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) GUEST_MODULE_PREFIX=$(GUEST_MODULE_PREFIX) cargo test
-	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) GUEST_MODULE_PREFIX=$(GUEST_MODULE_PREFIX) cargo test
+	cd lucet-runtime-internals && LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) GUEST_MODULE_PREFIX=$(GUEST_MODULE_PREFIX) cargo test --no-fail-fast
+	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) GUEST_MODULE_PREFIX=$(GUEST_MODULE_PREFIX) cargo test --no-fail-fast
 
 .PHONY: audit
 audit:

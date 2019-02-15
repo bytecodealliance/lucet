@@ -1,5 +1,5 @@
 // re-export types that should only be used for testing
-pub use lucet_runtime_internals::module::{HeapSpec, MockModule};
+pub use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder};
 #[allow(deprecated)]
 pub use lucet_runtime_internals::vmctx::vmctx_from_mock_instance;
 

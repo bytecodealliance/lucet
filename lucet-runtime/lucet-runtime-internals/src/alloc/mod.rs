@@ -158,7 +158,7 @@ impl Alloc {
         // the above makes sure this expression does not underflow
         let guard_remaining = self.heap_inaccessible_size - expand_pagealigned as usize;
 
-        let heap_spec = module.module_data().heap_spec();
+        let heap_spec = module.heap_spec();
         // The compiler specifies how much guard (memory which traps on access) must be beyond the
         // end of the accessible memory. We cannot perform an expansion that would make this region
         // smaller than the compiler expected it to be.

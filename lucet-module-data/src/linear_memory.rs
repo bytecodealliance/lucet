@@ -1,7 +1,7 @@
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeapSpec {
     /// Total bytes of memory for the heap to possibly expand into, as configured for Cranelift
     /// codegen.  All of this memory is addressable. Only some part of it is accessible - from 0 to

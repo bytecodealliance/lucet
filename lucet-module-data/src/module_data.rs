@@ -88,3 +88,9 @@ impl OwnedModuleData {
         self
     }
 }
+
+impl Default for OwnedModuleData {
+    fn default() -> Self {
+        OwnedModuleData::empty()
+    }
+}

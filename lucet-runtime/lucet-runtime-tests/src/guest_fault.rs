@@ -8,7 +8,6 @@ macro_rules! guest_fault_tests {
             DlModule, Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TrapCode,
             TrapCodeType,
         };
-        use lucet_module_data::module_data::OwnedModuleData;
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
         use nix::sys::wait::{waitpid, WaitStatus};
@@ -16,7 +15,9 @@ macro_rules! guest_fault_tests {
         use std::ptr;
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
-        use $crate::helpers::{guest_module_path, test_ex, test_nonex, DlModuleExt, MockModule};
+        use $crate::helpers::{
+            guest_module_path, test_ex, test_nonex, DlModuleExt, MockModuleBuilder,
+        };
 
         const TRAPS_SANDBOX_PATH: &'static str = "lucet-runtime-c/test/build/guest_faults/traps.so";
         const HOSTCALL_ERROR_SANDBOX_PATH: &'static str =
@@ -453,15 +454,13 @@ macro_rules! guest_fault_tests {
                 // pointer after a delay. This should lead to a sigsegv while the guest is running,
                 // therefore testing that the host signal gets re-raised.
                 let child = std::thread::spawn(|| {
-                    let mut module = MockModule::new(OwnedModuleData::empty());
-                    module.export_funcs.insert(
-                        b"sleepy_guest".to_vec(),
-                        sleepy_guest as *const extern "C" fn(),
-                    );
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(b"sleepy_guest", sleepy_guest as *const extern "C" fn())
+                        .build();
                     let region =
                         TestRegion::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
-                        .new_instance(Arc::new(module))
+                        .new_instance(module)
                         .expect("instance can be created");
 
                     inst.run(b"sleepy_guest", &[]).expect("instance runs");
