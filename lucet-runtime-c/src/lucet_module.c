@@ -65,7 +65,7 @@ struct lucet_module *lucet_module_load(const char *dl_path)
                     (unsigned long long) *p_table_segment_len);
             goto error;
         }
-        if (p_table_segment_len > 0U) {
+        if (*p_table_segment_len > 0U) {
             m->table_elements = (struct lucet_table_elements){
                 .elements = p_table_segment,
                 .last_id  = (uint32_t)(
