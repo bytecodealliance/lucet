@@ -17,10 +17,10 @@ use std::slice::from_raw_parts;
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct TrapManifestRecord {
-    func_addr: u64,
-    func_len: u64,
-    table_addr: u64,
-    table_len: u64,
+    pub func_addr: u64,
+    pub func_len: u64,
+    pub table_addr: u64,
+    pub table_len: u64,
 }
 
 impl TrapManifestRecord {
@@ -59,8 +59,8 @@ impl TrapManifestRecord {
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct TrapSite {
-    offset: u32,
-    trapcode: u32,
+    pub offset: u32,
+    pub trapcode: u32,
 }
 
 #[repr(C)]

@@ -232,7 +232,8 @@ impl ModuleInternal for MockModule {
     }
 
     fn addr_details(&self, _addr: *const c_void) -> Result<Option<AddrDetails>, Error> {
-        // TODO: possible to reflect on size of Rust functions?
+        // we can call `dladdr` on Rust code, but unless we inspect the stack I don't think there's
+        // a way to determine whether or not we're in "module" code; punt for now
         Ok(None)
     }
 }
