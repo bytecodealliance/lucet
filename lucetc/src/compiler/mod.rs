@@ -3,11 +3,11 @@ pub mod entity;
 pub mod function;
 pub mod globals;
 pub mod memory;
+pub mod module_data;
 pub mod opcode;
 pub mod state;
 pub mod table;
 pub mod traps;
-pub mod module_data;
 
 mod name;
 

@@ -214,12 +214,7 @@ fn module_imports(
                 &External::Function(typeix) => {
                     let functionix = functions.len() as u32;
                     let ftype = module_get_signature(&module, typeix)?;
-                    functions.push(FunctionImport::new(
-                        functionix,
-                        entry,
-                        ftype,
-                        &bindings,
-                    )?)
+                    functions.push(FunctionImport::new(functionix, entry, ftype, &bindings)?)
                 }
                 &External::Global(ref gty) => {
                     let globalix = globals.len() as u32;
