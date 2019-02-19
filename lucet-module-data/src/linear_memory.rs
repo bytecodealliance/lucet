@@ -89,6 +89,10 @@ impl<'a> SparseData<'a> {
     pub fn get_page(&self, offset: usize) -> &Option<&'a [u8]> {
         self.pages.get(offset).unwrap_or(&None)
     }
+
+    pub fn len(&self) -> usize {
+        self.pages.len()
+    }
 }
 
 pub struct OwnedSparseData {

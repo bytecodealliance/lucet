@@ -100,6 +100,9 @@ pub trait ModuleInternal: Send + Sync {
 
     fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]>;
 
+    /// Get the number of pages in the sparse page data.
+    fn sparse_page_data_len(&self) -> usize;
+
     /// Get the table elements from the module.
     fn table_elements(&self) -> Result<&[TableElement], Error>;
 
