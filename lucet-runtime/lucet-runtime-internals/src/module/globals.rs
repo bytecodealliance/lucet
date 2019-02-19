@@ -1,33 +1,77 @@
 #[macro_export]
 macro_rules! globals_tests {
     ( $TestRegion:path ) => {
-        /*
+        use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
+        use $crate::error::Error;
         use $crate::instance::InstanceInternal;
-        use $crate::module::ModuleInternal;
+        use $crate::module::{DlModule, MockModuleBuilder, Module};
         use $crate::region::Region;
-        */
+        use $crate::vmctx::{lucet_vmctx, Vmctx};
 
-        //const INTERNAL_MOD_PATH: &'static str = "lucet-runtime-c/test/build/globals/internal.so";
-        //const C_IMPORT_MOD_PATH: &'static str = "lucet-runtime-c/test/build/globals/import.so";
-        //const WAT_IMPORT_MOD_PATH: &'static str = "tests/build/globals_guests/import.so";
-        //const DEFINITION_SANDBOX_PATH: &'static str = "tests/build/globals_guests/definition.so";
+        const DEFINITION_SANDBOX_PATH: &'static str = "tests/build/globals_guests/definition.so";
+
+        fn mock_import_module() -> Arc<dyn Module> {
+            MockModuleBuilder::new()
+                .with_import(0, "something", "else")
+                .build()
+        }
 
         /* XXX use OwnedModuleData to write a globals spec, and instantiate a with MockModule
          * replace with instantiation of module with import global, assert failure
+         */
         #[test]
-        fn wat_reject_import() {
-            let module = DlModule::load_test(WAT_IMPORT_MOD_PATH);
-            assert!(module.is_err(), "module load should not succeed");
+        fn reject_import() {
+            let module = mock_import_module();
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            match region.new_instance(module) {
+                Ok(_) => panic!("instance creation should not succeed"),
+                Err(Error::Unsupported(_)) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+            }
         }
-        */
+
+        fn mock_globals_module() -> Arc<dyn Module> {
+            extern "C" fn get_global0(vmctx: *mut lucet_vmctx) -> i64 {
+                unsafe { Vmctx::from_raw(vmctx) }.globals()[0]
+            }
+
+            extern "C" fn set_global0(vmctx: *mut lucet_vmctx, val: i64) {
+                unsafe { Vmctx::from_raw(vmctx) }.globals_mut()[0] = val;
+            }
+
+            extern "C" fn get_global1(vmctx: *mut lucet_vmctx) -> i64 {
+                unsafe { Vmctx::from_raw(vmctx) }.globals()[1]
+            }
+
+            MockModuleBuilder::new()
+                .with_global(0, -1)
+                .with_global(1, 420)
+                .with_export_func(b"get_global0", get_global0 as *const extern "C" fn())
+                .with_export_func(b"set_global0", set_global0 as *const extern "C" fn())
+                .with_export_func(b"get_global1", get_global1 as *const extern "C" fn())
+                .build()
+        }
 
         /* replace with use of instance public api to make sure defined globals are initialized
          * correctly
+         */
+
         #[test]
-        fn read_global0() {
-        let module = DlModule::load_test(INTERNAL_MOD_PATH).expect("module loads");
+        fn globals_initialized() {
+            let module = mock_globals_module();
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+            assert_eq!(inst.globals()[0], -1);
+            assert_eq!(inst.globals()[1], 420);
+        }
+
+        #[test]
+        fn get_global0() {
+            let module = mock_globals_module();
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -36,8 +80,69 @@ macro_rules! globals_tests {
             let retval = inst.run(b"get_global0", &[]).expect("instance runs");
             assert_eq!(i64::from(retval), -1);
         }
-        */
 
+        #[test]
+        fn get_both_globals() {
+            let module = mock_globals_module();
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            let retval = inst.run(b"get_global0", &[]).expect("instance runs");
+            assert_eq!(i64::from(retval), -1);
+
+            let retval = inst.run(b"get_global1", &[]).expect("instance runs");
+            assert_eq!(i64::from(retval), 420);
+        }
+
+        #[test]
+        fn mutate_global0() {
+            let module = mock_globals_module();
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            inst.run(b"set_global0", &[666i64.into()])
+                .expect("instance runs");
+
+            let retval = inst.run(b"get_global0", &[]).expect("instance runs");
+            assert_eq!(i64::from(retval), 666);
+        }
+
+        #[test]
+        fn defined_globals() {
+            let module = DlModule::load_test(DEFINITION_SANDBOX_PATH).expect("module loads");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            inst.run(b"main", &[]).expect("instance runs");
+
+            // Now the globals should be:
+            // $x = 3
+            // $y = 2
+            // $z = 6
+            // and heap should be:
+            // [0] = 4
+            // [4] = 5
+            // [8] = 6
+
+            let heap_u32 = unsafe { inst.alloc().heap_u32() };
+            assert_eq!(heap_u32[0..=2], [4, 5, 6]);
+
+            inst.run(b"main", &[]).expect("instance runs");
+
+            // now heap should be:
+            // [0] = 3
+            // [4] = 2
+            // [8] = 6
+
+            let heap_u32 = unsafe { inst.alloc().heap_u32() };
+            assert_eq!(heap_u32[0..=2], [3, 2, 6]);
+        }
     };
 }
 

@@ -246,7 +246,12 @@ impl Instance {
         let mod_globals = self.module.globals();
         for (i, v) in mod_globals.iter().enumerate() {
             globals[i] = match v.global() {
-                Global::Import(i) => Err(lucet_format_err!("unsupported global import: {:?}", i))?,
+                Global::Import(i) => {
+                    return Err(Error::Unsupported(format!(
+                        "global imports are unsupported; found: {:?}",
+                        i
+                    )))
+                }
                 Global::Def(d) => d.init_val(),
             };
         }
