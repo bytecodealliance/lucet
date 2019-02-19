@@ -1,9 +1,10 @@
 use crate::error::Error;
 use crate::module::{
-    AddrDetails, Module, ModuleData, ModuleInternal, TableElement, TrapManifestRecord,
+    AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement, TrapManifestRecord,
 };
 use libc::c_void;
 use libloading::{Library, Symbol};
+use lucet_module_data::ModuleData;
 use std::ffi::{CStr, OsStr};
 use std::mem;
 use std::slice;
@@ -50,7 +51,6 @@ impl DlModule {
                 )
             })?
         };
-
 
         // Deserialize the slice into ModuleData, which will hold refs into the loaded
         // shared object file in `module_data_slice`. Both of these get a 'static lifetime because
@@ -101,6 +101,18 @@ impl DlModule {
 impl Module for DlModule {}
 
 impl ModuleInternal for DlModule {
+    fn heap_spec(&self) -> &HeapSpec {
+        self.module_data.heap_spec()
+    }
+
+    fn globals(&self) -> &[GlobalSpec] {
+        self.module_data.globals_spec()
+    }
+
+    fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]> {
+        *self.module_data.sparse_data().get_page(page)
+    }
+
     fn table_elements(&self) -> Result<&[TableElement], Error> {
         let p_table_segment: Symbol<*const TableElement> = unsafe {
             self.lib.get(b"guest_table_0").map_err(|e| {
@@ -125,10 +137,6 @@ impl ModuleInternal for DlModule {
             );
         }
         Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize / elem_size) })
-    }
-
-    fn module_data(&self) -> &ModuleData {
-        &self.module_data
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {

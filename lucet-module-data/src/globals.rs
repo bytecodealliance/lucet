@@ -90,7 +90,10 @@ impl OwnedGlobalSpec {
     }
 
     pub fn new_import(import_module: String, import_field: String, export: Option<String>) -> Self {
-        Self::new(OwnedGlobal::Import(OwnedGlobalImport::new(import_module, import_field)), export)
+        Self::new(
+            OwnedGlobal::Import(OwnedGlobalImport::new(import_module, import_field)),
+            export,
+        )
     }
 
     pub fn get_ref(&self) -> GlobalSpec {
