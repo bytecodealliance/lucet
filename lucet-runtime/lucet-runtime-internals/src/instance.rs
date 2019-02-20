@@ -246,13 +246,13 @@ impl Instance {
         let mod_globals = self.module.globals();
         for (i, v) in mod_globals.iter().enumerate() {
             globals[i] = match v.global() {
-                Global::Import(i) => {
+                Global::Import { .. } => {
                     return Err(Error::Unsupported(format!(
                         "global imports are unsupported; found: {:?}",
                         i
                     )))
                 }
-                Global::Def(d) => d.init_val(),
+                Global::Def { def } => def.init_val(),
             };
         }
 

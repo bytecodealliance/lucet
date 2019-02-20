@@ -151,7 +151,7 @@ impl MockModuleBuilder {
             globals_spec,
         );
         let serialized_module_data = owned_module_data
-            .get_ref()
+            .to_ref()
             .serialize()
             .expect("serialization of module_data succeeds");
         let module_data = ModuleData::deserialize(&serialized_module_data)

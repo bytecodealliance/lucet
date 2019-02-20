@@ -111,17 +111,20 @@ impl Global {
     }
 }
 
-use lucet_module_data::{
-    Global as GlobalData, GlobalDef as GlobalDefData, GlobalImport as GlobalImportData, GlobalSpec,
-};
+use lucet_module_data as data;
 
 impl Global {
-    pub fn to_spec(&self) -> GlobalSpec {
+    pub fn to_spec(&self) -> data::GlobalSpec {
         let global = match self {
-            Global::Import(i) => GlobalData::Import(GlobalImportData::new(i.module(), i.field())),
-            Global::Def(d) => GlobalData::Def(GlobalDefData::new(d.value())),
+            Global::Import(i) => data::Global::Import {
+                module: i.module(),
+                field: i.field(),
+            },
+            Global::Def(d) => data::Global::Def {
+                def: data::GlobalDef::new(d.value()),
+            },
         };
         let export = self.export();
-        GlobalSpec::new(global, export)
+        data::GlobalSpec::new(global, export)
     }
 }
