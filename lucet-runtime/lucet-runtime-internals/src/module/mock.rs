@@ -199,6 +199,10 @@ impl ModuleInternal for MockModule {
         *self.module_data.sparse_data().get_page(page)
     }
 
+    fn sparse_page_data_len(&self) -> usize {
+        self.module_data.sparse_data().len()
+    }
+
     fn table_elements(&self) -> Result<&[TableElement], Error> {
         Ok(&self.table_elements)
     }

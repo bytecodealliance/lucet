@@ -1,8 +1,8 @@
 use crate::{
     globals::GlobalSpec,
     linear_memory::{HeapSpec, SparseData},
+    Error,
 };
-use failure::Error;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,11 +39,11 @@ impl<'a> ModuleData<'a> {
         &self.globals_spec
     }
     pub fn serialize(&self) -> Result<Vec<u8>, Error> {
-        bincode::serialize(self).map_err(|e| format_err!("serialization error: {}", e))
+        bincode::serialize(self).map_err(Error::SerializationError)
     }
 
     pub fn deserialize(buf: &'a [u8]) -> Result<ModuleData<'a>, Error> {
-        bincode::deserialize(buf).map_err(|e| format_err!("deserialization error: {}", e))
+        bincode::deserialize(buf).map_err(Error::DeserializationError)
     }
 }
 

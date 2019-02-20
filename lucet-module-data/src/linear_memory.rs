@@ -1,4 +1,4 @@
-use failure::Error;
+use crate::Error;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,9 +74,7 @@ impl<'a> SparseData<'a> {
             Some(contents) => contents.len() == 4096,
             None => true,
         }) {
-            Err(format_err!(
-                "when creating SparseData, got page with len != 4k"
-            ))?
+            return Err(Error::IncorrectPageSize);
         }
 
         Ok(Self { pages })
@@ -88,6 +86,10 @@ impl<'a> SparseData<'a> {
 
     pub fn get_page(&self, offset: usize) -> &Option<&'a [u8]> {
         self.pages.get(offset).unwrap_or(&None)
+    }
+
+    pub fn len(&self) -> usize {
+        self.pages.len()
     }
 }
 
@@ -101,9 +103,7 @@ impl OwnedSparseData {
             Some(contents) => contents.len() == 4096,
             None => true,
         }) {
-            Err(format_err!(
-                "when creating OwnedSparseData, got page with len != 4k"
-            ))?
+            return Err(Error::IncorrectPageSize);
         }
         Ok(Self { pages })
     }

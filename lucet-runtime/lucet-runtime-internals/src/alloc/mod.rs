@@ -123,11 +123,7 @@ impl Alloc {
         (addr as usize >= guard_start) && ((addr as usize) < guard_end)
     }
 
-    pub fn expand_heap(
-        &mut self,
-        expand_bytes: u32,
-        module: &dyn Module,
-    ) -> Result<u32, Error> {
+    pub fn expand_heap(&mut self, expand_bytes: u32, module: &dyn Module) -> Result<u32, Error> {
         let slot = self.slot();
 
         if expand_bytes == 0 {

@@ -113,6 +113,10 @@ impl ModuleInternal for DlModule {
         *self.module_data.sparse_data().get_page(page)
     }
 
+    fn sparse_page_data_len(&self) -> usize {
+        self.module_data.sparse_data().len()
+    }
+
     fn table_elements(&self) -> Result<&[TableElement], Error> {
         let p_table_segment: Symbol<*const TableElement> = unsafe {
             self.lib.get(b"guest_table_0").map_err(|e| {

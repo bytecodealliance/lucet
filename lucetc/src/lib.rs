@@ -9,8 +9,8 @@ use crate::compiler::data::{compile_data_initializers, compile_sparse_page_data}
 use crate::compiler::function::compile_function;
 use crate::compiler::globals::compile_global_specs;
 use crate::compiler::memory::compile_memory_specs;
-use crate::compiler::table::compile_table;
 use crate::compiler::module_data::compile_module_data;
+use crate::compiler::table::compile_table;
 use crate::compiler::Compiler;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::program::Program;

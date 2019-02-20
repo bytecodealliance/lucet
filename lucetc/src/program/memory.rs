@@ -41,4 +41,3 @@ pub fn empty_heap_spec() -> HeapSpec {
         max_size: None,
     }
 }
-

@@ -1,10 +1,9 @@
-#[macro_use]
-extern crate failure;
-
+pub mod error;
 pub mod globals;
 pub mod linear_memory;
 pub mod module_data;
 
+pub use crate::error::Error;
 pub use crate::globals::{Global, GlobalDef, GlobalImport, GlobalSpec};
 pub use crate::linear_memory::{HeapSpec, SparseData};
 pub use crate::module_data::ModuleData;
