@@ -11,9 +11,9 @@ pub enum Error {
     #[fail(display = "Region capacity reached: {} instances", _0)]
     RegionFull(usize),
 
-    /// An error was found in the definition of a Lucet module.
-    #[fail(display = "Incorrect module definition: {}", _0)]
-    IncorrectModule(String),
+    /// A module error occurred.
+    #[fail(display = "Module error: {}", _0)]
+    ModuleError(ModuleError),
 
     /// A method call or module specification would exceed an instance's
     /// [`Limit`s](struct.Limits.html).
@@ -80,6 +80,24 @@ impl From<std::ffi::IntoStringError> for Error {
     }
 }
 
+impl From<lucet_module_data::Error> for Error {
+    fn from(e: lucet_module_data::Error) -> Error {
+        Error::ModuleError(ModuleError::ModuleDataError(e))
+    }
+}
+
+/// Lucet module errors.
+#[derive(Debug, Fail)]
+pub enum ModuleError {
+    /// An error was found in the definition of a Lucet module.
+    #[fail(display = "Incorrect module definition: {}", _0)]
+    IncorrectModule(String),
+
+    /// An error occurred with the module data section, likely during deserialization.
+    #[fail(display = "Module data error: {}", _0)]
+    ModuleDataError(#[cause] lucet_module_data::Error),
+}
+
 #[macro_export]
 macro_rules! lucet_bail {
     ($e:expr) => {
@@ -111,7 +129,11 @@ macro_rules! lucet_format_err {
 
 #[macro_export]
 macro_rules! lucet_incorrect_module {
-    ($($arg:tt)*) => { $crate::error::Error::IncorrectModule(format!($($arg)*)) }
+    ($($arg:tt)*) => {
+        $crate::error::Error::ModuleError(
+            $crate::error::ModuleError::IncorrectModule(format!($($arg)*))
+        )
+    }
 }
 
 #[macro_export]

@@ -4,21 +4,23 @@ mod mock;
 mod sparse_page_data;
 
 pub use crate::module::dl::DlModule;
-pub use crate::module::mock::MockModule;
+pub use crate::module::mock::MockModuleBuilder;
+pub use lucet_module_data::{Global, GlobalSpec, HeapSpec};
 
 use crate::alloc::Limits;
 use crate::error::Error;
 use crate::probestack::{lucet_probestack, lucet_probestack_size};
 use crate::trapcode::{TrapCode, TrapCodeType};
-use libc::{c_void, uint64_t};
+use libc::c_void;
 use std::slice::from_raw_parts;
 
 #[repr(C)]
+#[derive(Clone, Debug)]
 pub struct TrapManifestRecord {
-    func_addr: u64,
-    func_len: u64,
-    table_addr: u64,
-    table_len: u64,
+    pub func_addr: u64,
+    pub func_len: u64,
+    pub table_addr: u64,
+    pub table_len: u64,
 }
 
 impl TrapManifestRecord {
@@ -57,105 +59,15 @@ impl TrapManifestRecord {
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct TrapSite {
-    offset: u32,
-    trapcode: u32,
+    pub offset: u32,
+    pub trapcode: u32,
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TableElement {
     ty: u64,
     rf: u64,
-}
-
-/// Specifications from the WebAssembly module about its heap.
-///
-/// The `reserved_size` and `guard_size`, when added together, must not exceed the
-/// `heap_address_space_size` given in the corresponding `Limits`. The `initial_size` and `max_size`
-/// (if given) must fit into the `heap_memory_size` given in the corresponding `Limits`.
-///
-/// This is serialized into the object file by the compiler, so we need to take care not to change
-/// the layout.
-#[repr(C)]
-#[derive(Clone, Debug)]
-pub struct HeapSpec {
-    /// A region of the heap that is addressable, but only a subset of it is accessible.
-    ///
-    /// Specified in bytes, and must be evenly divisible by the host page size (4K).
-    pub reserved_size: uint64_t,
-
-    /// A region of the heap that is addressable, but never accessible.
-    ///
-    /// Specified in bytes, and must be evenly divisible by the host page size (4K).
-    pub guard_size: uint64_t,
-
-    /// The amount of heap that is accessible upon initialization.
-    ///
-    /// Specified in bytes, must be evenly divisible by the WebAssembly page size (64K), and must be less than or equal to `reserved_size`.
-    pub initial_size: uint64_t,
-
-    /// The maximum amount of the heap that the program will request; only valid if `max_size_valid == 1`.
-    ///
-    /// This comes directly from the WebAssembly program's memory definition.
-    pub max_size: uint64_t,
-
-    /// Set to `1` when `max_size` is valid, and `0` when it is not.
-    ///
-    /// This will eventually be nicer once we are using an IDL.
-    pub max_size_valid: uint64_t,
-}
-
-impl Default for HeapSpec {
-    fn default() -> HeapSpec {
-        // from the lucet tests' `helpers.h`
-        HeapSpec {
-            reserved_size: 4 * 1024 * 1024,
-            guard_size: 4 * 1024 * 1024,
-            initial_size: 64 * 1024,
-            max_size: 64 * 1024,
-            max_size_valid: 1,
-        }
-    }
-}
-
-impl RuntimeSpec {
-    /// Check that a spec is valid given certain `Limit`s.
-    pub fn validate(&self, limits: &Limits) -> Result<(), Error> {
-        // Assure that the total reserved + guard regions fit in the address space.
-        // First check makes sure they fit our 32-bit model, and ensures the second
-        // check doesn't overflow.
-        if self.heap.reserved_size > std::u32::MAX as u64 + 1
-            || self.heap.guard_size > std::u32::MAX as u64 + 1
-        {
-            return Err(lucet_incorrect_module!(
-                "heap spec sizes would overflow: {:?}",
-                self.heap
-            ));
-        }
-
-        if self.heap.reserved_size as usize + self.heap.guard_size as usize
-            > limits.heap_address_space_size
-        {
-            bail_limits_exceeded!("heap spec reserved and guard size: {:?}", self.heap);
-        }
-
-        if self.heap.initial_size as usize > limits.heap_memory_size {
-            bail_limits_exceeded!("heap spec initial size: {:?}", self.heap);
-        }
-
-        if self.globals.len() * std::mem::size_of::<u64>() > limits.globals_size {
-            bail_limits_exceeded!("globals exceed limits");
-        }
-
-        Ok(())
-    }
-}
-
-/// Specifications from the compiled WebAssembly module about its heap and globals.
-#[derive(Clone, Debug, Default)]
-pub struct RuntimeSpec {
-    pub heap: HeapSpec,
-    pub globals: Vec<i64>,
 }
 
 /// Details about a program address.
@@ -178,35 +90,21 @@ pub struct AddrDetails {
 pub trait Module: ModuleInternal {}
 
 pub trait ModuleInternal: Send + Sync {
-    /// Get the table elements from the module.
-    fn table_elements(&self) -> Result<&[TableElement], Error>;
-
-    /// Returns the sparse page data encoded into the module object.
-    ///
-    /// Indices into the returned slice correspond to the offset, in host page increments, from the
-    /// base of the instance heap.
-    ///
-    /// If the pointer at a given index is null, there is no data for that page. Otherwise, it
-    /// should be a pointer to the base of a host page-sized area of data.
-    ///
-    /// This method does no checking to ensure the above is valid; it relies on the correctness of
-    /// `lucetc`'s output.
-    fn sparse_page_data(&self) -> Result<&[*const c_void], Error>;
-
-    fn runtime_spec(&self) -> &RuntimeSpec;
-
-    /// Get the heap specification encoded into the module by `lucetc`.
-    fn heap_spec(&self) -> &HeapSpec {
-        &self.runtime_spec().heap
-    }
+    fn heap_spec(&self) -> &HeapSpec;
 
     /// Get the WebAssembly globals of the module.
     ///
     /// The indices into the returned slice correspond to the WebAssembly indices of the globals
     /// (<https://webassembly.github.io/spec/core/syntax/modules.html#syntax-globalidx>)
-    fn globals(&self) -> &[i64] {
-        &self.runtime_spec().globals
-    }
+    fn globals(&self) -> &[GlobalSpec];
+
+    fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]>;
+
+    /// Get the number of pages in the sparse page data.
+    fn sparse_page_data_len(&self) -> usize;
+
+    /// Get the table elements from the module.
+    fn table_elements(&self) -> Result<&[TableElement], Error>;
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error>;
 
@@ -263,5 +161,38 @@ pub trait ModuleInternal: Send + Sync {
     #[doc(hidden)]
     fn ensure_linked(&self) {
         crate::vmctx::vmctx_capi_init();
+    }
+
+    /// Check that the specifications of the WebAssembly module are valid given certain `Limit`s.
+    ///
+    /// Returns a `Result<(), Error>` rather than a boolean in order to provide a richer accounting
+    /// of what may be invalid.
+    fn validate_runtime_spec(&self, limits: &Limits) -> Result<(), Error> {
+        let heap = self.heap_spec();
+        // Assure that the total reserved + guard regions fit in the address space.
+        // First check makes sure they fit our 32-bit model, and ensures the second
+        // check doesn't overflow.
+        if heap.reserved_size > std::u32::MAX as u64 + 1
+            || heap.guard_size > std::u32::MAX as u64 + 1
+        {
+            return Err(lucet_incorrect_module!(
+                "heap spec sizes would overflow: {:?}",
+                heap
+            ));
+        }
+
+        if heap.reserved_size as usize + heap.guard_size as usize > limits.heap_address_space_size {
+            bail_limits_exceeded!("heap spec reserved and guard size: {:?}", heap);
+        }
+
+        if heap.initial_size as usize > limits.heap_memory_size {
+            bail_limits_exceeded!("heap spec initial size: {:?}", heap);
+        }
+
+        if self.globals().len() * std::mem::size_of::<u64>() > limits.globals_size {
+            bail_limits_exceeded!("globals exceed limits");
+        }
+
+        Ok(())
     }
 }

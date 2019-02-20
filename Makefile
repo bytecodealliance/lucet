@@ -8,6 +8,7 @@ build:
 	make -C lucet-libc
 	make -C lucet-rs
 	make -C lucet-libc-rs
+	cd lucet-module-data && cargo build
 	cd lucet-spectest && cargo build
 	cd lucet-analyze && cargo build
 	cd lucet-idl && cargo build
@@ -24,6 +25,7 @@ test: build-test-deps
 	make -C lucet-backtrace test
 	make -C lucet-rs test
 	make -C lucet-libc-rs test
+	cd lucet-module-data && cargo test
 	cd lucetc && cargo test
 	cd lucet-idl && cargo test
 	make -C tests
@@ -38,6 +40,7 @@ audit:
 	make -C lucet-runtime audit
 	make -C lucet-rs audit
 	make -C lucet-libc-rs audit
+	cd lucet-module-data && cargo audit
 	cd lucetc && cargo audit
 	cd lucet-idl && cargo audit
 

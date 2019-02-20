@@ -32,13 +32,12 @@ impl Region for MmapRegion {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
 
-        let runtime_spec = module.runtime_spec();
         let limits = &slot.limits;
-        runtime_spec.validate(limits)?;
+        module.validate_runtime_spec(limits)?;
 
         for (ptr, len) in [
             // make the heap read/writable and record its initial size
-            (slot.heap, runtime_spec.heap.initial_size as usize),
+            (slot.heap, module.heap_spec().initial_size as usize),
             // make the stack read/writable
             (slot.stack, limits.stack_size),
             // make the globals read/writable
@@ -64,9 +63,8 @@ impl Region for MmapRegion {
             .expect("backing region of slot (`self`) exists");
 
         let alloc = Alloc {
-            heap_accessible_size: runtime_spec.heap.initial_size as usize,
+            heap_accessible_size: module.heap_spec().initial_size as usize,
             heap_inaccessible_size: slot.limits.heap_address_space_size,
-            runtime_spec: runtime_spec.clone(),
             slot: Some(slot),
             region,
         };
@@ -120,8 +118,7 @@ impl RegionInternal for MmapRegion {
     }
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error> {
-        let heap_spec = &alloc.runtime_spec.heap;
-        let initial_size = heap_spec.initial_size as usize;
+        let initial_size = module.heap_spec().initial_size as usize;
 
         // reset the heap to the initial size
         if alloc.heap_accessible_size != initial_size {
@@ -149,12 +146,11 @@ impl RegionInternal for MmapRegion {
         // Initialize the heap using the module sparse page data. There cannot be more pages in the
         // sparse page data than will fit in the initial heap size.
         //
-        // Pages with a corresponding non-null entry in the sparse page data are initialized with
+        // Pages with a corresponding Some entry in the sparse page data are initialized with
         // the contents of that data.
         //
         // Any pages which don't have an entry in the sparse page data, either because their entry
-        // is NULL, or because the sparse data has fewer pages than the initial heap, are zeroed.
-        let sparse_page_data = module.sparse_page_data()?;
+        // is None, or because the sparse data has fewer pages than the initial heap, are zeroed.
         let heap = unsafe { alloc.heap_mut() };
         let initial_pages =
             initial_size
@@ -171,18 +167,15 @@ impl RegionInternal for MmapRegion {
                     "sparse page data length exceeded initial heap size"
                 ));
             }
-            let contents_ptr = sparse_page_data.get(page_num).unwrap_or(&ptr::null());
-            if contents_ptr.is_null() {
+            if let Some(contents) = module.get_sparse_page_data(page_num) {
+                // otherwise copy in the page data
+                heap[page_base..page_base + host_page_size()].copy_from_slice(contents);
+            } else {
                 // zero this page
+                // TODO would using a memset primitive be better here?
                 for b in heap[page_base..page_base + host_page_size()].iter_mut() {
                     *b = 0x00;
                 }
-            } else {
-                // otherwise copy in the page data
-                let contents = unsafe {
-                    std::slice::from_raw_parts(*contents_ptr as *const u8, host_page_size())
-                };
-                heap[page_base..page_base + host_page_size()].copy_from_slice(contents);
             }
         }
 

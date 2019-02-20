@@ -5,6 +5,7 @@ authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
 edition = "2018"
 
 [dependencies]
+lucet-module-data = { path = "../../lucet-module-data" }
 bitflags = "1.0"
 failure = "0.1"
 lazy_static = "1.1"

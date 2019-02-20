@@ -11,7 +11,7 @@ pub mod types;
 pub use self::data::{module_data, DataInit};
 pub use self::function::{Function, FunctionDef, FunctionImport, FunctionRuntime};
 pub use self::globals::{Global, GlobalDef, GlobalImport};
-pub use self::memory::{HeapSettings, HeapSpec, MemorySpec};
+pub use self::memory::{create_heap_spec, empty_heap_spec, HeapSettings, HeapSpec, MemorySpec};
 pub use self::names::{module_names, ModuleNames};
 pub use self::runtime::Runtime;
 pub use self::table::{TableBuilder, TableDef};
@@ -51,8 +51,8 @@ impl Program {
         })?;
 
         let module = validate_module(module)?.unwrap();
-        let imports = module_imports(&module, bindings)?;
         let names = module_names(&module)?;
+        let imports = module_imports(&module, bindings, &names)?;
         let defs = module_definitions(&module, &imports, &names)?;
         let tables = module_tables(&module, imports.tables)?;
         let globals = module_globals(imports.globals, defs.globals);
@@ -120,11 +120,11 @@ impl Program {
 
     pub fn heap_spec(&self) -> HeapSpec {
         if let Some(ref mem_spec) = self.import_memory {
-            HeapSpec::new(mem_spec, &self.heap_settings)
+            create_heap_spec(mem_spec, &self.heap_settings)
         } else if let Some(ref mem_spec) = self.defined_memory {
-            HeapSpec::new(mem_spec, &self.heap_settings)
+            create_heap_spec(mem_spec, &self.heap_settings)
         } else {
-            HeapSpec::empty()
+            empty_heap_spec()
         }
     }
 
@@ -199,22 +199,36 @@ impl ModuleImports {
     }
 }
 
-fn module_imports(module: &Module, bindings: Bindings) -> Result<ModuleImports, LucetcError> {
+fn module_imports(
+    module: &Module,
+    bindings: Bindings,
+    names: &ModuleNames,
+) -> Result<ModuleImports, LucetcError> {
     let mut memory = None;
     let mut functions = Vec::new();
     let mut globals = Vec::new();
     let mut tables = Vec::new();
     if let Some(import_section) = module.import_section() {
-        for (ix, entry) in import_section.entries().iter().enumerate() {
+        for entry in import_section.entries().iter() {
             match entry.external() {
                 &External::Function(typeix) => {
+                    let functionix = functions.len() as u32;
                     let ftype = module_get_signature(&module, typeix)?;
-                    functions.push(FunctionImport::new(ix as u32, entry, ftype, &bindings)?)
+                    functions.push(FunctionImport::new(functionix, entry, ftype, &bindings)?)
                 }
-                &External::Global(ref gty) => globals.push(GlobalImport::new(entry, gty.clone())),
+                &External::Global(ref gty) => {
+                    let globalix = globals.len() as u32;
+                    globals.push(GlobalImport::new(
+                        entry,
+                        gty.clone(),
+                        names.global_symbol(globalix),
+                    ))
+                }
+
                 &External::Table(ref tty) => {
+                    let tableix = tables.len() as u32;
                     let builder =
-                        TableBuilder::new(0, tty.limits().initial(), tty.limits().maximum())?;
+                        TableBuilder::new(tableix, tty.limits().initial(), tty.limits().maximum())?;
                     tables.push(builder.finalize());
                 }
                 &External::Memory(ref mem) => memory = Some(memory_spec(mem)),

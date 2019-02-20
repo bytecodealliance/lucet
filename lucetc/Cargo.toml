@@ -17,6 +17,7 @@ name = "lucetc"
 path = "src/main.rs"
 
 [dependencies]
+lucet-module-data = { path = "../lucet-module-data" }
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"

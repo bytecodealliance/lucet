@@ -75,7 +75,13 @@ fn initval(g: &Global) -> u64 {
 
 fn name(g: &Global) -> Option<String> {
     match g {
-        &Global::Def(ref def) => def.export(),
-        &Global::Import(ref import) => Some(format!("{}::{}", import.module(), import.field())),
+        &Global::Def(ref def) => def.export().map(|s| s.to_owned()),
+        &Global::Import(ref import) => {
+            if let Some(ex) = import.export() {
+                Some(ex.to_owned())
+            } else {
+                Some(format!("{}::{}", import.module(), import.field()))
+            }
+        }
     }
 }

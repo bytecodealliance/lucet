@@ -8,7 +8,8 @@ fn guest_module_path<P: AsRef<Path>>(path: P) -> PathBuf {
     if let Some(prefix) = env::var_os("GUEST_MODULE_PREFIX") {
         Path::new(&prefix).join(path)
     } else {
-        Path::new("/isolation/public").join(path)
+        // default to the `devenv` path convention
+        Path::new("/lucet").join(path)
     }
 }
 

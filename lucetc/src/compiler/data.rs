@@ -74,15 +74,16 @@ pub fn compile_data_initializers(compiler: &mut Compiler) -> Result<(), Error> {
 use std::io::Cursor;
 
 pub fn compile_sparse_page_data(compiler: &mut Compiler) -> Result<(), Error> {
-    use crate::program::data::sparse::{make_sparse, SparseData};
-    let sparse_datas = make_sparse(
+    use crate::program::data::sparse::OwnedSparseData;
+    let owned_data = OwnedSparseData::new(
         &compiler.prog.data_initializers()?,
         compiler.prog.heap_spec(),
     );
+    let sparse_data = owned_data.sparse_data();
 
     let mut table_ctx = DataContext::new();
     let mut table_data: Cursor<Vec<u8>> =
-        Cursor::new(Vec::with_capacity(sparse_datas.len() * 8 + 8));
+        Cursor::new(Vec::with_capacity(sparse_data.pages().len() * 8 + 8));
 
     // The table is an array of 64-bit elements:
     //  [0] the number subsequent elements
@@ -90,10 +91,10 @@ pub fn compile_sparse_page_data(compiler: &mut Compiler) -> Result<(), Error> {
     //        or null if it is initialized as zero.
 
     table_data
-        .write_u64::<LittleEndian>(sparse_datas.len() as u64)
+        .write_u64::<LittleEndian>(sparse_data.pages().len() as u64)
         .unwrap();
-    for (dix, d) in sparse_datas.iter().enumerate() {
-        if let SparseData::Full(vs) = d {
+    for (dix, d) in sparse_data.pages().iter().enumerate() {
+        if let Some(vs) = d {
             // Define the 4096-byte array for the contents of the page
             let seg_decl = compiler.module.declare_data(
                 &format!("guest_sparse_page_data_{}", dix),
@@ -101,7 +102,7 @@ pub fn compile_sparse_page_data(compiler: &mut Compiler) -> Result<(), Error> {
                 false,
             )?;
             let mut seg_ctx = DataContext::new();
-            seg_ctx.define(vs.clone().into_boxed_slice());
+            seg_ctx.define(vs.to_vec().into_boxed_slice());
             compiler.module.define_data(seg_decl, &seg_ctx)?;
 
             // Put a relocation to that array into the table:

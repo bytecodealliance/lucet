@@ -1,13 +1,13 @@
 use crate::error::Error;
-use crate::module::globals::{self, GlobalsSpec};
-use crate::module::sparse_page_data::SparsePageData;
 use crate::module::{
-    AddrDetails, HeapSpec, Module, ModuleInternal, RuntimeSpec, TableElement, TrapManifestRecord,
+    AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement, TrapManifestRecord,
 };
 use libc::c_void;
 use libloading::{Library, Symbol};
+use lucet_module_data::ModuleData;
 use std::ffi::{CStr, OsStr};
 use std::mem;
+use std::slice;
 use std::slice::from_raw_parts;
 use std::sync::Arc;
 
@@ -18,8 +18,8 @@ pub struct DlModule {
     /// Base address of the dynamically-loaded module
     fbase: *const c_void,
 
-    /// Spec for heap and globals required by the module
-    runtime_spec: RuntimeSpec,
+    /// Metadata decoded from inside the module
+    module_data: ModuleData<'static>,
 
     trap_manifest: &'static [TrapManifestRecord],
 }
@@ -37,45 +37,37 @@ impl DlModule {
         // stack and heap.
         let lib = Library::new(so_path).map_err(Error::DlError)?;
 
-        let heap_ptr = unsafe {
-            lib.get::<*const HeapSpec>(b"lucet_heap_spec")
-                .map_err(|e| {
-                    lucet_incorrect_module!(
-                        "error loading required symbol `lucet_heap_spec`: {}",
-                        e
-                    )
-                })?
-        };
-        let heap: HeapSpec = unsafe {
-            heap_ptr
-                .as_ref()
-                .ok_or(lucet_incorrect_module!(
-                    "`lucet_heap_spec` is defined but null"
-                ))?
-                .clone()
+        let module_data_ptr = unsafe {
+            lib.get::<*const u8>(b"lucet_module_data").map_err(|e| {
+                lucet_incorrect_module!("error loading required symbol `lucet_module_data`: {}", e)
+            })?
         };
 
-        let fbase = if let Some(dli) = dladdr(*heap_ptr as *const c_void) {
+        let module_data_len = unsafe {
+            lib.get::<usize>(b"lucet_module_data_len").map_err(|e| {
+                lucet_incorrect_module!(
+                    "error loading required symbol `lucet_module_data_len`: {}",
+                    e
+                )
+            })?
+        };
+
+        // Deserialize the slice into ModuleData, which will hold refs into the loaded
+        // shared object file in `module_data_slice`. Both of these get a 'static lifetime because
+        // Rust doesn't have a safe way to describe that their lifetime matches the containing
+        // struct (and the dll).
+        //
+        // The exposed lifetime of ModuleData will be the same as the lifetime of the
+        // dynamically loaded library. This makes the interface safe.
+        let module_data_slice: &'static [u8] =
+            unsafe { slice::from_raw_parts(*module_data_ptr, *module_data_len) };
+        let module_data = ModuleData::deserialize(module_data_slice)?;
+
+        let fbase = if let Some(dli) = dladdr(*module_data_ptr as *const c_void) {
             dli.dli_fbase
         } else {
             std::ptr::null()
         };
-
-        let globals = unsafe {
-            globals::read_from_module({
-                let spec = lib
-                    .get::<*const GlobalsSpec>(b"lucet_globals_spec")
-                    .map_err(|e| {
-                        lucet_incorrect_module!(
-                            "error loading required symbol `lucet_globals_spec`: {}",
-                            e
-                        )
-                    })?;
-                let spec_raw: *const GlobalsSpec = *spec;
-                spec_raw
-            })?
-        };
-        let runtime_spec = RuntimeSpec { heap, globals };
 
         let trap_manifest = unsafe {
             if let Ok(len_ptr) = lib.get::<*const u32>(b"lucet_trap_manifest_len") {
@@ -100,7 +92,7 @@ impl DlModule {
         Ok(Arc::new(DlModule {
             lib,
             fbase,
-            runtime_spec,
+            module_data,
             trap_manifest,
         }))
     }
@@ -109,6 +101,22 @@ impl DlModule {
 impl Module for DlModule {}
 
 impl ModuleInternal for DlModule {
+    fn heap_spec(&self) -> &HeapSpec {
+        self.module_data.heap_spec()
+    }
+
+    fn globals(&self) -> &[GlobalSpec] {
+        self.module_data.globals_spec()
+    }
+
+    fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]> {
+        *self.module_data.sparse_data().get_page(page)
+    }
+
+    fn sparse_page_data_len(&self) -> usize {
+        self.module_data.sparse_data().len()
+    }
+
     fn table_elements(&self) -> Result<&[TableElement], Error> {
         let p_table_segment: Symbol<*const TableElement> = unsafe {
             self.lib.get(b"guest_table_0").map_err(|e| {
@@ -133,29 +141,6 @@ impl ModuleInternal for DlModule {
             );
         }
         Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize / elem_size) })
-    }
-
-    fn sparse_page_data(&self) -> Result<&[*const c_void], Error> {
-        unsafe {
-            let spd = self
-                .lib
-                .get::<*const SparsePageData>(b"guest_sparse_page_data")
-                .map_err(|e| {
-                    lucet_incorrect_module!(
-                        "error loading required symbol `guest_sparse_page_data`: {}",
-                        e
-                    )
-                })?
-                .as_ref()
-                .ok_or(lucet_incorrect_module!(
-                    "`guest_sparse_page_data` is defined but null"
-                ))?;
-            Ok(from_raw_parts(&spd.pages, spd.num_pages as usize))
-        }
-    }
-
-    fn runtime_spec(&self) -> &RuntimeSpec {
-        &self.runtime_spec
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {

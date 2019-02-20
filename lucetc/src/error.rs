@@ -62,6 +62,8 @@ pub enum LucetcErrorKind {
     MemorySpecs,
     #[fail(display = "Global specs")]
     GlobalSpecs,
+    #[fail(display = "Module data")]
+    ModuleData,
     #[fail(display = "Function {}", _0)]
     Function(String),
     #[fail(display = "Table {}", _0)]

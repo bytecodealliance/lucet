@@ -1,18 +1,144 @@
+use crate::helpers::MockModuleBuilder;
+use lucet_runtime_internals::module::Module;
+use lucet_runtime_internals::vmctx::lucet_vmctx;
+use std::sync::Arc;
+
+pub fn mock_calculator_module() -> Arc<dyn Module> {
+    extern "C" fn add_2(_vmctx: *mut lucet_vmctx, arg0: u64, arg1: u64) -> u64 {
+        arg0 + arg1
+    }
+
+    extern "C" fn add_10(
+        _vmctx: *mut lucet_vmctx,
+        arg0: u64,
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+        arg5: u64,
+        arg6: u64,
+        arg7: u64,
+        arg8: u64,
+        arg9: u64,
+    ) -> u64 {
+        arg0 + arg1 + arg2 + arg3 + arg4 + arg5 + arg6 + arg7 + arg8 + arg9
+    }
+
+    extern "C" fn mul_2(_vmctx: *mut lucet_vmctx, arg0: u64, arg1: u64) -> u64 {
+        arg0 * arg1
+    }
+
+    extern "C" fn add_f32_2(_vmctx: *mut lucet_vmctx, arg0: f32, arg1: f32) -> f32 {
+        arg0 + arg1
+    }
+
+    extern "C" fn add_f64_2(_vmctx: *mut lucet_vmctx, arg0: f64, arg1: f64) -> f64 {
+        arg0 + arg1
+    }
+
+    extern "C" fn add_f32_10(
+        _vmctx: *mut lucet_vmctx,
+        arg0: f32,
+        arg1: f32,
+        arg2: f32,
+        arg3: f32,
+        arg4: f32,
+        arg5: f32,
+        arg6: f32,
+        arg7: f32,
+        arg8: f32,
+        arg9: f32,
+    ) -> f32 {
+        arg0 + arg1 + arg2 + arg3 + arg4 + arg5 + arg6 + arg7 + arg8 + arg9
+    }
+
+    extern "C" fn add_f64_10(
+        _vmctx: *mut lucet_vmctx,
+        arg0: f64,
+        arg1: f64,
+        arg2: f64,
+        arg3: f64,
+        arg4: f64,
+        arg5: f64,
+        arg6: f64,
+        arg7: f64,
+        arg8: f64,
+        arg9: f64,
+    ) -> f64 {
+        arg0 + arg1 + arg2 + arg3 + arg4 + arg5 + arg6 + arg7 + arg8 + arg9
+    }
+
+    extern "C" fn add_mixed_20(
+        _vmctx: *mut lucet_vmctx,
+        arg0: f64,
+        arg1: u8,
+        arg2: f32,
+        arg3: f64,
+        arg4: u16,
+        arg5: f32,
+        arg6: f64,
+        arg7: u32,
+        arg8: f32,
+        arg9: f64,
+        arg10: bool,
+        arg11: f32,
+        arg12: f64,
+        arg13: std::os::raw::c_int,
+        arg14: f32,
+        arg15: f64,
+        arg16: std::os::raw::c_long,
+        arg17: f32,
+        arg18: f64,
+        arg19: std::os::raw::c_longlong,
+    ) -> f64 {
+        arg0 as f64
+            + arg1 as f64
+            + arg2 as f64
+            + arg3 as f64
+            + arg4 as f64
+            + arg5 as f64
+            + arg6 as f64
+            + arg7 as f64
+            + arg8 as f64
+            + arg9 as f64
+            + if arg10 { 1.0f64 } else { 0.0f64 }
+            + arg11 as f64
+            + arg12 as f64
+            + arg13 as f64
+            + arg14 as f64
+            + arg15 as f64
+            + arg16 as f64
+            + arg17 as f64
+            + arg18 as f64
+            + arg19 as f64
+    }
+
+    MockModuleBuilder::new()
+        .with_export_func(b"add_2", add_2 as *const extern "C" fn())
+        .with_export_func(b"add_10", add_10 as *const extern "C" fn())
+        .with_export_func(b"mul_2", mul_2 as *const extern "C" fn())
+        .with_export_func(b"add_f32_2", add_f32_2 as *const extern "C" fn())
+        .with_export_func(b"add_f64_2", add_f64_2 as *const extern "C" fn())
+        .with_export_func(b"add_f32_10", add_f32_10 as *const extern "C" fn())
+        .with_export_func(b"add_f64_10", add_f64_10 as *const extern "C" fn())
+        .with_export_func(b"add_mixed_20", add_mixed_20 as *const extern "C" fn())
+        .build()
+}
+
 #[macro_export]
 macro_rules! entrypoint_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-        use lucet_runtime::{DlModule, Error, Limits, Region, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::{DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
+        use $crate::entrypoint::mock_calculator_module;
         use $crate::helpers::DlModuleExt;
 
         #[no_mangle]
         extern "C" fn black_box(_vmctx: *mut lucet_vmctx, _val: *mut c_void) {}
 
-        const C_CALCULATOR_MOD_PATH: &'static str =
-            "lucet-runtime-c/test/build/entrypoint/calculator.so";
         const WAT_CALCULATOR_MOD_PATH: &'static str = "tests/build/entrypoint_guests/calculator.so";
         const USE_ALLOCATOR_SANDBOX_PATH: &'static str =
             "tests/build/entrypoint_guests/use_allocator.so";
@@ -20,17 +146,16 @@ macro_rules! entrypoint_tests {
         const CALLBACK_SANDBOX_PATH: &'static str = "tests/build/entrypoint_guests/callback.so";
 
         #[test]
-        fn c_calc_add_2() {
-            calc_add_2(C_CALCULATOR_MOD_PATH)
+        fn mock_calc_add_2() {
+            calc_add_2(mock_calculator_module())
         }
 
         #[test]
         fn wat_calc_add_2() {
-            calc_add_2(WAT_CALCULATOR_MOD_PATH)
+            calc_add_2(DlModule::load_test(WAT_CALCULATOR_MOD_PATH).expect("module loads"))
         }
 
-        fn calc_add_2(mod_path: &str) {
-            let module = DlModule::load_test(mod_path).expect("module loads");
+        fn calc_add_2(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -44,12 +169,11 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn c_calc_add_10() {
-            calc_add_10(C_CALCULATOR_MOD_PATH)
+        fn mock_calc_add_10() {
+            calc_add_10(mock_calculator_module())
         }
 
-        fn calc_add_10(mod_path: &str) {
-            let module = DlModule::load_test(mod_path).expect("module loads");
+        fn calc_add_10(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -83,12 +207,11 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn c_calc_mul_2() {
-            calc_mul_2(C_CALCULATOR_MOD_PATH)
+        fn mock_calc_mul_2() {
+            calc_mul_2(mock_calculator_module())
         }
 
-        fn calc_mul_2(mod_path: &str) {
-            let module = DlModule::load_test(mod_path).expect("module loads");
+        fn calc_mul_2(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -102,12 +225,11 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn c_calc_add_then_mul() {
-            calc_add_then_mul(C_CALCULATOR_MOD_PATH)
+        fn mock_calc_add_then_mul() {
+            calc_add_then_mul(mock_calculator_module())
         }
 
-        fn calc_add_then_mul(mod_path: &str) {
-            let module = DlModule::load_test(mod_path).expect("module loads");
+        fn calc_add_then_mul(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -127,12 +249,11 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn c_calc_invalid_entrypoint() {
-            calc_invalid_entrypoint(C_CALCULATOR_MOD_PATH)
+        fn mock_calc_invalid_entrypoint() {
+            calc_invalid_entrypoint(mock_calculator_module())
         }
 
-        fn calc_invalid_entrypoint(mod_path: &str) {
-            let module = DlModule::load_test(mod_path).expect("module loads");
+        fn calc_invalid_entrypoint(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -146,7 +267,7 @@ macro_rules! entrypoint_tests {
 
         #[test]
         fn calc_add_f32_2() {
-            let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
+            let module = mock_calculator_module();
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -161,7 +282,7 @@ macro_rules! entrypoint_tests {
 
         #[test]
         fn calc_add_f64_2() {
-            let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
+            let module = mock_calculator_module();
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -176,7 +297,7 @@ macro_rules! entrypoint_tests {
 
         #[test]
         fn calc_add_f32_10() {
-            let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
+            let module = mock_calculator_module();
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -208,7 +329,7 @@ macro_rules! entrypoint_tests {
 
         #[test]
         fn calc_add_f64_10() {
-            let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
+            let module = mock_calculator_module();
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -240,7 +361,7 @@ macro_rules! entrypoint_tests {
 
         #[test]
         fn calc_add_mixed_20() {
-            let module = DlModule::load_test(C_CALCULATOR_MOD_PATH).expect("module loads");
+            let module = mock_calculator_module();
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)

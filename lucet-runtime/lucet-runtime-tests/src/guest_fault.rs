@@ -1,3 +1,116 @@
+use crate::helpers::MockModuleBuilder;
+use lucet_runtime_internals::module::{Module, TrapManifestRecord, TrapSite};
+use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
+use std::sync::Arc;
+
+pub fn mock_traps_module() -> Arc<dyn Module> {
+    extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
+        123
+    }
+
+    extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) {
+        extern "C" {
+            // actually is defined in this file
+            fn hostcall_test(vmctx: *mut lucet_vmctx);
+        }
+        unsafe {
+            hostcall_test(vmctx);
+            std::hint::unreachable_unchecked();
+        }
+    }
+
+    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
+        loop {}
+    }
+
+    extern "C" fn fatal(vmctx: *mut lucet_vmctx) {
+        let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+        let heap_base = vmctx.heap_mut().as_mut_ptr();
+
+        // Using the default limits, each instance as of this writing takes up 0x200026000 bytes
+        // worth of virtual address space. We want to access a point beyond all the instances, so
+        // that memory is unmapped. We assume no more than 16 instances are mapped
+        // concurrently. This may change as the library, test configuration, linker, phase of moon,
+        // etc change, but for now it works.
+        unsafe {
+            *heap_base.offset(0x200026000 * 16) = 0;
+        }
+    }
+
+    extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) {
+        use std::os::raw::c_char;
+        extern "C" {
+            fn guest_recoverable_get_ptr() -> *mut c_char;
+        }
+        unsafe {
+            *guest_recoverable_get_ptr() = '\0' as c_char;
+        }
+    }
+
+    // defined in `guest_fault/traps.S`
+    extern "C" {
+        fn guest_func_illegal_instr(vmctx: *mut lucet_vmctx);
+        fn guest_func_oob(vmctx: *mut lucet_vmctx);
+    }
+
+    // Note: manually creating a trap manifest structure like this is almost certain to fragile at
+    // best and flaky at worst. The test functions are provided in assembly in order to make it
+    // marginally easier to keep things stable, but the magic numbers below may need to be updated
+    // depending on the machine code that's generated.
+    //
+    // The easiest way I've found to update these is to use `layout asm` when running the tests in
+    // gdb, and use the offsets it prints when it catches the signal. For example:
+    //
+    // >│0x5555556f53bd <guest_func_oob+29> movb   $0x0,0x10001(%rax) │
+    //  │0x5555556f53c4 <guest_func_oob+36> add    $0x10,%rsp         │
+    //  │0x5555556f53c8 <guest_func_oob+40> pop    %rbp               │
+    //  │0x5555556f53c9 <guest_func_oob+41> retq                      |
+    //
+    // The offset below then should be 29, and the function length is 41.
+
+    static ILLEGAL_INSTR_TRAPS: &'static [TrapSite] = &[TrapSite {
+        offset: 8,
+        trapcode: 4, /* BadSignature */
+    }];
+
+    static OOB_TRAPS: &'static [TrapSite] = &[TrapSite {
+        offset: 29,
+        trapcode: 1, /* HeapOutOfBounds */
+    }];
+
+    let trap_manifest = &[
+        TrapManifestRecord {
+            func_addr: guest_func_illegal_instr as *const extern "C" fn() as u64,
+            func_len: 11,
+            table_addr: ILLEGAL_INSTR_TRAPS.as_ptr() as u64,
+            table_len: 1,
+        },
+        TrapManifestRecord {
+            func_addr: guest_func_oob as *const extern "C" fn() as u64,
+            func_len: 41,
+            table_addr: OOB_TRAPS.as_ptr() as u64,
+            table_len: 1,
+        },
+    ];
+
+    MockModuleBuilder::new()
+        .with_export_func(b"onetwothree", onetwothree as *const extern "C" fn())
+        .with_export_func(
+            b"illegal_instr",
+            guest_func_illegal_instr as *const extern "C" fn(),
+        )
+        .with_export_func(b"oob", guest_func_oob as *const extern "C" fn())
+        .with_export_func(b"hostcall_main", hostcall_main as *const extern "C" fn())
+        .with_export_func(b"infinite_loop", infinite_loop as *const extern "C" fn())
+        .with_export_func(b"fatal", fatal as *const extern "C" fn())
+        .with_export_func(
+            b"recoverable_fatal",
+            recoverable_fatal as *const extern "C" fn(),
+        )
+        .with_trap_manifest(trap_manifest)
+        .build()
+}
+
 #[macro_export]
 macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
@@ -15,11 +128,10 @@ macro_rules! guest_fault_tests {
         use std::ptr;
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
-        use $crate::helpers::{guest_module_path, test_ex, test_nonex, DlModuleExt, MockModule};
-
-        const TRAPS_SANDBOX_PATH: &'static str = "lucet-runtime-c/test/build/guest_faults/traps.so";
-        const HOSTCALL_ERROR_SANDBOX_PATH: &'static str =
-            "lucet-runtime-c/test/build/guest_faults/hostcall_error.so";
+        use $crate::guest_fault::mock_traps_module;
+        use $crate::helpers::{
+            guest_module_path, test_ex, test_nonex, DlModuleExt, MockModuleBuilder,
+        };
 
         lazy_static! {
             static ref RECOVERABLE_PTR_LOCK: Mutex<()> = Mutex::new(());
@@ -77,7 +189,7 @@ macro_rules! guest_fault_tests {
         #[test]
         fn illegal_instr() {
             test_nonex(|| {
-                let module = DlModule::load_test(TRAPS_SANDBOX_PATH).expect("module loads");
+                let module = mock_traps_module();
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
@@ -87,20 +199,6 @@ macro_rules! guest_fault_tests {
                 match inst.run(b"illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
                         assert_eq!(details.trapcode.ty, TrapCodeType::BadSignature);
-                        let addr_details = details.rip_addr_details.unwrap();
-                        assert!(addr_details.in_module_code);
-                        assert_eq!(
-                            addr_details.file_name,
-                            Some(
-                                guest_module_path(TRAPS_SANDBOX_PATH)
-                                    .to_string_lossy()
-                                    .into_owned()
-                            )
-                        );
-                        assert_eq!(
-                            addr_details.sym_name,
-                            Some(format!("guest_func_illegal_instr"))
-                        );
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
@@ -115,7 +213,7 @@ macro_rules! guest_fault_tests {
         #[test]
         fn oob() {
             test_nonex(|| {
-                let module = DlModule::load_test(TRAPS_SANDBOX_PATH).expect("module loads");
+                let module = mock_traps_module();
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
@@ -125,17 +223,6 @@ macro_rules! guest_fault_tests {
                 match inst.run(b"oob", &[]) {
                     Err(Error::RuntimeFault(details)) => {
                         assert_eq!(details.trapcode.ty, TrapCodeType::HeapOutOfBounds);
-                        let addr_details = details.rip_addr_details.unwrap();
-                        assert!(addr_details.in_module_code);
-                        assert_eq!(
-                            addr_details.file_name,
-                            Some(
-                                guest_module_path(TRAPS_SANDBOX_PATH)
-                                    .to_string_lossy()
-                                    .into_owned()
-                            )
-                        );
-                        assert_eq!(addr_details.sym_name, Some(format!("guest_func_oob")));
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
@@ -150,15 +237,14 @@ macro_rules! guest_fault_tests {
         #[test]
         fn hostcall_error() {
             test_nonex(|| {
-                let module =
-                    DlModule::load_test(HOSTCALL_ERROR_SANDBOX_PATH).expect("module loads");
+                let module = mock_traps_module();
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
                     .new_instance(module)
                     .expect("instance can be created");
 
-                match inst.run(b"main", &[]) {
+                match inst.run(b"hostcall_main", &[]) {
                     Err(Error::RuntimeTerminated(details)) => {
                         assert_eq!(
                             details.unwrap().info,
@@ -197,7 +283,7 @@ macro_rules! guest_fault_tests {
             test_nonex(|| {
                 // make sure only one test using RECOVERABLE_PTR is running at once
                 let lock = RECOVERABLE_PTR_LOCK.lock().unwrap();
-                let module = DlModule::load_test(TRAPS_SANDBOX_PATH).expect("module loads");
+                let module = mock_traps_module();
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
@@ -242,7 +328,7 @@ macro_rules! guest_fault_tests {
                 let lock = RECOVERABLE_PTR_LOCK.lock().unwrap();
                 match fork().expect("can fork") {
                     ForkResult::Child => {
-                        let module = DlModule::load_test(TRAPS_SANDBOX_PATH).expect("module loads");
+                        let module = mock_traps_module();
                         let region = TestRegion::create(1, &Limits::default())
                             .expect("region can be created");
                         let mut inst = region
@@ -301,7 +387,7 @@ macro_rules! guest_fault_tests {
             test_ex(|| {
                 // make sure only one test using RECOVERABLE_PTR is running at once
                 let recoverable_ptr_lock = RECOVERABLE_PTR_LOCK.lock().unwrap();
-                let module = DlModule::load_test(TRAPS_SANDBOX_PATH).expect("module loads");
+                let module = mock_traps_module();
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
@@ -318,20 +404,6 @@ macro_rules! guest_fault_tests {
                 match inst.run(b"illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
                         assert_eq!(details.trapcode.ty, TrapCodeType::BadSignature);
-                        let addr_details = details.rip_addr_details.unwrap();
-                        assert!(addr_details.in_module_code);
-                        assert_eq!(
-                            addr_details.file_name,
-                            Some(
-                                guest_module_path(TRAPS_SANDBOX_PATH)
-                                    .to_string_lossy()
-                                    .into_owned()
-                            )
-                        );
-                        assert_eq!(
-                            addr_details.sym_name,
-                            Some(format!("guest_func_illegal_instr"))
-                        );
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
@@ -370,7 +442,7 @@ macro_rules! guest_fault_tests {
                 std::process::exit(3);
             }
             test_ex(|| {
-                let module = DlModule::load_test(TRAPS_SANDBOX_PATH).expect("module loads");
+                let module = mock_traps_module();
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
@@ -452,15 +524,13 @@ macro_rules! guest_fault_tests {
                 // pointer after a delay. This should lead to a sigsegv while the guest is running,
                 // therefore testing that the host signal gets re-raised.
                 let child = std::thread::spawn(|| {
-                    let mut module = MockModule::new();
-                    module.export_funcs.insert(
-                        b"sleepy_guest".to_vec(),
-                        sleepy_guest as *const extern "C" fn(),
-                    );
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(b"sleepy_guest", sleepy_guest as *const extern "C" fn())
+                        .build();
                     let region =
                         TestRegion::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
-                        .new_instance(Arc::new(module))
+                        .new_instance(module)
                         .expect("instance can be created");
 
                     inst.run(b"sleepy_guest", &[]).expect("instance runs");
@@ -506,8 +576,7 @@ macro_rules! guest_fault_tests {
                         // to a sigsegv while the guest is running, therefore testing that the host signal
                         // gets re-raised.
                         std::thread::spawn(|| {
-                            let module =
-                                DlModule::load_test(TRAPS_SANDBOX_PATH).expect("module loads");
+                            let module = mock_traps_module();
                             let region = TestRegion::create(1, &Limits::default())
                                 .expect("region can be created");
                             let mut inst = region
@@ -542,7 +611,7 @@ macro_rules! guest_fault_tests {
                 std::process::abort()
             }
             test_ex(|| {
-                let module = DlModule::load_test(TRAPS_SANDBOX_PATH).expect("module loads");
+                let module = mock_traps_module();
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region
@@ -577,7 +646,7 @@ macro_rules! guest_fault_tests {
         #[test]
         fn fatal_handler() {
             test_ex(|| {
-                let module = DlModule::load_test(TRAPS_SANDBOX_PATH).expect("module loads");
+                let module = mock_traps_module();
                 let region =
                     TestRegion::create(1, &Limits::default()).expect("region can be created");
                 let mut inst = region

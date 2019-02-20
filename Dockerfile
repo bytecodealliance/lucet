@@ -30,7 +30,7 @@ RUN apt-get update \
  && update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-7 100
 
 # Xenial ships with libunwind 1.1, we need 1.2
-RUN curl -L http://download.savannah.nongnu.org/releases/libunwind/libunwind-1.2.1.tar.gz > libunwind-1.2.1.tar.gz \
+RUN curl -L -O http://download.savannah.nongnu.org/releases/libunwind/libunwind-1.2.1.tar.gz \
 	&& tar xzf libunwind-1.2.1.tar.gz \
 	&& cd libunwind-1.2.1 \
 	&& ./configure \
