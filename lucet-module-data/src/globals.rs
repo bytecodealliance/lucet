@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// The lifetime parameter exists to support zero-copy deserialization for the `&str` fields at the
 /// leaves of the structure. For a variant with owned types at the leaves, see
-/// [`OwnedGlobalSpec`](struct.OwnedGlobalSpec.html).
+/// [`OwnedGlobalSpec`](owned/struct.OwnedGlobalSpec.html).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GlobalSpec<'a> {
     #[serde(borrow)]
@@ -50,7 +50,7 @@ impl<'a> GlobalSpec<'a> {
 ///
 /// The lifetime parameter exists to support zero-copy deserialization for the `&str` fields at the
 /// leaves of the structure. For a variant with owned types at the leaves, see
-/// [`OwnedGlobal`](struct.OwnedGlobal.html).
+/// [`OwnedGlobal`](owned/struct.OwnedGlobal.html).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Global<'a> {
     Def { def: GlobalDef },
@@ -78,7 +78,7 @@ impl GlobalDef {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A variant of [`GlobalSpec`](struct.GlobalSpec.html) with owned strings throughout.
+/// A variant of [`GlobalSpec`](../struct.GlobalSpec.html) with owned strings throughout.
 ///
 /// This type is useful when directly building up a value to be serialized.
 pub struct OwnedGlobalSpec {
@@ -107,7 +107,7 @@ impl OwnedGlobalSpec {
         Self::new(OwnedGlobal::Import { module, field }, export)
     }
 
-    /// Create a [`GlobalSpec`](struct.GlobalSpec.html) backed by the values in this
+    /// Create a [`GlobalSpec`](../struct.GlobalSpec.html) backed by the values in this
     /// `OwnedGlobalSpec`.
     pub fn to_ref<'a>(&'a self) -> GlobalSpec<'a> {
         let export = match &self.export {
@@ -118,7 +118,7 @@ impl OwnedGlobalSpec {
     }
 }
 
-/// A variant of [`Global`](struct.Global.html) with owned strings throughout.
+/// A variant of [`Global`](../struct.Global.html) with owned strings throughout.
 ///
 /// This type is useful when directly building up a value to be serialized.
 pub enum OwnedGlobal {
@@ -127,7 +127,7 @@ pub enum OwnedGlobal {
 }
 
 impl OwnedGlobal {
-    /// Create a [`Global`](struct.Global.html) backed by the values in this `OwnedGlobal`.
+    /// Create a [`Global`](../struct.Global.html) backed by the values in this `OwnedGlobal`.
     pub fn to_ref<'a>(&'a self) -> Global<'a> {
         match self {
             OwnedGlobal::Def { def } => Global::Def { def: def.clone() },

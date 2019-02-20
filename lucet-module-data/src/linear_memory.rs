@@ -74,7 +74,7 @@ impl HeapSpec {
 ///
 /// The lifetime parameter exists to support zero-copy deserialization for the `&[u8]` slices
 /// representing non-zero pages. For a variant with owned `Vec<u8>` pages, see
-/// [`OwnedSparseData`](struct.OwnedSparseData.html).
+/// [`OwnedSparseData`](owned/struct.OwnedSparseData.html).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SparseData<'a> {
     /// Indices into the vector correspond to the offset, in host page (4k) increments, from the
@@ -121,8 +121,8 @@ impl<'a> SparseData<'a> {
 
 /// A sparse representation of a Lucet module's initial heap.
 ///
-/// This is a version of [`SparseData`](struct.SparseData.html) with owned `Vec<u8>`s representing
-/// pages. This type is useful when directly building up a value to be serialized.
+/// This is a version of [`SparseData`](../struct.SparseData.html) with owned `Vec<u8>`s
+/// representing pages. This type is useful when directly building up a value to be serialized.
 pub struct OwnedSparseData {
     pages: Vec<Option<Vec<u8>>>,
 }
@@ -143,7 +143,7 @@ impl OwnedSparseData {
         Ok(Self { pages })
     }
 
-    /// Create a [`SparseData`](struct.SparseData.html) backed by the values in this
+    /// Create a [`SparseData`](../struct.SparseData.html) backed by the values in this
     /// `OwnedSparseData`.
     pub fn to_ref<'a>(&'a self) -> SparseData<'a> {
         SparseData::new(

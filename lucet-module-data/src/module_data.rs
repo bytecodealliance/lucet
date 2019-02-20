@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// The lifetime parameter exists to support zero-copy deserialization for the `&str` and `&[u8]`
 /// fields at the leaves of the structure. For a variant with owned types at the leaves, see
-/// [`OwnedModuleData`](struct.OwnedModuleData.html).
+/// [`OwnedModuleData`](owned/struct.OwnedModuleData.html).
 ///
 /// The goal is for this structure to eventually include everything except the code for the guest
 /// functions themselves.
@@ -62,9 +62,9 @@ use crate::{globals::OwnedGlobalSpec, linear_memory::OwnedSparseData};
 
 /// The metadata (and some data) for a Lucet module.
 ///
-/// This is a version of [`ModuleData`](struct.ModuleData.html) with owned types throughout, rather
-/// than references to support zero-copy deserialization. This type is useful when directly building
-/// up a value to be serialized.
+/// This is a version of [`ModuleData`](../struct.ModuleData.html) with owned types throughout,
+/// rather than references to support zero-copy deserialization. This type is useful when directly
+/// building up a value to be serialized.
 pub struct OwnedModuleData {
     heap_spec: HeapSpec,
     sparse_data: OwnedSparseData,
@@ -84,7 +84,7 @@ impl OwnedModuleData {
         }
     }
 
-    /// Create a [`ModuleData`](struct.ModuleData.html) backed by the values in this
+    /// Create a [`ModuleData`](../struct.ModuleData.html) backed by the values in this
     /// `OwnedModuleData`.
     pub fn to_ref<'a>(&'a self) -> ModuleData<'a> {
         ModuleData::new(
