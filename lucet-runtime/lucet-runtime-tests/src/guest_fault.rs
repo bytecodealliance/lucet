@@ -292,7 +292,7 @@ macro_rules! guest_fault_tests {
 
                 // Install a signal handler that will override the fatal error and tell the sandbox to
                 // continue executing. Obviously this is dangerous, but for this test it should be harmless.
-                inst.signal_handler = signal_handler_continue;
+                inst.set_signal_handler(signal_handler_continue);
 
                 // set `recoverable_ptr` to point to a page that is not read/writable
                 unsafe { recoverable_ptr_setup() };
@@ -337,7 +337,7 @@ macro_rules! guest_fault_tests {
 
                         // Install a signal handler that will override the fatal error and tell the sandbox to
                         // exit, but with a nonfatal error (should be an unknown fault)
-                        inst.signal_handler = signal_handler_terminate;
+                        inst.set_signal_handler(signal_handler_terminate);
 
                         // set `recoverable_ptr` to point to a page that is not read/writable
                         unsafe { recoverable_ptr_setup() };
@@ -449,7 +449,7 @@ macro_rules! guest_fault_tests {
                     .new_instance(module)
                     .expect("instance can be created");
 
-                inst.fatal_handler = fatal_handler_exit;
+                inst.set_fatal_handler(fatal_handler_exit);
 
                 match fork().expect("can fork") {
                     ForkResult::Child => {
@@ -622,7 +622,7 @@ macro_rules! guest_fault_tests {
                     ForkResult::Child => {
                         // Child code should run code that will make an OOB beyond the guard page. This will
                         // cause the entire process to abort before returning from `run`
-                        inst.fatal_handler = handler;
+                        inst.set_fatal_handler(handler);
                         inst.run(b"fatal", &[]).expect("instance runs");
                         // Show that we never get here:
                         std::process::exit(1);
@@ -657,7 +657,7 @@ macro_rules! guest_fault_tests {
                     ForkResult::Child => {
                         // Child code should run code that will make an OOB beyond the guard page. This will
                         // cause the entire process to abort before returning from `run`
-                        inst.fatal_handler = fatal_handler_exit;
+                        inst.set_fatal_handler(fatal_handler_exit);
                         inst.run(b"fatal", &[]).expect("instance runs");
                         // Show that we never get here:
                         std::process::exit(1);

@@ -18,7 +18,7 @@ fn main() {
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    bindgen::Builder::default()
+    let bindings = bindgen::Builder::default()
         .clang_arg("-std=gnu99")
         .header(
             crate_dir
@@ -28,25 +28,17 @@ fn main() {
                 .unwrap(),
         )
         .whitelist_type("lucet_.*")
-        .whitelist_var("lucet_.*")
+        .whitelist_var("lucet_.*");
+
+    let bindings = if let Ok(libclang_include_dir) = env::var("LUCET_LIBCLANG_INCLUDE") {
+        bindings.clang_arg(format!("-I{}", libclang_include_dir))
+    } else {
+        bindings
+    };
+
+    bindings
         .generate()
         .expect("Unable to generate bindings")
         .write_to_file(out_path.join("lucet_val.rs"))
         .expect("Couldn't write bindings!");
-
-    // bindgen::Builder::default()
-    //     .clang_arg("-std=gnu99")
-    //     .header(
-    //         crate_dir
-    //             .join("include")
-    //             .join("lucet_state.h")
-    //             .to_str()
-    //             .unwrap(),
-    //     )
-    //     .whitelist_type("lucet_.*")
-    //     .whitelist_var("lucet_.*")
-    //     .generate()
-    //     .expect("Unable to generate bindings")
-    //     .write_to_file(out_path.join("lucet_state.rs"))
-    //     .expect("Couldn't write bindings!");
 }

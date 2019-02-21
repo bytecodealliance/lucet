@@ -28,6 +28,9 @@ pub enum SignalBehavior {
     Terminate,
 }
 
+pub type SignalHandler =
+    dyn Fn(&Instance, &TrapCode, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior;
+
 pub fn signal_handler_none(
     _inst: &Instance,
     _trapcode: &TrapCode,

@@ -121,7 +121,7 @@
 //! let mut inst = region.new_instance(module).unwrap();
 //!
 //! // install the handler
-//! inst.signal_handler = signal_handler_count;
+//! inst.set_signal_handler(signal_handler_count);
 //!
 //! match inst.run(b"raise_a_signal", &[]) {
 //!     Err(Error::RuntimeFault(_)) => {

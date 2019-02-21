@@ -63,7 +63,7 @@ include = ["lucet-runtime-internals"]
 [export]
 # # A list of additional items not used by exported functions to include in
 # # the generated bindings
-include = ["lucet_trapcode"]
+# include = ["lucet_trapcode", "lucet_state"]
 # # A list of items to not include in the generated bindings
 # exclude = ["Bad"]
 # A prefix to add before the name of every item
