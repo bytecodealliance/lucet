@@ -246,6 +246,21 @@ impl Default for UntypedRetVal {
     }
 }
 
+pub trait UntypedRetValInternal {
+    fn fp(&self) -> __m128;
+    fn gp(&self) -> u64;
+}
+
+impl UntypedRetValInternal for UntypedRetVal {
+    fn fp(&self) -> __m128 {
+        self.fp
+    }
+
+    fn gp(&self) -> u64 {
+        self.gp
+    }
+}
+
 // Helpers that we might want to put in a utils module someday
 
 /// Interpret the contents of a `__m128` register as an `f32`.

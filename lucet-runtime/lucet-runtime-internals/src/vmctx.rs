@@ -204,6 +204,7 @@ pub fn vmctx_capi_init() {
     use std::ptr::read_volatile;
     VMCTX_CAPI_INIT.call_once(|| unsafe {
         read_volatile(lucet_vmctx_get_heap as *const extern "C" fn());
+        read_volatile(lucet_vmctx_get_globals as *const extern "C" fn());
         read_volatile(lucet_vmctx_current_memory as *const extern "C" fn());
         read_volatile(lucet_vmctx_grow_memory as *const extern "C" fn());
         read_volatile(lucet_vmctx_check_heap as *const extern "C" fn());
@@ -215,6 +216,11 @@ pub fn vmctx_capi_init() {
 #[no_mangle]
 pub unsafe extern "C" fn lucet_vmctx_get_heap(vmctx: *mut lucet_vmctx) -> *mut u8 {
     Vmctx::from_raw(vmctx).instance().alloc().slot().heap as *mut u8
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut i64 {
+    Vmctx::from_raw(vmctx).instance().alloc().slot().globals as *mut i64
 }
 
 /// Get the number of WebAssembly pages currently in the heap.
