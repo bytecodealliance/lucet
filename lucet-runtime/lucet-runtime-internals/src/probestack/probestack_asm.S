@@ -10,10 +10,10 @@
 // determine the code size, and update the constant.
 
 .text
-.globl lucet_probestack
-.type lucet_probestack,@function
+.globl lucet_probestack_private
+.type lucet_probestack_private,@function
 .align 16
-lucet_probestack:
+lucet_probestack_private:
 	// Our goal is to touch every page between %rsp+8 and %rsp+8-%rax,
 	// ensuring that if any pages in that range are unmapped, we will
 	// cause a page fault, which liblucet will recognize as a stack overflow.
@@ -46,10 +46,10 @@ lucet_probestack:
 	add %rax,%rsp
 
 	ret
-.size lucet_probestack,.-lucet_probestack
+.size lucet_probestack_private,.-lucet_probestack_private
 .globl lucet_probestack_size
 .type lucet_probestack_size,@object
-lucet_probestack_size: .quad .-lucet_probestack
+lucet_probestack_size: .quad .-lucet_probestack_private
 
 /* Mark that we don't need executable stack. */
 .section .note.GNU-stack,"",%progbits

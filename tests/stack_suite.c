@@ -1,6 +1,6 @@
 #include "greatest.h"
-#include "guest_module.h"
 #include "lucet.h"
+#include "test_helpers.h"
 
 #define LOCALS64_SANDBOX_PATH "stack_guests/locals_64.so"
 #define LOCALS_1PAGE_SANDBOX_PATH "stack_guests/locals_1page.so"
@@ -10,96 +10,86 @@
 
 TEST expect_ok(const char *path, int recursion_depth)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(path));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(path), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_mmap_region *region;
+    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
 
-    enum lucet_run_stat const stat =
-        lucet_instance_run(inst, "localpalooza", 1, LUCET_VAL_C_INT(recursion_depth));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
-
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
-
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_run(inst, "localpalooza", 1,
+                                 (struct lucet_val[]){ LUCET_VAL_U32(recursion_depth) }));
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_mmap_region_release(region);
 
     PASS();
 }
 
 TEST expect_stack_overflow(const char *path, int recursion_depth)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(path));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(path), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_mmap_region *region;
+    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
 
-    enum lucet_run_stat const stat =
-        lucet_instance_run(inst, "localpalooza", 1, LUCET_VAL_C_INT(recursion_depth));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+    const enum lucet_error err = lucet_instance_run(
+        inst, "localpalooza", 1, (struct lucet_val[]){ LUCET_VAL_U32(recursion_depth) });
 
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
+    ASSERT_ENUM_EQ(lucet_error_runtime_fault, err, lucet_error_name);
+
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
     // We should get a nonfatal trap due to the stack overflow.
-    ASSERT_ENUM_EQ(lucet_state_fault, state->tag, lucet_state_name);
-    ASSERT_EQ(false, state->u.fault.fatal);
-    ASSERT_EQ(lucet_trapcode_stack_overflow, state->u.fault.trapcode.code);
-    ASSERT_EQ(0, state->u.fault.trapcode.tag);
+    ASSERT_ENUM_EQ(lucet_state_tag_fault, state.tag, lucet_state_tag_name);
+    ASSERT_EQ(false, state.val.fault.fatal);
+    ASSERT_EQ(lucet_trapcode_type_stack_overflow, state.val.fault.trapcode.code);
+    ASSERT_EQ(0, state.val.fault.trapcode.tag);
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_mmap_region_release(region);
 
     PASS();
 }
 
 TEST expect_stack_overflow_probestack(const char *path, int recursion_depth)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(path));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(path), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_mmap_region *region;
+    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
 
-    enum lucet_run_stat const stat =
-        lucet_instance_run(inst, "localpalooza", 1, LUCET_VAL_C_INT(recursion_depth));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+    const enum lucet_error err = lucet_instance_run(
+        inst, "localpalooza", 1, (struct lucet_val[]){ LUCET_VAL_U32(recursion_depth) });
 
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
+    ASSERT_ENUM_EQ(lucet_error_runtime_fault, err, lucet_error_name);
+
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
     // We should get a nonfatal trap due to the stack overflow.
-    ASSERT_ENUM_EQ(lucet_state_fault, state->tag, lucet_state_name);
-    ASSERT_EQ(false, state->u.fault.fatal);
-    ASSERT_EQ(lucet_trapcode_stack_overflow, state->u.fault.trapcode.code);
-    // When liblucet catches probestack, it puts this special tag in the trapcode.
-    ASSERT_EQ(UINT16_MAX, state->u.fault.trapcode.tag);
+    ASSERT_ENUM_EQ(lucet_state_tag_fault, state.tag, lucet_state_tag_name);
+    ASSERT_EQ(false, state.val.fault.fatal);
+    ASSERT_EQ(lucet_trapcode_type_stack_overflow, state.val.fault.trapcode.code);
+    // When the runtime catches probestack, it puts this special tag in the trapcode.
+    ASSERT_EQ(UINT16_MAX, state.val.fault.trapcode.tag);
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_mmap_region_release(region);
 
     PASS();
 }

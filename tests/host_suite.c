@@ -49,7 +49,7 @@ TEST test_load_module(const char *path)
 TEST test_load_nonexistent_module(void)
 {
     struct lucet_dl_module *mod;
-    enum lucet_error     err = lucet_dl_module_load("nonexistent_sandbox", &mod);
+    enum lucet_error        err = lucet_dl_module_load("nonexistent_sandbox", &mod);
 
     ASSERT_ENUM_EQ(lucet_error_dl, err, lucet_error_name);
 

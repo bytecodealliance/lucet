@@ -2,8 +2,8 @@
 #include <stdio.h>
 
 #include "greatest.h"
-#include "guest_module.h"
 #include "lucet.h"
+#include "test_helpers.h"
 
 #define FAULT_MOD_PATH "strcmp_guests/fault_guest.so"
 
@@ -14,35 +14,33 @@ void hostcall_host_fault(void *vmctx)
     *oob      = 'x';
 }
 
-TEST run_strcmp(const char *mod_path, const char *s1, const char *s2, int *res,
-                struct lucet_state *exit_state)
+TEST run_strcmp(const char *mod_path, const char *s1, const char *s2, int *res)
 {
     // Test helper function. Runs strcmp in the guest.
     ASSERTm("precondition mod_path", mod_path);
     ASSERTm("precondition s1", s1);
     ASSERTm("precondition s2", s2);
     ASSERTm("precondition res", res);
-    ASSERTm("precondition exit_state", exit_state);
 
     const size_t res_size = sizeof(int64_t);
     const size_t s1_size  = strlen(s1) + 1;
     const size_t s2_size  = strlen(s2) + 1;
     ASSERTm("precondition sizes", (res_size + s1_size + s2_size) < LUCET_WASM_PAGE_SIZE);
 
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(mod_path), &mod));
+
     // Pool size reduced from 1000 to 10 because we sometimes can't to get
     // enough virtual memory when running inside docker or on CI.
-    struct lucet_pool *pool = lucet_pool_create(10, NULL);
-    ASSERTm("failed to create pool", pool != NULL);
-    struct lucet_module *mod = lucet_module_load(guest_module_path(mod_path));
-    ASSERTm("failed to load module", mod != NULL);
+    struct lucet_mmap_region *region;
+    ASSERT_OK(lucet_mmap_region_create(10, NULL, &region));
 
-    struct lucet_instance *instance;
-    instance = lucet_instance_create(pool, mod, NULL);
-    ASSERTm("lucet_instance_create returned NULL", instance != NULL);
+    struct lucet_instance *inst;
+    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
 
-    char *  heap          = lucet_instance_get_heap(instance);
-    int32_t newpage_start = lucet_instance_grow_memory(instance, 1);
-    ASSERTm("unable to grow memory for args", newpage_start > 0);
+    uint8_t *heap = lucet_instance_heap(inst);
+    uint32_t newpage_start;
+    ASSERT_OK(lucet_instance_grow_heap(inst, 1, &newpage_start));
 
     const guest_ptr_t res_ptr = newpage_start * LUCET_WASM_PAGE_SIZE;
     const guest_ptr_t s1_ptr  = res_ptr + res_size;
@@ -50,38 +48,35 @@ TEST run_strcmp(const char *mod_path, const char *s1, const char *s2, int *res,
     memcpy(&heap[s1_ptr], s1, s1_size);
     memcpy(&heap[s2_ptr], s2, s2_size);
 
-    enum lucet_run_stat const stat =
-        lucet_instance_run(instance, "run_strcmp", 3, LUCET_VAL_GUEST_PTR(s1_ptr),
-                           LUCET_VAL_GUEST_PTR(s2_ptr), LUCET_VAL_GUEST_PTR(res_ptr));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+    ASSERT_OK(lucet_instance_run(inst, "run_strcmp", 3,
+                                 (struct lucet_val[]){ LUCET_VAL_GUEST_PTR(s1_ptr),
+                                                       LUCET_VAL_GUEST_PTR(s2_ptr),
+                                                       LUCET_VAL_GUEST_PTR(res_ptr) }));
 
     // Copy out state as of program termination
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(instance);
-    memcpy(exit_state, state, sizeof(struct lucet_state));
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
-    if (state->tag == lucet_state_ready) {
-        *res = LUCET_UNTYPED_RETVAL_TO_C_INT(state->u.ready.untyped_retval);
+    if (state.tag == lucet_state_tag_returned) {
+        *res = (int) LUCET_UNTYPED_RETVAL_TO_I64(state.val.returned);
     } else {
         // Make sure the result is obviously wrong
         *res = 666;
     }
 
-    lucet_instance_release(instance);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_instance_release(inst);
+    lucet_dl_module_release(mod);
+    lucet_mmap_region_release(region);
+
     PASS();
 }
 
 TEST strcmp_compare(const char *input1, const char *input2)
 {
     // Test compares native strcmp to strcmp running as a guest.
-    int                res;
-    struct lucet_state end_state;
+    int res;
 
-    CHECK_CALL(run_strcmp(FAULT_MOD_PATH, input1, input2, &res, &end_state));
-
-    ASSERT_ENUM_EQ(lucet_state_ready, end_state.tag, lucet_state_name);
+    CHECK_CALL(run_strcmp(FAULT_MOD_PATH, input1, input2, &res));
 
     ASSERT_EQ_FMT(strcmp(input1, input2), res, "%d");
 
@@ -90,21 +85,21 @@ TEST strcmp_compare(const char *input1, const char *input2)
 
 TEST wasm_fault_test(void)
 {
-    struct lucet_pool *pool = lucet_pool_create(10, NULL);
-    ASSERTm("failed to create pool", pool != NULL);
-    struct lucet_module *mod = lucet_module_load(guest_module_path(FAULT_MOD_PATH));
-    ASSERTm("failed to load module", mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(FAULT_MOD_PATH), &mod));
 
-    struct lucet_instance *instance;
-    instance = lucet_instance_create(pool, mod, NULL);
-    ASSERTm("lucet_instance_create returned NULL", instance != NULL);
+    struct lucet_mmap_region *region;
+    ASSERT_OK(lucet_mmap_region_create(10, NULL, &region));
 
-    enum lucet_run_stat const stat = lucet_instance_run(instance, "wasm_fault", 0);
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+    struct lucet_instance *inst;
+    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
 
-    const struct lucet_state *state = lucet_instance_get_state(instance);
+    const enum lucet_error err = lucet_instance_run(inst, "wasm_fault", 0, (struct lucet_val[]){});
+    ASSERT_ENUM_EQ(lucet_error_runtime_fault, err, lucet_error_name);
 
-    ASSERT_ENUM_EQ(lucet_state_fault, state->tag, lucet_state_name);
+    lucet_instance_release(inst);
+    lucet_dl_module_release(mod);
+    lucet_mmap_region_release(region);
 
     PASS();
 }

@@ -139,7 +139,7 @@ pub struct lucet_alloc_limits {
 
 impl From<Limits> for lucet_alloc_limits {
     fn from(limits: Limits) -> lucet_alloc_limits {
-        limits.into()
+        (&limits).into()
     }
 }
 
@@ -156,7 +156,7 @@ impl From<&Limits> for lucet_alloc_limits {
 
 impl From<lucet_alloc_limits> for Limits {
     fn from(limits: lucet_alloc_limits) -> Limits {
-        limits.into()
+        (&limits).into()
     }
 }
 
@@ -237,7 +237,10 @@ pub unsafe extern "C" fn lucet_dl_module_load(
             mod_out.write(Arc::into_raw(m) as _);
             lucet_error::Ok
         })
-        .unwrap_or_else(|e| e.into())
+        .unwrap_or_else(|e| {
+            // eprintln!("lucet_dl_module_load error: {}", e);
+            e.into()
+        })
 }
 
 #[no_mangle]
@@ -573,7 +576,7 @@ mod lucet_state {
 
     impl From<TrapCodeType> for lucet_trapcode_type {
         fn from(ty: TrapCodeType) -> lucet_trapcode_type {
-            ty.into()
+            (&ty).into()
         }
     }
 
@@ -605,7 +608,7 @@ mod lucet_state {
 
     impl From<TrapCode> for lucet_trapcode {
         fn from(trap: TrapCode) -> lucet_trapcode {
-            trap.into()
+            (&trap).into()
         }
     }
 
@@ -640,7 +643,7 @@ mod lucet_state {
 
     impl From<Option<AddrDetails>> for lucet_module_addr_details {
         fn from(details: Option<AddrDetails>) -> Self {
-            details.into()
+            (&details).into()
         }
     }
 
@@ -722,7 +725,7 @@ mod lucet_val {
 
     impl From<lucet_val> for Val {
         fn from(val: lucet_val) -> Val {
-            val.into()
+            (&val).into()
         }
     }
 
@@ -750,7 +753,7 @@ mod lucet_val {
 
     impl From<Val> for lucet_val {
         fn from(val: Val) -> Self {
-            val.into()
+            (&val).into()
         }
     }
 

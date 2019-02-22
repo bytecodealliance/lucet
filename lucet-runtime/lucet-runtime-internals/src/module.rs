@@ -9,7 +9,7 @@ pub use lucet_module_data::{Global, GlobalSpec, HeapSpec};
 
 use crate::alloc::Limits;
 use crate::error::Error;
-use crate::probestack::{lucet_probestack, lucet_probestack_size};
+use crate::probestack::{lucet_probestack_private, lucet_probestack_size};
 use crate::trapcode::{TrapCode, TrapCodeType};
 use libc::c_void;
 use std::slice::from_raw_parts;
@@ -138,7 +138,7 @@ pub trait ModuleInternal: Send + Sync {
         }
 
         // handle the special case when the probe stack is running
-        let probestack = lucet_probestack as *const c_void;
+        let probestack = lucet_probestack_private as *const c_void;
         if rip >= probestack
             && rip as usize <= probestack as usize + unsafe { lucet_probestack_size } as usize
         {
