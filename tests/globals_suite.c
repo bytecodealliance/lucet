@@ -1,31 +1,24 @@
 #include <assert.h>
 
 #include "greatest.h"
-#include "guest_module.h"
 #include "lucet.h"
+#include "test_helpers.h"
 
 #define DEFINITION_SANDBOX_PATH "globals_guests/definition.so"
 #define IMPORT_SANDBOX_PATH "globals_guests/import.so"
 
 TEST defined_globals(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(DEFINITION_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(DEFINITION_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_mmap_region *region;
+    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
 
-    enum lucet_run_stat const stat = lucet_instance_run(inst, "main", 0);
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
-
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_run(inst, "main", 0, (struct lucet_val[]){}));
 
     // Now the globals should be:
     // $x = 3
@@ -36,7 +29,7 @@ TEST defined_globals(void)
     // [4] = 5
     // [8] = 6
 
-    char *heap = lucet_instance_get_heap(inst);
+    uint8_t *heap = lucet_instance_heap(inst);
 
     uint32_t global_x_read = ((uint32_t *) heap)[0];
     ASSERT_EQ(4, global_x_read);
@@ -45,9 +38,7 @@ TEST defined_globals(void)
     uint32_t global_z_read = ((uint32_t *) heap)[2];
     ASSERT_EQ(6, global_z_read);
 
-    enum lucet_run_stat const stat2 = lucet_instance_run(inst, "main", 0);
-    ASSERT_ENUM_EQ(lucet_run_ok, stat2, lucet_run_stat_name);
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_run(inst, "main", 0, (struct lucet_val[]){}));
 
     // now heap should be:
     // [0] = 3
@@ -62,19 +53,27 @@ TEST defined_globals(void)
     ASSERT_EQ(6, global_z_read_2);
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_mmap_region_release(region);
 
     PASS();
 }
 
 TEST import_global(void)
 {
-    // A module that declares import globals will fail to load
-    // at this time.
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(IMPORT_SANDBOX_PATH));
-    ASSERT(mod == NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(IMPORT_SANDBOX_PATH), &mod));
+
+    struct lucet_mmap_region *region;
+    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+
+    // A module that declares import globals will fail instantiate at this time.
+    struct lucet_instance *inst;
+    const enum lucet_error err = lucet_mmap_region_new_instance(region, mod, &inst);
+    ASSERT_ENUM_EQ(lucet_error_unsupported, err, lucet_error_name);
+
+    lucet_dl_module_release(mod);
+    lucet_mmap_region_release(region);
 
     PASS();
 };

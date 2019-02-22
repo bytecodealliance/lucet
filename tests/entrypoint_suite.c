@@ -369,7 +369,7 @@ TEST test_ctype(void)
     ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_mmap_region_new_instance_with_ctx(region, mod, &lucet_libc, &inst));
 
     uint8_t *heap = lucet_instance_heap(inst);
 
