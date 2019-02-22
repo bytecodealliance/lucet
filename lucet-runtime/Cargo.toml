@@ -10,6 +10,8 @@ edition = "2018"
 [dependencies]
 libc = "0.2.48"
 lucet-runtime-internals = { path = "lucet-runtime-internals" }
+num-traits = "0.2"
+num-derive = "0.2"
 
 [dev-dependencies]
 byteorder = "1.2"
@@ -23,5 +25,7 @@ lucet-runtime-tests = { path = "lucet-runtime-tests" }
 nix = "0.13"
 
 [build-dependencies]
-bindgen = "0.47"
 cbindgen = "0.8"
+
+[lib]
+crate-type = ["rlib", "staticlib", "cdylib"]

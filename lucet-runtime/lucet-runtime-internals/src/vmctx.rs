@@ -154,8 +154,8 @@ impl Instance {
         // cant pull any shenanigans but there have been bugs before.)
         CURRENT_INSTANCE.with(|current_instance| {
             if let Some(current_inst_ptr) = current_instance.borrow().map(|nn| nn.as_ptr()) {
-                assert!(
-                    inst_ptr == current_inst_ptr,
+                assert_eq!(
+                    inst_ptr, current_inst_ptr,
                     "vmctx corresponds to current instance"
                 );
             } else {
@@ -210,6 +210,7 @@ pub fn vmctx_capi_init() {
         read_volatile(lucet_vmctx_check_heap as *const extern "C" fn());
         read_volatile(lucet_vmctx_terminate as *const extern "C" fn());
         read_volatile(lucet_vmctx_get_delegate as *const extern "C" fn());
+        read_volatile(lucet_vmctx_get_func_from_idx as *const extern "C" fn());
     });
 }
 
@@ -257,6 +258,21 @@ pub unsafe extern "C" fn lucet_vmctx_check_heap(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn lucet_vmctx_get_func_from_idx(
+    vmctx: *mut lucet_vmctx,
+    table_idx: u32,
+    func_idx: u32,
+) -> *const c_void {
+    let inst = Instance::from_vmctx(vmctx);
+    inst.module()
+        .get_func_from_idx(table_idx, func_idx)
+        // the Rust API actually returns a pointer to a function pointer, so we want to dereference
+        // one layer of that to make it nicer in C
+        .map(|fptr| *(fptr as *const *const c_void))
+        .unwrap_or(std::ptr::null())
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn lucet_vmctx_terminate(vmctx: *mut lucet_vmctx, info: *mut c_void) {
     let inst = Instance::from_vmctx(vmctx);
     inst.terminate(info);
@@ -264,6 +280,8 @@ pub unsafe extern "C" fn lucet_vmctx_terminate(vmctx: *mut lucet_vmctx, info: *m
 
 #[no_mangle]
 /// Get the delegate object for the current instance.
+///
+/// TODO: rename
 pub unsafe extern "C" fn lucet_vmctx_get_delegate(vmctx: *mut lucet_vmctx) -> *mut c_void {
     let inst = Instance::from_vmctx(vmctx);
     inst.embed_ctx

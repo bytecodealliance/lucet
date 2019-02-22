@@ -5,9 +5,14 @@ use crate::{
 };
 use libc::{c_char, c_int, c_void};
 use lucet_runtime_internals::instance::{instance_handle_from_raw, instance_handle_to_raw};
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use std::ffi::CStr;
 use std::ptr;
 use std::sync::Arc;
+
+#[no_mangle]
+pub static LUCET_WASM_PAGE_SIZE: u32 = crate::WASM_PAGE_SIZE;
 
 macro_rules! assert_nonnull {
     ( $name:ident ) => {
@@ -34,20 +39,20 @@ macro_rules! with_ffi_arcs {
 macro_rules! with_instance_ptr {
     ( $name:ident, $body:block ) => {{
         assert_nonnull!($name);
-        let $name: &mut Instance = &mut ($name as *mut Instance).read();
+        let $name: &mut Instance = &mut *($name as *mut Instance);
         $body
     }};
 }
 
 macro_rules! with_instance_ptr_unchecked {
     ( $name:ident, $body:block ) => {{
-        let $name: &mut Instance = &mut ($name as *mut Instance).read();
+        let $name: &mut Instance = &mut *($name as *mut Instance);
         $body
     }};
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromPrimitive)]
 pub enum lucet_error {
     Ok,
     InvalidArgument,
@@ -78,6 +83,29 @@ impl From<Error> for lucet_error {
             Error::InternalError(_) => lucet_error::Internal,
             Error::Unsupported(_) => lucet_error::Unsupported,
         }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn lucet_error_name(e: c_int) -> *const c_char {
+    if let Some(e) = lucet_error::from_i32(e) {
+        use self::lucet_error::*;
+        match e {
+            Ok => "lucet_error_ok\0".as_ptr() as _,
+            InvalidArgument => "lucet_error_invalid_argument\0".as_ptr() as _,
+            RegionFull => "lucet_error_region_full\0".as_ptr() as _,
+            Module => "lucet_error_module\0".as_ptr() as _,
+            LimitsExceeded => "lucet_error_limits_exceeded\0".as_ptr() as _,
+            SymbolNotFound => "lucet_error_symbol_not_found\0".as_ptr() as _,
+            FuncNotFound => "lucet_error_func_not_found\0".as_ptr() as _,
+            RuntimeFault => "lucet_error_runtime_fault\0".as_ptr() as _,
+            RuntimeTerminated => "lucet_error_runtime_terminated\0".as_ptr() as _,
+            Dl => "lucet_error_dl\0".as_ptr() as _,
+            Internal => "lucet_error_internal\0".as_ptr() as _,
+            Unsupported => "lucet_error_unsupported\0".as_ptr() as _,
+        }
+    } else {
+        "!!! error: unknown lucet_error variant\0".as_ptr() as _
     }
 }
 
@@ -146,11 +174,15 @@ impl From<&lucet_alloc_limits> for Limits {
 #[no_mangle]
 pub unsafe extern "C" fn lucet_mmap_region_create(
     instance_capacity: u64,
-    limits: &lucet_alloc_limits,
-    region_out: *mut *const lucet_mmap_region,
+    limits: *const lucet_alloc_limits,
+    region_out: *mut *mut lucet_mmap_region,
 ) -> lucet_error {
     assert_nonnull!(region_out);
-    match MmapRegion::create(instance_capacity as usize, &limits.into()) {
+    let limits = limits
+        .as_ref()
+        .map(|l| l.into())
+        .unwrap_or(Limits::default());
+    match MmapRegion::create(instance_capacity as usize, &limits) {
         Ok(region) => {
             region_out.write(Arc::into_raw(region) as _);
             return lucet_error::Ok;
@@ -196,7 +228,7 @@ pub unsafe extern "C" fn lucet_mmap_region_new_instance(
 #[no_mangle]
 pub unsafe extern "C" fn lucet_dl_module_load(
     path: *const c_char,
-    mod_out: *mut *const lucet_dl_module,
+    mod_out: *mut *mut lucet_dl_module,
 ) -> lucet_error {
     assert_nonnull!(mod_out);
     let path = CStr::from_ptr(path);
@@ -425,6 +457,8 @@ mod lucet_state {
     use lucet_runtime_internals::instance::State;
     use lucet_runtime_internals::module::AddrDetails;
     use lucet_runtime_internals::trapcode::{TrapCode, TrapCodeType};
+    use num_derive::FromPrimitive;
+    use num_traits::FromPrimitive;
     use std::ffi::CString;
     use std::ptr;
 
@@ -476,12 +510,27 @@ mod lucet_state {
     }
 
     #[repr(C)]
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug, FromPrimitive)]
     pub enum lucet_state_tag {
         Returned,
         Running,
         Fault,
         Terminated,
+    }
+
+    #[no_mangle]
+    pub extern "C" fn lucet_state_tag_name(tag: libc::c_int) -> *const c_char {
+        if let Some(tag) = lucet_state_tag::from_i32(tag) {
+            use self::lucet_state_tag::*;
+            match tag {
+                Returned => "lucet_state_tag_returned\0".as_ptr() as _,
+                Running => "lucet_state_tag_running\0".as_ptr() as _,
+                Fault => "lucet_state_tag_fault\0".as_ptr() as _,
+                Terminated => "lucet_state_tag_terminated\0".as_ptr() as _,
+            }
+        } else {
+            "!!! unknown lucet_state_tag variant!\0".as_ptr() as _
+        }
     }
 
     #[repr(C)]
@@ -627,10 +676,49 @@ mod lucet_state {
 }
 
 mod lucet_val {
-    #![allow(non_upper_case_globals)]
+    use libc::{c_char, c_void};
     use lucet_runtime_internals::val::{UntypedRetVal, UntypedRetValInternal, Val};
 
-    include!(concat!(env!("OUT_DIR"), "/lucet_val.rs"));
+    // Note on the value associated with each type: the most significant bits represent the "class"
+    // of the type (1: a C pointer, 2: something unsigned that fits in 64 bits, 3: something signed
+    // that fits in 64 bits, 4: f32, 5: f64). The remain bits can be anything as long as it is
+    // unique.
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug)]
+    pub enum lucet_val_type {
+        C_Ptr,    // = (1 << 16) | 0x0100,
+        GuestPtr, // = (2 << 16) | 0x0101,
+        U8,       // = (2 << 16) | 0x0201,
+        U16,      // = (2 << 16) | 0x0202,
+        U32,      // = (2 << 16) | 0x0203,
+        U64,      // = (2 << 16) | 0x0204,
+        I8,       // = (3 << 16) | 0x0300,
+        I16,      // = (3 << 16) | 0x0301,
+        I32,      // = (3 << 16) | 0x0302,
+        I64,      // = (3 << 16) | 0x0303,
+        USize,    // = (2 << 16) | 0x0400,
+        ISize,    // = (3 << 16) | 0x0401,
+        Bool,     // = (2 << 16) | 0x0700,
+        F32,      // = (4 << 16) | 0x0800,
+        F64,      // = (5 << 16) | 0x0801,
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub union lucet_val_inner_val {
+        as_c_ptr: *mut c_void, // (1 << 16)
+        as_u64: u64,           // (2 << 16)
+        as_i64: i64,           // (3 << 16)
+        as_f32: f32,           // (4 << 16)
+        as_f64: f64,           // (5 << 16)
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct lucet_val {
+        ty: lucet_val_type,
+        inner_val: lucet_val_inner_val,
+    }
 
     impl From<lucet_val> for Val {
         fn from(val: lucet_val) -> Val {
@@ -640,25 +728,22 @@ mod lucet_val {
 
     impl From<&lucet_val> for Val {
         fn from(val: &lucet_val) -> Val {
-            match val.type_ {
-                lucet_val_type_lucet_val_c_ptr => Val::CPtr(unsafe { val.inner_val.as_u64 } as _),
-                lucet_val_type_lucet_val_guest_ptr => {
-                    Val::GuestPtr(unsafe { val.inner_val.as_u64 } as _)
-                }
-                lucet_val_type_lucet_val_u8 => Val::U8(unsafe { val.inner_val.as_u64 } as _),
-                lucet_val_type_lucet_val_u16 => Val::U16(unsafe { val.inner_val.as_u64 } as _),
-                lucet_val_type_lucet_val_u32 => Val::U32(unsafe { val.inner_val.as_u64 } as _),
-                lucet_val_type_lucet_val_u64 => Val::U64(unsafe { val.inner_val.as_u64 } as _),
-                lucet_val_type_lucet_val_i8 => Val::I16(unsafe { val.inner_val.as_i64 } as _),
-                lucet_val_type_lucet_val_i16 => Val::I32(unsafe { val.inner_val.as_i64 } as _),
-                lucet_val_type_lucet_val_i32 => Val::I32(unsafe { val.inner_val.as_i64 } as _),
-                lucet_val_type_lucet_val_i64 => Val::I64(unsafe { val.inner_val.as_i64 } as _),
-                lucet_val_type_lucet_val_usize => Val::USize(unsafe { val.inner_val.as_u64 } as _),
-                lucet_val_type_lucet_val_isize => Val::ISize(unsafe { val.inner_val.as_i64 } as _),
-                lucet_val_type_lucet_val_bool => Val::Bool(unsafe { val.inner_val.as_u64 } != 0),
-                lucet_val_type_lucet_val_f32 => Val::F32(unsafe { val.inner_val.as_f32 } as _),
-                lucet_val_type_lucet_val_f64 => Val::F64(unsafe { val.inner_val.as_f64 } as _),
-                _ => panic!("Unsupported type"),
+            match val.ty {
+                lucet_val_type::C_Ptr => Val::CPtr(unsafe { val.inner_val.as_u64 } as _),
+                lucet_val_type::GuestPtr => Val::GuestPtr(unsafe { val.inner_val.as_u64 } as _),
+                lucet_val_type::U8 => Val::U8(unsafe { val.inner_val.as_u64 } as _),
+                lucet_val_type::U16 => Val::U16(unsafe { val.inner_val.as_u64 } as _),
+                lucet_val_type::U32 => Val::U32(unsafe { val.inner_val.as_u64 } as _),
+                lucet_val_type::U64 => Val::U64(unsafe { val.inner_val.as_u64 } as _),
+                lucet_val_type::I8 => Val::I16(unsafe { val.inner_val.as_i64 } as _),
+                lucet_val_type::I16 => Val::I32(unsafe { val.inner_val.as_i64 } as _),
+                lucet_val_type::I32 => Val::I32(unsafe { val.inner_val.as_i64 } as _),
+                lucet_val_type::I64 => Val::I64(unsafe { val.inner_val.as_i64 } as _),
+                lucet_val_type::USize => Val::USize(unsafe { val.inner_val.as_u64 } as _),
+                lucet_val_type::ISize => Val::ISize(unsafe { val.inner_val.as_i64 } as _),
+                lucet_val_type::Bool => Val::Bool(unsafe { val.inner_val.as_u64 } != 0),
+                lucet_val_type::F32 => Val::F32(unsafe { val.inner_val.as_f32 } as _),
+                lucet_val_type::F64 => Val::F64(unsafe { val.inner_val.as_f64 } as _),
             }
         }
     }
@@ -673,67 +758,83 @@ mod lucet_val {
         fn from(val: &Val) -> Self {
             match val {
                 Val::CPtr(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_c_ptr,
+                    ty: lucet_val_type::C_Ptr,
                     inner_val: lucet_val_inner_val { as_u64: *a as _ },
                 },
                 Val::GuestPtr(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_guest_ptr,
+                    ty: lucet_val_type::GuestPtr,
                     inner_val: lucet_val_inner_val { as_u64: *a as _ },
                 },
                 Val::U8(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_u8,
+                    ty: lucet_val_type::U8,
                     inner_val: lucet_val_inner_val { as_u64: *a as _ },
                 },
                 Val::U16(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_u16,
+                    ty: lucet_val_type::U16,
                     inner_val: lucet_val_inner_val { as_u64: *a as _ },
                 },
                 Val::U32(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_u32,
+                    ty: lucet_val_type::U32,
                     inner_val: lucet_val_inner_val { as_u64: *a as _ },
                 },
                 Val::U64(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_u64,
+                    ty: lucet_val_type::U64,
                     inner_val: lucet_val_inner_val { as_u64: *a as _ },
                 },
                 Val::I8(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_i8,
+                    ty: lucet_val_type::I8,
                     inner_val: lucet_val_inner_val { as_i64: *a as _ },
                 },
                 Val::I16(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_i16,
+                    ty: lucet_val_type::I16,
                     inner_val: lucet_val_inner_val { as_i64: *a as _ },
                 },
                 Val::I32(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_i32,
+                    ty: lucet_val_type::I32,
                     inner_val: lucet_val_inner_val { as_i64: *a as _ },
                 },
                 Val::I64(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_i64,
+                    ty: lucet_val_type::I64,
                     inner_val: lucet_val_inner_val { as_i64: *a as _ },
                 },
                 Val::USize(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_usize,
+                    ty: lucet_val_type::USize,
                     inner_val: lucet_val_inner_val { as_u64: *a as _ },
                 },
                 Val::ISize(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_isize,
+                    ty: lucet_val_type::ISize,
                     inner_val: lucet_val_inner_val { as_i64: *a as _ },
                 },
                 Val::Bool(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_bool,
+                    ty: lucet_val_type::Bool,
                     inner_val: lucet_val_inner_val { as_u64: *a as _ },
                 },
                 Val::F32(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_f32,
+                    ty: lucet_val_type::F32,
                     inner_val: lucet_val_inner_val { as_f32: *a as _ },
                 },
                 Val::F64(a) => lucet_val {
-                    type_: lucet_val_type_lucet_val_f64,
+                    ty: lucet_val_type::F64,
                     inner_val: lucet_val_inner_val { as_f64: *a as _ },
                 },
             }
         }
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug)]
+    pub struct lucet_untyped_retval {
+        fp: [c_char; 16],
+        gp: [c_char; 8],
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub union lucet_retval_gp {
+        as_untyped: [c_char; 8],
+        as_c_ptr: *mut c_void,
+        as_u64: u64,
+        as_i64: i64,
     }
 
     impl From<&UntypedRetVal> for lucet_untyped_retval {
@@ -751,5 +852,34 @@ mod lucet_val {
             }
             v
         }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn lucet_retval_gp(
+        retval: *const lucet_untyped_retval,
+    ) -> lucet_retval_gp {
+        lucet_retval_gp {
+            as_untyped: (*retval).gp,
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn lucet_retval_f32(retval: *const lucet_untyped_retval) -> f32 {
+        let mut v = 0.0f32;
+        core::arch::x86_64::_mm_storeu_ps(
+            &mut v as *mut f32,
+            core::arch::x86_64::_mm_loadu_ps((*retval).fp.as_ptr() as *const f32),
+        );
+        v
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn lucet_retval_f64(retval: *const lucet_untyped_retval) -> f64 {
+        let mut v = 0.0f64;
+        core::arch::x86_64::_mm_storeu_pd(
+            &mut v as *mut f64,
+            core::arch::x86_64::_mm_loadu_pd((*retval).fp.as_ptr() as *const f64),
+        );
+        v
     }
 }

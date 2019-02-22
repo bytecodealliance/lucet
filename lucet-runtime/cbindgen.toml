@@ -22,8 +22,8 @@ line_length = 100
 tab_width = 4
 # The language to output bindings in
 language = "C"
-# # A rule to use to select style of declaration in C, tagname vs typedef
-# style = "[Both|Type|Tag]"
+# A rule to use to select style of declaration in C, tagname vs typedef
+style = "Tag"
 
 # [defines]
 # # A rule for generating `#ifdef`s for matching `#[cfg]`ed items,

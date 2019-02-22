@@ -1,4 +1,3 @@
-use bindgen;
 use cbindgen;
 use std::env;
 use std::path::PathBuf;
@@ -10,35 +9,12 @@ fn main() {
         .with_config(cbindgen::Config::from_root_or_default(&crate_dir))
         .with_crate(&crate_dir)
         .with_language(cbindgen::Language::C)
-        .with_parse_deps(true)
-        // .with_parse_include(&["lucet-runtime-internals"])
+        .with_include("lucet_val.h")
+        .with_include("lucet_vmctx.h")
+        .with_sys_include("signal.h")
+        .with_sys_include("ucontext.h")
+        .with_include_guard("LUCET_H")
         .generate()
         .expect("Unable to generate bindings")
-        .write_to_file("lucet.h");
-
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-
-    let bindings = bindgen::Builder::default()
-        .clang_arg("-std=gnu99")
-        .header(
-            crate_dir
-                .join("include")
-                .join("lucet_val.h")
-                .to_str()
-                .unwrap(),
-        )
-        .whitelist_type("lucet_.*")
-        .whitelist_var("lucet_.*");
-
-    let bindings = if let Ok(libclang_include_dir) = env::var("LUCET_LIBCLANG_INCLUDE") {
-        bindings.clang_arg(format!("-I{}", libclang_include_dir))
-    } else {
-        bindings
-    };
-
-    bindings
-        .generate()
-        .expect("Unable to generate bindings")
-        .write_to_file(out_path.join("lucet_val.rs"))
-        .expect("Couldn't write bindings!");
+        .write_to_file("include/lucet.h");
 }
