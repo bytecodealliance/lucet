@@ -103,18 +103,18 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.26.0"
+version = "0.28.0"
 dependencies = [
- "cranelift-entity 0.26.0",
+ "cranelift-entity 0.28.0",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.26.0"
+version = "0.28.0"
 dependencies = [
- "cranelift-bforest 0.26.0",
- "cranelift-codegen-meta 0.26.0",
- "cranelift-entity 0.26.0",
+ "cranelift-bforest 0.28.0",
+ "cranelift-codegen-meta 0.28.0",
+ "cranelift-entity 0.28.0",
  "failure 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure_derive 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -123,21 +123,21 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.26.0"
+version = "0.28.0"
 dependencies = [
- "cranelift-entity 0.26.0",
+ "cranelift-entity 0.28.0",
 ]
 
 [[package]]
 name = "cranelift-entity"
-version = "0.26.0"
+version = "0.28.0"
 
 [[package]]
 name = "cranelift-faerie"
-version = "0.26.0"
+version = "0.28.0"
 dependencies = [
- "cranelift-codegen 0.26.0",
- "cranelift-module 0.26.0",
+ "cranelift-codegen 0.28.0",
+ "cranelift-module 0.28.0",
  "faerie 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "goblin 0.0.19 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -146,28 +146,28 @@ dependencies = [
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.26.0"
+version = "0.28.0"
 dependencies = [
- "cranelift-codegen 0.26.0",
+ "cranelift-codegen 0.28.0",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "target-lexicon 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "cranelift-module"
-version = "0.26.0"
+version = "0.28.0"
 dependencies = [
- "cranelift-codegen 0.26.0",
- "cranelift-entity 0.26.0",
+ "cranelift-codegen 0.28.0",
+ "cranelift-entity 0.28.0",
  "failure 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "cranelift-native"
-version = "0.26.0"
+version = "0.28.0"
 dependencies = [
- "cranelift-codegen 0.26.0",
+ "cranelift-codegen 0.28.0",
  "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "target-lexicon 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -199,7 +199,6 @@ dependencies = [
 [[package]]
 name = "faerie"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -212,6 +211,12 @@ dependencies = [
  "structopt-derive 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "target-lexicon 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "faerie"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+replace = "faerie 0.7.0"
 
 [[package]]
 name = "failure"
@@ -322,11 +327,11 @@ dependencies = [
  "bimap 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cranelift-codegen 0.26.0",
- "cranelift-faerie 0.26.0",
- "cranelift-frontend 0.26.0",
- "cranelift-module 0.26.0",
- "cranelift-native 0.26.0",
+ "cranelift-codegen 0.28.0",
+ "cranelift-faerie 0.28.0",
+ "cranelift-frontend 0.28.0",
+ "cranelift-module 0.28.0",
+ "cranelift-native 0.28.0",
  "env_logger 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "faerie 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
