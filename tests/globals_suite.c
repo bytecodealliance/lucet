@@ -12,11 +12,11 @@ TEST defined_globals(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(DEFINITION_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     ASSERT_OK(lucet_instance_run(inst, "main", 0, (struct lucet_val[]){}));
 
@@ -54,7 +54,7 @@ TEST defined_globals(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -64,16 +64,16 @@ TEST import_global(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(IMPORT_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     // A module that declares import globals will fail instantiate at this time.
     struct lucet_instance *inst;
-    const enum lucet_error err = lucet_mmap_region_new_instance(region, mod, &inst);
+    const enum lucet_error err = lucet_test_region_new_instance(region, mod, &inst);
     ASSERT_ENUM_EQ(lucet_error_unsupported, err, lucet_error_name);
 
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 };

@@ -178,4 +178,8 @@ pub mod vmctx {
     pub use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
 }
 
-mod c_api;
+#[doc(hidden)]
+#[no_mangle]
+extern "C" fn lucet_internal_ensure_linked() {
+    lucet_runtime_internals::vmctx::vmctx_capi_init();
+}

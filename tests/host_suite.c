@@ -61,15 +61,15 @@ TEST test_instantiate(const char *path)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(path), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -79,17 +79,17 @@ TEST test_run_null(const char *path)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(path), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     ASSERT_OK(lucet_instance_run(inst, "main", 0, (struct lucet_val[]){}));
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -119,11 +119,11 @@ TEST test_run_oob(const char *path)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(path), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     enum lucet_error err = lucet_instance_run(inst, "main", 0, (struct lucet_val[]){});
     ASSERT_ENUM_EQ(lucet_error_runtime_fault, err, lucet_error_name);
@@ -135,7 +135,7 @@ TEST test_run_oob(const char *path)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -145,13 +145,13 @@ TEST test_run_hello(const char *path)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(path), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     bool confirm_hello = false;
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance_with_ctx(region, mod, &confirm_hello, &inst));
+    ASSERT_OK(lucet_test_region_new_instance_with_ctx(region, mod, &confirm_hello, &inst));
 
     ASSERT_OK(lucet_instance_run(inst, "main", 0, (struct lucet_val[]){}));
 
@@ -159,7 +159,7 @@ TEST test_run_hello(const char *path)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -169,11 +169,11 @@ TEST test_run_hostcall_error(const char *path)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(path), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     const enum lucet_error err = lucet_instance_run(inst, "main", 0, (struct lucet_val[]){});
     ASSERT_ENUM_EQ(lucet_error_runtime_terminated, err, lucet_error_name);
@@ -185,7 +185,7 @@ TEST test_run_hostcall_error(const char *path)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -195,11 +195,11 @@ TEST test_run_fpe(const char *path)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(path), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     const enum lucet_error err =
         lucet_instance_run(inst, "trigger_div_error", 1, (struct lucet_val[]){ LUCET_VAL_U64(0) });
@@ -207,7 +207,7 @@ TEST test_run_fpe(const char *path)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }

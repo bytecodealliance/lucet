@@ -13,11 +13,11 @@ TEST test_calc_add_2(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     // Add the two arguments
     ASSERT_OK(lucet_instance_run(inst, "add_2", 2,
@@ -31,7 +31,7 @@ TEST test_calc_add_2(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -41,11 +41,11 @@ TEST test_calc_add_10(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     // Add all 10 arguments. Why 10? Because its more than will fit in
     // registers to be passed to `guest_add_10` by liblucet, so it will
@@ -69,7 +69,7 @@ TEST test_calc_add_10(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -79,11 +79,11 @@ TEST test_calc_mul_2(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     // Same sort of test as add_2, but with a different entrypoint.
     ASSERT_OK(lucet_instance_run(inst, "mul_2", 2,
@@ -97,7 +97,7 @@ TEST test_calc_mul_2(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -107,11 +107,11 @@ TEST test_calc_add_then_mul(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     // Both of these entrypoints have individual tests above, make sure
     // that they work when called in sequential runs on the same instance as
@@ -137,7 +137,7 @@ TEST test_calc_add_then_mul(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -147,11 +147,11 @@ TEST test_calc_invalid_entrypoint(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     enum lucet_error err = lucet_instance_run(
         inst, "invalid", 2, (struct lucet_val[]){ LUCET_VAL_U64(123), LUCET_VAL_U64(456) });
@@ -164,7 +164,7 @@ TEST test_calc_invalid_entrypoint(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -177,11 +177,11 @@ TEST allocator_create_region(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(USE_ALLOCATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     uint8_t *heap = lucet_instance_heap(inst);
 
@@ -216,7 +216,7 @@ TEST allocator_create_region(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -226,11 +226,11 @@ TEST allocator_create_region_and_increment(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(USE_ALLOCATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     uint8_t *heap = lucet_instance_heap(inst);
 
@@ -284,7 +284,7 @@ TEST allocator_create_region_and_increment(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -297,11 +297,11 @@ TEST allocator_create_two_regions(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(USE_ALLOCATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     uint8_t *heap = lucet_instance_heap(inst);
 
@@ -346,7 +346,7 @@ TEST allocator_create_two_regions(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -365,11 +365,11 @@ TEST test_ctype(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(CTYPE_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance_with_ctx(region, mod, &lucet_libc, &inst));
+    ASSERT_OK(lucet_test_region_new_instance_with_ctx(region, mod, &lucet_libc, &inst));
 
     uint8_t *heap = lucet_instance_heap(inst);
 
@@ -402,7 +402,7 @@ TEST test_ctype(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -418,11 +418,11 @@ TEST test_callback(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(CALLBACK_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     ASSERT_OK(lucet_instance_run(inst, "callback_entrypoint", 1,
                                  (struct lucet_val[]){ LUCET_VAL_U64(0) }));
@@ -435,7 +435,7 @@ TEST test_callback(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }

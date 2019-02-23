@@ -13,11 +13,11 @@ TEST current_memory_hostcall(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(CURRENT_MEMORY_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     ASSERT_OK(lucet_instance_run(inst, "main", 0, (struct lucet_val[]){}));
 
@@ -30,7 +30,7 @@ TEST current_memory_hostcall(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -40,11 +40,11 @@ TEST grow_memory_hostcall(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(GROW_MEMORY_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     ASSERT_OK(lucet_instance_run(inst, "main", 0, (struct lucet_val[]){}));
 
@@ -59,7 +59,7 @@ TEST grow_memory_hostcall(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -89,8 +89,8 @@ TEST musl_alloc(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(MUSL_ALLOC_SANDBOX_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_libc lucet_libc;
     reset_output();
@@ -98,7 +98,7 @@ TEST musl_alloc(void)
     lucet_libc_set_stdio_handler(&lucet_libc, debug_handler);
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance_with_ctx(region, mod, &lucet_libc, &inst));
+    ASSERT_OK(lucet_test_region_new_instance_with_ctx(region, mod, &lucet_libc, &inst));
 
     ASSERT_OK(lucet_instance_run(inst, "main", 0, (struct lucet_val[]){}));
 
@@ -107,7 +107,7 @@ TEST musl_alloc(void)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }

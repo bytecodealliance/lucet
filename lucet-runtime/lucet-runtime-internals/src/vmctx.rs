@@ -211,7 +211,8 @@ pub fn vmctx_capi_init() {
         read_volatile(lucet_vmctx_terminate as *const extern "C" fn());
         read_volatile(lucet_vmctx_get_delegate as *const extern "C" fn());
         read_volatile(lucet_vmctx_get_func_from_idx as *const extern "C" fn());
-        read_volatile(crate::probestack::lucet_probestack as *const c_void);
+        // need at least one of these to get the symbols exported
+        read_volatile(crate::c_api::lucet_dl_module_load as *const c_void);
     });
 }
 

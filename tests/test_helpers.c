@@ -1,6 +1,8 @@
-#include "test_helpers.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "lucet.h"
+#include "test_helpers.h"
 
 const char *guest_module_path(const char *name)
 {

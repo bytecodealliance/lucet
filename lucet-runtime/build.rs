@@ -7,7 +7,12 @@ fn main() {
 
     cbindgen::Builder::new()
         .with_config(cbindgen::Config::from_root_or_default(&crate_dir))
-        .with_crate(&crate_dir)
+        .with_src(
+            crate_dir
+                .join("lucet-runtime-internals")
+                .join("src")
+                .join("c_api.rs"),
+        )
         .with_language(cbindgen::Language::C)
         .with_include("lucet_val.h")
         .with_include("lucet_vmctx.h")

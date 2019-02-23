@@ -34,8 +34,15 @@ macro_rules! stack_tests {
                     assert_eq!(details.fatal, false);
                     assert_eq!(details.trapcode.ty, TrapCodeType::StackOverflow);
                     if probestack {
-                        // When the runtime catches probestack, it puts this special tag in the trapcode
-                        assert_eq!(details.trapcode.tag, std::u16::MAX);
+                        // Make sure we overflowed in the stack probe as expected
+                        //
+                        // TODO: this no longer differentiates between different stack overflow
+                        // sites after moving the stack probe into lucetc; figure out a way to
+                        // provide that information or just wait till we can do the stack probe as a
+                        // global symbol again
+                        let addr_details =
+                            details.rip_addr_details.expect("can look up addr details");
+                        assert!(addr_details.in_module_code);
                     }
                 }
                 res => panic!("unexpected result: {:?}", res),

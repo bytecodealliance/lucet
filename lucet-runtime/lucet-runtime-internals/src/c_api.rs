@@ -1,10 +1,16 @@
 #![allow(non_camel_case_types)]
 
-use crate::{
-    DlModule, Error, Instance, Limits, MmapRegion, Module, Region, SignalBehavior, TrapCode,
+use crate::alloc::Limits;
+use crate::error::Error;
+use crate::instance::signals::SignalBehavior;
+use crate::instance::{
+    instance_handle_from_raw, instance_handle_to_raw, Instance, InstanceInternal,
 };
+use crate::module::{DlModule, Module};
+use crate::region::mmap::MmapRegion;
+use crate::region::Region;
+use crate::trapcode::TrapCode;
 use libc::{c_char, c_int, c_void};
-use lucet_runtime_internals::instance::{instance_handle_from_raw, instance_handle_to_raw};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::ffi::CStr;
@@ -14,6 +20,7 @@ use std::sync::Arc;
 #[no_mangle]
 pub static LUCET_WASM_PAGE_SIZE: u32 = crate::WASM_PAGE_SIZE;
 
+#[macro_export]
 macro_rules! assert_nonnull {
     ( $name:ident ) => {
         if $name.is_null() {
@@ -22,6 +29,7 @@ macro_rules! assert_nonnull {
     };
 }
 
+#[macro_export]
 macro_rules! with_ffi_arcs {
     ( [ $($name:ident : $ty:ty),+ ], $body:block ) => {{
         $(
@@ -308,7 +316,6 @@ pub unsafe extern "C" fn lucet_instance_state(
 ) -> lucet_error {
     assert_nonnull!(state_out);
     with_instance_ptr!(inst, {
-        use lucet_runtime_internals::instance::InstanceInternal;
         state_out.write(inst.state().into());
         lucet_error::Ok
     })
@@ -454,12 +461,12 @@ pub unsafe extern "C" fn lucet_instance_set_fatal_handler(
     lucet_error::Ok
 }
 
-mod lucet_state {
+pub mod lucet_state {
     use crate::c_api::lucet_val;
+    use crate::instance::State;
+    use crate::module::AddrDetails;
+    use crate::trapcode::{TrapCode, TrapCodeType};
     use libc::{c_char, c_void};
-    use lucet_runtime_internals::instance::State;
-    use lucet_runtime_internals::module::AddrDetails;
-    use lucet_runtime_internals::trapcode::{TrapCode, TrapCodeType};
     use num_derive::FromPrimitive;
     use num_traits::FromPrimitive;
     use std::ffi::CString;
@@ -678,9 +685,9 @@ mod lucet_state {
     }
 }
 
-mod lucet_val {
+pub mod lucet_val {
+    use crate::val::{UntypedRetVal, UntypedRetValInternal, Val};
     use libc::{c_char, c_void};
-    use lucet_runtime_internals::val::{UntypedRetVal, UntypedRetValInternal, Val};
 
     // Note on the value associated with each type: the most significant bits represent the "class"
     // of the type (1: a C pointer, 2: something unsigned that fits in 64 bits, 3: something signed

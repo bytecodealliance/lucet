@@ -32,11 +32,11 @@ TEST run_strcmp(const char *mod_path, const char *s1, const char *s2, int *res)
 
     // Pool size reduced from 1000 to 10 because we sometimes can't to get
     // enough virtual memory when running inside docker or on CI.
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(10, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(10, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     uint8_t *heap = lucet_instance_heap(inst);
     uint32_t newpage_start;
@@ -66,7 +66,7 @@ TEST run_strcmp(const char *mod_path, const char *s1, const char *s2, int *res)
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -88,18 +88,18 @@ TEST wasm_fault_test(void)
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(FAULT_MOD_PATH), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(10, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(10, NULL, &region));
 
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     const enum lucet_error err = lucet_instance_run(inst, "wasm_fault", 0, (struct lucet_val[]){});
     ASSERT_ENUM_EQ(lucet_error_runtime_fault, err, lucet_error_name);
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }

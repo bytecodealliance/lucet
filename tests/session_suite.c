@@ -29,12 +29,12 @@ TEST run(const char *mod_path, struct session *session, enum lucet_error *err_ou
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(guest_module_path(mod_path), &mod));
 
-    struct lucet_mmap_region *region;
-    ASSERT_OK(lucet_mmap_region_create(1, NULL, &region));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     // Now we have all the ingredients to create an instance, and run it
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_mmap_region_new_instance_with_ctx(region, mod, session, &inst));
+    ASSERT_OK(lucet_test_region_new_instance_with_ctx(region, mod, session, &inst));
 
     lucet_libc_set_stdio_handler(&session->libc, session_stdio_handler);
 
@@ -42,7 +42,7 @@ TEST run(const char *mod_path, struct session *session, enum lucet_error *err_ou
 
     lucet_instance_release(inst);
     lucet_dl_module_release(mod);
-    lucet_mmap_region_release(region);
+    lucet_test_region_release(region);
 
     PASS();
 }
