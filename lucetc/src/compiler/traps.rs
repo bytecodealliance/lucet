@@ -11,20 +11,14 @@ pub fn write_trap_manifest(manifest: &FaerieTrapManifest, obj: &mut Artifact) ->
     let manifest_len_sym = "lucet_trap_manifest_len";
     obj.declare(
         &manifest_len_sym,
-        Decl::Data {
-            global: true,
-            writable: false,
-        },
+        Decl::data().global(),
     )
     .context(format!("declaring {}", &manifest_len_sym))?;
 
     let manifest_sym = "lucet_trap_manifest";
     obj.declare(
         &manifest_sym,
-        Decl::Data {
-            global: true,
-            writable: false,
-        },
+        Decl::data().global(),
     )
     .context(format!("declaring {}", &manifest_sym))?;
 
@@ -49,10 +43,7 @@ pub fn write_trap_manifest(manifest: &FaerieTrapManifest, obj: &mut Artifact) ->
         // declare function-level trap table
         obj.declare(
             &trap_sym,
-            Decl::Data {
-                global: true,
-                writable: false,
-            },
+            Decl::data().global(),
         )
         .context(format!("declaring {}", &trap_sym))?;
 
@@ -139,6 +130,7 @@ fn serialize_trapcode(code: ir::TrapCode) -> u32 {
         ir::TrapCode::BadConversionToInteger => 7,
         ir::TrapCode::Interrupt => 8,
         ir::TrapCode::TableOutOfBounds => 9,
+        ir::TrapCode::UnreachableCodeReached => (u16::max_value() - 1) as u32, // XXX this used to be User(0)
         ir::TrapCode::User(x) => ((u16::max_value() - 1) as u32) | ((x as u32) << 16),
     }
 }
