@@ -16,7 +16,7 @@ else
 	CLANG_FORMAT="${LUCET_CLANG_FORMAT}";
 fi
 
-if ! $($CLANG_FORMAT --version | grep -q "version 7.0.0"); then
+if ! $($CLANG_FORMAT --version | grep -q "version 7.0"); then
 	echo "indent requires clang-format 7.0.0"
 	exit 1;
 fi
