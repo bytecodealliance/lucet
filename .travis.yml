@@ -8,6 +8,7 @@ before_install:
 
 script:
   - ./devenv_run make indent-check test audit
+  - git diff --exit-code
 
 notifications:
   email: false

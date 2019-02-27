@@ -6,5 +6,5 @@ fi
 if [ $# -eq 0 ]; then
 	docker exec -it -w /lucet $(cat .devenv_container_id)  /bin/bash
 else
-	docker exec -it -w /lucet $(cat .devenv_container_id) bash -c "$@"
+	docker exec -it -w /lucet $(cat .devenv_container_id) $@
 fi
