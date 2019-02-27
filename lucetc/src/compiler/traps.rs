@@ -9,18 +9,12 @@ use std::io::Cursor;
 pub fn write_trap_manifest(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> Result<(), Error> {
     // declare traptable symbol
     let manifest_len_sym = "lucet_trap_manifest_len";
-    obj.declare(
-        &manifest_len_sym,
-        Decl::data().global(),
-    )
-    .context(format!("declaring {}", &manifest_len_sym))?;
+    obj.declare(&manifest_len_sym, Decl::data().global())
+        .context(format!("declaring {}", &manifest_len_sym))?;
 
     let manifest_sym = "lucet_trap_manifest";
-    obj.declare(
-        &manifest_sym,
-        Decl::data().global(),
-    )
-    .context(format!("declaring {}", &manifest_sym))?;
+    obj.declare(&manifest_sym, Decl::data().global())
+        .context(format!("declaring {}", &manifest_sym))?;
 
     let manifest_len = manifest.sinks.len();
     let mut manifest_len_buf: Vec<u8> = Vec::new();
@@ -41,11 +35,8 @@ pub fn write_trap_manifest(manifest: &FaerieTrapManifest, obj: &mut Artifact) ->
         let trap_sym = trap_sym_for_func(func_sym);
 
         // declare function-level trap table
-        obj.declare(
-            &trap_sym,
-            Decl::data().global(),
-        )
-        .context(format!("declaring {}", &trap_sym))?;
+        obj.declare(&trap_sym, Decl::data().global())
+            .context(format!("declaring {}", &trap_sym))?;
 
         // function symbol is provided via a link (abs8 relocation)
         obj.link(Link {
