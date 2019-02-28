@@ -1,51 +1,53 @@
 #include <assert.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <sys/types.h>
 
-#include <lucet.h>
-#include <lucet_libc.h>
-#include <sightglass.h>
-#include <stdio.h>
+#include "lucet.h"
+#include "lucet_libc.h"
+#include "sightglass.h"
+#include "wrapper.h"
 
 #define xstr(x) str(x)
 #define str(x) #x
 
 typedef struct LucetCtx_ {
-    struct lucet_module *  mod;
-    struct lucet_instance *inst;
-    struct lucet_pool *    pool;
-    char *               heap;
-    guest_ptr_t          ctx_p;
+    struct lucet_dl_module *  mod;
+    struct lucet_instance *   inst;
+    struct lucet_test_region *region;
+    uint8_t *                 heap;
+    guest_ptr_t               ctx_p;
 } LucetCtx;
 
-static LucetCtx
-lucet_setup(void)
+static LucetCtx lucet_setup(void)
 {
-    struct lucet_module *  mod  = lucet_module_load(xstr(WASM_MODULE));
-    assert(mod);
-    struct lucet_pool *    pool = lucet_pool_create(1, NULL);
-    assert(pool);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(xstr(WASM_MODULE), &mod));
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
     struct lucet_libc libc;
     lucet_libc_init(&libc);
-    struct lucet_instance *inst = lucet_instance_create(pool, mod, &libc);
-    assert(inst);
+    struct lucet_instance *inst;
+    ASSERT_OK(lucet_test_region_new_instance_with_ctx(region, mod, &libc, &inst));
 
-    char *      heap          = lucet_instance_get_heap(inst);
-    int32_t     newpage_start = lucet_instance_grow_memory(inst, 1);
-    guest_ptr_t ctx_p         = newpage_start * LUCET_WASM_PAGE_SIZE;
+    uint8_t *heap = lucet_instance_heap(inst);
+    uint32_t newpage_start;
+    ASSERT_OK(lucet_instance_grow_heap(inst, 1, &newpage_start));
+    guest_ptr_t ctx_p = newpage_start * LUCET_WASM_PAGE_SIZE;
 
-    LucetCtx lucet_ctx = { .mod = mod, .pool = pool, .inst = inst, .heap = heap, .ctx_p = ctx_p };
+    LucetCtx lucet_ctx = {
+        .mod = mod, .region = region, .inst = inst, .heap = heap, .ctx_p = ctx_p
+    };
     return lucet_ctx;
 }
 
 #define LUCET_SETUP lucet_ctx = lucet_setup()
 
-static void
-lucet_teardown(LucetCtx *lucet_ctx)
+static void lucet_teardown(LucetCtx *lucet_ctx)
 {
     lucet_instance_release(lucet_ctx->inst);
-    lucet_module_unload(lucet_ctx->mod);
-    lucet_pool_decref(lucet_ctx->pool);
+    lucet_dl_module_release(lucet_ctx->mod);
+    lucet_test_region_release(lucet_ctx->region);
 }
 
 #define LUCET_TEARDOWN lucet_teardown(&lucet_ctx)
@@ -56,53 +58,58 @@ TestsConfig tests_config = { .global_setup    = NULL,
 
 static LucetCtx lucet_ctx;
 
-static void
-setup_wrapper(const char *name, void *global_ctx_, void **ctx_p)
+static void setup_wrapper(const char *name, void *global_ctx_, void **ctx_p)
 {
     (void) global_ctx_;
-    enum lucet_run_stat const stat =
-        lucet_instance_run(lucet_ctx.inst, name, 2, LUCET_VAL_GUEST_PTR(0),
-                         LUCET_VAL_GUEST_PTR(lucet_ctx.ctx_p));
-    assert(stat == lucet_run_ok);
+    ASSERT_OK(lucet_instance_run(
+        lucet_ctx.inst, name, 2,
+        (struct lucet_val[]){ LUCET_VAL_GUEST_PTR(0), LUCET_VAL_GUEST_PTR(lucet_ctx.ctx_p) }));
     *ctx_p = (void *) (uintptr_t) * (guest_ptr_t *) &lucet_ctx.heap[lucet_ctx.ctx_p];
 }
 
 #define SETUP(NAME)                                        \
     void NAME##_setup(void *global_ctx_, void **ctx_p)     \
     {                                                      \
-        LUCET_SETUP;                                         \
+        LUCET_SETUP;                                       \
         setup_wrapper(#NAME "_setup", global_ctx_, ctx_p); \
     }
 
-#define SETUP_NOWRAP(NAME) \
-    void NAME##_setup(void *global_ctx_, void **ctx_p) { (void) global_ctx_; (void) ctx_p; LUCET_SETUP; }
+#define SETUP_NOWRAP(NAME)                             \
+    void NAME##_setup(void *global_ctx_, void **ctx_p) \
+    {                                                  \
+        (void) global_ctx_;                            \
+        (void) ctx_p;                                  \
+        LUCET_SETUP;                                   \
+    }
 
-static void
-body_wrapper(const char *name, void *ctx)
+static void body_wrapper(const char *name, void *ctx)
 {
     lucet_instance_run(lucet_ctx.inst, name, 1,
-                     LUCET_VAL_GUEST_PTR((guest_ptr_t) (uintptr_t) ctx));
+                       (struct lucet_val[]){ LUCET_VAL_GUEST_PTR((guest_ptr_t)(uintptr_t) ctx) });
 }
 
 #define BODY(NAME) \
     void NAME##_body(void *ctx) { body_wrapper(#NAME "_body", ctx); }
 
-static void
-teardown_wrapper(const char *name, void *ctx)
+static void teardown_wrapper(const char *name, void *ctx)
 {
     lucet_instance_run(lucet_ctx.inst, name, 1,
-                     LUCET_VAL_GUEST_PTR((guest_ptr_t) (uintptr_t) ctx));
+                       (struct lucet_val[]){ LUCET_VAL_GUEST_PTR((guest_ptr_t)(uintptr_t) ctx) });
 }
 
 #define TEARDOWN(NAME)                            \
     void NAME##_teardown(void *ctx)               \
     {                                             \
         teardown_wrapper(#NAME "_teardown", ctx); \
-        LUCET_TEARDOWN;                             \
+        LUCET_TEARDOWN;                           \
     }
 
-#define TEARDOWN_NOWRAP(NAME) \
-    void NAME##_teardown(void *ctx) { (void) ctx; LUCET_TEARDOWN; }
+#define TEARDOWN_NOWRAP(NAME)       \
+    void NAME##_teardown(void *ctx) \
+    {                               \
+        (void) ctx;                 \
+        LUCET_TEARDOWN;             \
+    }
 
 SETUP(ackermann)
 BODY(ackermann)
@@ -215,4 +222,3 @@ TEARDOWN_NOWRAP(xchacha20)
 SETUP_NOWRAP(xblabla20)
 BODY(xblabla20)
 TEARDOWN_NOWRAP(xblabla20)
-
