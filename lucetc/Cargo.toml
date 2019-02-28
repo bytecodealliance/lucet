@@ -22,13 +22,13 @@ clap="2.32"
 log = "0.4"
 env_logger = "0.6"
 parity-wasm = "0.35"
-cranelift-codegen = { path = "../cranelift/lib/codegen" }
-cranelift-native = { path = "../cranelift/lib/native" }
-cranelift-frontend = { path = "../cranelift/lib/frontend" }
-cranelift-module = { path = "../cranelift/lib/module" }
-cranelift-faerie = { path = "../cranelift/lib/faerie" }
+cranelift-codegen = { path = "../cranelift/cranelift-codegen" }
+cranelift-native = { path = "../cranelift/cranelift-native" }
+cranelift-frontend = { path = "../cranelift/cranelift-frontend" }
+cranelift-module = { path = "../cranelift/cranelift-module" }
+cranelift-faerie = { path = "../cranelift/cranelift-faerie" }
 target-lexicon = "0.2"
-faerie = "0.7"
+faerie = "0.8.0"
 failure = "0.1"
 serde = "1.0"
 serde_json = "1.0"
@@ -39,3 +39,6 @@ tempdir = "0.3"
 bimap = "0.1"
 pwasm-validation = { path = "../pwasm-validation" }
 human-size = "0.4"
+
+[replace]
+"faerie:0.8.0" = { path = "../faerie" }

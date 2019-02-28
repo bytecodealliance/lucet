@@ -38,7 +38,7 @@ const STACK_PROBE_BINARY: &'static [u8] = &[
 pub fn declare_and_define(product: &mut FaerieProduct) -> Result<(), Error> {
     product.artifact.declare_with(
         STACK_PROBE_SYM,
-        Decl::Function { global: false },
+        Decl::function(),
         STACK_PROBE_BINARY.to_vec(),
     )?;
     add_sink(

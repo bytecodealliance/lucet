@@ -7,7 +7,8 @@ before_install:
   - ./devenv_build_container
 
 script:
-  - ./devenv_run make indent-check test audit
+  - ./devenv_run make indent-check test bench audit
+  - git diff --exit-code
 
 notifications:
   email: false
