@@ -12,8 +12,8 @@
  * We cant take return values from a wasm guest, so we need to wrap
  * strcmp up in a function that takes a pointer for the return value.
  */
-__attribute__((visibility("default"))) int run_strcmp(const char *s1, const char *s2)
+__attribute__((visibility("default"))) int64_t run_strcmp(const char *s1, const char *s2)
 {
     int res = strcmp(s1, s2);
-    return res;
+    return (int64_t) res;
 }

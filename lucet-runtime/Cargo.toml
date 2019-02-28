@@ -8,16 +8,24 @@ license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"
 
 [dependencies]
+libc = "0.2.48"
 lucet-runtime-internals = { path = "lucet-runtime-internals" }
+num-traits = "0.2"
+num-derive = "0.2"
 
 [dev-dependencies]
 byteorder = "1.2"
 failure = "0.1"
 lazy_static = "1.1"
-libc = "0.2.47"
 # default-features = false means it doesn't link against lucet-runtime-c, but instead lets us link
 # this runtime instead
 lucet-libc = { path = "../lucet-libc-rs", features = ["no-lucet-runtime-c"] }
 lucet-module-data = { path = "../lucet-module-data" }
 lucet-runtime-tests = { path = "lucet-runtime-tests" }
 nix = "0.13"
+
+[build-dependencies]
+cbindgen = "0.8"
+
+[lib]
+crate-type = ["rlib", "staticlib", "cdylib"]

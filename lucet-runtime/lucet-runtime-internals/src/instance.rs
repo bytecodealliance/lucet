@@ -1,7 +1,7 @@
 mod siginfo_ext;
 pub mod signals;
 
-pub use crate::instance::signals::{signal_handler_none, SignalBehavior};
+pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 
 use crate::alloc::Alloc;
 use crate::context::Context;
@@ -20,7 +20,7 @@ use std::ptr::{self, NonNull};
 use std::sync::Arc;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
-pub const INSTANCE_PADDING: usize = 2344;
+pub const INSTANCE_PADDING: usize = 2328;
 
 thread_local! {
     /// The host context.
@@ -95,6 +95,18 @@ pub fn new_instance_handle(
     Ok(handle)
 }
 
+pub fn instance_handle_to_raw(inst: InstanceHandle) -> *mut Instance {
+    let ptr = inst.inst.as_ptr();
+    std::mem::forget(inst);
+    ptr
+}
+
+pub unsafe fn instance_handle_from_raw(ptr: *mut Instance) -> InstanceHandle {
+    InstanceHandle {
+        inst: NonNull::new_unchecked(ptr),
+    }
+}
+
 // Safety argument for these deref impls: the instance's `Alloc` field contains an `Arc` to the
 // region that backs this memory, keeping the page containing the `Instance` alive as long as the
 // region exists
@@ -155,31 +167,21 @@ pub struct Instance {
 
     /// Handler run for signals that do not arise from a known WebAssembly trap, or that involve
     /// memory outside of the current instance.
-    ///
-    /// Fatal signals are not only unrecoverable for the instance that raised them, but may
-    /// compromise the correctness of the rest of the process if unhandled.
-    ///
-    /// The default fatal handler calls `panic!()`.
-    pub fatal_handler: fn(&Instance) -> !,
+    fatal_handler: fn(&Instance) -> !,
+
+    /// A fatal handler set from C
+    c_fatal_handler: Option<unsafe extern "C" fn(*mut Instance)>,
 
     /// Handler run when `SIGBUS`, `SIGFPE`, `SIGILL`, or `SIGSEGV` are caught by the instance thread.
-    ///
-    /// In most cases, these signals are unrecoverable for the instance that raised them, but do not
-    /// affect the rest of the process.
-    ///
-    /// The default signal handler returns
-    /// [`SignalBehavior::Default`](enum.SignalBehavior.html#variant.Default), which yields a
-    /// runtime fault error.
-    ///
-    /// The signal handler must be
-    /// [signal-safe](http://man7.org/linux/man-pages/man7/signal-safety.7.html).
-    pub signal_handler: fn(
-        &Instance,
-        &TrapCode,
-        signum: libc::c_int,
-        siginfo_ptr: *const siginfo_t,
-        ucontext_ptr: *const c_void,
-    ) -> SignalBehavior,
+    signal_handler: Box<
+        dyn Fn(
+            &Instance,
+            &TrapCode,
+            libc::c_int,
+            *const siginfo_t,
+            *const c_void,
+        ) -> SignalBehavior,
+    >,
 
     /// Pointer to the function used as the entrypoint (for use in backtraces)
     entrypoint: *const extern "C" fn(),
@@ -271,6 +273,20 @@ impl Instance {
         self.run_func(func, &args)
     }
 
+    /// Run a function with arguments in the guest context from the [WebAssembly function
+    /// table](https://webassembly.github.io/spec/core/syntax/modules.html#tables).
+    ///
+    /// The same safety caveats of [`Instance::run()`](struct.Instance.html#method.run) apply.
+    pub fn run_func_idx(
+        &mut self,
+        table_idx: u32,
+        func_idx: u32,
+        args: &[Val],
+    ) -> Result<UntypedRetVal, Error> {
+        let func = self.module.get_func_from_idx(table_idx, func_idx)?;
+        self.run_func(func, &args)
+    }
+
     /// Reset the instance's heap and global variables to their initial state.
     ///
     /// The WebAssembly `start` section will also be run, if one exists.
@@ -349,6 +365,53 @@ impl Instance {
     pub fn check_heap<T>(&self, ptr: *const T, len: usize) -> bool {
         self.alloc.mem_in_heap(ptr, len)
     }
+
+    pub fn embed_ctx(&self) -> *mut c_void {
+        self.embed_ctx
+    }
+
+    /// Set the handler run when `SIGBUS`, `SIGFPE`, `SIGILL`, or `SIGSEGV` are caught by the
+    /// instance thread.
+    ///
+    /// In most cases, these signals are unrecoverable for the instance that raised them, but do not
+    /// affect the rest of the process.
+    ///
+    /// The default signal handler returns
+    /// [`SignalBehavior::Default`](enum.SignalBehavior.html#variant.Default), which yields a
+    /// runtime fault error.
+    ///
+    /// The signal handler must be
+    /// [signal-safe](http://man7.org/linux/man-pages/man7/signal-safety.7.html).
+    pub fn set_signal_handler<H>(&mut self, handler: H)
+    where
+        H: 'static
+            + Fn(&Instance, &TrapCode, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior,
+    {
+        self.signal_handler = Box::new(handler) as Box<SignalHandler>;
+    }
+
+    /// Set the handler run for signals that do not arise from a known WebAssembly trap, or that
+    /// involve memory outside of the current instance.
+    ///
+    /// Fatal signals are not only unrecoverable for the instance that raised them, but may
+    /// compromise the correctness of the rest of the process if unhandled.
+    ///
+    /// The default fatal handler calls `panic!()`.
+    pub fn set_fatal_handler(&mut self, handler: fn(&Instance) -> !) {
+        self.fatal_handler = handler;
+    }
+
+    /// Set the fatal handler to a C-compatible function.
+    ///
+    /// This is a separate interface, because C functions can't return the `!` type. Like the
+    /// regular `fatal_handler`, it is not expected to return, but we cannot enforce that through
+    /// types.
+    ///
+    /// When a fatal error occurs, this handler is run first, and then the regular `fatal_handler`
+    /// runs in case it returns.
+    pub fn set_c_fatal_handler(&mut self, handler: unsafe extern "C" fn(*mut Instance)) {
+        self.c_fatal_handler = Some(handler);
+    }
 }
 
 // Private API
@@ -365,7 +428,8 @@ impl Instance {
             },
             alloc,
             fatal_handler: default_fatal_handler,
-            signal_handler: signal_handler_none,
+            c_fatal_handler: None,
+            signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
             entrypoint: ptr::null(),
             _reserved: [0; INSTANCE_PADDING],
             globals_ptr,
@@ -458,6 +522,13 @@ impl Instance {
                         // Some errors indicate that the guest is not functioning correctly or that
                         // the loaded code violated some assumption, so bail out via the fatal
                         // handler.
+
+                        // Run the C-style fatal handler, if it exists.
+                        self.c_fatal_handler
+                            .map(|h| unsafe { h(self as *mut Instance) });
+
+                        // If there is no C-style fatal handler, or if it (erroneously) returns,
+                        // call the Rust handler that we know will not return
                         (self.fatal_handler)(self)
                     } else {
                         // leave the full fault details in the instance state, and return the

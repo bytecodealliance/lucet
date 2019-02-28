@@ -10,6 +10,7 @@ pub mod table;
 pub mod traps;
 
 mod name;
+mod stack_probe;
 
 pub use self::name::Name;
 
@@ -64,7 +65,7 @@ pub struct Compiler<'p> {
 impl<'p> Compiler<'p> {
     pub fn new(name: String, prog: &'p Program, opt_level: OptLevel) -> Result<Self, Error> {
         let libcalls = Box::new(move |libcall| match libcall {
-            ir::LibCall::Probestack => "lucet_probestack".to_owned(),
+            ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
             _ => (FaerieBuilder::default_libcall_names())(libcall),
         });
 
@@ -278,6 +279,7 @@ pub struct ObjectFile {
 }
 impl ObjectFile {
     pub fn new(mut product: FaerieProduct) -> Result<Self, Error> {
+        stack_probe::declare_and_define(&mut product)?;
         let trap_manifest = &product
             .trap_manifest
             .expect("trap manifest will be present");

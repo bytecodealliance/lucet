@@ -12,10 +12,10 @@ pub mod error;
 pub mod test_helpers;
 
 pub mod alloc;
+pub mod c_api;
 pub mod context;
 pub mod instance;
 pub mod module;
-pub mod probestack;
 pub mod region;
 pub mod trapcode;
 pub mod val;

@@ -1,6 +1,7 @@
 #include "greatest.h"
-#include "guest_module.h"
 #include "lucet.h"
+#include "lucet_libc.h"
+#include "test_helpers.h"
 
 #define CALCULATOR_SANDBOX_PATH "entrypoint_guests/calculator.so"
 #define USE_ALLOCATOR_SANDBOX_PATH "entrypoint_guests/use_allocator.so"
@@ -9,49 +10,42 @@
 
 TEST test_calc_add_2(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     // Add the two arguments
-    enum lucet_run_stat const stat =
-        lucet_instance_run(inst, "add_2", 2, LUCET_VAL_U64(123), LUCET_VAL_U64(456));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+    ASSERT_OK(lucet_instance_run(inst, "add_2", 2,
+                                 (struct lucet_val[]){ LUCET_VAL_U64(123), LUCET_VAL_U64(456) }));
 
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
-
-    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state->u.ready.untyped_retval);
+    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state.val.returned);
     ASSERT_EQ(123 + 456, res);
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }
 
 TEST test_calc_add_10(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     // Add all 10 arguments. Why 10? Because its more than will fit in
     // registers to be passed to `guest_add_10` by liblucet, so it will
@@ -59,132 +53,118 @@ TEST test_calc_add_10(void)
     // stack is working.
     // A better test might be to use an operation that doesn't commute,
     // so we can verify that the order is correct.
-    enum lucet_run_stat const stat =
-        lucet_instance_run(inst, "add_10", 10, LUCET_VAL_U64(1), LUCET_VAL_U64(2), LUCET_VAL_U64(3),
-                           LUCET_VAL_U64(4), LUCET_VAL_U64(5), LUCET_VAL_U64(6), LUCET_VAL_U64(7),
-                           LUCET_VAL_U64(8), LUCET_VAL_U64(9), LUCET_VAL_U64(10));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+    ASSERT_OK(lucet_instance_run(inst, "add_10", 10,
+                                 (struct lucet_val[]){ LUCET_VAL_U64(1), LUCET_VAL_U64(2),
+                                                       LUCET_VAL_U64(3), LUCET_VAL_U64(4),
+                                                       LUCET_VAL_U64(5), LUCET_VAL_U64(6),
+                                                       LUCET_VAL_U64(7), LUCET_VAL_U64(8),
+                                                       LUCET_VAL_U64(9), LUCET_VAL_U64(10) }));
 
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
-
-    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state->u.ready.untyped_retval);
+    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state.val.returned);
 
     ASSERT_EQ(1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10, res);
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }
 
 TEST test_calc_mul_2(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     // Same sort of test as add_2, but with a different entrypoint.
-    enum lucet_run_stat const stat =
-        lucet_instance_run(inst, "mul_2", 2, LUCET_VAL_U64(123), LUCET_VAL_U64(456));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+    ASSERT_OK(lucet_instance_run(inst, "mul_2", 2,
+                                 (struct lucet_val[]){ LUCET_VAL_U64(123), LUCET_VAL_U64(456) }));
 
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
-    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state->u.ready.untyped_retval);
-
+    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state.val.returned);
     ASSERT_EQ(123 * 456, res);
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }
 
 TEST test_calc_add_then_mul(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     // Both of these entrypoints have individual tests above, make sure
     // that they work when called in sequential runs on the same instance as
     // well. Neither should store state anywhere besides heap[0].
-    enum lucet_run_stat const stat =
-        lucet_instance_run(inst, "add_2", 2, LUCET_VAL_U64(111), LUCET_VAL_U64(222));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+    ASSERT_OK(lucet_instance_run(inst, "add_2", 2,
+                                 (struct lucet_val[]){ LUCET_VAL_U64(111), LUCET_VAL_U64(222) }));
 
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
-
-    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state->u.ready.untyped_retval);
+    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state.val.returned);
 
     ASSERT_EQ(111 + 222, res);
 
-    enum lucet_run_stat const stat2 =
-        lucet_instance_run(inst, "mul_2", 2, LUCET_VAL_U64(333), LUCET_VAL_U64(444));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat2, lucet_run_stat_name);
+    ASSERT_OK(lucet_instance_run(inst, "mul_2", 2,
+                                 (struct lucet_val[]){ LUCET_VAL_U64(333), LUCET_VAL_U64(444) }));
 
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
-    uint64_t res2 = LUCET_UNTYPED_RETVAL_TO_U64(state->u.ready.untyped_retval);
+    uint64_t res2 = LUCET_UNTYPED_RETVAL_TO_U64(state.val.returned);
 
     ASSERT_EQ(333 * 444, res2);
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }
 
 TEST test_calc_invalid_entrypoint(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(CALCULATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
-    enum lucet_run_stat const stat =
-        lucet_instance_run(inst, "invalid", 2, LUCET_VAL_U64(123), LUCET_VAL_U64(456));
-    ASSERT_ENUM_EQ(lucet_run_symbol_not_found, stat, lucet_run_stat_name);
+    enum lucet_error err = lucet_instance_run(
+        inst, "invalid", 2, (struct lucet_val[]){ LUCET_VAL_U64(123), LUCET_VAL_U64(456) });
+    ASSERT_ENUM_EQ(lucet_error_symbol_not_found, err, lucet_error_name);
 
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_ENUM_EQ(lucet_state_tag_returned, state.tag, lucet_state_tag_name);
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -194,23 +174,21 @@ TEST test_calc_invalid_entrypoint(void)
 
 TEST allocator_create_region(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(USE_ALLOCATOR_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(USE_ALLOCATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
-    char *heap = lucet_instance_get_heap(inst);
+    uint8_t *heap = lucet_instance_heap(inst);
 
     // First, we need to get an unused location in linear memory for the pointer
     // that will be passed as an argument to create_and_memset.
-    int32_t new_page = lucet_instance_grow_memory(inst, 1);
-    ASSERT(new_page > 0);
+    uint32_t new_page;
+    ASSERT_OK(lucet_instance_grow_heap(inst, 1, &new_page));
     // Wasm location:
     uint32_t loc_outval = new_page * LUCET_WASM_PAGE_SIZE;
     // C pointer to value:
@@ -219,17 +197,11 @@ TEST allocator_create_region(void)
     // This function will call `malloc` for the given size, then `memset` the
     // entire region to the init_as argument. The pointer to the allocated
     // region gets stored in loc_outval.
-    enum lucet_run_stat const stat = lucet_instance_run(
-        inst, "create_and_memset", 3, LUCET_VAL_C_INT(TEST_REGION_INIT_VAL), /* int init_as */
-        LUCET_VAL_USIZE(TEST_REGION_SIZE),                                   /* size_t size */
-        LUCET_VAL_GUEST_PTR(loc_outval));                                    /* char** ptr_outval */
-
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
-
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
-
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_run(
+        inst, "create_and_memset", 3,
+        (struct lucet_val[]){ LUCET_VAL_U32(TEST_REGION_INIT_VAL), /* int init as */
+                              LUCET_VAL_USIZE(TEST_REGION_SIZE),   /* size_t size */
+                              LUCET_VAL_GUEST_PTR(loc_outval) /* char** ptr_outval */ }));
 
     // The location of the created region should be in a new page that the
     // allocator grabbed from the runtime. That page will be above the one
@@ -243,46 +215,38 @@ TEST allocator_create_region(void)
     }
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }
 
 TEST allocator_create_region_and_increment(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(USE_ALLOCATOR_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(USE_ALLOCATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
-    char *heap = lucet_instance_get_heap(inst);
+    uint8_t *heap = lucet_instance_heap(inst);
 
     // First, we need to get an unused location in linear memory for the pointer
     // that will be passed as an argument to create_and_memset.
-    int32_t new_page = lucet_instance_grow_memory(inst, 1);
-    ASSERT(new_page > 0);
+    uint32_t new_page;
+    ASSERT_OK(lucet_instance_grow_heap(inst, 1, &new_page));
     uint32_t  loc_outval = new_page * LUCET_WASM_PAGE_SIZE;
     uint32_t *ptr_outval = (uint32_t *) &heap[loc_outval];
 
     // Create a region and initialize it, just like above.
-    enum lucet_run_stat const stat = lucet_instance_run(
-        inst, "create_and_memset", 3, LUCET_VAL_C_INT(TEST_REGION_INIT_VAL), /* int init as */
-        LUCET_VAL_USIZE(TEST_REGION_SIZE),                                   /* size_t size */
-        LUCET_VAL_GUEST_PTR(loc_outval));                                    /* char** ptr_outval */
-
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
-
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
-
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_run(
+        inst, "create_and_memset", 3,
+        (struct lucet_val[]){ LUCET_VAL_U32(TEST_REGION_INIT_VAL), /* int init as */
+                              LUCET_VAL_USIZE(TEST_REGION_SIZE),   /* size_t size */
+                              LUCET_VAL_GUEST_PTR(loc_outval) /* char** ptr_outval */ }));
 
     uint32_t loc_region_1 = *ptr_outval;
     ASSERT(loc_region_1 > loc_outval);
@@ -293,12 +257,8 @@ TEST allocator_create_region_and_increment(void)
     }
 
     // Then increment the first location in the region.
-    enum lucet_run_stat const stat2 =
-        lucet_instance_run(inst, "increment_ptr", 1, LUCET_VAL_GUEST_PTR(loc_region_1));
-
-    ASSERT_ENUM_EQ(lucet_run_ok, stat2, lucet_run_stat_name);
-
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_run(inst, "increment_ptr", 1,
+                                 (struct lucet_val[]){ LUCET_VAL_GUEST_PTR(loc_region_1) }));
 
     // Just the first location in the region should be incremented.
     for (int i = 0; i < TEST_REGION_SIZE; i++) {
@@ -310,12 +270,8 @@ TEST allocator_create_region_and_increment(void)
     }
 
     // Increment the first location again.
-    enum lucet_run_stat const stat3 =
-        lucet_instance_run(inst, "increment_ptr", 1, LUCET_VAL_GUEST_PTR(loc_region_1));
-
-    ASSERT_ENUM_EQ(lucet_run_ok, stat3, lucet_run_stat_name);
-
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_run(inst, "increment_ptr", 1,
+                                 (struct lucet_val[]){ LUCET_VAL_GUEST_PTR(loc_region_1) }));
 
     // Just the first location in the region should be incremented twice.
     for (int i = 0; i < TEST_REGION_SIZE; i++) {
@@ -327,8 +283,8 @@ TEST allocator_create_region_and_increment(void)
     }
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -338,49 +294,39 @@ TEST allocator_create_region_and_increment(void)
 
 TEST allocator_create_two_regions(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(USE_ALLOCATOR_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(USE_ALLOCATOR_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
-    char *heap = lucet_instance_get_heap(inst);
+    uint8_t *heap = lucet_instance_heap(inst);
 
     // Same as above
-    int32_t new_page = lucet_instance_grow_memory(inst, 1);
-    ASSERT(new_page > 0);
+    uint32_t new_page;
+    ASSERT_OK(lucet_instance_grow_heap(inst, 1, &new_page));
     uint32_t  loc_outval = new_page * LUCET_WASM_PAGE_SIZE;
     uint32_t *ptr_outval = (uint32_t *) &heap[loc_outval];
 
     // Same as above
-    enum lucet_run_stat const stat = lucet_instance_run(
-        inst, "create_and_memset", 3, LUCET_VAL_C_INT(TEST_REGION_INIT_VAL), /* int init as */
-        LUCET_VAL_USIZE(TEST_REGION_SIZE),                                   /* size_t size */
-        LUCET_VAL_GUEST_PTR(loc_outval));                                    /* char** ptr_outval */
-
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
-
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
-
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_run(
+        inst, "create_and_memset", 3,
+        (struct lucet_val[]){ LUCET_VAL_U32(TEST_REGION_INIT_VAL), /* int init as */
+                              LUCET_VAL_USIZE(TEST_REGION_SIZE),   /* size_t size */
+                              LUCET_VAL_GUEST_PTR(loc_outval) /* char** ptr_outval */ }));
 
     uint32_t loc_region_1 = *ptr_outval;
     ASSERT(loc_region_1 > loc_outval);
 
     // Create a second region.
-    enum lucet_run_stat const stat2 = lucet_instance_run(
-        inst, "create_and_memset", 3, LUCET_VAL_C_INT(TEST_REGION2_INIT_VAL), /* int init as */
-        LUCET_VAL_USIZE(TEST_REGION2_SIZE),                                   /* size_t size */
-        LUCET_VAL_GUEST_PTR(loc_outval)); /* char** ptr_outval */
-
-    ASSERT_ENUM_EQ(lucet_run_ok, stat2, lucet_run_stat_name);
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(lucet_instance_run(
+        inst, "create_and_memset", 3,
+        (struct lucet_val[]){ LUCET_VAL_U32(TEST_REGION2_INIT_VAL), /* int init as */
+                              LUCET_VAL_USIZE(TEST_REGION2_SIZE),   /* size_t size */
+                              LUCET_VAL_GUEST_PTR(loc_outval) /* char** ptr_outval */ }));
 
     // The allocator should pick a spot *after* the first region for the second
     // one. (It doesn't have to, but it will.) This shows that the allocators
@@ -399,8 +345,8 @@ TEST allocator_create_two_regions(void)
     }
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }
@@ -413,37 +359,36 @@ void black_box(void *vmctx, void *val)
 
 TEST test_ctype(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(CTYPE_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_libc lucet_libc;
+    lucet_libc_init(&lucet_libc);
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(CTYPE_SANDBOX_PATH), &mod));
+
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance_with_ctx(region, mod, &lucet_libc, &inst));
 
-    char *heap = lucet_instance_get_heap(inst);
+    uint8_t *heap = lucet_instance_heap(inst);
 
     // First, we need to get an unused location in linear memory to store the
     // pointer to the "context" for the test case.
-    int32_t new_page = lucet_instance_grow_memory(inst, 1);
-    ASSERT(new_page > 0);
+    uint32_t new_page;
+    ASSERT_OK(lucet_instance_grow_heap(inst, 1, &new_page));
+
     // Wasm location:
     uint32_t loc_ctxstar = new_page * LUCET_WASM_PAGE_SIZE;
 
     // Run the setup routine
-    enum lucet_run_stat const stat = lucet_instance_run(
-        inst, "ctype_setup", 2, LUCET_VAL_C_PTR(NULL), /* void* global_ctx  -- not used */
-        LUCET_VAL_GUEST_PTR(loc_ctxstar));             /* void** ctx_p */
+    ASSERT_OK(lucet_instance_run(
+        inst, "ctype_setup", 2,
+        (struct lucet_val[]){ LUCET_VAL_C_PTR(NULL), /* void* global_ctx  -- not used */
+                              LUCET_VAL_GUEST_PTR(loc_ctxstar) /* void** ctx_p */ }));
 
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
-
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
-
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
     // Grab the value of the pointer that the setup routine wrote:
     uint32_t const ctxstar = *((uint32_t *) &heap[loc_ctxstar]);
@@ -451,55 +396,46 @@ TEST test_ctype(void)
     ASSERT(ctxstar > 0);
 
     // Run the body routine
-    enum lucet_run_stat const stat2 =
-        lucet_instance_run(inst, "ctype_body", 1, LUCET_VAL_GUEST_PTR(ctxstar)); /* void* ctx_ */
-
-    ASSERT_ENUM_EQ(lucet_run_ok, stat2, lucet_run_stat_name);
-
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
+    ASSERT_OK(
+        lucet_instance_run(inst, "ctype_body", 1,
+                           (struct lucet_val[]){ LUCET_VAL_GUEST_PTR(ctxstar) /* void* ctx_ */ }));
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }
 
 uint64_t callback_hostcall(void *vmctx, uint32_t cb_id, uint64_t x)
 {
-    void *func = lucet_vmctx_get_func_from_id(vmctx, 0, cb_id);
+    void *func = lucet_vmctx_get_func_from_idx(vmctx, 0, cb_id);
     return (*(uint64_t(*)(void *, uint64_t)) func)(vmctx, x) + 1;
 }
 
 TEST test_callback(void)
 {
-    struct lucet_module *mod;
-    mod = lucet_module_load(guest_module_path(CALLBACK_SANDBOX_PATH));
-    ASSERT(mod != NULL);
+    struct lucet_dl_module *mod;
+    ASSERT_OK(lucet_dl_module_load(guest_module_path(CALLBACK_SANDBOX_PATH), &mod));
 
-    struct lucet_pool *pool;
-    pool = lucet_pool_create(1, NULL);
+    struct lucet_test_region *region;
+    ASSERT_OK(lucet_test_region_create(1, NULL, &region));
 
     struct lucet_instance *inst;
-    inst = lucet_instance_create(pool, mod, NULL);
-    ASSERT(inst != NULL);
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
-    // Add the two arguments
-    enum lucet_run_stat const stat =
-        lucet_instance_run(inst, "callback_entrypoint", 1, LUCET_VAL_U64(0));
-    ASSERT_ENUM_EQ(lucet_run_ok, stat, lucet_run_stat_name);
+    ASSERT_OK(lucet_instance_run(inst, "callback_entrypoint", 1,
+                                 (struct lucet_val[]){ LUCET_VAL_U64(0) }));
 
-    const struct lucet_state *state;
-    state = lucet_instance_get_state(inst);
+    struct lucet_state state;
+    ASSERT_OK(lucet_instance_state(inst, &state));
 
-    ASSERT_ENUM_EQ(lucet_state_ready, state->tag, lucet_state_name);
-
-    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state->u.ready.untyped_retval);
+    uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state.val.returned);
     ASSERT_EQ(3, res);
 
     lucet_instance_release(inst);
-    lucet_module_unload(mod);
-    lucet_pool_decref(pool);
+    lucet_dl_module_release(mod);
+    lucet_test_region_release(region);
 
     PASS();
 }

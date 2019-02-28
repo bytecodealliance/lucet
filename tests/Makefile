@@ -1,6 +1,7 @@
 
 include Makefile.vars
 
+LUCET_RUNTIME:=../lucet-runtime
 LIBLUCET_RUNTIME_C:=../lucet-runtime-c
 LIBLUCET_BACKTRACE:=../lucet-backtrace
 LUCETC:=../lucetc/target/debug/lucetc
@@ -183,23 +184,21 @@ build/globals_guests/%.so: globals_guests/%.wat
 build/%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) \
-		-I$(LIBLUCET_RUNTIME_C)/include \
-		-I$(LIBLUCET_BACKTRACE)/include \
+		-I$(LUCET_RUNTIME)/include \
 		-I$(LUCET_LIBC_PATH)/build/include \
 		-c $< -o $@
 
 build/lucet_test: $(LUCET_LIBC_HOST_LIB_PATH)
-build/lucet_test: $(LIBLUCET_RUNTIME_C)/build/liblucet-runtime-c.so
-build/lucet_test: $(LIBLUCET_BACKTRACE)/build/liblucet-backtrace.so
+build/lucet_test: $(LUCET_RUNTIME)/target/debug/liblucet_runtime.so
 build/lucet_test: $(LUCET_TEST_OBJECTS)
 	LIBRARY_PATH=$(LD_LIBRARY_PATH) \
 		$(CC) -rdynamic -pthread \
-		-L$(LIBLUCET_RUNTIME_C)/build/ -Wl,-rpath=$(LIBLUCET_RUNTIME_C)/build/ \
-		-L$(LIBLUCET_BACKTRACE)/build/ -Wl,-rpath=$(LIBLUCET_BACKTRACE)/build/ \
+		-L$(LUCET_RUNTIME)/target/debug/ -Wl,-rpath=$(LUCET_RUNTIME)/target/debug/ \
 		-o $@ $^ -ldl -lunwind
 
-$(LIBLUCET_RUNTIME_C)/build/liblucet-runtime-c.so:
-	make -C $(LIBLUCET_RUNTIME_C)
+.PHONY: $(LUCET_RUNTIME)/target/debug/liblucet_runtime.so
+$(LUCET_RUNTIME)/target/debug/liblucet_runtime.so:
+	make -C $(LUCET_RUNTIME)
 
 .PHONY: clean
 clean:

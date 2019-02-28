@@ -121,7 +121,7 @@
 //! let mut inst = region.new_instance(module).unwrap();
 //!
 //! // install the handler
-//! inst.signal_handler = signal_handler_count;
+//! inst.set_signal_handler(signal_handler_count);
 //!
 //! match inst.run(b"raise_a_signal", &[]) {
 //!     Err(Error::RuntimeFault(_)) => {
@@ -176,4 +176,10 @@ pub mod vmctx {
     //! associated with a running instance. This should never occur if run in guest code on the
     //! pointer argument inserted by the compiler.
     pub use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
+}
+
+#[doc(hidden)]
+#[no_mangle]
+extern "C" fn lucet_internal_ensure_linked() {
+    lucet_runtime_internals::vmctx::vmctx_capi_init();
 }
