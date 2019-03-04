@@ -40,4 +40,5 @@ audit:
 .PHONY: clean
 clean:
 	cd lucet-runtime-internals && cargo clean
+	cd lucet-runtime-tests && cargo clean
 	cargo clean

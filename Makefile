@@ -48,6 +48,8 @@ audit:
 clean:
 	rm -rf lucetc/target
 	rm -rf lucet-idl/target
+	make -C benchmarks/shootout clean
+	make -C builtins clean
 	make -C lucet-runtime clean
 	make -C lucet-runtime-c clean
 	make -C lucet-backtrace clean
@@ -59,6 +61,8 @@ clean:
 	cd lucet-idl && cargo clean
 	cd lucet-analyze && cargo clean
 	cd lucet-spectest && cargo clean
+	cd lucet-module-data && cargo clean
+	cd sightglass && cargo clean
 
 .PHONY: indent
 indent:

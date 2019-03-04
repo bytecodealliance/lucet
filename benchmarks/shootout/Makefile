@@ -38,11 +38,11 @@ bench: run
 run: build
 	$(SIGHTGLASS)/target/release/sightglass -c sightglass.toml $(SIGHTGLASS_ARGS)
 
-$(LUCET_LIBC)/build/wasmlib/libc.a:
+$(LUCET_LIBC)/build/lib/liblucet_libc.so:
 	make -C ../../lucet-libc
 
-.PHONY: $(LUCET_RUNTIME)/target/release/liblucet_runtime.a
-$(LUCET_RUNTIME)/target/release/liblucet_runtime.a:
+.PHONY: $(LUCET_RUNTIME)/target/release/liblucet_runtime.so
+$(LUCET_RUNTIME)/target/release/liblucet_runtime.so:
 	make -C $(LUCET_RUNTIME) release
 
 .PHONY: build
@@ -92,19 +92,18 @@ build/lucet/%.o: %.c
 		-DWASM_MODULE=$(abspath build/lucet/module.so) \
 		-c $^ -o $@
 
-build/lucet/implementation.so: $(LUCET_LIBC)/build/wasmlib/libc.a
+build/lucet/implementation.so: $(LUCET_RUNTIME)/target/release/liblucet_runtime.so
+build/lucet/implementation.so: $(LUCET_LIBC)/build/lib/liblucet_libc.so
 build/lucet/implementation.so: build/lucet/wrapper.o
 build/lucet/implementation.so: build/lucet/hostcalls.o
 build/lucet/implementation.so: $(LIBBUILTINS)
 	@mkdir -p $(@D)
 	$(LUCET_CLANG) -rdynamic -shared \
-		-L $(LUCET_RUNTIME)/target/release \
-		-Wl,-rpath $(LUCET_RUNTIME)/target/release \
 		-L $(LUCET_LIBC)/build/lib \
 		-Wl,-rpath $(LUCET_LIBC)/build/lib \
 		-L $(dir $(LIBBUILTINS)) \
 		-Wl,-rpath $(dir $(LIBBUILTINS)) \
-		$^ -llucet_runtime -llucet_libc -ldl -lbuiltins -o $@
+		$^ -ldl -lbuiltins -o $@
 
 $(SIGHTGLASS)/target/release/sightglass:
 	cd $(SIGHTGLASS) && cargo build --release
