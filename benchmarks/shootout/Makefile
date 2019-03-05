@@ -3,12 +3,12 @@ LUCET_CLANG?=clang
 LUCET_WASM_LD?=wasm-ld
 
 GCC:=$(FST_GCC)/bin/gcc
-LUCETC:=../../lucetc/target/debug/lucetc
+LUCETC:=../../lucetc/target/release/lucetc
 LUCETCC:=../../lucetc/scripts/bin/lucetcc
 LUCETLD:=../../lucetc/scripts/bin/lucetld
 
 LUCET_LIBC:=../../lucet-libc/
-LIBLUCET_RUNTIME_C:=../../lucet-runtime-c
+LUCET_RUNTIME:=../../lucet-runtime
 SIGHTGLASS:=../../sightglass
 
 LIBBUILTINS:=../../builtins/build/libbuiltins.so
@@ -38,11 +38,12 @@ bench: run
 run: build
 	$(SIGHTGLASS)/target/release/sightglass -c sightglass.toml $(SIGHTGLASS_ARGS)
 
-$(LUCET_LIBC)/build/wasmlib/libc.a:
+$(LUCET_LIBC)/build/lib/liblucet_libc.so:
 	make -C ../../lucet-libc
 
-$(LIBLUCET_RUNTIME_C)/build/liblucet-runtime-c.a:
-	make -C $(LIBLUCET_RUNTIME_C)
+.PHONY: $(LUCET_RUNTIME)/target/release/liblucet_runtime.so
+$(LUCET_RUNTIME)/target/release/liblucet_runtime.so:
+	make -C $(LUCET_RUNTIME) release
 
 .PHONY: build
 build: $(LUCETC)
@@ -76,7 +77,7 @@ build/lucet/module.clif: build/lucet/module.wasm $(LIBBUILTINS)
 	@mkdir -p $(@D)
 	$(LUCETC) $(LUCETC_FLAGS) --emit=clif --bindings=bindings.json --builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
 
-# Because liblucet-runtime-c is dynamically loaded (transitively) by implementation.so, we
+# Because liblucet_runtime is dynamically loaded (transitively) by implementation.so, we
 # need to link the wasm object to the same libraries.
 build/lucet/module.so: build/lucet/module.o
 	@mkdir -p $(@D)
@@ -86,24 +87,23 @@ build/lucet/%.o: %.c
 	@mkdir -p $(@D)
 	$(LUCET_CLANG) --std=c99 -fPIC -D_GNU_SOURCE -g3 $(COMMON_CFLAGS) \
 		-fvisibility=default \
-		-I$(LIBLUCET_RUNTIME_C)/include \
+		-I$(LUCET_RUNTIME)/include \
 		-I$(LUCET_LIBC)/build/include \
 		-DWASM_MODULE=$(abspath build/lucet/module.so) \
 		-c $^ -o $@
 
-build/lucet/implementation.so: $(LUCET_LIBC)/build/wasmlib/libc.a
+build/lucet/implementation.so: $(LUCET_RUNTIME)/target/release/liblucet_runtime.so
+build/lucet/implementation.so: $(LUCET_LIBC)/build/lib/liblucet_libc.so
 build/lucet/implementation.so: build/lucet/wrapper.o
 build/lucet/implementation.so: build/lucet/hostcalls.o
 build/lucet/implementation.so: $(LIBBUILTINS)
 	@mkdir -p $(@D)
 	$(LUCET_CLANG) -rdynamic -shared \
-		-L $(LIBLUCET_RUNTIME_C)/build \
-		-Wl,-rpath $(LIBLUCET_RUNTIME_C)/build \
 		-L $(LUCET_LIBC)/build/lib \
 		-Wl,-rpath $(LUCET_LIBC)/build/lib \
 		-L $(dir $(LIBBUILTINS)) \
 		-Wl,-rpath $(dir $(LIBBUILTINS)) \
-		$^ -llucet-runtime-c -llucet_libc -ldl -lbuiltins -o $@
+		$^ -ldl -lbuiltins -o $@
 
 $(SIGHTGLASS)/target/release/sightglass:
 	cd $(SIGHTGLASS) && cargo build --release
@@ -112,7 +112,7 @@ $(LIBBUILTINS):
 	make -C ../../builtins
 
 $(LUCETC):
-	cd ../../lucetc && cargo build
+	cd ../../lucetc && cargo build --release
 
 .PHONY: clean
 clean:
