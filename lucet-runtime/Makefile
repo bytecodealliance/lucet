@@ -1,7 +1,6 @@
 # This Makefile exists primarily to keep all of the test guest sources in one place. They should
 # probably be factored out of the C runtime eventually into a standalone test support package.
 
-LD_LIBRARY_PATH:=$(abspath ../lucet-libc/build/lib):$(LD_LIBRARY_PATH)
 GUEST_MODULE_PREFIX=$(abspath $(CURDIR)/..)
 
 default: build
