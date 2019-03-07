@@ -4,8 +4,6 @@ use lucetc::compiler::OptLevel;
 use lucetc::program::memory::HeapSettings;
 use std::path::PathBuf;
 
-include!(concat!(env!("OUT_DIR"), "/paths.rs"));
-
 #[derive(Debug)]
 pub enum CodegenOutput {
     Clif,
@@ -38,7 +36,6 @@ pub struct Options {
     pub input: Vec<PathBuf>,
     pub codegen: CodegenOutput,
     pub print_isa: bool,
-    pub liblucet_runtime_c_bindings: bool,
     pub binding_files: Vec<PathBuf>,
     pub builtins_path: Option<PathBuf>,
     pub heap: HeapSettings,
@@ -97,7 +94,6 @@ impl Options {
             input,
             codegen,
             print_isa,
-            liblucet_runtime_c_bindings: !m.is_present("nostdbindings"),
             binding_files,
             builtins_path,
             heap: HeapSettings {
@@ -141,13 +137,6 @@ impl Options {
                     .takes_value(true)
                     .multiple(true)
                     .help("path to bindings json file"),
-            )
-            .arg(
-                Arg::with_name("nostdbindings")
-                    .long("--no-std-bindings")
-                    .takes_value(false)
-                    .multiple(false)
-                    .help("do not use standard (liblucet_runtime_c) bindings"),
             )
             .arg(
                 Arg::with_name("reserved_size")

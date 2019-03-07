@@ -1,6 +1,6 @@
 mod options;
 
-use crate::options::{CodegenOutput, Options, LUCET_LIBC_BINDINGS};
+use crate::options::{CodegenOutput, Options};
 use failure::{format_err, Error, ResultExt};
 use log::info;
 use lucetc::bindings::Bindings;
@@ -52,12 +52,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         (module, HashMap::new())
     };
 
-    let mut bindings = if opts.liblucet_runtime_c_bindings {
-        Bindings::from_str(LUCET_LIBC_BINDINGS).context("lucet_libc bindings")?
-    } else {
-        Bindings::empty()
-    };
-
+    let mut bindings = Bindings::empty();
     bindings.extend(Bindings::env(builtins_map))?;
 
     for file in opts.binding_files.iter() {
