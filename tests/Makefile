@@ -5,11 +5,9 @@ LUCET_RUNTIME:=../lucet-runtime
 LIBLUCET_RUNTIME_C:=../lucet-runtime-c
 LIBLUCET_BACKTRACE:=../lucet-backtrace
 LUCETC:=../lucetc/target/debug/lucetc
-LUCETCC:=../lucetc/scripts/bin/lucetcc
-LUCETLD:=../lucetc/scripts/bin/lucetld
 
-LUCET_LIBC_PATH=../lucet-libc
-LUCET_LIBC_HOST_LIB_PATH=$(LUCET_LIBC_PATH)/build/lib/liblucet_libc.so
+WASICC:=$(WASI_SDK)/bin/clang
+WASILD:=$(WASI_SDK)/bin/clang
 
 HOST_GUEST_OBJECTS:= $(addprefix build/host_guests/, \
 	null.so \
@@ -19,7 +17,7 @@ HOST_GUEST_OBJECTS:= $(addprefix build/host_guests/, \
 	fpe.so \
 	)
 
-HOST_GUEST_BINDINGS:= --no-std-bindings --bindings=host_guests/bindings.json
+HOST_GUEST_BINDINGS:= --bindings=host_guests/bindings.json
 
 SESSION_GUEST_OBJECTS:= $(addprefix build/session_guests/, \
 	hello.so \
@@ -100,30 +98,30 @@ check_mmap: build/lucet_test guests
 
 build/host_guests/%.o: host_guests/%.c
 	@mkdir -p $(@D)
-	$(LUCETCC) -c $< -o $@
+	$(WASICC) -c $< -o $@
 
 build/host_guests/%.wasm: build/host_guests/%.o
-	$(LUCETLD) $^ -o $@
+	$(WASILD) $^ -o $@
 
 build/host_guests/%.so: build/host_guests/%.wasm
 	$(LUCETC) $(HOST_GUEST_BINDINGS) $< -o $@
 
 build/session_guests/%.o: session_guests/%.c
 	@mkdir -p $(@D)
-	$(LUCETCC) -I. -c $< -o $@
+	$(WASICC) -I. -c $< -o $@
 
 build/session_guests/%.wasm: build/session_guests/%.o
-	$(LUCETLD) $^ -o $@
+	$(WASILD) $^ -o $@
 
 build/session_guests/%.so: build/session_guests/%.wasm
 	$(LUCETC) $(SESSION_GUEST_BINDINGS) $< -o $@
 
 build/entrypoint_guests/%.o: entrypoint_guests/%.c
 	@mkdir -p $(@D)
-	$(LUCETCC) -I. -c $< -o $@
+	$(WASICC) -I. -c $< -o $@
 
 build/entrypoint_guests/%.wasm: build/entrypoint_guests/%.o
-	$(LUCETLD) $^ -o $@
+	$(WASILD) $^ -o $@
 
 build/entrypoint_guests/%.so: build/entrypoint_guests/%.wasm
 	@mkdir -p $(@D)
@@ -135,10 +133,10 @@ build/entrypoint_guests/%.so: entrypoint_guests/%.wat
 
 build/memory_guests/%.o: memory_guests/%.c
 	@mkdir -p $(@D)
-	$(LUCETCC) -c $< -o $@
+	$(WASICC) -c $< -o $@
 
 build/memory_guests/%.wasm: build/memory_guests/%.o build/memory_guests/observe.o
-	$(LUCETLD) $^ -o $@
+	$(WASILD) $^ -o $@
 
 build/memory_guests/%.so: build/memory_guests/%.wasm
 	$(LUCETC) $< -o $@
@@ -149,10 +147,10 @@ build/memory_guests/%.so: memory_guests/%.wat
 
 build/strcmp_guests/%.o: strcmp_guests/%.c
 	@mkdir -p $(@D)
-	$(LUCETCC) -c $< -o $@
+	$(WASICC) -c $< -o $@
 
 build/strcmp_guests/%.wasm : build/strcmp_guests/%.o
-	$(LUCETLD) $^ -o $@
+	$(WASILD) $^ -o $@
 
 build/strcmp_guests/%.so: build/strcmp_guests/%.wasm
 	$(LUCETC) $(VARNISH_GUEST_BINDINGS) $< -o $@
@@ -185,10 +183,8 @@ build/%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) \
 		-I$(LUCET_RUNTIME)/include \
-		-I$(LUCET_LIBC_PATH)/build/include \
 		-c $< -o $@
 
-build/lucet_test: $(LUCET_LIBC_HOST_LIB_PATH)
 build/lucet_test: $(LUCET_RUNTIME)/target/debug/liblucet_runtime.so
 build/lucet_test: $(LUCET_TEST_OBJECTS)
 	LIBRARY_PATH=$(LD_LIBRARY_PATH) \
