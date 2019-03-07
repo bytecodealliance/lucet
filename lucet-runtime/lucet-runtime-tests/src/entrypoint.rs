@@ -420,15 +420,6 @@ macro_rules! entrypoint_tests {
             );
         }
 
-        // Guests which use an allocator fail if we don't at least link in lucet-libc, but it works whether
-        // or not we then pass in a `LucetLibc` as the embedding context, so keeping this as a standalone
-        // test is sufficient. This is kind of weird
-        #[test]
-        fn link_libc() {
-            use lucet_libc::LucetLibc;
-            let _libc = LucetLibc::new();
-        }
-
         const TEST_REGION_INIT_VAL: libc::c_int = 123;
         const TEST_REGION_SIZE: libc::size_t = 4;
 
