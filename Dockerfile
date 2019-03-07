@@ -47,4 +47,5 @@ RUN curl -L -O https://static.rust-lang.org/dist/rust-1.31.0-x86_64-unknown-linu
 	&& cd .. \
 	&& rm -rf rust-1.31.0-x86_64-unknown-linux-gnu rust-1.31.0-x86_64-unknown-linux-gnu.tar.gz
 ENV PATH=/usr/local/bin:$PATH
-RUN cargo install cargo-audit cargo-watch
+RUN cargo install --root /usr/local cargo-audit cargo-watch
+
