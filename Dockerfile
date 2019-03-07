@@ -49,3 +49,6 @@ RUN curl -L -O https://static.rust-lang.org/dist/rust-1.31.0-x86_64-unknown-linu
 ENV PATH=/usr/local/bin:$PATH
 RUN cargo install --root /usr/local cargo-audit cargo-watch
 
+RUN curl -O https://moreproductive.org/wasi-sdk/wasi-sdk_1.0_amd64.deb \
+ && dpkg -i wasi-sdk_1.0_amd64.deb
+ENV WASI_SDK=/opt/wasi-sdk
