@@ -19,9 +19,6 @@ xfailure = "0.1"
 
 [dev-dependencies]
 byteorder = "1.2"
-# default-features = false means it doesn't link against lucet-runtime-c, but instead lets us link
-# this runtime instead
-lucet-libc = { path = "../../lucet-libc-rs" }
 memoffset = "0.2"
 
 [build-dependencies]
