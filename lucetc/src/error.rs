@@ -70,6 +70,8 @@ pub enum LucetcErrorKind {
     Table(String),
     #[fail(display = "Validation")]
     Validation,
+    #[fail(display = "Signatures")]
+    Signatures,
 
     #[fail(display = "Unsupported: {}", _0)]
     Unsupported(String),

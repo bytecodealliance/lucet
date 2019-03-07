@@ -5,6 +5,7 @@ pub mod globals;
 pub mod memory;
 pub mod module_data;
 pub mod opcode;
+pub mod signatures;
 pub mod state;
 pub mod table;
 pub mod traps;
@@ -15,6 +16,7 @@ mod stack_probe;
 pub use self::name::Name;
 
 use crate::compiler::traps::write_trap_manifest;
+use crate::error::{LucetcError, LucetcErrorKind};
 use crate::program::{Function, Program, TableDef};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::settings::{self, Configurable};

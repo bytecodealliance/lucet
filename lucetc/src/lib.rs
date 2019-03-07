@@ -10,6 +10,7 @@ use crate::compiler::function::compile_function;
 use crate::compiler::globals::compile_global_specs;
 use crate::compiler::memory::compile_memory_specs;
 use crate::compiler::module_data::compile_module_data;
+use crate::compiler::signatures::compile_signatures_and_function_signatures_map;
 use crate::compiler::table::compile_table;
 use crate::compiler::{Compiler, OptLevel};
 use crate::error::{LucetcError, LucetcErrorKind};
@@ -38,6 +39,8 @@ pub fn compile<'p>(
         compile_table(&mut compiler, &table)
             .context(LucetcErrorKind::Table(table.symbol().to_owned()))?;
     }
+    compile_signatures_and_function_signatures_map(&mut compiler)
+        .context(LucetcErrorKind::Signatures)?;
 
     Ok(compiler)
 }
