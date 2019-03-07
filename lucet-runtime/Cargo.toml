@@ -28,6 +28,7 @@ nix = "0.13"
 cbindgen = "0.8"
 
 [lib]
+name = "lucet_runtime"
 crate-type = ["rlib", "staticlib", "cdylib"]
 
 [package.metadata.deb]
