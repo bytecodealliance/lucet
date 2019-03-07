@@ -5,6 +5,7 @@ pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHa
 
 use crate::alloc::Alloc;
 use crate::context::Context;
+use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, Global, Module};
@@ -12,6 +13,7 @@ use crate::trapcode::{TrapCode, TrapCodeType};
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
+use std::any::Any;
 use std::cell::{RefCell, UnsafeCell};
 use std::ffi::{CStr, CString};
 use std::mem;
@@ -66,7 +68,6 @@ pub fn new_instance_handle(
     instance: *mut Instance,
     module: Arc<dyn Module>,
     alloc: Alloc,
-    embed_ctx: *mut c_void,
 ) -> Result<InstanceHandle, Error> {
     let inst = NonNull::new(instance)
         .ok_or(lucet_format_err!("instance pointer is null; this is a bug"))?;
@@ -79,7 +80,7 @@ pub fn new_instance_handle(
 
     let mut handle = InstanceHandle { inst };
 
-    let inst = Instance::new(alloc, module, embed_ctx);
+    let inst = Instance::new(alloc, module);
 
     unsafe {
         // this is wildly unsafe! you must be very careful to not let the drop impls run on the
@@ -150,8 +151,9 @@ pub struct Instance {
     /// Used to catch bugs in pointer math used to find the address of the instance
     magic: u64,
 
-    /// The embedding context is a pointer from the embedder that is used to implement hostcalls
-    pub(crate) embed_ctx: *mut c_void,
+    /// The embedding context is a map containing embedder-specific values that are used to
+    /// implement hostcalls
+    pub(crate) embed_ctx: CtxMap,
 
     /// The program (WebAssembly module) that is the entrypoint for the instance.
     module: Arc<dyn Module>,
@@ -291,6 +293,11 @@ impl Instance {
     ///
     /// The WebAssembly `start` section will also be run, if one exists.
     ///
+    /// The embedder contexts added with
+    /// [`Instance::insert_embed_ctx()`](struct.Instance.html#method.insert_embed_ctx) are not
+    /// modified by this call; it is the embedder's responsibility to clear or reset their state if
+    /// necessary.
+    ///
     /// # Safety
     ///
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
@@ -366,8 +373,31 @@ impl Instance {
         self.alloc.mem_in_heap(ptr, len)
     }
 
-    pub fn embed_ctx(&self) -> *mut c_void {
-        self.embed_ctx
+    /// Check whether a context value of a particular type exists.
+    pub fn contains_embed_ctx<T: Any>(&self) -> bool {
+        self.embed_ctx.contains::<T>()
+    }
+
+    /// Get a reference to a context value of a particular type, if it exists.
+    pub fn get_embed_ctx<T: Any>(&self) -> Option<&T> {
+        self.embed_ctx.get::<T>()
+    }
+
+    /// Get a mutable reference to a context value of a particular type, if it exists.
+    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<&mut T> {
+        self.embed_ctx.get_mut::<T>()
+    }
+
+    /// Insert a context value.
+    ///
+    /// If a context value of the same type already existed, it is returned.
+    pub fn insert_embed_ctx<T: Any>(&mut self, x: T) -> Option<T> {
+        self.embed_ctx.insert(x)
+    }
+
+    /// Remove a context value of a particular type, returning it if it exists.
+    pub fn remove_embed_ctx<T: Any>(&mut self) -> Option<T> {
+        self.embed_ctx.remove::<T>()
     }
 
     /// Set the handler run when `SIGBUS`, `SIGFPE`, `SIGILL`, or `SIGSEGV` are caught by the
@@ -416,11 +446,11 @@ impl Instance {
 
 // Private API
 impl Instance {
-    fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: *mut c_void) -> Self {
+    fn new(alloc: Alloc, module: Arc<dyn Module>) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
         Instance {
             magic: LUCET_INSTANCE_MAGIC,
-            embed_ctx,
+            embed_ctx: CtxMap::new(),
             module,
             ctx: Context::new(),
             state: State::Ready {

@@ -14,6 +14,7 @@ pub mod test_helpers;
 pub mod alloc;
 pub mod c_api;
 pub mod context;
+pub mod embed_ctx;
 pub mod instance;
 pub mod module;
 pub mod region;

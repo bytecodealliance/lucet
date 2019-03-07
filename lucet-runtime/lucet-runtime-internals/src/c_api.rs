@@ -215,8 +215,9 @@ pub unsafe extern "C" fn lucet_mmap_region_new_instance_with_ctx(
     assert_nonnull!(inst_out);
     with_ffi_arcs!([region: MmapRegion, module: DlModule], {
         region
-            .new_instance_with_ctx(module.clone() as Arc<dyn Module>, embed_ctx)
-            .map(|i| {
+            .new_instance(module.clone() as Arc<dyn Module>)
+            .map(|mut i| {
+                i.insert_embed_ctx(embed_ctx);
                 inst_out.write(instance_handle_to_raw(i) as _);
                 lucet_error::Ok
             })
@@ -389,7 +390,11 @@ pub unsafe extern "C" fn lucet_instance_grow_heap(
 
 #[no_mangle]
 pub unsafe extern "C" fn lucet_instance_embed_ctx(inst: *mut lucet_instance) -> *mut c_void {
-    with_instance_ptr_unchecked!(inst, { inst.embed_ctx() })
+    with_instance_ptr_unchecked!(inst, {
+        inst.get_embed_ctx::<*mut c_void>()
+            .map(|p| *p)
+            .unwrap_or(ptr::null_mut())
+    })
 }
 
 #[repr(C)]

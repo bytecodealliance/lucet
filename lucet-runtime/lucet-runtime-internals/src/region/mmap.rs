@@ -16,11 +16,7 @@ pub struct MmapRegion {
 }
 
 impl Region for MmapRegion {
-    fn new_instance_with_ctx(
-        &self,
-        module: Arc<dyn Module>,
-        embed_ctx: *mut c_void,
-    ) -> Result<InstanceHandle, Error> {
+    fn new_instance(&self, module: Arc<dyn Module>) -> Result<InstanceHandle, Error> {
         let slot = self
             .freelist
             .lock()
@@ -69,7 +65,7 @@ impl Region for MmapRegion {
             region,
         };
 
-        let inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
+        let inst = new_instance_handle(inst_ptr, module, alloc)?;
 
         Ok(inst)
     }

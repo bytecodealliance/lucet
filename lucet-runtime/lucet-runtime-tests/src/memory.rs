@@ -80,14 +80,20 @@ macro_rules! memory_tests {
 
             let mut libc = Box::new(LucetLibc::new());
             libc.set_stdio_handler(debug_handler);
+            let libc = Box::into_raw(libc) as *mut libc::c_void;
 
             let mut inst = region
-                .new_instance_with_ctx(module, Box::into_raw(libc) as *mut libc::c_void)
+                .new_instance(module)
                 .expect("instance can be created");
+            inst.insert_embed_ctx(libc);
 
             inst.run(b"main", &[]).expect("instance runs");
 
             assert_output_eq!("this is a string located in the heap: hello from musl_alloc.c!\n\n");
+
+            unsafe {
+                Box::from_raw(libc as *mut LucetLibc);
+            }
         }
     };
 }

@@ -12,6 +12,7 @@ use crate::instance::{
 };
 use crate::WASM_PAGE_SIZE;
 use libc::c_void;
+use std::any::Any;
 use std::sync::Once;
 
 /// Marker type for the `vmctx` pointer argument.
@@ -70,9 +71,31 @@ impl Vmctx {
         self.instance().check_heap(ptr, len)
     }
 
-    /// Get the embedder context for this instance.
-    pub fn embed_ctx(&self) -> *mut c_void {
-        self.instance().embed_ctx
+    /// Check whether a context value of a particular type exists.
+    pub fn contains_embed_ctx<T: Any>(&self) -> bool {
+        self.instance().contains_embed_ctx::<T>()
+    }
+
+    /// Get a reference to a context value of a particular type, if it exists.
+    pub fn get_embed_ctx<T: Any>(&self) -> Option<&T> {
+        self.instance().get_embed_ctx::<T>()
+    }
+
+    /// Get a mutable reference to a context value of a particular type, if it exists.
+    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<&mut T> {
+        self.instance_mut().get_embed_ctx_mut::<T>()
+    }
+
+    /// Insert a context value.
+    ///
+    /// If a context value of the same type already existed, it is returned.
+    pub fn insert_embed_ctx<T: Any>(&mut self, x: T) -> Option<T> {
+        self.instance_mut().insert_embed_ctx(x)
+    }
+
+    /// Remove a context value of a particular type, returning it if it exists.
+    pub fn remove_embed_ctx<T: Any>(&mut self) -> Option<T> {
+        self.instance_mut().remove_embed_ctx::<T>()
     }
 
     /// Terminate this guest and return to the host context.
@@ -287,4 +310,7 @@ pub unsafe extern "C" fn lucet_vmctx_terminate(vmctx: *mut lucet_vmctx, info: *m
 pub unsafe extern "C" fn lucet_vmctx_get_delegate(vmctx: *mut lucet_vmctx) -> *mut c_void {
     let inst = Instance::from_vmctx(vmctx);
     inst.embed_ctx
+        .get::<*mut c_void>()
+        .map(|p| *p)
+        .unwrap_or(std::ptr::null_mut())
 }
