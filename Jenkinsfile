@@ -6,6 +6,7 @@ def builtTag = fastlyDockerBuild([script: this, containers: containers])
 
 def podTemplates = new PodTemplates(this)
 
+def builders = [:]
 builders['fastly/isolation-test'] = {
   podTemplates.adhocImage('fastly/isolation', builtTag) {
     checkout scm
