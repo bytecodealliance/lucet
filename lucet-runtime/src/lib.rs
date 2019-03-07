@@ -3,7 +3,7 @@
 //! This crate runs programs that were compiled with the `lucetc` WebAssembly to native code
 //! compiler. It provides an interface for modules to be loaded from shared object files (see
 //! `DlModule`), and for hosts to provide specialized functionality to guests (see
-//! `Region::new_instance_with_ctx`).
+//! `Instance::embed_ctx()`).
 //!
 //! The runtime is a critical part of the safety and security story for Lucet. While the semantics
 //! of WebAssembly and the `lucetc` compiler provide many guarantees, the runtime must be correct in
@@ -68,8 +68,45 @@
 //! Some simple hostcalls can be implemented simply as an exported C function that takes an opaque
 //! pointer argument (usually called `vmctx`). Hostcalls that require access to some underlying
 //! state, such as the key/value store in Terrarium, can access a custom embedder context through
-//! `vmctx`. For example, `lucet-libc` uses the embedder context to keep track of stdio and
-//! termination info.
+//! `vmctx`. For example, to make a `u32` available to hostcalls:
+//!
+//! ```no_run
+//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
+//! use lucet_runtime::vmctx::{Vmctx, lucet_vmctx};
+//! use lucet_libc::LucetLibc;
+//!
+//! struct MyContext { x: u32 }
+//!
+//! #[no_mangle]
+//! unsafe extern "C" fn foo(vmctx: *mut lucet_vmctx) {
+//!     let mut vmctx = Vmctx::from_raw(vmctx);
+//!     let hostcall_context = vmctx
+//!         .get_embed_ctx_mut::<MyContext>()
+//!         .unwrap();
+//!     hostcall_context.x = 42;
+//! }
+//!
+//! let module = DlModule::load("/my/lucet/module.so").unwrap();
+//! let region = MmapRegion::create(1, &Limits::default()).unwrap();
+//! let mut inst = region
+//!     .new_instance(module)
+//!     .unwrap();
+//! inst.insert_embed_ctx(MyContext { x: 0 });
+//!
+//! inst.run(b"call_foo", &[]).unwrap();
+//!
+//! let context_after = inst.get_embed_ctx::<MyContext>().unwrap();
+//! assert_eq!(context_after.x, 42);
+//! ```
+//!
+//! The embedder context is backed by a structure that can hold a single value of any type. Rust
+//! embedders should add their own custom state type (like `MyContext` above) for any context they
+//! require, rather than using a common type (such as the `u32`) from the standard library. This
+//! avoids collisions between libraries, and allows for easy composition of embeddings.
+//!
+//! For C-based embedders, the type `*mut libc::c_void` is privileged as the only type that the C
+//! API provides. The following example shows how a Rust embedder can initialize a C-compatible
+//! context:
 //!
 //! ```no_run
 //! use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
@@ -77,12 +114,18 @@
 //!
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
-//! let mut libc = Box::new(LucetLibc::new());
+//! let mut libc = Box::into_raw(Box::new(LucetLibc::new()));
 //! let mut inst = region
-//!     .new_instance_with_ctx(module, Box::into_raw(libc) as *mut libc::c_void)
+//!     .new_instance(module)
 //!     .unwrap();
+//! inst.insert_embed_ctx(libc as *mut libc::c_void);
 //!
 //! inst.run(b"main", &[]).unwrap();
+//!
+//! // clean up embedder context
+//! drop(inst);
+//! // `libc` must outlive `inst`, but then must be turned back into a box in order to drop
+//! unsafe { Box::from_raw(libc) };
 //! ```
 //!
 //! ## Custom Signal Handlers

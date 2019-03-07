@@ -32,7 +32,6 @@ macro_rules! host_tests {
         ) {
             unsafe {
                 let mut vmctx = Vmctx::from_raw(vmctx);
-                let confirmed_hello = vmctx.embed_ctx() as *mut bool;
                 let heap = vmctx.heap();
                 let hello = heap.as_ptr() as usize + hello_ptr as usize;
                 if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
@@ -40,7 +39,7 @@ macro_rules! host_tests {
                 }
                 let hello = std::slice::from_raw_parts(hello as *const u8, hello_len as usize);
                 if hello.starts_with(b"hello") {
-                    *confirmed_hello = true;
+                    *vmctx.get_embed_ctx_mut::<bool>().unwrap() = true;
                 }
             }
         }
@@ -76,15 +75,14 @@ macro_rules! host_tests {
             let module = DlModule::load_test(HELLO_MOD_PATH).expect("module loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
-            let mut confirm_hello = false;
-
             let mut inst = region
-                .new_instance_with_ctx(module, (&mut confirm_hello) as *mut bool as *mut c_void)
+                .new_instance(module)
                 .expect("instance can be created");
+            inst.insert_embed_ctx(false);
 
             inst.run(b"main", &[]).expect("instance runs");
 
-            assert!(confirm_hello);
+            assert!(inst.get_embed_ctx::<bool>().unwrap());
         }
 
         #[test]
