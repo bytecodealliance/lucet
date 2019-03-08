@@ -691,6 +691,15 @@ pub enum TerminationDetails {
     Other(Arc<Box<dyn Any>>),
 }
 
+impl TerminationDetails {
+    pub fn provided_details(&self) -> Option<&dyn Any> {
+        match self {
+            TerminationDetails::Other(a) => Some(a),
+            _ => None,
+        }
+    }
+}
+
 impl std::fmt::Debug for TerminationDetails {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "TerminationDetails::{}", match self {

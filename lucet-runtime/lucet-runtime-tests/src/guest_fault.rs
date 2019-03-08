@@ -178,7 +178,7 @@ macro_rules! guest_fault_tests {
 
         #[no_mangle]
         unsafe extern "C" fn hostcall_test(vmctx: *mut lucet_vmctx) {
-            Vmctx::from_raw(vmctx).terminate(HOSTCALL_TEST_ERROR.as_ptr() as *mut c_void);
+            Vmctx::from_raw(vmctx).terminate(HOSTCALL_TEST_ERROR);
         }
 
         fn run_onetwothree(inst: &mut Instance) {
@@ -245,10 +245,13 @@ macro_rules! guest_fault_tests {
                     .expect("instance can be created");
 
                 match inst.run(b"hostcall_main", &[]) {
-                    Err(Error::RuntimeTerminated(details)) => {
+                    Err(Error::RuntimeTerminated(term)) => {
                         assert_eq!(
-                            details.unwrap().info,
-                            HOSTCALL_TEST_ERROR.as_ptr() as *mut c_void
+                            *term.provided_details()
+                                .expect("user terminated in hostcall")
+                                .downcast_ref::<&'static str>()
+                                .expect("error was str"),
+                            HOSTCALL_TEST_ERROR,
                         );
                     }
                     res => panic!("unexpected result: {:?}", res),
