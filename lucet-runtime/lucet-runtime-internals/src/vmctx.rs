@@ -13,7 +13,7 @@ use crate::instance::{
 use crate::WASM_PAGE_SIZE;
 use libc::c_void;
 use std::any::Any;
-use std::sync::{Once, Arc};
+use std::sync::{Arc, Once};
 
 /// Marker type for the `vmctx` pointer argument.
 ///
@@ -76,32 +76,22 @@ impl Vmctx {
         self.instance().contains_embed_ctx::<T>()
     }
 
-    /// Get a reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx<T: Any>(&self) -> Option<&T> {
-        self.instance().get_embed_ctx::<T>()
+    /// Get a reference to a context value of a particular type. If it does not exist,
+    /// the context will terminate.
+    pub fn get_embed_ctx<T: Any>(&mut self) -> &T {
+        self.instance_mut().get_embed_ctx_or_term()
     }
 
-    /// Get a mutable reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<&mut T> {
-        self.instance_mut().get_embed_ctx_mut::<T>()
-    }
-
-    /// Insert a context value.
-    ///
-    /// If a context value of the same type already existed, it is returned.
-    pub fn insert_embed_ctx<T: Any>(&mut self, x: T) -> Option<T> {
-        self.instance_mut().insert_embed_ctx(x)
-    }
-
-    /// Remove a context value of a particular type, returning it if it exists.
-    pub fn remove_embed_ctx<T: Any>(&mut self) -> Option<T> {
-        self.instance_mut().remove_embed_ctx::<T>()
+    /// Get a mutable reference to a context value of a particular type> If it does not exist,
+    /// the context will terminate.
+    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> &mut T {
+        self.instance_mut().get_embed_ctx_mut_or_term()
     }
 
     /// Terminate this guest and return to the host context.
     ///
     /// This will return an `Error::RuntimeTerminated` value to the caller of `Instance::run()`.
-    pub fn terminate<A: Any>(&mut self, info: A) -> ! {
+    pub fn terminate<I: Any>(&mut self, info: I) -> ! {
         let details = TerminationDetails::Other(Arc::new(Box::new(info)));
         unsafe { self.instance_mut().terminate(details) }
     }
@@ -163,6 +153,18 @@ impl Vmctx {
     }
 }
 
+/// Terminating an instance requires mutating the state field, and then jumping back to the
+/// host context. The mutable borrow may conflict with a mutable borrow of the embed_ctx if
+/// this is performed via a method call. We use a macro so we can convince the borrow checker that
+/// this is safe at each use site.
+macro_rules! inst_terminate {
+    ($self:ident, $details:expr) => {{
+        $self.state = State::Terminated { details: $details };
+        #[allow(unused_unsafe)] // The following unsafe will be incorrectly warned as unused
+        HOST_CTX.with(|host_ctx| unsafe { Context::set(&*host_ctx.get()) })
+    }};
+}
+
 impl Instance {
     /// Get an Instance from the `vmctx` pointer.
     ///
@@ -195,14 +197,29 @@ impl Instance {
         inst
     }
 
+    /// Helper function specific to Vmctx::get_embed_ctx. From the vmctx interface,
+    /// there is no way to recover if the expected embedder ctx is not set, so we terminate
+    /// the instance.
+    fn get_embed_ctx_or_term<T: Any>(&mut self) -> &T {
+        match self.embed_ctx.get::<T>() {
+            Some(t) => t,
+            None => inst_terminate!(self, TerminationDetails::GetEmbedCtx),
+        }
+    }
+
+    /// Helper function specific to Vmctx::get_embed_ctx_mut. See above.
+    fn get_embed_ctx_mut_or_term<T: Any>(&mut self) -> &mut T {
+        match self.embed_ctx.get_mut::<T>() {
+            Some(t) => t,
+            None => inst_terminate!(self, TerminationDetails::GetEmbedCtx),
+        }
+    }
+
     /// Terminate the guest and swap back to the host context.
     ///
     /// Only safe to call from within the guest context.
     unsafe fn terminate(&mut self, details: TerminationDetails) -> ! {
-        self.state = State::Terminated {
-            details,
-        };
-        HOST_CTX.with(|host_ctx| Context::set(&*host_ctx.get()))
+        inst_terminate!(self, details)
     }
 }
 
