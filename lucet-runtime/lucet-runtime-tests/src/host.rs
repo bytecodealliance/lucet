@@ -35,11 +35,11 @@ macro_rules! host_tests {
                 let heap = vmctx.heap();
                 let hello = heap.as_ptr() as usize + hello_ptr as usize;
                 if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
-                    vmctx.terminate(std::ptr::null_mut());
+                    vmctx.terminate("heap access");
                 }
                 let hello = std::slice::from_raw_parts(hello as *const u8, hello_len as usize);
                 if hello.starts_with(b"hello") {
-                    *vmctx.get_embed_ctx_mut::<bool>().unwrap() = true;
+                    *vmctx.get_embed_ctx_mut::<bool>() = true;
                 }
             }
         }
@@ -47,8 +47,7 @@ macro_rules! host_tests {
         const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
         #[no_mangle]
         extern "C" fn hostcall_test_func_hostcall_error(vmctx: *mut lucet_vmctx) {
-            let info = Box::new(ERROR_MESSAGE);
-            unsafe { Vmctx::from_raw(vmctx).terminate(Box::into_raw(info) as *mut c_void) }
+            unsafe { Vmctx::from_raw(vmctx).terminate(ERROR_MESSAGE) }
         }
 
         #[test]
@@ -94,9 +93,15 @@ macro_rules! host_tests {
                 .expect("instance can be created");
 
             match inst.run(b"main", &[]) {
-                Err(Error::RuntimeTerminated(details)) => {
-                    let info = unsafe { Box::from_raw(details.unwrap().info as *mut &'static str) };
-                    assert_eq!(*info, ERROR_MESSAGE);
+                Err(Error::RuntimeTerminated(term)) => {
+                    assert_eq!(
+                        *term
+                            .provided_details()
+                            .expect("user provided termination reason")
+                            .downcast_ref::<&'static str>()
+                            .expect("error was static str"),
+                        ERROR_MESSAGE
+                    );
                 }
                 res => panic!("unexpected result: {:?}", res),
             }
