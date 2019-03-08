@@ -1,0 +1,9 @@
+{
+    "env": {
+        "__wasi_proc_exit": "__wasi_proc_exit",
+        "__wasi_fd_close": "__wasi_fd_close",
+        "__wasi_fd_stat_get": "__wasi_fd_stat_get",
+        "__wasi_fd_seek": "__wasi_fd_seek",
+        "__wasi_fd_write": "__wasi_fd_write"
+    }
+}
