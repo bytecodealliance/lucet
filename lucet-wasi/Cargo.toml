@@ -1,0 +1,14 @@
+[package]
+name = "lucet-wasi"
+version = "0.1.0"
+authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+cast = "0.2"
+clap = "2.23"
+lucet-runtime = { path = "../../public/lucet-runtime" }
+nix = "0.13"
+
+[build-dependencies]
+bindgen = "0.47"
