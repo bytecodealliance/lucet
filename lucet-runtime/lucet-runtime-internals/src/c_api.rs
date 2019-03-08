@@ -469,7 +469,7 @@ pub unsafe extern "C" fn lucet_instance_set_fatal_handler(
 
 pub mod lucet_state {
     use crate::c_api::lucet_val;
-    use crate::instance::State;
+    use crate::instance::{State, TerminationDetails};
     use crate::module::AddrDetails;
     use crate::trapcode::{TrapCode, TrapCodeType};
     use libc::{c_char, c_void};
@@ -511,7 +511,23 @@ pub mod lucet_state {
                 State::Terminated { details } => lucet_state {
                     tag: lucet_state_tag::Terminated,
                     val: lucet_state_val {
-                        terminated: details.info,
+                        terminated: match details {
+                            TerminationDetails::Signal => lucet_terminated {
+                                reason: lucet_terminated_reason::Signal,
+                                other: std::ptr::null_mut(),
+                            },
+                            TerminationDetails::GetEmbedCtx => lucet_terminated {
+                                reason: lucet_terminated_reason::GetEmbedCtx,
+                                other: std::ptr::null_mut(),
+                            },
+                            TerminationDetails::Other(other) => lucet_terminated {
+                                reason: lucet_terminated_reason::Other,
+                                other: other
+                                    .downcast_ref()
+                                    .map(|v| *v)
+                                    .unwrap_or(std::ptr::null_mut()),
+                            },
+                        },
                     },
                 },
             }
@@ -556,7 +572,22 @@ pub mod lucet_state {
         // no meaning to this boolean, it's just there so the type is FFI-safe
         pub running: bool,
         pub fault: lucet_runtime_fault,
-        pub terminated: *mut c_void,
+        pub terminated: lucet_terminated,
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct lucet_terminated {
+        pub reason: lucet_terminated_reason,
+        pub other: *mut c_void,
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub enum lucet_terminated_reason {
+        Signal,
+        GetEmbedCtx,
+        Other,
     }
 
     #[repr(C)]

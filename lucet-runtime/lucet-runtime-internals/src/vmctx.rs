@@ -13,7 +13,7 @@ use crate::instance::{
 use crate::WASM_PAGE_SIZE;
 use libc::c_void;
 use std::any::Any;
-use std::sync::Once;
+use std::sync::{Once, Arc};
 
 /// Marker type for the `vmctx` pointer argument.
 ///
@@ -106,8 +106,9 @@ impl Vmctx {
     /// Terminate this guest and return to the host context.
     ///
     /// This will return an `Error::RuntimeTerminated` value to the caller of `Instance::run()`.
-    pub fn terminate(&mut self, info: *mut c_void) -> ! {
-        unsafe { self.instance_mut().terminate(info) }
+    pub fn terminate<A: Any>(&mut self, info: A) -> ! {
+        let details = TerminationDetails::Other(Arc::new(Box::new(info)));
+        unsafe { self.instance_mut().terminate(details) }
     }
 
     /// Grow the guest memory by the given number of WebAssembly pages.
@@ -202,9 +203,9 @@ impl Instance {
     /// Terminate the guest and swap back to the host context.
     ///
     /// Only safe to call from within the guest context.
-    unsafe fn terminate(&mut self, info: *mut c_void) -> ! {
+    unsafe fn terminate(&mut self, details: TerminationDetails) -> ! {
         self.state = State::Terminated {
-            details: TerminationDetails { info },
+            details,
         };
         HOST_CTX.with(|host_ctx| Context::set(&*host_ctx.get()))
     }
@@ -304,8 +305,7 @@ pub unsafe extern "C" fn lucet_vmctx_get_func_from_idx(
 
 #[no_mangle]
 pub unsafe extern "C" fn lucet_vmctx_terminate(vmctx: *mut lucet_vmctx, info: *mut c_void) {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.terminate(info);
+    Vmctx::from_raw(vmctx).terminate(info);
 }
 
 #[no_mangle]
