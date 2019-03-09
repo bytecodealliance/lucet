@@ -27,7 +27,8 @@ test: indent-check build-test-deps
             -p lucet-libc-sys \
             -p lucet-module-data \
             -p lucetc \
-            -p lucet-idl
+            -p lucet-idl \
+            -p lucet-wasi-sdk
 	make -C tests
 
 .PHONY: bench

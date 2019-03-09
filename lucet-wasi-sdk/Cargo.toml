@@ -1,0 +1,11 @@
+[package]
+name = "lucet-wasi-sdk"
+version = "0.1.0"
+authors = ["Pat Hickey <phickey@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+failure = "0.1"
+
+[dev-dependencies]
+tempdir = "0.3.7"
