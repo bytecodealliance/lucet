@@ -40,5 +40,5 @@ macro_rules! memory_tests {
             // guest then puts the result of the current memory call in heap[4] (indexed by bytes)
             assert_eq!(heap[1], 5);
         }
-    }
+    };
 }

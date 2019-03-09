@@ -247,7 +247,8 @@ macro_rules! guest_fault_tests {
                 match inst.run(b"hostcall_main", &[]) {
                     Err(Error::RuntimeTerminated(term)) => {
                         assert_eq!(
-                            *term.provided_details()
+                            *term
+                                .provided_details()
                                 .expect("user terminated in hostcall")
                                 .downcast_ref::<&'static str>()
                                 .expect("error was str"),

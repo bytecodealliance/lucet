@@ -590,9 +590,7 @@ impl Instance {
         {
             // We do this after returning from the signal handler because it requires `dladdr`
             // calls, which are not signal safe
-            *rip_addr_details = self
-                .module
-                .addr_details(rip_addr as *const c_void)?.clone();
+            *rip_addr_details = self.module.addr_details(rip_addr as *const c_void)?.clone();
 
             // If the trap table lookup returned unknown, it is a fatal error
             let unknown_fault = trapcode.ty == TrapCodeType::Unknown;
@@ -696,11 +694,15 @@ impl TerminationDetails {
 
 impl std::fmt::Debug for TerminationDetails {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "TerminationDetails::{}", match self {
-           TerminationDetails::Signal => "Signal",
-           TerminationDetails::GetEmbedCtx => "GetEmbedCtx",
-           TerminationDetails::Other(_) => "Other(Any)",
-        })
+        write!(
+            f,
+            "TerminationDetails::{}",
+            match self {
+                TerminationDetails::Signal => "Signal",
+                TerminationDetails::GetEmbedCtx => "GetEmbedCtx",
+                TerminationDetails::Other(_) => "Other(Any)",
+            }
+        )
     }
 }
 
