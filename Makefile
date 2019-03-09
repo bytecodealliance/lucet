@@ -10,6 +10,8 @@ build:
 	cd lucet-spectest && cargo build
 	cd lucet-analyze && cargo build
 	cd lucet-idl && cargo build
+	cd lucet-wasi && cargo build
+	cd lucet-wasi-sdk && cargo build
 
 .PHONY: build-test-deps
 build-test-deps:
@@ -24,6 +26,8 @@ test: build-test-deps
 	cd lucet-module-data && cargo test
 	cd lucetc && cargo test
 	cd lucet-idl && cargo test
+	cd lucet-wasi && cargo build
+	cd lucet-wasi-sdk && cargo build
 	make -C tests
 
 .PHONY: bench
