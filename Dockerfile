@@ -40,7 +40,12 @@ RUN curl -L -O http://download.savannah.nongnu.org/releases/libunwind/libunwind-
 	&& rm -rf libunwind-1.2.1 libunwind-1.2.1.tar.gz
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=1.31.0 -y
-ENV PATH=/root/.cargo/bin:$PATH
-RUN rustup component add rustfmt
-RUN cargo install cargo-audit cargo-watch
+RUN curl -L -O https://static.rust-lang.org/dist/rust-1.31.0-x86_64-unknown-linux-gnu.tar.gz \
+	&& tar xzf rust-1.31.0-x86_64-unknown-linux-gnu.tar.gz \
+	&& cd rust-1.31.0-x86_64-unknown-linux-gnu \
+	&& ./install.sh \
+	&& cd .. \
+	&& rm -rf rust-1.31.0-x86_64-unknown-linux-gnu rust-1.31.0-x86_64-unknown-linux-gnu.tar.gz
+ENV PATH=/usr/local/bin:$PATH
+RUN cargo install --root /usr/local cargo-audit cargo-watch
+
