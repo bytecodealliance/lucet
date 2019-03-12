@@ -36,6 +36,12 @@ pub enum OptLevel {
     Fastest,
 }
 
+impl Default for OptLevel {
+    fn default() -> OptLevel {
+        OptLevel::Default
+    }
+}
+
 impl OptLevel {
     fn to_flag(&self) -> &str {
         match self {

@@ -3,14 +3,11 @@ mod options;
 use crate::options::{CodegenOutput, Options};
 use failure::{format_err, Error, ResultExt};
 use log::info;
-use lucetc::bindings::Bindings;
-use lucetc::load::read_module;
-use lucetc::patch::patch_module;
-use lucetc::program::Program;
-use std::collections::HashMap;
+use lucetc::{Bindings, Lucetc};
+
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::process::{self, Command};
+use std::process;
 
 fn main() {
     env_logger::init();
@@ -36,25 +33,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         _ => Err(format_err!("provided too many inputs: {:?}", opts.input)),
     }?;
 
-    let name = String::from(
-        PathBuf::from(input)
-            .file_stem()
-            .ok_or(format_err!("input filename {:?} is not a file", input))?
-            .to_str()
-            .ok_or(format_err!("input filename {:?} is not valid utf8", input))?,
-    );
-
-    let module = read_module(&PathBuf::from(input)).context("loading module {}")?;
-
-    let (module, builtins_map) = if let Some(builtins_path) = &opts.builtins_path {
-        patch_module(module, builtins_path)?
-    } else {
-        (module, HashMap::new())
-    };
-
     let mut bindings = Bindings::empty();
-    bindings.extend(Bindings::env(builtins_map))?;
-
     for file in opts.binding_files.iter() {
         let file_bindings =
             Bindings::from_file(file).context(format!("bindings file {:?}", file))?;
@@ -63,48 +42,26 @@ pub fn run(opts: &Options) -> Result<(), Error> {
             .context(format!("adding bindings from {:?}", file))?;
     }
 
-    let prog = Program::new(module, bindings, opts.heap.clone())?;
-    let comp = lucetc::compile(&prog, &name, opts.opt_level)?;
+    let mut c = Lucetc::new(PathBuf::from(input))?
+        .bindings(bindings)?
+        .opt_level(opts.opt_level);
 
-    if opts.print_isa {
-        println!("{}", comp.isa())
+    if let Some(ref builtins) = opts.builtins_path {
+        c.with_builtins(builtins.clone())?;
+    }
+
+    if let Some(reserved_size) = opts.reserved_size {
+        c.with_reserved_size(reserved_size);
+    }
+
+    if let Some(guard_size) = opts.guard_size {
+        c.with_guard_size(guard_size);
     }
 
     match opts.codegen {
-        CodegenOutput::Obj => {
-            let obj = comp.codegen()?;
-            obj.write(&opts.output).context("writing object file")?;
-        }
-        CodegenOutput::SharedObj => {
-            let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
-            let objpath = dir.path().join("tmp.o");
-
-            let obj = comp.codegen()?;
-            obj.write(&objpath).context("writing object file")?;
-
-            let mut cmd_ld = Command::new("ld");
-            cmd_ld.arg(objpath.clone());
-            cmd_ld.arg("-shared");
-            cmd_ld.arg("-o");
-            cmd_ld.arg(opts.output.clone());
-
-            let run_ld = cmd_ld
-                .output()
-                .context(format_err!("running ld on {:?}", objpath.clone()))?;
-
-            if !run_ld.status.success() {
-                Err(format_err!(
-                    "ld of {} failed: {}",
-                    objpath.to_str().unwrap(),
-                    String::from_utf8_lossy(&run_ld.stderr)
-                ))?;
-            }
-        }
-        CodegenOutput::Clif => {
-            comp.cranelift_funcs()
-                .write(&opts.output)
-                .context("writing clif file")?;
-        }
+        CodegenOutput::Obj => c.object_file(opts.output.clone())?,
+        CodegenOutput::SharedObj => c.shared_object_file(opts.output.clone())?,
+        CodegenOutput::Clif => c.clif_ir(opts.output.clone())?,
     }
     Ok(())
 }

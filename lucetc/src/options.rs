@@ -1,10 +1,9 @@
 use clap::{App, Arg, ArgMatches};
-use failure::{Error, ResultExt};
-use lucetc::compiler::OptLevel;
-use lucetc::program::memory::HeapSettings;
+use failure::Error;
+use lucetc::{OptLevel, HeapSettings};
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CodegenOutput {
     Clif,
     Obj,
@@ -35,10 +34,10 @@ pub struct Options {
     pub output: PathBuf,
     pub input: Vec<PathBuf>,
     pub codegen: CodegenOutput,
-    pub print_isa: bool,
     pub binding_files: Vec<PathBuf>,
     pub builtins_path: Option<PathBuf>,
-    pub heap: HeapSettings,
+    pub reserved_size: Option<u64>,
+    pub guard_size: Option<u64>,
     pub opt_level: OptLevel,
 }
 
@@ -51,8 +50,6 @@ impl Options {
             .collect();
 
         let output = PathBuf::from(m.value_of("output").unwrap_or("a.out"));
-
-        let print_isa = m.is_present("print_isa");
 
         let binding_files: Vec<PathBuf> = m
             .values_of("bindings")
@@ -70,16 +67,17 @@ impl Options {
 
         let builtins_path = m.value_of("builtins").map(PathBuf::from);
 
-        let reserved_size = m
-            .value_of("reserved_size")
-            .map(parse_humansized)
-            .unwrap_or(Ok(HeapSettings::default().reserved_size))
-            .context("parsing reserved-size argument")?;
-        let guard_size = m
-            .value_of("guard_size")
-            .map(parse_humansized)
-            .unwrap_or(Ok(HeapSettings::default().guard_size))
-            .context("parsing guard-size argument")?;
+        let reserved_size = if let Some(reserved_str) = m.value_of("reserved_size") {
+            Some(parse_humansized(reserved_str)?)
+        } else {
+            None
+        };
+
+        let guard_size = if let Some(guard_str) = m.value_of("guard_size") {
+            Some(parse_humansized(guard_str)?)
+        } else {
+            None
+        };
 
         let opt_level = match m.value_of("opt_level") {
             None => OptLevel::Default,
@@ -93,13 +91,10 @@ impl Options {
             output,
             input,
             codegen,
-            print_isa,
             binding_files,
             builtins_path,
-            heap: HeapSettings {
-                reserved_size,
-                guard_size,
-            },
+            reserved_size,
+            guard_size,
             opt_level,
         })
     }
@@ -124,12 +119,6 @@ impl Options {
                     .takes_value(true)
                     .multiple(false)
                     .help("output destination, defaults to a.out if unspecified"),
-            )
-            .arg(
-                Arg::with_name("print_isa")
-                    .long("print-isa")
-                    .takes_value(false)
-                    .help("print out cretonne target ISA flags (code generation only)"),
             )
             .arg(
                 Arg::with_name("bindings")
