@@ -15,4 +15,4 @@ crate-type=["rlib"]
 lucet-runtime = { path = "../../lucet-runtime" }
 
 [build-dependencies]
-bindgen = "0.45"
+bindgen = "0.47"
