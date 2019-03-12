@@ -1,7 +1,6 @@
 # This Makefile exists primarily to allow running just the test suite for lucet-runtime, rather than
 # for the whole workspace.
 
-export LD_LIBRARY_PATH:=$(abspath ../lucet-runtime-c/build):$(abspath ../lucet-libc/build/lib):$(LD_LIBRARY_PATH)
 export GUEST_MODULE_PREFIX=$(abspath $(CURDIR)/..)
 
 default: build

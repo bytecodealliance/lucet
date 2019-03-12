@@ -1,6 +1,3 @@
-# Even though we don't need LD_LIBRARY_PATH for each target, setting it once and for all prevents
-# Cargo from engaging in unnecessary rebuilds
-export LD_LIBRARY_PATH:=$(abspath ./lucet-runtime-c/build):$(abspath ./lucet-libc/build/lib):$(LD_LIBRARY_PATH)
 export GUEST_MODULE_PREFIX:=$(abspath .)
 
 .PHONY: build
