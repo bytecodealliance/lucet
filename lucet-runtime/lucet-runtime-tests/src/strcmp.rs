@@ -1,15 +1,14 @@
+
 #[macro_export]
 macro_rules! strcmp_tests {
     ( $TestRegion:path ) => {
         use libc::{c_char, c_int, c_void, strcmp, uint64_t};
         use lucet_runtime::vmctx::lucet_vmctx;
-        use lucet_runtime::{DlModule, Error, Limits, Region, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::{Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use std::ffi::CString;
         use std::sync::Arc;
         use $TestRegion as TestRegion;
-        use $crate::helpers::DlModuleExt;
-
-        const FAULT_MOD_PATH: &'static str = "tests/build/strcmp_guests/fault_guest.so";
+        use $crate::build::test_module;
 
         #[no_mangle]
         unsafe extern "C" fn hostcall_host_fault(_vmctx: *const lucet_vmctx) {
@@ -28,7 +27,7 @@ macro_rules! strcmp_tests {
             let res_size = std::mem::size_of::<uint64_t>();
             assert!(res_size + s1.len() + s2.len() < WASM_PAGE_SIZE as usize);
 
-            let module = DlModule::load_test(FAULT_MOD_PATH).expect("module loads");
+            let module = test_module("strcmp", "guest.c").expect("compile module");
             let region = TestRegion::create(10, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -61,28 +60,28 @@ macro_rules! strcmp_tests {
         }
 
         #[test]
-        fn abc_abc() {
+        fn strcmp_abc_abc() {
             strcmp_compare("abc", "abc");
         }
 
         #[test]
-        fn def_abc() {
+        fn strcmp_def_abc() {
             strcmp_compare("def", "abc");
         }
 
         #[test]
-        fn abcd_abc() {
+        fn strcmp_abcd_abc() {
             strcmp_compare("abcd", "abc");
         }
 
         #[test]
-        fn abc_abcd() {
+        fn strcmp_abc_abcd() {
             strcmp_compare("abc", "abcd");
         }
 
         #[test]
-        fn wasm_fault_test() {
-            let module = DlModule::load_test(FAULT_MOD_PATH).expect("module loads");
+        fn strcmp_fault_test() {
+            let module = test_module("strcmp", "guest.c").expect("compile module");
             let region = TestRegion::create(10, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)

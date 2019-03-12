@@ -1,3 +1,4 @@
+pub mod build;
 pub mod entrypoint;
 pub mod guest_fault;
 pub mod helpers;
