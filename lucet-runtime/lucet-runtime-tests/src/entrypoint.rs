@@ -1,7 +1,12 @@
+use crate::build::{test_module_c, test_module_wasm};
 use crate::helpers::MockModuleBuilder;
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
+
+pub fn wat_calculator_module() -> Arc<dyn Module> {
+    test_module_wasm("entrypoint", "calculator.wat").expect("build and load module")
+}
 
 pub fn mock_calculator_module() -> Arc<dyn Module> {
     extern "C" fn add_2(_vmctx: *mut lucet_vmctx, arg0: u64, arg1: u64) -> u64 {
@@ -133,13 +138,12 @@ macro_rules! entrypoint_tests {
         use lucet_runtime::{DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
-        use $crate::entrypoint::mock_calculator_module;
+        use $crate::entrypoint::{mock_calculator_module, wat_calculator_module};
         use $crate::helpers::DlModuleExt;
 
         #[no_mangle]
         extern "C" fn black_box(_vmctx: *mut lucet_vmctx, _val: *mut c_void) {}
 
-        const WAT_CALCULATOR_MOD_PATH: &'static str = "tests/build/entrypoint_guests/calculator.so";
         const USE_ALLOCATOR_SANDBOX_PATH: &'static str =
             "tests/build/entrypoint_guests/use_allocator.so";
         const CTYPE_SANDBOX_PATH: &'static str = "tests/build/entrypoint_guests/ctype.so";
@@ -152,7 +156,7 @@ macro_rules! entrypoint_tests {
 
         #[test]
         fn wat_calc_add_2() {
-            calc_add_2(DlModule::load_test(WAT_CALCULATOR_MOD_PATH).expect("module loads"))
+            calc_add_2(wat_calculator_module());
         }
 
         fn calc_add_2(module: Arc<dyn Module>) {
@@ -171,6 +175,11 @@ macro_rules! entrypoint_tests {
         #[test]
         fn mock_calc_add_10() {
             calc_add_10(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_calc_add_10() {
+            calc_add_10(wat_calculator_module())
         }
 
         fn calc_add_10(module: Arc<dyn Module>) {
@@ -209,6 +218,11 @@ macro_rules! entrypoint_tests {
         #[test]
         fn mock_calc_mul_2() {
             calc_mul_2(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_calc_mul_2() {
+            calc_mul_2(wat_calculator_module())
         }
 
         fn calc_mul_2(module: Arc<dyn Module>) {
@@ -253,6 +267,11 @@ macro_rules! entrypoint_tests {
             calc_invalid_entrypoint(mock_calculator_module())
         }
 
+        #[test]
+        fn wat_calc_invalid_entrypoint() {
+            calc_invalid_entrypoint(wat_calculator_module())
+        }
+
         fn calc_invalid_entrypoint(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
@@ -266,8 +285,15 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn calc_add_f32_2() {
-            let module = mock_calculator_module();
+        fn mock_calc_add_f32_2() {
+            calc_add_f32_2(mock_calculator_module());
+        }
+        #[test]
+        fn wat_calc_add_f32_2() {
+            calc_add_f32_2(wat_calculator_module());
+        }
+
+        fn calc_add_f32_2(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -281,8 +307,14 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn calc_add_f64_2() {
-            let module = mock_calculator_module();
+        fn mock_calc_add_f64_2() {
+            calc_add_f64_2(mock_calculator_module());
+        }
+        #[test]
+        fn wat_calc_add_f64_2() {
+            calc_add_f64_2(wat_calculator_module());
+        }
+        fn calc_add_f64_2(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -295,9 +327,16 @@ macro_rules! entrypoint_tests {
             assert_eq!(f64::from(retval), -6.9 + 4.2);
         }
 
+
         #[test]
-        fn calc_add_f32_10() {
-            let module = mock_calculator_module();
+        fn mock_calc_add_f32_10() {
+            calc_add_f32_10(mock_calculator_module());
+        }
+        #[test]
+        fn wat_calc_add_f32_10() {
+            calc_add_f32_10(wat_calculator_module());
+        }
+        fn calc_add_f32_10(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -328,8 +367,14 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn calc_add_f64_10() {
-            let module = mock_calculator_module();
+        fn mock_calc_add_f64_10() {
+            calc_add_f64_10(mock_calculator_module());
+        }
+        #[test]
+        fn wat_calc_add_f64_10() {
+            calc_add_f64_10(wat_calculator_module());
+        }
+        fn calc_add_f64_10(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -360,8 +405,11 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn calc_add_mixed_20() {
-            let module = mock_calculator_module();
+        fn mock_calc_add_mixed_20() {
+            calc_add_mixed_20(mock_calculator_module());
+        }
+        // TODO: it would be pretty annoying to write the mixed_20 calc test in wasm, so we havent.
+        fn calc_add_mixed_20(module: Arc<dyn Module>) {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
