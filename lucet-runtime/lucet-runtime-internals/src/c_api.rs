@@ -514,15 +514,15 @@ pub mod lucet_state {
                         terminated: match details {
                             TerminationDetails::Signal => lucet_terminated {
                                 reason: lucet_terminated_reason::Signal,
-                                other: std::ptr::null_mut(),
+                                provided: std::ptr::null_mut(),
                             },
                             TerminationDetails::GetEmbedCtx => lucet_terminated {
                                 reason: lucet_terminated_reason::GetEmbedCtx,
-                                other: std::ptr::null_mut(),
+                                provided: std::ptr::null_mut(),
                             },
-                            TerminationDetails::Other(other) => lucet_terminated {
-                                reason: lucet_terminated_reason::Other,
-                                other: other
+                            TerminationDetails::Provided(p) => lucet_terminated {
+                                reason: lucet_terminated_reason::Provided,
+                                provided: p
                                     .downcast_ref()
                                     .map(|v| *v)
                                     .unwrap_or(std::ptr::null_mut()),
@@ -579,7 +579,7 @@ pub mod lucet_state {
     #[derive(Clone, Copy)]
     pub struct lucet_terminated {
         pub reason: lucet_terminated_reason,
-        pub other: *mut c_void,
+        pub provided: *mut c_void,
     }
 
     #[repr(C)]
@@ -587,7 +587,7 @@ pub mod lucet_state {
     pub enum lucet_terminated_reason {
         Signal,
         GetEmbedCtx,
-        Other,
+        Provided,
     }
 
     #[repr(C)]

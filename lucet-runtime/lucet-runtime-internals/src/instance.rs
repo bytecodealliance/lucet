@@ -686,13 +686,16 @@ pub enum TerminationDetails {
     GetEmbedCtx,
     /// Calls to `Vmctx::terminate()` may attach an arbitrary pointer for extra debugging
     /// information.
-    Other(Arc<Box<dyn Any>>),
+    Provided(Arc<Box<dyn Any>>),
 }
 
 impl TerminationDetails {
+    pub fn provide(details: Arc<Box<dyn Any>>) -> Self {
+        TerminationDetails::Provided(details)
+    }
     pub fn provided_details(&self) -> Option<&dyn Any> {
         match self {
-            TerminationDetails::Other(a) => Some(a),
+            TerminationDetails::Provided(a) => Some(a),
             _ => None,
         }
     }
@@ -706,7 +709,7 @@ impl std::fmt::Debug for TerminationDetails {
             match self {
                 TerminationDetails::Signal => "Signal",
                 TerminationDetails::GetEmbedCtx => "GetEmbedCtx",
-                TerminationDetails::Other(_) => "Other(Any)",
+                TerminationDetails::Provided(_) => "Provided(Any)",
             }
         )
     }
