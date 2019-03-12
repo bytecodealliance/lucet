@@ -18,7 +18,7 @@ build-test-deps:
 	make -C tests guests
 
 .PHONY: test
-test: build-test-deps
+test: indent-check build-test-deps
 	make -C lucet-runtime-c test
 	make -C lucet-backtrace test
 	cargo test --no-fail-fast \

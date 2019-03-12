@@ -9,7 +9,7 @@ const char *guest_module_path(const char *name)
     const char *prefix = getenv("GUEST_MODULE_PREFIX");
     if (prefix) {
         char *relroot = "tests/build";
-        char *path = malloc(strlen(name) + strlen(relroot) + strlen(prefix) + 3);
+        char *path    = malloc(strlen(name) + strlen(relroot) + strlen(prefix) + 3);
         sprintf(path, "%s/%s/%s", prefix, relroot, name);
         return path;
     } else {
