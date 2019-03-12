@@ -1,12 +1,12 @@
-use tempdir::TempDir;
-use std::path::PathBuf;
-use std::sync::Arc;
 use failure::Error;
 use lucet_runtime_internals::module::DlModule;
 use lucet_wasi_sdk::Link;
-use lucetc::{Lucetc, Bindings};
+use lucetc::{Bindings, Lucetc};
+use std::path::PathBuf;
+use std::sync::Arc;
+use tempdir::TempDir;
 
-pub fn test_module(dir: &str, cfile: &str) -> Result<Arc<DlModule>, Error> {
+pub fn test_module_c(dir: &str, cfile: &str) -> Result<Arc<DlModule>, Error> {
     let c_path = guest_file(dir, cfile);
     let bindings_path = guest_file(dir, "bindings.json");
     c_test(c_path, bindings_path)
@@ -23,7 +23,6 @@ pub fn guest_file(dir: &str, fname: &str) -> PathBuf {
 }
 
 pub fn c_test(c_file: PathBuf, bindings_file: PathBuf) -> Result<Arc<DlModule>, Error> {
-
     let workdir = TempDir::new("c_test").expect("create working directory");
 
     let wasm_build = Link::new(vec![c_file])
@@ -38,8 +37,7 @@ pub fn c_test(c_file: PathBuf, bindings_file: PathBuf) -> Result<Arc<DlModule>, 
 
     let bindings = Bindings::from_file(&bindings_file)?;
 
-    let native_build = Lucetc::new(wasm_file)?
-        .bindings(bindings)?;
+    let native_build = Lucetc::new(wasm_file)?.bindings(bindings)?;
 
     let so_file = workdir.path().join("out.so");
 
@@ -50,4 +48,24 @@ pub fn c_test(c_file: PathBuf, bindings_file: PathBuf) -> Result<Arc<DlModule>, 
     Ok(dlmodule)
 }
 
+pub fn test_module_wasm(dir: &str, wasmfile: &str) -> Result<Arc<DlModule>, Error> {
+    let wasm_path = guest_file(dir, wasmfile);
+    let bindings_path = guest_file(dir, "bindings.json");
+    wasm_test(wasm_path, bindings_path)
+}
 
+pub fn wasm_test(wasm_file: PathBuf, bindings_file: PathBuf) -> Result<Arc<DlModule>, Error> {
+    let workdir = TempDir::new("wasm_test").expect("create working directory");
+
+    let bindings = Bindings::from_file(&bindings_file)?;
+
+    let native_build = Lucetc::new(wasm_file)?.bindings(bindings)?;
+
+    let so_file = workdir.path().join("out.so");
+
+    native_build.shared_object_file(so_file.clone())?;
+
+    let dlmodule = DlModule::load(so_file)?;
+
+    Ok(dlmodule)
+}

@@ -6,14 +6,11 @@ macro_rules! memory_tests {
         use std::sync::Mutex;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
-
-        const CURRENT_MEMORY_SANDBOX_PATH: &'static str =
-            "tests/build/memory_guests/current_memory.so";
-        const GROW_MEMORY_SANDBOX_PATH: &'static str = "tests/build/memory_guests/grow_memory.so";
+        use $crate::build::test_module_wasm;
 
         #[test]
         fn current_memory_hostcall() {
-            let module = DlModule::load_test(CURRENT_MEMORY_SANDBOX_PATH).expect("module loads");
+            let module = test_module_wasm("memory", "current_memory.wat").expect("compile and load current_memory.wasm");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -25,7 +22,7 @@ macro_rules! memory_tests {
 
         #[test]
         fn grow_memory_hostcall() {
-            let module = DlModule::load_test(GROW_MEMORY_SANDBOX_PATH).expect("module loads");
+            let module = test_module_wasm("memory", "grow_memory.wat").expect("compile and load grow_memory.wasm");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
