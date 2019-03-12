@@ -8,7 +8,7 @@ macro_rules! strcmp_tests {
         use std::ffi::CString;
         use std::sync::Arc;
         use $TestRegion as TestRegion;
-        use $crate::build::test_module;
+        use $crate::build::test_module_c;
 
         #[no_mangle]
         unsafe extern "C" fn hostcall_host_fault(_vmctx: *const lucet_vmctx) {
@@ -27,7 +27,7 @@ macro_rules! strcmp_tests {
             let res_size = std::mem::size_of::<uint64_t>();
             assert!(res_size + s1.len() + s2.len() < WASM_PAGE_SIZE as usize);
 
-            let module = test_module("strcmp", "guest.c").expect("compile module");
+            let module = test_module_c("strcmp", "guest.c").expect("compile module");
             let region = TestRegion::create(10, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -81,7 +81,7 @@ macro_rules! strcmp_tests {
 
         #[test]
         fn strcmp_fault_test() {
-            let module = test_module("strcmp", "guest.c").expect("compile module");
+            let module = test_module_c("strcmp", "guest.c").expect("compile module");
             let region = TestRegion::create(10, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
