@@ -11,14 +11,8 @@ build = "build.rs"
 [lib]
 crate-type=["rlib"]
 
-[features]
-default = []
-# used to conditionally link against liblucet-runtime-c.so for testing; eventually this should just
-# depend on `lucet-runtime`
-no-lucet-runtime-c = []
+[dev-dependencies]
+lucet-runtime = { path = "../../lucet-runtime" }
 
 [build-dependencies]
 bindgen = "0.45"
-
-[profile.test]
-rpath = true

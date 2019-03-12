@@ -27,11 +27,7 @@ fn main() {
         panic!("cannot link lucet-libc-sys: lucet-libc needs to either be built in its source tree or installed in /opt/fst-lucet-libc/lib!")
     }
 
-    println!("cargo:rustc-link-lib=dylib=lucet_libc");
-
-    if !env::var("CARGO_FEATURE_NO_LUCET_RUNTIME_C").is_ok() {
-        liblucet_runtime_dependency();
-    }
+    println!("cargo:rustc-link-lib=static=lucet_libc");
 
     let mut lucet_libc_include_dir = lucet_libc_base_dir.clone();
     lucet_libc_include_dir.push("src");
@@ -70,31 +66,4 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
-}
-
-fn liblucet_runtime_dependency() {
-    let mut liblucet_runtime_base_dir =
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("cargo env var set"));
-    liblucet_runtime_base_dir.push("..");
-    liblucet_runtime_base_dir.push("..");
-    liblucet_runtime_base_dir.push("lucet-runtime-c");
-
-    let liblucet_runtime_install_dir = PathBuf::from("/opt/fst-liblucet-runtime-c/lib/");
-
-    let mut liblucet_runtime_build_dir = liblucet_runtime_base_dir.clone();
-    liblucet_runtime_build_dir.push("build");
-    if liblucet_runtime_build_dir.exists() {
-        let liblucet_runtime_build_dir =
-            std::fs::canonicalize(&liblucet_runtime_build_dir).expect("absolute path");
-        println!(
-            "cargo:rustc-link-search=native={}",
-            liblucet_runtime_build_dir.to_str().expect("path")
-        );
-    } else if liblucet_runtime_install_dir.exists() {
-        println!("cargo:rustc-link-search=native=/opt/fst-liblucet-runtime-c/lib/");
-    } else {
-        panic!("cannot link lucet-runtime-sys: liblucet-runtime-c needs to either be built in its source tree or installed in /opt/fst-liblucet-runtime-c/lib!")
-    }
-
-    println!("cargo:rustc-link-lib=dylib=lucet-runtime-c");
 }

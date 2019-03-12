@@ -12,7 +12,6 @@ use lucetc::{
 use parity_wasm::{self, deserialize_buffer};
 use std::io;
 use std::process::Command;
-use tempdir::TempDir;
 
 #[derive(Fail, Debug)]
 pub enum ScriptError {
@@ -86,7 +85,7 @@ impl ScriptEnv {
         let program =
             Program::new(module, bindings, HeapSettings::default()).map_err(program_error)?;
 
-        let dir = TempDir::new("codegen")?;
+        let dir = tempfile::Builder::new().prefix("codegen").tempdir()?;
         let objfile_path = dir.path().join("a.o");
         let sofile_path = dir.path().join("a.so");
 

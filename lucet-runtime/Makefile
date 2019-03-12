@@ -1,37 +1,38 @@
-# This Makefile exists primarily to keep all of the test guest sources in one place. They should
-# probably be factored out of the C runtime eventually into a standalone test support package.
+# This Makefile exists primarily to allow running just the test suite for lucet-runtime, rather than
+# for the whole workspace.
 
-LD_LIBRARY_PATH:=$(abspath ../lucet-libc/build/lib):$(LD_LIBRARY_PATH)
-GUEST_MODULE_PREFIX=$(abspath $(CURDIR)/..)
+export LD_LIBRARY_PATH:=$(abspath ../lucet-runtime-c/build):$(abspath ../lucet-libc/build/lib):$(LD_LIBRARY_PATH)
+export GUEST_MODULE_PREFIX=$(abspath $(CURDIR)/..)
 
 default: build
 
-LIBLUCET_RUNTIME_C:=../lucet-runtime-c
-.PHONY: $(LIBLUCET_RUNTIME_C)
-$(LIBLUCET_RUNTIME_C):
-	make -C $(LIBLUCET_RUNTIME_C)
-	make -C $(LIBLUCET_RUNTIME_C)/test guests
+.PHONY: lucetc
+lucetc:
+	cargo build -p lucetc
+
+LUCET_LIBC:=../lucet-libc
+.PHONY: $(LUCET_LIBC)
+$(LUCET_LIBC):
+	make -C $(LUCET_LIBC)
 
 LUCET_TESTS:=../tests
 .PHONY: $(LUCET_TESTS)
-$(LUCET_TESTS):
+$(LUCET_TESTS): $(LUCET_LIBC) lucetc
 	make -C $(LUCET_TESTS) guests
 
-TEST_DEPS:= $(LIBLUCET_RUNTIME_C) $(LUCET_TESTS)
+TEST_DEPS:= $(LUCET_LIB_C) $(LUCET_TESTS)
 
 .PHONY: build
 build:
-	cd lucet-runtime-internals && cargo build
-	cargo build
+	cargo build -p lucet-runtime
 
 .PHONY: release
 release:
-	cargo build --release
+	cargo build --release -p lucet-runtime
 
 .PHONY: test
 test: build $(TEST_DEPS)
-	cd lucet-runtime-internals && LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) GUEST_MODULE_PREFIX=$(GUEST_MODULE_PREFIX) cargo test --no-fail-fast
-	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH) GUEST_MODULE_PREFIX=$(GUEST_MODULE_PREFIX) cargo test --no-fail-fast
+	cargo test --no-fail-fast -p lucet-runtime -p lucet-runtime-internals
 
 .PHONY: audit
 audit:
@@ -39,6 +40,4 @@ audit:
 
 .PHONY: clean
 clean:
-	cd lucet-runtime-internals && cargo clean
-	cd lucet-runtime-tests && cargo clean
-	cargo clean
+	cargo clean -p lucet-runtime lucet-runtime-internals lucet-runtime-tests

@@ -1,6 +1,6 @@
 
 
-LUCETC_BIN_PATH=$(abspath ../../lucetc/target/debug/lucetc)
+LUCETC_BIN_PATH=$(abspath ../../target/debug/lucetc)
 LIBC_PATH=$(abspath ../../lucet-libc)
 
 LUCETCC:=../../lucetc/scripts/bin/lucetcc --verbose
@@ -49,7 +49,7 @@ $(LIBLUCET_RUNTIME_C)/build/liblucet-runtime-c.a:
 	make -C $(LIBLUCET_RUNTIME_C)
 
 $(LUCETC_BIN_PATH):
-	cd ../../lucetc/ && cargo build
+	cargo build -p lucetc
 
 .PHONY: clean
 clean:

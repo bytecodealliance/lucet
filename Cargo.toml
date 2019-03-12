@@ -1,0 +1,19 @@
+[workspace]
+members = [
+  "lucet-analyze",
+  "lucet-idl",
+  "lucet-libc-rs",
+  "lucet-module-data",
+  "lucet-rs",
+  "lucet-runtime",
+  "lucet-runtime/lucet-runtime-internals",
+  "lucet-runtime/lucet-runtime-tests",
+  "lucet-spectest",
+  "lucetc",
+  "sightglass",
+]
+exclude = ["cranelift"]
+
+[profile.test]
+rpath = true
+

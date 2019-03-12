@@ -12,7 +12,4 @@ failure = "0.1"
 libc = "0.2.47"
 lucet-sys = { path = "lucet-sys" }
 xfailure = "0.1"
-nix = "0.11.0"
-
-[profile.test]
-rpath = true
+nix = "0.13"

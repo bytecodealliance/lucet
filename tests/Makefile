@@ -1,10 +1,11 @@
 
 include Makefile.vars
 
+LUCET_ROOT:=$(abspath ../)
 LUCET_RUNTIME:=../lucet-runtime
 LIBLUCET_RUNTIME_C:=../lucet-runtime-c
 LIBLUCET_BACKTRACE:=../lucet-backtrace
-LUCETC:=../lucetc/target/debug/lucetc
+LUCETC:=$(LUCET_ROOT)/target/debug/lucetc
 LUCETCC:=../lucetc/scripts/bin/lucetcc
 LUCETLD:=../lucetc/scripts/bin/lucetld
 
@@ -189,16 +190,15 @@ build/%.o: %.c
 		-c $< -o $@
 
 build/lucet_test: $(LUCET_LIBC_HOST_LIB_PATH)
-build/lucet_test: $(LUCET_RUNTIME)/target/debug/liblucet_runtime.so
+build/lucet_test: $(LUCET_ROOT)/target/debug/liblucet_runtime.so
 build/lucet_test: $(LUCET_TEST_OBJECTS)
 	LIBRARY_PATH=$(LD_LIBRARY_PATH) \
 		$(CC) -rdynamic -pthread \
-		-L$(LUCET_RUNTIME)/target/debug/ -Wl,-rpath=$(LUCET_RUNTIME)/target/debug/ \
 		-o $@ $^ -ldl -lunwind
 
-.PHONY: $(LUCET_RUNTIME)/target/debug/liblucet_runtime.so
-$(LUCET_RUNTIME)/target/debug/liblucet_runtime.so:
-	make -C $(LUCET_RUNTIME)
+.PHONY: $(LUCET_ROOT)/target/debug/liblucet_runtime.so
+$(LUCET_ROOT)/target/debug/liblucet_runtime.so:
+	cargo build -p lucet-runtime
 
 .PHONY: clean
 clean:

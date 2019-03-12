@@ -324,7 +324,6 @@ mod execute {
     use lucetc::program::{HeapSettings, Program};
     use std::process::Command;
     use std::str;
-    use tempdir::TempDir;
 
     fn run_execute_test(file: &str) {
         // Compile the wasm file
@@ -335,7 +334,10 @@ mod execute {
         let comp = compile(&p, file, OptLevel::Best).expect(&format!("compile test for {}", file));
 
         // Set up output fils
-        let tmp_dir = TempDir::new("execute_test_out").expect("Failed to create temp dir");
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("execute_test_out")
+            .tempdir()
+            .expect("Failed to create temp dir");
         let obj_path = tmp_dir.path().join(format!("{}.o", file));
         let obj_file = obj_path
             .to_str()

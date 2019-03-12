@@ -68,6 +68,7 @@ mod tests {
     use super::*;
     #[test]
     fn create() {
+        lucet_runtime::lucet_internal_ensure_linked();
         let libc = LucetLibc::new();
         assert_eq!(libc.termination_reason(), None);
     }
