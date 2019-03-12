@@ -1,9 +1,15 @@
-
-
-#include <assert.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
+
+// The WASI implementation of assert pulls facilities for in printing to stderr
+// and aborting. This is lighter weight for a unit test
+static void assert(bool v) {
+    if (!v) {
+        __builtin_unreachable();
+    }
+}
 
 extern void black_box(void *);
 #define BLACK_BOX(n) black_box((void *) &n)
@@ -17,7 +23,7 @@ typedef struct CtypeCtx_ {
     size_t ret;
 } CtypeCtx;
 
-__attribute__((visibility("default"))) void ctype_setup(void *global_ctx, void **ctx_p)
+void ctype_setup(void *global_ctx, void **ctx_p)
 {
     (void) global_ctx;
 
@@ -27,7 +33,7 @@ __attribute__((visibility("default"))) void ctype_setup(void *global_ctx, void *
     *ctx_p = (void *) &ctx;
 }
 
-__attribute__((visibility("default"))) void ctype_body(void *ctx_)
+void ctype_body(void *ctx_)
 {
     CtypeCtx *ctx = (CtypeCtx *) ctx_;
 

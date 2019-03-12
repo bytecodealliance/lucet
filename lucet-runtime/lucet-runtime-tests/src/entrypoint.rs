@@ -1,4 +1,4 @@
-use crate::build::{test_module_c, test_module_wasm};
+use crate::build::test_module_wasm;
 use crate::helpers::MockModuleBuilder;
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
@@ -143,11 +143,6 @@ macro_rules! entrypoint_tests {
 
         #[no_mangle]
         extern "C" fn black_box(_vmctx: *mut lucet_vmctx, _val: *mut c_void) {}
-
-        const USE_ALLOCATOR_SANDBOX_PATH: &'static str =
-            "tests/build/entrypoint_guests/use_allocator.so";
-        const CTYPE_SANDBOX_PATH: &'static str = "tests/build/entrypoint_guests/ctype.so";
-        const CALLBACK_SANDBOX_PATH: &'static str = "tests/build/entrypoint_guests/callback.so";
 
         #[test]
         fn mock_calc_add_2() {
@@ -327,7 +322,6 @@ macro_rules! entrypoint_tests {
             assert_eq!(f64::from(retval), -6.9 + 4.2);
         }
 
-
         #[test]
         fn mock_calc_add_f32_10() {
             calc_add_f32_10(mock_calculator_module());
@@ -468,6 +462,7 @@ macro_rules! entrypoint_tests {
             );
         }
 
+        use $crate::build::test_module_c;
         const TEST_REGION_INIT_VAL: libc::c_int = 123;
         const TEST_REGION_SIZE: libc::size_t = 4;
 
@@ -475,7 +470,8 @@ macro_rules! entrypoint_tests {
         fn allocator_create_region() {
             use byteorder::{LittleEndian, ReadBytesExt};
 
-            let module = DlModule::load_test(USE_ALLOCATOR_SANDBOX_PATH).expect("module loads");
+            let module =
+                test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
@@ -526,7 +522,8 @@ macro_rules! entrypoint_tests {
         fn allocator_create_region_and_increment() {
             use byteorder::{LittleEndian, ReadBytesExt};
 
-            let module = DlModule::load_test(USE_ALLOCATOR_SANDBOX_PATH).expect("module loads");
+            let module =
+                test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
@@ -601,7 +598,8 @@ macro_rules! entrypoint_tests {
         fn allocator_create_two_regions() {
             use byteorder::{LittleEndian, ReadBytesExt};
 
-            let module = DlModule::load_test(USE_ALLOCATOR_SANDBOX_PATH).expect("module loads");
+            let module =
+                test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
@@ -676,10 +674,10 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn ctype() {
+        fn entrypoint_ctype() {
             use byteorder::{LittleEndian, ReadBytesExt};
-
-            let module = DlModule::load_test(CTYPE_SANDBOX_PATH).expect("module loads");
+            let module =
+                test_module_c("entrypoint", "ctype.c").expect("module builds and loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
@@ -726,8 +724,9 @@ macro_rules! entrypoint_tests {
         }
 
         #[test]
-        fn callback() {
-            let module = DlModule::load_test(CALLBACK_SANDBOX_PATH).expect("module loads");
+        fn entrypoint_callback() {
+            let module =
+                test_module_c("entrypoint", "callback.c").expect("module builds and loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
