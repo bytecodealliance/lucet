@@ -92,7 +92,7 @@ impl Vmctx {
     ///
     /// This will return an `Error::RuntimeTerminated` value to the caller of `Instance::run()`.
     pub fn terminate<I: Any>(&mut self, info: I) -> ! {
-        let details = TerminationDetails::Other(Arc::new(Box::new(info)));
+        let details = TerminationDetails::provide(Arc::new(Box::new(info)));
         unsafe { self.instance_mut().terminate(details) }
     }
 
