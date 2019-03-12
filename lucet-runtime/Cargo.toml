@@ -19,7 +19,7 @@ failure = "0.1"
 lazy_static = "1.1"
 # default-features = false means it doesn't link against lucet-runtime-c, but instead lets us link
 # this runtime instead
-lucet-libc = { path = "../lucet-libc-rs", features = ["no-lucet-runtime-c"] }
+lucet-libc = { path = "../lucet-libc-rs" }
 lucet-module-data = { path = "../lucet-module-data" }
 lucet-runtime-tests = { path = "lucet-runtime-tests" }
 nix = "0.13"

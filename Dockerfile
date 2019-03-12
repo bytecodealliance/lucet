@@ -38,7 +38,12 @@ RUN curl -L -O http://download.savannah.nongnu.org/releases/libunwind/libunwind-
 	&& make install \
 	&& cd .. \
 	&& rm -rf libunwind-1.2.1 libunwind-1.2.1.tar.gz
-ENV LD_LIBRARY_PATH=/usr/local/lib
+
+# Setting a consistent LD_LIBRARY_PATH across the entire environment prevents unnecessary Cargo
+# rebuilds.
+#
+# TODO: remove these first two paths once the C runtime and lucet-libc, respectively, are deprecated
+ENV LD_LIBRARY_PATH=/lucet/lucet-runtime-c/build:/lucet/lucet-libc/build/lib:/usr/local/lib
 
 RUN curl -L -O https://static.rust-lang.org/dist/rust-1.31.0-x86_64-unknown-linux-gnu.tar.gz \
 	&& tar xzf rust-1.31.0-x86_64-unknown-linux-gnu.tar.gz \

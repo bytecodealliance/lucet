@@ -2,6 +2,8 @@ use super::*;
 
 #[test]
 fn create_lucet_libc() {
+    lucet_runtime::lucet_internal_ensure_linked();
+
     let mut libc = lucet_libc {
         magic: 0,
         term_info: lucet_libc__bindgen_ty_1 { exit: 0 },

@@ -1,33 +1,33 @@
+export GUEST_MODULE_PREFIX:=$(abspath .)
 
 .PHONY: build
 build:
-	cd lucetc && cargo build
-	make -C lucet-runtime
 	make -C lucet-runtime-c
 	make -C lucet-backtrace
 	make -C lucet-libc
-	make -C lucet-rs
-	make -C lucet-libc-rs
-	cd lucet-module-data && cargo build
-	cd lucet-spectest && cargo build
-	cd lucet-analyze && cargo build
-	cd lucet-idl && cargo build
+	cargo build --all
 
 .PHONY: build-test-deps
 build-test-deps:
-	cd lucetc && cargo build
+	cargo build -p lucetc
+	make -C lucet-runtime-c/test guests
 	make -C lucet-libc
+	make -C tests guests
 
 .PHONY: test
-test: build-test-deps
-	make -C lucet-runtime test
+test: indent-check build-test-deps
 	make -C lucet-runtime-c test
 	make -C lucet-backtrace test
-	make -C lucet-rs test
-	make -C lucet-libc-rs test
-	cd lucet-module-data && cargo test
-	cd lucetc && cargo test
-	cd lucet-idl && cargo test
+	cargo test --no-fail-fast \
+            -p lucet-runtime-internals \
+            -p lucet-runtime \
+            -p lucet \
+            -p lucet-sys \
+            -p lucet-libc \
+            -p lucet-libc-sys \
+            -p lucet-module-data \
+            -p lucetc \
+            -p lucet-idl
 	make -C tests
 
 .PHONY: bench
@@ -37,32 +37,17 @@ bench:
 
 .PHONY: audit
 audit:
-	make -C lucet-runtime audit
-	make -C lucet-rs audit
-	make -C lucet-libc-rs audit
-	cd lucet-module-data && cargo audit
-	cd lucetc && cargo audit
-	cd lucet-idl && cargo audit
+	cargo audit
 
 .PHONY: clean
 clean:
-	rm -rf lucetc/target
-	rm -rf lucet-idl/target
 	make -C benchmarks/shootout clean
 	make -C builtins clean
-	make -C lucet-runtime clean
 	make -C lucet-runtime-c clean
 	make -C lucet-backtrace clean
-	make -C lucet-rs clean
 	make -C lucet-libc clean
-	make -C lucet-libc-rs clean
 	make -C tests clean
-	cd lucetc && cargo clean
-	cd lucet-idl && cargo clean
-	cd lucet-analyze && cargo clean
-	cd lucet-spectest && cargo clean
-	cd lucet-module-data && cargo clean
-	cd sightglass && cargo clean
+	cargo clean
 
 .PHONY: indent
 indent:

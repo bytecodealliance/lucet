@@ -221,8 +221,11 @@ pub mod vmctx {
     pub use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
 }
 
-#[doc(hidden)]
+/// Call this if you're having trouble with `lucet_*` symbols not being exported.
+///
+/// This is pretty hackish; we will hopefully be able to avoid this altogether once [this
+/// issue](https://github.com/rust-lang/rust/issues/58037) is addressed.
 #[no_mangle]
-extern "C" fn lucet_internal_ensure_linked() {
+pub extern "C" fn lucet_internal_ensure_linked() {
     lucet_runtime_internals::vmctx::vmctx_capi_init();
 }

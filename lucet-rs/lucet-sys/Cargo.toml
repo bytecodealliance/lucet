@@ -12,7 +12,4 @@ build = "build.rs"
 crate-type=["rlib"]
 
 [build-dependencies]
-bindgen = "0.45"
-
-[profile.test]
-rpath = true
+bindgen = "0.47"

@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::{self, Command};
-use tempdir::TempDir;
 
 fn main() {
     env_logger::init();
@@ -82,7 +81,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
             obj.write(&opts.output).context("writing object file")?;
         }
         CodegenOutput::SharedObj => {
-            let dir = TempDir::new("lucetc")?;
+            let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
             let objpath = dir.path().join("tmp.o");
 
             let obj = comp.codegen()?;

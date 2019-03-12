@@ -5,7 +5,7 @@ use std::env;
 use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::str;
-use tempdir::TempDir;
+use tempfile::{self, TempDir};
 
 fn expect_success(o: &Output) -> Result<(), Error> {
     if !o.status.success() {
@@ -79,7 +79,10 @@ fn test_file_path(name: &str) -> PathBuf {
 
 fn module_from_c(cfiles: &[&str]) -> Result<Module, Error> {
     let cfiles: Vec<PathBuf> = cfiles.iter().map(|ref f| test_file_path(f)).collect();
-    let tempdir = TempDir::new("clang").context("tempdir creation")?;
+    let tempdir = tempfile::Builder::new()
+        .prefix("clang")
+        .tempdir()
+        .context("tempdir creation")?;
     let wasm =
         build_wasm(&cfiles, &[], &tempdir).context(format!("building wasm for {:?}", cfiles))?;
     let m = load::read_module(&wasm).context(format!("loading module built from {:?}", cfiles))?;

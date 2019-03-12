@@ -35,7 +35,7 @@ serde_json = "1.0"
 byteorder = "1.2"
 wasmonkey = { path = "../builtins/wasmonkey" }
 wabt = "0.7"
-tempdir = "0.3"
+tempfile = "3.0"
 bimap = "0.1"
 pwasm-validation = { path = "../pwasm-validation" }
 human-size = "0.4"

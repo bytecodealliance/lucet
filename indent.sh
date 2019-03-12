@@ -38,7 +38,7 @@ if [[ $ARG == "check" ]]; then
 	done
 	for RUST_DIR in ${RUST_DIRS}; do
 		pushd $(dirname ${RUST_DIR}) > /dev/null
-		cargo fmt --all -- --check
+		cargo fmt -- --check
 		popd > /dev/null
 	done
 elif [[ $ARG == "" ]]; then
@@ -47,7 +47,7 @@ elif [[ $ARG == "" ]]; then
 	done
 	for RUST_DIR in ${RUST_DIRS}; do
 		pushd $(dirname ${RUST_DIR}) > /dev/null
-		cargo fmt --all
+		cargo fmt
 		popd > /dev/null
 	done
 else
