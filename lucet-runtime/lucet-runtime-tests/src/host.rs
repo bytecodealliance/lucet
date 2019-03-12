@@ -7,20 +7,15 @@ macro_rules! host_tests {
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
-
-        const NULL_MOD_PATH: &'static str = "tests/build/host_guests/null.so";
-        const HELLO_MOD_PATH: &'static str = "tests/build/host_guests/hello.so";
-        const HOSTCALL_ERROR_MOD_PATH: &'static str = "tests/build/host_guests/hostcall_error.so";
-        const FPE_MOD_PATH: &'static str = "tests/build/host_guests/fpe.so";
-
+        use $crate::build::test_module_c;
         #[test]
         fn load_module() {
-            let _module = DlModule::load_test(NULL_MOD_PATH).expect("module loads");
+            let _module = test_module_c("host", "trivial.c").expect("build and load module");
         }
 
         #[test]
         fn load_nonexistent_module() {
-            let module = DlModule::load_test("nonexistent_sandbox");
+            let module = DlModule::load("/non/existient/file");
             assert!(module.is_err());
         }
 
@@ -51,8 +46,8 @@ macro_rules! host_tests {
         }
 
         #[test]
-        fn instantiate_null() {
-            let module = DlModule::load_test(NULL_MOD_PATH).expect("module loads");
+        fn instantiate_trivial() {
+            let module = test_module_c("host", "trivial.c").expect("build and load module");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let inst = region
                 .new_instance(module)
@@ -60,8 +55,8 @@ macro_rules! host_tests {
         }
 
         #[test]
-        fn run_null() {
-            let module = DlModule::load_test(NULL_MOD_PATH).expect("module loads");
+        fn run_trivial() {
+            let module = test_module_c("host", "trivial.c").expect("build and load module");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -71,7 +66,7 @@ macro_rules! host_tests {
 
         #[test]
         fn run_hello() {
-            let module = DlModule::load_test(HELLO_MOD_PATH).expect("module loads");
+            let module = test_module_c("host", "hello.c").expect("build and load module");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
@@ -87,7 +82,7 @@ macro_rules! host_tests {
 
         #[test]
         fn run_hostcall_error() {
-            let module = DlModule::load_test(HOSTCALL_ERROR_MOD_PATH).expect("module loads");
+            let module = test_module_c("host", "hostcall_error.c").expect("build and load module");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -110,7 +105,7 @@ macro_rules! host_tests {
 
         #[test]
         fn run_fpe() {
-            let module = DlModule::load_test(FPE_MOD_PATH).expect("module loads");
+            let module = test_module_c("host", "fpe.c").expect("build and load module");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
