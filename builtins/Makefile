@@ -7,8 +7,8 @@ LIBBUILTINS_OBJS:=$(addprefix build/, \
 	strcmp.o \
 	strlen.o )
 
-COMMON_CFLAGS:= --std=c99 -Ofast -Wall -Werror -march=native -fPIC \
-	-I../lucet-runtime-c/include
+COMMON_CFLAGS:= --std=gnu99 -Ofast -Wall -Werror -march=native -fPIC \
+	-I../lucet-runtime/include 
 
 default: build/libbuiltins.so
 
