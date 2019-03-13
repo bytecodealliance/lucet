@@ -1,11 +1,10 @@
-
 use failure::Error;
 use lucet_runtime_internals::module::DlModule;
 use lucetc::Lucetc;
-use std::sync::Arc;
-use tempdir::TempDir;
 use std::fs::File;
 use std::io::prelude::*;
+use std::sync::Arc;
+use tempdir::TempDir;
 
 pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, Error> {
     let workdir = TempDir::new("stack_test").expect("create working directory");
@@ -29,7 +28,9 @@ pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, Error> {
 fn generate_test_wat(num_locals: usize) -> String {
     assert!(num_locals > 2);
 
-    let mut module = "(module (func $localpalooza (export \"localpalooza\") (param i32) (result i32)\n".to_owned();
+    let mut module =
+        "(module (func $localpalooza (export \"localpalooza\") (param i32) (result i32)\n"
+            .to_owned();
 
     // Declare locals:
     module.push_str("(local ");
@@ -40,26 +41,44 @@ fn generate_test_wat(num_locals: usize) -> String {
 
     // Use each local for the first time:
     for i in 1..num_locals {
-        module.push_str(&format!("(set_local {} (i32.add (get_local {}) (get_local {})))\n", i, i-1, i));
+        module.push_str(&format!(
+            "(set_local {} (i32.add (get_local {}) (get_local {})))\n",
+            i,
+            i - 1,
+            i
+        ));
     }
 
     // Use each local for a second time, so they get pushed to the stack between uses:
     for i in 2..(num_locals - 1) {
-        module.push_str(&format!("(set_local {} (i32.add (get_local {}) (get_local {})))\n", i, i-1, i));
+        module.push_str(&format!(
+            "(set_local {} (i32.add (get_local {}) (get_local {})))\n",
+            i,
+            i - 1,
+            i
+        ));
     }
 
     // Keep locals alive across a recursive call. Make as many recursive calls as the first
     // argument to the func:
     module.push_str("(if (get_local 0)\n");
-    module.push_str(&format!("  (then (set_local {} (i32.add (get_local {})\n", num_locals-1, num_locals-2));
+    module.push_str(&format!(
+        "  (then (set_local {} (i32.add (get_local {})\n",
+        num_locals - 1,
+        num_locals - 2
+    ));
     module.push_str("      (call $localpalooza (i32.sub (get_local 0) (i32.const 1))))))\n");
-    module.push_str(&format!("  (else (set_local {} (i32.add (get_local {}) (get_local {})))))\n", num_locals-1, num_locals-2, num_locals-3));
+    module.push_str(&format!(
+        "  (else (set_local {} (i32.add (get_local {}) (get_local {})))))\n",
+        num_locals - 1,
+        num_locals - 2,
+        num_locals - 3
+    ));
 
-    module.push_str(&format!("(get_local {})\n", num_locals-1));
+    module.push_str(&format!("(get_local {})\n", num_locals - 1));
     module.push_str("))\n");
     module
 }
-
 
 #[macro_export]
 macro_rules! stack_tests {
@@ -72,7 +91,10 @@ macro_rules! stack_tests {
         use $crate::helpers::DlModuleExt;
         use $crate::stack::stack_testcase;
 
-        fn run(module: Arc<DlModule>, recursion_depth: libc::c_int) -> Result<UntypedRetVal, Error> {
+        fn run(
+            module: Arc<DlModule>,
+            recursion_depth: libc::c_int,
+        ) -> Result<UntypedRetVal, Error> {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -85,7 +107,11 @@ macro_rules! stack_tests {
             assert!(run(module, recursion_depth).is_ok());
         }
 
-        fn expect_stack_overflow(module: Arc<DlModule>, recursion_depth: libc::c_int, probestack: bool) {
+        fn expect_stack_overflow(
+            module: Arc<DlModule>,
+            recursion_depth: libc::c_int,
+            probestack: bool,
+        ) {
             match run(module, recursion_depth) {
                 Err(Error::RuntimeFault(details)) => {
                     // We should get a nonfatal trap due to the stack overflow.
@@ -133,7 +159,11 @@ macro_rules! stack_tests {
 
         #[test]
         fn expect_stack_overflow_locals64_481() {
-            expect_stack_overflow(stack_testcase(64).expect("generate stack_testcase 64"), 481, true);
+            expect_stack_overflow(
+                stack_testcase(64).expect("generate stack_testcase 64"),
+                481,
+                true,
+            );
         }
 
         // 1050 locals is about 1 page (4k) on the stack - just enough for Cranelift to use probestack to grow
@@ -141,22 +171,35 @@ macro_rules! stack_tests {
 
         #[test]
         fn expect_ok_locals_1page_1() {
-            expect_ok(stack_testcase(1050).expect("generate stack_testcase 1050"), 1);
+            expect_ok(
+                stack_testcase(1050).expect("generate stack_testcase 1050"),
+                1,
+            );
         }
 
         #[test]
         fn expect_ok_locals_1page_2() {
-            expect_ok(stack_testcase(1050).expect("generate stack_testcase 1050"), 2);
+            expect_ok(
+                stack_testcase(1050).expect("generate stack_testcase 1050"),
+                2,
+            );
         }
 
         #[test]
         fn expect_ok_locals_1page_30() {
-            expect_ok(stack_testcase(1050).expect("generate stack_testcase 1050"), 30);
+            expect_ok(
+                stack_testcase(1050).expect("generate stack_testcase 1050"),
+                30,
+            );
         }
 
         #[test]
         fn expect_stack_overflow_locals_1page_31() {
-            expect_stack_overflow(stack_testcase(1050).expect("generate stack_testcase 1050"), 31, true);
+            expect_stack_overflow(
+                stack_testcase(1050).expect("generate stack_testcase 1050"),
+                31,
+                true,
+            );
         }
 
         // This test has 5000 locals - over 4 pages worth. Cranelift will use probestack here as well. The
@@ -164,22 +207,35 @@ macro_rules! stack_tests {
 
         #[test]
         fn expect_ok_locals_multipage_1() {
-            expect_ok(stack_testcase(5000).expect("generate stack_testcase 5000"), 1);
+            expect_ok(
+                stack_testcase(5000).expect("generate stack_testcase 5000"),
+                1,
+            );
         }
 
         #[test]
         fn expect_ok_locals_multipage_2() {
-            expect_ok(stack_testcase(5000).expect("generate stack_testcase 5000"), 2);
+            expect_ok(
+                stack_testcase(5000).expect("generate stack_testcase 5000"),
+                2,
+            );
         }
 
         #[test]
         fn expect_ok_locals_multipage_5() {
-            expect_ok(stack_testcase(5000).expect("generate stack_testcase 5000"), 5);
+            expect_ok(
+                stack_testcase(5000).expect("generate stack_testcase 5000"),
+                5,
+            );
         }
 
         #[test]
         fn expect_stack_overflow_locals_multipage_6() {
-            expect_stack_overflow(stack_testcase(5000).expect("generate stack_testcase 5000"), 6, true);
+            expect_stack_overflow(
+                stack_testcase(5000).expect("generate stack_testcase 5000"),
+                6,
+                true,
+            );
         }
     };
 }

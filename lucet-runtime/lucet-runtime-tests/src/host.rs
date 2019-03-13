@@ -6,8 +6,8 @@ macro_rules! host_tests {
         use lucet_runtime::{DlModule, Error, Limits, Region, TrapCodeType};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
-        use $crate::helpers::DlModuleExt;
         use $crate::build::test_module_c;
+        use $crate::helpers::DlModuleExt;
         #[test]
         fn load_module() {
             let _module = test_module_c("host", "trivial.c").expect("build and load module");

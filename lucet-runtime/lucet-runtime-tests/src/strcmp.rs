@@ -1,4 +1,3 @@
-
 #[macro_export]
 macro_rules! strcmp_tests {
     ( $TestRegion:path ) => {

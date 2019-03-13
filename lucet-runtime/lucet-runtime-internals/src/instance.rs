@@ -708,7 +708,10 @@ fn termination_details_any_typing() {
     let hello = "hello, world".to_owned();
     let details = TerminationDetails::provide(hello.clone());
     let provided = details.provided_details().expect("got Provided");
-    assert_eq!(provided.downcast_ref::<String>().expect("right type"), &hello);
+    assert_eq!(
+        provided.downcast_ref::<String>().expect("right type"),
+        &hello
+    );
 }
 
 impl std::fmt::Debug for TerminationDetails {

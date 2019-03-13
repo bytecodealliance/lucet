@@ -1,12 +1,12 @@
 #[macro_export]
 macro_rules! globals_tests {
     ( $TestRegion:path ) => {
+        use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
+        use lucet_runtime::{Limits, Region};
+        use lucet_runtime_internals::instance::InstanceInternal;
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_wasm;
-        use lucet_runtime::{Limits, Region};
-        use lucet_runtime_internals::instance::InstanceInternal;
-        use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 
         #[test]
         fn defined_globals() {

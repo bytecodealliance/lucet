@@ -107,7 +107,6 @@ macro_rules! globals_tests {
             let retval = inst.run(b"get_global0", &[]).expect("instance runs");
             assert_eq!(i64::from(retval), 666);
         }
-
     };
 }
 

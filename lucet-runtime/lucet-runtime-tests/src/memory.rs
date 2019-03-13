@@ -5,12 +5,13 @@ macro_rules! memory_tests {
         use lucet_runtime::{DlModule, Limits, Region};
         use std::sync::Mutex;
         use $TestRegion as TestRegion;
-        use $crate::helpers::DlModuleExt;
         use $crate::build::test_module_wasm;
+        use $crate::helpers::DlModuleExt;
 
         #[test]
         fn current_memory_hostcall() {
-            let module = test_module_wasm("memory", "current_memory.wat").expect("compile and load current_memory.wasm");
+            let module = test_module_wasm("memory", "current_memory.wat")
+                .expect("compile and load current_memory.wasm");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -22,7 +23,8 @@ macro_rules! memory_tests {
 
         #[test]
         fn grow_memory_hostcall() {
-            let module = test_module_wasm("memory", "grow_memory.wat").expect("compile and load grow_memory.wasm");
+            let module = test_module_wasm("memory", "grow_memory.wat")
+                .expect("compile and load grow_memory.wasm");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)

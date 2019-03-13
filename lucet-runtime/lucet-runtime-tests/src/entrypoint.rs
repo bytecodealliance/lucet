@@ -676,8 +676,7 @@ macro_rules! entrypoint_tests {
         #[test]
         fn entrypoint_ctype() {
             use byteorder::{LittleEndian, ReadBytesExt};
-            let module =
-                test_module_c("entrypoint", "ctype.c").expect("module builds and loads");
+            let module = test_module_c("entrypoint", "ctype.c").expect("module builds and loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
