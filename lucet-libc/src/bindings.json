@@ -1,7 +1,0 @@
-{
-    "env": {
-        "lucet_libc_stdio": "lucet_libc_stdio",
-        "lucet_libc_syscall_exit": "lucet_libc_syscall_exit",
-        "lucet_libc_syscall_abort": "lucet_libc_syscall_abort"
-    }
-}
