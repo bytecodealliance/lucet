@@ -12,7 +12,6 @@ build-test-deps:
 	cargo build -p lucetc
 	make -C lucet-runtime-c/test guests
 	make -C lucet-libc
-	make -C tests guests
 
 .PHONY: test
 test: indent-check build-test-deps
@@ -29,7 +28,6 @@ test: indent-check build-test-deps
             -p lucetc \
             -p lucet-idl \
             -p lucet-wasi-sdk
-	make -C tests
 
 .PHONY: bench
 bench:
@@ -47,7 +45,6 @@ clean:
 	make -C lucet-runtime-c clean
 	make -C lucet-backtrace clean
 	make -C lucet-libc clean
-	make -C tests clean
 	cargo clean
 
 .PHONY: indent
