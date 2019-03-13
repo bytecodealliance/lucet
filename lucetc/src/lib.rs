@@ -80,9 +80,9 @@ impl Lucetc {
         Ok(self)
     }
     pub fn with_builtins(&mut self, builtins_path: PathBuf) -> Result<(), Error> {
-            let (newmodule, builtins_map) = patch_module(self.module.clone(), builtins_path)?;
-            self.module = newmodule;
-            self.bindings.extend(Bindings::env(builtins_map))?;
+        let (newmodule, builtins_map) = patch_module(self.module.clone(), builtins_path)?;
+        self.module = newmodule;
+        self.bindings.extend(Bindings::env(builtins_map))?;
         Ok(())
     }
 

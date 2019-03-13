@@ -1,6 +1,6 @@
 use clap::{App, Arg, ArgMatches};
 use failure::Error;
-use lucetc::{OptLevel, HeapSettings};
+use lucetc::{HeapSettings, OptLevel};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
