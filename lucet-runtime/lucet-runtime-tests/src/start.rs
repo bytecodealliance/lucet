@@ -5,7 +5,6 @@ macro_rules! start_tests {
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_wasm;
-        use $crate::helpers::DlModuleExt;
 
         #[test]
         fn global_init() {

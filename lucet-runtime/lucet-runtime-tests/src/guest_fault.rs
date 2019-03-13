@@ -129,9 +129,7 @@ macro_rules! guest_fault_tests {
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::guest_fault::mock_traps_module;
-        use $crate::helpers::{
-            guest_module_path, test_ex, test_nonex, DlModuleExt, MockModuleBuilder,
-        };
+        use $crate::helpers::{test_ex, test_nonex, MockModuleBuilder};
 
         lazy_static! {
             static ref RECOVERABLE_PTR_LOCK: Mutex<()> = Mutex::new(());

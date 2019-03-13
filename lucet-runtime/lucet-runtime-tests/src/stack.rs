@@ -88,7 +88,6 @@ macro_rules! stack_tests {
         };
         use std::sync::Arc;
         use $TestRegion as TestRegion;
-        use $crate::helpers::DlModuleExt;
         use $crate::stack::stack_testcase;
 
         fn run(

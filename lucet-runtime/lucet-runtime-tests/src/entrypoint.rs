@@ -139,7 +139,6 @@ macro_rules! entrypoint_tests {
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::entrypoint::{mock_calculator_module, wat_calculator_module};
-        use $crate::helpers::DlModuleExt;
 
         #[no_mangle]
         extern "C" fn black_box(_vmctx: *mut lucet_vmctx, _val: *mut c_void) {}

@@ -6,7 +6,6 @@ macro_rules! memory_tests {
         use std::sync::Mutex;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_wasm;
-        use $crate::helpers::DlModuleExt;
 
         #[test]
         fn current_memory_hostcall() {

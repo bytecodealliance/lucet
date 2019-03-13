@@ -41,22 +41,3 @@ where
     drop(lock);
     r
 }
-
-pub fn guest_module_path<P: AsRef<Path>>(path: P) -> PathBuf {
-    if let Some(prefix) = env::var_os("GUEST_MODULE_PREFIX") {
-        Path::new(&prefix).join(path)
-    } else {
-        // default to the `devenv` path convention
-        Path::new("/lucet").join(path)
-    }
-}
-
-pub trait DlModuleExt {
-    fn load_test<P: AsRef<Path>>(so_path: P) -> Result<Arc<DlModule>, Error>;
-}
-
-impl DlModuleExt for DlModule {
-    fn load_test<P: AsRef<Path>>(so_path: P) -> Result<Arc<DlModule>, Error> {
-        DlModule::load(guest_module_path(so_path))
-    }
-}
