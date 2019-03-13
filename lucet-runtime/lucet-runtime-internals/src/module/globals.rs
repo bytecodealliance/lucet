@@ -5,12 +5,9 @@ macro_rules! globals_tests {
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
         use $crate::error::Error;
-        use $crate::instance::InstanceInternal;
-        use $crate::module::{DlModule, MockModuleBuilder, Module};
+        use $crate::module::{MockModuleBuilder, Module};
         use $crate::region::Region;
         use $crate::vmctx::{lucet_vmctx, Vmctx};
-
-        const DEFINITION_SANDBOX_PATH: &'static str = "tests/build/globals_guests/definition.so";
 
         fn mock_import_module() -> Arc<dyn Module> {
             MockModuleBuilder::new()

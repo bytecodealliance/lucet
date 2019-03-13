@@ -138,8 +138,7 @@ impl Vmctx {
     ///         let typed_binop = binop as *const extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32;
     ///         unsafe { (*typed_binop)(vmctx, operand1, operand2) }
     ///     } else {
-    ///         // invalid function index
-    ///         ctx.terminate(std::ptr::null_mut())
+    ///         ctx.terminate("invalid function index")
     ///     }
     /// }
     pub fn get_func_from_idx(
