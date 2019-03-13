@@ -1,96 +1,38 @@
-use failure::{format_err, Error, ResultExt};
+use failure::{Error, ResultExt};
+use lucet_wasi_sdk::Link;
+use lucetc::bindings::Bindings;
 use lucetc::load;
 use parity_wasm::elements::Module;
-use std::env;
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::process::{Command, Output};
 use std::str;
-use tempfile::{self, TempDir};
+use tempfile;
 
-fn expect_success(o: &Output) -> Result<(), Error> {
-    if !o.status.success() {
-        let stdout = str::from_utf8(&o.stdout).unwrap();
-        let stderr = str::from_utf8(&o.stderr).unwrap();
-        Err(format_err!("stdout:{}\nstderr:{}", stdout, stderr))
-    } else {
-        Ok(())
-    }
-}
-
-fn cc(input: &PathBuf, output: &PathBuf) -> Result<(), Error> {
-    let cc = Command::new(env::var("LUCET_CLANG").unwrap_or("clang".to_owned()))
-        .arg("--target=wasm32-wasm")
-        .arg("-nostdinc")
-        .arg("-fvisibility=default")
-        .arg("-c")
-        .arg(input)
-        .arg("-o")
-        .arg(output)
-        .output()
-        .context(format!("compiling {:?}", input))?;
-    expect_success(&cc).context(format!("compiling {:?}", input))?;
-    Ok(())
-}
-
-fn link(inputs: &[PathBuf], output: &PathBuf) -> Result<(), Error> {
-    let mut ld_cmd = Command::new(env::var("LUCET_WASM_LD").unwrap_or("wasm-ld".to_owned()));
-    ld_cmd.arg("--no-entry");
-    ld_cmd.arg("--allow-undefined");
-    ld_cmd.arg("--no-threads");
-    for input in inputs {
-        ld_cmd.arg(input);
-    }
-    let ld = ld_cmd
-        .arg("-o")
-        .arg(output)
-        .output()
-        .context(format!("linking {:?}", output))?;
-    expect_success(&ld).context(format!("linking {:?}", output))?;
-    Ok(())
-}
-
-fn build_wasm(cfiles: &[PathBuf], libs: &[PathBuf], tempdir: &TempDir) -> Result<PathBuf, Error> {
-    let mut objs = Vec::new();
-    for c in cfiles {
-        let stem = c
-            .file_stem()
-            .ok_or(format_err!("invalid filename {:?}", c))?
-            .to_str()
-            .ok_or(format_err!("non-utf8 filename {:?}", c))?;
-        let obj = tempdir.path().join(stem).with_extension("o");
-        if objs.contains(&obj) {
-            return Err(format_err!("non-unique file stem {:?}", c));
-        }
-        cc(c, &obj)?;
-        objs.push(obj);
-    }
-
-    let out = tempdir.path().join("out.wasm");
-    for lib in libs {
-        objs.push(lib.clone());
-    }
-    link(&objs, &out)?;
-    Ok(out)
-}
-
-fn test_file_path(name: &str) -> PathBuf {
-    PathBuf::from(format!("tests/clang/{}.c", name))
-}
-
-fn module_from_c(cfiles: &[&str]) -> Result<Module, Error> {
-    let cfiles: Vec<PathBuf> = cfiles.iter().map(|ref f| test_file_path(f)).collect();
+fn module_from_c(cfiles: &[&str], exports: &[&str]) -> Result<Module, Error> {
+    let cfiles: Vec<PathBuf> = cfiles
+        .iter()
+        .map(|ref name| PathBuf::from(format!("tests/wasi-sdk/{}.c", name)))
+        .collect();
     let tempdir = tempfile::Builder::new()
-        .prefix("clang")
+        .prefix("wasi-sdk-test")
         .tempdir()
         .context("tempdir creation")?;
-    let wasm =
-        build_wasm(&cfiles, &[], &tempdir).context(format!("building wasm for {:?}", cfiles))?;
+
+    let mut wasm = PathBuf::from(tempdir.path());
+    wasm.push("out.wasm");
+
+    let mut linker = Link::new(cfiles.clone())
+        .cflag("-nostartfiles")
+        .ldflag("--no-entry")
+        .ldflag("--allow-undefined");
+    for export in exports {
+        linker.with_ldflag(&format!("--export={}", export));
+    }
+    linker.link(wasm.clone())?;
+
     let m = load::read_module(&wasm).context(format!("loading module built from {:?}", cfiles))?;
     Ok(m)
 }
-
-use lucetc::bindings::Bindings;
-use std::collections::HashMap;
 
 fn b_only_test_bindings() -> Bindings {
     let imports: HashMap<String, String> = [
@@ -129,7 +71,7 @@ mod programs {
 
     #[test]
     fn empty() {
-        let m = module_from_c(&["empty"]).expect("build module for empty");
+        let m = module_from_c(&["empty"], &[]).expect("build module for empty");
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let p = Program::new(m, b, h).expect("create program for empty");
@@ -141,7 +83,7 @@ mod programs {
 
     #[test]
     fn just_a() {
-        let m = module_from_c(&["a"]).expect("build module for a");
+        let m = module_from_c(&["a"], &["a"]).expect("build module for a");
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let p = Program::new(m, b, h).expect("create program for a");
@@ -153,7 +95,7 @@ mod programs {
 
     #[test]
     fn just_b() {
-        let m = module_from_c(&["b"]).expect("build module for b");
+        let m = module_from_c(&["b"], &["b"]).expect("build module for b");
         let b = b_only_test_bindings();
         let h = HeapSettings::default();
         let p = Program::new(m, b, h).expect("create program for b");
@@ -165,7 +107,7 @@ mod programs {
 
     #[test]
     fn a_and_b() {
-        let m = module_from_c(&["a", "b"]).expect("build module for a & b");
+        let m = module_from_c(&["a", "b"], &["a", "b"]).expect("build module for a & b");
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let p = Program::new(m, b, h).expect("create program for a & b");

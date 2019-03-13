@@ -37,3 +37,6 @@ tempfile = "3.0"
 bimap = "0.1"
 pwasm-validation = { path = "../pwasm-validation" }
 human-size = "0.4"
+
+[dev-dependencies]
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
