@@ -5,15 +5,11 @@ macro_rules! start_tests {
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::helpers::DlModuleExt;
-
-        const GLOBAL_INIT_SANDBOX_PATH: &'static str = "tests/build/start_guests/global_init.so";
-        const START_AND_CALL_SANDBOX_PATH: &'static str =
-            "tests/build/start_guests/start_and_call.so";
-        const NO_START_SANDBOX_PATH: &'static str = "tests/build/start_guests/no_start.so";
+        use $crate::build::test_module_wasm;
 
         #[test]
         fn global_init() {
-            let module = DlModule::load_test(GLOBAL_INIT_SANDBOX_PATH).expect("module loads");
+            let module = test_module_wasm("start", "global_init.wat").expect("module compiled and loaded");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -32,7 +28,7 @@ macro_rules! start_tests {
 
         #[test]
         fn start_and_call() {
-            let module = DlModule::load_test(START_AND_CALL_SANDBOX_PATH).expect("module loads");
+            let module = test_module_wasm("start", "start_and_call.wat").expect("module compiled and loaded");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -51,7 +47,7 @@ macro_rules! start_tests {
 
         #[test]
         fn no_start() {
-            let module = DlModule::load_test(NO_START_SANDBOX_PATH).expect("module loads");
+            let module = test_module_wasm("start", "no_start.wat").expect("module compiled and loaded");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
