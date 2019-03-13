@@ -4,11 +4,7 @@ pub use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder};
 pub use lucet_runtime_internals::vmctx::vmctx_from_mock_instance;
 
 use lazy_static::lazy_static;
-use lucet_runtime_internals::error::Error;
-use lucet_runtime_internals::module::DlModule;
-use std::env;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 lazy_static! {
     static ref EXCLUSIVE_TEST: RwLock<()> = RwLock::default();
