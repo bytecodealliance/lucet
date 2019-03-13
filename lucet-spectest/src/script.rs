@@ -1,8 +1,7 @@
 use crate::bindings;
 use crate::instance::Instance;
 use failure::{format_err, Error, Fail};
-use lucet;
-use lucet::{UntypedRetval, Val};
+use lucet_runtime::{self, MmapRegion, Module as LucetModule, Region, UntypedRetVal, Val};
 use lucetc::{
     compile,
     compiler::OptLevel,
@@ -11,6 +10,7 @@ use lucetc::{
 };
 use parity_wasm::{self, deserialize_buffer};
 use std::io;
+use std::sync::Arc;
 use std::process::Command;
 
 #[derive(Fail, Debug)]
@@ -26,11 +26,11 @@ pub enum ScriptError {
     #[fail(display = "Codegen error: {}", _0)]
     CodegenError(Error),
     #[fail(display = "Load error: {}", _0)]
-    LoadError(lucet::LucetError),
+    LoadError(lucet_runtime::Error),
     #[fail(display = "Instaitiation error: {}", _0)]
-    InstantiateError(lucet::LucetError),
+    InstantiateError(lucet_runtime::Error),
     #[fail(display = "Runtime error: {}", _0)]
-    RuntimeError(lucet::LucetError),
+    RuntimeError(lucet_runtime::Error),
     #[fail(display = "Malformed script: {}", _0)]
     MalformedScript(String),
     #[fail(display = "IO error: {}", _0)]
@@ -118,19 +118,19 @@ impl ScriptEnv {
             )))?;
         }
 
-        let lucet_module = lucet::Module::from_file(sofile_path).map_err(ScriptError::LoadError)?;
+        let lucet_module: Arc<dyn LucetModule> =
+            lucet_runtime::DlModule::load(sofile_path).map_err(ScriptError::LoadError)?;
 
-        let mut lucet_pool = lucet::Pool::builder()
-            .entries(1)
-            .build()
-            .expect("valid pool");
+        let lucet_region =
+            MmapRegion::create(1, &lucet_runtime::Limits::default()).expect("valid region");
 
-        let lucet_instance = lucet::Instance::new(&mut lucet_pool, &lucet_module)
+        let lucet_instance = lucet_region
+            .new_instance(lucet_module.clone())
             .map_err(ScriptError::InstantiateError)?;
 
         self.instances.push((
             name.clone(),
-            Instance::new(program, lucet_module, lucet_pool, lucet_instance),
+            Instance::new(program, lucet_module, lucet_region, lucet_instance),
         ));
         Ok(())
     }
@@ -175,7 +175,7 @@ impl ScriptEnv {
         name: &Option<String>,
         field: &str,
         args: Vec<Val>,
-    ) -> Result<UntypedRetval, ScriptError> {
+    ) -> Result<UntypedRetVal, ScriptError> {
         let (_, ref mut inst) = self.instance_named_mut(name)?;
         inst.run(&field, &args)
             .map_err(|e| ScriptError::RuntimeError(e))

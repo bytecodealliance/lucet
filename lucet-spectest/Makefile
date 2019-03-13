@@ -7,7 +7,7 @@ build:
 
 .PHONY: test
 test:
-	cargo test -p lucet-spectest -- --nocapture
+	cargo test -p lucet-spectest -- --nocapture --test-threads 1
 
 .PHONY: test-%
 test-%:
