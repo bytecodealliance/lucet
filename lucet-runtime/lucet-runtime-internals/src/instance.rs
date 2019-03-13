@@ -312,7 +312,7 @@ impl Instance {
                     return Err(Error::Unsupported(format!(
                         "global imports are unsupported; found: {:?}",
                         i
-                    )))
+                    )));
                 }
                 Global::Def { def } => def.init_val(),
             };

@@ -31,26 +31,34 @@ macro_rules! test_body {
         reset_output();
 
         let mut $stack = new_stack();
-        let mut parent = ContextHandle::new();
+        let parent = Box::into_raw(Box::new(ContextHandle::new()));
 
         unsafe {
-            parent_regs = &mut parent as *mut ContextHandle;
+            parent_regs = parent;
         }
 
-        $body
+        {
+            $body
+        }
+
+        unsafe {
+            Box::from_raw(parent_regs);
+            Box::from_raw(child_regs);
+        }
     };
 }
 
 macro_rules! init_and_swap {
     ( $stack:ident, $fn:ident, [ $( $args:expr ),* ] ) => {
         unsafe {
-            let mut child = ContextHandle::create_and_init(
+            let child = Box::into_raw(Box::new(ContextHandle::create_and_init(
                 &mut *$stack,
                 parent_regs.as_mut().unwrap(),
                 $fn as *const extern "C" fn(),
                 &[$( $args ),*],
-            ).unwrap();
-            child_regs = &mut child as *mut ContextHandle;
+            ).unwrap()));
+
+            child_regs = child;
 
             Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap());
         }

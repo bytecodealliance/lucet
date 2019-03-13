@@ -17,3 +17,5 @@ exclude = ["cranelift"]
 [profile.test]
 rpath = true
 
+[replace]
+"faerie:0.8.0" = { path = "faerie" }

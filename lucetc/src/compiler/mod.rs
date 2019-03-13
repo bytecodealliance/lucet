@@ -194,7 +194,7 @@ impl<'p> Compiler<'p> {
                 return Err(format_err!(
                     "function {} has duplicate definition",
                     name.symbol()
-                ))
+                ));
             }
             Entry::Vacant(entry) => {
                 entry.insert(func);
