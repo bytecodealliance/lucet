@@ -26,7 +26,7 @@ if ! $(rustfmt --version | grep -q "rustfmt 1.0.1-stable"); then
 	exit 1;
 fi
 
-C_DIRS="lucet-runtime-c lucet-backtrace tests"
+C_DIRS="lucet-runtime-c lucet-backtrace"
 C_FILES=$(find ${C_DIRS} -type f \( -name '*.h' -or -name '*.c' \) -and -not \( -name 'greatest.h' -or -path '*/target/*' \) -print)
 RUST_DIRS=$(find lucet-analyze lucet-idl lucet-libc-rs lucet-rs lucet-spectest lucetc lucet-runtime lucet-wasi-sdk -type f -name 'Cargo.toml' -print)
 
