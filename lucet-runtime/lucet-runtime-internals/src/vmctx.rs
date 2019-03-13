@@ -13,7 +13,7 @@ use crate::instance::{
 use crate::WASM_PAGE_SIZE;
 use libc::c_void;
 use std::any::Any;
-use std::sync::{Arc, Once};
+use std::sync::Once;
 
 /// Marker type for the `vmctx` pointer argument.
 ///
@@ -92,7 +92,7 @@ impl Vmctx {
     ///
     /// This will return an `Error::RuntimeTerminated` value to the caller of `Instance::run()`.
     pub fn terminate<I: Any>(&mut self, info: I) -> ! {
-        let details = TerminationDetails::provide(Arc::new(Box::new(info)));
+        let details = TerminationDetails::provide(info);
         unsafe { self.instance_mut().terminate(details) }
     }
 

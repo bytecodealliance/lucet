@@ -686,19 +686,29 @@ pub enum TerminationDetails {
     GetEmbedCtx,
     /// Calls to `Vmctx::terminate()` may attach an arbitrary pointer for extra debugging
     /// information.
-    Provided(Arc<Box<dyn Any>>),
+    Provided(Arc<dyn Any>),
 }
 
 impl TerminationDetails {
-    pub fn provide(details: Arc<Box<dyn Any>>) -> Self {
-        TerminationDetails::Provided(details)
+    pub fn provide<A: Any>(details: A) -> Self {
+        TerminationDetails::Provided(Arc::new(details))
     }
     pub fn provided_details(&self) -> Option<&dyn Any> {
         match self {
-            TerminationDetails::Provided(a) => Some(a),
+            TerminationDetails::Provided(a) => Some(a.as_ref()),
             _ => None,
         }
     }
+}
+
+// Because of deref coercions, the code above was tricky to get right-
+// test that a string makes it through
+#[test]
+fn termination_details_any_typing() {
+    let hello = "hello, world".to_owned();
+    let details = TerminationDetails::provide(hello.clone());
+    let provided = details.provided_details().expect("got Provided");
+    assert_eq!(provided.downcast_ref::<String>().expect("right type"), &hello);
 }
 
 impl std::fmt::Debug for TerminationDetails {
