@@ -19,7 +19,7 @@ use failure::{format_err, Error, ResultExt};
 use parity_wasm::elements::Module;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tempdir::TempDir;
+use tempfile;
 
 pub use crate::{
     bindings::Bindings,
@@ -133,7 +133,7 @@ impl Lucetc {
     }
 
     pub fn shared_object_file(self, output: PathBuf) -> Result<(), Error> {
-        let dir = TempDir::new("lucetc")?;
+        let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
         link_so(objpath, output)?;
