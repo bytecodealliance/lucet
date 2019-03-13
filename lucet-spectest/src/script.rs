@@ -10,8 +10,8 @@ use lucetc::{
 };
 use parity_wasm::{self, deserialize_buffer};
 use std::io;
-use std::sync::Arc;
 use std::process::Command;
+use std::sync::Arc;
 
 #[derive(Fail, Debug)]
 pub enum ScriptError {

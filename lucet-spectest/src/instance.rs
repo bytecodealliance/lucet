@@ -1,5 +1,7 @@
 use failure::{format_err, Error};
-use lucet_runtime::{Error as RuntimeError, Module as LucetModule, UntypedRetVal, Val, Region as LucetRegion};
+use lucet_runtime::{
+    Error as RuntimeError, Module as LucetModule, Region as LucetRegion, UntypedRetVal, Val,
+};
 use lucetc::program::Program;
 pub use parity_wasm::elements::ValueType;
 use parity_wasm::elements::{Internal, Type};
@@ -33,7 +35,9 @@ impl Instance {
     pub fn run(&mut self, field: &str, args: &[Val]) -> Result<UntypedRetVal, RuntimeError> {
         let res = self.lucet_instance.run(field.as_bytes(), args);
         if let Err(_) = res {
-            self.lucet_instance.reset().expect("possible to reset instance");
+            self.lucet_instance
+                .reset()
+                .expect("possible to reset instance");
         }
         res
     }
