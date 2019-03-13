@@ -38,8 +38,7 @@ void wasm_fault(void)
  * Cause a fault in the host
  */
 extern void hostcall_host_fault(void);
-void host_fault(void)
+void        host_fault(void)
 {
     hostcall_host_fault();
 }
-
