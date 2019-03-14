@@ -29,11 +29,8 @@ int64_t run_strcmp(const char *s1, const char *s2)
  */
 void wasm_fault(void)
 {
-    char *oob = (char *) -1; // BUG: llvm 6.0.0 encodes this address
-    // incorrectly and makes an invalid wasm file. So, I am switching to an
-    // address that is out-of-bounds in liblucet-runtime-c but can be represented in less
-    // than 32 bits, but is beyond the end of the guard pages
-    // char *oob = (char *) (64 * 1000 * 1000);
+    // Create an out-of-bounds pointer, and write to it
+    char *oob = (char *) -1;
     *oob      = 'x';
 }
 
