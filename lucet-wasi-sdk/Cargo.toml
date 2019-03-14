@@ -8,4 +8,4 @@ edition = "2018"
 failure = "0.1"
 
 [dev-dependencies]
-tempdir = "0.3.7"
+tempfile = "3.0"

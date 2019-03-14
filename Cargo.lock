@@ -592,7 +592,7 @@ name = "lucet-wasi-sdk"
 version = "0.1.0"
 dependencies = [
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "tempdir 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

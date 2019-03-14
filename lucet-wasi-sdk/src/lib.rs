@@ -1,6 +1,6 @@
 use failure::Fail;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 #[derive(Debug, Fail)]
@@ -25,10 +25,7 @@ impl CompileError {
 }
 
 fn wasi_sdk_clang() -> PathBuf {
-    let mut base = match env::var("WASI_SDK") {
-        Ok(sdk) => PathBuf::from(sdk),
-        Err(_) => PathBuf::from("/opt/wasi-sdk"),
-    };
+    let mut base = PathBuf::from(env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned()));
     base.push("bin");
     base.push("clang");
     base
@@ -40,9 +37,9 @@ pub struct Compile {
 }
 
 impl Compile {
-    pub fn new(input: PathBuf) -> Self {
+    pub fn new<P: AsRef<Path>>(input: P) -> Self {
         Compile {
-            input,
+            input: PathBuf::from(input.as_ref()),
             cflags: Vec::new(),
         }
     }
@@ -65,7 +62,7 @@ impl Compile {
         self.cflags.push(format!("-I{}", include.as_ref()));
     }
 
-    pub fn compile(&self, output: PathBuf) -> Result<(), CompileError> {
+    pub fn compile<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
         let clang = wasi_sdk_clang();
         if !clang.exists() {
             Err(CompileError::FileNotFound(
@@ -81,7 +78,7 @@ impl Compile {
         cmd.arg("-c");
         cmd.arg(self.input.clone());
         cmd.arg("-o");
-        cmd.arg(output);
+        cmd.arg(output.as_ref());
         for cflag in self.cflags.iter() {
             cmd.arg(cflag);
         }
@@ -97,9 +94,9 @@ pub struct Link {
 }
 
 impl Link {
-    pub fn new(input: Vec<PathBuf>) -> Self {
+    pub fn new<P: AsRef<Path>>(input: &[P]) -> Self {
         Link {
-            input,
+            input: input.iter().map(|p| PathBuf::from(p.as_ref())).collect(),
             cflags: Vec::new(),
             ldflags: Vec::new(),
         }
@@ -141,7 +138,7 @@ impl Link {
         self.ldflags.push(format!("--export={}", export.as_ref()));
     }
 
-    pub fn link(&self, output: PathBuf) -> Result<(), CompileError> {
+    pub fn link<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
         let clang = wasi_sdk_clang();
         if !clang.exists() {
             Err(CompileError::FileNotFound(
@@ -158,7 +155,7 @@ impl Link {
             cmd.arg(input.clone());
         }
         cmd.arg("-o");
-        cmd.arg(output);
+        cmd.arg(output.as_ref());
         for cflag in self.cflags.iter() {
             cmd.arg(cflag);
         }
@@ -173,7 +170,7 @@ impl Link {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
     #[test]
     fn wasi_sdk_installed() {
         let clang = wasi_sdk_clang();
@@ -190,7 +187,7 @@ mod tests {
 
     #[test]
     fn compile_a() {
-        let tmp = TempDir::new("compile_a").expect("create temporary directory");
+        let tmp = TempDir::new().expect("create temporary directory");
 
         let compiler = Compile::new(test_file("a.c"));
 
@@ -200,7 +197,7 @@ mod tests {
 
         assert!(objfile.exists(), "object file created");
 
-        let mut linker = Link::new(vec![objfile]);
+        let mut linker = Link::new(&[objfile]);
         linker.with_cflag("-nostartfiles");
         linker.with_ldflag("--no-entry");
 
@@ -213,7 +210,7 @@ mod tests {
 
     #[test]
     fn compile_b() {
-        let tmp = TempDir::new("compile_b").expect("create temporary directory");
+        let tmp = TempDir::new().expect("create temporary directory");
 
         let compiler = Compile::new(test_file("b.c"));
 
@@ -223,7 +220,7 @@ mod tests {
 
         assert!(objfile.exists(), "object file created");
 
-        let mut linker = Link::new(vec![objfile]);
+        let mut linker = Link::new(&[objfile]);
         linker.with_cflag("-nostartfiles");
         linker.with_ldflag("--no-entry");
         linker.with_ldflag("--allow-undefined");
@@ -237,9 +234,9 @@ mod tests {
 
     #[test]
     fn compile_a_and_b() {
-        let tmp = TempDir::new("compile_ab").expect("create temporary directory");
+        let tmp = TempDir::new().expect("create temporary directory");
 
-        let mut linker = Link::new(vec![test_file("a.c"), test_file("b.c")]);
+        let mut linker = Link::new(&[test_file("a.c"), test_file("b.c")]);
         linker.with_cflag("-nostartfiles");
         linker.with_ldflag("--no-entry");
 
