@@ -76,9 +76,10 @@ macro_rules! host_tests {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
 
             let mut inst = region
-                .new_instance(module)
+                .new_instance_builder(module)
+                .with_embed_ctx(false)
+                .build()
                 .expect("instance can be created");
-            inst.insert_embed_ctx(false);
 
             inst.run(b"main", &[]).expect("instance runs");
 
