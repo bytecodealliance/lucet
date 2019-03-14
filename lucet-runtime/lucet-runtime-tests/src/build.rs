@@ -4,7 +4,7 @@ use lucet_wasi_sdk::Link;
 use lucetc::{Bindings, Lucetc};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 pub fn test_module_c(dir: &str, cfile: &str) -> Result<Arc<DlModule>, Error> {
     let c_path = guest_file(dir, cfile);
@@ -23,9 +23,9 @@ pub fn guest_file(dir: &str, fname: &str) -> PathBuf {
 }
 
 pub fn c_test(c_file: PathBuf, bindings_file: PathBuf) -> Result<Arc<DlModule>, Error> {
-    let workdir = TempDir::new("c_test").expect("create working directory");
+    let workdir = TempDir::new().expect("create working directory");
 
-    let wasm_build = Link::new(vec![c_file])
+    let wasm_build = Link::new(&[c_file])
         .cflag("-nostartfiles")
         .ldflag("--no-entry")
         .ldflag("--allow-undefined")
@@ -55,7 +55,7 @@ pub fn test_module_wasm(dir: &str, wasmfile: &str) -> Result<Arc<DlModule>, Erro
 }
 
 pub fn wasm_test(wasm_file: PathBuf, bindings_file: PathBuf) -> Result<Arc<DlModule>, Error> {
-    let workdir = TempDir::new("wasm_test").expect("create working directory");
+    let workdir = TempDir::new().expect("create working directory");
 
     let bindings = Bindings::from_file(&bindings_file)?;
 

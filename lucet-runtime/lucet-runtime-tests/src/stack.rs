@@ -4,10 +4,10 @@ use lucetc::Lucetc;
 use std::fs::File;
 use std::io::prelude::*;
 use std::sync::Arc;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, Error> {
-    let workdir = TempDir::new("stack_test").expect("create working directory");
+    let workdir = TempDir::new().expect("create working directory");
 
     let wasm_path = workdir.path().join("out.wasm");
 
