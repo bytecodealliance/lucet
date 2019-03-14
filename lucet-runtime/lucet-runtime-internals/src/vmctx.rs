@@ -50,8 +50,11 @@ impl Vmctx {
         unsafe { Instance::from_vmctx(self.vmctx) }
     }
 
-    /// Get a mutable reference to the `Instance` for this guest.
-    fn instance_mut(&mut self) -> &mut Instance {
+    /// Get a mutable reference to the `Instance` for this guest.  SAFETY NOTE: With this method,
+    /// you could hold on to multiple mutable references to the same Instance. Only hold on to one!
+    /// This method does not take `&mut self` because otherwise you could not use orthogonal mut
+    /// refs that come from Vmctx, like the heap or termination.
+    fn instance_mut(&self) -> &mut Instance {
         unsafe { Instance::from_vmctx(self.vmctx) }
     }
 
@@ -78,7 +81,7 @@ impl Vmctx {
 
     /// Get a reference to a context value of a particular type. If it does not exist,
     /// the context will terminate.
-    pub fn get_embed_ctx<T: Any>(&mut self) -> &T {
+    pub fn get_embed_ctx<T: Any>(&self) -> &T {
         self.instance_mut().get_embed_ctx_or_term()
     }
 
