@@ -7,6 +7,7 @@ members = [
   "lucet-runtime/lucet-runtime-internals",
   "lucet-runtime/lucet-runtime-tests",
   "lucet-spectest",
+  "lucet-wasi-sdk",
   "lucetc",
   "sightglass",
 ]

@@ -68,6 +68,15 @@ implementation of `lucet-spectest` has not been maintained very well during rece
 codebase evolutions. We expect to fix this up and reach spec compliance in the
 near future.
 
+### lucet-builtins
+
+C library that provides optimized native versions of libc primitives. `lucetc` can
+substitute the implementations defined in this library for the WebAssembly
+implementations.
+
+Contains a Rust crate `wasmonkey` that transforms a WebAssembly module from defining
+a function to using it as an import function.
+
 ### Vendor libraries
 
 Lucet is tightly coupled to several upstream dependencies, and Lucet

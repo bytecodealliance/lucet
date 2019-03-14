@@ -8,7 +8,7 @@ LUCETC:=$(LUCET_ROOT)/target/release/lucetc
 LUCET_RUNTIME:=$(LUCET_ROOT)/lucet-runtime
 SIGHTGLASS:=$(LUCET_ROOT)/sightglass
 
-LIBBUILTINS:=$(LUCET_ROOT)/builtins/build/libbuiltins.so
+LIBBUILTINS:=$(LUCET_ROOT)/lucet-builtins/build/libbuiltins.so
 
 SHOOTOUT:=$(LUCET_ROOT)/sightglass/benchmarks/shootout
 SHOOTOUT_SRCS:=$(shell ls $(SHOOTOUT)/*.c)
@@ -106,7 +106,7 @@ $(LUCET_ROOT)/target/release/sightglass:
 	cargo build --release -p sightglass
 
 $(LIBBUILTINS):
-	make -C $(LUCET_ROOT)/builtins
+	make -C $(LUCET_ROOT)/lucet-builtins
 
 $(LUCETC):
 	cargo build --release -p lucetc

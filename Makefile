@@ -3,6 +3,7 @@ export GUEST_MODULE_PREFIX:=$(abspath .)
 .PHONY: build
 build:
 	cargo build --all
+	make -C lucet-builtins
 
 .PHONY: test
 test: indent-check
@@ -26,7 +27,7 @@ audit:
 .PHONY: clean
 clean:
 	make -C benchmarks/shootout clean
-	make -C builtins clean
+	make -C lucet-builtins clean
 	cargo clean
 
 .PHONY: indent
