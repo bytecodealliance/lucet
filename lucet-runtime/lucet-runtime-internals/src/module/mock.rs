@@ -43,7 +43,11 @@ impl MockModuleBuilder {
                 if page.iter().all(|b| *b == 0) {
                     None
                 } else {
-                    Some(page.to_vec())
+                    let mut page = page.to_vec();
+                    if page.len() < 4096 {
+                        page.resize(4096, 0);
+                    }
+                    Some(page)
                 }
             })
             .collect();

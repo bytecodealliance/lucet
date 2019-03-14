@@ -83,9 +83,10 @@ macro_rules! memory_tests {
             let libc = Box::into_raw(libc) as *mut libc::c_void;
 
             let mut inst = region
-                .new_instance(module)
+                .new_instance_builder(module)
+                .with_embed_ctx(libc)
+                .build()
                 .expect("instance can be created");
-            inst.insert_embed_ctx(libc);
 
             inst.run(b"main", &[]).expect("instance runs");
 

@@ -215,9 +215,10 @@ pub unsafe extern "C" fn lucet_mmap_region_new_instance_with_ctx(
     assert_nonnull!(inst_out);
     with_ffi_arcs!([region: MmapRegion, module: DlModule], {
         region
-            .new_instance(module.clone() as Arc<dyn Module>)
-            .map(|mut i| {
-                i.insert_embed_ctx(embed_ctx);
+            .new_instance_builder(module.clone() as Arc<dyn Module>)
+            .with_embed_ctx(embed_ctx)
+            .build()
+            .map(|i| {
                 inst_out.write(instance_handle_to_raw(i) as _);
                 lucet_error::Ok
             })

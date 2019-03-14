@@ -1,4 +1,5 @@
 use crate::alloc::{host_page_size, instance_heap_offset, Alloc, Limits, Slot};
+use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle};
 use crate::module::Module;
@@ -15,8 +16,14 @@ pub struct MmapRegion {
     limits: Limits,
 }
 
-impl Region for MmapRegion {
-    fn new_instance(&self, module: Arc<dyn Module>) -> Result<InstanceHandle, Error> {
+impl Region for MmapRegion {}
+
+impl RegionInternal for MmapRegion {
+    fn new_instance_with(
+        &self,
+        module: Arc<dyn Module>,
+        embed_ctx: CtxMap,
+    ) -> Result<InstanceHandle, Error> {
         let slot = self
             .freelist
             .lock()
@@ -65,13 +72,11 @@ impl Region for MmapRegion {
             region,
         };
 
-        let inst = new_instance_handle(inst_ptr, module, alloc)?;
+        let inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
 
         Ok(inst)
     }
-}
 
-impl RegionInternal for MmapRegion {
     fn drop_alloc(&self, alloc: &mut Alloc) {
         let slot = alloc
             .slot
@@ -176,6 +181,10 @@ impl RegionInternal for MmapRegion {
         }
 
         Ok(())
+    }
+
+    fn as_dyn_internal(&self) -> &dyn RegionInternal {
+        self
     }
 }
 

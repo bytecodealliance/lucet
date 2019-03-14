@@ -68,6 +68,7 @@ pub fn new_instance_handle(
     instance: *mut Instance,
     module: Arc<dyn Module>,
     alloc: Alloc,
+    embed_ctx: CtxMap,
 ) -> Result<InstanceHandle, Error> {
     let inst = NonNull::new(instance)
         .ok_or(lucet_format_err!("instance pointer is null; this is a bug"))?;
@@ -80,7 +81,7 @@ pub fn new_instance_handle(
 
     let mut handle = InstanceHandle { inst };
 
-    let inst = Instance::new(alloc, module);
+    let inst = Instance::new(alloc, module, embed_ctx);
 
     unsafe {
         // this is wildly unsafe! you must be very careful to not let the drop impls run on the
@@ -293,7 +294,7 @@ impl Instance {
     ///
     /// The WebAssembly `start` section will also be run, if one exists.
     ///
-    /// The embedder contexts added with
+    /// The embedder contexts present at instance creation or added with
     /// [`Instance::insert_embed_ctx()`](struct.Instance.html#method.insert_embed_ctx) are not
     /// modified by this call; it is the embedder's responsibility to clear or reset their state if
     /// necessary.
@@ -391,6 +392,11 @@ impl Instance {
     /// Insert a context value.
     ///
     /// If a context value of the same type already existed, it is returned.
+    ///
+    /// **Note**: this method is intended for embedder contexts that need to be added _after_ an
+    /// instance is created and initialized. To add a context for an instance's entire lifetime,
+    /// including the execution of its `start` section, see
+    /// [`Region::new_instance_builder()`](trait.Region.html#method.new_instance_builder).
     pub fn insert_embed_ctx<T: Any>(&mut self, x: T) -> Option<T> {
         self.embed_ctx.insert(x)
     }
@@ -446,11 +452,11 @@ impl Instance {
 
 // Private API
 impl Instance {
-    fn new(alloc: Alloc, module: Arc<dyn Module>) -> Self {
+    fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: CtxMap) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
         Instance {
             magic: LUCET_INSTANCE_MAGIC,
-            embed_ctx: CtxMap::new(),
+            embed_ctx: embed_ctx,
             module,
             ctx: Context::new(),
             state: State::Ready {

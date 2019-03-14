@@ -89,9 +89,10 @@
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
 //! let mut inst = region
-//!     .new_instance(module)
+//!     .new_instance_builder(module)
+//!     .with_embed_ctx(MyContext { x: 0 })
+//!     .build()
 //!     .unwrap();
-//! inst.insert_embed_ctx(MyContext { x: 0 });
 //!
 //! inst.run(b"call_foo", &[]).unwrap();
 //!
@@ -116,9 +117,10 @@
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
 //! let mut libc = Box::into_raw(Box::new(LucetLibc::new()));
 //! let mut inst = region
-//!     .new_instance(module)
+//!     .new_instance_builder(module)
+//!     .with_embed_ctx(libc as *mut libc::c_void)
+//!     .build()
 //!     .unwrap();
-//! inst.insert_embed_ctx(libc as *mut libc::c_void);
 //!
 //! inst.run(b"main", &[]).unwrap();
 //!
@@ -200,7 +202,7 @@ pub use lucet_runtime_internals::instance::{
 };
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
-pub use lucet_runtime_internals::region::Region;
+pub use lucet_runtime_internals::region::{InstanceBuilder, Region};
 pub use lucet_runtime_internals::trapcode::{TrapCode, TrapCodeType};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
 pub use lucet_runtime_internals::WASM_PAGE_SIZE;

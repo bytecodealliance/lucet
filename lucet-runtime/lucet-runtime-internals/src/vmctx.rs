@@ -89,6 +89,11 @@ impl Vmctx {
     /// Insert a context value.
     ///
     /// If a context value of the same type already existed, it is returned.
+    ///
+    /// **Note**: this method is intended for embedder contexts that need to be added _after_ an
+    /// instance is created and initialized. To add a context for an instance's entire lifetime,
+    /// including the execution of its `start` section, see
+    /// [`Region::new_instance_builder()`](trait.Region.html#method.new_instance_builder).
     pub fn insert_embed_ctx<T: Any>(&mut self, x: T) -> Option<T> {
         self.instance_mut().insert_embed_ctx(x)
     }
