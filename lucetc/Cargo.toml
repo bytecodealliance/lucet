@@ -39,6 +39,3 @@ tempfile = "3.0"
 bimap = "0.1"
 pwasm-validation = { path = "../pwasm-validation" }
 human-size = "0.4"
-
-[replace]
-"faerie:0.8.0" = { path = "../faerie" }

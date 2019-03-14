@@ -45,12 +45,12 @@ RUN curl -L -O http://download.savannah.nongnu.org/releases/libunwind/libunwind-
 # TODO: remove these first two paths once the C runtime and lucet-libc, respectively, are deprecated
 ENV LD_LIBRARY_PATH=/lucet/lucet-runtime-c/build:/lucet/lucet-libc/build/lib:/usr/local/lib
 
-RUN curl -L -O https://static.rust-lang.org/dist/rust-1.31.0-x86_64-unknown-linux-gnu.tar.gz \
-	&& tar xzf rust-1.31.0-x86_64-unknown-linux-gnu.tar.gz \
-	&& cd rust-1.31.0-x86_64-unknown-linux-gnu \
+RUN curl -L -O https://static.rust-lang.org/dist/rust-1.33.0-x86_64-unknown-linux-gnu.tar.gz \
+	&& tar xzf rust-1.33.0-x86_64-unknown-linux-gnu.tar.gz \
+	&& cd rust-1.33.0-x86_64-unknown-linux-gnu \
 	&& ./install.sh \
 	&& cd .. \
-	&& rm -rf rust-1.31.0-x86_64-unknown-linux-gnu rust-1.31.0-x86_64-unknown-linux-gnu.tar.gz
+	&& rm -rf rust-1.33.0-x86_64-unknown-linux-gnu rust-1.33.0-x86_64-unknown-linux-gnu.tar.gz
 ENV PATH=/usr/local/bin:$PATH
 RUN cargo install --root /usr/local cargo-audit cargo-watch
 

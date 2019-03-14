@@ -21,8 +21,8 @@ if ! $($CLANG_FORMAT --version | grep -q "version 7.0"); then
 	exit 1;
 fi
 
-if ! $(rustfmt --version | grep -q "rustfmt 1.0.0-stable"); then
-	echo "indent requires rustfmt 1.0.0-stable"
+if ! $(rustfmt --version | grep -q "rustfmt 1.0.1-stable"); then
+	echo "indent requires rustfmt 1.0.1-stable"
 	exit 1;
 fi
 
