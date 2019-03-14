@@ -116,7 +116,7 @@
 //! let mut libc = PretendLibcRuntime { _unused: 0 };
 //! let mut inst = region
 //!     .new_instance_builder(module)
-//!     .with_embed_ctx(libc as *mut libc::c_void)
+//!     .with_embed_ctx(libc)
 //!     .build()
 //!     .unwrap();
 //!
