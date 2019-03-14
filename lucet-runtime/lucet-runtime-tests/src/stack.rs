@@ -92,7 +92,7 @@ macro_rules! stack_tests {
 
         fn run(
             module: Arc<DlModule>,
-            recursion_depth: libc::c_int,
+            recursion_depth: i32,
         ) -> Result<UntypedRetVal, Error> {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
@@ -102,13 +102,13 @@ macro_rules! stack_tests {
             inst.run(b"localpalooza", &[recursion_depth.into()])
         }
 
-        fn expect_ok(module: Arc<DlModule>, recursion_depth: libc::c_int) {
+        fn expect_ok(module: Arc<DlModule>, recursion_depth: i32) {
             assert!(run(module, recursion_depth).is_ok());
         }
 
         fn expect_stack_overflow(
             module: Arc<DlModule>,
-            recursion_depth: libc::c_int,
+            recursion_depth: i32,
             probestack: bool,
         ) {
             match run(module, recursion_depth) {
