@@ -2,10 +2,13 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    let wasi_sdk = env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned());
+
     let host_builder = bindgen::Builder::default()
         .clang_arg("-nostdinc")
-        .clang_arg("-I/opt/fst-clang/7.0.0/lib/clang/7.0.0/include")
-        .clang_arg("-I/usr/lib/clang/7/include")
+        .clang_arg("-D__wasi__")
+        .clang_arg(format!("-isystem={}/share/sysroot/include/", wasi_sdk))
+        .clang_arg(format!("-I{}/lib/clang/8.0.0/include/", wasi_sdk))
         .header("wasi/include/wasi.h")
         .whitelist_type("__wasi_.*")
         .whitelist_var("__WASI_.*");
