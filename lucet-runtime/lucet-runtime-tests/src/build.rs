@@ -58,7 +58,11 @@ pub fn test_module_wasm(dir: &str, wasmfile: &str) -> Result<Arc<DlModule>, Erro
     wasm_test(wasm_path, bindings_path)
 }
 
-pub fn wasm_test<P, Q>(wasm_file: P, bindings_file: Q) -> Result<Arc<DlModule>, Error> where P: AsRef<Path>, Q: AsRef<Path> {
+pub fn wasm_test<P, Q>(wasm_file: P, bindings_file: Q) -> Result<Arc<DlModule>, Error>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
     let workdir = TempDir::new().expect("create working directory");
 
     let bindings = Bindings::from_file(&bindings_file)?;

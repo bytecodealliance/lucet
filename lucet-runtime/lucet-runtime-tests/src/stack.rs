@@ -90,10 +90,7 @@ macro_rules! stack_tests {
         use $TestRegion as TestRegion;
         use $crate::stack::stack_testcase;
 
-        fn run(
-            module: Arc<DlModule>,
-            recursion_depth: i32,
-        ) -> Result<UntypedRetVal, Error> {
+        fn run(module: Arc<DlModule>, recursion_depth: i32) -> Result<UntypedRetVal, Error> {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
@@ -106,11 +103,7 @@ macro_rules! stack_tests {
             assert!(run(module, recursion_depth).is_ok());
         }
 
-        fn expect_stack_overflow(
-            module: Arc<DlModule>,
-            recursion_depth: i32,
-            probestack: bool,
-        ) {
+        fn expect_stack_overflow(module: Arc<DlModule>, recursion_depth: i32, probestack: bool) {
             match run(module, recursion_depth) {
                 Err(Error::RuntimeFault(details)) => {
                     // We should get a nonfatal trap due to the stack overflow.

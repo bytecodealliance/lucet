@@ -113,7 +113,7 @@ impl Vmctx {
 
     /// Return the WebAssembly globals as a mutable slice of `i64`s.
     pub fn globals_mut(&mut self) -> &mut [i64] {
-        unsafe { self.instance_mut().globals_mut() } 
+        unsafe { self.instance_mut().globals_mut() }
     }
 
     /// Get a function pointer by WebAssembly table and function index.
