@@ -133,7 +133,7 @@ time.
 Lucet requires:
 
 * Rust stable, and rustfmt. We typically track the latest stable release.
-* Wasi-sdk, providing a Clang toolchain with wasm-ld, the WebAssembly
+* `wasi-sdk`, providing a Clang toolchain with wasm-ld, the WebAssembly
   reference sysroot, and a libc that depends on only the WebAssembly System
   Interface (WASI) import functions.
 * GNU Make, CMake, & various standard unix utilities for the
