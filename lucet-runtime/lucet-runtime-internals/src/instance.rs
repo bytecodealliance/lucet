@@ -534,25 +534,17 @@ impl Instance {
         // * trapped, or called hostcall_error: state tag changed to something other than `Running`
         // * function body returned: set state back to `Ready` with return value
 
-        match self.state {
+        match &self.state {
             State::Running => {
                 let retval = self.ctx.get_untyped_retval();
                 self.state = State::Ready { retval };
                 Ok(retval)
             }
-            State::Terminated { details, .. } => {
-                // Sandbox is no longer runnable due to termination in hostcall
-                let details = if details.info.is_null() {
-                    None
-                } else {
-                    Some(details)
-                };
-                Err(Error::RuntimeTerminated(details))
-            }
+            State::Terminated { details, .. } => Err(Error::RuntimeTerminated(details.clone())),
             State::Fault { .. } => {
                 // Sandbox is no longer runnable. It's unsafe to determine all error details in the signal
                 // handler, so we fill in extra details here.
-                self.state = self.populate_fault_detail()?;
+                self.populate_fault_detail()?;
                 if let State::Fault { ref details, .. } = self.state {
                     if details.fatal {
                         // Some errors indicate that the guest is not functioning correctly or that
@@ -588,45 +580,38 @@ impl Instance {
         Ok(())
     }
 
-    fn populate_fault_detail(&mut self) -> Result<State, Error> {
-        match &self.state {
-            State::Fault {
-                details: FaultDetails {
-                    rip_addr, trapcode, ..
+    fn populate_fault_detail(&mut self) -> Result<(), Error> {
+        if let State::Fault {
+            details:
+                FaultDetails {
+                    rip_addr,
+                    trapcode,
+                    ref mut fatal,
+                    ref mut rip_addr_details,
+                    ..
                 },
-                siginfo,
-                context,
-                ..
-            } => {
-                // We do this after returning from the signal handler because it requires `dladdr`
-                // calls, which are not signal safe
-                let rip_addr_details = self.module.addr_details(*rip_addr as *const c_void)?;
+            siginfo,
+            ..
+        } = self.state
+        {
+            // We do this after returning from the signal handler because it requires `dladdr`
+            // calls, which are not signal safe
+            *rip_addr_details = self.module.addr_details(rip_addr as *const c_void)?.clone();
 
-                // If the trap table lookup returned unknown, it is a fatal error
-                let unknown_fault = trapcode.ty == TrapCodeType::Unknown;
+            // If the trap table lookup returned unknown, it is a fatal error
+            let unknown_fault = trapcode.ty == TrapCodeType::Unknown;
 
-                // If the trap was a segv or bus fault and the addressed memory was outside the
-                // guard pages, it is also a fatal error
-                let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
-                    && !self.alloc.addr_in_heap_guard(siginfo.si_addr());
+            // If the trap was a segv or bus fault and the addressed memory was outside the
+            // guard pages, it is also a fatal error
+            let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
+                && !self.alloc.addr_in_heap_guard(siginfo.si_addr());
 
-                Ok(State::Fault {
-                    details: FaultDetails {
-                        fatal: unknown_fault || outside_guard,
-                        trapcode: *trapcode,
-                        rip_addr: *rip_addr,
-                        rip_addr_details,
-                    },
-                    siginfo: *siginfo,
-                    context: *context,
-                })
-            }
-            st => Ok(st.clone()),
+            *fatal = unknown_fault || outside_guard;
         }
+        Ok(())
     }
 }
 
-#[derive(Clone)]
 pub enum State {
     Ready {
         retval: UntypedRetVal,
@@ -695,11 +680,52 @@ impl std::fmt::Display for FaultDetails {
 /// Guests are terminated either explicitly by `Vmctx::terminate()`, or implicitly by signal
 /// handlers that return `SignalBehavior::Terminate`. It usually indicates that an unrecoverable
 /// error has occurred in a hostcall, rather than in WebAssembly code.
-#[derive(Copy, Clone, Debug)]
-pub struct TerminationDetails {
+#[derive(Clone)]
+pub enum TerminationDetails {
+    Signal,
+    GetEmbedCtx,
     /// Calls to `Vmctx::terminate()` may attach an arbitrary pointer for extra debugging
     /// information.
-    pub info: *mut c_void,
+    Provided(Arc<dyn Any>),
+}
+
+impl TerminationDetails {
+    pub fn provide<A: Any>(details: A) -> Self {
+        TerminationDetails::Provided(Arc::new(details))
+    }
+    pub fn provided_details(&self) -> Option<&dyn Any> {
+        match self {
+            TerminationDetails::Provided(a) => Some(a.as_ref()),
+            _ => None,
+        }
+    }
+}
+
+// Because of deref coercions, the code above was tricky to get right-
+// test that a string makes it through
+#[test]
+fn termination_details_any_typing() {
+    let hello = "hello, world".to_owned();
+    let details = TerminationDetails::provide(hello.clone());
+    let provided = details.provided_details().expect("got Provided");
+    assert_eq!(
+        provided.downcast_ref::<String>().expect("right type"),
+        &hello
+    );
+}
+
+impl std::fmt::Debug for TerminationDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "TerminationDetails::{}",
+            match self {
+                TerminationDetails::Signal => "Signal",
+                TerminationDetails::GetEmbedCtx => "GetEmbedCtx",
+                TerminationDetails::Provided(_) => "Provided(Any)",
+            }
+        )
+    }
 }
 
 unsafe impl Send for TerminationDetails {}

@@ -27,13 +27,19 @@ use failure::{format_err, Error, ResultExt};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
     Default,
     Best,
     Fastest,
+}
+
+impl Default for OptLevel {
+    fn default() -> OptLevel {
+        OptLevel::Default
+    }
 }
 
 impl OptLevel {
@@ -260,7 +266,7 @@ pub struct CraneliftFuncs {
 
 impl CraneliftFuncs {
     /// This outputs a .clif file
-    pub fn write(&self, path: &PathBuf) -> Result<(), Error> {
+    pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
         use cranelift_codegen::write_function;
         let mut buffer = String::new();
         for (n, func) in self.funcs.iter() {
@@ -288,10 +294,10 @@ impl ObjectFile {
             artifact: product.artifact,
         })
     }
-    pub fn write(&self, path: &PathBuf) -> Result<(), Error> {
-        let _ = path.file_name().ok_or(format_err!(
+    pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
+        let _ = path.as_ref().file_name().ok_or(format_err!(
             "path {:?} needs to have filename",
-            path.clone()
+            path.as_ref()
         ));
         let file = File::create(path)?;
         self.artifact.write(file)?;

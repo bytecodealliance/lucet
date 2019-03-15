@@ -5,12 +5,9 @@ macro_rules! globals_tests {
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
         use $crate::error::Error;
-        use $crate::instance::InstanceInternal;
-        use $crate::module::{DlModule, MockModuleBuilder, Module};
+        use $crate::module::{MockModuleBuilder, Module};
         use $crate::region::Region;
         use $crate::vmctx::{lucet_vmctx, Vmctx};
-
-        const DEFINITION_SANDBOX_PATH: &'static str = "tests/build/globals_guests/definition.so";
 
         fn mock_import_module() -> Arc<dyn Module> {
             MockModuleBuilder::new()
@@ -18,9 +15,6 @@ macro_rules! globals_tests {
                 .build()
         }
 
-        /* XXX use OwnedModuleData to write a globals spec, and instantiate a with MockModule
-         * replace with instantiation of module with import global, assert failure
-         */
         #[test]
         fn reject_import() {
             let module = mock_import_module();
@@ -109,39 +103,6 @@ macro_rules! globals_tests {
 
             let retval = inst.run(b"get_global0", &[]).expect("instance runs");
             assert_eq!(i64::from(retval), 666);
-        }
-
-        #[test]
-        fn defined_globals() {
-            let module = DlModule::load_test(DEFINITION_SANDBOX_PATH).expect("module loads");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            inst.run(b"main", &[]).expect("instance runs");
-
-            // Now the globals should be:
-            // $x = 3
-            // $y = 2
-            // $z = 6
-            // and heap should be:
-            // [0] = 4
-            // [4] = 5
-            // [8] = 6
-
-            let heap_u32 = unsafe { inst.alloc().heap_u32() };
-            assert_eq!(heap_u32[0..=2], [4, 5, 6]);
-
-            inst.run(b"main", &[]).expect("instance runs");
-
-            // now heap should be:
-            // [0] = 3
-            // [4] = 2
-            // [8] = 6
-
-            let heap_u32 = unsafe { inst.alloc().heap_u32() };
-            assert_eq!(heap_u32[0..=2], [3, 2, 6]);
         }
     };
 }

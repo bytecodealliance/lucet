@@ -38,7 +38,7 @@ pub enum Error {
     /// [`Vmctx::terminate()`](struct.Vmctx.html#method.terminate), or via a custom signal handler
     /// that returns [`SignalBehavior::Terminate`](enum.SignalBehavior.html#variant.Terminate).
     #[fail(display = "Runtime terminated")]
-    RuntimeTerminated(Option<TerminationDetails>),
+    RuntimeTerminated(TerminationDetails),
 
     /// IO errors arising during dynamic loading with [`DlModule`](struct.DlModule.html).
     #[fail(display = "Dynamic loading error: {}", _0)]

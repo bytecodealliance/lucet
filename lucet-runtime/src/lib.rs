@@ -73,7 +73,6 @@
 //! ```no_run
 //! use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
 //! use lucet_runtime::vmctx::{Vmctx, lucet_vmctx};
-//! use lucet_libc::LucetLibc;
 //!
 //! struct MyContext { x: u32 }
 //!
@@ -81,8 +80,7 @@
 //! unsafe extern "C" fn foo(vmctx: *mut lucet_vmctx) {
 //!     let mut vmctx = Vmctx::from_raw(vmctx);
 //!     let hostcall_context = vmctx
-//!         .get_embed_ctx_mut::<MyContext>()
-//!         .unwrap();
+//!         .get_embed_ctx_mut::<MyContext>();
 //!     hostcall_context.x = 42;
 //! }
 //!
@@ -111,14 +109,15 @@
 //!
 //! ```no_run
 //! use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
-//! use lucet_libc::LucetLibc;
 //!
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
-//! let mut libc = Box::into_raw(Box::new(LucetLibc::new()));
+//! #[repr(C)]
+//! struct MyForeignContext { x: u32 };
+//! let mut foreign_ctx = Box::into_raw(Box::new(MyForeignContext{ x: 0 }));
 //! let mut inst = region
 //!     .new_instance_builder(module)
-//!     .with_embed_ctx(libc as *mut libc::c_void)
+//!     .with_embed_ctx(foreign_ctx as *mut libc::c_void)
 //!     .build()
 //!     .unwrap();
 //!
@@ -126,8 +125,9 @@
 //!
 //! // clean up embedder context
 //! drop(inst);
-//! // `libc` must outlive `inst`, but then must be turned back into a box in order to drop
-//! unsafe { Box::from_raw(libc) };
+//! // foreign_ctx must outlive inst, but then must be turned back into a box
+//! // in order to drop.
+//! unsafe { Box::from_raw(foreign_ctx) };
 //! ```
 //!
 //! ## Custom Signal Handlers

@@ -50,9 +50,12 @@ impl Vmctx {
         unsafe { Instance::from_vmctx(self.vmctx) }
     }
 
-    /// Get a mutable reference to the `Instance` for this guest.
-    fn instance_mut(&mut self) -> &mut Instance {
-        unsafe { Instance::from_vmctx(self.vmctx) }
+    /// Get a mutable reference to the `Instance` for this guest.  SAFETY NOTE: With this method,
+    /// you could hold on to multiple mutable references to the same Instance. Only hold on to one!
+    /// This method does not take `&mut self` because otherwise you could not use orthogonal mut
+    /// refs that come from Vmctx, like the heap or termination.
+    unsafe fn instance_mut(&self) -> &mut Instance {
+        Instance::from_vmctx(self.vmctx)
     }
 
     /// Return the WebAssembly heap as a slice of bytes.
@@ -62,7 +65,7 @@ impl Vmctx {
 
     /// Return the WebAssembly heap as a mutable slice of bytes.
     pub fn heap_mut(&mut self) -> &mut [u8] {
-        self.instance_mut().heap_mut()
+        unsafe { self.instance_mut().heap_mut() }
     }
 
     /// Check whether a given range in the host address space overlaps with the memory that backs
@@ -76,45 +79,31 @@ impl Vmctx {
         self.instance().contains_embed_ctx::<T>()
     }
 
-    /// Get a reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx<T: Any>(&self) -> Option<&T> {
-        self.instance().get_embed_ctx::<T>()
+    /// Get a reference to a context value of a particular type. If it does not exist,
+    /// the context will terminate.
+    pub fn get_embed_ctx<T: Any>(&self) -> &T {
+        unsafe { self.instance_mut().get_embed_ctx_or_term() }
     }
 
-    /// Get a mutable reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<&mut T> {
-        self.instance_mut().get_embed_ctx_mut::<T>()
-    }
-
-    /// Insert a context value.
-    ///
-    /// If a context value of the same type already existed, it is returned.
-    ///
-    /// **Note**: this method is intended for embedder contexts that need to be added _after_ an
-    /// instance is created and initialized. To add a context for an instance's entire lifetime,
-    /// including the execution of its `start` section, see
-    /// [`Region::new_instance_builder()`](trait.Region.html#method.new_instance_builder).
-    pub fn insert_embed_ctx<T: Any>(&mut self, x: T) -> Option<T> {
-        self.instance_mut().insert_embed_ctx(x)
-    }
-
-    /// Remove a context value of a particular type, returning it if it exists.
-    pub fn remove_embed_ctx<T: Any>(&mut self) -> Option<T> {
-        self.instance_mut().remove_embed_ctx::<T>()
+    /// Get a mutable reference to a context value of a particular type> If it does not exist,
+    /// the context will terminate.
+    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> &mut T {
+        unsafe { self.instance_mut().get_embed_ctx_mut_or_term() }
     }
 
     /// Terminate this guest and return to the host context.
     ///
     /// This will return an `Error::RuntimeTerminated` value to the caller of `Instance::run()`.
-    pub fn terminate(&mut self, info: *mut c_void) -> ! {
-        unsafe { self.instance_mut().terminate(info) }
+    pub fn terminate<I: Any>(&mut self, info: I) -> ! {
+        let details = TerminationDetails::provide(info);
+        unsafe { self.instance_mut().terminate(details) }
     }
 
     /// Grow the guest memory by the given number of WebAssembly pages.
     ///
     /// On success, returns the number of pages that existed before the call.
     pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
-        self.instance_mut().grow_memory(additional_pages)
+        unsafe { self.instance_mut().grow_memory(additional_pages) }
     }
 
     /// Return the WebAssembly globals as a slice of `i64`s.
@@ -124,7 +113,7 @@ impl Vmctx {
 
     /// Return the WebAssembly globals as a mutable slice of `i64`s.
     pub fn globals_mut(&mut self) -> &mut [i64] {
-        self.instance_mut().globals_mut()
+        unsafe { self.instance_mut().globals_mut() }
     }
 
     /// Get a function pointer by WebAssembly table and function index.
@@ -152,8 +141,7 @@ impl Vmctx {
     ///         let typed_binop = binop as *const extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32;
     ///         unsafe { (*typed_binop)(vmctx, operand1, operand2) }
     ///     } else {
-    ///         // invalid function index
-    ///         ctx.terminate(std::ptr::null_mut())
+    ///         ctx.terminate("invalid function index")
     ///     }
     /// }
     pub fn get_func_from_idx(
@@ -165,6 +153,18 @@ impl Vmctx {
             .module()
             .get_func_from_idx(table_idx, func_idx)
     }
+}
+
+/// Terminating an instance requires mutating the state field, and then jumping back to the
+/// host context. The mutable borrow may conflict with a mutable borrow of the embed_ctx if
+/// this is performed via a method call. We use a macro so we can convince the borrow checker that
+/// this is safe at each use site.
+macro_rules! inst_terminate {
+    ($self:ident, $details:expr) => {{
+        $self.state = State::Terminated { details: $details };
+        #[allow(unused_unsafe)] // The following unsafe will be incorrectly warned as unused
+        HOST_CTX.with(|host_ctx| unsafe { Context::set(&*host_ctx.get()) })
+    }};
 }
 
 impl Instance {
@@ -199,14 +199,29 @@ impl Instance {
         inst
     }
 
+    /// Helper function specific to Vmctx::get_embed_ctx. From the vmctx interface,
+    /// there is no way to recover if the expected embedder ctx is not set, so we terminate
+    /// the instance.
+    fn get_embed_ctx_or_term<T: Any>(&mut self) -> &T {
+        match self.embed_ctx.get::<T>() {
+            Some(t) => t,
+            None => inst_terminate!(self, TerminationDetails::GetEmbedCtx),
+        }
+    }
+
+    /// Helper function specific to Vmctx::get_embed_ctx_mut. See above.
+    fn get_embed_ctx_mut_or_term<T: Any>(&mut self) -> &mut T {
+        match self.embed_ctx.get_mut::<T>() {
+            Some(t) => t,
+            None => inst_terminate!(self, TerminationDetails::GetEmbedCtx),
+        }
+    }
+
     /// Terminate the guest and swap back to the host context.
     ///
     /// Only safe to call from within the guest context.
-    unsafe fn terminate(&mut self, info: *mut c_void) -> ! {
-        self.state = State::Terminated {
-            details: TerminationDetails { info },
-        };
-        HOST_CTX.with(|host_ctx| Context::set(&*host_ctx.get()))
+    unsafe fn terminate(&mut self, details: TerminationDetails) -> ! {
+        inst_terminate!(self, details)
     }
 }
 
@@ -304,8 +319,7 @@ pub unsafe extern "C" fn lucet_vmctx_get_func_from_idx(
 
 #[no_mangle]
 pub unsafe extern "C" fn lucet_vmctx_terminate(vmctx: *mut lucet_vmctx, info: *mut c_void) {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.terminate(info);
+    Vmctx::from_raw(vmctx).terminate(info);
 }
 
 #[no_mangle]

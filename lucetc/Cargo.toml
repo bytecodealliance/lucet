@@ -7,8 +7,6 @@ authors = ["Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>",
 license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"
 
-build = "build.rs"
-
 [lib]
 crate-type=["rlib"]
 
