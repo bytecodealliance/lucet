@@ -25,7 +25,7 @@ static LucetCtx lucet_setup(void)
     struct lucet_test_region *region;
     ASSERT_OK(lucet_test_region_create(1, NULL, &region));
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_test_region_new_instance_with_ctx(region, mod, NULL, &inst));
+    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
 
     uint8_t *heap = lucet_instance_heap(inst);
     uint32_t newpage_start;
