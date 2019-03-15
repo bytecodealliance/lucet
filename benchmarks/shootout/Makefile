@@ -35,8 +35,6 @@ bench: run
 run: build
 	$(LUCET_ROOT)/target/release/sightglass -c sightglass.toml $(SIGHTGLASS_ARGS)
 
-	make -C $(LUCET_ROOT)/lucet-libc
-
 .PHONY: $(LUCET_ROOT)/target/release/liblucet_runtime.so
 $(LUCET_ROOT)/target/release/liblucet_runtime.so:
 	cargo build --release -p lucet-runtime
