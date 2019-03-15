@@ -113,8 +113,8 @@
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
 //! #[repr(C)]
-//! struct MyForeignContext { _unused: u8 };
-//! let mut foreign_ctx = Box::into_raw(Box::new(MyForeignContext{ _unused: 0 }));
+//! struct MyForeignContext { x: u32 };
+//! let mut foreign_ctx = Box::into_raw(Box::new(MyForeignContext{ x: 0 }));
 //! let mut inst = region
 //!     .new_instance_builder(module)
 //!     .with_embed_ctx(foreign_ctx as *mut libc::c_void)
