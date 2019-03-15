@@ -21,7 +21,7 @@ fn module_from_c(cfiles: &[&str], exports: &[&str]) -> Result<Module, Error> {
     let mut wasm = PathBuf::from(tempdir.path());
     wasm.push("out.wasm");
 
-    let mut linker = Link::new(cfiles.clone())
+    let mut linker = Link::new(&cfiles)
         .cflag("-nostartfiles")
         .ldflag("--no-entry")
         .ldflag("--allow-undefined");
