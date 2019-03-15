@@ -54,8 +54,8 @@ impl Vmctx {
     /// you could hold on to multiple mutable references to the same Instance. Only hold on to one!
     /// This method does not take `&mut self` because otherwise you could not use orthogonal mut
     /// refs that come from Vmctx, like the heap or termination.
-    fn instance_mut(&self) -> &mut Instance {
-        unsafe { Instance::from_vmctx(self.vmctx) }
+    unsafe fn instance_mut(&self) -> &mut Instance {
+        Instance::from_vmctx(self.vmctx)
     }
 
     /// Return the WebAssembly heap as a slice of bytes.
@@ -65,7 +65,7 @@ impl Vmctx {
 
     /// Return the WebAssembly heap as a mutable slice of bytes.
     pub fn heap_mut(&mut self) -> &mut [u8] {
-        self.instance_mut().heap_mut()
+        unsafe { self.instance_mut().heap_mut() }
     }
 
     /// Check whether a given range in the host address space overlaps with the memory that backs
@@ -82,13 +82,13 @@ impl Vmctx {
     /// Get a reference to a context value of a particular type. If it does not exist,
     /// the context will terminate.
     pub fn get_embed_ctx<T: Any>(&self) -> &T {
-        self.instance_mut().get_embed_ctx_or_term()
+        unsafe { self.instance_mut().get_embed_ctx_or_term() }
     }
 
     /// Get a mutable reference to a context value of a particular type> If it does not exist,
     /// the context will terminate.
     pub fn get_embed_ctx_mut<T: Any>(&mut self) -> &mut T {
-        self.instance_mut().get_embed_ctx_mut_or_term()
+        unsafe { self.instance_mut().get_embed_ctx_mut_or_term() }
     }
 
     /// Terminate this guest and return to the host context.
@@ -103,7 +103,7 @@ impl Vmctx {
     ///
     /// On success, returns the number of pages that existed before the call.
     pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
-        self.instance_mut().grow_memory(additional_pages)
+        unsafe { self.instance_mut().grow_memory(additional_pages) }
     }
 
     /// Return the WebAssembly globals as a slice of `i64`s.
@@ -113,7 +113,7 @@ impl Vmctx {
 
     /// Return the WebAssembly globals as a mutable slice of `i64`s.
     pub fn globals_mut(&mut self) -> &mut [i64] {
-        self.instance_mut().globals_mut()
+        unsafe { self.instance_mut().globals_mut() } 
     }
 
     /// Get a function pointer by WebAssembly table and function index.
