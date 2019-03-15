@@ -2,7 +2,7 @@ use failure::{format_err, Error};
 use serde_json::{self, Map, Value};
 use std::collections::{hash_map::Entry, HashMap};
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 fn parse_modules(
     m: &Map<String, Value>,
@@ -66,8 +66,8 @@ impl Bindings {
         Ok(Self::from_json(&top)?)
     }
 
-    pub fn from_file(path: &PathBuf) -> Result<Bindings, Error> {
-        let contents = fs::read_to_string(path)?;
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Bindings, Error> {
+        let contents = fs::read_to_string(path.as_ref())?;
         Ok(Self::from_str(&contents)?)
     }
 

@@ -47,7 +47,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         .opt_level(opts.opt_level);
 
     if let Some(ref builtins) = opts.builtins_path {
-        c.with_builtins(builtins.clone())?;
+        c.with_builtins(builtins)?;
     }
 
     if let Some(reserved_size) = opts.reserved_size {
@@ -59,9 +59,9 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     }
 
     match opts.codegen {
-        CodegenOutput::Obj => c.object_file(opts.output.clone())?,
-        CodegenOutput::SharedObj => c.shared_object_file(opts.output.clone())?,
-        CodegenOutput::Clif => c.clif_ir(opts.output.clone())?,
+        CodegenOutput::Obj => c.object_file(&opts.output)?,
+        CodegenOutput::SharedObj => c.shared_object_file(&opts.output)?,
+        CodegenOutput::Clif => c.clif_ir(&opts.output)?,
     }
     Ok(())
 }

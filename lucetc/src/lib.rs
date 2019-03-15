@@ -18,7 +18,7 @@ use crate::program::Program;
 use failure::{format_err, Error, ResultExt};
 use parity_wasm::elements::Module;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tempfile;
 
 pub use crate::{
@@ -40,8 +40,9 @@ pub struct Lucetc {
 */
 
 impl Lucetc {
-    pub fn new(input: PathBuf) -> Result<Self, LucetcError> {
-        let module = read_module(&input)?;
+    pub fn new<P: AsRef<Path>>(input: P) -> Result<Self, LucetcError> {
+        let input = input.as_ref();
+        let module = read_module(input)?;
         let name = String::from(
             input
                 .file_stem()
@@ -75,11 +76,11 @@ impl Lucetc {
         self.opt_level = opt_level;
     }
 
-    pub fn builtins(mut self, builtins: PathBuf) -> Result<Self, Error> {
+    pub fn builtins<P: AsRef<Path>>(mut self, builtins: P) -> Result<Self, Error> {
         self.with_builtins(builtins)?;
         Ok(self)
     }
-    pub fn with_builtins(&mut self, builtins_path: PathBuf) -> Result<(), Error> {
+    pub fn with_builtins<P: AsRef<Path>>(&mut self, builtins_path: P) -> Result<(), Error> {
         let (newmodule, builtins_map) = patch_module(self.module.clone(), builtins_path)?;
         self.module = newmodule;
         self.bindings.extend(Bindings::env(builtins_map))?;
@@ -102,17 +103,17 @@ impl Lucetc {
         self.heap.guard_size = guard_size;
     }
 
-    pub fn object_file(self, output: PathBuf) -> Result<(), Error> {
+    pub fn object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
         let prog = Program::new(self.module, self.bindings, self.heap.clone())?;
         let comp = compile(&prog, &self.name, self.opt_level)?;
 
         let obj = comp.codegen()?;
-        obj.write(&output).context("writing object file")?;
+        obj.write(output.as_ref()).context("writing object file")?;
 
         Ok(())
     }
 
-    pub fn clif_ir(self, output: PathBuf) -> Result<(), Error> {
+    pub fn clif_ir<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
         let (module, builtins_map) = if let Some(ref builtins_path) = self.builtins_path {
             patch_module(self.module, builtins_path)?
         } else {
@@ -132,7 +133,7 @@ impl Lucetc {
         Ok(())
     }
 
-    pub fn shared_object_file(self, output: PathBuf) -> Result<(), Error> {
+    pub fn shared_object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
@@ -141,22 +142,26 @@ impl Lucetc {
     }
 }
 
-fn link_so(objpath: PathBuf, sopath: PathBuf) -> Result<(), Error> {
+fn link_so<P, Q>(objpath: P, sopath: Q) -> Result<(), Error>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
     use std::process::Command;
     let mut cmd_ld = Command::new("ld");
-    cmd_ld.arg(objpath.clone());
+    cmd_ld.arg(objpath.as_ref());
     cmd_ld.arg("-shared");
     cmd_ld.arg("-o");
-    cmd_ld.arg(sopath);
+    cmd_ld.arg(sopath.as_ref());
 
     let run_ld = cmd_ld
         .output()
-        .context(format_err!("running ld on {:?}", objpath.clone()))?;
+        .context(format_err!("running ld on {:?}", objpath.as_ref()))?;
 
     if !run_ld.status.success() {
         Err(format_err!(
             "ld of {} failed: {}",
-            objpath.to_str().unwrap(),
+            objpath.as_ref().to_str().unwrap(),
             String::from_utf8_lossy(&run_ld.stderr)
         ))?;
     }

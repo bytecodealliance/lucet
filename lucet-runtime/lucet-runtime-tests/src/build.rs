@@ -2,7 +2,7 @@ use failure::Error;
 use lucet_runtime_internals::module::DlModule;
 use lucet_wasi_sdk::Link;
 use lucetc::{Bindings, Lucetc};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -22,7 +22,11 @@ pub fn guest_file(dir: &str, fname: &str) -> PathBuf {
     p
 }
 
-pub fn c_test(c_file: PathBuf, bindings_file: PathBuf) -> Result<Arc<DlModule>, Error> {
+pub fn c_test<P, Q>(c_file: P, bindings_file: Q) -> Result<Arc<DlModule>, Error>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
     let workdir = TempDir::new().expect("create working directory");
 
     let wasm_build = Link::new(&[c_file])
@@ -35,7 +39,7 @@ pub fn c_test(c_file: PathBuf, bindings_file: PathBuf) -> Result<Arc<DlModule>, 
 
     wasm_build.link(wasm_file.clone())?;
 
-    let bindings = Bindings::from_file(&bindings_file)?;
+    let bindings = Bindings::from_file(bindings_file.as_ref())?;
 
     let native_build = Lucetc::new(wasm_file)?.bindings(bindings)?;
 
@@ -54,7 +58,7 @@ pub fn test_module_wasm(dir: &str, wasmfile: &str) -> Result<Arc<DlModule>, Erro
     wasm_test(wasm_path, bindings_path)
 }
 
-pub fn wasm_test(wasm_file: PathBuf, bindings_file: PathBuf) -> Result<Arc<DlModule>, Error> {
+pub fn wasm_test<P, Q>(wasm_file: P, bindings_file: Q) -> Result<Arc<DlModule>, Error> where P: AsRef<Path>, Q: AsRef<Path> {
     let workdir = TempDir::new().expect("create working directory");
 
     let bindings = Bindings::from_file(&bindings_file)?;
