@@ -4,7 +4,6 @@ extern crate clap;
 use clap::Arg;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::hostcalls::WasiCtx;
-use std::os::raw::c_void;
 use std::sync::Arc;
 
 struct Config {
@@ -27,9 +26,10 @@ fn main() {
 fn run(config: &Config) {
     let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
     let module = DlModule::load(&config.lucet_module).expect("module can be loaded");
-    let ctx = Box::new(WasiCtx::new());
     let mut inst = region
-        .new_instance_with_ctx(module as Arc<dyn Module>, Box::into_raw(ctx) as *mut c_void)
+        .new_instance_builder(module as Arc<dyn Module>)
+        .with_embed_ctx(WasiCtx::new())
+        .build()
         .expect("instance can be created");
     inst.run(b"_start", &[]).expect("instance runs");
 }

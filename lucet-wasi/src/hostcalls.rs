@@ -181,13 +181,12 @@ pub extern "C" fn __wasi_fd_close(
 }
 
 #[no_mangle]
-pub extern "C" fn __wasi_fd_stat_get(
+pub extern "C" fn __wasi_fd_fdstat_get(
     vmctx: *mut lucet_vmctx,
     fd: wasm32::__wasi_fd_t,
     fdstat_ptr: wasm32::uintptr_t, // *mut wasm32::__wasi_fdstat_t
 ) -> wasm32::__wasi_errno_t {
     let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
-    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
 
     let host_fd = dec_fd(fd);
     let mut host_fdstat = match unsafe { dec_fdstat_byref(&mut vmctx, fdstat_ptr) } {
@@ -195,6 +194,7 @@ pub extern "C" fn __wasi_fd_stat_get(
         Err(e) => return enc_errno(e),
     };
 
+    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
     let errno = if let Some(ref fe) = ctx.fds.get(&host_fd) {
         host_fdstat.fs_filetype = fe.fd_object.ty;
         host_fdstat.fs_rights_base = fe.rights_base;
@@ -289,13 +289,13 @@ pub extern "C" fn __wasi_fd_write(
     use nix::sys::uio::{writev, IoVec};
 
     let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
-    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
     let fd = dec_fd(fd);
     let iovs = match unsafe { dec_ciovec_slice(&mut vmctx, iovs_ptr, iovs_len) } {
         Ok(iovs) => iovs,
         Err(e) => return enc_errno(e),
     };
 
+    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
     let fe = match ctx.get_fd_entry(fd, host::__WASI_RIGHT_FD_WRITE.into(), 0) {
         Ok(fe) => fe,
         Err(e) => return enc_errno(e),

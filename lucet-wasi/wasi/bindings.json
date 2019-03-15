@@ -1,9 +1,9 @@
 {
-    "env": {
-        "__wasi_proc_exit": "__wasi_proc_exit",
-        "__wasi_fd_close": "__wasi_fd_close",
-        "__wasi_fd_stat_get": "__wasi_fd_stat_get",
-        "__wasi_fd_seek": "__wasi_fd_seek",
-        "__wasi_fd_write": "__wasi_fd_write"
+    "wasi_unstable": {
+        "proc_exit": "__wasi_proc_exit",
+        "fd_close": "__wasi_fd_close",
+        "fd_fdstat_get": "__wasi_fd_fdstat_get",
+        "fd_seek": "__wasi_fd_seek",
+        "fd_write": "__wasi_fd_write"
     }
 }
