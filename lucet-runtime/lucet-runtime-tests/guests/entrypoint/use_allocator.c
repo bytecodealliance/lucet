@@ -1,11 +1,12 @@
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
 // The WASI implementation of assert pulls facilities for in printing to stderr
 // and aborting. This is lighter weight for a unit test
-static void assert(bool v) {
+static void assert(bool v)
+{
     if (!v) {
         __builtin_unreachable();
     }

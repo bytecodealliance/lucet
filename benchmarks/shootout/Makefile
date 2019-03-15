@@ -1,18 +1,14 @@
 LUCET_ROOT:=$(abspath ../..)
 
-LUCET_CLANG?=clang
-LUCET_WASM_LD?=wasm-ld
+WASI_SDK?=/opt/wasi
+WASI_CC=$(WASI_SDK)/bin/clang
 
-GCC:=$(FST_GCC)/bin/gcc
 LUCETC:=$(LUCET_ROOT)/target/release/lucetc
-LUCETCC:=$(LUCET_ROOT)/lucetc/scripts/bin/lucetcc
-LUCETLD:=$(LUCET_ROOT)/lucetc/scripts/bin/lucetld
 
-LUCET_LIBC:=$(LUCET_ROOT)/lucet-libc/
 LUCET_RUNTIME:=$(LUCET_ROOT)/lucet-runtime
 SIGHTGLASS:=$(LUCET_ROOT)/sightglass
 
-LIBBUILTINS:=$(LUCET_ROOT)/builtins/build/libbuiltins.so
+LIBBUILTINS:=$(LUCET_ROOT)/lucet-builtins/build/libbuiltins.so
 
 SHOOTOUT:=$(LUCET_ROOT)/sightglass/benchmarks/shootout
 SHOOTOUT_SRCS:=$(shell ls $(SHOOTOUT)/*.c)
@@ -39,9 +35,6 @@ bench: run
 run: build
 	$(LUCET_ROOT)/target/release/sightglass -c sightglass.toml $(SIGHTGLASS_ARGS)
 
-$(LUCET_LIBC)/build/lib/liblucet_libc.so:
-	make -C $(LUCET_ROOT)/lucet-libc
-
 .PHONY: $(LUCET_ROOT)/target/release/liblucet_runtime.so
 $(LUCET_ROOT)/target/release/liblucet_runtime.so:
 	cargo build --release -p lucet-runtime
@@ -53,21 +46,26 @@ build: build/lucet/implementation.so
 build: build/lucet/module.so
 build: $(LUCET_ROOT)/target/release/sightglass
 
+# With the xenial gcc (5.4.0) this pins the CPU for minutes if above -O1, so its getting downgraded to -O1
+build/native/shootout/switch2.o: $(SHOOTOUT)/switch2.c
+	@mkdir -p $(@D)
+	$(CC) $(SHOOTOUT_NATIVE_CFLAGS) $(COMMON_CFLAGS) -O1 -c $^ -o $@
+
 build/native/shootout/%.o: $(SHOOTOUT)/%.c
 	@mkdir -p $(@D)
-	$(LUCET_CLANG) $(SHOOTOUT_NATIVE_CFLAGS) $(COMMON_CFLAGS) -c $^ -o $@
+	$(CC) $(SHOOTOUT_NATIVE_CFLAGS) $(COMMON_CFLAGS) -c $^ -o $@
 
 build/native/implementation.so: $(patsubst %.c, %.o, $(addprefix build/native/shootout/, $(notdir $(SHOOTOUT_SRCS))))
 	@mkdir -p $(@D)
-	$(LUCET_CLANG) -shared -o $@ $^
+	$(CC) -shared -o $@ $^
 
 build/lucet/shootout/%.o: $(SHOOTOUT)/%.c
 	@mkdir -p $(@D)
-	$(LUCETCC) $(COMMON_CFLAGS) -c $^ -o $@
+	$(WASI_CC) $(COMMON_CFLAGS) -c $^ -o $@
 
 build/lucet/module.wasm: $(patsubst %.c, %.o, $(addprefix build/lucet/shootout/, $(notdir $(SHOOTOUT_SRCS))))
 	@mkdir -p $(@D)
-	$(LUCETLD) $^ -o $@
+	$(WASI_CC) $^ -o $@ -nostartfiles -Wl,--no-entry -Wl,--export-all
 
 # Don't emit the shared object, we need a saparate link step below.
 build/lucet/module.o: build/lucet/module.wasm $(LIBBUILTINS)
@@ -82,24 +80,22 @@ build/lucet/module.clif: build/lucet/module.wasm $(LIBBUILTINS)
 # need to link the wasm object to the same libraries.
 build/lucet/module.so: build/lucet/module.o
 	@mkdir -p $(@D)
-	$(LUCET_CLANG) -rdynamic -shared build/lucet/module.o -o $@
+	$(CC) -rdynamic -shared build/lucet/module.o -o $@
 
-build/lucet/%.o: %.c | $(LUCET_LIBC)/build/lib/liblucet_libc.so
+build/lucet/%.o: %.c
 	@mkdir -p $(@D)
-	$(LUCET_CLANG) --std=c99 -fPIC -D_GNU_SOURCE -g3 $(COMMON_CFLAGS) \
+	$(CC) --std=c99 -fPIC -D_GNU_SOURCE -g3 $(COMMON_CFLAGS) \
 		-fvisibility=default \
 		-I$(LUCET_RUNTIME)/include \
-		-I$(LUCET_LIBC)/build/include \
 		-DWASM_MODULE=$(abspath build/lucet/module.so) \
 		-c $^ -o $@
 
 build/lucet/implementation.so: $(LUCET_ROOT)/target/release/liblucet_runtime.so
-build/lucet/implementation.so: $(LUCET_LIBC)/build/lib/liblucet_libc.so
 build/lucet/implementation.so: build/lucet/wrapper.o
 build/lucet/implementation.so: build/lucet/hostcalls.o
 build/lucet/implementation.so: $(LIBBUILTINS)
 	@mkdir -p $(@D)
-	$(LUCET_CLANG) -rdynamic -shared \
+	$(CC) -rdynamic -shared \
 		-L $(dir $(LIBBUILTINS)) \
 		-Wl,-rpath $(dir $(LIBBUILTINS)) \
 		$^ -ldl -lbuiltins -o $@
@@ -108,7 +104,7 @@ $(LUCET_ROOT)/target/release/sightglass:
 	cargo build --release -p sightglass
 
 $(LIBBUILTINS):
-	make -C $(LUCET_ROOT)/builtins
+	make -C $(LUCET_ROOT)/lucet-builtins
 
 $(LUCETC):
 	cargo build --release -p lucetc

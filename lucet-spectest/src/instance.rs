@@ -1,36 +1,45 @@
 use failure::{format_err, Error};
-use lucet::{LucetError, UntypedRetval, Val};
+use lucet_runtime::{
+    Error as RuntimeError, Module as LucetModule, Region as LucetRegion, UntypedRetVal, Val,
+};
 use lucetc::program::Program;
 pub use parity_wasm::elements::ValueType;
 use parity_wasm::elements::{Internal, Type};
+use std::sync::Arc;
 
 // some of the fields of this are not used, but they need to be stored
 // because lifetimes
 #[allow(dead_code)]
 pub struct Instance {
     program: Program,
-    lucet_module: lucet::Module,
-    lucet_pool: lucet::Pool,
-    lucet_instance: lucet::Instance,
+    lucet_module: Arc<dyn LucetModule>,
+    lucet_region: Arc<dyn LucetRegion>,
+    lucet_instance: lucet_runtime::InstanceHandle,
 }
 
 impl Instance {
     pub fn new(
         program: Program,
-        lucet_module: lucet::Module,
-        lucet_pool: lucet::Pool,
-        lucet_instance: lucet::Instance,
+        lucet_module: Arc<dyn LucetModule>,
+        lucet_region: Arc<dyn LucetRegion>,
+        lucet_instance: lucet_runtime::InstanceHandle,
     ) -> Self {
         Self {
             program,
             lucet_module,
-            lucet_pool,
+            lucet_region,
             lucet_instance,
         }
     }
 
-    pub fn run(&mut self, field: &str, args: &[Val]) -> Result<UntypedRetval, LucetError> {
-        self.lucet_instance.run(field, args)
+    pub fn run(&mut self, field: &str, args: &[Val]) -> Result<UntypedRetVal, RuntimeError> {
+        let res = self.lucet_instance.run(field.as_bytes(), args);
+        if let Err(_) = res {
+            self.lucet_instance
+                .reset()
+                .expect("possible to reset instance");
+        }
+        res
     }
 
     pub fn type_of(&self, field: &str) -> Result<ExportType, Error> {

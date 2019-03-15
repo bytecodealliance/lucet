@@ -11,7 +11,7 @@ mod result;
 use crate::instance::{ExportType, ValueType};
 use crate::script::{ScriptEnv, ScriptError};
 use failure::{format_err, Error, ResultExt};
-use lucet::{LucetError, TrapcodeType, UntypedRetval, Val};
+use lucet_runtime::{Error as RuntimeError, TrapCodeType, UntypedRetVal, Val};
 use std::fs;
 use std::path::PathBuf;
 use wabt::script::{Action, CommandKind, ScriptParser, Value};
@@ -132,9 +132,9 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 match res {
                     Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
 
-                    Err(ScriptError::RuntimeError(LucetError::RuntimeFault(details))) => {
-                        match details.trapcode.type_ {
-                            TrapcodeType::StackOverflow => Ok(()),
+                    Err(ScriptError::RuntimeError(RuntimeError::RuntimeFault(details))) => {
+                        match details.trapcode.ty {
+                            TrapCodeType::StackOverflow => Ok(()),
                             e => Err(format_err!(
                                 "AssertExhaustion expects stack overflow, got {:?}",
                                 e
@@ -230,7 +230,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
     }
 }
 
-fn check_retval(expected: &[Value], got: UntypedRetval) -> Result<(), SpecTestError> {
+fn check_retval(expected: &[Value], got: UntypedRetVal) -> Result<(), SpecTestError> {
     match expected.len() {
         0 => {}
         1 => match expected[0] {

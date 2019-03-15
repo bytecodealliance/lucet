@@ -31,9 +31,12 @@ failure = "0.1"
 serde = "1.0"
 serde_json = "1.0"
 byteorder = "1.2"
-wasmonkey = { path = "../builtins/wasmonkey" }
+wasmonkey = { path = "../lucet-builtins/wasmonkey" }
 wabt = "0.7"
 tempfile = "3.0"
 bimap = "0.1"
 pwasm-validation = { path = "../pwasm-validation" }
 human-size = "0.4"
+
+[dev-dependencies]
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }

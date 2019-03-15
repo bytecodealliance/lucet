@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 lucetc = { path = "../lucetc" }
-lucet = { path = "../lucet-rs" }
+lucet-runtime = { path = "../lucet-runtime" }
 parity-wasm = "0.35"
 wabt = "0.7"
 serde = "1.0"
