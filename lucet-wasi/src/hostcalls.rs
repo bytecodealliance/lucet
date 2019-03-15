@@ -167,8 +167,8 @@ pub extern "C" fn __wasi_fd_close(
     vmctx: *mut lucet_vmctx,
     fd: wasm32::__wasi_fd_t,
 ) -> wasm32::__wasi_errno_t {
-    let vmctx = unsafe { Vmctx::from_raw(vmctx) };
-    let mut ctx = unsafe { Box::from_raw(vmctx.embed_ctx() as *mut WasiCtx) };
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
     let fd = dec_fd(fd);
     if let Some(fdent) = ctx.fds.remove(&fd) {
         match nix::unistd::close(fdent.fd_object.rawfd) {
@@ -187,7 +187,7 @@ pub extern "C" fn __wasi_fd_stat_get(
     fdstat_ptr: wasm32::uintptr_t, // *mut wasm32::__wasi_fdstat_t
 ) -> wasm32::__wasi_errno_t {
     let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
-    let ctx = unsafe { Box::from_raw(vmctx.embed_ctx() as *mut WasiCtx) };
+    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
 
     let host_fd = dec_fd(fd);
     let mut host_fdstat = match unsafe { dec_fdstat_byref(&mut vmctx, fdstat_ptr) } {
@@ -243,7 +243,7 @@ pub extern "C" fn __wasi_fd_seek(
     newoffset: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
     let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
-    let ctx = unsafe { Box::from_raw(vmctx.embed_ctx() as *mut WasiCtx) };
+    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
     let fd = dec_fd(fd);
     let offset = dec_filedelta(offset);
     let whence = dec_whence(whence);
@@ -289,7 +289,7 @@ pub extern "C" fn __wasi_fd_write(
     use nix::sys::uio::{writev, IoVec};
 
     let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
-    let ctx = unsafe { Box::from_raw(vmctx.embed_ctx() as *mut WasiCtx) };
+    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
     let fd = dec_fd(fd);
     let iovs = match unsafe { dec_ciovec_slice(&mut vmctx, iovs_ptr, iovs_len) } {
         Ok(iovs) => iovs,
