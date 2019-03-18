@@ -4,6 +4,7 @@ pub mod error;
 pub mod load;
 pub mod patch;
 pub mod program;
+pub mod new;
 
 use crate::compiler::function::compile_function;
 use crate::compiler::module_data::compile_module_data;
