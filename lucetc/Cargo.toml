@@ -15,17 +15,17 @@ name = "lucetc"
 path = "src/main.rs"
 
 [dependencies]
-lucet-module-data = { path = "../lucet-module-data" }
-clap="2.32"
-log = "0.4"
-env_logger = "0.6"
-parity-wasm = "0.35"
 cranelift-codegen = { path = "../cranelift/cranelift-codegen" }
 cranelift-native = { path = "../cranelift/cranelift-native" }
 cranelift-frontend = { path = "../cranelift/cranelift-frontend" }
 cranelift-module = { path = "../cranelift/cranelift-module" }
 cranelift-faerie = { path = "../cranelift/cranelift-faerie" }
-target-lexicon = "0.2"
+cranelift-wasm = { path = "../cranelift/cranelift-wasm" }
+target-lexicon = "0.3"
+lucet-module-data = { path = "../lucet-module-data" }
+clap="2.32"
+log = "0.4"
+env_logger = "0.6"
 faerie = "0.9.1"
 failure = "0.1"
 serde = "1.0"
@@ -34,9 +34,10 @@ byteorder = "1.2"
 wasmonkey = { path = "../lucet-builtins/wasmonkey" }
 wabt = "0.7"
 tempfile = "3.0"
-bimap = "0.1"
-pwasm-validation = { path = "../pwasm-validation" }
+bimap = "0.2"
 human-size = "0.4"
+parity-wasm = "0.35"
+pwasm-validation = { path = "../pwasm-validation" }
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
