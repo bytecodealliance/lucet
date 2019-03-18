@@ -58,8 +58,6 @@ impl From<pwasm_validation::Error> for LucetcError {
 pub enum LucetcErrorKind {
     #[fail(display = "Data Initializers")]
     DataInitializers,
-    #[fail(display = "Memory specs")]
-    MemorySpecs,
     #[fail(display = "Global specs")]
     GlobalSpecs,
     #[fail(display = "Module data")]

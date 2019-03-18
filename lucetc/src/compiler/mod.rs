@@ -2,7 +2,6 @@ pub mod data;
 pub mod entity;
 pub mod function;
 pub mod globals;
-pub mod memory;
 pub mod module_data;
 pub mod opcode;
 pub mod state;
