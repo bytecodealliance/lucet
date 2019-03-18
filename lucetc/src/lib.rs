@@ -5,7 +5,6 @@ pub mod load;
 pub mod patch;
 pub mod program;
 
-use crate::compiler::data::{compile_data_initializers, compile_sparse_page_data};
 use crate::compiler::function::compile_function;
 use crate::compiler::globals::compile_global_specs;
 use crate::compiler::module_data::compile_module_data;
@@ -241,8 +240,6 @@ pub fn compile<'p>(
 ) -> Result<Compiler<'p>, LucetcError> {
     let mut compiler = Compiler::new(name.to_owned(), &program, opt_level)?;
 
-    compile_data_initializers(&mut compiler).context(LucetcErrorKind::DataInitializers)?;
-    compile_sparse_page_data(&mut compiler).context(LucetcErrorKind::DataInitializers)?;
     compile_global_specs(&mut compiler).context(LucetcErrorKind::GlobalSpecs)?;
     compile_module_data(&mut compiler).context(LucetcErrorKind::ModuleData)?;
 
