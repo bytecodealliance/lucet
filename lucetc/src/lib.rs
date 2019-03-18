@@ -6,7 +6,6 @@ pub mod patch;
 pub mod program;
 
 use crate::compiler::function::compile_function;
-use crate::compiler::globals::compile_global_specs;
 use crate::compiler::module_data::compile_module_data;
 use crate::compiler::table::compile_table;
 use crate::error::{LucetcError, LucetcErrorKind};
@@ -240,7 +239,6 @@ pub fn compile<'p>(
 ) -> Result<Compiler<'p>, LucetcError> {
     let mut compiler = Compiler::new(name.to_owned(), &program, opt_level)?;
 
-    compile_global_specs(&mut compiler).context(LucetcErrorKind::GlobalSpecs)?;
     compile_module_data(&mut compiler).context(LucetcErrorKind::ModuleData)?;
 
     for function in program.defined_functions() {
