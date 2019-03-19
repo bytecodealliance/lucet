@@ -1,11 +1,11 @@
-use crate::new::module::{ModuleInfo};
+use crate::new::module::ModuleInfo;
 
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
-    FuncEnvironment, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex,
-    ModuleEnvironment, SignatureIndex, TableIndex, WasmResult,
+    FuncEnvironment, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex, ModuleEnvironment,
+    SignatureIndex, TableIndex, WasmResult,
 };
 
 pub struct FuncInfo<'a> {

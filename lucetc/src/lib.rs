@@ -2,9 +2,9 @@ pub mod bindings;
 pub mod compiler;
 pub mod error;
 pub mod load;
+pub mod new;
 pub mod patch;
 pub mod program;
-pub mod new;
 
 use crate::compiler::function::compile_function;
 use crate::compiler::module_data::compile_module_data;
