@@ -6,8 +6,8 @@ pub mod state;
 pub mod table;
 pub mod traps;
 
-mod name;
-mod stack_probe;
+pub mod name;
+pub mod stack_probe;
 
 pub use self::name::Name;
 
@@ -40,7 +40,7 @@ impl Default for OptLevel {
 }
 
 impl OptLevel {
-    fn to_flag(&self) -> &str {
+    pub fn to_flag(&self) -> &str {
         match self {
             OptLevel::Default => "default",
             OptLevel::Best => "best",

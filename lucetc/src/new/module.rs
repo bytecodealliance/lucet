@@ -3,8 +3,8 @@ use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
-    TableIndex, WasmResult,
+    FuncIndex, Global, GlobalIndex, GlobalVariable, Memory, MemoryIndex, ModuleEnvironment,
+    SignatureIndex, Table, TableIndex, WasmResult,
 };
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -39,36 +39,36 @@ pub struct DataInitializer<'a> {
 
 pub struct ModuleInfo<'a> {
     /// Target description used for codegen
-    target_config: TargetFrontendConfig,
+    pub target_config: TargetFrontendConfig,
     /// Provided by `declare_signature`
-    signatures: PrimaryMap<SignatureIndex, ir::Signature>,
+    pub signatures: PrimaryMap<SignatureIndex, ir::Signature>,
     /// Provided by `declare_func_import`
-    imported_funcs: PrimaryMap<FuncIndex, (&'a str, &'a str)>,
+    pub imported_funcs: PrimaryMap<FuncIndex, (&'a str, &'a str)>,
     /// Provided by `declare_global_import`
-    imported_globals: PrimaryMap<GlobalIndex, (&'a str, &'a str)>,
+    pub imported_globals: PrimaryMap<GlobalIndex, (&'a str, &'a str)>,
     /// Provided by `declare_table_import`
-    imported_tables: PrimaryMap<TableIndex, (&'a str, &'a str)>,
+    pub imported_tables: PrimaryMap<TableIndex, (&'a str, &'a str)>,
     /// Provided by `declare_memory_import`
-    imported_memories: PrimaryMap<MemoryIndex, (&'a str, &'a str)>,
+    pub imported_memories: PrimaryMap<MemoryIndex, (&'a str, &'a str)>,
     /// Function signatures: imported and local
-    functions: PrimaryMap<FuncIndex, Exportable<'a, SignatureIndex>>,
+    pub functions: PrimaryMap<FuncIndex, Exportable<'a, SignatureIndex>>,
     /// Provided by `declare_table`
-    tables: PrimaryMap<TableIndex, Exportable<'a, Table>>,
+    pub tables: PrimaryMap<TableIndex, Exportable<'a, Table>>,
     /// Provided by `declare_memory`
-    memories: PrimaryMap<MemoryIndex, Exportable<'a, Memory>>,
+    pub memories: PrimaryMap<MemoryIndex, Exportable<'a, Memory>>,
     /// Provided by `declare_global`
-    globals: PrimaryMap<GlobalIndex, Exportable<'a, Global>>,
+    pub globals: PrimaryMap<GlobalIndex, Exportable<'a, Global>>,
     /// Provided by `declare_start_func`
-    start_func: Option<FuncIndex>,
+    pub start_func: Option<FuncIndex>,
 
     /// Function bodies: local only
-    function_bodies: HashMap<FuncIndex, (&'a [u8], usize)>,
+    pub function_bodies: HashMap<FuncIndex, (&'a [u8], usize)>,
 
     /// Table elements: local only
-    table_elems: HashMap<TableIndex, Vec<TableElems>>,
+    pub table_elems: HashMap<TableIndex, Vec<TableElems>>,
 
     /// Data initializers: local only
-    data_initializers: HashMap<MemoryIndex, Vec<DataInitializer<'a>>>,
+    pub data_initializers: HashMap<MemoryIndex, Vec<DataInitializer<'a>>>,
 }
 
 impl<'a> ModuleInfo<'a> {
@@ -195,7 +195,8 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
 
     fn define_function_body(&mut self, body_bytes: &'a [u8], body_offset: usize) -> WasmResult<()> {
         let func_index = FuncIndex::new(self.imported_funcs.len() + self.function_bodies.len());
-        self.function_bodies.insert(func_index, (body_bytes, body_offset));
+        self.function_bodies
+            .insert(func_index, (body_bytes, body_offset));
         Ok(())
     }
 
