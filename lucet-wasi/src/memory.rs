@@ -31,7 +31,7 @@ pub unsafe fn dec_ptr(
 
     // check that `len` fits in the wasm32 address space
     if len > wasm32::UINTPTR_MAX as usize {
-        bail_errno!(__WASI_EINVAL);
+        bail_errno!(__WASI_EOVERFLOW);
     }
 
     // check that `ptr` and `ptr + len` are both within the guest heap
@@ -82,12 +82,35 @@ pub unsafe fn dec_slice_of<T>(
     let len_bytes = if let Some(len) = size_of::<T>().checked_mul(len) {
         len
     } else {
-        return Err(host::__WASI_EINVAL as host::__wasi_errno_t);
+        return Err(host::__WASI_EOVERFLOW as host::__wasi_errno_t);
     };
 
     let ptr = dec_ptr(vmctx, ptr, len_bytes)? as *mut T;
 
     Ok((ptr, len))
+}
+
+pub unsafe fn enc_slice_of<T>(
+    vmctx: &mut Vmctx,
+    slice: &[T],
+    ptr: wasm32::uintptr_t,
+) -> Result<(), host::__wasi_errno_t> {
+    // check alignment
+    if ptr as usize % align_of::<T>() != 0 {
+        return Err(host::__WASI_EINVAL as host::__wasi_errno_t);
+    }
+    // check that length doesn't overflow
+    let len_bytes = if let Some(len) = size_of::<T>().checked_mul(slice.len()) {
+        len
+    } else {
+        return Err(host::__WASI_EOVERFLOW as host::__wasi_errno_t);
+    };
+
+    // get the pointer into guest memory, and copy the bytes
+    let ptr = dec_ptr(vmctx, ptr, len_bytes)? as *mut libc::c_void;
+    libc::memcpy(ptr, slice.as_ptr() as *const libc::c_void, len_bytes);
+
+    Ok(())
 }
 
 macro_rules! dec_enc_scalar {

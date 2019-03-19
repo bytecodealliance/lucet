@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 cast = "0.2"
 clap = "2.23"
+libc = "0.2"
 lucet-runtime = { path = "../lucet-runtime" }
 nix = "0.13"
 

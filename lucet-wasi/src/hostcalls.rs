@@ -11,8 +11,10 @@
 #![allow(non_camel_case_types)]
 use crate::memory::*;
 use crate::{host, wasm32};
+use cast::From as _0;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use std::collections::HashMap;
+use std::ffi::CString;
 use std::fs::File;
 use std::io::{stderr, stdin, stdout};
 use std::os::unix::prelude::{AsRawFd, FileTypeExt, FromRawFd, RawFd};
@@ -24,14 +26,30 @@ pub extern "C" fn __wasi_proc_exit(_vmctx: *mut lucet_vmctx, rval: wasm32::__was
 
 pub struct WasiCtx {
     fds: HashMap<host::__wasi_fd_t, FdEntry>,
+    args: Vec<CString>,
+    env: Vec<CString>,
 }
 
 impl WasiCtx {
-    pub fn new() -> WasiCtx {
+    pub fn new(module_path: &str, args: &[&str]) -> WasiCtx {
         use nix::unistd::dup;
+
+        let args = std::iter::once(&module_path)
+            .chain(args.into_iter())
+            .map(|arg| CString::new(*arg).expect("argument can be converted to a CString"))
+            .collect();
+
+        let env = std::env::vars()
+            .map(|(k, v)| {
+                CString::new(format!("{}={}", k, v))
+                    .expect("environment pair can be converted to a CString")
+            })
+            .collect();
 
         let mut ctx = WasiCtx {
             fds: HashMap::new(),
+            args,
+            env,
         };
         ctx.insert_existing_fd(0, dup(stdin().as_raw_fd()).unwrap());
         ctx.insert_existing_fd(1, dup(stdout().as_raw_fd()).unwrap());
@@ -163,6 +181,146 @@ struct FdObject {
 }
 
 #[no_mangle]
+pub extern "C" fn __wasi_args_get(
+    vmctx_raw: *mut lucet_vmctx,
+    argv_ptr: wasm32::uintptr_t,
+    argv_buf: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx_raw) };
+    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+
+    let mut argv_buf_offset = 0;
+    let mut argv = vec![];
+
+    for arg in ctx.args.iter() {
+        let arg_bytes = arg.as_bytes_with_nul();
+        let arg_ptr = argv_buf + argv_buf_offset;
+
+        // nasty aliasing here, but we aren't interfering with the borrow for `ctx`
+        // TODO: rework vmctx interface to avoid this
+        let mut vmctx = unsafe { Vmctx::from_raw(vmctx_raw) };
+        if let Err(e) = unsafe { enc_slice_of(&mut vmctx, arg_bytes, arg_ptr) } {
+            return enc_errno(e);
+        }
+
+        argv.push(arg_ptr);
+
+        argv_buf_offset = if let Some(new_offset) = argv_buf_offset.checked_add(
+            wasm32::uintptr_t::cast(arg_bytes.len())
+                .expect("cast overflow would have been caught by `enc_slice_of` above"),
+        ) {
+            new_offset
+        } else {
+            return wasm32::__WASI_EOVERFLOW;
+        }
+    }
+
+    unsafe {
+        enc_slice_of(&mut vmctx, argv.as_slice(), argv_ptr)
+            .map(|_| wasm32::__WASI_ESUCCESS)
+            .unwrap_or_else(|e| e)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_args_sizes_get(
+    vmctx: *mut lucet_vmctx,
+    argc_ptr: wasm32::uintptr_t,
+    argv_buf_size_ptr: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+
+    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+
+    let argc = ctx.args.len();
+    let argv_size = ctx
+        .args
+        .iter()
+        .map(|arg| arg.as_bytes_with_nul().len())
+        .sum();
+
+    unsafe {
+        if let Err(e) = enc_usize_byref(&mut vmctx, argc_ptr, argc) {
+            return enc_errno(e);
+        }
+        if let Err(e) = enc_usize_byref(&mut vmctx, argv_buf_size_ptr, argv_size) {
+            return enc_errno(e);
+        }
+    }
+    wasm32::__WASI_ESUCCESS
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_environ_get(
+    vmctx_raw: *mut lucet_vmctx,
+    environ_ptr: wasm32::uintptr_t,
+    environ_buf: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx_raw) };
+    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+
+    let mut environ_buf_offset = 0;
+    let mut environ = vec![];
+
+    for pair in ctx.env.iter() {
+        let env_bytes = pair.as_bytes_with_nul();
+        let env_ptr = environ_buf + environ_buf_offset;
+
+        // nasty aliasing here, but we aren't interfering with the borrow for `ctx`
+        // TODO: rework vmctx interface to avoid this
+        let mut vmctx = unsafe { Vmctx::from_raw(vmctx_raw) };
+        if let Err(e) = unsafe { enc_slice_of(&mut vmctx, env_bytes, env_ptr) } {
+            return enc_errno(e);
+        }
+
+        environ.push(env_ptr);
+
+        environ_buf_offset = if let Some(new_offset) = environ_buf_offset.checked_add(
+            wasm32::uintptr_t::cast(env_bytes.len())
+                .expect("cast overflow would have been caught by `enc_slice_of` above"),
+        ) {
+            new_offset
+        } else {
+            return wasm32::__WASI_EOVERFLOW;
+        }
+    }
+
+    unsafe {
+        enc_slice_of(&mut vmctx, environ.as_slice(), environ_ptr)
+            .map(|_| wasm32::__WASI_ESUCCESS)
+            .unwrap_or_else(|e| e)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_environ_sizes_get(
+    vmctx: *mut lucet_vmctx,
+    environ_count_ptr: wasm32::uintptr_t,
+    environ_size_ptr: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+
+    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+
+    let environ_count = ctx.env.len();
+    let environ_size = ctx
+        .env
+        .iter()
+        .map(|pair| pair.as_bytes_with_nul().len())
+        .sum();
+
+    unsafe {
+        if let Err(e) = enc_usize_byref(&mut vmctx, environ_count_ptr, environ_count) {
+            return enc_errno(e);
+        }
+        if let Err(e) = enc_usize_byref(&mut vmctx, environ_size_ptr, environ_size) {
+            return enc_errno(e);
+        }
+    }
+    wasm32::__WASI_ESUCCESS
+}
+
+#[no_mangle]
 pub extern "C" fn __wasi_fd_close(
     vmctx: *mut lucet_vmctx,
     fd: wasm32::__wasi_fd_t,
@@ -273,6 +431,46 @@ pub extern "C" fn __wasi_fd_seek(
 
     unsafe {
         enc_filesize_byref(&mut vmctx, newoffset, host_newoffset as u64)
+            .map(|_| wasm32::__WASI_ESUCCESS)
+            .unwrap_or_else(|e| e)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_fd_read(
+    vmctx: *mut lucet_vmctx,
+    fd: wasm32::__wasi_fd_t,
+    iovs_ptr: wasm32::uintptr_t,
+    iovs_len: wasm32::size_t,
+    nread: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    use nix::sys::uio::{readv, IoVec};
+
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+    let fd = dec_fd(fd);
+    let mut iovs = match unsafe { dec_ciovec_slice(&mut vmctx, iovs_ptr, iovs_len) } {
+        Ok(iovs) => iovs,
+        Err(e) => return enc_errno(e),
+    };
+
+    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+    let fe = match ctx.get_fd_entry(fd, host::__WASI_RIGHT_FD_READ.into(), 0) {
+        Ok(fe) => fe,
+        Err(e) => return enc_errno(e),
+    };
+
+    let mut iovs: Vec<IoVec<&mut [u8]>> = iovs
+        .iter_mut()
+        .map(|iov| unsafe { host::ciovec_to_nix_mut(iov) })
+        .collect();
+
+    let host_nread = match readv(fe.fd_object.rawfd, &mut iovs) {
+        Ok(len) => len,
+        Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
+    };
+
+    unsafe {
+        enc_usize_byref(&mut vmctx, nread, host_nread)
             .map(|_| wasm32::__WASI_ESUCCESS)
             .unwrap_or_else(|e| e)
     }
