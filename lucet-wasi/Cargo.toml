@@ -11,5 +11,11 @@ libc = "0.2"
 lucet-runtime = { path = "../lucet-runtime" }
 nix = "0.13"
 
+[dev-dependencies]
+failure = "0.1"
+lucetc = { path = "../lucetc" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
+tempfile = "3.0"
+
 [build-dependencies]
 bindgen = "0.47"

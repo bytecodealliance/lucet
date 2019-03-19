@@ -32,6 +32,14 @@ pub struct WasiCtx {
 
 impl WasiCtx {
     pub fn new(module_path: &str, args: &[&str]) -> WasiCtx {
+        WasiCtx::new_with_env(module_path, args, std::env::vars())
+    }
+
+    pub fn new_with_env<E, S>(module_path: &str, args: &[&str], env: E) -> WasiCtx
+    where
+        E: IntoIterator<Item = (S, S)>,
+        S: AsRef<str>,
+    {
         use nix::unistd::dup;
 
         let args = std::iter::once(&module_path)
@@ -39,9 +47,10 @@ impl WasiCtx {
             .map(|arg| CString::new(*arg).expect("argument can be converted to a CString"))
             .collect();
 
-        let env = std::env::vars()
+        let env = env
+            .into_iter()
             .map(|(k, v)| {
-                CString::new(format!("{}={}", k, v))
+                CString::new(format!("{}={}", k.as_ref(), v.as_ref()))
                     .expect("environment pair can be converted to a CString")
             })
             .collect();
@@ -77,7 +86,6 @@ impl WasiCtx {
     }
 
     pub fn insert_existing_fd(&mut self, fd: host::__wasi_fd_t, rawfd: RawFd) {
-        assert!(!self.fds.contains_key(&fd));
         self.fds.insert(fd, unsafe { FdEntry::from_raw_fd(rawfd) });
     }
 }
