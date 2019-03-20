@@ -11,6 +11,7 @@
         "fd_fdstat_get": "__wasi_fd_fdstat_get",
         "fd_read": "__wasi_fd_read",
         "fd_seek": "__wasi_fd_seek",
-        "fd_write": "__wasi_fd_write"
+        "fd_write": "__wasi_fd_write",
+        "random_get": "__wasi_random_get"
     }
 }

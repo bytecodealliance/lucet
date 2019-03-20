@@ -609,3 +609,26 @@ pub extern "C" fn __wasi_fd_write(
             .unwrap_or_else(|e| e)
     }
 }
+
+#[no_mangle]
+pub extern "C" fn __wasi_random_get(
+    vmctx: *mut lucet_vmctx,
+    buf_ptr: wasm32::uintptr_t,
+    buf_len: wasm32::size_t,
+) -> wasm32::__wasi_errno_t {
+    use rand::{thread_rng, RngCore};
+
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+
+    let buf_len = dec_usize(buf_len);
+    let buf_ptr = match unsafe { dec_ptr(&mut vmctx, buf_ptr, buf_len) } {
+        Ok(ptr) => ptr,
+        Err(e) => return enc_errno(e),
+    };
+
+    let buf = unsafe { std::slice::from_raw_parts_mut(buf_ptr, buf_len) };
+
+    thread_rng().fill_bytes(buf);
+
+    return wasm32::__WASI_ESUCCESS;
+}

@@ -10,6 +10,7 @@ clap = "2.23"
 libc = "0.2"
 lucet-runtime = { path = "../lucet-runtime" }
 nix = "0.13"
+rand = "0.6"
 
 [dev-dependencies]
 failure = "0.1"

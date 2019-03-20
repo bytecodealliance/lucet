@@ -72,9 +72,7 @@ fn clock_getres() {
 fn getrusage() {
     let ctx = WasiCtx::new("getrusage", &[]);
 
-    let (exitcode, stdout) = run_with_stdout("getrusage.c", ctx).unwrap();
-
-    eprint!("{}", stdout);
+    let exitcode = run("getrusage.c", ctx).unwrap();
 
     assert_eq!(exitcode, 0);
 }
@@ -83,10 +81,16 @@ fn getrusage() {
 fn gettimeofday() {
     let ctx = WasiCtx::new("gettimeofday", &[]);
 
-    let (exitcode, stdout) = run_with_stdout("gettimeofday.c", ctx).unwrap();
-
-    eprint!("{}", stdout);
+    let exitcode = run("gettimeofday.c", ctx).unwrap();
 
     assert_eq!(exitcode, 0);
 }
 
+#[test]
+fn getentropy() {
+    let ctx = WasiCtx::new("getentropy", &[]);
+
+    let exitcode = run("getentropy.c", ctx).unwrap();
+
+    assert_eq!(exitcode, 0);
+}
