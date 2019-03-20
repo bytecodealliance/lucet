@@ -1,6 +1,7 @@
-use failure::Error;
+use failure::{bail, Error};
 use lucet_runtime::{DlModule, Module};
 use lucet_runtime::{Limits, MmapRegion, Region};
+use lucet_wasi::host::__wasi_exitcode_t;
 use lucet_wasi::WasiCtx;
 use lucet_wasi_sdk::Link;
 use lucetc::{Bindings, Lucetc};
@@ -34,7 +35,10 @@ pub fn guest_file<P: AsRef<Path>>(path: P) -> PathBuf {
 pub fn wasi_test<P: AsRef<Path>>(c_file: P) -> Result<Arc<dyn Module>, Error> {
     let workdir = TempDir::new().expect("create working directory");
 
-    let wasm_build = Link::new(&[c_file]);
+    let wasm_build = Link::new(&[c_file])
+        .cflag("-Wall")
+        .cflag("-Werror")
+        .print_output(true);
 
     let wasm_file = workdir.path().join("out.wasm");
 
@@ -53,18 +57,35 @@ pub fn wasi_test<P: AsRef<Path>>(c_file: P) -> Result<Arc<dyn Module>, Error> {
     Ok(dlmodule as Arc<dyn Module>)
 }
 
-pub fn run_with_stdout<P: AsRef<Path>>(path: P, mut ctx: WasiCtx) -> Result<String, Error> {
+pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, Error> {
     let region = MmapRegion::create(1, &Limits::default())?;
     let module = test_module_wasi(path)?;
-
-    let (pipe_out, pipe_in) = nix::unistd::pipe()?;
-    ctx.insert_existing_fd(1, pipe_in);
 
     let mut inst = region
         .new_instance_builder(module)
         .with_embed_ctx(ctx)
         .build()?;
-    inst.run(b"_start", &[])?;
+
+    match inst.run(b"_start", &[]) {
+        // normal termination implies 0 exit code
+        Ok(_) => Ok(0),
+        Err(lucet_runtime::Error::RuntimeTerminated(
+            lucet_runtime::TerminationDetails::Provided(any),
+        )) => Ok(*any
+            .downcast_ref::<__wasi_exitcode_t>()
+            .expect("termination yields an exitcode")),
+        Err(e) => bail!("runtime error: {}", e),
+    }
+}
+
+pub fn run_with_stdout<P: AsRef<Path>>(
+    path: P,
+    mut ctx: WasiCtx,
+) -> Result<(__wasi_exitcode_t, String), Error> {
+    let (pipe_out, pipe_in) = nix::unistd::pipe()?;
+    ctx.insert_existing_fd(1, pipe_in);
+
+    let exitcode = run(path, ctx)?;
 
     nix::unistd::close(pipe_in)?;
 
@@ -73,5 +94,5 @@ pub fn run_with_stdout<P: AsRef<Path>>(path: P, mut ctx: WasiCtx) -> Result<Stri
     stdout_file.read_to_string(&mut stdout)?;
     nix::unistd::close(stdout_file.into_raw_fd())?;
 
-    Ok(stdout)
+    Ok((exitcode, stdout))
 }

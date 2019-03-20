@@ -1,5 +1,6 @@
 use failure::Fail;
 use std::env;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -12,7 +13,11 @@ pub enum CompileError {
 }
 
 impl CompileError {
-    pub fn check(output: Output) -> Result<(), Self> {
+    pub fn check(output: Output, print: bool) -> Result<(), Self> {
+        if print {
+            std::io::stdout().write_all(&output.stdout).unwrap();
+            std::io::stderr().write_all(&output.stderr).unwrap();
+        }
         if output.status.success() {
             Ok(())
         } else {
@@ -34,6 +39,7 @@ fn wasi_sdk_clang() -> PathBuf {
 pub struct Compile {
     input: PathBuf,
     cflags: Vec<String>,
+    print_output: bool,
 }
 
 impl Compile {
@@ -41,6 +47,7 @@ impl Compile {
         Compile {
             input: PathBuf::from(input.as_ref()),
             cflags: Vec::new(),
+            print_output: false,
         }
     }
 
@@ -60,6 +67,11 @@ impl Compile {
 
     pub fn with_include<S: AsRef<str>>(&mut self, include: S) {
         self.cflags.push(format!("-I{}", include.as_ref()));
+    }
+
+    pub fn print_output(mut self, print: bool) -> Self {
+        self.print_output = print;
+        self
     }
 
     pub fn compile<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
@@ -83,7 +95,7 @@ impl Compile {
             cmd.arg(cflag);
         }
         let run = cmd.output().expect("clang executable exists");
-        CompileError::check(run)
+        CompileError::check(run, self.print_output)
     }
 }
 
@@ -91,6 +103,7 @@ pub struct Link {
     input: Vec<PathBuf>,
     cflags: Vec<String>,
     ldflags: Vec<String>,
+    print_output: bool,
 }
 
 impl Link {
@@ -99,6 +112,7 @@ impl Link {
             input: input.iter().map(|p| PathBuf::from(p.as_ref())).collect(),
             cflags: Vec::new(),
             ldflags: Vec::new(),
+            print_output: false,
         }
     }
 
@@ -138,6 +152,11 @@ impl Link {
         self.ldflags.push(format!("--export={}", export.as_ref()));
     }
 
+    pub fn print_output(mut self, print: bool) -> Self {
+        self.print_output = print;
+        self
+    }
+
     pub fn link<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
         let clang = wasi_sdk_clang();
         if !clang.exists() {
@@ -163,7 +182,7 @@ impl Link {
             cmd.arg(format!("-Wl,{}", ldflag));
         }
         let run = cmd.output().expect("clang executable exists");
-        CompileError::check(run)
+        CompileError::check(run, self.print_output)
     }
 }
 

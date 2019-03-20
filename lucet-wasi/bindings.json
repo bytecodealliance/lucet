@@ -2,6 +2,8 @@
     "wasi_unstable": {
         "args_get": "__wasi_args_get",
         "args_sizes_get": "__wasi_args_sizes_get",
+        "clock_res_get": "__wasi_clock_res_get",
+        "clock_time_get": "__wasi_clock_time_get",
         "environ_get": "__wasi_environ_get",
         "environ_sizes_get": "__wasi_environ_sizes_get",
         "proc_exit": "__wasi_proc_exit",

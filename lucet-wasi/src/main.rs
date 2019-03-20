@@ -38,12 +38,27 @@ fn main() {
 }
 
 fn run(config: &Config) {
-    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
-    let module = DlModule::load(&config.lucet_module).expect("module can be loaded");
-    let mut inst = region
-        .new_instance_builder(module as Arc<dyn Module>)
-        .with_embed_ctx(WasiCtx::new(&config.lucet_module, &config.guest_args))
-        .build()
-        .expect("instance can be created");
-    inst.run(b"_start", &[]).expect("instance runs");
+    let exitcode = {
+        // doing all of this in a block makes sure everything gets dropped before exiting
+        let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+        let module = DlModule::load(&config.lucet_module).expect("module can be loaded");
+
+        let mut inst = region
+            .new_instance_builder(module as Arc<dyn Module>)
+            .with_embed_ctx(WasiCtx::new(&config.lucet_module, &config.guest_args))
+            .build()
+            .expect("instance can be created");
+
+        match inst.run(b"_start", &[]) {
+            // normal termination implies 0 exit code
+            Ok(_) => 0,
+            Err(lucet_runtime::Error::RuntimeTerminated(
+                lucet_runtime::TerminationDetails::Provided(any),
+            )) => *any
+                .downcast_ref::<lucet_wasi::host::__wasi_exitcode_t>()
+                .expect("termination yields an exitcode"),
+            Err(e) => panic!("lucet-wasi runtime error: {}", e),
+        }
+    };
+    std::process::exit(exitcode as i32);
 }

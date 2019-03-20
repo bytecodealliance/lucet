@@ -20,8 +20,9 @@ use std::io::{stderr, stdin, stdout};
 use std::os::unix::prelude::{AsRawFd, FileTypeExt, FromRawFd, RawFd};
 
 #[no_mangle]
-pub extern "C" fn __wasi_proc_exit(_vmctx: *mut lucet_vmctx, rval: wasm32::__wasi_exitcode_t) -> ! {
-    std::process::exit(rval as i32)
+pub extern "C" fn __wasi_proc_exit(vmctx: *mut lucet_vmctx, rval: wasm32::__wasi_exitcode_t) -> ! {
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+    vmctx.terminate(dec_exitcode(rval))
 }
 
 pub struct WasiCtx {
@@ -256,6 +257,91 @@ pub extern "C" fn __wasi_args_sizes_get(
         }
     }
     wasm32::__WASI_ESUCCESS
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_clock_res_get(
+    vmctx: *mut lucet_vmctx,
+    clock_id: wasm32::__wasi_clockid_t,
+    resolution_ptr: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+
+    // convert the supported clocks to the libc types, or return EINVAL
+    let clock_id = match dec_clockid(clock_id) {
+        host::__WASI_CLOCK_REALTIME => libc::CLOCK_REALTIME,
+        host::__WASI_CLOCK_MONOTONIC => libc::CLOCK_MONOTONIC,
+        host::__WASI_CLOCK_PROCESS_CPUTIME_ID => libc::CLOCK_PROCESS_CPUTIME_ID,
+        host::__WASI_CLOCK_THREAD_CPUTIME_ID => libc::CLOCK_THREAD_CPUTIME_ID,
+        _ => return wasm32::__WASI_EINVAL,
+    };
+
+    // no `nix` wrapper for clock_getres, so we do it ourselves
+    let mut timespec = unsafe { std::mem::uninitialized::<libc::timespec>() };
+    let res = unsafe { libc::clock_getres(clock_id, &mut timespec as *mut libc::timespec) };
+    if res != 0 {
+        return wasm32::errno_from_nix(nix::errno::Errno::last());
+    }
+
+    // convert to nanoseconds, returning EOVERFLOW in case of overflow; this is freelancing a bit
+    // from the spec but seems like it'll be an unusual situation to hit
+    (timespec.tv_sec as host::__wasi_timestamp_t)
+        .checked_mul(1_000_000_000)
+        .and_then(|sec_ns| sec_ns.checked_add(timespec.tv_nsec as host::__wasi_timestamp_t))
+        .map(|resolution| {
+            // a supported clock can never return zero; this case will probably never get hit, but
+            // make sure we follow the spec
+            if resolution == 0 {
+                wasm32::__WASI_EINVAL
+            } else {
+                unsafe {
+                    enc_timestamp_byref(&mut vmctx, resolution_ptr, resolution)
+                        .map(|_| wasm32::__WASI_ESUCCESS)
+                        .unwrap_or_else(|e| e)
+                }
+            }
+        })
+        .unwrap_or(wasm32::__WASI_EOVERFLOW)
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_clock_time_get(
+    vmctx: *mut lucet_vmctx,
+    clock_id: wasm32::__wasi_clockid_t,
+    // ignored for now, but will be useful once we put optional limits on precision to reduce side
+    // channels
+    _precision: wasm32::__wasi_timestamp_t,
+    time_ptr: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+
+    // convert the supported clocks to the libc types, or return EINVAL
+    let clock_id = match dec_clockid(clock_id) {
+        host::__WASI_CLOCK_REALTIME => libc::CLOCK_REALTIME,
+        host::__WASI_CLOCK_MONOTONIC => libc::CLOCK_MONOTONIC,
+        host::__WASI_CLOCK_PROCESS_CPUTIME_ID => libc::CLOCK_PROCESS_CPUTIME_ID,
+        host::__WASI_CLOCK_THREAD_CPUTIME_ID => libc::CLOCK_THREAD_CPUTIME_ID,
+        _ => return wasm32::__WASI_EINVAL,
+    };
+
+    // no `nix` wrapper for clock_getres, so we do it ourselves
+    let mut timespec = unsafe { std::mem::uninitialized::<libc::timespec>() };
+    let res = unsafe { libc::clock_gettime(clock_id, &mut timespec as *mut libc::timespec) };
+    if res != 0 {
+        return wasm32::errno_from_nix(nix::errno::Errno::last());
+    }
+
+    // convert to nanoseconds, returning EOVERFLOW in case of overflow; this is freelancing a bit
+    // from the spec but seems like it'll be an unusual situation to hit
+    (timespec.tv_sec as host::__wasi_timestamp_t)
+        .checked_mul(1_000_000_000)
+        .and_then(|sec_ns| sec_ns.checked_add(timespec.tv_nsec as host::__wasi_timestamp_t))
+        .map(|time| unsafe {
+            enc_timestamp_byref(&mut vmctx, time_ptr, time)
+                .map(|_| wasm32::__WASI_ESUCCESS)
+                .unwrap_or_else(|e| e)
+        })
+        .unwrap_or(wasm32::__WASI_EOVERFLOW)
 }
 
 #[no_mangle]

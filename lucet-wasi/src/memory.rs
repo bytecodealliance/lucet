@@ -162,11 +162,25 @@ pub unsafe fn dec_ciovec_slice(
 }
 
 dec_enc_scalar!(
+    __wasi_clockid_t,
+    dec_clockid,
+    dec_clockid_byref,
+    enc_clockid,
+    enc_clockid_byref
+);
+dec_enc_scalar!(
     __wasi_errno_t,
     dec_errno,
     dec_errno_byref,
     enc_errno,
     enc_errno_byref
+);
+dec_enc_scalar!(
+    __wasi_exitcode_t,
+    dec_exitcode,
+    dec_exitcode_byref,
+    enc_exitcode,
+    enc_exitcode_byref
 );
 dec_enc_scalar!(__wasi_fd_t, dec_fd, dec_fd_byref, enc_fd, enc_fd_byref);
 dec_enc_scalar!(
@@ -240,6 +254,13 @@ dec_enc_scalar!(
     dec_rights_byref,
     enc_rights,
     enc_rights_byref
+);
+dec_enc_scalar!(
+    __wasi_timestamp_t,
+    dec_timestamp,
+    dec_timestamp_byref,
+    enc_timestamp,
+    enc_timestamp_byref
 );
 
 pub fn dec_usize(size: wasm32::size_t) -> usize {

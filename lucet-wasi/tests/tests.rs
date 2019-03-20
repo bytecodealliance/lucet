@@ -1,52 +1,92 @@
 mod test_helpers;
 
-use crate::test_helpers::{run_with_stdout, LUCET_WASI_ROOT};
-use failure::Error;
+use crate::test_helpers::{run, run_with_stdout, LUCET_WASI_ROOT};
 use lucet_wasi::WasiCtx;
 use std::path::Path;
 
 #[test]
-fn hello() -> Result<(), Error> {
+fn hello() {
     let ctx = WasiCtx::new("hello", &[]);
 
-    let stdout = run_with_stdout(
+    let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
         ctx,
-    )?;
+    )
+    .unwrap();
 
+    assert_eq!(exitcode, 0);
     assert_eq!(&stdout, "hello, wasi!\n");
-
-    Ok(())
 }
 
 #[test]
-fn hello_args() -> Result<(), Error> {
+fn hello_args() {
     let ctx = WasiCtx::new("hello", &["test suite"]);
 
-    let stdout = run_with_stdout(
+    let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
         ctx,
-    )?;
+    )
+    .unwrap();
 
+    assert_eq!(exitcode, 0);
     assert_eq!(&stdout, "hello, test suite!\n");
-
-    Ok(())
 }
 
 #[test]
-fn hello_env() -> Result<(), Error> {
+fn hello_env() {
     let ctx = WasiCtx::new_with_env(
         "hello",
         &["test suite"],
         std::iter::once(("GREETING", "goodbye")),
     );
 
-    let stdout = run_with_stdout(
+    let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
         ctx,
-    )?;
+    )
+    .unwrap();
 
+    assert_eq!(exitcode, 0);
     assert_eq!(&stdout, "goodbye, test suite!\n");
-
-    Ok(())
 }
+
+#[test]
+fn exitcode() {
+    let ctx = WasiCtx::new("exitcode", &[]);
+
+    let exitcode = run("exitcode.c", ctx).unwrap();
+
+    assert_eq!(exitcode, 120);
+}
+
+#[test]
+fn clock_getres() {
+    let ctx = WasiCtx::new("clock_getres", &[]);
+
+    let exitcode = run("clock_getres.c", ctx).unwrap();
+
+    assert_eq!(exitcode, 0);
+}
+
+#[test]
+fn getrusage() {
+    let ctx = WasiCtx::new("getrusage", &[]);
+
+    let (exitcode, stdout) = run_with_stdout("getrusage.c", ctx).unwrap();
+
+    eprint!("{}", stdout);
+
+    assert_eq!(exitcode, 0);
+}
+
+#[test]
+fn gettimeofday() {
+    let ctx = WasiCtx::new("gettimeofday", &[]);
+
+    let (exitcode, stdout) = run_with_stdout("gettimeofday.c", ctx).unwrap();
+
+    eprint!("{}", stdout);
+
+    assert_eq!(exitcode, 0);
+}
+
