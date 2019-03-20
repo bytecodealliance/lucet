@@ -5,7 +5,7 @@ Experimental WASI embedding for the Lucet runtime.
 ## TODOs
 
 In addition to the [WASI
-syscalls](https://github.com/CraneStation/wasmtime-wasi/blob/wasi/docs/WASI-api.md) we haven't yet
+syscalls](https://github.com/CraneStation/wasmtime/blob/wasi/docs/WASI-api.md) we haven't yet
 defined:
 
 ### Introduce optional abstraction between system clocks and WASI clocks
@@ -19,5 +19,5 @@ accurate.
 ## Third-Party Code
 
 `src/wasm32.rs` is copied from
-[wasmtime-wasi](https://github.com/CraneStation/wasmtime-wasi/tree/372ea83881f279d144f664ebe70e3799fd070117),
+[wasmtime-wasi](https://github.com/CraneStation/wasmtime/blob/wasi/wasmtime-wasi/src/wasm32.rs),
 along with the associated `LICENSE.wasmtime-wasi` file.

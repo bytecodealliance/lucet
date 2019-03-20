@@ -11,6 +11,8 @@ fn main() {
     let core_h_path = out_path.join("core.h");
     let core_h = File::create(&core_h_path).unwrap();
 
+    // `bindgen` doesn't understand typed constant macros like `UINT8_C(123)`, so this fun regex
+    // strips them off to yield a copy of `wasi/core.h` with bare constants.
     Command::new("sed")
         .arg("-E")
         .arg(r#"s/U?INT[0-9]+_C\(((0x)?[0-9]+)\)/\1/g"#)
