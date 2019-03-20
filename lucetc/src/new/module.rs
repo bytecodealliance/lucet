@@ -3,7 +3,7 @@ use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, GlobalVariable, Memory, MemoryIndex, ModuleEnvironment,
+    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment,
     SignatureIndex, Table, TableIndex, WasmResult,
 };
 use std::collections::{hash_map::Entry, HashMap};

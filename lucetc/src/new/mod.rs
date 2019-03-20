@@ -1,3 +1,4 @@
+mod decls;
 mod function;
 mod module;
 
@@ -5,14 +6,15 @@ use crate::compiler::{stack_probe, ObjectFile, OptLevel};
 use crate::error::{LucetcError, LucetcErrorKind};
 use cranelift_codegen::{
     ir,
-    isa::{TargetFrontendConfig, TargetIsa},
+    isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
 };
-use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieProduct, FaerieTrapCollection};
+use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::Module as ClifModule;
 use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator};
+use decls::ModuleDecls;
 use failure::ResultExt;
 use function::FuncInfo;
 use module::ModuleInfo;
@@ -49,17 +51,16 @@ pub fn compile<'a>(wasm_binary: &'a [u8], opt_level: OptLevel) -> Result<ObjectF
         .context(LucetcErrorKind::Other("FIXME".to_owned()))?,
     );
 
-    for (func_index, (code, code_offset)) in module_info.function_bodies.iter() {
-        let mut func_info = FuncInfo::new(&module_info);
+    let decls = ModuleDecls::declare(module_info, &mut clif_module)?;
+
+    for (ref func, (code, code_offset)) in decls.function_bodies() {
+        let mut func_info = FuncInfo::new(&decls);
         func_translator
             .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
             .context(LucetcErrorKind::Function("FIXME".to_owned()))?;
 
         clif_module
-            .define_function(
-                unimplemented!(), // XXX identifiers / names is not yet ported into this new compiler
-                &mut clif_context,
-            )
+            .define_function(func.name.into_funcid().unwrap(), &mut clif_context)
             .context(LucetcErrorKind::Function("FIXME".to_owned()))?;
     }
 
