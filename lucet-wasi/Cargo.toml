@@ -1,0 +1,23 @@
+[package]
+name = "lucet-wasi"
+version = "0.1.0"
+authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
+edition = "2018"
+license = "Apache-2.0 WITH LLVM-exception"
+
+[dependencies]
+cast = "0.2"
+clap = "2.23"
+libc = "0.2"
+lucet-runtime = { path = "../lucet-runtime" }
+nix = "0.13"
+rand = "0.6"
+
+[dev-dependencies]
+failure = "0.1"
+lucetc = { path = "../lucetc" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
+tempfile = "3.0"
+
+[build-dependencies]
+bindgen = "0.47"

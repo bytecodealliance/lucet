@@ -3,6 +3,7 @@ name = "lucet-wasi-sdk"
 version = "0.1.0"
 authors = ["Pat Hickey <phickey@fastly.com>"]
 edition = "2018"
+license = "Apache-2.0 WITH LLVM-exception"
 
 [dependencies]
 failure = "0.1"
