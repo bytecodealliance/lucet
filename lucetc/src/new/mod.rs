@@ -2,6 +2,7 @@ mod decls;
 mod function;
 mod module;
 
+use crate::bindings::Bindings;
 use crate::compiler::{stack_probe, ObjectFile, OptLevel};
 use crate::error::{LucetcError, LucetcErrorKind};
 use cranelift_codegen::{
@@ -28,7 +29,11 @@ fn target_isa(opt_level: OptLevel) -> Box<dyn TargetIsa> {
     isa_builder.finish(settings::Flags::new(flags_builder))
 }
 
-pub fn compile<'a>(wasm_binary: &'a [u8], opt_level: OptLevel) -> Result<ObjectFile, LucetcError> {
+pub fn compile<'a>(
+    wasm_binary: &'a [u8],
+    opt_level: OptLevel,
+    bindings: &Bindings,
+) -> Result<ObjectFile, LucetcError> {
     let isa = target_isa(opt_level);
 
     let mut module_info = ModuleInfo::new(isa.frontend_config());
@@ -51,7 +56,7 @@ pub fn compile<'a>(wasm_binary: &'a [u8], opt_level: OptLevel) -> Result<ObjectF
         .context(LucetcErrorKind::Other("FIXME".to_owned()))?,
     );
 
-    let decls = ModuleDecls::declare(module_info, &mut clif_module)?;
+    let decls = ModuleDecls::declare(module_info, &mut clif_module, bindings)?;
 
     for (ref func, (code, code_offset)) in decls.function_bodies() {
         let mut func_info = FuncInfo::new(&decls);
