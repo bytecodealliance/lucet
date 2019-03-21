@@ -33,8 +33,8 @@ clean:
 
 .PHONY: indent
 indent:
-	./indent.sh
+	helpers/indent.sh
 
 .PHONY: indent-check
 indent-check:
-	./indent.sh check
+	helpers/indent.sh check
