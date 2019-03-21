@@ -4,10 +4,11 @@ services:
   - docker
 
 before_install:
-  - ./devenv_build_container
+  - ./devenv_build_container.sh
+  - ./devenv_start.sh
 
 script:
-  - ./devenv_run make indent-check test audit
+  - docker exec -t -w /lucet lucet make indent-check test audit
   - git diff --exit-code
 
 notifications:

@@ -1,9 +1,20 @@
 export GUEST_MODULE_PREFIX:=$(abspath .)
 
-.PHONY: build
-build:
+.PHONY: build-dev
+build-dev:
+	@echo Creating a DEBUG build
 	cargo build --all
 	make -C lucet-builtins
+
+.PHONY: build
+build:
+	@echo Creating a RELEASE build
+	cargo build --all --release --bins --lib
+	make -C lucet-builtins
+
+.PHONY: install
+install: build
+	@helpers/install.sh
 
 .PHONY: test
 test: indent-check
