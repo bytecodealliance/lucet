@@ -42,8 +42,8 @@ install -d -v "$LUCET_LIBEXEC_DIR"
 install -p -v "${LUCET_SRC_PREFIX}/lucet-builtins/build/libbuiltins.so" \
     "${LUCET_LIBEXEC_DIR}/libbuiltins.so"
 
-lucet_setenv_file="$(mktemp)"
-cat > "$lucet_setenv_file" << EOT
+devenv_setenv_file="$(mktemp)"
+cat > "$devenv_setenv_file" << EOT
 #! /bin/sh
 
 export PATH="${LUCET_BIN_DIR}:${PATH}"
@@ -54,8 +54,8 @@ if [ \$# -gt 0 ]; then
 fi
 EOT
 
-install -p -v "$lucet_setenv_file" "${LUCET_BIN_DIR}/lucet_setenv.sh"
-rm -f "$lucet_setenv_file"
+install -p -v "$devenv_setenv_file" "${LUCET_BIN_DIR}/devenv_setenv.sh"
+rm -f "$devenv_setenv_file"
 
 install -d -v "${LUCET_EXAMPLES_DIR}/sightglass"
 install -p -v -m 0644 "${LUCET_SRC_PREFIX}/sightglass/sightglass.toml" "${LUCET_EXAMPLES_DIR}/sightglass/sightglass.toml"

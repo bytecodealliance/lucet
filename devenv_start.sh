@@ -13,3 +13,23 @@ fi
 
 docker run --name=lucet --detach --mount type=bind,src="$(cd $(dirname ${0}); pwd -P),target=/lucet" \
 	lucet-dev:latest /bin/sleep 99999999 > /dev/null
+
+if [ -z "$DEVENV_NO_INSTALL" ]; then
+
+lucet_workdir="$HOST_LUCET_MOUNT_POINT"
+prefix="$(pwd)"
+relpath=""
+while [ -n "$prefix" -a "$prefix" != "/" -a "$prefix" != "$HOST_BASE_PREFIX" ]; do
+	relpath="$(basename $prefix)/${relpath}"
+	prefix=$(dirname "$prefix")
+done
+if [ "$prefix" = "$HOST_BASE_PREFIX" ]; then
+	lucet_workdir="${HOST_LUCET_MOUNT_POINT}/${relpath}"
+fi
+
+if ! docker exec -t -w "$lucet_workdir" lucet stat "$LUCET_PREFIX" > /dev/null ; then
+	echo "Lucet hasn't been installed yet... installing..."
+	docker exec -t -w "$lucet_workdir" lucet make install
+fi
+
+fi

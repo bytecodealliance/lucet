@@ -17,7 +17,7 @@ while read -r wrapper_path ; do
     env cat >> "$wrapper_file" << EOT
 #! /bin/sh
 
-exec "$HOST_RUN" ${LUCET_BIN_DIR}/lucet_setenv.sh $wrapper_path \$@
+exec "$HOST_RUN" ${LUCET_BIN_DIR}/devenv_setenv.sh $wrapper_path \$@
 EOT
     install -p "$wrapper_file" "${HOST_BIN_DIR}/${original_file}"
     rm -f "$wrapper_file"
@@ -25,5 +25,3 @@ done
 
 export PATH="${HOST_BIN_DIR}:$PATH"
 rehash 2> /dev/null ||:
-
-
