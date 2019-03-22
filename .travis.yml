@@ -1,5 +1,8 @@
 dist: xenial
 
+env:
+  - DEVENV_NO_INSTALL=1
+
 services:
   - docker
 
@@ -8,7 +11,7 @@ before_install:
   - ./devenv_start.sh
 
 script:
-  - docker exec -t -w /lucet lucet make indent-check test audit
+  - ./devenv_run make indent-check test audit
   - git diff --exit-code
 
 notifications:
