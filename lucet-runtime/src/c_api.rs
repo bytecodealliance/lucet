@@ -139,10 +139,7 @@ pub unsafe extern "C" fn lucet_dl_module_load(
             mod_out.write(Arc::into_raw(m) as _);
             lucet_error::Ok
         })
-        .unwrap_or_else(|e| {
-            // eprintln!("lucet_dl_module_load error: {}", e);
-            e.into()
-        })
+        .unwrap_or_else(|e| e.into())
 }
 
 #[no_mangle]

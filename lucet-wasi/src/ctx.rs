@@ -188,8 +188,4 @@ impl WasiCtx {
             Err(host::__WASI_EBADF as host::__wasi_errno_t)
         }
     }
-
-    pub fn insert_existing_fd(&mut self, fd: host::__wasi_fd_t, rawfd: RawFd) {
-        self.fds.insert(fd, unsafe { FdEntry::from_raw_fd(rawfd) });
-    }
 }

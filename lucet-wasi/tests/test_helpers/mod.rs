@@ -2,7 +2,7 @@ use failure::{bail, Error};
 use lucet_runtime::{DlModule, Module};
 use lucet_runtime::{Limits, MmapRegion, Region};
 use lucet_wasi::host::__wasi_exitcode_t;
-use lucet_wasi::WasiCtx;
+use lucet_wasi::{WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::Link;
 use lucetc::{Bindings, Lucetc};
 use std::fs::File;
@@ -80,14 +80,13 @@ pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, E
 
 pub fn run_with_stdout<P: AsRef<Path>>(
     path: P,
-    mut ctx: WasiCtx,
+    ctx: WasiCtxBuilder,
 ) -> Result<(__wasi_exitcode_t, String), Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
-    ctx.insert_existing_fd(1, pipe_in);
+
+    let ctx = unsafe { ctx.raw_fd(1, pipe_in) }.build();
 
     let exitcode = run(path, ctx)?;
-
-    nix::unistd::close(pipe_in)?;
 
     let mut stdout_file = unsafe { File::from_raw_fd(pipe_out) };
     let mut stdout = String::new();

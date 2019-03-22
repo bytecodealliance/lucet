@@ -6,7 +6,7 @@ use std::path::Path;
 
 #[test]
 fn hello() {
-    let ctx = WasiCtx::new(&["hello"]);
+    let ctx = WasiCtxBuilder::new().args(&["hello"]);
 
     let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
@@ -20,7 +20,7 @@ fn hello() {
 
 #[test]
 fn hello_args() {
-    let ctx = WasiCtx::new(&["hello", "test suite"]);
+    let ctx = WasiCtxBuilder::new().args(&["hello", "test suite"]);
 
     let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
@@ -36,8 +36,7 @@ fn hello_args() {
 fn hello_env() {
     let ctx = WasiCtxBuilder::new()
         .args(&["hello", "test suite"])
-        .env("GREETING", "goodbye")
-        .build();
+        .env("GREETING", "goodbye");
 
     let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),

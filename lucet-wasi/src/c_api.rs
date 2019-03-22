@@ -89,3 +89,14 @@ pub unsafe extern "C" fn lucet_region_new_instance_with_wasi_ctx(
             .unwrap_or_else(|e| e.into())
     })
 }
+
+
+/// Call this if you're having trouble with `__wasi_*` symbols not being exported.
+///
+/// This is pretty hackish; we will hopefully be able to avoid this altogether once [this
+/// issue](https://github.com/rust-lang/rust/issues/58037) is addressed.
+#[no_mangle]
+#[doc(hidden)]
+pub extern "C" fn lucet_wasi_internal_ensure_linked() {
+    crate::hostcalls::ensure_linked();
+}

@@ -101,3 +101,9 @@ pub struct FdObject {
     pub rawfd: RawFd,
     // TODO: directories
 }
+
+impl Drop for FdObject {
+    fn drop(&mut self) {
+        nix::unistd::close(self.rawfd).unwrap_or_else(|e| eprintln!("FdObject::drop(): {}", e));
+    }
+}
