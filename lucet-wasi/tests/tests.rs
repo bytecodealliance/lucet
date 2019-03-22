@@ -1,12 +1,12 @@
 mod test_helpers;
 
 use crate::test_helpers::{run, run_with_stdout, LUCET_WASI_ROOT};
-use lucet_wasi::WasiCtx;
+use lucet_wasi::{WasiCtx, WasiCtxBuilder};
 use std::path::Path;
 
 #[test]
 fn hello() {
-    let ctx = WasiCtx::new("hello", &[]);
+    let ctx = WasiCtx::new(&["hello"]);
 
     let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
@@ -20,7 +20,7 @@ fn hello() {
 
 #[test]
 fn hello_args() {
-    let ctx = WasiCtx::new("hello", &["test suite"]);
+    let ctx = WasiCtx::new(&["hello", "test suite"]);
 
     let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
@@ -34,11 +34,10 @@ fn hello_args() {
 
 #[test]
 fn hello_env() {
-    let ctx = WasiCtx::new_with_env(
-        "hello",
-        &["test suite"],
-        std::iter::once(("GREETING", "goodbye")),
-    );
+    let ctx = WasiCtxBuilder::new()
+        .args(&["hello", "test suite"])
+        .env("GREETING", "goodbye")
+        .build();
 
     let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
@@ -52,7 +51,7 @@ fn hello_env() {
 
 #[test]
 fn exitcode() {
-    let ctx = WasiCtx::new("exitcode", &[]);
+    let ctx = WasiCtx::new(&["exitcode"]);
 
     let exitcode = run("exitcode.c", ctx).unwrap();
 
@@ -61,7 +60,7 @@ fn exitcode() {
 
 #[test]
 fn clock_getres() {
-    let ctx = WasiCtx::new("clock_getres", &[]);
+    let ctx = WasiCtx::new(&["clock_getres"]);
 
     let exitcode = run("clock_getres.c", ctx).unwrap();
 
@@ -70,7 +69,7 @@ fn clock_getres() {
 
 #[test]
 fn getrusage() {
-    let ctx = WasiCtx::new("getrusage", &[]);
+    let ctx = WasiCtx::new(&["getrusage"]);
 
     let exitcode = run("getrusage.c", ctx).unwrap();
 
@@ -79,7 +78,7 @@ fn getrusage() {
 
 #[test]
 fn gettimeofday() {
-    let ctx = WasiCtx::new("gettimeofday", &[]);
+    let ctx = WasiCtx::new(&["gettimeofday"]);
 
     let exitcode = run("gettimeofday.c", ctx).unwrap();
 
@@ -88,7 +87,7 @@ fn gettimeofday() {
 
 #[test]
 fn getentropy() {
-    let ctx = WasiCtx::new("getentropy", &[]);
+    let ctx = WasiCtx::new(&["getentropy"]);
 
     let exitcode = run("getentropy.c", ctx).unwrap();
 

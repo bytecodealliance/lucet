@@ -4,6 +4,7 @@
 #include <sys/types.h>
 
 #include "lucet.h"
+#include "lucet_wasi.h"
 #include "sightglass.h"
 #include "wrapper.h"
 
@@ -11,21 +12,22 @@
 #define str(x) #x
 
 typedef struct LucetCtx_ {
-    struct lucet_dl_module *  mod;
-    struct lucet_instance *   inst;
-    struct lucet_test_region *region;
-    uint8_t *                 heap;
-    guest_ptr_t               ctx_p;
+    struct lucet_dl_module *mod;
+    struct lucet_instance * inst;
+    struct lucet_region *   region;
+    uint8_t *               heap;
+    guest_ptr_t             ctx_p;
 } LucetCtx;
 
 static LucetCtx lucet_setup(void)
 {
     struct lucet_dl_module *mod;
     ASSERT_OK(lucet_dl_module_load(xstr(WASM_MODULE), &mod));
-    struct lucet_test_region *region;
+    struct lucet_region *region;
     ASSERT_OK(lucet_test_region_create(1, NULL, &region));
+    struct lucet_wasi_ctx *wasi_ctx = lucet_wasi_ctx_create();
     struct lucet_instance *inst;
-    ASSERT_OK(lucet_test_region_new_instance(region, mod, &inst));
+    ASSERT_OK(lucet_region_new_instance_with_wasi_ctx(region, mod, wasi_ctx, &inst));
 
     uint8_t *heap = lucet_instance_heap(inst);
     uint32_t newpage_start;
@@ -44,7 +46,7 @@ static void lucet_teardown(LucetCtx *lucet_ctx)
 {
     lucet_instance_release(lucet_ctx->inst);
     lucet_dl_module_release(lucet_ctx->mod);
-    lucet_test_region_release(lucet_ctx->region);
+    lucet_region_release(lucet_ctx->region);
 }
 
 #define LUCET_TEARDOWN lucet_teardown(&lucet_ctx)

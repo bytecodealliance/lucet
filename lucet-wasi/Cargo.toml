@@ -10,6 +10,7 @@ cast = "0.2"
 clap = "2.23"
 libc = "0.2"
 lucet-runtime = { path = "../lucet-runtime" }
+lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals" }
 nix = "0.13"
 rand = "0.6"
 
@@ -21,3 +22,7 @@ tempfile = "3.0"
 
 [build-dependencies]
 bindgen = "0.47"
+
+[lib]
+name = "lucet_wasi"
+crate-type = ["rlib", "staticlib", "cdylib"]
