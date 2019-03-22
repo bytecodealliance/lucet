@@ -5,8 +5,9 @@ use crate::module::{
 use libc::c_void;
 use libloading::{Library, Symbol};
 use lucet_module_data::ModuleData;
-use std::ffi::{CStr, OsStr};
+use std::ffi::CStr;
 use std::mem;
+use std::path::Path;
 use std::slice;
 use std::slice::from_raw_parts;
 use std::sync::Arc;
@@ -30,12 +31,13 @@ unsafe impl Sync for DlModule {}
 
 impl DlModule {
     /// Create a module, loading code from a shared object on the filesystem.
-    pub fn load<P: AsRef<OsStr>>(so_path: P) -> Result<Arc<Self>, Error> {
+    pub fn load<P: AsRef<Path>>(so_path: P) -> Result<Arc<Self>, Error> {
         // Load the dynamic library. The undefined symbols corresponding to the lucet_syscall_
         // functions will be provided by the current executable.  We trust our wasm->dylib compiler
         // to make sure these function calls are the way the dylib can touch memory outside of its
         // stack and heap.
-        let lib = Library::new(so_path).map_err(Error::DlError)?;
+        let abs_so_path = so_path.as_ref().canonicalize().map_err(Error::DlError)?;
+        let lib = Library::new(abs_so_path.as_os_str()).map_err(Error::DlError)?;
 
         let module_data_ptr = unsafe {
             lib.get::<*const u8>(b"lucet_module_data").map_err(|e| {

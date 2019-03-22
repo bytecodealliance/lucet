@@ -138,17 +138,6 @@ pub trait ModuleInternal: Send + Sync {
         None
     }
 
-    /// This is a hack to make sure we don't DCE away the `lucet_vmctx_*` C API
-    ///
-    /// It's on this trait because no guest code can run without using some instance of `Module`,
-    /// but could've gone on `Region`.
-    ///
-    /// This should never actually get called, but it is harmless if it is.
-    #[doc(hidden)]
-    fn ensure_linked(&self) {
-        crate::vmctx::vmctx_capi_init();
-    }
-
     /// Check that the specifications of the WebAssembly module are valid given certain `Limit`s.
     ///
     /// Returns a `Result<(), Error>` rather than a boolean in order to provide a richer accounting

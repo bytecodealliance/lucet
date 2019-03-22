@@ -13,9 +13,9 @@
  *
  * Usage:
  *
- * lucet_instance_run(inst, "add_2", 2, (struct lucet_val[]){ LUCET_VAL_U64(123), LUCET_VAL_U64(456) });
- * lucet_instance_state(inst, &state);
- * uint64_t res = LUCET_UNTYPED_RETVAL_TO_U64(state.val.returned);
+ * lucet_instance_run(inst, "add_2", 2, (struct lucet_val[]){ LUCET_VAL_U64(123), LUCET_VAL_U64(456)
+ * }); lucet_instance_state(inst, &state); uint64_t res =
+ * LUCET_UNTYPED_RETVAL_TO_U64(state.val.returned);
  */
 
 #include <sys/types.h>
@@ -50,7 +50,7 @@
 #define LUCET_VAL_F32(X) LUCET_VAL_T(f32, as_f32, X)
 #define LUCET_VAL_F64(X) LUCET_VAL_T(f64, as_f64, X)
 
-// Converts an lucet_val value to the given type
+// Converts a lucet_val value to the given type
 
 #define LUCET_VAL_TO_T(T, C, V) ((T)((V).inner_val.C))
 
@@ -74,21 +74,6 @@
 
 #define LUCET_VAL_TO_F32(X) LUCET_VAL_TO_T(float, as_f32, X)
 #define LUCET_VAL_TO_F64(X) LUCET_VAL_TO_T(double, as_f64, X)
-
-// Return values
-
-/* // An untyped value, returned by guest function calls */
-/* struct lucet_untyped_retval { */
-/*     unsigned char fp[16]; */
-/*     unsigned char gp[8]; */
-/* }; */
-
-/* union lucet_retval_gp { */
-/*     unsigned char as_untyped[8]; */
-/*     void *        as_c_ptr; */
-/*     uint64_t      as_u64; */
-/*     int64_t       as_i64; */
-/* }; */
 
 // Converts an untyped return value to the given type
 
@@ -114,9 +99,5 @@
 
 #define LUCET_UNTYPED_RETVAL_TO_F32(X) lucet_retval_f32(&(X))
 #define LUCET_UNTYPED_RETVAL_TO_F64(X) lucet_retval_f64(&(X))
-
-/* union lucet_retval_gp lucet_retval_gp(const struct lucet_untyped_retval *untyped_retval) EXPORTED; */
-/* float                 lucet_retval_f32(const struct lucet_untyped_retval *untyped_retval) EXPORTED; */
-/* double                lucet_retval_f64(const struct lucet_untyped_retval *untyped_retval) EXPORTED; */
 
 #endif

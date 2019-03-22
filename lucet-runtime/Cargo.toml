@@ -21,9 +21,6 @@ lucet-module-data = { path = "../lucet-module-data" }
 lucet-runtime-tests = { path = "lucet-runtime-tests" }
 nix = "0.13"
 
-[build-dependencies]
-cbindgen = "0.8"
-
 [lib]
 name = "lucet_runtime"
 crate-type = ["rlib", "staticlib", "cdylib"]

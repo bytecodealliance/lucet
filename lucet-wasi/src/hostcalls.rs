@@ -9,184 +9,16 @@
 //! something nice.
 
 #![allow(non_camel_case_types)]
+use crate::ctx::WasiCtx;
 use crate::memory::*;
 use crate::{host, wasm32};
 use cast::From as _0;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-use std::collections::HashMap;
-use std::ffi::CString;
-use std::fs::File;
-use std::io::{stderr, stdin, stdout};
-use std::os::unix::prelude::{AsRawFd, FileTypeExt, FromRawFd, RawFd};
 
 #[no_mangle]
 pub extern "C" fn __wasi_proc_exit(vmctx: *mut lucet_vmctx, rval: wasm32::__wasi_exitcode_t) -> ! {
     let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
     vmctx.terminate(dec_exitcode(rval))
-}
-
-pub struct WasiCtx {
-    fds: HashMap<host::__wasi_fd_t, FdEntry>,
-    args: Vec<CString>,
-    env: Vec<CString>,
-}
-
-impl WasiCtx {
-    pub fn new(module_path: &str, args: &[&str]) -> WasiCtx {
-        WasiCtx::new_with_env(module_path, args, std::env::vars())
-    }
-
-    pub fn new_with_env<E, S>(module_path: &str, args: &[&str], env: E) -> WasiCtx
-    where
-        E: IntoIterator<Item = (S, S)>,
-        S: AsRef<str>,
-    {
-        use nix::unistd::dup;
-
-        let args = std::iter::once(&module_path)
-            .chain(args.into_iter())
-            .map(|arg| CString::new(*arg).expect("argument can be converted to a CString"))
-            .collect();
-
-        let env = env
-            .into_iter()
-            .map(|(k, v)| {
-                CString::new(format!("{}={}", k.as_ref(), v.as_ref()))
-                    .expect("environment pair can be converted to a CString")
-            })
-            .collect();
-
-        let mut ctx = WasiCtx {
-            fds: HashMap::new(),
-            args,
-            env,
-        };
-        ctx.insert_existing_fd(0, dup(stdin().as_raw_fd()).unwrap());
-        ctx.insert_existing_fd(1, dup(stdout().as_raw_fd()).unwrap());
-        ctx.insert_existing_fd(2, dup(stderr().as_raw_fd()).unwrap());
-        ctx
-    }
-
-    fn get_fd_entry(
-        &self,
-        fd: host::__wasi_fd_t,
-        rights_base: host::__wasi_rights_t,
-        rights_inheriting: host::__wasi_rights_t,
-    ) -> Result<&FdEntry, host::__wasi_errno_t> {
-        if let Some(ref fe) = self.fds.get(&fd) {
-            // validate rights
-            if !fe.rights_base & rights_base != 0 || !fe.rights_inheriting & rights_inheriting != 0
-            {
-                Err(host::__WASI_ENOTCAPABLE as host::__wasi_errno_t)
-            } else {
-                Ok(fe)
-            }
-        } else {
-            Err(host::__WASI_EBADF as host::__wasi_errno_t)
-        }
-    }
-
-    pub fn insert_existing_fd(&mut self, fd: host::__wasi_fd_t, rawfd: RawFd) {
-        self.fds.insert(fd, unsafe { FdEntry::from_raw_fd(rawfd) });
-    }
-}
-
-struct FdEntry {
-    fd_object: FdObject,
-    rights_base: host::__wasi_rights_t,
-    rights_inheriting: host::__wasi_rights_t,
-}
-
-impl FromRawFd for FdEntry {
-    unsafe fn from_raw_fd(rawfd: RawFd) -> FdEntry {
-        let (ty, mut rights_base, rights_inheriting) = {
-            let file = File::from_raw_fd(rawfd);
-            let ft = file.metadata().unwrap().file_type();
-            // we just make a `File` here for convenience; we don't want it to close when it drops
-            std::mem::forget(file);
-            if ft.is_block_device() {
-                (
-                    host::__WASI_FILETYPE_BLOCK_DEVICE,
-                    host::RIGHTS_BLOCK_DEVICE_BASE,
-                    host::RIGHTS_BLOCK_DEVICE_INHERITING,
-                )
-            } else if ft.is_char_device() {
-                if nix::unistd::isatty(rawfd).unwrap() {
-                    (
-                        host::__WASI_FILETYPE_CHARACTER_DEVICE,
-                        host::RIGHTS_TTY_BASE,
-                        host::RIGHTS_TTY_BASE,
-                    )
-                } else {
-                    (
-                        host::__WASI_FILETYPE_CHARACTER_DEVICE,
-                        host::RIGHTS_CHARACTER_DEVICE_BASE,
-                        host::RIGHTS_CHARACTER_DEVICE_INHERITING,
-                    )
-                }
-            } else if ft.is_dir() {
-                (
-                    host::__WASI_FILETYPE_DIRECTORY,
-                    host::RIGHTS_DIRECTORY_BASE,
-                    host::RIGHTS_DIRECTORY_INHERITING,
-                )
-            } else if ft.is_file() {
-                (
-                    host::__WASI_FILETYPE_REGULAR_FILE,
-                    host::RIGHTS_REGULAR_FILE_BASE,
-                    host::RIGHTS_REGULAR_FILE_INHERITING,
-                )
-            } else if ft.is_socket() {
-                use nix::sys::socket;
-                match socket::getsockopt(rawfd, socket::sockopt::SockType).unwrap() {
-                    socket::SockType::Datagram => (
-                        host::__WASI_FILETYPE_SOCKET_DGRAM,
-                        host::RIGHTS_SOCKET_BASE,
-                        host::RIGHTS_SOCKET_INHERITING,
-                    ),
-                    socket::SockType::Stream => (
-                        host::__WASI_FILETYPE_SOCKET_STREAM,
-                        host::RIGHTS_SOCKET_BASE,
-                        host::RIGHTS_SOCKET_INHERITING,
-                    ),
-                    s => panic!("unsupported socket type: {:?}", s),
-                }
-            } else if ft.is_fifo() {
-                (
-                    host::__WASI_FILETYPE_SOCKET_STREAM,
-                    host::RIGHTS_SOCKET_BASE,
-                    host::RIGHTS_SOCKET_INHERITING,
-                )
-            } else {
-                panic!("unsupported file type: {:?}", ft);
-            }
-        };
-
-        use nix::fcntl::{fcntl, OFlag, F_GETFL};
-        let flags_bits = fcntl(rawfd, F_GETFL).expect("fcntl succeeds");
-        let flags = OFlag::from_bits_truncate(flags_bits);
-        let accmode = flags & OFlag::O_ACCMODE;
-        if accmode == OFlag::O_RDONLY {
-            rights_base &= !host::__WASI_RIGHT_FD_WRITE as host::__wasi_rights_t;
-        } else if accmode == OFlag::O_WRONLY {
-            rights_base &= !host::__WASI_RIGHT_FD_READ as host::__wasi_rights_t;
-        }
-
-        FdEntry {
-            fd_object: FdObject {
-                ty: ty as u8,
-                rawfd,
-            },
-            rights_base,
-            rights_inheriting,
-        }
-    }
-}
-
-struct FdObject {
-    ty: host::__wasi_filetype_t,
-    rawfd: RawFd,
-    // TODO: directories
 }
 
 #[no_mangle]
@@ -447,7 +279,7 @@ pub extern "C" fn __wasi_fd_fdstat_get(
     };
 
     let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
-    let errno = if let Some(ref fe) = ctx.fds.get(&host_fd) {
+    let errno = if let Some(fe) = ctx.fds.get(&host_fd) {
         host_fdstat.fs_filetype = fe.fd_object.ty;
         host_fdstat.fs_rights_base = fe.rights_base;
         host_fdstat.fs_rights_inheriting = fe.rights_inheriting;
@@ -631,4 +463,11 @@ pub extern "C" fn __wasi_random_get(
     thread_rng().fill_bytes(buf);
 
     return wasm32::__WASI_ESUCCESS;
+}
+
+#[doc(hidden)]
+pub fn ensure_linked() {
+    unsafe {
+        std::ptr::read_volatile(__wasi_proc_exit as *const extern "C" fn());
+    }
 }

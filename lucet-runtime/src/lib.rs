@@ -195,6 +195,8 @@
 //! that, for example, a `SIGSEGV` on a non-Lucet thread of a host program will still likely abort
 //! the entire process.
 
+mod c_api;
+
 pub use lucet_runtime_internals::alloc::Limits;
 pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::{
@@ -228,6 +230,7 @@ pub mod vmctx {
 /// This is pretty hackish; we will hopefully be able to avoid this altogether once [this
 /// issue](https://github.com/rust-lang/rust/issues/58037) is addressed.
 #[no_mangle]
+#[doc(hidden)]
 pub extern "C" fn lucet_internal_ensure_linked() {
-    lucet_runtime_internals::vmctx::vmctx_capi_init();
+    self::c_api::ensure_linked();
 }

@@ -6,6 +6,7 @@ WASI_CC=$(WASI_SDK)/bin/clang
 LUCETC:=$(LUCET_ROOT)/target/release/lucetc
 
 LUCET_RUNTIME:=$(LUCET_ROOT)/lucet-runtime
+LUCET_WASI:=$(LUCET_ROOT)/lucet-wasi
 SIGHTGLASS:=$(LUCET_ROOT)/sightglass
 
 LIBBUILTINS:=$(LUCET_ROOT)/lucet-builtins/build/libbuiltins.so
@@ -34,10 +35,6 @@ bench: run
 .PHONY: run
 run: build
 	$(LUCET_ROOT)/target/release/sightglass -c sightglass.toml $(SIGHTGLASS_ARGS)
-
-.PHONY: $(LUCET_ROOT)/target/release/liblucet_runtime.so
-$(LUCET_ROOT)/target/release/liblucet_runtime.so:
-	cargo build --release -p lucet-runtime
 
 .PHONY: build
 build: $(LUCETC)
@@ -70,13 +67,19 @@ build/lucet/module.wasm: $(patsubst %.c, %.o, $(addprefix build/lucet/shootout/,
 # Don't emit the shared object, we need a saparate link step below.
 build/lucet/module.o: build/lucet/module.wasm $(LIBBUILTINS)
 	@mkdir -p $(@D)
-	$(LUCETC) $(LUCETC_FLAGS) --emit=obj --bindings=bindings.json --builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
+	$(LUCETC) $(LUCETC_FLAGS) --emit=obj \
+		--bindings=bindings.json \
+		--bindings=$(LUCET_WASI)/bindings.json \
+		--builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
 
 build/lucet/module.clif: build/lucet/module.wasm $(LIBBUILTINS)
 	@mkdir -p $(@D)
-	$(LUCETC) $(LUCETC_FLAGS) --emit=clif --bindings=bindings.json --builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
+	$(LUCETC) $(LUCETC_FLAGS) --emit=clif \
+		--bindings=bindings.json \
+		--bindings=$(LUCET_WASI)/bindings.json \
+		--builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
 
-# Because liblucet_runtime is dynamically loaded (transitively) by implementation.so, we
+# Because liblucet-runtime-c is dynamically loaded (transitively) by implementation.so, we
 # need to link the wasm object to the same libraries.
 build/lucet/module.so: build/lucet/module.o
 	@mkdir -p $(@D)
@@ -87,10 +90,12 @@ build/lucet/%.o: %.c
 	$(CC) --std=c99 -fPIC -D_GNU_SOURCE -g3 $(COMMON_CFLAGS) \
 		-fvisibility=default \
 		-I$(LUCET_RUNTIME)/include \
+		-I$(LUCET_WASI)/include \
 		-DWASM_MODULE=$(abspath build/lucet/module.so) \
 		-c $^ -o $@
 
 build/lucet/implementation.so: $(LUCET_ROOT)/target/release/liblucet_runtime.so
+build/lucet/implementation.so: $(LUCET_ROOT)/target/release/liblucet_wasi.so
 build/lucet/implementation.so: build/lucet/wrapper.o
 build/lucet/implementation.so: build/lucet/hostcalls.o
 build/lucet/implementation.so: $(LIBBUILTINS)
@@ -108,6 +113,15 @@ $(LIBBUILTINS):
 
 $(LUCETC):
 	cargo build --release -p lucetc
+
+.PHONY: $(LUCET_ROOT)/target/release/liblucet_runtime.so
+$(LUCET_ROOT)/target/release/liblucet_runtime.so:
+	cargo build --release -p lucet-runtime
+
+
+.PHONY: $(LUCET_ROOT)/target/release/liblucet_wasi.so
+$(LUCET_ROOT)/target/release/liblucet_wasi.so:
+	cargo build --release -p lucet-wasi
 
 .PHONY: clean
 clean:

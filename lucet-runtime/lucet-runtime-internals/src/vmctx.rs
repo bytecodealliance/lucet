@@ -3,6 +3,8 @@
 //! This module contains both a Rust-friendly API ([`Vmctx`](struct.Vmctx.html)) as well as C-style
 //! exports for compatibility with hostcalls written against `lucet-runtime-c`.
 
+pub use crate::c_api::lucet_vmctx;
+
 use crate::alloc::instance_heap_offset;
 use crate::context::Context;
 use crate::error::Error;
@@ -10,23 +12,37 @@ use crate::instance::{
     Instance, InstanceHandle, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE,
     HOST_CTX,
 };
-use crate::WASM_PAGE_SIZE;
-use libc::c_void;
 use std::any::Any;
-use std::sync::Once;
-
-/// Marker type for the `vmctx` pointer argument.
-///
-/// This type should only be used with [`Vmctx::from_raw()`](struct.Vmctx.html#method.from_raw).
-#[repr(C)]
-pub struct lucet_vmctx {
-    _unused: [u8; 0],
-}
 
 /// An opaque handle to a running instance's context.
 #[derive(Debug)]
 pub struct Vmctx {
     vmctx: *mut lucet_vmctx,
+}
+
+pub trait VmctxInternal {
+    /// Get a reference to the `Instance` for this guest.
+    fn instance(&self) -> &Instance;
+
+    /// Get a mutable reference to the `Instance` for this guest.
+    ///
+    /// ### Safety
+    ///
+    /// Using this method, you could hold on to multiple mutable references to the same
+    /// `Instance`. Only use one at a time! This method does not take `&mut self` because otherwise
+    /// you could not use orthogonal `&mut` refs that come from `Vmctx`, like the heap or
+    /// terminating the instance.
+    unsafe fn instance_mut(&self) -> &mut Instance;
+}
+
+impl VmctxInternal for Vmctx {
+    fn instance(&self) -> &Instance {
+        unsafe { instance_from_vmctx(self.vmctx) }
+    }
+
+    unsafe fn instance_mut(&self) -> &mut Instance {
+        instance_from_vmctx(self.vmctx)
+    }
 }
 
 impl Vmctx {
@@ -43,19 +59,6 @@ impl Vmctx {
     /// Return the underlying `vmctx` pointer.
     pub fn as_raw(&self) -> *mut lucet_vmctx {
         self.vmctx
-    }
-
-    /// Get a reference to the `Instance` for this guest.
-    fn instance(&self) -> &Instance {
-        unsafe { Instance::from_vmctx(self.vmctx) }
-    }
-
-    /// Get a mutable reference to the `Instance` for this guest.  SAFETY NOTE: With this method,
-    /// you could hold on to multiple mutable references to the same Instance. Only hold on to one!
-    /// This method does not take `&mut self` because otherwise you could not use orthogonal mut
-    /// refs that come from Vmctx, like the heap or termination.
-    unsafe fn instance_mut(&self) -> &mut Instance {
-        Instance::from_vmctx(self.vmctx)
     }
 
     /// Return the WebAssembly heap as a slice of bytes.
@@ -167,38 +170,38 @@ macro_rules! inst_terminate {
     }};
 }
 
+/// Get an `Instance` from the `vmctx` pointer.
+///
+/// Only safe to call from within the guest context.
+pub unsafe fn instance_from_vmctx<'a>(vmctx: *mut lucet_vmctx) -> &'a mut Instance {
+    assert!(!vmctx.is_null(), "vmctx is not null");
+
+    let inst_ptr = (vmctx as usize - instance_heap_offset()) as *mut Instance;
+
+    // We shouldn't actually need to access the thread local, only the exception handler should
+    // need to. But, as long as the thread local exists, we should make sure that the guest
+    // hasn't pulled any shenanigans and passed a bad vmctx. (Codegen should ensure the guest
+    // cant pull any shenanigans but there have been bugs before.)
+    CURRENT_INSTANCE.with(|current_instance| {
+        if let Some(current_inst_ptr) = current_instance.borrow().map(|nn| nn.as_ptr()) {
+            assert_eq!(
+                inst_ptr, current_inst_ptr,
+                "vmctx corresponds to current instance"
+            );
+        } else {
+            panic!(
+                "current instance is not set; thread local storage failure can indicate \
+                 dynamic linking issues"
+            );
+        }
+    });
+
+    let inst = inst_ptr.as_mut().unwrap();
+    assert!(inst.valid_magic());
+    inst
+}
+
 impl Instance {
-    /// Get an Instance from the `vmctx` pointer.
-    ///
-    /// Only safe to call from within the guest context.
-    unsafe fn from_vmctx<'a>(vmctx: *mut lucet_vmctx) -> &'a mut Instance {
-        assert!(!vmctx.is_null(), "vmctx is not null");
-
-        let inst_ptr = (vmctx as usize - instance_heap_offset()) as *mut Instance;
-
-        // We shouldn't actually need to access the thread local, only the exception handler should
-        // need to. But, as long as the thread local exists, we should make sure that the guest
-        // hasn't pulled any shenanigans and passed a bad vmctx. (Codegen should ensure the guest
-        // cant pull any shenanigans but there have been bugs before.)
-        CURRENT_INSTANCE.with(|current_instance| {
-            if let Some(current_inst_ptr) = current_instance.borrow().map(|nn| nn.as_ptr()) {
-                assert_eq!(
-                    inst_ptr, current_inst_ptr,
-                    "vmctx corresponds to current instance"
-                );
-            } else {
-                panic!(
-                    "current instance is not set; thread local storage failure can indicate \
-                     dynamic linking issues"
-                );
-            }
-        });
-
-        let inst = inst_ptr.as_mut().unwrap();
-        assert!(inst.valid_magic());
-        inst
-    }
-
     /// Helper function specific to Vmctx::get_embed_ctx. From the vmctx interface,
     /// there is no way to recover if the expected embedder ctx is not set, so we terminate
     /// the instance.
@@ -238,98 +241,4 @@ pub unsafe fn vmctx_from_mock_instance(inst: &InstanceHandle) -> Vmctx {
         ));
     });
     Vmctx::from_raw(inst.alloc().slot().heap as *mut lucet_vmctx)
-}
-
-static VMCTX_CAPI_INIT: Once = Once::new();
-
-/// Should never actually be called, but should be reachable via a trait method to prevent DCE.
-pub fn vmctx_capi_init() {
-    use std::ptr::read_volatile;
-    VMCTX_CAPI_INIT.call_once(|| unsafe {
-        read_volatile(lucet_vmctx_get_heap as *const extern "C" fn());
-        read_volatile(lucet_vmctx_get_globals as *const extern "C" fn());
-        read_volatile(lucet_vmctx_current_memory as *const extern "C" fn());
-        read_volatile(lucet_vmctx_grow_memory as *const extern "C" fn());
-        read_volatile(lucet_vmctx_check_heap as *const extern "C" fn());
-        read_volatile(lucet_vmctx_terminate as *const extern "C" fn());
-        read_volatile(lucet_vmctx_get_delegate as *const extern "C" fn());
-        read_volatile(lucet_vmctx_get_func_from_idx as *const extern "C" fn());
-        // need at least one of these to get the symbols exported
-        read_volatile(crate::c_api::lucet_dl_module_load as *const c_void);
-    });
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lucet_vmctx_get_heap(vmctx: *mut lucet_vmctx) -> *mut u8 {
-    Vmctx::from_raw(vmctx).instance().alloc().slot().heap as *mut u8
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut i64 {
-    Vmctx::from_raw(vmctx).instance().alloc().slot().globals as *mut i64
-}
-
-/// Get the number of WebAssembly pages currently in the heap.
-#[no_mangle]
-pub unsafe extern "C" fn lucet_vmctx_current_memory(vmctx: *mut lucet_vmctx) -> libc::uint32_t {
-    Vmctx::from_raw(vmctx).instance().alloc().heap_len() as u32 / WASM_PAGE_SIZE
-}
-
-#[no_mangle]
-/// Grows the guest heap by the given number of WebAssembly pages.
-///
-/// On success, returns the number of pages that existed before the call. On failure, returns `-1`.
-pub unsafe extern "C" fn lucet_vmctx_grow_memory(
-    vmctx: *mut lucet_vmctx,
-    additional_pages: libc::uint32_t,
-) -> libc::int32_t {
-    let inst = Instance::from_vmctx(vmctx);
-    if let Ok(old_pages) = inst.grow_memory(additional_pages) {
-        old_pages as libc::int32_t
-    } else {
-        -1
-    }
-}
-
-#[no_mangle]
-/// Check if a memory region is inside the instance heap.
-pub unsafe extern "C" fn lucet_vmctx_check_heap(
-    vmctx: *mut lucet_vmctx,
-    ptr: *mut c_void,
-    len: libc::size_t,
-) -> bool {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.check_heap(ptr, len)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lucet_vmctx_get_func_from_idx(
-    vmctx: *mut lucet_vmctx,
-    table_idx: u32,
-    func_idx: u32,
-) -> *const c_void {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.module()
-        .get_func_from_idx(table_idx, func_idx)
-        // the Rust API actually returns a pointer to a function pointer, so we want to dereference
-        // one layer of that to make it nicer in C
-        .map(|fptr| *(fptr as *const *const c_void))
-        .unwrap_or(std::ptr::null())
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lucet_vmctx_terminate(vmctx: *mut lucet_vmctx, info: *mut c_void) {
-    Vmctx::from_raw(vmctx).terminate(info);
-}
-
-#[no_mangle]
-/// Get the delegate object for the current instance.
-///
-/// TODO: rename
-pub unsafe extern "C" fn lucet_vmctx_get_delegate(vmctx: *mut lucet_vmctx) -> *mut c_void {
-    let inst = Instance::from_vmctx(vmctx);
-    inst.embed_ctx
-        .get::<*mut c_void>()
-        .map(|p| *p)
-        .unwrap_or(std::ptr::null_mut())
 }
