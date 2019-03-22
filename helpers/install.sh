@@ -91,3 +91,12 @@ done
 for file in ld; do
     ln -sfv "${WASI_BIN}/wasm-${file}" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-${file}"
 done
+
+wrapper_file="$(mktemp)"
+cat > "$wrapper_file" << EOT
+#! /bin/sh
+
+exec "${LUCET_BIN_DIR}/lucetc" \$@ --bindings "${LUCET_SHARE_DIR}/lucet-wasi/bindings.json"
+EOT
+install -p -v "$wrapper_file" "${LUCET_BIN_DIR}/lucetc-wasi"
+rm -f "$wrapper_file"
