@@ -43,6 +43,26 @@ tests invoke `lucetc` and the `wasi-sdk`'s tools.
 `lucet-runtime` is usable as a Rust crate or as a C library. The C language
 interface is found at `lucet-runtime/include/lucet.h`.
 
+### lucet-wasi
+
+`lucet-wasi` is a crate providing runtime support for the [WebAssembly System
+Interface (WASI)](https://github.com/CraneStation/wasmtime/blob/wasi/docs/WASI-intro.md).
+It can be used as a library to support WASI in another application, or as an
+executable, to execute WASI programs compiled through `lucetc`.
+
+See the section below titled ["Your first lucet
+application"](https://github.com/fastly/lucet#your-first-lucet-application) for
+an example building a C program and executing it with `lucet-wasi`.
+
+### lucet-wasi-sdk
+
+[`wasi-sdk`](https://github.com/cranestation/wasi-sdk) is a Cranelift project
+that packages a build of the Clang toolchain, the WebAssembly reference
+sysroot, and a libc that uses the WebAssembly System Interface (WASI) import
+functions. `lucet-wasi-sdk` is a Rust crate that provides a wrapper build C
+programs into WebAssembly modules using this sdk. Used to build test cases in
+`lucet-runtime-tests`.
+
 ### lucet-module-data
 
 Rust crate describing data structures that are emitted into the object file by
@@ -63,14 +83,6 @@ Functionality is incomplete at the time of writing, and not yet integrated with
 other parts of the project.  Rust code generator, definition of import and
 export function interfaces, and opaque type definitions are planned for the
 near future.
-
-### lucet-wasi-sdk
-
-`wasi-sdk` is a Cranelift project that packages a build of the Clang toolchain,
-the WebAssembly reference sysroot, and a libc that uses the WebAssembly System
-Interface (WASI) import functions. `lucet-wasi-sdk` is a Rust crate that provides
-a wrapper build C programs into WebAssembly modules using this sdk. Used to build
-test cases in `lucet-runtime-tests`.
 
 ### lucet-spectest
 
