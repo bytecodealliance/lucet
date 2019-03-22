@@ -2,8 +2,8 @@
 extern crate clap;
 
 use clap::Arg;
-use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
-use lucet_wasi::ctx::WasiCtx;
+use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, Region};
+use lucet_wasi::{ctx::WasiCtx, hostcalls};
 use std::sync::Arc;
 
 struct Config<'a> {
@@ -12,6 +12,11 @@ struct Config<'a> {
 }
 
 fn main() {
+    // No-ops, but makes sure the linker doesn't throw away parts
+    // of the runtime:
+    lucet_runtime::lucet_internal_ensure_linked();
+    hostcalls::ensure_linked();
+
     let matches = app_from_crate!()
         .arg(
             Arg::with_name("lucet_module")
