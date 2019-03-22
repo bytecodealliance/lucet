@@ -92,6 +92,9 @@ for file in ld; do
     ln -sfv "${WASI_BIN}/wasm-${file}" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-${file}"
 done
 
+ln -svf "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-clang" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-gcc"
+ln -svf "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-clang++" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-g++"
+
 wrapper_file="$(mktemp)"
 cat > "$wrapper_file" << EOT
 #! /bin/sh
