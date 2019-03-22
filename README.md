@@ -136,7 +136,7 @@ toolchain are in `/benchmarks/shootout`.
 Lucet is developed and tested on Linux. We expect it to work on any POSIX
 system which supports ELF.
 
-Experimentally, we have shown that supporting Mac OS (which uses the mach-o
+Experimentally, we have shown that supporting Mac OS (which uses the Mach-O
 executable format instead of ELF) is possible, but it is not supported at this
 time.
 
@@ -144,7 +144,7 @@ time.
 
 Lucet requires:
 
-* Rust stable, and rustfmt. We typically track the latest stable release.
+* Rust stable, and `rustfmt`. We typically track the latest stable release.
 * `wasi-sdk`, providing a Clang toolchain with wasm-ld, the WebAssembly
   reference sysroot, and a libc that depends on only the WebAssembly System
   Interface (WASI) import functions.
@@ -152,23 +152,81 @@ Lucet requires:
   build system
 * libhwloc, for sightglass to pin benchmarks to a single core
 
-### Docker container
+### Getting started
 
-A Docker container which includes all dependencies is provided in `Dockerfile`.
-A set of `devenv` shell scripts automate building and running this container,
-for those who may be unfamilar with Docker.
+The easiest way to get started with the Lucet toolchain is by using a Docker container.
 
-First, use `devenv_build_container` to create a docker image from `Dockerfile`.
-You will need to rerun this only if the Dockerfile changes.
+This repository includes a `Dockerfile` to build a complete environement for
+compiling and running WebAssembly code with Lucet.
 
-Then, use `devenv_run` to open an interactive shell in the container, or pass
-arguments to `devenv_run` to run them as a command in the container.
-`devenv_run` will automatically start the container if it is not running. You
-can manually start and stop the container with `devenv_start` and `devenv_stop`.
+#### Setting up the environment
+
+1) Install and run the `docker` service. We do not support `podman` at this time. On MacOS, [Docker for Mac](https://docs.docker.com/docker-for-mac/install/) is an option.
+2) Once Docker is running, in a terminal, and at the root of the cloned repository, type: `source ./devenv_build_container.sh`. This command requires the current shell to be `zsh`, `ksh` or `bash`. After a couple minutes, the Docker image is built and a new container is run.
+3) Check that new commands are now available:
+
+```sh
+lucetc --help
+```
+
+You're now all set!
+
+#### Your first Lucet application
+
+Under the hood, these commands are executed in the Docker container. And this container has limited visibility over the host's filesystem. Namely, files that are in the `lucet` directory you just cloned can be compiled and run.
+
+Create a new work directory in that base directory:
+
+```sh
+mkdir -p src/hello
+
+cd src/hello
+```
+
+Save the following C source code as `hello.c`:
+
+```c
+#include <stdio.h>
+
+int main(void)
+{
+    puts("Hello world");
+    return 0;
+}
+```
+
+Time to compile it! The Docker container includes the `clang` compiler, built to generate webassembly source code. The related commands are accessible from your current shell.
+
+```sh
+wasm32-unknown-wasi-clang -Ofast -o hello.wasm hello.c
+```
+
+Note that tools from the LLVM/Clang targeting webassembly share a common `wasm32-unknown-wasi-` prefix.
+
+The previous command creates a WebAssembly module `hello.wasm` from our original C source code.
+
+The next step is to build native `x86_64` code from that WebAssembly file.
+
+```sh
+lucetc-wasi -o hello.so hello.wasm
+```
+
+`lucetc` is the WebAssembly to native code compiler. The `lucetc-wasi` command runs the same compiler, but configured for applications using WASI.
+
+`hello.so` is created and ready to be run:
+
+```sh
+lucet-wasi hello.so
+```
+
+#### Additional shell commands
+
+* `./devenv_build_container.sh` rebuilds Lucet. This is never required unless you are working on the Lucet code itself.
+* `./devenv_run.sh [<command>] [<arg>...]` runs a command in the container. If a command is not provided, an interactive shell is spawned. In this container, Lucet tools are installed in `/opt/lucet` by default. The command `source /opt/lucet/bin/lucet_setenv.sh` can be used to initialize the environment.
+* `./devenv_start.sh` and `./devenv_stop.sh` start and stop the container.
 
 ## Reporting Security Issues
 
 The Lucet maintainers are committed to providing a prompt response to security
 issues. Reporters may make a public report [on GitHub](https://github.com/fastly/lucet),
 or make a private report [via Fastly's security reporting system](https://www.fastly.com/security/report-security-issue)
-
