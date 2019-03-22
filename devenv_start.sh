@@ -4,7 +4,6 @@
 
 if ! docker image inspect lucet-dev:latest > /dev/null; then
 	${HOST_BASE_PREFIX}/devenv_build_container.sh
-	sleep 30
 fi
 
 if docker ps -f name=lucet | grep -Fq lucet ; then
@@ -12,5 +11,5 @@ if docker ps -f name=lucet | grep -Fq lucet ; then
 	exit 1
 fi
 
-docker run --name=lucet --detach --mount type=bind,src="$(pwd),target=/lucet" \
+docker run --name=lucet --detach --mount type=bind,src="$(cd $(dirname ${0}); pwd -P),target=/lucet" \
 	lucet-dev:latest /bin/sleep 99999999 > /dev/null
