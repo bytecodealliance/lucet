@@ -1,6 +1,7 @@
 mod decls;
 mod function;
 mod module;
+mod runtime;
 
 use crate::bindings::Bindings;
 use crate::compiler::{stack_probe, ObjectFile, OptLevel};
@@ -19,6 +20,7 @@ use decls::ModuleDecls;
 use failure::ResultExt;
 use function::FuncInfo;
 use module::ModuleInfo;
+use runtime::Runtime;
 
 fn target_isa(opt_level: OptLevel) -> Box<dyn TargetIsa> {
     let mut flags_builder = settings::builder();
@@ -35,8 +37,8 @@ pub fn compile<'a>(
     bindings: &Bindings,
 ) -> Result<ObjectFile, LucetcError> {
     let isa = target_isa(opt_level);
-
-    let mut module_info = ModuleInfo::new(isa.frontend_config());
+    let frontend_config = isa.frontend_config();
+    let mut module_info = ModuleInfo::new(frontend_config.clone());
     translate_module(wasm_binary, &mut module_info).context(LucetcErrorKind::TranslatingModule)?;
 
     let libcalls = Box::new(move |libcall| match libcall {
@@ -56,7 +58,8 @@ pub fn compile<'a>(
         .context(LucetcErrorKind::Other("FIXME".to_owned()))?,
     );
 
-    let decls = ModuleDecls::declare(module_info, &mut clif_module, bindings)?;
+    let runtime = Runtime::lucet(frontend_config);
+    let decls = ModuleDecls::declare(module_info, &mut clif_module, bindings, runtime)?;
 
     for (ref func, (code, code_offset)) in decls.function_bodies() {
         let mut func_info = FuncInfo::new(&decls);

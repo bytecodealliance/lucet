@@ -2,6 +2,7 @@ use crate::bindings::Bindings;
 use crate::compiler::name::Name;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::new::module::ModuleInfo;
+use crate::new::runtime::{Runtime, RuntimeFunc};
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -10,12 +11,7 @@ use cranelift_wasm::{
     FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, Table, TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
-
-pub struct ModuleDecls<'a> {
-    info: ModuleInfo<'a>,
-    function_names: PrimaryMap<FuncIndex, Name>,
-    table_names: PrimaryMap<TableIndex, (Name, Name)>,
-}
+use std::collections::HashMap;
 
 pub struct FunctionDecl<'a> {
     pub import_name: Option<(&'a str, &'a str)>,
@@ -36,6 +32,11 @@ impl<'a> FunctionDecl<'a> {
     }
 }
 
+pub struct RuntimeDecl<'a> {
+    pub signature: &'a ir::Signature,
+    pub name: Name,
+}
+
 pub struct TableDecl<'a> {
     pub import_name: Option<(&'a str, &'a str)>,
     pub export_names: Vec<&'a str>,
@@ -44,18 +45,30 @@ pub struct TableDecl<'a> {
     pub len_name: Name,
 }
 
+pub struct ModuleDecls<'a> {
+    info: ModuleInfo<'a>,
+    runtime: Runtime,
+    function_names: PrimaryMap<FuncIndex, Name>,
+    table_names: PrimaryMap<TableIndex, (Name, Name)>,
+    runtime_names: HashMap<RuntimeFunc, Name>,
+}
+
 impl<'a> ModuleDecls<'a> {
     pub fn declare<B: ClifBackend>(
         info: ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
         bindings: &Bindings,
+        runtime: Runtime,
     ) -> Result<Self, LucetcError> {
         let function_names = Self::declare_funcs(&info, clif_module, bindings)?;
         let table_names = Self::declare_tables(&info, clif_module)?;
+        let runtime_names = Self::declare_runtime(&runtime, clif_module)?;
         Ok(Self {
             info,
             function_names,
             table_names,
+            runtime_names,
+            runtime,
         })
     }
 
@@ -121,6 +134,22 @@ impl<'a> ModuleDecls<'a> {
         Ok(table_names)
     }
 
+    fn declare_runtime<B: ClifBackend>(
+        runtime: &Runtime,
+        clif_module: &mut ClifModule<B>,
+    ) -> Result<HashMap<RuntimeFunc, Name>, LucetcError> {
+        let mut runtime_names: HashMap<RuntimeFunc, Name> = HashMap::new();
+        for (func, (symbol, signature)) in runtime.functions.iter() {
+            let funcid = clif_module
+                .declare_function(&symbol, Linkage::Import, signature)
+                .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+            let name = Name::new_func(symbol.clone(), funcid);
+
+            runtime_names.insert(*func, name);
+        }
+        Ok(runtime_names)
+    }
+
     pub fn target_config(&self) -> TargetFrontendConfig {
         self.info.target_config()
     }
@@ -146,6 +175,19 @@ impl<'a> ModuleDecls<'a> {
             signature,
             export_names: exportable_sigix.export_names.clone(),
             import_name: import_name.cloned(),
+            name: name.clone(),
+        })
+    }
+
+    pub fn get_runtime(&self, runtime_func: RuntimeFunc) -> Result<RuntimeDecl, Error> {
+        let (_, signature) = self
+            .runtime
+            .functions
+            .get(&runtime_func)
+            .ok_or_else(|| format_err!(""))?;
+        let name = self.runtime_names.get(&runtime_func).unwrap();
+        Ok(RuntimeDecl{
+            signature,
             name: name.clone(),
         })
     }
