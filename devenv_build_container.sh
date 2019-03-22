@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. config.inc
+. "$(dirname ${0})/config.inc"
 
 if docker image inspect lucet-dev:latest > /dev/null; then
 	echo "A lucet-dev image is already present"
