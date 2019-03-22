@@ -11,7 +11,7 @@ before_install:
   - ./devenv_start.sh
 
 script:
-  - ./devenv_run make indent-check test audit
+  - ./devenv_run.sh make indent-check test audit
   - git diff --exit-code
 
 notifications:
