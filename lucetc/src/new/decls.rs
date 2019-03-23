@@ -8,7 +8,7 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, Table, TableIndex,
+    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, Table, TableIndex, SignatureIndex,
 };
 use failure::{format_err, Error, ResultExt};
 use std::collections::HashMap;
@@ -184,7 +184,7 @@ impl<'a> ModuleDecls<'a> {
             .runtime
             .functions
             .get(&runtime_func)
-            .ok_or_else(|| format_err!(""))?;
+            .ok_or_else(|| format_err!("runtime func not supported: {:?}", runtime_func))?;
         let name = self.runtime_names.get(&runtime_func).unwrap();
         Ok(RuntimeDecl{
             signature,
@@ -206,5 +206,9 @@ impl<'a> ModuleDecls<'a> {
             contents_name: contents_name.clone(),
             len_name: len_name.clone(),
         })
+    }
+
+    pub fn get_signature(&self, signature_index: SignatureIndex) -> Result<&ir::Signature, Error> {
+        self.info.signatures.get(signature_index).ok_or_else(|| format_err!("signature out of bounds: {:?}", signature_index))
     }
 }

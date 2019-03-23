@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
 pub enum RuntimeFunc {
-    MemCurrent,
+    MemSize,
     MemGrow,
 }
 
@@ -16,7 +16,7 @@ impl Runtime {
     pub fn lucet(target: TargetFrontendConfig) -> Self {
         let mut functions = HashMap::new();
         functions.insert(
-            RuntimeFunc::MemCurrent,
+            RuntimeFunc::MemSize,
             (
                 "lucet_vmctx_current_memory".to_owned(),
                 Signature {
