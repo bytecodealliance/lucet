@@ -359,6 +359,8 @@ pub fn ensure_linked() {
     use std::ptr::read_volatile;
     C_API_INIT.call_once(|| unsafe {
         read_volatile(lucet_vmctx_get_heap as *const extern "C" fn());
+        read_volatile(lucet_vmctx_current_memory as *const extern "C" fn());
+        read_volatile(lucet_vmctx_grow_memory as *const extern "C" fn());
     });
 }
 
