@@ -17,8 +17,11 @@ if [ "$prefix" = "$HOST_BASE_PREFIX" ]; then
 	lucet_workdir="${HOST_LUCET_MOUNT_POINT}/${relpath}"
 fi
 
+opts="-i"
+[ -t 0 ] && opts="-t $opts"
+
 if [ $# -eq 0 ]; then
-	docker exec -it -w "$lucet_workdir" lucet /bin/bash
+	docker exec $opts -w "$lucet_workdir" lucet /bin/bash
 else
-	docker exec -t -w "$lucet_workdir" lucet $@
+	docker exec $opts -w "$lucet_workdir" lucet $@
 fi
