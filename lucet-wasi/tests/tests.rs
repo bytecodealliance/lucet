@@ -92,3 +92,23 @@ fn getentropy() {
 
     assert_eq!(exitcode, 0);
 }
+
+#[test]
+fn stdin() {
+    use std::fs::File;
+    use std::io::Write;
+    use std::os::unix::io::FromRawFd;
+
+    let (pipe_out, pipe_in) = nix::unistd::pipe().expect("can create pipe");
+
+    let mut stdin_file = unsafe { File::from_raw_fd(pipe_in) };
+    write!(stdin_file, "hello from stdin!").expect("pipe write succeeds");
+    drop(stdin_file);
+
+    let ctx = unsafe { WasiCtxBuilder::new().args(&["stdin"]).raw_fd(0, pipe_out) };
+
+    let (exitcode, stdout) = run_with_stdout("stdin.c", ctx).unwrap();
+
+    assert_eq!(exitcode, 0);
+    assert_eq!(&stdout, "hello from stdin!");
+}
