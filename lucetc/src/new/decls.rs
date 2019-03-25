@@ -1,16 +1,20 @@
 use crate::bindings::Bindings;
 use crate::compiler::name::Name;
 use crate::error::{LucetcError, LucetcErrorKind};
+pub use crate::new::module::Exportable;
 use crate::new::module::ModuleInfo;
 use crate::new::runtime::{Runtime, RuntimeFunc};
+use crate::program::memory::HeapSettings;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, Table, TableIndex, SignatureIndex,
+    FuncIndex, Global, GlobalIndex, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
+    TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
+use lucet_module_data::HeapSpec;
 use std::collections::HashMap;
 
 pub struct FunctionDecl<'a> {
@@ -26,9 +30,6 @@ impl<'a> FunctionDecl<'a> {
     }
     pub fn imported(&self) -> bool {
         !self.defined()
-    }
-    pub fn exported(&self) -> bool {
-        !self.export_names.is_empty()
     }
 }
 
@@ -51,6 +52,7 @@ pub struct ModuleDecls<'a> {
     function_names: PrimaryMap<FuncIndex, Name>,
     table_names: PrimaryMap<TableIndex, (Name, Name)>,
     runtime_names: HashMap<RuntimeFunc, Name>,
+    heaps: PrimaryMap<MemoryIndex, HeapSpec>,
 }
 
 impl<'a> ModuleDecls<'a> {
@@ -59,16 +61,19 @@ impl<'a> ModuleDecls<'a> {
         clif_module: &mut ClifModule<B>,
         bindings: &Bindings,
         runtime: Runtime,
+        heap_settings: HeapSettings,
     ) -> Result<Self, LucetcError> {
         let function_names = Self::declare_funcs(&info, clif_module, bindings)?;
         let table_names = Self::declare_tables(&info, clif_module)?;
         let runtime_names = Self::declare_runtime(&runtime, clif_module)?;
+        let heaps = Self::declare_heaps(&info, heap_settings)?;
         Ok(Self {
             info,
             function_names,
             table_names,
             runtime_names,
             runtime,
+            heaps,
         })
     }
 
@@ -134,6 +139,34 @@ impl<'a> ModuleDecls<'a> {
         Ok(table_names)
     }
 
+    fn declare_heaps(
+        info: &ModuleInfo<'a>,
+        heap_settings: HeapSettings,
+    ) -> Result<PrimaryMap<MemoryIndex, HeapSpec>, LucetcError> {
+        let mut heaps = PrimaryMap::new();
+
+        for ix in 0..info.memories.len() {
+            let ix = MemoryIndex::new(ix);
+
+            if ix != MemoryIndex::new(0) {
+                Err(format_err!("lucetc only supports memory 0"))?
+            }
+
+            let memory = info.memories.get(ix).expect("memory in range").entity;
+
+            let wasm_page: u64 = 64 * 1024;
+            let initial_size = memory.minimum as u64 * wasm_page;
+            // Find the max size permitted by the heap and the memory spec
+            let max_size = memory.maximum.map(|pages| pages as u64 * wasm_page);
+            heaps.push(HeapSpec {
+                reserved_size: heap_settings.reserved_size,
+                guard_size: heap_settings.guard_size,
+                initial_size: initial_size,
+                max_size: max_size,
+            });
+        }
+        Ok(heaps)
+    }
     fn declare_runtime<B: ClifBackend>(
         runtime: &Runtime,
         clif_module: &mut ClifModule<B>,
@@ -186,7 +219,7 @@ impl<'a> ModuleDecls<'a> {
             .get(&runtime_func)
             .ok_or_else(|| format_err!("runtime func not supported: {:?}", runtime_func))?;
         let name = self.runtime_names.get(&runtime_func).unwrap();
-        Ok(RuntimeDecl{
+        Ok(RuntimeDecl {
             signature,
             name: name.clone(),
         })
@@ -209,6 +242,22 @@ impl<'a> ModuleDecls<'a> {
     }
 
     pub fn get_signature(&self, signature_index: SignatureIndex) -> Result<&ir::Signature, Error> {
-        self.info.signatures.get(signature_index).ok_or_else(|| format_err!("signature out of bounds: {:?}", signature_index))
+        self.info
+            .signatures
+            .get(signature_index)
+            .ok_or_else(|| format_err!("signature out of bounds: {:?}", signature_index))
+    }
+
+    pub fn get_global(&self, global_index: GlobalIndex) -> Result<&Exportable<Global>, Error> {
+        self.info
+            .globals
+            .get(global_index)
+            .ok_or_else(|| format_err!("global out of bounds: {:?}", global_index))
+    }
+
+    pub fn get_heap(&self, mem_index: MemoryIndex) -> Result<&HeapSpec, Error> {
+        self.heaps
+            .get(mem_index)
+            .ok_or_else(|| format_err!("linear memory out of bounds: {:?}", mem_index))
     }
 }

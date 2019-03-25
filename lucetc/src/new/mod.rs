@@ -6,7 +6,7 @@ mod runtime;
 use crate::bindings::Bindings;
 use crate::compiler::{stack_probe, ObjectFile, OptLevel};
 use crate::error::{LucetcError, LucetcErrorKind};
-use crate::program::HeapSpec;
+use crate::program::memory::HeapSettings;
 use cranelift_codegen::{
     ir,
     isa::TargetIsa,
@@ -36,7 +36,7 @@ pub fn compile<'a>(
     wasm_binary: &'a [u8],
     opt_level: OptLevel,
     bindings: &Bindings,
-    heap_spec: &HeapSpec,
+    heap_settings: HeapSettings,
 ) -> Result<ObjectFile, LucetcError> {
     let isa = target_isa(opt_level);
     let frontend_config = isa.frontend_config();
@@ -61,10 +61,10 @@ pub fn compile<'a>(
     );
 
     let runtime = Runtime::lucet(frontend_config);
-    let decls = ModuleDecls::declare(module_info, &mut clif_module, bindings, runtime)?;
+    let decls = ModuleDecls::declare(module_info, &mut clif_module, bindings, runtime, heap_settings)?;
 
     for (ref func, (code, code_offset)) in decls.function_bodies() {
-        let mut func_info = FuncInfo::new(&decls, heap_spec);
+        let mut func_info = FuncInfo::new(&decls);
         func_translator
             .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
             .context(LucetcErrorKind::Function("FIXME".to_owned()))?;
