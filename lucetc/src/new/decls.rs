@@ -2,7 +2,7 @@ use crate::bindings::Bindings;
 use crate::compiler::name::Name;
 use crate::error::{LucetcError, LucetcErrorKind};
 pub use crate::new::module::Exportable;
-use crate::new::module::ModuleInfo;
+use crate::new::module::{ModuleInfo, DataInitializer};
 use crate::new::runtime::{Runtime, RuntimeFunc};
 use crate::program::memory::HeapSettings;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
@@ -10,8 +10,8 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
-    TableIndex,
+    FuncIndex, Global, GlobalIndex, MemoryIndex, ModuleEnvironment,
+    SignatureIndex, Table, TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
 use lucet_module_data::HeapSpec;
@@ -167,6 +167,7 @@ impl<'a> ModuleDecls<'a> {
         }
         Ok(heaps)
     }
+
     fn declare_runtime<B: ClifBackend>(
         runtime: &Runtime,
         clif_module: &mut ClifModule<B>,
@@ -259,5 +260,16 @@ impl<'a> ModuleDecls<'a> {
         self.heaps
             .get(mem_index)
             .ok_or_else(|| format_err!("linear memory out of bounds: {:?}", mem_index))
+    }
+
+    pub fn get_data_initializers(
+        &self,
+        mem_index: MemoryIndex,
+    ) -> Result<&[DataInitializer<'a>], Error> {
+        self.info
+            .data_initializers
+            .get(&mem_index)
+            .map(|v| v.as_slice())
+            .ok_or_else(|| format_err!("linear memory has no data initializers: {:?}", mem_index))
     }
 }

@@ -2,6 +2,7 @@ mod decls;
 mod function;
 mod module;
 mod runtime;
+mod sparsedata;
 
 use crate::bindings::Bindings;
 use crate::compiler::{stack_probe, ObjectFile, OptLevel};
@@ -14,11 +15,11 @@ use cranelift_codegen::{
     Context as ClifContext,
 };
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
-use cranelift_module::Module as ClifModule;
+use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator};
 use decls::ModuleDecls;
-use failure::ResultExt;
+use failure::{Error, ResultExt};
 use function::FuncInfo;
 use module::ModuleInfo;
 use runtime::Runtime;
@@ -61,7 +62,13 @@ pub fn compile<'a>(
     );
 
     let runtime = Runtime::lucet(frontend_config);
-    let decls = ModuleDecls::declare(module_info, &mut clif_module, bindings, runtime, heap_settings)?;
+    let decls = ModuleDecls::declare(
+        module_info,
+        &mut clif_module,
+        bindings,
+        runtime,
+        heap_settings,
+    )?;
 
     for (ref func, (code, code_offset)) in decls.function_bodies() {
         let mut func_info = FuncInfo::new(&decls);
@@ -74,7 +81,61 @@ pub fn compile<'a>(
             .context(LucetcErrorKind::Function("FIXME".to_owned()))?;
     }
 
+    write_module_data(&mut clif_module, &decls).context(LucetcErrorKind::ModuleData)?;
+
     let obj = ObjectFile::new(clif_module.finish())
         .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
     Ok(obj)
+}
+
+fn write_module_data<B: ClifBackend>(
+    clif_module: &mut ClifModule<B>,
+    decls: &ModuleDecls,
+) -> Result<(), Error> {
+    use crate::new::sparsedata::OwnedSparseData;
+    use byteorder::{LittleEndian, WriteBytesExt};
+    use cranelift_codegen::entity::EntityRef;
+    use cranelift_module::{DataContext, Linkage};
+    use cranelift_wasm::MemoryIndex;
+    use lucet_module_data::ModuleData;
+
+    let memix = MemoryIndex::new(0);
+
+    let module_data_serialized: Vec<u8> = {
+        let heap_spec = decls.get_heap(memix)?;
+
+        let compiled_data = OwnedSparseData::new(
+            decls.get_data_initializers(memix)?,
+            heap_spec.clone(),
+        )?;
+        let sparse_data = compiled_data.sparse_data();
+
+        let globals = unimplemented!();
+        let globals_spec = globals.iter().map(|g| g.to_spec()).collect();
+
+        let module_data = ModuleData::new(heap_spec.clone(), sparse_data, globals_spec);
+        module_data.serialize()?
+    };
+    {
+        let mut serialized_len: Vec<u8> = Vec::new();
+        serialized_len
+            .write_u32::<LittleEndian>(module_data_serialized.len() as u32)
+            .unwrap();
+        let mut data_len_ctx = DataContext::new();
+        data_len_ctx.define(serialized_len.into_boxed_slice());
+
+        let data_len_decl =
+            clif_module.declare_data("lucet_module_data_len", Linkage::Export, false)?;
+        clif_module.define_data(data_len_decl, &data_len_ctx)?;
+    }
+
+    {
+        let mut module_data_ctx = DataContext::new();
+        module_data_ctx.define(module_data_serialized.into_boxed_slice());
+
+        let module_data_decl =
+            clif_module.declare_data("lucet_module_data", Linkage::Export, true)?;
+        clif_module.define_data(module_data_decl, &module_data_ctx)?;
+    }
+    Ok(())
 }

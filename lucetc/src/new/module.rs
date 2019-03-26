@@ -137,6 +137,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             self.imported_memories.len(),
             "import memories are declared first"
         );
+        self.data_initializers.insert(MemoryIndex::new(self.memories.len()), vec![]);
         self.memories.push(Exportable::new(memory));
         self.imported_memories.push((module, field));
     }
@@ -150,6 +151,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
     }
 
     fn declare_memory(&mut self, memory: Memory) {
+        self.data_initializers.insert(MemoryIndex::new(self.memories.len()), vec![]);
         self.memories.push(Exportable::new(memory));
     }
 
