@@ -1,12 +1,20 @@
 use crate::host;
 use std::fs::File;
-use std::os::unix::prelude::{FileTypeExt, FromRawFd, RawFd};
+use std::os::unix::prelude::{FileTypeExt, FromRawFd, IntoRawFd, RawFd};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct FdEntry {
     pub fd_object: FdObject,
     pub rights_base: host::__wasi_rights_t,
     pub rights_inheriting: host::__wasi_rights_t,
+    pub preopen_path: Option<PathBuf>,
+}
+
+impl FdEntry {
+    pub fn from_file(file: File) -> FdEntry {
+        unsafe { FdEntry::from_raw_fd(file.into_raw_fd()) }
+    }
 }
 
 impl FromRawFd for FdEntry {
@@ -91,6 +99,7 @@ impl FromRawFd for FdEntry {
             },
             rights_base,
             rights_inheriting,
+            preopen_path: None,
         }
     }
 }

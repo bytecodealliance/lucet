@@ -84,7 +84,7 @@ pub fn run_with_stdout<P: AsRef<Path>>(
 ) -> Result<(__wasi_exitcode_t, String), Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = unsafe { ctx.raw_fd(1, pipe_in) }.build();
+    let ctx = unsafe { ctx.raw_fd(1, pipe_in) }.build()?;
 
     let exitcode = run(path, ctx)?;
 

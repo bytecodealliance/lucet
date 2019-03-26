@@ -14,6 +14,7 @@ use crate::memory::*;
 use crate::{host, wasm32};
 use cast::From as _0;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
+use std::os::unix::prelude::OsStrExt;
 
 #[no_mangle]
 pub extern "C" fn __wasi_proc_exit(vmctx: *mut lucet_vmctx, rval: wasm32::__wasi_exitcode_t) -> ! {
@@ -284,8 +285,8 @@ pub extern "C" fn __wasi_fd_fdstat_get(
         host_fdstat.fs_rights_base = fe.rights_base;
         host_fdstat.fs_rights_inheriting = fe.rights_inheriting;
         use nix::fcntl::{fcntl, OFlag, F_GETFL};
-        match fcntl(fe.fd_object.rawfd, F_GETFL).map(OFlag::from_bits) {
-            Ok(Some(flags)) => {
+        match fcntl(fe.fd_object.rawfd, F_GETFL).map(OFlag::from_bits_truncate) {
+            Ok(flags) => {
                 if flags.contains(OFlag::O_APPEND) {
                     host_fdstat.fs_flags |= wasm32::__WASI_FDFLAG_APPEND;
                 }
@@ -303,11 +304,10 @@ pub extern "C" fn __wasi_fd_fdstat_get(
                 }
                 wasm32::__WASI_ESUCCESS
             }
-            Ok(None) => wasm32::__WASI_ENOSYS,
             Err(e) => wasm32::errno_from_nix(e.as_errno().unwrap()),
         }
     } else {
-        return wasm32::__WASI_EBADF;
+        wasm32::__WASI_EBADF
     };
 
     unsafe {
@@ -359,6 +359,84 @@ pub extern "C" fn __wasi_fd_seek(
         enc_filesize_byref(&mut vmctx, newoffset, host_newoffset as u64)
             .map(|_| wasm32::__WASI_ESUCCESS)
             .unwrap_or_else(|e| e)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_fd_prestat_get(
+    vmctx_raw: *mut lucet_vmctx,
+    fd: wasm32::__wasi_fd_t,
+    prestat_ptr: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    let vmctx = unsafe { Vmctx::from_raw(vmctx_raw) };
+    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+    let fd = dec_fd(fd);
+    // TODO: is this the correct right for this?
+    match ctx.get_fd_entry(fd, host::__WASI_RIGHT_PATH_OPEN.into(), 0) {
+        Ok(fe) => {
+            if let Some(po_path) = &fe.preopen_path {
+                if fe.fd_object.ty != host::__WASI_FILETYPE_DIRECTORY as host::__wasi_filetype_t {
+                    return wasm32::__WASI_ENOTDIR;
+                }
+                // nasty aliasing here, but we aren't interfering with the borrow for `ctx`
+                // TODO: rework vmctx interface to avoid this
+                unsafe {
+                    enc_prestat_byref(
+                        &mut Vmctx::from_raw(vmctx_raw),
+                        prestat_ptr,
+                        host::__wasi_prestat_t {
+                            pr_type: host::__WASI_PREOPENTYPE_DIR as host::__wasi_preopentype_t,
+                            u: host::__wasi_prestat_t___wasi_prestat_u {
+                                dir:
+                                    host::__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t {
+                                        pr_name_len: po_path.as_os_str().as_bytes().len(),
+                                    },
+                            },
+                        },
+                    )
+                    .map(|_| wasm32::__WASI_ESUCCESS)
+                    .unwrap_or_else(|e| e)
+                }
+            } else {
+                wasm32::__WASI_ENOTSUP
+            }
+        }
+        Err(e) => enc_errno(e),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_fd_prestat_dir_name(
+    vmctx_raw: *mut lucet_vmctx,
+    fd: wasm32::__wasi_fd_t,
+    path_ptr: wasm32::uintptr_t,
+    path_len: wasm32::size_t,
+) -> wasm32::__wasi_errno_t {
+    let vmctx = unsafe { Vmctx::from_raw(vmctx_raw) };
+    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+    let fd = dec_fd(fd);
+    match ctx.get_fd_entry(fd, host::__WASI_RIGHT_PATH_OPEN.into(), 0) {
+        Ok(fe) => {
+            if let Some(po_path) = &fe.preopen_path {
+                if fe.fd_object.ty != host::__WASI_FILETYPE_DIRECTORY as host::__wasi_filetype_t {
+                    return wasm32::__WASI_ENOTDIR;
+                }
+                let path_bytes = po_path.as_os_str().as_bytes();
+                if path_bytes.len() > dec_usize(path_len) {
+                    return wasm32::__WASI_ENAMETOOLONG;
+                }
+                // nasty aliasing here, but we aren't interfering with the borrow for `ctx`
+                // TODO: rework vmctx interface to avoid this
+                unsafe {
+                    enc_slice_of(&mut Vmctx::from_raw(vmctx_raw), path_bytes, path_ptr)
+                        .map(|_| wasm32::__WASI_ESUCCESS)
+                        .unwrap_or_else(|e| e)
+                }
+            } else {
+                wasm32::__WASI_ENOTSUP
+            }
+        }
+        Err(e) => enc_errno(e),
     }
 }
 

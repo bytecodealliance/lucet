@@ -248,6 +248,61 @@ dec_enc_scalar!(
     enc_filetype,
     enc_filetype_byref
 );
+
+pub fn dec_prestat(
+    prestat: wasm32::__wasi_prestat_t,
+) -> Result<host::__wasi_prestat_t, host::__wasi_errno_t> {
+    match prestat.pr_type {
+        wasm32::__WASI_PREOPENTYPE_DIR => {
+            let u = host::__wasi_prestat_t___wasi_prestat_u {
+                dir: host::__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t {
+                    pr_name_len: dec_usize(unsafe { prestat.u.dir.pr_name_len }),
+                },
+            };
+            Ok(host::__wasi_prestat_t {
+                pr_type: host::__WASI_PREOPENTYPE_DIR as host::__wasi_preopentype_t,
+                u,
+            })
+        }
+        _ => Err(host::__WASI_EINVAL as host::__wasi_errno_t),
+    }
+}
+
+pub unsafe fn dec_prestat_byref(
+    vmctx: &mut Vmctx,
+    prestat_ptr: wasm32::uintptr_t,
+) -> Result<host::__wasi_prestat_t, host::__wasi_errno_t> {
+    dec_pointee::<wasm32::__wasi_prestat_t>(vmctx, prestat_ptr).and_then(dec_prestat)
+}
+
+pub fn enc_prestat(
+    prestat: host::__wasi_prestat_t,
+) -> Result<wasm32::__wasi_prestat_t, host::__wasi_errno_t> {
+    match prestat.pr_type as u32 {
+        host::__WASI_PREOPENTYPE_DIR => {
+            let u = wasm32::__wasi_prestat_t___wasi_prestat_u {
+                dir: wasm32::__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t {
+                    pr_name_len: enc_usize(unsafe { prestat.u.dir.pr_name_len }),
+                },
+            };
+            Ok(wasm32::__wasi_prestat_t {
+                pr_type: wasm32::__WASI_PREOPENTYPE_DIR as wasm32::__wasi_preopentype_t,
+                u,
+            })
+        }
+        _ => Err(host::__WASI_EINVAL as host::__wasi_errno_t),
+    }
+}
+
+pub unsafe fn enc_prestat_byref(
+    vmctx: &mut Vmctx,
+    prestat_ptr: wasm32::uintptr_t,
+    host_prestat: host::__wasi_prestat_t,
+) -> Result<(), host::__wasi_errno_t> {
+    let prestat = enc_prestat(host_prestat)?;
+    enc_pointee::<wasm32::__wasi_prestat_t>(vmctx, prestat_ptr, prestat)
+}
+
 dec_enc_scalar!(
     __wasi_rights_t,
     dec_rights,

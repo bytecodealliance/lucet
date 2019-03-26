@@ -2,7 +2,9 @@ mod test_helpers;
 
 use crate::test_helpers::{run, run_with_stdout, LUCET_WASI_ROOT};
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
+use std::fs::File;
 use std::path::Path;
+use tempfile::TempDir;
 
 #[test]
 fn hello() {
@@ -95,7 +97,6 @@ fn getentropy() {
 
 #[test]
 fn stdin() {
-    use std::fs::File;
     use std::io::Write;
     use std::os::unix::io::FromRawFd;
 
@@ -111,4 +112,24 @@ fn stdin() {
 
     assert_eq!(exitcode, 0);
     assert_eq!(&stdout, "hello from stdin!");
+}
+
+#[test]
+fn preopen_populates() {
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    std::fs::create_dir(&preopen_host_path).unwrap();
+    let preopen_dir = File::open(preopen_host_path).unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["preopen_populates"])
+        .preopened_dir(preopen_dir, "/preopen")
+        .build()
+        .expect("can build WasiCtx");
+
+    let exitcode = run("preopen_populates.c", ctx).unwrap();
+
+    drop(tmpdir);
+
+    assert_eq!(exitcode, 0);
 }

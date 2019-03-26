@@ -2,9 +2,11 @@
 //! by running bindgen over wasi/core.h with a wasm32 target, and the content
 //! still largely reflects that, however it's been heavily modified, to
 //! be host-independent, to avoid exposing libc implementation details,
-//! to clean up cases where the headers use complex preprocessor macros.
+//! to clean up cases where the headers use complex preprocessor macros,
+//! and to
 
 #![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
 #![allow(dead_code)]
 
 // C types
@@ -119,7 +121,6 @@ fn bindgen_test_layout_fsid_t() {
 
 // WASI types
 pub type __wasi_advice_t = u8;
-pub type __wasi_auxtype_t = u32;
 pub type __wasi_clockid_t = u32;
 pub type __wasi_device_t = u64;
 pub type __wasi_dircookie_t = u64;
@@ -133,6 +134,7 @@ pub type __wasi_fdsflags_t = u16;
 pub type __wasi_filedelta_t = i64;
 pub type __wasi_filesize_t = u64;
 pub type __wasi_filetype_t = u8;
+pub type __wasi_preopentype_t = u8;
 pub type __wasi_fstflags_t = u16;
 pub type __wasi_inode_t = u64;
 pub type __wasi_linkcount_t = u32;
@@ -213,6 +215,115 @@ pub struct __wasi_event_t {
     pub type_: __wasi_eventtype_t,
     pub __bindgen_padding_0: u32,
     pub __bindgen_anon_1: __wasi_event_t__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct __wasi_prestat_t {
+    pub pr_type: __wasi_preopentype_t,
+    pub u: __wasi_prestat_t___wasi_prestat_u,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union __wasi_prestat_t___wasi_prestat_u {
+    pub dir: __wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t {
+    pub pr_name_len: size_t,
+}
+#[test]
+fn bindgen_test_layout___wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t() {
+    assert_eq!(
+        ::std::mem::size_of::<__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t>(),
+        4usize,
+        concat!(
+            "Size of: ",
+            stringify!(__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t)
+        )
+    );
+    assert_eq!(
+        ::std::mem::align_of::<__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t>(),
+        4usize,
+        concat!(
+            "Alignment of ",
+            stringify!(__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t>()))
+                .pr_name_len as *const _ as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t),
+            "::",
+            stringify!(pr_name_len)
+        )
+    );
+}
+#[test]
+fn bindgen_test_layout___wasi_prestat_t___wasi_prestat_u() {
+    assert_eq!(
+        ::std::mem::size_of::<__wasi_prestat_t___wasi_prestat_u>(),
+        4usize,
+        concat!("Size of: ", stringify!(__wasi_prestat_t___wasi_prestat_u))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<__wasi_prestat_t___wasi_prestat_u>(),
+        4usize,
+        concat!(
+            "Alignment of ",
+            stringify!(__wasi_prestat_t___wasi_prestat_u)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<__wasi_prestat_t___wasi_prestat_u>())).dir as *const _ as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(__wasi_prestat_t___wasi_prestat_u),
+            "::",
+            stringify!(dir)
+        )
+    );
+}
+#[test]
+fn bindgen_test_layout___wasi_prestat_t() {
+    assert_eq!(
+        ::std::mem::size_of::<__wasi_prestat_t>(),
+        8usize,
+        concat!("Size of: ", stringify!(__wasi_prestat_t))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<__wasi_prestat_t>(),
+        4usize,
+        concat!("Alignment of ", stringify!(__wasi_prestat_t))
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<__wasi_prestat_t>())).pr_type as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(__wasi_prestat_t),
+            "::",
+            stringify!(pr_type)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<__wasi_prestat_t>())).u as *const _ as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(__wasi_prestat_t),
+            "::",
+            stringify!(u)
+        )
+    );
 }
 #[allow(non_snake_case)]
 #[repr(C)]
@@ -951,85 +1062,6 @@ pub fn whence_to_str(whence: __wasi_whence_t) -> &'static str {
     }
 }
 
-pub fn errno_from_nix(errno: nix::errno::Errno) -> __wasi_errno_t {
-    match errno {
-        nix::errno::Errno::EPERM => __WASI_EPERM,
-        nix::errno::Errno::ENOENT => __WASI_ENOENT,
-        nix::errno::Errno::ESRCH => __WASI_ESRCH,
-        nix::errno::Errno::EINTR => __WASI_EINTR,
-        nix::errno::Errno::EIO => __WASI_EIO,
-        nix::errno::Errno::ENXIO => __WASI_ENXIO,
-        nix::errno::Errno::E2BIG => __WASI_E2BIG,
-        nix::errno::Errno::ENOEXEC => __WASI_ENOEXEC,
-        nix::errno::Errno::EBADF => __WASI_EBADF,
-        nix::errno::Errno::ECHILD => __WASI_ECHILD,
-        nix::errno::Errno::EAGAIN => __WASI_EAGAIN,
-        nix::errno::Errno::ENOMEM => __WASI_ENOMEM,
-        nix::errno::Errno::EACCES => __WASI_EACCES,
-        nix::errno::Errno::EFAULT => __WASI_EFAULT,
-        nix::errno::Errno::EBUSY => __WASI_EBUSY,
-        nix::errno::Errno::EEXIST => __WASI_EEXIST,
-        nix::errno::Errno::EXDEV => __WASI_EXDEV,
-        nix::errno::Errno::ENODEV => __WASI_ENODEV,
-        nix::errno::Errno::ENOTDIR => __WASI_ENOTDIR,
-        nix::errno::Errno::EISDIR => __WASI_EISDIR,
-        nix::errno::Errno::EINVAL => __WASI_EINVAL,
-        nix::errno::Errno::ENFILE => __WASI_ENFILE,
-        nix::errno::Errno::EMFILE => __WASI_EMFILE,
-        nix::errno::Errno::ENOTTY => __WASI_ENOTTY,
-        nix::errno::Errno::ETXTBSY => __WASI_ETXTBSY,
-        nix::errno::Errno::EFBIG => __WASI_EFBIG,
-        nix::errno::Errno::ENOSPC => __WASI_ENOSPC,
-        nix::errno::Errno::ESPIPE => __WASI_ESPIPE,
-        nix::errno::Errno::EROFS => __WASI_EROFS,
-        nix::errno::Errno::EMLINK => __WASI_EMLINK,
-        nix::errno::Errno::EPIPE => __WASI_EPIPE,
-        nix::errno::Errno::EDOM => __WASI_EDOM,
-        nix::errno::Errno::ERANGE => __WASI_ERANGE,
-        nix::errno::Errno::EDEADLK => __WASI_EDEADLK,
-        nix::errno::Errno::ENAMETOOLONG => __WASI_ENAMETOOLONG,
-        nix::errno::Errno::ENOLCK => __WASI_ENOLCK,
-        nix::errno::Errno::ENOSYS => __WASI_ENOSYS,
-        nix::errno::Errno::ENOTEMPTY => __WASI_ENOTEMPTY,
-        nix::errno::Errno::ELOOP => __WASI_ELOOP,
-        nix::errno::Errno::ENOMSG => __WASI_ENOMSG,
-        nix::errno::Errno::EIDRM => __WASI_EIDRM,
-        nix::errno::Errno::ENOLINK => __WASI_ENOLINK,
-        nix::errno::Errno::EPROTO => __WASI_EPROTO,
-        nix::errno::Errno::EMULTIHOP => __WASI_EMULTIHOP,
-        nix::errno::Errno::EBADMSG => __WASI_EBADMSG,
-        nix::errno::Errno::EOVERFLOW => __WASI_EOVERFLOW,
-        nix::errno::Errno::EILSEQ => __WASI_EILSEQ,
-        nix::errno::Errno::ENOTSOCK => __WASI_ENOTSOCK,
-        nix::errno::Errno::EDESTADDRREQ => __WASI_EDESTADDRREQ,
-        nix::errno::Errno::EMSGSIZE => __WASI_EMSGSIZE,
-        nix::errno::Errno::EPROTOTYPE => __WASI_EPROTOTYPE,
-        nix::errno::Errno::ENOPROTOOPT => __WASI_ENOPROTOOPT,
-        nix::errno::Errno::EPROTONOSUPPORT => __WASI_EPROTONOSUPPORT,
-        nix::errno::Errno::EAFNOSUPPORT => __WASI_EAFNOSUPPORT,
-        nix::errno::Errno::EADDRINUSE => __WASI_EADDRINUSE,
-        nix::errno::Errno::EADDRNOTAVAIL => __WASI_EADDRNOTAVAIL,
-        nix::errno::Errno::ENETDOWN => __WASI_ENETDOWN,
-        nix::errno::Errno::ENETUNREACH => __WASI_ENETUNREACH,
-        nix::errno::Errno::ENETRESET => __WASI_ENETRESET,
-        nix::errno::Errno::ECONNABORTED => __WASI_ECONNABORTED,
-        nix::errno::Errno::ECONNRESET => __WASI_ECONNRESET,
-        nix::errno::Errno::ENOBUFS => __WASI_ENOBUFS,
-        nix::errno::Errno::EISCONN => __WASI_EISCONN,
-        nix::errno::Errno::ENOTCONN => __WASI_ENOTCONN,
-        nix::errno::Errno::ETIMEDOUT => __WASI_ETIMEDOUT,
-        nix::errno::Errno::ECONNREFUSED => __WASI_ECONNREFUSED,
-        nix::errno::Errno::EHOSTUNREACH => __WASI_EHOSTUNREACH,
-        nix::errno::Errno::EALREADY => __WASI_EALREADY,
-        nix::errno::Errno::EINPROGRESS => __WASI_EINPROGRESS,
-        nix::errno::Errno::ESTALE => __WASI_ESTALE,
-        nix::errno::Errno::EDQUOT => __WASI_EDQUOT,
-        nix::errno::Errno::ECANCELED => __WASI_ECANCELED,
-        nix::errno::Errno::EOWNERDEAD => __WASI_EOWNERDEAD,
-        nix::errno::Errno::ENOTRECOVERABLE => __WASI_ENOTRECOVERABLE,
-        _ => __WASI_ENOSYS,
-    }
-}
 // libc constants
 pub const INT8_MIN: i32 = -128;
 pub const INT16_MIN: i32 = -32768;
@@ -1167,6 +1199,7 @@ pub const __WASI_FDFLAG_DSYNC: __wasi_fdflags_t = 2;
 pub const __WASI_FDFLAG_NONBLOCK: __wasi_fdflags_t = 4;
 pub const __WASI_FDFLAG_RSYNC: __wasi_fdflags_t = 8;
 pub const __WASI_FDFLAG_SYNC: __wasi_fdflags_t = 16;
+pub const __WASI_PREOPENTYPE_DIR: __wasi_preopentype_t = 0;
 pub const __WASI_FILETYPE_UNKNOWN: __wasi_filetype_t = 0;
 pub const __WASI_FILETYPE_BLOCK_DEVICE: __wasi_filetype_t = 1;
 pub const __WASI_FILETYPE_CHARACTER_DEVICE: __wasi_filetype_t = 2;
@@ -1252,3 +1285,83 @@ pub const __WASI_SUBSCRIPTION_CLOCK_ABSTIME: __wasi_subclockflags_t = 1;
 pub const __WASI_WHENCE_CUR: __wasi_whence_t = 0;
 pub const __WASI_WHENCE_END: __wasi_whence_t = 1;
 pub const __WASI_WHENCE_SET: __wasi_whence_t = 2;
+
+pub fn errno_from_nix(errno: nix::errno::Errno) -> __wasi_errno_t {
+    match errno {
+        nix::errno::Errno::EPERM => __WASI_EPERM,
+        nix::errno::Errno::ENOENT => __WASI_ENOENT,
+        nix::errno::Errno::ESRCH => __WASI_ESRCH,
+        nix::errno::Errno::EINTR => __WASI_EINTR,
+        nix::errno::Errno::EIO => __WASI_EIO,
+        nix::errno::Errno::ENXIO => __WASI_ENXIO,
+        nix::errno::Errno::E2BIG => __WASI_E2BIG,
+        nix::errno::Errno::ENOEXEC => __WASI_ENOEXEC,
+        nix::errno::Errno::EBADF => __WASI_EBADF,
+        nix::errno::Errno::ECHILD => __WASI_ECHILD,
+        nix::errno::Errno::EAGAIN => __WASI_EAGAIN,
+        nix::errno::Errno::ENOMEM => __WASI_ENOMEM,
+        nix::errno::Errno::EACCES => __WASI_EACCES,
+        nix::errno::Errno::EFAULT => __WASI_EFAULT,
+        nix::errno::Errno::EBUSY => __WASI_EBUSY,
+        nix::errno::Errno::EEXIST => __WASI_EEXIST,
+        nix::errno::Errno::EXDEV => __WASI_EXDEV,
+        nix::errno::Errno::ENODEV => __WASI_ENODEV,
+        nix::errno::Errno::ENOTDIR => __WASI_ENOTDIR,
+        nix::errno::Errno::EISDIR => __WASI_EISDIR,
+        nix::errno::Errno::EINVAL => __WASI_EINVAL,
+        nix::errno::Errno::ENFILE => __WASI_ENFILE,
+        nix::errno::Errno::EMFILE => __WASI_EMFILE,
+        nix::errno::Errno::ENOTTY => __WASI_ENOTTY,
+        nix::errno::Errno::ETXTBSY => __WASI_ETXTBSY,
+        nix::errno::Errno::EFBIG => __WASI_EFBIG,
+        nix::errno::Errno::ENOSPC => __WASI_ENOSPC,
+        nix::errno::Errno::ESPIPE => __WASI_ESPIPE,
+        nix::errno::Errno::EROFS => __WASI_EROFS,
+        nix::errno::Errno::EMLINK => __WASI_EMLINK,
+        nix::errno::Errno::EPIPE => __WASI_EPIPE,
+        nix::errno::Errno::EDOM => __WASI_EDOM,
+        nix::errno::Errno::ERANGE => __WASI_ERANGE,
+        nix::errno::Errno::EDEADLK => __WASI_EDEADLK,
+        nix::errno::Errno::ENAMETOOLONG => __WASI_ENAMETOOLONG,
+        nix::errno::Errno::ENOLCK => __WASI_ENOLCK,
+        nix::errno::Errno::ENOSYS => __WASI_ENOSYS,
+        nix::errno::Errno::ENOTEMPTY => __WASI_ENOTEMPTY,
+        nix::errno::Errno::ELOOP => __WASI_ELOOP,
+        nix::errno::Errno::ENOMSG => __WASI_ENOMSG,
+        nix::errno::Errno::EIDRM => __WASI_EIDRM,
+        nix::errno::Errno::ENOLINK => __WASI_ENOLINK,
+        nix::errno::Errno::EPROTO => __WASI_EPROTO,
+        nix::errno::Errno::EMULTIHOP => __WASI_EMULTIHOP,
+        nix::errno::Errno::EBADMSG => __WASI_EBADMSG,
+        nix::errno::Errno::EOVERFLOW => __WASI_EOVERFLOW,
+        nix::errno::Errno::EILSEQ => __WASI_EILSEQ,
+        nix::errno::Errno::ENOTSOCK => __WASI_ENOTSOCK,
+        nix::errno::Errno::EDESTADDRREQ => __WASI_EDESTADDRREQ,
+        nix::errno::Errno::EMSGSIZE => __WASI_EMSGSIZE,
+        nix::errno::Errno::EPROTOTYPE => __WASI_EPROTOTYPE,
+        nix::errno::Errno::ENOPROTOOPT => __WASI_ENOPROTOOPT,
+        nix::errno::Errno::EPROTONOSUPPORT => __WASI_EPROTONOSUPPORT,
+        nix::errno::Errno::EAFNOSUPPORT => __WASI_EAFNOSUPPORT,
+        nix::errno::Errno::EADDRINUSE => __WASI_EADDRINUSE,
+        nix::errno::Errno::EADDRNOTAVAIL => __WASI_EADDRNOTAVAIL,
+        nix::errno::Errno::ENETDOWN => __WASI_ENETDOWN,
+        nix::errno::Errno::ENETUNREACH => __WASI_ENETUNREACH,
+        nix::errno::Errno::ENETRESET => __WASI_ENETRESET,
+        nix::errno::Errno::ECONNABORTED => __WASI_ECONNABORTED,
+        nix::errno::Errno::ECONNRESET => __WASI_ECONNRESET,
+        nix::errno::Errno::ENOBUFS => __WASI_ENOBUFS,
+        nix::errno::Errno::EISCONN => __WASI_EISCONN,
+        nix::errno::Errno::ENOTCONN => __WASI_ENOTCONN,
+        nix::errno::Errno::ETIMEDOUT => __WASI_ETIMEDOUT,
+        nix::errno::Errno::ECONNREFUSED => __WASI_ECONNREFUSED,
+        nix::errno::Errno::EHOSTUNREACH => __WASI_EHOSTUNREACH,
+        nix::errno::Errno::EALREADY => __WASI_EALREADY,
+        nix::errno::Errno::EINPROGRESS => __WASI_EINPROGRESS,
+        nix::errno::Errno::ESTALE => __WASI_ESTALE,
+        nix::errno::Errno::EDQUOT => __WASI_EDQUOT,
+        nix::errno::Errno::ECANCELED => __WASI_ECANCELED,
+        nix::errno::Errno::EOWNERDEAD => __WASI_EOWNERDEAD,
+        nix::errno::Errno::ENOTRECOVERABLE => __WASI_ENOTRECOVERABLE,
+        _ => __WASI_ENOSYS,
+    }
+}
