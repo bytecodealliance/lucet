@@ -1,8 +1,8 @@
 use crate::bindings::Bindings;
 use crate::compiler::name::Name;
 use crate::error::{LucetcError, LucetcErrorKind};
-pub use crate::new::module::Exportable;
-use crate::new::module::{ModuleInfo, DataInitializer};
+use crate::new::module::{DataInitializer, ModuleInfo};
+pub use crate::new::module::{Exportable, TableElems};
 use crate::new::runtime::{Runtime, RuntimeFunc};
 use crate::program::memory::HeapSettings;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
@@ -10,16 +10,18 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, MemoryIndex, ModuleEnvironment,
-    SignatureIndex, Table, TableIndex,
+    FuncIndex, Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex,
+    Table, TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
-use lucet_module_data::HeapSpec;
+use lucet_module_data::{Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec};
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct FunctionDecl<'a> {
     pub import_name: Option<(&'a str, &'a str)>,
     pub export_names: Vec<&'a str>,
+    pub signature_index: SignatureIndex,
     pub signature: &'a ir::Signature,
     pub name: Name,
 }
@@ -33,15 +35,18 @@ impl<'a> FunctionDecl<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct RuntimeDecl<'a> {
     pub signature: &'a ir::Signature,
     pub name: Name,
 }
 
+#[derive(Debug)]
 pub struct TableDecl<'a> {
     pub import_name: Option<(&'a str, &'a str)>,
     pub export_names: Vec<&'a str>,
     pub table: &'a Table,
+    pub elems: &'a [TableElems],
     pub contents_name: Name,
     pub len_name: Name,
 }
@@ -56,7 +61,7 @@ pub struct ModuleDecls<'a> {
 }
 
 impl<'a> ModuleDecls<'a> {
-    pub fn declare<B: ClifBackend>(
+    pub fn new<B: ClifBackend>(
         info: ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
         bindings: &Bindings,
@@ -76,6 +81,8 @@ impl<'a> ModuleDecls<'a> {
             heaps,
         })
     }
+
+    // ********************* Constructor auxillary functions ***********************
 
     fn declare_funcs<B: ClifBackend>(
         info: &ModuleInfo<'a>,
@@ -184,6 +191,8 @@ impl<'a> ModuleDecls<'a> {
         Ok(runtime_names)
     }
 
+    // ********************* Public Interface **************************
+
     pub fn target_config(&self) -> TargetFrontendConfig {
         self.info.target_config()
     }
@@ -203,10 +212,12 @@ impl<'a> ModuleDecls<'a> {
             .get(func_index)
             .ok_or_else(|| format_err!("func index out of bounds: {:?}", func_index))?;
         let exportable_sigix = self.info.functions.get(func_index).unwrap();
-        let signature = self.info.signatures.get(exportable_sigix.entity).unwrap();
+        let signature_index = exportable_sigix.entity;
+        let signature = self.info.signatures.get(signature_index).unwrap();
         let import_name = self.info.imported_funcs.get(func_index);
         Ok(FunctionDecl {
             signature,
+            signature_index,
             export_names: exportable_sigix.export_names.clone(),
             import_name: import_name.cloned(),
             name: name.clone(),
@@ -233,8 +244,10 @@ impl<'a> ModuleDecls<'a> {
             .ok_or_else(|| format_err!("table index out of bounds: {:?}", table_index))?;
         let exportable_tbl = self.info.tables.get(table_index).unwrap();
         let import_name = self.info.imported_tables.get(table_index);
+        let elems = self.info.table_elems.get(&table_index).unwrap().as_slice();
         Ok(TableDecl {
             table: &exportable_tbl.entity,
+            elems,
             export_names: exportable_tbl.export_names.clone(),
             import_name: import_name.cloned(),
             contents_name: contents_name.clone(),
@@ -271,5 +284,31 @@ impl<'a> ModuleDecls<'a> {
             .get(&mem_index)
             .map(|v| v.as_slice())
             .ok_or_else(|| format_err!("linear memory has no data initializers: {:?}", mem_index))
+    }
+
+    pub fn get_globals_spec(&self) -> Result<Vec<GlobalSpec<'a>>, LucetcError> {
+        let mut globals = Vec::new();
+        for ix in 0..self.info.globals.len() {
+            let ix = GlobalIndex::new(ix);
+            let g_decl = self.info.globals.get(ix).unwrap();
+            let g_import = self.info.imported_globals.get(ix);
+            let g_variant = if let Some((module, field)) = g_import {
+                GlobalVariant::Import { module, field }
+            } else {
+                let init_val = match g_decl.entity.initializer {
+                    // Need to fix global spec in ModuleData and the runtime to support more:
+                    GlobalInit::I32Const(i) => i as i64,
+                    GlobalInit::I64Const(i) => i,
+                    _ => Err(format_err!("global initializer {:?}", g_decl.entity)).context(
+                        LucetcErrorKind::Unsupported("non-integer global initializer".to_owned()),
+                    )?,
+                };
+                GlobalVariant::Def {
+                    def: GlobalDef::new(init_val),
+                }
+            };
+            globals.push(GlobalSpec::new(g_variant, None));
+        }
+        Ok(globals)
     }
 }

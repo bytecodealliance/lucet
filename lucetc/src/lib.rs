@@ -163,17 +163,26 @@ impl Lucetc {
     }
 
     pub fn object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
-        let (name, module, bindings) = self.build()?;
+        use new::compile;
+        use parity_wasm::elements::serialize;
+        let module_contents = serialize(self.module)?;
 
-        let prog = Program::new(module, bindings, self.heap)?;
-        let comp = compile(&prog, &name, self.opt_level)?;
+        let obj = compile(&module_contents, self.opt_level, &self.bindings, self.heap)?;
+
+        obj.write(output.as_ref()).context("writing object file")?;
+        Ok(())
+    }
+/*
+    pub fn object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
+        let prog = Program::new(self.module, self.bindings, self.heap.clone())?;
+        let comp = compile(&prog, &self.name, self.opt_level)?;
 
         let obj = comp.codegen()?;
         obj.write(output.as_ref()).context("writing object file")?;
 
         Ok(())
     }
-
+*/
     pub fn clif_ir<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
         let (name, module, bindings) = self.build()?;
 

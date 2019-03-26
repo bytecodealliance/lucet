@@ -3,11 +3,12 @@ use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment,
-    SignatureIndex, Table, TableIndex, WasmResult,
+    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
+    TableIndex, WasmResult,
 };
 use std::collections::{hash_map::Entry, HashMap};
 
+#[derive(Debug, Clone)]
 pub struct Exportable<'a, T> {
     pub entity: T,
     pub export_names: Vec<&'a str>,
@@ -25,12 +26,14 @@ impl<'a, T> Exportable<'a, T> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TableElems {
     pub base: Option<GlobalIndex>,
     pub offset: usize,
     pub elements: Box<[FuncIndex]>,
 }
 
+#[derive(Debug, Clone)]
 pub struct DataInitializer<'a> {
     pub base: Option<GlobalIndex>,
     pub offset: usize,
@@ -137,7 +140,8 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             self.imported_memories.len(),
             "import memories are declared first"
         );
-        self.data_initializers.insert(MemoryIndex::new(self.memories.len()), vec![]);
+        self.data_initializers
+            .insert(MemoryIndex::new(self.memories.len()), vec![]);
         self.memories.push(Exportable::new(memory));
         self.imported_memories.push((module, field));
     }
@@ -147,11 +151,14 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
     }
 
     fn declare_table(&mut self, table: Table) {
+        self.table_elems
+            .insert(TableIndex::new(self.tables.len()), vec![]);
         self.tables.push(Exportable::new(table));
     }
 
     fn declare_memory(&mut self, memory: Memory) {
-        self.data_initializers.insert(MemoryIndex::new(self.memories.len()), vec![]);
+        self.data_initializers
+            .insert(MemoryIndex::new(self.memories.len()), vec![]);
         self.memories.push(Exportable::new(memory));
     }
 
@@ -216,9 +223,10 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         };
         match self.table_elems.entry(table_index) {
             Entry::Occupied(mut occ) => occ.get_mut().push(table_elems),
-            Entry::Vacant(vac) => {
-                vac.insert(vec![table_elems]);
-            }
+            Entry::Vacant(_) => panic!(
+                "table elements for undeclared table {:?}: {:?}",
+                table_index, table_elems
+            ),
         }
     }
 
@@ -232,9 +240,10 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         let data_init = DataInitializer { base, offset, data };
         match self.data_initializers.entry(memory_index) {
             Entry::Occupied(mut occ) => occ.get_mut().push(data_init),
-            Entry::Vacant(vac) => {
-                vac.insert(vec![data_init]);
-            }
+            Entry::Vacant(_) => panic!(
+                "data initializer for undeclared memory {:?}: {:?}",
+                memory_index, data_init
+            ),
         }
     }
 }

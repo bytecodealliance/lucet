@@ -3,6 +3,7 @@ mod function;
 mod module;
 mod runtime;
 mod sparsedata;
+mod table;
 
 use crate::bindings::Bindings;
 use crate::compiler::{stack_probe, ObjectFile, OptLevel};
@@ -19,10 +20,11 @@ use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator};
 use decls::ModuleDecls;
-use failure::{Error, ResultExt};
+use failure::ResultExt;
 use function::FuncInfo;
 use module::ModuleInfo;
 use runtime::Runtime;
+use table::write_table_data;
 
 fn target_isa(opt_level: OptLevel) -> Box<dyn TargetIsa> {
     let mut flags_builder = settings::builder();
@@ -62,7 +64,7 @@ pub fn compile<'a>(
     );
 
     let runtime = Runtime::lucet(frontend_config);
-    let decls = ModuleDecls::declare(
+    let decls = ModuleDecls::new(
         module_info,
         &mut clif_module,
         bindings,
@@ -81,7 +83,8 @@ pub fn compile<'a>(
             .context(LucetcErrorKind::Function("FIXME".to_owned()))?;
     }
 
-    write_module_data(&mut clif_module, &decls).context(LucetcErrorKind::ModuleData)?;
+    write_module_data(&mut clif_module, &decls)?;
+    write_table_data(&mut clif_module, &decls)?;
 
     let obj = ObjectFile::new(clif_module.finish())
         .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
@@ -91,30 +94,32 @@ pub fn compile<'a>(
 fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     decls: &ModuleDecls,
-) -> Result<(), Error> {
+) -> Result<(), LucetcError> {
     use crate::new::sparsedata::OwnedSparseData;
     use byteorder::{LittleEndian, WriteBytesExt};
     use cranelift_codegen::entity::EntityRef;
     use cranelift_module::{DataContext, Linkage};
     use cranelift_wasm::MemoryIndex;
     use lucet_module_data::ModuleData;
-
     let memix = MemoryIndex::new(0);
 
     let module_data_serialized: Vec<u8> = {
-        let heap_spec = decls.get_heap(memix)?;
+        let heap_spec = decls.get_heap(memix).context(LucetcErrorKind::ModuleData)?;
 
         let compiled_data = OwnedSparseData::new(
-            decls.get_data_initializers(memix)?,
+            decls
+                .get_data_initializers(memix)
+                .context(LucetcErrorKind::ModuleData)?,
             heap_spec.clone(),
         )?;
         let sparse_data = compiled_data.sparse_data();
 
-        let globals = unimplemented!();
-        let globals_spec = globals.iter().map(|g| g.to_spec()).collect();
+        let globals_spec = decls.get_globals_spec()?;
 
         let module_data = ModuleData::new(heap_spec.clone(), sparse_data, globals_spec);
-        module_data.serialize()?
+        module_data
+            .serialize()
+            .context(LucetcErrorKind::ModuleData)?
     };
     {
         let mut serialized_len: Vec<u8> = Vec::new();
@@ -124,18 +129,24 @@ fn write_module_data<B: ClifBackend>(
         let mut data_len_ctx = DataContext::new();
         data_len_ctx.define(serialized_len.into_boxed_slice());
 
-        let data_len_decl =
-            clif_module.declare_data("lucet_module_data_len", Linkage::Export, false)?;
-        clif_module.define_data(data_len_decl, &data_len_ctx)?;
+        let data_len_decl = clif_module
+            .declare_data("lucet_module_data_len", Linkage::Export, false)
+            .context(LucetcErrorKind::ModuleData)?;
+        clif_module
+            .define_data(data_len_decl, &data_len_ctx)
+            .context(LucetcErrorKind::ModuleData)?;
     }
 
     {
         let mut module_data_ctx = DataContext::new();
         module_data_ctx.define(module_data_serialized.into_boxed_slice());
 
-        let module_data_decl =
-            clif_module.declare_data("lucet_module_data", Linkage::Export, true)?;
-        clif_module.define_data(module_data_decl, &module_data_ctx)?;
+        let module_data_decl = clif_module
+            .declare_data("lucet_module_data", Linkage::Export, true)
+            .context(LucetcErrorKind::ModuleData)?;
+        clif_module
+            .define_data(module_data_decl, &module_data_ctx)
+            .context(LucetcErrorKind::ModuleData)?;
     }
     Ok(())
 }
