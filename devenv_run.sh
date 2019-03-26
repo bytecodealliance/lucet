@@ -20,5 +20,5 @@ fi
 if [ $# -eq 0 ]; then
 	docker exec -it -w "$lucet_workdir" lucet /bin/bash
 else
-	docker exec -t -w "$lucet_workdir" lucet $@
+	docker exec -t -w "$lucet_workdir" lucet "$@"
 fi

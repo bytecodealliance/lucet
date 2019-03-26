@@ -50,7 +50,7 @@ export PATH="${LUCET_BIN_DIR}:${PATH}"
 export LD_LIBRARY_PATH="${LUCET_LIB_DIR}:${LD_LIBRARY_PATH}"
 
 if [ \$# -gt 0 ]; then
-    exec \$@
+    exec "\$@"
 fi
 EOT
 
@@ -78,7 +78,7 @@ for file in clang clang++; do
     cat > "$wrapper_file" << EOT
 #! /bin/sh
 
-exec "${WASI_BIN}/${file}" --target="$WASI_TARGET" --sysroot="$WASI_SYSROOT" \$@
+exec "${WASI_BIN}/${file}" --target="$WASI_TARGET" --sysroot="$WASI_SYSROOT" "\$@"
 EOT
     install -p -v "$wrapper_file" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-${file}"
     rm -f "$wrapper_file"
@@ -99,7 +99,7 @@ wrapper_file="$(mktemp)"
 cat > "$wrapper_file" << EOT
 #! /bin/sh
 
-exec "${LUCET_BIN_DIR}/lucetc" \$@ --bindings "${LUCET_SHARE_DIR}/lucet-wasi/bindings.json"
+exec "${LUCET_BIN_DIR}/lucetc" "\$@" --bindings "${LUCET_SHARE_DIR}/lucet-wasi/bindings.json"
 EOT
 install -p -v "$wrapper_file" "${LUCET_BIN_DIR}/lucetc-wasi"
 rm -f "$wrapper_file"
