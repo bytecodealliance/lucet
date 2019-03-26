@@ -23,5 +23,5 @@ opts="-i"
 if [ $# -eq 0 ]; then
 	docker exec $opts -w "$lucet_workdir" lucet /bin/bash
 else
-	docker exec $opts -w "$lucet_workdir" lucet $@
+	docker exec $opts -w "$lucet_workdir" lucet "$@"
 fi
