@@ -100,6 +100,7 @@ fn write_module_data<B: ClifBackend>(
     decls: &ModuleDecls,
 ) -> Result<(), LucetcError> {
     use crate::new::sparsedata::OwnedSparseData;
+    use crate::program::memory::empty_heap_spec;
     use byteorder::{LittleEndian, WriteBytesExt};
     use cranelift_codegen::entity::EntityRef;
     use cranelift_module::{DataContext, Linkage};
@@ -108,14 +109,16 @@ fn write_module_data<B: ClifBackend>(
     let memix = MemoryIndex::new(0);
 
     let module_data_serialized: Vec<u8> = {
-        let heap_spec = decls.get_heap(memix).context(LucetcErrorKind::ModuleData)?;
+        // In case the module doesnt declare a memory, provide empty heap spec and empty data
+        // initializers:
+        let empty_heap = empty_heap_spec();
+        let empty_data_initializers = vec![];
+        let heap_spec = decls.get_heap(memix).unwrap_or(&empty_heap);
+        let data_initializers = decls
+            .get_data_initializers(memix)
+            .unwrap_or(&empty_data_initializers);
 
-        let compiled_data = OwnedSparseData::new(
-            decls
-                .get_data_initializers(memix)
-                .context(LucetcErrorKind::ModuleData)?,
-            heap_spec.clone(),
-        )?;
+        let compiled_data = OwnedSparseData::new(data_initializers, heap_spec.clone())?;
         let sparse_data = compiled_data.sparse_data();
 
         let globals_spec = decls.get_globals_spec()?;
