@@ -12,7 +12,7 @@
 #include "lucet_val.h"
 #include "lucet_vmctx.h"
 
-extern const uint32_t LUCET_WASM_PAGE_SIZE;
+#define LUCET_WASM_PAGE_SIZE (64 * 1024)
 
 enum lucet_error lucet_dl_module_load(const char *path, struct lucet_dl_module **mod_out);
 
