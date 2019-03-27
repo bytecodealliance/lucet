@@ -15,17 +15,17 @@ The lucet security model can be summarized via two simplified execution scenario
 - Trusted: refers to code, processes, or inputs that are fully trusted and generally controlled by the administrator of a system that runs or embeds lucet components.
 - Untrusted: refers to code, processes, or inputs that are completely untrusted and generally supplied by a third party. For example, user-supplied WASM code is untrusted.
 
-The scenarios are modeled as simplified data flow diagrams below. [draw.io](https://draw.io) diagram source files are available [here](lucet_dfds.xml).
+The scenarios are modeled as simplified data flow diagrams below. [draw.io](https://draw.io) diagram source files are available [here](assets/lucet_dfds.xml).
 
 ### Compile/load scenario
 
-![](security_dfd_cl.png)
+![](assets/security_dfd_cl.png)
 
 In the compile/load scenario, a user provides untrusted WebAssembly code to the [lucetc](https://github.com/fastly/lucet/tree/master/lucetc) compiler. The lucetc compiler consumes this code along with trusted bindings and produces a shared object file. A trusted application (e.g. server) that embeds lucetc-runtime then loads the guest program.
 
 ### Program execution scenario
 
-![](security_dfd_pe.png)
+![](assets/security_dfd_pe.png)
 
 In the program execution scenario, an untrusted third party end-user sends data to a trusted server that has loaded a guest program (via the compile/load scenario above). The trusted server handles this data and passes it to an instance of the untrusted guest program for processing. The guest program may call into trusted server APIs to perform privileged processing, such as further communication with the end-user, untrusted network endpoints, etc. before execution terminates.
 
