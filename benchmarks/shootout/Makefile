@@ -83,7 +83,10 @@ build/lucet/module.clif: build/lucet/module.wasm $(LIBBUILTINS)
 # need to link the wasm object to the same libraries.
 build/lucet/module.so: build/lucet/module.o
 	@mkdir -p $(@D)
-	$(CC) -rdynamic -shared build/lucet/module.o -o $@
+	$(CC) -rdynamic -shared \
+		-L $(dir $(LIBBUILTINS)) \
+		-Wl,-rpath $(dir $(LIBBUILTINS)) \
+		build/lucet/module.o -lbuiltins -o $@
 
 build/lucet/%.o: %.c
 	@mkdir -p $(@D)
@@ -103,7 +106,10 @@ build/lucet/implementation.so: $(LIBBUILTINS)
 	$(CC) -rdynamic -shared \
 		-L $(dir $(LIBBUILTINS)) \
 		-Wl,-rpath $(dir $(LIBBUILTINS)) \
-		$^ -ldl -lbuiltins -o $@
+		build/lucet/wrapper.o build/lucet/hostcalls.o \
+		-L $(LUCET_ROOT)/target/release \
+		-Wl,-rpath $(LUCET_ROOT)/target/release \
+		-llucet_runtime -llucet_wasi -ldl -lbuiltins -o $@
 
 $(LUCET_ROOT)/target/release/sightglass:
 	cargo build --release -p sightglass

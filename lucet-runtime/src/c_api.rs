@@ -30,9 +30,6 @@ macro_rules! with_instance_ptr_unchecked {
 }
 
 #[no_mangle]
-pub static LUCET_WASM_PAGE_SIZE: u32 = crate::WASM_PAGE_SIZE;
-
-#[no_mangle]
 pub extern "C" fn lucet_error_name(e: c_int) -> *const c_char {
     if let Some(e) = lucet_error::from_i32(e) {
         use self::lucet_error::*;
