@@ -52,7 +52,6 @@ pub fn compile<'a>(
     });
 
     let mut func_translator = FuncTranslator::new();
-    let mut clif_context = ClifContext::new();
     let mut clif_module: ClifModule<FaerieBackend> = ClifModule::new(
         FaerieBuilder::new(
             isa,
@@ -74,13 +73,17 @@ pub fn compile<'a>(
 
     for (ref func, (code, code_offset)) in decls.function_bodies() {
         let mut func_info = FuncInfo::new(&decls);
+        let mut clif_context = ClifContext::new();
+        clif_context.func.name = func.name.as_externalname();
+        clif_context.func.signature = func.signature.clone();
+
         func_translator
             .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
-            .context(LucetcErrorKind::Function("FIXME".to_owned()))?;
+            .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
 
         clif_module
-            .define_function(func.name.into_funcid().unwrap(), &mut clif_context)
-            .context(LucetcErrorKind::Function("FIXME".to_owned()))?;
+            .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
+            .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
     }
 
     write_module_data(&mut clif_module, &decls)?;

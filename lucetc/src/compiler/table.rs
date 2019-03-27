@@ -60,7 +60,7 @@ pub fn compile_table<'p>(compiler: &mut Compiler<'p>, table: &TableDef) -> Resul
     table_ctx.define(table_data.into_inner().into_boxed_slice());
     let table_id = compiler
         .get_table(table)?
-        .into_dataid()
+        .as_dataid()
         .expect("tables are data");
     compiler.module.define_data(table_id, &table_ctx)?;
     Ok(())

@@ -123,7 +123,7 @@ impl<'p> Compiler<'p> {
         let mut ctx = DataContext::new();
         ctx.define_zeroinit(8);
         let fid = start_func
-            .into_funcid()
+            .as_funcid()
             .ok_or(format_err!("start index pointed to a non-function"))?;
         let fref = self.module.declare_func_in_data(fid, &mut ctx);
         ctx.write_function_addr(0, fref);
@@ -208,7 +208,7 @@ impl<'p> Compiler<'p> {
 
     pub fn define_data(&mut self, name: Name, data: &DataContext) -> Result<(), Error> {
         let id = name
-            .into_dataid()
+            .as_dataid()
             .ok_or(format_err!("data defined with invalid name {:?}", name))?;
         self.module.define_data(id, data)?;
         Ok(())
@@ -232,7 +232,7 @@ impl<'p> Compiler<'p> {
         for (name, func) in self.funcs.iter() {
             ctx.func = func.clone();
             let id = name
-                .into_funcid()
+                .as_funcid()
                 .ok_or(format_err!("function defined with invalid name {:?}", name,))?;
             module.define_function(id, &mut ctx).map_err(|e| match e {
                 ModuleError::Compilation(ce) => match ce {

@@ -20,10 +20,10 @@ impl Runtime {
             (
                 "lucet_vmctx_current_memory".to_owned(),
                 Signature {
-                    params: vec![
-                        AbiParam::special(target.pointer_type(), ArgumentPurpose::VMContext),
-                        AbiParam::new(types::I32), // memory index
-                    ],
+                    params: vec![AbiParam::special(
+                        target.pointer_type(),
+                        ArgumentPurpose::VMContext,
+                    )],
                     returns: vec![AbiParam::new(types::I32)],
                     call_conv: target.default_call_conv,
                 },
@@ -36,7 +36,6 @@ impl Runtime {
                 Signature {
                     params: vec![
                         AbiParam::special(target.pointer_type(), ArgumentPurpose::VMContext),
-                        AbiParam::new(types::I32), // memory index
                         AbiParam::new(types::I32), // wasm pages to grow
                     ],
                     returns: vec![AbiParam::new(types::I32)],
