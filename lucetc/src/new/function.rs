@@ -5,8 +5,8 @@ use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
-    FuncEnvironment, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex,
-    SignatureIndex, TableIndex, WasmResult,
+    FuncEnvironment, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex, SignatureIndex,
+    TableIndex, WasmResult,
 };
 use std::collections::HashMap;
 
@@ -173,7 +173,8 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         args.extend_from_slice(call_args);
         args.insert(
             0,
-            pos.func.special_param(ir::ArgumentPurpose::VMContext)
+            pos.func
+                .special_param(ir::ArgumentPurpose::VMContext)
                 .expect("vmctx available"),
         );
 
@@ -207,7 +208,8 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         args.extend_from_slice(call_args);
         args.insert(
             0,
-            pos.func.special_param(ir::ArgumentPurpose::VMContext)
+            pos.func
+                .special_param(ir::ArgumentPurpose::VMContext)
                 .expect("vmctx available"),
         );
         Ok(pos.ins().call(callee, &args))

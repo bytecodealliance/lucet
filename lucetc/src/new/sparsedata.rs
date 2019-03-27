@@ -1,6 +1,6 @@
-use failure::{Error, format_err};
-use crate::program::memory::HeapSpec;
 use crate::new::module::DataInitializer;
+use crate::program::memory::HeapSpec;
+use failure::{format_err, Error};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
@@ -9,13 +9,13 @@ pub use lucet_module_data::SparseData;
 const PAGE_SIZE: usize = 4096;
 
 fn linear_memory_range<'a>(di: &DataInitializer<'a>, start: usize, end: usize) -> &'a [u8] {
-        let offs = di.offset as usize;
-        assert!(end >= start);
-        assert!(start >= offs);
-        assert!(start < offs + di.data.len());
-        assert!(end >= offs);
-        assert!(end <= offs + di.data.len());
-        &di.data[(start - offs)..(end - offs)]
+    let offs = di.offset as usize;
+    assert!(end >= start);
+    assert!(start >= offs);
+    assert!(start < offs + di.data.len());
+    assert!(end >= offs);
+    assert!(end <= offs + di.data.len());
+    &di.data[(start - offs)..(end - offs)]
 }
 
 fn split<'a>(di: &DataInitializer<'a>) -> Vec<(usize, DataInitializer<'a>)> {
@@ -54,7 +54,9 @@ impl OwnedSparseData {
 
         for initializer in initializers {
             if initializer.base.is_some() {
-                Err(format_err!("cannot create sparse data: data initializer uses global as base"))?
+                Err(format_err!(
+                    "cannot create sparse data: data initializer uses global as base"
+                ))?
             }
             let chunks = split(initializer);
             for (pagenumber, chunk) in chunks {

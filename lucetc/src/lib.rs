@@ -172,17 +172,17 @@ impl Lucetc {
         obj.write(output.as_ref()).context("writing object file")?;
         Ok(())
     }
-/*
-    pub fn object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
-        let prog = Program::new(self.module, self.bindings, self.heap.clone())?;
-        let comp = compile(&prog, &self.name, self.opt_level)?;
+    /*
+        pub fn object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
+            let prog = Program::new(self.module, self.bindings, self.heap.clone())?;
+            let comp = compile(&prog, &self.name, self.opt_level)?;
 
-        let obj = comp.codegen()?;
-        obj.write(output.as_ref()).context("writing object file")?;
+            let obj = comp.codegen()?;
+            obj.write(output.as_ref()).context("writing object file")?;
 
-        Ok(())
-    }
-*/
+            Ok(())
+        }
+    */
     pub fn clif_ir<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
         let (name, module, bindings) = self.build()?;
 

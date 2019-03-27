@@ -4,7 +4,7 @@ use crate::new::decls::{ModuleDecls, TableDecl};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
-use cranelift_wasm::{FuncIndex, TableIndex, TableElementType};
+use cranelift_wasm::{FuncIndex, TableElementType, TableIndex};
 use failure::{format_err, ResultExt};
 use std::io::Cursor;
 
@@ -19,7 +19,7 @@ fn table_elements(decl: &TableDecl) -> Result<Vec<Elem>, LucetcError> {
         TableElementType::Func => Ok(()),
         _ => Err(format_err!("table {:?}", decl)).context(LucetcErrorKind::Unsupported(
             "table with non-function elements".to_owned(),
-        ))
+        )),
     }?;
 
     let mut elems = Vec::new();
@@ -32,7 +32,7 @@ fn table_elements(decl: &TableDecl) -> Result<Vec<Elem>, LucetcError> {
         }
         let final_len = initializer.offset + initializer.elements.len();
         if final_len > elems.len() {
-             elems.resize(final_len, Elem::Empty);
+            elems.resize(final_len, Elem::Empty);
         }
         for (ix, func_ix) in initializer.elements.iter().enumerate() {
             elems[initializer.offset + ix] = Elem::Func(*func_ix);
