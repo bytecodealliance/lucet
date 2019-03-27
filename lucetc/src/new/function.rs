@@ -105,33 +105,27 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             style: ir::HeapStyle::Static {
                 bound: heap_spec.reserved_size.into(),
             },
-            index_type: ir::types::I32,
+            index_type: ir::types::I64,
         })
     }
 
     fn make_table(&mut self, func: &mut ir::Function, index: TableIndex) -> ir::Table {
         let table_decl = self.module_decls.get_table(index).expect("valid table");
-        let base_ptr_gv = func.create_global_value(ir::GlobalValueData::Symbol {
+        let base_gv = func.create_global_value(ir::GlobalValueData::Symbol {
             name: table_decl.contents_name.into(),
             offset: 0.into(),
             colocated: true,
         });
-        let bound_ptr_gv = func.create_global_value(ir::GlobalValueData::Symbol {
+        let bound_gv = func.create_global_value(ir::GlobalValueData::Symbol {
             name: table_decl.len_name.into(),
             offset: 0.into(),
             colocated: true,
-        });
-        let bound_gv = func.create_global_value(ir::GlobalValueData::Load {
-            base: bound_ptr_gv,
-            global_type: ir::types::I64,
-            offset: 0.into(),
-            readonly: true,
         });
         let element_size = ((POINTER_SIZE * 2) as u64).into();
         let index_type = ir::types::I64;
         let min_size = (table_decl.table.minimum as u64).into();
         func.create_table(ir::TableData {
-            base_gv: base_ptr_gv,
+            base_gv,
             bound_gv,
             element_size,
             index_type,
