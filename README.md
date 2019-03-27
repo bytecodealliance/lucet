@@ -260,8 +260,4 @@ lucet-wasi hello.so
 
 ## Reporting Security Issues
 
-The Lucet maintainers are committed to providing a prompt response to security
-issues. Reporters may make a public report
-[on GitHub](https://github.com/fastly/lucet),
-or make a private report
-[via Fastly's security reporting system](https://www.fastly.com/security/report-security-issue)
+The lucet project team welcomes security reports and is committed to providing prompt attention to security issues. Security issues should be reported privately via [Fastly’s security issue reporting process](https://www.fastly.com/security/report-security-issue). Remediation of security vulnerabilities is prioritized. The project teams endeavors to coordinate remediation with third-party stakeholders, and is committed to transparency in the disclosure process.
