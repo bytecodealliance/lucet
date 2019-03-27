@@ -46,9 +46,9 @@ interface is found at `lucet-runtime/include/lucet.h`.
 ### lucet-wasi
 
 `lucet-wasi` is a crate providing runtime support for the [WebAssembly System
-Interface (WASI)](https://github.com/CraneStation/wasmtime/blob/wasi/docs/WASI-intro.md).
-It can be used as a library to support WASI in another application, or as an
-executable, to execute WASI programs compiled through `lucetc`.
+Interface (WASI)](https://wasi.dev).  It can be used as a library to support
+WASI in another application, or as an executable, to execute WASI programs
+compiled through `lucetc`.
 
 See the section below titled ["Your first lucet
 application"](https://github.com/fastly/lucet#your-first-lucet-application) for
