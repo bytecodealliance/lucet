@@ -1,4 +1,5 @@
 //! Implements ModuleEnvironment for cranelift-wasm. Code derived from cranelift-wasm/environ/dummy.rs
+use crate::compiler::entity::NATIVE_POINTER;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -100,7 +101,11 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         self.target_config
     }
 
-    fn declare_signature(&mut self, sig: ir::Signature) {
+    fn declare_signature(&mut self, mut sig: ir::Signature) {
+        sig.params.insert(
+            0,
+            ir::AbiParam::special(NATIVE_POINTER, ir::ArgumentPurpose::VMContext),
+        );
         self.signatures.push(sig);
     }
 

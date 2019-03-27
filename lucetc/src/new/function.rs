@@ -196,6 +196,23 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         })
     }
 
+    fn translate_call(
+        &mut self,
+        mut pos: FuncCursor,
+        _callee_index: FuncIndex,
+        callee: ir::FuncRef,
+        call_args: &[ir::Value],
+    ) -> WasmResult<ir::Inst> {
+        let mut args: Vec<ir::Value> = Vec::with_capacity(call_args.len() + 1);
+        args.extend_from_slice(call_args);
+        args.insert(
+            0,
+            pos.func.special_param(ir::ArgumentPurpose::VMContext)
+                .expect("vmctx available"),
+        );
+        Ok(pos.ins().call(callee, &args))
+    }
+
     fn translate_memory_grow(
         &mut self,
         mut pos: FuncCursor<'_>,
