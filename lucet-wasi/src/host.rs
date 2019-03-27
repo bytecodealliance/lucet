@@ -98,6 +98,66 @@ pub fn errno_from_nix(errno: nix::errno::Errno) -> __wasi_errno_t {
     e as __wasi_errno_t
 }
 
+pub fn nix_from_fdflags(fdflags: __wasi_fdflags_t) -> nix::fcntl::OFlag {
+    use nix::fcntl::OFlag;
+    let mut nix_flags = OFlag::empty();
+    if fdflags & (__WASI_FDFLAG_APPEND as __wasi_fdflags_t) != 0 {
+        nix_flags.insert(OFlag::O_APPEND);
+    }
+    if fdflags & (__WASI_FDFLAG_DSYNC as __wasi_fdflags_t) != 0 {
+        nix_flags.insert(OFlag::O_DSYNC);
+    }
+    if fdflags & (__WASI_FDFLAG_NONBLOCK as __wasi_fdflags_t) != 0 {
+        nix_flags.insert(OFlag::O_NONBLOCK);
+    }
+    if fdflags & (__WASI_FDFLAG_RSYNC as __wasi_fdflags_t) != 0 {
+        nix_flags.insert(OFlag::O_RSYNC);
+    }
+    if fdflags & (__WASI_FDFLAG_SYNC as __wasi_fdflags_t) != 0 {
+        nix_flags.insert(OFlag::O_SYNC);
+    }
+    nix_flags
+}
+
+pub fn fdflags_from_nix(oflags: nix::fcntl::OFlag) -> __wasi_fdflags_t {
+    use nix::fcntl::OFlag;
+    let mut fdflags = 0;
+    if oflags.contains(OFlag::O_APPEND) {
+        fdflags |= __WASI_FDFLAG_APPEND;
+    }
+    if oflags.contains(OFlag::O_DSYNC) {
+        fdflags |= __WASI_FDFLAG_DSYNC;
+    }
+    if oflags.contains(OFlag::O_NONBLOCK) {
+        fdflags |= __WASI_FDFLAG_NONBLOCK;
+    }
+    if oflags.contains(OFlag::O_RSYNC) {
+        fdflags |= __WASI_FDFLAG_RSYNC;
+    }
+    if oflags.contains(OFlag::O_SYNC) {
+        fdflags |= __WASI_FDFLAG_SYNC;
+    }
+    fdflags as __wasi_fdflags_t
+}
+
+pub fn nix_from_oflags(oflags: __wasi_oflags_t) -> nix::fcntl::OFlag {
+    use nix::fcntl::OFlag;
+    let mut nix_flags = OFlag::empty();
+    if oflags & (__WASI_O_CREAT as __wasi_oflags_t) != 0 {
+        nix_flags.insert(OFlag::O_CREAT);
+    }
+    if oflags & (__WASI_O_DIRECTORY as __wasi_oflags_t) != 0 {
+        nix_flags.insert(OFlag::O_DIRECTORY);
+    }
+    if oflags & (__WASI_O_EXCL as __wasi_oflags_t) != 0 {
+        nix_flags.insert(OFlag::O_EXCL);
+    }
+    if oflags & (__WASI_O_TRUNC as __wasi_oflags_t) != 0 {
+        nix_flags.insert(OFlag::O_TRUNC);
+    }
+    nix_flags
+}
+
 // Rights sets from wasmtime-wasi sandboxed system primitives. Transcribed because bindgen can't
 // parse the #defines.
 
@@ -123,6 +183,7 @@ pub const RIGHTS_ALL: __wasi_rights_t = (__WASI_RIGHT_FD_DATASYNC
     | __WASI_RIGHT_PATH_FILESTAT_SET_SIZE
     | __WASI_RIGHT_PATH_FILESTAT_SET_TIMES
     | __WASI_RIGHT_FD_FILESTAT_GET
+    | __WASI_RIGHT_FD_FILESTAT_SET_SIZE
     | __WASI_RIGHT_FD_FILESTAT_SET_TIMES
     | __WASI_RIGHT_PATH_SYMLINK
     | __WASI_RIGHT_PATH_UNLINK_FILE
@@ -152,8 +213,10 @@ pub const RIGHTS_DIRECTORY_BASE: __wasi_rights_t = (__WASI_RIGHT_FD_FDSTAT_SET_F
     | __WASI_RIGHT_PATH_RENAME_SOURCE
     | __WASI_RIGHT_PATH_RENAME_TARGET
     | __WASI_RIGHT_PATH_FILESTAT_GET
+    | __WASI_RIGHT_PATH_FILESTAT_SET_SIZE
     | __WASI_RIGHT_PATH_FILESTAT_SET_TIMES
     | __WASI_RIGHT_FD_FILESTAT_GET
+    | __WASI_RIGHT_FD_FILESTAT_SET_SIZE
     | __WASI_RIGHT_FD_FILESTAT_SET_TIMES
     | __WASI_RIGHT_PATH_SYMLINK
     | __WASI_RIGHT_PATH_UNLINK_FILE

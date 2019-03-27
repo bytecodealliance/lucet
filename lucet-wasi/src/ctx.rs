@@ -25,6 +25,9 @@ impl WasiCtxBuilder {
             args: vec![],
             env: HashMap::new(),
         }
+        .fd_dup(0, stdin())
+        .fd_dup(1, stdout())
+        .fd_dup(2, stderr())
     }
 
     pub fn args(mut self, args: &[&str]) -> Self {
@@ -65,12 +68,6 @@ impl WasiCtxBuilder {
             })
             .collect();
         self
-    }
-
-    pub fn inherit_stdio(self) -> Self {
-        self.fd_dup(0, stdin())
-            .fd_dup(1, stdout())
-            .fd_dup(2, stderr())
     }
 
     pub fn env(mut self, k: &str, v: &str) -> Self {
@@ -196,7 +193,6 @@ impl WasiCtx {
         WasiCtxBuilder::new()
             .args(args)
             .inherit_env()
-            .inherit_stdio()
             .build()
             .expect("default options don't fail")
     }
@@ -218,5 +214,22 @@ impl WasiCtx {
         } else {
             Err(host::__WASI_EBADF as host::__wasi_errno_t)
         }
+    }
+
+    pub fn insert_fd_entry(
+        &mut self,
+        fe: FdEntry,
+    ) -> Result<host::__wasi_fd_t, host::__wasi_errno_t> {
+        // never insert where stdio handles usually are
+        let mut fd = 3;
+        while self.fds.contains_key(&fd) {
+            if let Some(next_fd) = fd.checked_add(1) {
+                fd = next_fd;
+            } else {
+                return Err(host::__WASI_EMFILE as host::__wasi_errno_t);
+            }
+        }
+        self.fds.insert(fd, fe);
+        Ok(fd)
     }
 }

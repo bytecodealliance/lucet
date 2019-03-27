@@ -10,11 +10,14 @@
 
 #![allow(non_camel_case_types)]
 use crate::ctx::WasiCtx;
+use crate::fdentry::{determine_type_rights, FdEntry};
 use crate::memory::*;
 use crate::{host, wasm32};
 use cast::From as _0;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-use std::os::unix::prelude::OsStrExt;
+use std::ffi::{OsStr, OsString};
+use std::fs::File;
+use std::os::unix::prelude::{AsRawFd, FromRawFd, OsStrExt, OsStringExt, RawFd};
 
 #[no_mangle]
 pub extern "C" fn __wasi_proc_exit(vmctx: *mut lucet_vmctx, rval: wasm32::__wasi_exitcode_t) -> ! {
@@ -230,21 +233,21 @@ pub extern "C" fn __wasi_environ_sizes_get(
     let ctx: &WasiCtx = vmctx.get_embed_ctx();
 
     let environ_count = ctx.env.len();
-    let environ_size = ctx
-        .env
-        .iter()
-        .map(|pair| pair.as_bytes_with_nul().len())
-        .sum();
-
-    unsafe {
-        if let Err(e) = enc_usize_byref(&mut vmctx, environ_count_ptr, environ_count) {
-            return enc_errno(e);
+    if let Some(environ_size) = ctx.env.iter().try_fold(0, |acc: u32, pair| {
+        acc.checked_add(pair.as_bytes_with_nul().len() as u32)
+    }) {
+        unsafe {
+            if let Err(e) = enc_usize_byref(&mut vmctx, environ_count_ptr, environ_count) {
+                return enc_errno(e);
+            }
+            if let Err(e) = enc_usize_byref(&mut vmctx, environ_size_ptr, environ_size as usize) {
+                return enc_errno(e);
+            }
         }
-        if let Err(e) = enc_usize_byref(&mut vmctx, environ_size_ptr, environ_size) {
-            return enc_errno(e);
-        }
+        wasm32::__WASI_ESUCCESS
+    } else {
+        wasm32::__WASI_EOVERFLOW
     }
-    wasm32::__WASI_ESUCCESS
 }
 
 #[no_mangle]
@@ -255,6 +258,12 @@ pub extern "C" fn __wasi_fd_close(
     let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
     let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
     let fd = dec_fd(fd);
+    if let Some(fdent) = ctx.fds.get(&fd) {
+        // can't close preopened files
+        if fdent.preopen_path.is_some() {
+            return wasm32::__WASI_ENOTSUP;
+        }
+    }
     if let Some(fdent) = ctx.fds.remove(&fd) {
         match nix::unistd::close(fdent.fd_object.rawfd) {
             Ok(_) => wasm32::__WASI_ESUCCESS,
@@ -287,21 +296,7 @@ pub extern "C" fn __wasi_fd_fdstat_get(
         use nix::fcntl::{fcntl, OFlag, F_GETFL};
         match fcntl(fe.fd_object.rawfd, F_GETFL).map(OFlag::from_bits_truncate) {
             Ok(flags) => {
-                if flags.contains(OFlag::O_APPEND) {
-                    host_fdstat.fs_flags |= wasm32::__WASI_FDFLAG_APPEND;
-                }
-                if flags.contains(OFlag::O_DSYNC) {
-                    host_fdstat.fs_flags |= wasm32::__WASI_FDFLAG_DSYNC;
-                }
-                if flags.contains(OFlag::O_NONBLOCK) {
-                    host_fdstat.fs_flags |= wasm32::__WASI_FDFLAG_NONBLOCK;
-                }
-                if flags.contains(OFlag::O_RSYNC) {
-                    host_fdstat.fs_flags |= wasm32::__WASI_FDFLAG_RSYNC;
-                }
-                if flags.contains(OFlag::O_SYNC) {
-                    host_fdstat.fs_flags |= wasm32::__WASI_FDFLAG_SYNC;
-                }
+                host_fdstat.fs_flags = host::fdflags_from_nix(flags);
                 wasm32::__WASI_ESUCCESS
             }
             Err(e) => wasm32::errno_from_nix(e.as_errno().unwrap()),
@@ -316,6 +311,30 @@ pub extern "C" fn __wasi_fd_fdstat_get(
     }
 
     errno
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_fd_fdstat_set_flags(
+    vmctx: *mut lucet_vmctx,
+    fd: wasm32::__wasi_fd_t,
+    fdflags: wasm32::__wasi_fdflags_t,
+) -> wasm32::__wasi_errno_t {
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+
+    let host_fd = dec_fd(fd);
+    let host_fdflags = dec_fdflags(fdflags);
+    let nix_flags = host::nix_from_fdflags(host_fdflags);
+
+    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
+
+    if let Some(fe) = ctx.fds.get(&host_fd) {
+        match nix::fcntl::fcntl(fe.fd_object.rawfd, nix::fcntl::F_SETFL(nix_flags)) {
+            Ok(_) => wasm32::__WASI_ESUCCESS,
+            Err(e) => wasm32::errno_from_nix(e.as_errno().unwrap()),
+        }
+    } else {
+        wasm32::__WASI_EBADF
+    }
 }
 
 #[no_mangle]
@@ -517,6 +536,422 @@ pub extern "C" fn __wasi_fd_write(
         enc_usize_byref(&mut vmctx, nwritten, host_nwritten)
             .map(|_| wasm32::__WASI_ESUCCESS)
             .unwrap_or_else(|e| e)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_path_open(
+    vmctx: *mut lucet_vmctx,
+    dirfd: wasm32::__wasi_fd_t,
+    dirflags: wasm32::__wasi_lookupflags_t,
+    path_ptr: wasm32::uintptr_t,
+    path_len: wasm32::size_t,
+    oflags: wasm32::__wasi_oflags_t,
+    fs_rights_base: wasm32::__wasi_rights_t,
+    fs_rights_inheriting: wasm32::__wasi_rights_t,
+    fs_flags: wasm32::__wasi_fdflags_t,
+    fd_out_ptr: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    use nix::errno::Errno;
+    use nix::fcntl::{openat, AtFlags, OFlag};
+    use nix::sys::stat::{fstatat, Mode, SFlag};
+
+    let dirfd = dec_fd(dirfd);
+    let dirflags = dec_lookupflags(dirflags);
+    let oflags = dec_oflags(oflags);
+    let fs_rights_base = dec_rights(fs_rights_base);
+    let fs_rights_inheriting = dec_rights(fs_rights_inheriting);
+    let fs_flags = dec_fdflags(fs_flags);
+
+    // which open mode do we need?
+    let read = fs_rights_base
+        & ((host::__WASI_RIGHT_FD_READ | host::__WASI_RIGHT_FD_READDIR) as host::__wasi_rights_t)
+        != 0;
+    let write = fs_rights_base
+        & ((host::__WASI_RIGHT_FD_DATASYNC
+            | host::__WASI_RIGHT_FD_WRITE
+            | host::__WASI_RIGHT_FD_ALLOCATE
+            | host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE) as host::__wasi_rights_t)
+        != 0;
+
+    let mut nix_all_oflags = if read && write {
+        OFlag::O_RDWR
+    } else if read {
+        OFlag::O_RDONLY
+    } else {
+        OFlag::O_WRONLY
+    };
+
+    // on non-Capsicum systems, we always want nofollow
+    nix_all_oflags.insert(OFlag::O_NOFOLLOW);
+
+    // which rights are needed on the dirfd?
+    let mut needed_base = host::__WASI_RIGHT_PATH_OPEN as host::__wasi_rights_t;
+    let mut needed_inheriting = fs_rights_base | fs_rights_inheriting;
+
+    // convert open flags
+    let nix_oflags = host::nix_from_oflags(oflags);
+    nix_all_oflags.insert(nix_oflags);
+    if nix_all_oflags.contains(OFlag::O_CREAT) {
+        needed_base |= host::__WASI_RIGHT_PATH_CREATE_FILE as host::__wasi_rights_t;
+    }
+    if nix_all_oflags.contains(OFlag::O_TRUNC) {
+        needed_inheriting |= host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE as host::__wasi_rights_t;
+    }
+
+    // convert file descriptor flags
+    nix_all_oflags.insert(host::nix_from_fdflags(fs_flags));
+    if nix_all_oflags.contains(OFlag::O_DSYNC) {
+        needed_inheriting |= host::__WASI_RIGHT_FD_DATASYNC as host::__wasi_rights_t;
+    }
+    if nix_all_oflags.intersects(OFlag::O_RSYNC | OFlag::O_SYNC) {
+        needed_inheriting |= host::__WASI_RIGHT_FD_SYNC as host::__wasi_rights_t;
+    }
+
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+
+    let path = match unsafe { dec_slice_of::<u8>(&mut vmctx, path_ptr, path_len) } {
+        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+        Err(e) => return enc_errno(e),
+    };
+
+    let (dir, path) = match path_get(
+        &vmctx,
+        dirfd,
+        dirflags,
+        path,
+        needed_base,
+        needed_inheriting,
+        nix_oflags.contains(OFlag::O_CREAT),
+    ) {
+        Ok((dir, path)) => (dir, path),
+        Err(e) => return enc_errno(e),
+    };
+
+    let new_fd = match openat(
+        dir.as_raw_fd(),
+        path.as_os_str(),
+        nix_all_oflags,
+        Mode::from_bits_truncate(0o777),
+    ) {
+        Ok(fd) => fd,
+        Err(e) => {
+            match e.as_errno() {
+                // Linux returns ENXIO instead of EOPNOTSUPP when opening a socket
+                Some(Errno::ENXIO) => {
+                    if let Ok(stat) = fstatat(
+                        dir.as_raw_fd(),
+                        path.as_os_str(),
+                        AtFlags::AT_SYMLINK_NOFOLLOW,
+                    ) {
+                        if SFlag::from_bits_truncate(stat.st_mode).contains(SFlag::S_IFSOCK) {
+                            return wasm32::__WASI_ENOTSUP;
+                        } else {
+                            return wasm32::__WASI_ENXIO;
+                        }
+                    } else {
+                        return wasm32::__WASI_ENXIO;
+                    }
+                }
+                Some(e) => return wasm32::errno_from_nix(e),
+                None => return wasm32::__WASI_ENOSYS,
+            }
+        }
+    };
+
+    // Determine the type of the new file descriptor and which rights contradict with this type
+    let guest_fd = match unsafe { determine_type_rights(new_fd) } {
+        Err(e) => {
+            // if `close` fails, note it but do not override the underlying errno
+            nix::unistd::close(new_fd).unwrap_or_else(|e| {
+                dbg!(e);
+            });
+            return enc_errno(e);
+        }
+        Ok((_ty, max_base, max_inheriting)) => {
+            let mut fe = unsafe { FdEntry::from_raw_fd(new_fd) };
+            fe.rights_base &= max_base;
+            fe.rights_inheriting &= max_inheriting;
+            match vmctx.get_embed_ctx_mut::<WasiCtx>().insert_fd_entry(fe) {
+                Ok(fd) => fd,
+                Err(e) => return enc_errno(e),
+            }
+        }
+    };
+
+    unsafe {
+        enc_fd_byref(&mut vmctx, fd_out_ptr, guest_fd)
+            .map(|_| wasm32::__WASI_ESUCCESS)
+            .unwrap_or_else(|e| e)
+    }
+}
+
+/// Normalizes a path to ensure that the target path is located under the directory provided.
+///
+/// This is a workaround for not having Capsicum support in the OS.
+pub fn path_get<P: AsRef<OsStr>>(
+    vmctx: &Vmctx,
+    dirfd: host::__wasi_fd_t,
+    dirflags: host::__wasi_lookupflags_t,
+    path: P,
+    needed_base: host::__wasi_rights_t,
+    needed_inheriting: host::__wasi_rights_t,
+    needs_final_component: bool,
+) -> Result<(File, OsString), host::__wasi_errno_t> {
+    use nix::errno::Errno;
+    use nix::fcntl::{openat, readlinkat, OFlag};
+    use nix::sys::stat::Mode;
+
+    const MAX_SYMLINK_EXPANSIONS: usize = 128;
+
+    /// close all the intermediate file descriptors, but make sure not to drop either the original
+    /// dirfd or the one we return (which may be the same dirfd)
+    fn ret_dir_success(dir_stack: &mut Vec<RawFd>) -> File {
+        let ret_dir = unsafe {
+            File::from_raw_fd(dir_stack.pop().expect("there is always a dirfd to return"))
+        };
+        if let Some(dirfds) = dir_stack.get(1..) {
+            for dirfd in dirfds {
+                nix::unistd::close(*dirfd).unwrap_or_else(|e| {
+                    dbg!(e);
+                });
+            }
+        }
+        ret_dir
+    }
+
+    /// close all file descriptors other than the base directory, and return the errno for
+    /// convenience with `return`
+    fn ret_error(
+        dir_stack: &mut Vec<RawFd>,
+        errno: host::__wasi_errno_t,
+    ) -> Result<(File, OsString), host::__wasi_errno_t> {
+        if let Some(dirfds) = dir_stack.get(1..) {
+            for dirfd in dirfds {
+                nix::unistd::close(*dirfd).unwrap_or_else(|e| {
+                    dbg!(e);
+                });
+            }
+        }
+        Err(dbg!(errno))
+    }
+
+    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+
+    let dirfe = ctx.get_fd_entry(dirfd, needed_base, needed_inheriting)?;
+
+    // Stack of directory file descriptors. Index 0 always corresponds with the directory provided
+    // to this function. Entering a directory causes a file descriptor to be pushed, while handling
+    // ".." entries causes an entry to be popped. Index 0 cannot be popped, as this would imply
+    // escaping the base directory.
+    let mut dir_stack = vec![dirfe.fd_object.rawfd];
+
+    // Stack of paths left to process. This is initially the `path` argument to this function, but
+    // any symlinks we encounter are processed by pushing them on the stack.
+    let mut path_stack = vec![path.as_ref().to_owned().into_vec()];
+
+    // Track the number of symlinks we've expanded, so we can return `ELOOP` after too many.
+    let mut symlink_expansions = 0;
+
+    // Buffer to read links into; defined outside of the loop so we don't reallocate it constantly.
+    let mut readlink_buf = vec![0u8; libc::PATH_MAX as usize + 1];
+
+    // TODO: rewrite this using a custom posix path type, with a component iterator that respects
+    // trailing slashes. This version does way too much allocation, and is way too fiddly.
+    loop {
+        let component = if let Some(cur_path) = path_stack.pop() {
+            // eprintln!(
+            //     "cur_path = {:?}",
+            //     std::str::from_utf8(cur_path.as_slice()).unwrap()
+            // );
+            let mut split = cur_path.splitn(2, |&c| c == '/' as u8);
+            let head = split.next();
+            let tail = split.next();
+            match (head, tail) {
+                (None, _) => {
+                    // split always returns at least a singleton iterator with an empty slice
+                    panic!("unreachable");
+                }
+                // path is empty
+                (Some([]), None) => {
+                    return ret_error(&mut dir_stack, host::__WASI_ENOENT as host::__wasi_errno_t);
+                }
+                // path starts with `/`, is absolute
+                (Some([]), Some(_)) => {
+                    return ret_error(
+                        &mut dir_stack,
+                        host::__WASI_ENOTCAPABLE as host::__wasi_errno_t,
+                    );
+                }
+                // the final component of the path with no trailing slash
+                (Some(component), None) => component.to_vec(),
+                (Some(component), Some(rest)) => {
+                    if rest.iter().all(|&c| c == '/' as u8) {
+                        // the final component of the path with trailing slashes; put one trailing
+                        // slash back on
+                        let mut component = component.to_vec();
+                        component.push('/' as u8);
+                        component
+                    } else {
+                        // non-final component; push the rest back on the stack
+                        path_stack.push(rest.to_vec());
+                        component.to_vec()
+                    }
+                }
+            }
+        } else {
+            // if the path stack is ever empty, we return rather than going through the loop again
+            panic!("unreachable");
+        };
+
+        // eprintln!(
+        //     "component = {:?}",
+        //     std::str::from_utf8(component.as_slice()).unwrap()
+        // );
+
+        match component.as_slice() {
+            b"." => {
+                // skip component
+            }
+            b".." => {
+                // pop a directory
+                let dirfd = dir_stack.pop().expect("dir_stack is never empty");
+
+                // we're not allowed to pop past the original directory
+                if dir_stack.is_empty() {
+                    return ret_error(
+                        &mut dir_stack,
+                        host::__WASI_ENOTCAPABLE as host::__wasi_errno_t,
+                    );
+                } else {
+                    nix::unistd::close(dirfd).unwrap_or_else(|e| {
+                        dbg!(e);
+                    });
+                }
+            }
+            // should the component be a directory? it should if there is more path left to process, or
+            // if it has a trailing slash and `needs_final_component` is not set
+            component
+                if !path_stack.is_empty()
+                    || (component.ends_with(b"/") && !needs_final_component) =>
+            {
+                match openat(
+                    *dir_stack.first().expect("dir_stack is never empty"),
+                    component,
+                    OFlag::O_RDONLY | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW,
+                    Mode::empty(),
+                ) {
+                    Ok(new_dir) => {
+                        dir_stack.push(new_dir);
+                        continue;
+                    }
+                    Err(e)
+                        if e.as_errno() == Some(Errno::ELOOP)
+                            || e.as_errno() == Some(Errno::EMLINK) =>
+                    {
+                        // attempt symlink expansion
+                        match readlinkat(
+                            *dir_stack.last().expect("dir_stack is never empty"),
+                            component,
+                            readlink_buf.as_mut_slice(),
+                        ) {
+                            Ok(link_path) => {
+                                symlink_expansions += 1;
+                                if symlink_expansions > MAX_SYMLINK_EXPANSIONS {
+                                    return ret_error(
+                                        &mut dir_stack,
+                                        host::__WASI_ELOOP as host::__wasi_errno_t,
+                                    );
+                                }
+
+                                let mut link_path = link_path.as_bytes().to_vec();
+
+                                // append a trailing slash if the component leading to it has one, so
+                                // that we preserve any ENOTDIR that might come from trying to open a
+                                // non-directory
+                                if component.ends_with(b"/") {
+                                    link_path.push('/' as u8);
+                                }
+
+                                path_stack.push(link_path);
+                                continue;
+                            }
+                            Err(e) => {
+                                return ret_error(
+                                    &mut dir_stack,
+                                    host::errno_from_nix(e.as_errno().unwrap()),
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        return ret_error(
+                            &mut dir_stack,
+                            host::errno_from_nix(e.as_errno().unwrap()),
+                        );
+                    }
+                }
+            }
+            // the final component
+            component => {
+                // if there's a trailing slash, or if `LOOKUP_SYMLINK_FOLLOW` is set, attempt
+                // symlink expansion
+                if component.ends_with(b"/") || (dirflags & host::__WASI_LOOKUP_SYMLINK_FOLLOW) != 0
+                {
+                    match readlinkat(
+                        *dir_stack.last().expect("dir_stack is never empty"),
+                        component,
+                        readlink_buf.as_mut_slice(),
+                    ) {
+                        Ok(link_path) => {
+                            symlink_expansions += 1;
+                            if symlink_expansions > MAX_SYMLINK_EXPANSIONS {
+                                return ret_error(
+                                    &mut dir_stack,
+                                    host::__WASI_ELOOP as host::__wasi_errno_t,
+                                );
+                            }
+
+                            let mut link_path = link_path.as_bytes().to_vec();
+
+                            // append a trailing slash if the component leading to it has one, so
+                            // that we preserve any ENOTDIR that might come from trying to open a
+                            // non-directory
+                            if component.ends_with(b"/") {
+                                link_path.push('/' as u8);
+                            }
+
+                            path_stack.push(link_path);
+                            continue;
+                        }
+                        Err(e) => {
+                            let errno = e.as_errno().unwrap();
+                            if errno != Errno::EINVAL && errno != Errno::ENOENT {
+                                // only return an error if this path is not actually a symlink
+                                return ret_error(&mut dir_stack, host::errno_from_nix(errno));
+                            }
+                        }
+                    }
+                }
+
+                // not a symlink, so we're done;
+                return Ok((
+                    ret_dir_success(&mut dir_stack),
+                    OsStr::from_bytes(component).to_os_string(),
+                ));
+            }
+        }
+
+        if path_stack.is_empty() {
+            // no further components to process. means we've hit a case like "." or "a/..", or if the
+            // input path has trailing slashes and `needs_final_component` is not set
+            return Ok((
+                ret_dir_success(&mut dir_stack),
+                OsStr::new(".").to_os_string(),
+            ));
+        } else {
+            continue;
+        }
     }
 }
 

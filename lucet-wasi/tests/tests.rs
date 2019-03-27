@@ -133,3 +133,184 @@ fn preopen_populates() {
 
     assert_eq!(exitcode, 0);
 }
+
+#[test]
+fn write_file() {
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    std::fs::create_dir(&preopen_host_path).unwrap();
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["write_file"])
+        .preopened_dir(preopen_dir, "/sandbox")
+        .build()
+        .expect("can build WasiCtx");
+
+    let exitcode = run("write_file.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+
+    let output = std::fs::read(preopen_host_path.join("output.txt")).unwrap();
+
+    assert_eq!(output.as_slice(), b"hello, file!");
+
+    drop(tmpdir);
+}
+
+#[test]
+fn read_file() {
+    const MESSAGE: &'static str = "hello from file!";
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    std::fs::create_dir(&preopen_host_path).unwrap();
+
+    std::fs::write(preopen_host_path.join("input.txt"), MESSAGE).unwrap();
+
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["read_file"])
+        .preopened_dir(preopen_dir, "/sandbox");
+
+    let (exitcode, stdout) = run_with_stdout("read_file.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+
+    assert_eq!(&stdout, MESSAGE);
+
+    drop(tmpdir);
+}
+
+#[test]
+fn cant_dotdot() {
+    const MESSAGE: &'static str = "hello from file!";
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    std::fs::create_dir(&preopen_host_path).unwrap();
+
+    std::fs::write(
+        preopen_host_path.parent().unwrap().join("outside.txt"),
+        MESSAGE,
+    )
+    .unwrap();
+
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["cant_dotdot"])
+        .preopened_dir(preopen_dir, "/sandbox")
+        .build()
+        .unwrap();
+
+    let exitcode = run("cant_dotdot.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+
+    drop(tmpdir);
+}
+
+#[ignore] // needs fd_readdir
+#[test]
+fn notdir() {
+    const MESSAGE: &'static str = "hello from file!";
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    std::fs::create_dir(&preopen_host_path).unwrap();
+
+    std::fs::write(preopen_host_path.join("notadir"), MESSAGE).unwrap();
+
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["notdir"])
+        .preopened_dir(preopen_dir, "/sandbox")
+        .build()
+        .unwrap();
+
+    let exitcode = run("notdir.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+
+    drop(tmpdir);
+}
+
+#[test]
+fn follow_symlink() {
+    const MESSAGE: &'static str = "hello from file!";
+
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    let subdir1 = preopen_host_path.join("subdir1");
+    let subdir2 = preopen_host_path.join("subdir2");
+    std::fs::create_dir_all(&subdir1).unwrap();
+    std::fs::create_dir_all(&subdir2).unwrap();
+
+    std::fs::write(subdir1.join("input.txt"), MESSAGE).unwrap();
+
+    std::os::unix::fs::symlink("../subdir1/input.txt", subdir2.join("input_link.txt")).unwrap();
+
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["follow_symlink"])
+        .preopened_dir(preopen_dir, "/sandbox");
+
+    let (exitcode, stdout) = run_with_stdout("follow_symlink.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+    assert_eq!(&stdout, MESSAGE);
+
+    drop(tmpdir);
+}
+
+#[test]
+fn symlink_loop() {
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    let subdir1 = preopen_host_path.join("subdir1");
+    let subdir2 = preopen_host_path.join("subdir2");
+    std::fs::create_dir_all(&subdir1).unwrap();
+    std::fs::create_dir_all(&subdir2).unwrap();
+
+    std::os::unix::fs::symlink("../subdir1/loop1", subdir2.join("loop2")).unwrap();
+    std::os::unix::fs::symlink("../subdir2/loop2", subdir1.join("loop1")).unwrap();
+
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["symlink_loop"])
+        .preopened_dir(preopen_dir, "/sandbox")
+        .build()
+        .unwrap();
+
+    let exitcode = run("symlink_loop.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+
+    drop(tmpdir);
+}
+
+#[test]
+fn symlink_escape() {
+    const MESSAGE: &'static str = "hello from file!";
+
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    let subdir = preopen_host_path.join("subdir");
+    std::fs::create_dir_all(&subdir).unwrap();
+
+    std::fs::write(
+        preopen_host_path.parent().unwrap().join("outside.txt"),
+        MESSAGE,
+    )
+    .unwrap();
+    std::os::unix::fs::symlink("../../outside.txt", subdir.join("outside.txt")).unwrap();
+
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["symlink_escape"])
+        .preopened_dir(preopen_dir, "/sandbox")
+        .build()
+        .unwrap();
+
+    let exitcode = run("symlink_escape.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+
+    drop(tmpdir);
+}

@@ -249,6 +249,22 @@ dec_enc_scalar!(
     enc_filetype_byref
 );
 
+dec_enc_scalar!(
+    __wasi_lookupflags_t,
+    dec_lookupflags,
+    dec_lookupflags_byref,
+    enc_lookupflags,
+    enc_lookupflags_byref
+);
+
+dec_enc_scalar!(
+    __wasi_oflags_t,
+    dec_oflags,
+    dec_oflags_byref,
+    enc_oflags,
+    enc_oflags_byref
+);
+
 pub fn dec_prestat(
     prestat: wasm32::__wasi_prestat_t,
 ) -> Result<host::__wasi_prestat_t, host::__wasi_errno_t> {

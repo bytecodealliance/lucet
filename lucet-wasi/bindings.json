@@ -9,11 +9,13 @@
         "proc_exit": "__wasi_proc_exit",
         "fd_close": "__wasi_fd_close",
         "fd_fdstat_get": "__wasi_fd_fdstat_get",
+        "fd_fdstat_set_flags": "__wasi_fd_fdstat_set_flags",
         "fd_prestat_get": "__wasi_fd_prestat_get",
         "fd_prestat_dir_name": "__wasi_fd_prestat_dir_name",
         "fd_read": "__wasi_fd_read",
         "fd_seek": "__wasi_fd_seek",
         "fd_write": "__wasi_fd_write",
+        "path_open": "__wasi_path_open",
         "random_get": "__wasi_random_get"
     }
 }
