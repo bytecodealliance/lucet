@@ -224,6 +224,10 @@ impl<'a> ModuleDecls<'a> {
         })
     }
 
+    pub fn get_start_func(&self) -> Option<FuncIndex> {
+        self.info.start_func.clone()
+    }
+
     pub fn get_runtime(&self, runtime_func: RuntimeFunc) -> Result<RuntimeDecl, Error> {
         let (_, signature) = self
             .runtime

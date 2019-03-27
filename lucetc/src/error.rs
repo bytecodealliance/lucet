@@ -54,7 +54,7 @@ impl From<pwasm_validation::Error> for LucetcError {
     }
 }
 
-#[derive(Debug, Fail, PartialEq, Eq)]
+#[derive(Debug, Fail, PartialEq, Eq, Clone)]
 pub enum LucetcErrorKind {
     #[fail(display = "Translating module")]
     TranslatingModule,

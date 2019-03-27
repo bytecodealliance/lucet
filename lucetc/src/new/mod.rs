@@ -87,6 +87,7 @@ pub fn compile<'a>(
     }
 
     write_module_data(&mut clif_module, &decls)?;
+    write_startfunc_data(&mut clif_module, &decls)?;
     write_table_data(&mut clif_module, &decls)?;
 
     let obj = ObjectFile::new(clif_module.finish())
@@ -150,6 +151,37 @@ fn write_module_data<B: ClifBackend>(
         clif_module
             .define_data(module_data_decl, &module_data_ctx)
             .context(LucetcErrorKind::ModuleData)?;
+    }
+    Ok(())
+}
+
+fn write_startfunc_data<B: ClifBackend>(
+    clif_module: &mut ClifModule<B>,
+    decls: &ModuleDecls,
+) -> Result<(), LucetcError> {
+    use cranelift_module::{DataContext, Linkage};
+    use failure::format_err;
+
+    let error_kind = LucetcErrorKind::Other("start_func".to_owned());
+
+    if let Some(func_ix) = decls.get_start_func() {
+        let name = clif_module
+            .declare_data("guest_start", Linkage::Export, false)
+            .context(error_kind.clone())?;
+        let mut ctx = DataContext::new();
+        ctx.define_zeroinit(8);
+
+        let start_func = decls
+            .get_func(func_ix)
+            .expect("start func is valid func id");
+        let fid = start_func
+            .name
+            .as_funcid()
+            .ok_or(format_err!("start index pointed to a non-function"))
+            .context(error_kind.clone())?;
+        let fref = clif_module.declare_func_in_data(fid, &mut ctx);
+        ctx.write_function_addr(0, fref);
+        clif_module.define_data(name, &ctx).context(error_kind)?;
     }
     Ok(())
 }
