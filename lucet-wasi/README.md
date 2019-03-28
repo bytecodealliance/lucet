@@ -7,6 +7,13 @@ Much of this code is a direct port of the `cloudabi-utils`-based syscall emulati
 is currently suitable for demonstration purposes, but needs to be rewritten in a more Rust-native
 style to reduce the code complexity and the number of potential panics.
 
+If you have questions or suggestions, the authors of `lucet-wasi` and others in the WASI community
+can be found in [`#wasi` on Mozilla IRC](https://wiki.mozilla.org/IRC).
+
+## Examples
+
+Example WASI programs are in the [`examples`](examples) directory.
+
 ## Supported syscalls
 
 We support a subset of the [WASI
