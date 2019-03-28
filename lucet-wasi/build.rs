@@ -1,10 +1,14 @@
 use std::env;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 fn main() {
-    let wasi_sdk = env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned());
+    let wasi_sdk =
+        Path::new(&env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned())).to_path_buf();
+    let wasi_sdk_core_h = wasi_sdk.join("share/sysroot/include/wasi/core.h");
+
+    println!("cargo:rerun-if-changed={}", wasi_sdk_core_h.display());
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
@@ -16,7 +20,7 @@ fn main() {
     Command::new("sed")
         .arg("-E")
         .arg(r#"s/U?INT[0-9]+_C\(((0x)?[0-9]+)\)/\1/g"#)
-        .arg("/opt/wasi-sdk/share/sysroot/include/wasi/core.h")
+        .arg(wasi_sdk_core_h)
         .stdout(Stdio::from(core_h))
         .status()
         .unwrap();
@@ -24,8 +28,11 @@ fn main() {
     let host_builder = bindgen::Builder::default()
         .clang_arg("-nostdinc")
         .clang_arg("-D__wasi__")
-        .clang_arg(format!("-isystem={}/share/sysroot/include/", wasi_sdk))
-        .clang_arg(format!("-I{}/lib/clang/8.0.0/include/", wasi_sdk))
+        .clang_arg(format!(
+            "-isystem={}/share/sysroot/include/",
+            wasi_sdk.display()
+        ))
+        .clang_arg(format!("-I{}/lib/clang/8.0.0/include/", wasi_sdk.display()))
         .header(core_h_path.to_str().unwrap())
         .whitelist_type("__wasi_.*")
         .whitelist_var("__WASI_.*");
