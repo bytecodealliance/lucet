@@ -38,5 +38,6 @@ assets = [
     ["include/*.h", "/opt/fst-lucet-wasi/include/", "644"],
     ["README.md", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
     ["LICENSE", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
-    ["LICENSE.wasmtime-wasi", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
+    ["LICENSE.wasmtime", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
+    ["LICENSE.cloudabi-utils", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
 ]
