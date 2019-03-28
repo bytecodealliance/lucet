@@ -4,7 +4,7 @@
 
 if ! "$HOST_RUN" true ; then
     echo "Unable to run commands in the container" >&2
-    exit 1
+    return 1 2> /dev/null || exit 1
 fi
 
 install -d "$HOST_BIN_DIR"
