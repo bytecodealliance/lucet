@@ -181,6 +181,30 @@ fn read_file() {
 }
 
 #[test]
+fn read_file_twice() {
+    const MESSAGE: &'static str = "hello from file!";
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    std::fs::create_dir(&preopen_host_path).unwrap();
+
+    std::fs::write(preopen_host_path.join("input.txt"), MESSAGE).unwrap();
+
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["read_file_twice"])
+        .preopened_dir(preopen_dir, "/sandbox");
+
+    let (exitcode, stdout) = run_with_stdout("read_file_twice.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+
+    let double_message = format!("{}{}", MESSAGE, MESSAGE);
+    assert_eq!(stdout, double_message);
+
+    drop(tmpdir);
+}
+
+#[test]
 fn cant_dotdot() {
     const MESSAGE: &'static str = "hello from file!";
     let tmpdir = TempDir::new().unwrap();
@@ -313,4 +337,22 @@ fn symlink_escape() {
     assert_eq!(exitcode, 0);
 
     drop(tmpdir);
+}
+
+#[test]
+fn pseudoquine() {
+    let examples_dir = Path::new(LUCET_WASI_ROOT).join("examples");
+    let pseudoquine_c = examples_dir.join("pseudoquine.c");
+
+    let ctx = WasiCtxBuilder::new()
+        .args(&["pseudoquine"])
+        .preopened_dir(File::open(examples_dir).unwrap(), "/examples");
+
+    let (exitcode, stdout) = run_with_stdout(&pseudoquine_c, ctx).unwrap();
+
+    assert_eq!(exitcode, 0);
+
+    let expected = std::fs::read_to_string(&pseudoquine_c).unwrap();
+
+    assert_eq!(stdout, expected);
 }
