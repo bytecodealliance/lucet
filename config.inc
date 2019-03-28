@@ -1,6 +1,6 @@
 #! /bin/sh
 
-HOST_BASE_PREFIX=${HOST_BASE_PREFIX:-$(cd "$(dirname ${0})" && pwd)}
+HOST_BASE_PREFIX=${HOST_BASE_PREFIX:-$(cd "$(dirname ${BASH_SOURCE:-$0})" && pwd)}
 if [ ! -x "${HOST_BASE_PREFIX}/helpers/install.sh" ]; then
     echo "Unable to find the current script base directory" >&2
     exit 1

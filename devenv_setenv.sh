@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. $(dirname ${0})/config.inc
+. $(dirname ${BASH_SOURCE:-$0})/config.inc
 
 if ! "$HOST_RUN" true ; then
     echo "Unable to run commands in the container" >&2

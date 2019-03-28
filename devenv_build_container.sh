@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. "$(dirname ${0})/config.inc"
+. "$(dirname ${BASH_SOURCE:-$0})/config.inc"
 
 if docker image inspect lucet-dev:latest > /dev/null; then
 	if [ -z "$DEVENV_FORCE_REBUILD" ]; then

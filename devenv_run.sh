@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. "$(dirname ${0})/config.inc"
+. "$(dirname ${BASH_SOURCE:-$0})/config.inc"
 
 if ! docker ps -f name=lucet | grep -Fq lucet ; then
 	${HOST_BASE_PREFIX}/devenv_start.sh

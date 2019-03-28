@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. "$(dirname ${0})/config.inc"
+. "$(dirname ${BASH_SOURCE:-$0})/config.inc"
 
 if ! docker image inspect lucet-dev:latest > /dev/null; then
 	${HOST_BASE_PREFIX}/devenv_build_container.sh
