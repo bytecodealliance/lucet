@@ -9,6 +9,7 @@ use std::sync::Arc;
 struct Config<'a> {
     lucet_module: &'a str,
     guest_args: Vec<&'a str>,
+    entrypoint: &'a str,
 }
 
 fn main() {
@@ -18,6 +19,13 @@ fn main() {
     hostcalls::ensure_linked();
 
     let matches = app_from_crate!()
+        .arg(
+            Arg::with_name("entrypoint")
+                .long("entry-point")
+                .takes_value(true)
+                .default_value("_start")
+                .help("Entry point"),
+        )
         .arg(
             Arg::with_name("lucet_module")
                 .required(true)
@@ -30,14 +38,17 @@ fn main() {
                 .help("Arguments to the WASI `main` function"),
         )
         .get_matches();
+
     let lucet_module = matches.value_of("lucet_module").unwrap();
     let guest_args = matches
         .values_of("guest_args")
         .map(|vals| vals.collect())
         .unwrap_or(vec![]);
+    let entrypoint = matches.value_of("entrypoint").unwrap();
     let config = Config {
         lucet_module,
         guest_args,
+        entrypoint,
     };
     run(config)
 }
@@ -58,7 +69,7 @@ fn run(config: Config) {
             .build()
             .expect("instance can be created");
 
-        match inst.run(b"_start", &[]) {
+        match inst.run(config.entrypoint.as_bytes(), &[]) {
             // normal termination implies 0 exit code
             Ok(_) => 0,
             Err(lucet_runtime::Error::RuntimeTerminated(
