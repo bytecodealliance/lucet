@@ -190,6 +190,9 @@ used to manage the container.
 
 #### Setting up the environment
 
+0) The Lucet repository uses git submodules. Make sure they are checked out
+   by running `git submodule init && git submodule update`.
+
 1) Install and run the `docker` service. We do not support `podman` at this
    time. On MacOS, [Docker for
    Mac](https://docs.docker.com/docker-for-mac/install/) is an option.
