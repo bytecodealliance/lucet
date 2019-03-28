@@ -1,36 +1,68 @@
 // The entry file of your WebAssembly module.
 
 import 'allocator/arena';
+import {
+  errno, fd_write, fd_read, random_get, clock_time_get, proc_exit,
+  environ_sizes_get, environ_get, args_sizes_get, args_get, path_open,
+  oflags, rights, lookupflags, fdflags, fd, fd_renumber
+} from './wasi_unstable';
 export { memory };
 
-@external("wasi_unstable", "fd_write")
-declare function fd_write(fd: usize, iovs_ptr: usize, iovs_len: usize, written_p: usize): usize;
+export type Descriptor = fd;
 
-@external("wasi_unstable", "fd_read")
-declare function fd_read(fd: usize, iovs_ptr: usize, iovs_len: usize, read_p: usize): usize;
+export class Filesystem {
+  /**
+   * A simplified interface to open a file for read operations
+   * @param path Path
+   * @param dirfd Base directory descriptor (will be automatically set soon)
+   */
+  static openForRead(path: String, dirfd: Descriptor = 3): Descriptor | null {
+    let fd_lookup_flags = lookupflags.SYMLINK_FOLLOW;
+    let fd_oflags: oflags = 0;
+    let fd_rights = rights.FD_READ | rights.FD_SEEK |
+      rights.FD_TELL | rights.FD_FILESTAT_GET;
+    let fd_rights_inherited = fd_rights;
+    let fd_flags: fdflags = 0;
+    let path_utf8_len: usize = path.lengthUTF8 - 1;
+    let path_utf8 = path.toUTF8();
+    let fd_buf = memory.allocate(sizeof<u32>());
+    let res = path_open(dirfd as fd, fd_lookup_flags, path_utf8, path_utf8_len,
+      fd_oflags, fd_rights, fd_rights_inherited, fd_flags, fd_buf);
+    if (res != errno.SUCCESS) {
+      return null;
+    }
+    let fd = load<u32>(fd_buf);
+    memory.free(fd_buf);
 
-@external("wasi_unstable", "random_get")
-declare function random_get(buf: usize, len: usize): u16;
+    return fd as Descriptor;
+  }
 
-@external("wasi_unstable", "clock_time_get")
-declare function clock_time_get(clock_id: u32, precision: u64, time_p: usize): void;
+  /**
+  * A simplified interface to open a file for write operations
+  * @param path Path
+  * @param dirfd Base directory descriptor (will be automatically set soon)
+  */
+  static openForWrite(path: String, dirfd: Descriptor = 3): Descriptor | null {
+    let fd_lookup_flags = lookupflags.SYMLINK_FOLLOW;
+    let fd_oflags: oflags = oflags.CREAT | oflags.TRUNC;
+    let fd_rights = rights.FD_WRITE | rights.FD_SEEK |
+      rights.FD_TELL | rights.FD_FILESTAT_GET;
+    let fd_rights_inherited = fd_rights;
+    let fd_flags: fdflags = 0;
+    let path_utf8_len: usize = path.lengthUTF8 - 1;
+    let path_utf8 = path.toUTF8();
+    let fd_buf = memory.allocate(sizeof<u32>());
+    let res = path_open(dirfd as fd, fd_lookup_flags, path_utf8, path_utf8_len,
+      fd_oflags, fd_rights, fd_rights_inherited, fd_flags, fd_buf);
+    if (res != errno.SUCCESS) {
+      return null;
+    }
+    let fd = load<u32>(fd_buf);
+    memory.free(fd_buf);
 
-@external("wasi_unstable", "proc_exit")
-declare function proc_exit(status: u32): void;
-
-@external("wasi_unstable", "environ_sizes_get")
-declare function environ_sizes_get(count: u32, size: u32): u16;
-
-@external("wasi_unstable", "environ_get")
-declare function environ_get(env_ptrs_p: usize, buf_p: usize): u16;
-
-@external("wasi_unstable", "args_sizes_get")
-declare function args_sizes_get(count: u32, size: u32): u16;
-
-@external("wasi_unstable", "args_get")
-declare function args_get(env_ptrs_p: usize, buf_p: usize): u16;
-
-const __WASI_ESUCCESS: u16 = 0;
+    return fd as Descriptor;
+  }
+}
 
 export class IO {
   /**
@@ -38,7 +70,7 @@ export class IO {
    * @param fd file descriptor
    * @param data data
    */
-  static write(fd: usize, data: Array<u8>): void {
+  static write(fd: Descriptor, data: Array<u8>): void {
     let data_buf_len = data.length;
     let data_buf = memory.allocate(data_buf_len);
     let iov = memory.allocate(2 * sizeof<usize>());
@@ -56,12 +88,12 @@ export class IO {
    * @param s string
    * @param newline `true` to add a newline after the string
    */
-  static writeString(fd: usize, s: String, newline: bool = false): void {
+  static writeString(fd: Descriptor, s: String, newline: bool = false): void {
     if (newline) {
       this.writeStringLn(fd, s);
       return;
     }
-    let s_utf8_len: usize = s.lengthUTF8;
+    let s_utf8_len: usize = s.lengthUTF8 - 1;
     let s_utf8 = s.toUTF8();
     let iov = memory.allocate(2 * sizeof<usize>());
     store<u32>(iov, s_utf8);
@@ -77,8 +109,8 @@ export class IO {
    * @param fd file descriptor
    * @param s string
    */
-  static writeStringLn(fd: usize, s: String): void {
-    let s_utf8_len: usize = s.lengthUTF8;
+  static writeStringLn(fd: Descriptor, s: String): void {
+    let s_utf8_len: usize = s.lengthUTF8 - 1;
     let s_utf8 = s.toUTF8();
     let iov = memory.allocate(4 * sizeof<usize>());
     store<u32>(iov, s_utf8);
@@ -99,7 +131,7 @@ export class IO {
    * @param data existing array to push data to
    * @param chunk_size chunk size (default: 4096)
    */
-  static read(fd: usize, data: Array<u8> = [], chunk_size: usize = 4096): Array<u8> | null {
+  static read(fd: Descriptor, data: Array<u8> = [], chunk_size: usize = 4096): Array<u8> | null {
     let data_partial_len = chunk_size;
     let data_partial = memory.allocate(data_partial_len);
     let iov = memory.allocate(2 * sizeof<usize>());
@@ -128,7 +160,7 @@ export class IO {
    * @param data existing array to push data to
    * @param chunk_size chunk size (default: 4096)
    */
-  static readAll(fd: usize, data: Array<u8> = [], chunk_size: usize = 4096): Array<u8> | null {
+  static readAll(fd: Descriptor, data: Array<u8> = [], chunk_size: usize = 4096): Array<u8> | null {
     let data_partial_len = chunk_size;
     let data_partial = memory.allocate(data_partial_len);
     let iov = memory.allocate(2 * sizeof<usize>());
@@ -137,7 +169,9 @@ export class IO {
     let read_ptr = memory.allocate(sizeof<usize>());
     let read: usize = 0;
     for (; ;) {
-      fd_read(fd, iov, 1, read_ptr);
+      if (fd_read(fd, iov, 1, read_ptr) != errno.SUCCESS) {
+        break;
+      }
       read = load<usize>(read_ptr);
       if (read <= 0) {
         break;
@@ -160,12 +194,12 @@ export class IO {
    * @param fd file descriptor
    * @param chunk_size chunk size (default: 4096)
    */
-  static readString(fd: usize, chunk_size: usize = 4096): String | null {
-    let s_utf8_ = IO.readAll(0);
+  static readString(fd: Descriptor, chunk_size: usize = 4096): String | null {
+    let s_utf8_ = IO.readAll(fd);
     if (s_utf8_ === null) {
       return null;
     }
-    let s_utf8 = s_utf8_ as Array<u8>;
+    let s_utf8 = s_utf8_!;
     let s_utf8_len = s_utf8.length;
     let s_utf8_buf = memory.allocate(s_utf8_len);
     for (let i = 0; i < s_utf8_len; i++) {
@@ -223,7 +257,7 @@ export class Random {
     let ptr = buffer.data;
     while (len > 0) {
       let chunk = min(len, 256);
-      if (random_get(ptr, chunk) != __WASI_ESUCCESS) {
+      if (random_get(ptr, chunk) != errno.SUCCESS) {
         abort();
       }
       len -= chunk;
@@ -277,14 +311,14 @@ export class Environ {
     this.env = [];
     let count_and_size = memory.allocate(2 * sizeof<usize>());
     let ret = environ_sizes_get(count_and_size, count_and_size + 4);
-    if (ret != __WASI_ESUCCESS) {
+    if (ret != errno.SUCCESS) {
       abort();
     }
     let count = load<usize>(count_and_size);
     let size = load<usize>(count_and_size + sizeof<usize>());
     let env_ptrs = memory.allocate((count + 1) * sizeof<usize>());
     let buf = memory.allocate(size);
-    if (environ_get(env_ptrs, buf) != __WASI_ESUCCESS) {
+    if (environ_get(env_ptrs, buf) != errno.SUCCESS) {
       abort();
     }
     for (let i: usize = 0; i < count; i++) {
@@ -326,14 +360,14 @@ export class CommandLine {
     this.args = [];
     let count_and_size = memory.allocate(2 * sizeof<usize>());
     let ret = args_sizes_get(count_and_size, count_and_size + 4);
-    if (ret != __WASI_ESUCCESS) {
+    if (ret != errno.SUCCESS) {
       abort();
     }
     let count = load<usize>(count_and_size);
     let size = load<usize>(count_and_size + sizeof<usize>());
     let env_ptrs = memory.allocate((count + 1) * sizeof<usize>());
     let buf = memory.allocate(size);
-    if (args_get(env_ptrs, buf) != __WASI_ESUCCESS) {
+    if (args_get(env_ptrs, buf) != errno.SUCCESS) {
       abort();
     }
     for (let i: usize = 0; i < count; i++) {

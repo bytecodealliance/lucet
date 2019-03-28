@@ -11,6 +11,7 @@
     "environ_sizes_get": "__wasi_environ_sizes_get",
     "environ_get": "__wasi_environ_get",
     "args_sizes_get": "__wasi_args_sizes_get",
-    "args_get": "__wasi_args_get"
+    "args_get": "__wasi_args_get",
+    "path_open": "__wasi_path_open"
   }
 }
