@@ -16,8 +16,7 @@ use crate::{host, wasm32};
 use cast::From as _0;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use std::ffi::{OsStr, OsString};
-use std::fs::File;
-use std::os::unix::prelude::{AsRawFd, FromRawFd, OsStrExt, OsStringExt, RawFd};
+use std::os::unix::prelude::{FromRawFd, OsStrExt, OsStringExt, RawFd};
 
 #[no_mangle]
 pub extern "C" fn __wasi_proc_exit(vmctx: *mut lucet_vmctx, rval: wasm32::__wasi_exitcode_t) -> ! {
@@ -264,7 +263,8 @@ pub extern "C" fn __wasi_fd_close(
             return wasm32::__WASI_ENOTSUP;
         }
     }
-    if let Some(fdent) = ctx.fds.remove(&fd) {
+    if let Some(mut fdent) = ctx.fds.remove(&fd) {
+        fdent.fd_object.needs_close = false;
         match nix::unistd::close(fdent.fd_object.rawfd) {
             Ok(_) => wasm32::__WASI_ESUCCESS,
             Err(e) => wasm32::errno_from_nix(e.as_errno().unwrap()),
@@ -476,7 +476,7 @@ pub extern "C" fn __wasi_fd_read(
         Err(e) => return enc_errno(e),
     };
 
-    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
     let fe = match ctx.get_fd_entry(fd, host::__WASI_RIGHT_FD_READ.into(), 0) {
         Ok(fe) => fe,
         Err(e) => return enc_errno(e),
@@ -487,10 +487,18 @@ pub extern "C" fn __wasi_fd_read(
         .map(|iov| unsafe { host::ciovec_to_nix_mut(iov) })
         .collect();
 
+    let full_nread = iovs.iter().map(|iov| iov.as_slice().len()).sum();
+
     let host_nread = match readv(fe.fd_object.rawfd, &mut iovs) {
         Ok(len) => len,
         Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
     };
+
+    if host_nread < full_nread {
+        // we hit eof, so remove the fdentry from the context
+        let mut fe = ctx.fds.remove(&fd).expect("file entry is still there");
+        fe.fd_object.needs_close = false;
+    }
 
     unsafe {
         enc_usize_byref(&mut vmctx, nread, host_nread)
@@ -629,7 +637,7 @@ pub extern "C" fn __wasi_path_open(
     };
 
     let new_fd = match openat(
-        dir.as_raw_fd(),
+        dir,
         path.as_os_str(),
         nix_all_oflags,
         Mode::from_bits_truncate(0o777),
@@ -639,11 +647,7 @@ pub extern "C" fn __wasi_path_open(
             match e.as_errno() {
                 // Linux returns ENXIO instead of EOPNOTSUPP when opening a socket
                 Some(Errno::ENXIO) => {
-                    if let Ok(stat) = fstatat(
-                        dir.as_raw_fd(),
-                        path.as_os_str(),
-                        AtFlags::AT_SYMLINK_NOFOLLOW,
-                    ) {
+                    if let Ok(stat) = fstatat(dir, path.as_os_str(), AtFlags::AT_SYMLINK_NOFOLLOW) {
                         if SFlag::from_bits_truncate(stat.st_mode).contains(SFlag::S_IFSOCK) {
                             return wasm32::__WASI_ENOTSUP;
                         } else {
@@ -697,7 +701,7 @@ pub fn path_get<P: AsRef<OsStr>>(
     needed_base: host::__wasi_rights_t,
     needed_inheriting: host::__wasi_rights_t,
     needs_final_component: bool,
-) -> Result<(File, OsString), host::__wasi_errno_t> {
+) -> Result<(RawFd, OsString), host::__wasi_errno_t> {
     use nix::errno::Errno;
     use nix::fcntl::{openat, readlinkat, OFlag};
     use nix::sys::stat::Mode;
@@ -706,10 +710,8 @@ pub fn path_get<P: AsRef<OsStr>>(
 
     /// close all the intermediate file descriptors, but make sure not to drop either the original
     /// dirfd or the one we return (which may be the same dirfd)
-    fn ret_dir_success(dir_stack: &mut Vec<RawFd>) -> File {
-        let ret_dir = unsafe {
-            File::from_raw_fd(dir_stack.pop().expect("there is always a dirfd to return"))
-        };
+    fn ret_dir_success(dir_stack: &mut Vec<RawFd>) -> RawFd {
+        let ret_dir = dir_stack.pop().expect("there is always a dirfd to return");
         if let Some(dirfds) = dir_stack.get(1..) {
             for dirfd in dirfds {
                 nix::unistd::close(*dirfd).unwrap_or_else(|e| {
@@ -725,7 +727,7 @@ pub fn path_get<P: AsRef<OsStr>>(
     fn ret_error(
         dir_stack: &mut Vec<RawFd>,
         errno: host::__wasi_errno_t,
-    ) -> Result<(File, OsString), host::__wasi_errno_t> {
+    ) -> Result<(RawFd, OsString), host::__wasi_errno_t> {
         if let Some(dirfds) = dir_stack.get(1..) {
             for dirfd in dirfds {
                 nix::unistd::close(*dirfd).unwrap_or_else(|e| {
@@ -733,7 +735,7 @@ pub fn path_get<P: AsRef<OsStr>>(
                 });
             }
         }
-        Err(dbg!(errno))
+        Err(errno)
     }
 
     let ctx: &WasiCtx = vmctx.get_embed_ctx();

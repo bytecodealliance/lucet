@@ -37,6 +37,7 @@ impl FromRawFd for FdEntry {
             fd_object: FdObject {
                 ty: ty as u8,
                 rawfd,
+                needs_close: true,
             },
             rights_base,
             rights_inheriting,
@@ -129,11 +130,14 @@ pub unsafe fn determine_type_rights(
 pub struct FdObject {
     pub ty: host::__wasi_filetype_t,
     pub rawfd: RawFd,
+    pub needs_close: bool,
     // TODO: directories
 }
 
 impl Drop for FdObject {
     fn drop(&mut self) {
-        nix::unistd::close(self.rawfd).unwrap_or_else(|e| eprintln!("FdObject::drop(): {}", e));
+        if self.needs_close {
+            nix::unistd::close(self.rawfd).unwrap_or_else(|e| eprintln!("FdObject::drop(): {}", e));
+        }
     }
 }

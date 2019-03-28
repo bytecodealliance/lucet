@@ -137,9 +137,6 @@ impl WasiCtxBuilder {
         // startup code starts looking at fd 3 for preopens
         let mut preopen_fd = 3;
         for (guest_path, dir) in self.preopens {
-            if !guest_path.is_absolute() {
-                bail!("preopened paths must be absolute");
-            }
             if !dir.metadata()?.is_dir() {
                 bail!("preopened file is not a directory");
             }

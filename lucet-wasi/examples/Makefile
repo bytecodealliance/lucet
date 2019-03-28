@@ -22,6 +22,20 @@ build/hello.wasm: hello.c
 build/hello.wat: build/hello.wasm
 	wasm2wat -f $< > $@
 
+.PHONY: run-pseudoquine
+run-pseudoquine: build/pseudoquine.so
+	cargo run -p lucet-wasi -- ./build/pseudoquine.so --dir "$(CURDIR):/examples"
+
+build/pseudoquine.so: build/pseudoquine.wasm ../bindings.json
+	cargo run -p lucetc -- $< --bindings ../bindings.json -o $@
+
+build/pseudoquine.wasm: pseudoquine.c
+	mkdir -p build
+	$(WASI_CC) $< -o $@
+
+build/pseudoquine.wat: build/pseudoquine.wasm
+	wasm2wat -f $< > $@
+
 .PHONY: run-kgt
 run-kgt: build/kgt.so
 	cargo run -p lucet-wasi -- ./build/kgt.so -- -l bnf -e rrutf8 < build/kgt/examples/expr.bnf
