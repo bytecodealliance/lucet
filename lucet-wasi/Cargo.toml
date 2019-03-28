@@ -8,6 +8,7 @@ license = "Apache-2.0 WITH LLVM-exception"
 [dependencies]
 cast = "0.2"
 clap = "2.23"
+failure = "0.1"
 libc = "0.2"
 lucet-runtime = { path = "../lucet-runtime" }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals" }
@@ -15,7 +16,6 @@ nix = "0.13"
 rand = "0.6"
 
 [dev-dependencies]
-failure = "0.1"
 lucetc = { path = "../lucetc" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 tempfile = "3.0"

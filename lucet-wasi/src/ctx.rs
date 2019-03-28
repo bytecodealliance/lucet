@@ -1,13 +1,17 @@
 use crate::fdentry::FdEntry;
 use crate::host;
+use failure::{bail, format_err, Error};
 use nix::unistd::dup;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
+use std::fs::File;
 use std::io::{stderr, stdin, stdout};
 use std::os::unix::prelude::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::path::{Path, PathBuf};
 
 pub struct WasiCtxBuilder {
     fds: HashMap<host::__wasi_fd_t, FdEntry>,
+    preopens: HashMap<PathBuf, File>,
     args: Vec<CString>,
     env: HashMap<CString, CString>,
 }
@@ -17,9 +21,13 @@ impl WasiCtxBuilder {
     pub fn new() -> Self {
         WasiCtxBuilder {
             fds: HashMap::new(),
+            preopens: HashMap::new(),
             args: vec![],
             env: HashMap::new(),
         }
+        .fd_dup(0, stdin())
+        .fd_dup(1, stdout())
+        .fd_dup(2, stderr())
     }
 
     pub fn args(mut self, args: &[&str]) -> Self {
@@ -60,12 +68,6 @@ impl WasiCtxBuilder {
             })
             .collect();
         self
-    }
-
-    pub fn inherit_stdio(self) -> Self {
-        self.fd_dup(0, stdin())
-            .fd_dup(1, stdout())
-            .fd_dup(2, stderr())
     }
 
     pub fn env(mut self, k: &str, v: &str) -> Self {
@@ -126,7 +128,32 @@ impl WasiCtxBuilder {
         self.raw_fd(wasm_fd, dup(fd).unwrap())
     }
 
-    pub fn build(self) -> WasiCtx {
+    pub fn preopened_dir<P: AsRef<Path>>(mut self, dir: File, guest_path: P) -> Self {
+        self.preopens.insert(guest_path.as_ref().to_owned(), dir);
+        self
+    }
+
+    pub fn build(mut self) -> Result<WasiCtx, Error> {
+        // startup code starts looking at fd 3 for preopens
+        let mut preopen_fd = 3;
+        for (guest_path, dir) in self.preopens {
+            if !guest_path.is_absolute() {
+                bail!("preopened paths must be absolute");
+            }
+            if !dir.metadata()?.is_dir() {
+                bail!("preopened file is not a directory");
+            }
+            while self.fds.contains_key(&preopen_fd) {
+                preopen_fd = preopen_fd
+                    .checked_add(1)
+                    .ok_or(format_err!("not enough file handles"))?;
+            }
+            let mut fe = FdEntry::from_file(dir);
+            fe.preopen_path = Some(guest_path);
+            self.fds.insert(preopen_fd, fe);
+            preopen_fd += 1;
+        }
+
         let env = self
             .env
             .into_iter()
@@ -139,11 +166,11 @@ impl WasiCtxBuilder {
             })
             .collect();
 
-        WasiCtx {
+        Ok(WasiCtx {
             fds: self.fds,
             args: self.args,
             env,
-        }
+        })
     }
 }
 
@@ -166,8 +193,8 @@ impl WasiCtx {
         WasiCtxBuilder::new()
             .args(args)
             .inherit_env()
-            .inherit_stdio()
             .build()
+            .expect("default options don't fail")
     }
 
     pub fn get_fd_entry(
@@ -187,5 +214,22 @@ impl WasiCtx {
         } else {
             Err(host::__WASI_EBADF as host::__wasi_errno_t)
         }
+    }
+
+    pub fn insert_fd_entry(
+        &mut self,
+        fe: FdEntry,
+    ) -> Result<host::__wasi_fd_t, host::__wasi_errno_t> {
+        // never insert where stdio handles usually are
+        let mut fd = 3;
+        while self.fds.contains_key(&fd) {
+            if let Some(next_fd) = fd.checked_add(1) {
+                fd = next_fd;
+            } else {
+                return Err(host::__WASI_EMFILE as host::__wasi_errno_t);
+            }
+        }
+        self.fds.insert(fd, fe);
+        Ok(fd)
     }
 }

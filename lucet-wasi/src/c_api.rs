@@ -47,18 +47,6 @@ pub unsafe extern "C" fn lucet_wasi_ctx_inherit_env(
     lucet_error::Ok
 }
 
-
-#[no_mangle]
-pub unsafe extern "C" fn lucet_wasi_ctx_inherit_stdio(
-    wasi_ctx: *mut lucet_wasi_ctx,
-) -> lucet_error {
-    assert_nonnull!(wasi_ctx);
-    let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
-    *b = b.inherit_stdio();
-    Box::into_raw(b);
-    lucet_error::Ok
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn lucet_wasi_ctx_destroy(wasi_ctx: *mut lucet_wasi_ctx) {
     Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);

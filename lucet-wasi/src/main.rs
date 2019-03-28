@@ -54,6 +54,7 @@ fn main() {
 }
 
 fn run(config: Config) {
+    lucet_wasi::hostcalls::ensure_linked();
     let exitcode = {
         // doing all of this in a block makes sure everything gets dropped before exiting
         let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
