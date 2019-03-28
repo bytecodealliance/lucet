@@ -1,10 +1,13 @@
 # Lucet &emsp; [![Build Status]][travis]
 
-[Build Status]: https://api.travis-ci.org/fastly/lucet.svg?branch=master
-[travis]: https://github.com/fastly/lucet
+[Build Status]: https://travis-ci.org/fastly/lucet.svg?branch=master
+[travis]: https://travis-ci.org/fastly/lucet
 
 **Lucet is a native WebAssembly compiler and runtime. It is designed to safely
 execute untrusted WebAssembly programs inside your application.**
+
+Check out our [announcement post on the Fastly
+blog](https://www.fastly.com/blog/announcing-lucet-fastly-native-webassembly-compiler-runtime).
 
 Lucet uses, and is developed in collaboration with, Mozilla's
 [Cranelift](http://github.com/cranestation/cranelift) code generator.
