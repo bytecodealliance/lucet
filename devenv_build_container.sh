@@ -2,6 +2,8 @@
 
 . "$(dirname ${BASH_SOURCE:-$0})/config.inc"
 
+git submodule update --init 2>/dev/null ||:
+
 if docker image inspect lucet-dev:latest > /dev/null; then
 	if [ -z "$DEVENV_FORCE_REBUILD" ]; then
 		echo "A lucet-dev image is already present"
