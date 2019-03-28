@@ -3,6 +3,8 @@
 
 include!(concat!(env!("OUT_DIR"), "/wasi_host.rs"));
 
+pub use crate::wasm32::*;
+
 pub type void = ::std::os::raw::c_void;
 
 pub unsafe fn ciovec_to_nix<'a>(ciovec: &'a __wasi_ciovec_t) -> nix::sys::uio::IoVec<&'a [u8]> {
