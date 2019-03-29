@@ -4,6 +4,7 @@ extern crate clap;
 use clap::Arg;
 use human_size::{Byte, Size};
 use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, Region};
+use lucet_runtime_internals::module::ModuleInternal;
 use lucet_wasi::{hostcalls, WasiCtxBuilder};
 use std::fs::File;
 use std::sync::Arc;
@@ -62,7 +63,7 @@ fn main() {
             Arg::with_name("heap_memory_size")
                 .long("max-heap-size")
                 .takes_value(true)
-                .default_value("1024 KiB")
+                .default_value("4 GiB")
                 .help("Maximum heap size (must be a multiple of 4 KiB)"),
         )
         .arg(
@@ -76,15 +77,8 @@ fn main() {
             Arg::with_name("stack_size")
                 .long("stack-size")
                 .takes_value(true)
-                .default_value("128 KiB")
+                .default_value("8 MiB")
                 .help("Maximum stack size (must be a multiple of 4 KiB)"),
-        )
-        .arg(
-            Arg::with_name("globals_size")
-                .long("globals-size")
-                .takes_value(true)
-                .default_value("4 KiB")
-                .help("Maximum globals size (must be a multiple of 4 KiB)"),
         )
         .arg(
             Arg::with_name("guest_args")
@@ -136,16 +130,12 @@ fn main() {
         .unwrap_or_else(|e| e.exit())
         .into::<Byte>()
         .value() as usize;
-    let globals_size = value_t!(matches, "globals_size", Size)
-        .unwrap_or_else(|e| e.exit())
-        .into::<Byte>()
-        .value() as usize;
 
     let limits = Limits {
         heap_memory_size,
         heap_address_space_size,
         stack_size,
-        globals_size,
+        globals_size: 0, // calculated from module
     };
 
     let guest_args = matches
@@ -168,8 +158,18 @@ fn run(config: Config) {
     lucet_wasi::hostcalls::ensure_linked();
     let exitcode = {
         // doing all of this in a block makes sure everything gets dropped before exiting
-        let region = MmapRegion::create(1, &config.limits).expect("region can be created");
         let module = DlModule::load(&config.lucet_module).expect("module can be loaded");
+        let min_globals_size = module.globals().len() * std::mem::size_of::<u64>();
+        let globals_size = ((min_globals_size + 4096 - 1) / 4096) * 4096;
+
+        let region = MmapRegion::create(
+            1,
+            &Limits {
+                globals_size,
+                ..config.limits
+            },
+        )
+        .expect("region can be created");
 
         // put the path to the module on the front for argv[0]
         let args = std::iter::once(config.lucet_module)
