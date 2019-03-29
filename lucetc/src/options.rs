@@ -124,6 +124,7 @@ impl Options {
             .arg(
                 Arg::with_name("output")
                     .short("o")
+                    .long("output")
                     .takes_value(true)
                     .multiple(false)
                     .help("output destination, defaults to a.out if unspecified"),
@@ -133,6 +134,7 @@ impl Options {
                     .long("--bindings")
                     .takes_value(true)
                     .multiple(true)
+                    .number_of_values(1)
                     .help("path to bindings json file"),
             )
             .arg(
