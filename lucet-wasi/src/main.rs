@@ -70,12 +70,7 @@ fn main() {
                 .long("heap-address-space")
                 .takes_value(true)
                 .default_value("8 GiB")
-                .help("Maximum heap address space size (must be a multiple of 4 KiB)")
-                .long_help(
-                    "Maximum heap address space size. Must be a multiple of 4KiB, and \
-                     must be least as large as `max-heap-size`, `stack-size`, and \
-                     `globals-size`, combined.",
-                ),
+                .help("Maximum heap address space size (must be a multiple of 4 KiB, and >= `max-heap-size`)"),
         )
         .arg(
             Arg::with_name("stack_size")
@@ -130,6 +125,13 @@ fn main() {
         .unwrap_or_else(|e| e.exit())
         .into::<Byte>()
         .value() as usize;
+
+    if heap_memory_size > heap_address_space_size {
+        println!("`heap-address-space` must be at least as large as `max-heap-size`");
+        println!("{}", matches.usage());
+        std::process::exit(1);
+    }
+
     let stack_size = value_t!(matches, "stack_size", Size)
         .unwrap_or_else(|e| e.exit())
         .into::<Byte>()

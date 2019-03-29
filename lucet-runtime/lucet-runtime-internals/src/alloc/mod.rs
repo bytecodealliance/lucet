@@ -388,6 +388,11 @@ impl Limits {
                 "address space size must be a multiple of host page size",
             ));
         }
+        if self.heap_memory_size > self.heap_address_space_size {
+            return Err(Error::InvalidArgument(
+                "address space size must be at least as large as memory size",
+            ));
+        }
         if self.stack_size % host_page_size() != 0 {
             return Err(Error::InvalidArgument(
                 "stack size must be a multiple of host page size",

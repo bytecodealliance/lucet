@@ -256,6 +256,19 @@ macro_rules! alloc_tests {
             assert!(res.is_err(), "new_instance fails");
         }
 
+        /// This test shows that we reject limits with a larger memory size than address space size
+        #[test]
+        fn reject_undersized_address_space() {
+        const LIMITS: Limits = Limits {
+            heap_memory_size: LIMITS_HEAP_ADDRSPACE_SIZE + 4096,
+            heap_address_space_size: LIMITS_HEAP_ADDRSPACE_SIZE,
+            stack_size: LIMITS_STACK_SIZE,
+            globals_size: LIMITS_GLOBALS_SIZE,
+        };
+            let res = TestRegion::create(10, &LIMITS);
+            assert!(res.is_err(), "region creation fails");
+        }
+
         const SMALL_GUARD_HEAP: HeapSpec = HeapSpec {
             reserved_size: SPEC_HEAP_RESERVED_SIZE,
             guard_size: SPEC_HEAP_GUARD_SIZE - 1,
