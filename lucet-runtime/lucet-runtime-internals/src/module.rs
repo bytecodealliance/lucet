@@ -164,6 +164,13 @@ pub trait ModuleInternal: Send + Sync {
             bail_limits_exceeded!("heap spec initial size: {:?}", heap);
         }
 
+        if heap.initial_size > heap.reserved_size {
+            return Err(lucet_incorrect_module!(
+                "initial heap size greater than reserved size: {:?}",
+                heap
+            ));
+        }
+
         if self.globals().len() * std::mem::size_of::<u64>() > limits.globals_size {
             bail_limits_exceeded!("globals exceed limits");
         }

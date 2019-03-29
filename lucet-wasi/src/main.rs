@@ -2,6 +2,7 @@
 extern crate clap;
 
 use clap::Arg;
+use human_size::{Byte, Size};
 use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::{hostcalls, WasiCtxBuilder};
 use std::fs::File;
@@ -12,6 +13,7 @@ struct Config<'a> {
     guest_args: Vec<&'a str>,
     entrypoint: &'a str,
     preopen_dirs: Vec<(File, &'a str)>,
+    limits: Limits,
 }
 
 fn main() {
@@ -41,10 +43,10 @@ fn main() {
                      virtual filesystem. Each directory is specified as \
                      --dir `host_path:guest_path`, where `guest_path` specifies the path that will \
                      correspond to `host_path` for calls like `fopen` in the guest.\
-                     \
+                     \n\n\
                      For example, `--dir /home/host_user/wasi_sandbox:/sandbox` will make \
                      `/home/host_user/wasi_sandbox` available within the guest as `/sandbox`.\
-                     \
+                     \n\n\
                      Guests will be able to access any files and directories under the \
                      `host_path`, but will be unable to access other parts of the host \
                      filesystem through relative paths (e.g., `/sandbox/../some_other_file`) \
@@ -57,6 +59,39 @@ fn main() {
                 .help("Path to the `lucetc`-compiled WASI module"),
         )
         .arg(
+            Arg::with_name("heap_memory_size")
+                .long("max-heap-size")
+                .takes_value(true)
+                .default_value("1024 KiB")
+                .help("Maximum heap size (must be a multiple of 4 KiB)"),
+        )
+        .arg(
+            Arg::with_name("heap_address_space_size")
+                .long("heap-address-space")
+                .takes_value(true)
+                .default_value("8 GiB")
+                .help("Maximum heap address space size (must be a multiple of 4 KiB)")
+                .long_help(
+                    "Maximum heap address space size. Must be a multiple of 4KiB, and \
+                     must be least as large as `max-heap-size`, `stack-size`, and \
+                     `globals-size`, combined.",
+                ),
+        )
+        .arg(
+            Arg::with_name("stack_size")
+                .long("stack-size")
+                .takes_value(true)
+                .default_value("128 KiB")
+                .help("Maximum stack size (must be a multiple of 4 KiB)"),
+        )
+        .arg(
+            Arg::with_name("globals_size")
+                .long("globals-size")
+                .takes_value(true)
+                .default_value("4 KiB")
+                .help("Maximum globals size (must be a multiple of 4 KiB)"),
+        )
+        .arg(
             Arg::with_name("guest_args")
                 .required(false)
                 .multiple(true)
@@ -65,7 +100,9 @@ fn main() {
         .get_matches();
 
     let entrypoint = matches.value_of("entrypoint").unwrap();
+
     let lucet_module = matches.value_of("lucet_module").unwrap();
+
     let preopen_dirs = matches
         .values_of("preopen_dirs")
         .map(|vals| {
@@ -84,16 +121,44 @@ fn main() {
             .collect()
         })
         .unwrap_or(vec![]);
+
+    let heap_memory_size = value_t!(matches, "heap_memory_size", Size)
+        .unwrap_or_else(|e| e.exit())
+        .into::<Byte>()
+        .value() as usize;
+    let heap_address_space_size = value_t!(matches, "heap_address_space_size", Size)
+        .unwrap_or_else(|e| e.exit())
+        .into::<Byte>()
+        .value() as usize;
+    let stack_size = value_t!(matches, "stack_size", Size)
+        .unwrap_or_else(|e| e.exit())
+        .into::<Byte>()
+        .value() as usize;
+    let globals_size = value_t!(matches, "globals_size", Size)
+        .unwrap_or_else(|e| e.exit())
+        .into::<Byte>()
+        .value() as usize;
+
+    let limits = Limits {
+        heap_memory_size,
+        heap_address_space_size,
+        stack_size,
+        globals_size,
+    };
+
     let guest_args = matches
         .values_of("guest_args")
         .map(|vals| vals.collect())
         .unwrap_or(vec![]);
+
     let config = Config {
         lucet_module,
         guest_args,
         entrypoint,
         preopen_dirs,
+        limits,
     };
+
     run(config)
 }
 
@@ -101,7 +166,7 @@ fn run(config: Config) {
     lucet_wasi::hostcalls::ensure_linked();
     let exitcode = {
         // doing all of this in a block makes sure everything gets dropped before exiting
-        let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+        let region = MmapRegion::create(1, &config.limits).expect("region can be created");
         let module = DlModule::load(&config.lucet_module).expect("module can be loaded");
 
         // put the path to the module on the front for argv[0]
