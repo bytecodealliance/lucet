@@ -118,13 +118,15 @@ impl Program {
         self.runtime.get_symbol(name)
     }
 
-    pub fn heap_spec(&self) -> HeapSpec {
+    pub fn heap_spec(&self) -> Result<HeapSpec, LucetcError> {
         if let Some(ref mem_spec) = self.import_memory {
-            create_heap_spec(mem_spec, &self.heap_settings)
+            Ok(create_heap_spec(mem_spec, &self.heap_settings)
+                .context(LucetcErrorKind::MemorySpecs)?)
         } else if let Some(ref mem_spec) = self.defined_memory {
-            create_heap_spec(mem_spec, &self.heap_settings)
+            Ok(create_heap_spec(mem_spec, &self.heap_settings)
+                .context(LucetcErrorKind::MemorySpecs)?)
         } else {
-            empty_heap_spec()
+            Ok(empty_heap_spec())
         }
     }
 

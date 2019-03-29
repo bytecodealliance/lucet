@@ -7,10 +7,10 @@ use lucet_module_data::ModuleData;
 
 pub fn compile_module_data(compiler: &mut Compiler) -> Result<(), Error> {
     let module_data_serialized: Vec<u8> = {
-        let heap_spec = compiler.prog.heap_spec();
+        let heap_spec = compiler.prog.heap_spec()?;
         let compiled_data = OwnedSparseData::new(
             &compiler.prog.data_initializers()?,
-            compiler.prog.heap_spec(),
+            compiler.prog.heap_spec()?,
         );
         let sparse_data = compiled_data.sparse_data();
 

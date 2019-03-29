@@ -5,7 +5,7 @@ use cranelift_module::{DataContext, Linkage};
 use failure::Error;
 
 pub fn compile_memory_specs(compiler: &mut Compiler) -> Result<(), Error> {
-    let heap = compiler.prog.heap_spec();
+    let heap = compiler.prog.heap_spec()?;
 
     let mut heap_spec_ctx = DataContext::new();
     heap_spec_ctx.define(serialize_spec(&heap).into_boxed_slice());

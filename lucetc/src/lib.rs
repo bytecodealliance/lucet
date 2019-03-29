@@ -87,12 +87,20 @@ impl Lucetc {
         Ok(())
     }
 
-    pub fn reserved_size(mut self, reserved_size: u64) -> Self {
-        self.with_reserved_size(reserved_size);
+    pub fn min_reserved_size(mut self, min_reserved_size: u64) -> Self {
+        self.with_min_reserved_size(min_reserved_size);
         self
     }
-    pub fn with_reserved_size(&mut self, reserved_size: u64) {
-        self.heap.reserved_size = reserved_size;
+    pub fn with_min_reserved_size(&mut self, min_reserved_size: u64) {
+        self.heap.min_reserved_size = min_reserved_size;
+    }
+
+    pub fn max_reserved_size(mut self, max_reserved_size: u64) -> Self {
+        self.with_max_reserved_size(max_reserved_size);
+        self
+    }
+    pub fn with_max_reserved_size(&mut self, max_reserved_size: u64) {
+        self.heap.max_reserved_size = max_reserved_size;
     }
 
     pub fn guard_size(mut self, guard_size: u64) -> Self {

@@ -36,7 +36,8 @@ pub struct Options {
     pub codegen: CodegenOutput,
     pub binding_files: Vec<PathBuf>,
     pub builtins_path: Option<PathBuf>,
-    pub reserved_size: Option<u64>,
+    pub min_reserved_size: Option<u64>,
+    pub max_reserved_size: Option<u64>,
     pub guard_size: Option<u64>,
     pub opt_level: OptLevel,
 }
@@ -67,8 +68,14 @@ impl Options {
 
         let builtins_path = m.value_of("builtins").map(PathBuf::from);
 
-        let reserved_size = if let Some(reserved_str) = m.value_of("reserved_size") {
-            Some(parse_humansized(reserved_str)?)
+        let min_reserved_size = if let Some(min_reserved_str) = m.value_of("min_reserved_size") {
+            Some(parse_humansized(min_reserved_str)?)
+        } else {
+            None
+        };
+
+        let max_reserved_size = if let Some(max_reserved_str) = m.value_of("max_reserved_size") {
+            Some(parse_humansized(max_reserved_str)?)
         } else {
             None
         };
@@ -93,7 +100,8 @@ impl Options {
             codegen,
             binding_files,
             builtins_path,
-            reserved_size,
+            min_reserved_size,
+            max_reserved_size,
             guard_size,
             opt_level,
         })
@@ -128,14 +136,21 @@ impl Options {
                     .help("path to bindings json file"),
             )
             .arg(
-                Arg::with_name("reserved_size")
-                    .long("--reserved-size")
+                Arg::with_name("min_reserved_size")
+                    .long("--min-reserved-size")
                     .takes_value(true)
                     .multiple(false)
                     .help(&format!(
-                        "size of usable linear memory region. must be multiple of 4k. default: {}",
-                        humansized(HeapSettings::default().reserved_size)
+                        "minimum size of usable linear memory region. must be multiple of 4k. default: {}",
+                        humansized(HeapSettings::default().min_reserved_size)
                     )),
+            )
+            .arg(
+                Arg::with_name("max_reserved_size")
+                    .long("--max-reserved-size")
+                    .takes_value(true)
+                    .multiple(false)
+                    .help("maximum size of usable linear memory region. must be multiple of 4k. default: 4 GiB"),
             )
             .arg(
                 Arg::with_name("guard_size")

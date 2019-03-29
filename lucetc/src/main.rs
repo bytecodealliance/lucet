@@ -50,8 +50,12 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.with_builtins(builtins)?;
     }
 
-    if let Some(reserved_size) = opts.reserved_size {
-        c.with_reserved_size(reserved_size);
+    if let Some(min_reserved_size) = opts.min_reserved_size {
+        c.with_min_reserved_size(min_reserved_size);
+    }
+
+    if let Some(max_reserved_size) = opts.max_reserved_size {
+        c.with_max_reserved_size(max_reserved_size);
     }
 
     if let Some(guard_size) = opts.guard_size {
