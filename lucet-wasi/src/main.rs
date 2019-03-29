@@ -29,21 +29,17 @@ fn main() {
                 .help("Entrypoint to run within the WASI module"),
         )
         .arg(
-            Arg::with_name("lucet_module")
-                .required(true)
-                .help("Path to the `lucetc`-compiled WASI module"),
-        )
-        .arg(
             Arg::with_name("preopen_dirs")
                 .required(false)
                 .long("dir")
                 .takes_value(true)
                 .multiple(true)
-                .help("Directories to provide to the WASI guest")
+                .number_of_values(1)
+                .help("A directory to provide to the WASI guest")
                 .long_help(
                     "Directories on the host can be provided to the WASI guest as part of a \
-                     virtual filesystem. Each directory is specified as a \
-                     `host_path:guest_path`, where `guest_path` specifies the  path that will \
+                     virtual filesystem. Each directory is specified as \
+                     --dir `host_path:guest_path`, where `guest_path` specifies the path that will \
                      correspond to `host_path` for calls like `fopen` in the guest.\
                      \
                      For example, `--dir /home/host_user/wasi_sandbox:/sandbox` will make \
@@ -54,6 +50,11 @@ fn main() {
                      filesystem through relative paths (e.g., `/sandbox/../some_other_file`) \
                      or through symlinks.",
                 ),
+        )
+        .arg(
+            Arg::with_name("lucet_module")
+                .required(true)
+                .help("Path to the `lucetc`-compiled WASI module"),
         )
         .arg(
             Arg::with_name("guest_args")
