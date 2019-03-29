@@ -275,7 +275,11 @@ lucet-wasi hello.so
   environment.
 * `./devenv_start.sh` and `./devenv_stop.sh` start and stop the container.
 
-## Reporting Security Issues
+## Security
+
+The lucet project aims to provide support for secure execution of untrusted code. Security is achieved through a combination of lucet-supplied security controls and user-supplied security controls. See [SECURITY.md](SECURITY.md) for more information on the lucet security model.
+
+###  Reporting Security Issues
 
 The Lucet project team welcomes security reports and is committed to providing
 prompt attention to security issues. Security issues should be reported
