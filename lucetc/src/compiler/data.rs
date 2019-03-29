@@ -77,7 +77,7 @@ pub fn compile_sparse_page_data(compiler: &mut Compiler) -> Result<(), Error> {
     use crate::program::data::sparse::OwnedSparseData;
     let owned_data = OwnedSparseData::new(
         &compiler.prog.data_initializers()?,
-        compiler.prog.heap_spec(),
+        compiler.prog.heap_spec()?,
     );
     let sparse_data = owned_data.sparse_data();
 

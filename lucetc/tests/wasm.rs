@@ -180,7 +180,7 @@ mod programs {
         let h = HeapSettings::default();
         let p = Program::new(m, b, h).expect(&format!("instantiating program"));
         assert_eq!(
-            p.heap_spec(),
+            p.heap_spec().unwrap(),
             HeapSpec {
                 // reserved and guard is liblucet_runtime_c standard
                 reserved_size: 4 * 1024 * 1024,
@@ -201,7 +201,7 @@ mod programs {
         let h = HeapSettings::default();
         let p = Program::new(m, b, h).expect(&format!("instantiating program"));
         assert_eq!(
-            p.heap_spec(),
+            p.heap_spec().unwrap(),
             HeapSpec {
                 // reserved and guard is liblucet_runtime_c standard
                 reserved_size: 4 * 1024 * 1024,
@@ -222,7 +222,7 @@ mod programs {
         let h = HeapSettings::default();
         let p = Program::new(m, b, h).expect(&format!("instantiating program"));
         assert_eq!(
-            p.heap_spec(),
+            p.heap_spec().unwrap(),
             HeapSpec {
                 reserved_size: 0,
                 guard_size: 0,

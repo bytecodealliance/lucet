@@ -76,7 +76,7 @@ impl<'p> EntityCreator<'p> {
         compiler: &Compiler,
     ) -> Result<ir::Heap, Error> {
         let base = self.bases.heap(func, compiler);
-        let heap_spec = self.program.heap_spec();
+        let heap_spec = self.program.heap_spec()?;
 
         self.cache.heap(index, || {
             if index != 0 {

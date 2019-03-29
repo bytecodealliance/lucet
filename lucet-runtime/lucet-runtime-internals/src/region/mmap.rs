@@ -39,8 +39,6 @@ impl RegionInternal for MmapRegion {
         module.validate_runtime_spec(limits)?;
 
         for (ptr, len) in [
-            // make the heap read/writable and record its initial size
-            (slot.heap, module.heap_spec().initial_size as usize),
             // make the stack read/writable
             (slot.stack, limits.stack_size),
             // make the globals read/writable
@@ -54,6 +52,8 @@ impl RegionInternal for MmapRegion {
             unsafe { mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)? };
         }
 
+        // note: the initial heap will be made read/writable when `new_instance_handle` calls `reset`
+
         let inst_ptr = slot.start as *mut Instance;
 
         // upgrade the slot's weak region pointer so the region can't get dropped while the instance
@@ -66,7 +66,7 @@ impl RegionInternal for MmapRegion {
             .expect("backing region of slot (`self`) exists");
 
         let alloc = Alloc {
-            heap_accessible_size: module.heap_spec().initial_size as usize,
+            heap_accessible_size: 0, // the `reset` call in `new_instance_handle` will set this
             heap_inaccessible_size: slot.limits.heap_address_space_size,
             slot: Some(slot),
             region,
@@ -119,29 +119,32 @@ impl RegionInternal for MmapRegion {
     }
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error> {
+        let heap = alloc.slot().heap;
+
+        if alloc.heap_accessible_size > 0 {
+            // zero the whole heap, if any of it is currently accessible
+            let heap_size = alloc.slot().limits.heap_address_space_size;
+
+            unsafe {
+                mprotect(heap, heap_size, ProtFlags::PROT_NONE)?;
+                madvise(heap, heap_size, MmapAdvise::MADV_DONTNEED)?;
+            }
+        }
+
         let initial_size = module.heap_spec().initial_size as usize;
 
-        // reset the heap to the initial size
+        // reset the heap to the initial size, and mprotect those pages appropriately
         if alloc.heap_accessible_size != initial_size {
+            unsafe {
+                mprotect(
+                    heap,
+                    initial_size,
+                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                )?
+            };
             alloc.heap_accessible_size = initial_size;
             alloc.heap_inaccessible_size =
                 alloc.slot().limits.heap_address_space_size - initial_size;
-
-            // turn off any extra pages
-            let acc_heap_end =
-                (alloc.slot().heap as usize + alloc.heap_accessible_size) as *mut c_void;
-            unsafe {
-                mprotect(
-                    acc_heap_end,
-                    alloc.heap_inaccessible_size,
-                    ProtFlags::PROT_NONE,
-                )?;
-                madvise(
-                    acc_heap_end,
-                    alloc.heap_inaccessible_size,
-                    MmapAdvise::MADV_DONTNEED,
-                )?;
-            }
         }
 
         // Initialize the heap using the module sparse page data. There cannot be more pages in the
@@ -171,12 +174,6 @@ impl RegionInternal for MmapRegion {
             if let Some(contents) = module.get_sparse_page_data(page_num) {
                 // otherwise copy in the page data
                 heap[page_base..page_base + host_page_size()].copy_from_slice(contents);
-            } else {
-                // zero this page
-                // TODO would using a memset primitive be better here?
-                for b in heap[page_base..page_base + host_page_size()].iter_mut() {
-                    *b = 0x00;
-                }
             }
         }
 
