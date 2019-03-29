@@ -1,12 +1,26 @@
 // The entry file of your WebAssembly module.
 
-import 'allocator/arena';
 import {
-  errno, fd_write, fd_read, random_get, clock_time_get, proc_exit,
-  environ_sizes_get, environ_get, args_sizes_get, args_get, path_open,
-  oflags, rights, lookupflags, fdflags, fd, fd_renumber
+  errno,
+  clockid,
+  fd_write,
+  fd_read,
+  random_get,
+  clock_time_get,
+  clock_res_get,
+  proc_exit,
+  environ_sizes_get,
+  environ_get,
+  args_sizes_get,
+  args_get,
+  path_open,
+  oflags,
+  rights,
+  lookupflags,
+  fd,
+  fdflags,
+  fd_close,
 } from './wasi_unstable';
-export { memory };
 
 export type Descriptor = fd;
 
@@ -16,7 +30,7 @@ export class Filesystem {
    * @param path Path
    * @param dirfd Base directory descriptor (will be automatically set soon)
    */
-  static openForRead(path: String, dirfd: Descriptor = 3): Descriptor | null {
+  static openForRead(path: string, dirfd: Descriptor = 3): Descriptor | null {
     let fd_lookup_flags = lookupflags.SYMLINK_FOLLOW;
     let fd_oflags: oflags = 0;
     let fd_rights = rights.FD_READ | rights.FD_SEEK |
@@ -42,11 +56,11 @@ export class Filesystem {
   * @param path Path
   * @param dirfd Base directory descriptor (will be automatically set soon)
   */
-  static openForWrite(path: String, dirfd: Descriptor = 3): Descriptor | null {
+  static openForWrite(path: string, dirfd: Descriptor = 3): Descriptor | null {
     let fd_lookup_flags = lookupflags.SYMLINK_FOLLOW;
-    let fd_oflags: oflags = oflags.CREAT | oflags.TRUNC;
+    let fd_oflags: oflags = oflags.CREAT;
     let fd_rights = rights.FD_WRITE | rights.FD_SEEK |
-      rights.FD_TELL | rights.FD_FILESTAT_GET;
+      rights.FD_TELL | rights.FD_FILESTAT_GET | rights.PATH_CREATE_FILE;
     let fd_rights_inherited = fd_rights;
     let fd_flags: fdflags = 0;
     let path_utf8_len: usize = path.lengthUTF8 - 1;
@@ -66,6 +80,14 @@ export class Filesystem {
 
 export class IO {
   /**
+   * Close a file descriptor
+   * @param fd file descriptor
+   */
+  static close(fd: Descriptor): void {
+    fd_close(fd);
+  }
+
+  /**
    * Write data to a file descriptor
    * @param fd file descriptor
    * @param data data
@@ -73,6 +95,9 @@ export class IO {
   static write(fd: Descriptor, data: Array<u8>): void {
     let data_buf_len = data.length;
     let data_buf = memory.allocate(data_buf_len);
+    for (let i = 0; i < data_buf_len; i++) {
+      store<u8>(data_buf + i, unchecked(data[i]));
+    }
     let iov = memory.allocate(2 * sizeof<usize>());
     store<u32>(iov, data_buf);
     store<u32>(iov + sizeof<usize>(), data_buf_len);
@@ -88,7 +113,7 @@ export class IO {
    * @param s string
    * @param newline `true` to add a newline after the string
    */
-  static writeString(fd: Descriptor, s: String, newline: bool = false): void {
+  static writeString(fd: Descriptor, s: string, newline: bool = false): void {
     if (newline) {
       this.writeStringLn(fd, s);
       return;
@@ -109,7 +134,7 @@ export class IO {
    * @param fd file descriptor
    * @param s string
    */
-  static writeStringLn(fd: Descriptor, s: String): void {
+  static writeStringLn(fd: Descriptor, s: string): void {
     let s_utf8_len: usize = s.lengthUTF8 - 1;
     let s_utf8 = s.toUTF8();
     let iov = memory.allocate(4 * sizeof<usize>());
@@ -194,7 +219,7 @@ export class IO {
    * @param fd file descriptor
    * @param chunk_size chunk size (default: 4096)
    */
-  static readString(fd: Descriptor, chunk_size: usize = 4096): String | null {
+  static readString(fd: Descriptor, chunk_size: usize = 4096): string | null {
     let s_utf8_ = IO.readAll(fd);
     if (s_utf8_ === null) {
       return null;
@@ -219,21 +244,21 @@ export class Console {
    * @param s string
    * @param newline `false` to avoid inserting a newline after the string
    */
-  static write(s: String, newline: bool = true): void {
+  static write(s: string, newline: bool = true): void {
     IO.writeString(1, s, newline);
   }
 
   /**
    * Read an UTF8 string from the console, convert it to a native string
    */
-  static readAll(): String | null {
+  static readAll(): string | null {
     return IO.readString(0);
   }
 
   /**
    * Alias for `Console.write()`
    */
-  static log(s: String): void {
+  static log(s: string): void {
     this.write(s);
   }
 
@@ -242,7 +267,7 @@ export class Console {
    * @param s string
    * @param newline `false` to avoid inserting a newline after the string
    */
-  static error(s: String, newline: bool = true): void {
+  static error(s: string, newline: bool = true): void {
     IO.writeString(2, s, newline);
   }
 }
@@ -276,17 +301,26 @@ export class Random {
   }
 }
 
-const __WASI_CLOCK_REALTIME: u32 = 0;
 export class Date {
   /**
    * Return the current timestamp, as a number of milliseconds since the epoch
    */
   static now(): f64 {
     let time_ptr = memory.allocate(8);
-    clock_time_get(__WASI_CLOCK_REALTIME, 1000, time_ptr);
+    clock_time_get(clockid.REALTIME, 1000, time_ptr);
     let unix_ts = load<u64>(time_ptr);
     memory.free(time_ptr);
     return unix_ts as f64 / 1000.0;
+  }
+}
+
+export class Performance {
+  static now(): f64 {
+    let time_ptr = memory.allocate(8);
+    clock_res_get(clockid.MONOTONIC, time_ptr);
+    let res_ts = load<u64>(time_ptr);
+    memory.free(time_ptr);
+    return res_ts as f64;
   }
 }
 
@@ -301,7 +335,7 @@ export class Process {
 }
 
 export class EnvironEntry {
-  constructor(readonly key: String, readonly value: String) { };
+  constructor(readonly key: string, readonly value: string) { };
 }
 
 export class Environ {
@@ -343,7 +377,7 @@ export class Environ {
    * Return the value for an environment variable
    * @param key environment variable name
    */
-  get(key: String): String | null {
+  get(key: string): string | null {
     for (let i = 0, j = this.env.length; i < j; i++) {
       if (this.env[i].key == key) {
         return this.env[i].value;
@@ -390,7 +424,7 @@ export class CommandLine {
    * Return the i-th command-ine argument
    * @param i index
    */
-  get(i: usize): String | null {
+  get(i: usize): string | null {
     let args_len: usize = this.args[0].length;
     if (i < args_len) {
       return this.args[i];
@@ -400,7 +434,7 @@ export class CommandLine {
 }
 
 class StringUtils {
-  static fromCString(cstring: usize): String {
+  static fromCString(cstring: usize): string {
     let size = 0;
     while (load<u8>(cstring + size) != 0) {
       size++;

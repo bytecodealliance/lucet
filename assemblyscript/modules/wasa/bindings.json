@@ -5,8 +5,10 @@
   "wasi_unstable": {
     "fd_write": "__wasi_fd_write",
     "fd_read": "__wasi_fd_read",
+    "fd_close": "__wasi_fd_close",
     "random_get": "__wasi_random_get",
     "clock_time_get": "__wasi_clock_time_get",
+    "clock_res_get": "__wasi_clock_res_get",
     "proc_exit": "__wasi_proc_exit",
     "environ_sizes_get": "__wasi_environ_sizes_get",
     "environ_get": "__wasi_environ_get",
