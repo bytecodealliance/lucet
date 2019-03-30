@@ -183,7 +183,7 @@ Lucet requires:
 The easiest way to get started with the Lucet toolchain is by using the provided
 Docker-based development environment.
 
-This repository includes a `Dockerfile` to build a complete environement for
+This repository includes a `Dockerfile` to build a complete environment for
 compiling and running WebAssembly code with Lucet, but you shouldn't have to use
 Docker commands directly. A set of shell scripts with the `devenv_` prefix are
 used to manage the container.
