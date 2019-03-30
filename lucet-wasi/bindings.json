@@ -16,6 +16,7 @@
         "fd_seek": "__wasi_fd_seek",
         "fd_write": "__wasi_fd_write",
         "path_open": "__wasi_path_open",
+        "poll_oneoff": "__wasi_poll_oneoff",
         "random_get": "__wasi_random_get"
     }
 }

@@ -357,3 +357,80 @@ dec_enc_scalar!(
     enc_whence,
     enc_whence_byref
 );
+
+dec_enc_scalar!(
+    __wasi_subclockflags_t,
+    dec_subclockflags,
+    dec_subclockflags_byref,
+    enc_subclockflags,
+    enc_subclockflags_byref
+);
+
+dec_enc_scalar!(
+    __wasi_eventrwflags_t,
+    dec_eventrwflags,
+    dec_eventrwflags_byref,
+    enc_eventrwflags,
+    enc_eventrwflags_byref
+);
+
+dec_enc_scalar!(
+    __wasi_eventtype_t,
+    dec_eventtype,
+    dec_eventtype_byref,
+    enc_eventtype,
+    enc_eventtype_byref
+);
+
+dec_enc_scalar!(
+    __wasi_userdata_t,
+    dec_userdata,
+    dec_userdata_byref,
+    enc_userdata,
+    enc_userdata_byref
+);
+
+pub fn dec_subscription(
+    subscription: &wasm32::__wasi_subscription_t,
+) -> Result<host::__wasi_subscription_t, host::__wasi_errno_t> {
+    let userdata = dec_userdata(subscription.userdata);
+    let type_ = dec_eventtype(subscription.type_);
+    let u_orig = subscription.__bindgen_anon_1;
+    let u = match type_ {
+        wasm32::__WASI_EVENTTYPE_CLOCK => host::__wasi_subscription_t___wasi_subscription_u {
+            clock: unsafe {
+                host::__wasi_subscription_t___wasi_subscription_u___wasi_subscription_u_clock_t {
+                    identifier: u_orig.clock.identifier,
+                    clock_id: dec_clockid(u_orig.clock.clock_id),
+                    timeout: dec_timestamp(u_orig.clock.timeout),
+                    precision: dec_timestamp(u_orig.clock.precision),
+                    flags: dec_subclockflags(u_orig.clock.flags),
+                }
+            },
+        },
+        wasm32::__WASI_EVENTTYPE_FD_READ | wasm32::__WASI_EVENTTYPE_FD_WRITE =>  host::__wasi_subscription_t___wasi_subscription_u {
+            fd_readwrite:  host::__wasi_subscription_t___wasi_subscription_u___wasi_subscription_u_fd_readwrite_t {
+                fd: dec_fd(unsafe{u_orig.fd_readwrite.fd})
+            }
+        },
+        _  => return Err(wasm32::__WASI_EINVAL)
+    };
+    Ok(host::__wasi_subscription_t { userdata, type_, u })
+}
+
+pub fn enc_event(event: host::__wasi_event_t) -> wasm32::__wasi_event_t {
+    let fd_readwrite = unsafe { event.u.fd_readwrite };
+    wasm32::__wasi_event_t {
+        userdata: enc_userdata(event.userdata),
+        type_: enc_eventtype(event.type_),
+        error: enc_errno(event.error),
+        __bindgen_anon_1: wasm32::__wasi_event_t__bindgen_ty_1 {
+            fd_readwrite: wasm32::__wasi_event_t__bindgen_ty_1__bindgen_ty_1 {
+                nbytes: enc_filesize(fd_readwrite.nbytes),
+                flags: enc_eventrwflags(fd_readwrite.flags),
+                __bindgen_padding_0: [0; 3],
+            },
+        },
+        __bindgen_padding_0: 0,
+    }
+}
