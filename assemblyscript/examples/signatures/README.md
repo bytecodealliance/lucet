@@ -79,7 +79,7 @@ lucet-wasi --entrypoint main --dir /lucet:/lucet example sign LICENSE
 Signature for that file: [deedf3910d5b166ca17e0e307312a422cb50efcbcc90754cf0e2d528a9159c4ad3ac973e3cd9b2c2986fb2e467a0506bc9a5ceb9c7d6d30e360fb4d1cef3c50d]
 ```
 
-This command reads the `/lucet/LICENSE` file, as well as the key pair, and compute a signature of the file's content that can be verified using the public key.
+This command reads the `/lucet/LICENSE` file, as well as the key pair, and computes a signature of the file's content that can be verified using the public key.
 
 Signature verification:
 
