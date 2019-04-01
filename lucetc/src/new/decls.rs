@@ -1,10 +1,10 @@
 use crate::bindings::Bindings;
-use crate::compiler::name::Name;
+use crate::new::name::Name;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::new::module::{DataInitializer, ModuleInfo};
 pub use crate::new::module::{Exportable, TableElems};
 use crate::new::runtime::{Runtime, RuntimeFunc};
-use crate::program::memory::HeapSettings;
+use crate::new::heap::HeapSettings;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;

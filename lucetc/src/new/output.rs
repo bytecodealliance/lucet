@@ -1,6 +1,6 @@
-use crate::compiler::name::Name;
-use crate::compiler::stack_probe;
-use crate::compiler::traps::write_trap_manifest;
+use crate::new::name::Name;
+use crate::new::stack_probe;
+use crate::new::traps::write_trap_manifest;
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
 use faerie::Artifact;

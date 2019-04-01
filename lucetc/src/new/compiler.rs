@@ -1,5 +1,5 @@
 use crate::bindings::Bindings;
-use crate::compiler::{stack_probe, OptLevel};
+use crate::new::stack_probe;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::new::decls::ModuleDecls;
 use crate::new::function::FuncInfo;
@@ -7,7 +7,7 @@ use crate::new::module::ModuleInfo;
 use crate::new::output::{CraneliftFuncs, ObjectFile};
 use crate::new::runtime::Runtime;
 use crate::new::table::write_table_data;
-use crate::program::memory::HeapSettings;
+use crate::new::heap::HeapSettings;
 use cranelift_codegen::{
     ir,
     isa::TargetIsa,
@@ -19,6 +19,29 @@ use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator};
 use failure::ResultExt;
+
+#[derive(Debug, Clone, Copy)]
+pub enum OptLevel {
+    Default,
+    Best,
+    Fastest,
+}
+
+impl Default for OptLevel {
+    fn default() -> OptLevel {
+        OptLevel::Default
+    }
+}
+
+impl OptLevel {
+    pub fn to_flag(&self) -> &str {
+        match self {
+            OptLevel::Default => "default",
+            OptLevel::Best => "best",
+            OptLevel::Fastest => "fastest",
+        }
+    }
+}
 
 pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
@@ -135,7 +158,7 @@ fn write_module_data<B: ClifBackend>(
     decls: &ModuleDecls,
 ) -> Result<(), LucetcError> {
     use crate::new::sparsedata::OwnedSparseData;
-    use crate::program::memory::empty_heap_spec;
+    use crate::new::heap::empty_heap_spec;
     use byteorder::{LittleEndian, WriteBytesExt};
     use cranelift_codegen::entity::EntityRef;
     use cranelift_module::{DataContext, Linkage};
