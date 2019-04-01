@@ -20,9 +20,7 @@ use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use nix::convert_ioctl_res;
 use nix::libc::c_int;
 use std::ffi::{OsStr, OsString};
-use std::iter::{Take, Zip};
 use std::os::unix::prelude::{FromRawFd, OsStrExt, OsStringExt, RawFd};
-use std::slice::Iter;
 use std::time::SystemTime;
 use std::{cmp, slice};
 
@@ -1037,22 +1035,22 @@ fn __wasi_poll_oneoff_handle_timeout_event(
         };
         output_slice[0] = enc_event(output_event);
         if let Err(e) = unsafe { enc_pointee(vmctx, nevents, 1) } {
-            return e;
+            return enc_errno(e);
         }
     } else {
         // shouldn't happen
         if let Err(e) = unsafe { enc_pointee(vmctx, nevents, 0) } {
-            return e;
+            return enc_errno(e);
         }
     }
-    return wasm32::__WASI_ESUCCESS;
+    wasm32::__WASI_ESUCCESS
 }
 
-fn __wasi_poll_oneoff_handle_fd_event(
+fn __wasi_poll_oneoff_handle_fd_event<'t>(
     vmctx: &mut Vmctx,
     output_slice: &mut [wasm32::__wasi_event_t],
     nevents: wasm32::uintptr_t,
-    events: Take<Zip<Iter<'_, FdEventData>, Iter<'_, nix::poll::PollFd>>>,
+    events: impl Iterator<Item = (&'t FdEventData, &'t nix::poll::PollFd)>,
 ) -> wasm32::__wasi_errno_t {
     let mut output_slice_cur = output_slice.iter_mut();
     let mut revents_count = 0;
@@ -1126,7 +1124,7 @@ fn __wasi_poll_oneoff_handle_fd_event(
         revents_count += 1;
     }
     if let Err(e) = unsafe { enc_pointee(vmctx, nevents, revents_count) } {
-        return e;
+        return enc_errno(e);
     }
     wasm32::__WASI_ESUCCESS
 }

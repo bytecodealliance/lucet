@@ -400,7 +400,7 @@ pub fn dec_subscription(
         wasm32::__WASI_EVENTTYPE_CLOCK => host::__wasi_subscription_t___wasi_subscription_u {
             clock: unsafe {
                 host::__wasi_subscription_t___wasi_subscription_u___wasi_subscription_u_clock_t {
-                    identifier: u_orig.clock.identifier,
+                    identifier: dec_userdata(u_orig.clock.identifier),
                     clock_id: dec_clockid(u_orig.clock.clock_id),
                     timeout: dec_timestamp(u_orig.clock.timeout),
                     precision: dec_timestamp(u_orig.clock.precision),
