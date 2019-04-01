@@ -17,8 +17,13 @@ mod table;
 mod traps;
 
 pub use crate::{
-    bindings::Bindings, compiler::Compiler, compiler::OptLevel, error::LucetcError,
-    heap::HeapSettings, load::read_module, patch::patch_module,
+    bindings::Bindings,
+    compiler::Compiler,
+    compiler::OptLevel,
+    error::{LucetcError, LucetcErrorKind},
+    heap::HeapSettings,
+    load::read_module,
+    patch::patch_module,
 };
 use failure::{format_err, Error, ResultExt};
 use parity_wasm::elements::serialize;
@@ -42,7 +47,7 @@ pub struct Lucetc {
 impl Lucetc {
     pub fn new<P: AsRef<Path>>(input: P) -> Result<Self, LucetcError> {
         let input = input.as_ref();
-        let module = read_module(input)?;
+        let module = read_module(input).context(LucetcErrorKind::Input)?;
         Ok(Self {
             module,
             bindings: Bindings::empty(),

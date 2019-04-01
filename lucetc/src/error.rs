@@ -1,4 +1,4 @@
-use failure::{Backtrace, Context, Error, Fail};
+use failure::{Backtrace, Context, Fail};
 use pwasm_validation;
 use std::fmt::{self, Display};
 
@@ -42,12 +42,6 @@ impl Display for LucetcError {
     }
 }
 
-impl From<Error> for LucetcError {
-    fn from(e: Error) -> LucetcError {
-        e.context(LucetcErrorKind::UnknownKind).into()
-    }
-}
-
 impl From<pwasm_validation::Error> for LucetcError {
     fn from(e: pwasm_validation::Error) -> LucetcError {
         e.context(LucetcErrorKind::Validation).into()
@@ -56,6 +50,10 @@ impl From<pwasm_validation::Error> for LucetcError {
 
 #[derive(Debug, Fail, PartialEq, Eq, Clone)]
 pub enum LucetcErrorKind {
+    #[fail(display = "Input")]
+    Input,
+    #[fail(display = "Validation")]
+    Validation,
     #[fail(display = "Translating module")]
     TranslatingModule,
     #[fail(display = "Module data")]
@@ -68,14 +66,9 @@ pub enum LucetcErrorKind {
     Table,
     #[fail(display = "Memory Specs")]
     MemorySpecs,
-    #[fail(display = "Validation")]
-    Validation,
     #[fail(display = "Output")]
     Output,
 
     #[fail(display = "Unsupported: {}", _0)]
     Unsupported(String),
-
-    #[fail(display = "Unknown error:")]
-    UnknownKind,
 }

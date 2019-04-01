@@ -116,8 +116,7 @@ impl<'a> Compiler<'a> {
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
         write_table_data(&mut self.clif_module, &self.decls)?;
 
-        let obj = ObjectFile::new(self.clif_module.finish())
-            .context(LucetcErrorKind::Output)?;
+        let obj = ObjectFile::new(self.clif_module.finish()).context(LucetcErrorKind::Output)?;
         Ok(obj)
     }
 
@@ -176,7 +175,8 @@ fn write_module_data<B: ClifBackend>(
             .get_data_initializers(memix)
             .unwrap_or(&empty_data_initializers);
 
-        let compiled_data = OwnedSparseData::new(data_initializers, heap_spec.clone())?;
+        let compiled_data = OwnedSparseData::new(data_initializers, heap_spec.clone())
+            .context(LucetcErrorKind::ModuleData)?;
         let sparse_data = compiled_data.sparse_data();
 
         let globals_spec = decls.get_globals_spec()?;

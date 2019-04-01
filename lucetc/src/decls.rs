@@ -156,7 +156,9 @@ impl<'a> ModuleDecls<'a> {
             let ix = MemoryIndex::new(ix);
 
             if ix != MemoryIndex::new(0) {
-                Err(format_err!("lucetc only supports memory 0"))?
+                Err(format_err!("lucetc only supports memory 0")).context(
+                    LucetcErrorKind::Unsupported("memories with index != 0".to_owned()),
+                )?
             }
 
             let memory = info.memories.get(ix).expect("memory in range").entity;
