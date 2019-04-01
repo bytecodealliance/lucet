@@ -1,16 +1,16 @@
-pub mod bindings;
-pub mod compiler;
-pub mod error;
-pub mod load;
-pub mod new;
-pub mod patch;
-pub mod program;
+mod bindings;
+mod error;
+mod load;
+mod new;
+mod patch;
 
-use crate::error::LucetcError;
-use crate::load::read_module;
-use crate::new::Compiler;
-use crate::patch::patch_module;
-pub use crate::{bindings::Bindings, compiler::OptLevel, program::memory::HeapSettings};
+pub use crate::{
+    bindings::Bindings,
+    error::LucetcError,
+    load::read_module,
+    new::{Compiler, HeapSettings, OptLevel},
+    patch::patch_module,
+};
 use failure::{format_err, Error, ResultExt};
 use parity_wasm::elements::serialize;
 use parity_wasm::elements::Module;

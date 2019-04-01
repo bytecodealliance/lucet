@@ -12,5 +12,6 @@ mod stack_probe;
 mod table;
 mod traps;
 
-pub use compiler::Compiler;
+pub use compiler::{Compiler, OptLevel};
 pub use output::{CraneliftFuncs, ObjectFile};
+pub use heap::HeapSettings;
