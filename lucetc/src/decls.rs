@@ -98,23 +98,23 @@ impl<'a> ModuleDecls<'a> {
             {
                 let import_symbol = bindings
                     .translate(import_mod, import_field)
-                    .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+                    .context(LucetcErrorKind::TranslatingModule)?;
                 let funcid = clif_module
                     .declare_function(&import_symbol, Linkage::Import, signature)
-                    .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+                    .context(LucetcErrorKind::TranslatingModule)?;
                 Name::new_func(import_symbol, funcid)
             } else {
                 if exportable_sigix.export_names.is_empty() {
                     let def_symbol = format!("guest_func_{}", ix);
                     let funcid = clif_module
                         .declare_function(&def_symbol, Linkage::Local, signature)
-                        .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+                        .context(LucetcErrorKind::TranslatingModule)?;
                     Name::new_func(def_symbol, funcid)
                 } else {
                     let export_symbol = format!("guest_func_{}", exportable_sigix.export_names[0]);
                     let funcid = clif_module
                         .declare_function(&export_symbol, Linkage::Export, signature)
-                        .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+                        .context(LucetcErrorKind::TranslatingModule)?;
                     Name::new_func(export_symbol, funcid)
                 }
             };
@@ -132,13 +132,13 @@ impl<'a> ModuleDecls<'a> {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id = clif_module
                 .declare_data(&def_symbol, Linkage::Local, false)
-                .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+                .context(LucetcErrorKind::TranslatingModule)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             let len_symbol = format!("guest_table_{}_len", ix);
             let len_data_id = clif_module
                 .declare_data(&len_symbol, Linkage::Local, false)
-                .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+                .context(LucetcErrorKind::TranslatingModule)?;
             let len_name = Name::new_data(len_symbol, len_data_id);
 
             table_names.push((def_name, len_name));
@@ -193,7 +193,7 @@ impl<'a> ModuleDecls<'a> {
         for (func, (symbol, signature)) in runtime.functions.iter() {
             let funcid = clif_module
                 .declare_function(&symbol, Linkage::Import, signature)
-                .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+                .context(LucetcErrorKind::TranslatingModule)?;
             let name = Name::new_func(symbol.clone(), funcid);
 
             runtime_names.insert(*func, name);

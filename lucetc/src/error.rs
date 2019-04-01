@@ -60,6 +60,8 @@ pub enum LucetcErrorKind {
     TranslatingModule,
     #[fail(display = "Module data")]
     ModuleData,
+    #[fail(display = "Metadata Serializer")] // specifically non-ModuleData; this will go away soon
+    MetadataSerializer,
     #[fail(display = "Function {}", _0)]
     Function(String),
     #[fail(display = "Table {}", _0)]
@@ -68,12 +70,11 @@ pub enum LucetcErrorKind {
     MemorySpecs,
     #[fail(display = "Validation")]
     Validation,
+    #[fail(display = "Output")]
+    Output,
 
     #[fail(display = "Unsupported: {}", _0)]
     Unsupported(String),
-
-    #[fail(display = "{}", _0)]
-    Other(String),
 
     #[fail(display = "Unknown error:")]
     UnknownKind,

@@ -75,7 +75,7 @@ impl<'a> Compiler<'a> {
                 FaerieTrapCollection::Enabled,
                 libcalls,
             )
-            .context(LucetcErrorKind::Other("FIXME".to_owned()))?,
+            .context(LucetcErrorKind::Validation)?,
         );
 
         let runtime = Runtime::lucet(frontend_config);
@@ -117,7 +117,7 @@ impl<'a> Compiler<'a> {
         write_table_data(&mut self.clif_module, &self.decls)?;
 
         let obj = ObjectFile::new(self.clif_module.finish())
-            .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+            .context(LucetcErrorKind::Output)?;
         Ok(obj)
     }
 
@@ -223,7 +223,7 @@ fn write_startfunc_data<B: ClifBackend>(
     use cranelift_module::{DataContext, Linkage};
     use failure::format_err;
 
-    let error_kind = LucetcErrorKind::Other("start_func".to_owned());
+    let error_kind = LucetcErrorKind::MetadataSerializer;
 
     if let Some(func_ix) = decls.get_start_func() {
         let name = clif_module
