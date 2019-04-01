@@ -64,6 +64,8 @@ pub enum LucetcErrorKind {
     Function(String),
     #[fail(display = "Table {}", _0)]
     Table(String),
+    #[fail(display = "Memory Specs")]
+    MemorySpecs,
     #[fail(display = "Validation")]
     Validation,
 

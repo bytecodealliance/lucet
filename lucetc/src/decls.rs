@@ -163,10 +163,20 @@ impl<'a> ModuleDecls<'a> {
 
             let wasm_page: u64 = 64 * 1024;
             let initial_size = memory.minimum as u64 * wasm_page;
+
+            let reserved_size = std::cmp::max(initial_size, heap_settings.min_reserved_size);
+            if reserved_size > heap_settings.max_reserved_size {
+                Err(format_err!(
+                    "module reserved size ({}) exceeds max reserved size ({})",
+                    reserved_size,
+                    heap_settings.max_reserved_size
+                ))
+                .context(LucetcErrorKind::MemorySpecs)?;
+            }
             // Find the max size permitted by the heap and the memory spec
             let max_size = memory.maximum.map(|pages| pages as u64 * wasm_page);
             heaps.push(HeapSpec {
-                reserved_size: heap_settings.reserved_size,
+                reserved_size,
                 guard_size: heap_settings.guard_size,
                 initial_size: initial_size,
                 max_size: max_size,
