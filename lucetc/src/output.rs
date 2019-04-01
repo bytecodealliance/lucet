@@ -1,6 +1,6 @@
-use crate::new::name::Name;
-use crate::new::stack_probe;
-use crate::new::traps::write_trap_manifest;
+use crate::name::Name;
+use crate::stack_probe;
+use crate::traps::write_trap_manifest;
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
 use faerie::Artifact;
@@ -17,10 +17,7 @@ pub struct CraneliftFuncs {
 
 impl CraneliftFuncs {
     pub fn new(funcs: HashMap<Name, ir::Function>, isa: Box<isa::TargetIsa>) -> Self {
-        Self {
-            funcs,
-            isa,
-        }
+        Self { funcs, isa }
     }
     /// This outputs a .clif file
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {

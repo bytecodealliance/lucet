@@ -1,15 +1,24 @@
 mod bindings;
+mod compiler;
+mod decls;
 mod error;
+mod function;
+mod heap;
 mod load;
-mod new;
+mod module;
+mod name;
+mod output;
 mod patch;
+mod pointer;
+mod runtime;
+mod sparsedata;
+mod stack_probe;
+mod table;
+mod traps;
 
 pub use crate::{
-    bindings::Bindings,
-    error::LucetcError,
-    load::read_module,
-    new::{Compiler, HeapSettings, OptLevel},
-    patch::patch_module,
+    bindings::Bindings, compiler::Compiler, compiler::OptLevel, error::LucetcError,
+    heap::HeapSettings, load::read_module, patch::patch_module,
 };
 use failure::{format_err, Error, ResultExt};
 use parity_wasm::elements::serialize;

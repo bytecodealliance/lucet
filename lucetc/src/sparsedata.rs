@@ -1,5 +1,5 @@
-use crate::new::module::DataInitializer;
-use crate::new::heap::HeapSpec;
+use crate::heap::HeapSpec;
+use crate::module::DataInitializer;
 use failure::{format_err, Error};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;

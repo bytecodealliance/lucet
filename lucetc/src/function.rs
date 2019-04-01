@@ -1,6 +1,6 @@
 use super::runtime::RuntimeFunc;
-use crate::new::pointer::{NATIVE_POINTER, POINTER_SIZE};
-use crate::new::decls::ModuleDecls;
+use crate::decls::ModuleDecls;
+use crate::pointer::{NATIVE_POINTER, POINTER_SIZE};
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;

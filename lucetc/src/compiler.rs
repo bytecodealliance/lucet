@@ -1,13 +1,13 @@
 use crate::bindings::Bindings;
-use crate::new::stack_probe;
+use crate::decls::ModuleDecls;
 use crate::error::{LucetcError, LucetcErrorKind};
-use crate::new::decls::ModuleDecls;
-use crate::new::function::FuncInfo;
-use crate::new::module::ModuleInfo;
-use crate::new::output::{CraneliftFuncs, ObjectFile};
-use crate::new::runtime::Runtime;
-use crate::new::table::write_table_data;
-use crate::new::heap::HeapSettings;
+use crate::function::FuncInfo;
+use crate::heap::HeapSettings;
+use crate::module::ModuleInfo;
+use crate::output::{CraneliftFuncs, ObjectFile};
+use crate::runtime::Runtime;
+use crate::stack_probe;
+use crate::table::write_table_data;
 use cranelift_codegen::{
     ir,
     isa::TargetIsa,
@@ -157,8 +157,8 @@ fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     decls: &ModuleDecls,
 ) -> Result<(), LucetcError> {
-    use crate::new::sparsedata::OwnedSparseData;
-    use crate::new::heap::empty_heap_spec;
+    use crate::heap::empty_heap_spec;
+    use crate::sparsedata::OwnedSparseData;
     use byteorder::{LittleEndian, WriteBytesExt};
     use cranelift_codegen::entity::EntityRef;
     use cranelift_module::{DataContext, Linkage};

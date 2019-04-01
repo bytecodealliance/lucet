@@ -1,6 +1,6 @@
-use crate::new::pointer::POINTER_SIZE;
+use crate::decls::{ModuleDecls, TableDecl};
 use crate::error::{LucetcError, LucetcErrorKind};
-use crate::new::decls::{ModuleDecls, TableDecl};
+use crate::pointer::POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};

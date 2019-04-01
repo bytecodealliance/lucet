@@ -1,4 +1,3 @@
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HeapSettings {
     pub reserved_size: u64,
