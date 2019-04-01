@@ -69,7 +69,7 @@ pub fn write_table_data<B: ClifBackend>(
                     // function. If this is ever removed, make sure this check happens elsewhere.
                     let func = decls
                         .get_func(*func_index)
-                        .context(LucetcErrorKind::Table("FIXME".to_owned()))?;
+                        .context(LucetcErrorKind::Table)?;
                     // First element in row is the SignatureIndex for the function
                     putelem(&mut table_data, func.signature_index.as_u32() as u64);
 
@@ -99,7 +99,7 @@ pub fn write_table_data<B: ClifBackend>(
             .expect("tables are data");
         clif_module
             .define_data(table_id, &table_ctx)
-            .context(LucetcErrorKind::Table("FIXME".to_owned()))?;
+            .context(LucetcErrorKind::Table)?;
 
         {
             // Define the length of the table as a u64:
@@ -112,7 +112,7 @@ pub fn write_table_data<B: ClifBackend>(
             let table_len_id = table_decl.len_name.as_dataid().expect("tables are data");
             clif_module
                 .define_data(table_len_id, &table_len_ctx)
-                .context(LucetcErrorKind::Table("FIXME".to_owned()))?;
+                .context(LucetcErrorKind::Table)?;
         }
     }
     Ok(())

@@ -64,8 +64,8 @@ pub enum LucetcErrorKind {
     MetadataSerializer,
     #[fail(display = "Function {}", _0)]
     Function(String),
-    #[fail(display = "Table {}", _0)]
-    Table(String),
+    #[fail(display = "Table")]
+    Table,
     #[fail(display = "Memory Specs")]
     MemorySpecs,
     #[fail(display = "Validation")]
