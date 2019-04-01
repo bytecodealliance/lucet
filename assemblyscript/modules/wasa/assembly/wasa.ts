@@ -20,7 +20,7 @@ import {
   fd,
   fdflags,
   fd_close,
-} from './wasi_unstable';
+} from 'bindings/wasi';
 
 export type Descriptor = fd;
 
