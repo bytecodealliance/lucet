@@ -1,9 +1,10 @@
 use crate::bindings::Bindings;
-use crate::compiler::{stack_probe, ObjectFile, OptLevel};
+use crate::compiler::{stack_probe, OptLevel};
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::new::decls::ModuleDecls;
 use crate::new::function::FuncInfo;
 use crate::new::module::ModuleInfo;
+use crate::new::output::{CraneliftFuncs, ObjectFile};
 use crate::new::runtime::Runtime;
 use crate::new::table::write_table_data;
 use crate::program::memory::HeapSettings;
@@ -19,73 +20,114 @@ use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator};
 use failure::ResultExt;
 
-fn target_isa(opt_level: OptLevel) -> Box<dyn TargetIsa> {
-    let mut flags_builder = settings::builder();
-    let isa_builder = cranelift_native::builder().expect("host machine is not a supported target");
-    flags_builder.enable("enable_verifier").unwrap();
-    flags_builder.enable("is_pic").unwrap();
-    flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
-    isa_builder.finish(settings::Flags::new(flags_builder))
+pub struct Compiler<'a> {
+    decls: ModuleDecls<'a>,
+    clif_module: ClifModule<FaerieBackend>,
+    opt_level: OptLevel,
 }
 
-pub fn compile<'a>(
-    wasm_binary: &'a [u8],
-    opt_level: OptLevel,
-    bindings: &Bindings,
-    heap_settings: HeapSettings,
-) -> Result<ObjectFile, LucetcError> {
-    let isa = target_isa(opt_level);
-    let frontend_config = isa.frontend_config();
-    let mut module_info = ModuleInfo::new(frontend_config.clone());
-    translate_module(wasm_binary, &mut module_info).context(LucetcErrorKind::TranslatingModule)?;
+impl<'a> Compiler<'a> {
+    pub fn new(
+        wasm_binary: &'a [u8],
+        opt_level: OptLevel,
+        bindings: &Bindings,
+        heap_settings: HeapSettings,
+    ) -> Result<Self, LucetcError> {
+        let isa = Self::target_isa(opt_level);
 
-    let libcalls = Box::new(move |libcall| match libcall {
-        ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
-        _ => (FaerieBuilder::default_libcall_names())(libcall),
-    });
+        let frontend_config = isa.frontend_config();
+        let mut module_info = ModuleInfo::new(frontend_config.clone());
+        translate_module(wasm_binary, &mut module_info)
+            .context(LucetcErrorKind::TranslatingModule)?;
 
-    let mut func_translator = FuncTranslator::new();
-    let mut clif_module: ClifModule<FaerieBackend> = ClifModule::new(
-        FaerieBuilder::new(
-            isa,
-            "lucet_guest".to_owned(),
-            FaerieTrapCollection::Enabled,
-            libcalls,
-        )
-        .context(LucetcErrorKind::Other("FIXME".to_owned()))?,
-    );
+        let libcalls = Box::new(move |libcall| match libcall {
+            ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
+            _ => (FaerieBuilder::default_libcall_names())(libcall),
+        });
 
-    let runtime = Runtime::lucet(frontend_config);
-    let decls = ModuleDecls::new(
-        module_info,
-        &mut clif_module,
-        bindings,
-        runtime,
-        heap_settings,
-    )?;
+        let mut clif_module: ClifModule<FaerieBackend> = ClifModule::new(
+            FaerieBuilder::new(
+                isa,
+                "lucet_guest".to_owned(),
+                FaerieTrapCollection::Enabled,
+                libcalls,
+            )
+            .context(LucetcErrorKind::Other("FIXME".to_owned()))?,
+        );
 
-    for (ref func, (code, code_offset)) in decls.function_bodies() {
-        let mut func_info = FuncInfo::new(&decls);
-        let mut clif_context = ClifContext::new();
-        clif_context.func.name = func.name.as_externalname();
-        clif_context.func.signature = func.signature.clone();
+        let runtime = Runtime::lucet(frontend_config);
+        let decls = ModuleDecls::new(
+            module_info,
+            &mut clif_module,
+            bindings,
+            runtime,
+            heap_settings,
+        )?;
 
-        func_translator
-            .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
-            .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
-
-        clif_module
-            .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
-            .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
+        Ok(Self {
+            decls,
+            clif_module,
+            opt_level,
+        })
     }
 
-    write_module_data(&mut clif_module, &decls)?;
-    write_startfunc_data(&mut clif_module, &decls)?;
-    write_table_data(&mut clif_module, &decls)?;
+    pub fn object_file(mut self) -> Result<ObjectFile, LucetcError> {
+        let mut func_translator = FuncTranslator::new();
 
-    let obj = ObjectFile::new(clif_module.finish())
-        .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
-    Ok(obj)
+        for (ref func, (code, code_offset)) in self.decls.function_bodies() {
+            let mut func_info = FuncInfo::new(&self.decls);
+            let mut clif_context = ClifContext::new();
+            clif_context.func.name = func.name.as_externalname();
+            clif_context.func.signature = func.signature.clone();
+
+            func_translator
+                .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
+                .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
+
+            self.clif_module
+                .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
+                .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
+        }
+
+        write_module_data(&mut self.clif_module, &self.decls)?;
+        write_startfunc_data(&mut self.clif_module, &self.decls)?;
+        write_table_data(&mut self.clif_module, &self.decls)?;
+
+        let obj = ObjectFile::new(self.clif_module.finish())
+            .context(LucetcErrorKind::Other("FIXME".to_owned()))?;
+        Ok(obj)
+    }
+
+    pub fn cranelift_funcs(self) -> Result<CraneliftFuncs, LucetcError> {
+        use std::collections::HashMap;
+
+        let mut funcs = HashMap::new();
+        let mut func_translator = FuncTranslator::new();
+
+        for (ref func, (code, code_offset)) in self.decls.function_bodies() {
+            let mut func_info = FuncInfo::new(&self.decls);
+            let mut clif_context = ClifContext::new();
+            clif_context.func.name = func.name.as_externalname();
+            clif_context.func.signature = func.signature.clone();
+
+            func_translator
+                .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
+                .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
+
+            funcs.insert(func.name.clone(), clif_context.func);
+        }
+        Ok(CraneliftFuncs::new(funcs, Self::target_isa(self.opt_level)))
+    }
+
+    fn target_isa(opt_level: OptLevel) -> Box<dyn TargetIsa> {
+        let mut flags_builder = settings::builder();
+        let isa_builder =
+            cranelift_native::builder().expect("host machine is not a supported target");
+        flags_builder.enable("enable_verifier").unwrap();
+        flags_builder.enable("is_pic").unwrap();
+        flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
+        isa_builder.finish(settings::Flags::new(flags_builder))
+    }
 }
 
 fn write_module_data<B: ClifBackend>(
