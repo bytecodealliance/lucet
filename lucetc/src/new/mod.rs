@@ -6,6 +6,7 @@ mod sparsedata;
 mod table;
 mod compiler;
 mod output;
+mod pointer;
 
 pub use compiler::Compiler;
 pub use output::{CraneliftFuncs, ObjectFile};

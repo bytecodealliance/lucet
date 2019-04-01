@@ -1,4 +1,4 @@
-use crate::compiler::entity::POINTER_SIZE;
+use crate::new::pointer::POINTER_SIZE;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::new::decls::{ModuleDecls, TableDecl};
 use byteorder::{LittleEndian, WriteBytesExt};
