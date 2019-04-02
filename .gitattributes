@@ -1,0 +1,3 @@
+# Auto detect text and normalize to LF on commit regardless of "core.autocrlf".
+# See: https://help.github.com/en/articles/dealing-with-line-endings#example
+* text=auto eol=lf
