@@ -356,3 +356,10 @@ fn pseudoquine() {
 
     assert_eq!(stdout, expected);
 }
+
+#[test]
+fn poll() {
+    let ctx = WasiCtxBuilder::new().args(&["poll"]).build().unwrap();
+    let exitcode = run("poll.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+}
