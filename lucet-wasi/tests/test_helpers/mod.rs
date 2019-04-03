@@ -1,6 +1,5 @@
 use failure::{bail, Error};
-use lucet_runtime::{DlModule, Module};
-use lucet_runtime::{Limits, MmapRegion, Region};
+use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::host::__wasi_exitcode_t;
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::Link;
