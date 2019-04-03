@@ -14,7 +14,7 @@ use failure::Error;
 /// The program that consumes the resulting ELF object is responsible for
 /// using it to initialize WASM linear memory regions.
 ///
-/// [0] https://webassembly.github.io/spec/syntax/modules.html#data-segments
+/// [0] https://webassembly.github.io/spec/core/syntax/modules.html#data-segments
 ///
 /// WARNING: At present, this code
 /// - Does limited validation of data segments
