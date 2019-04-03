@@ -14,6 +14,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use structopt::StructOpt;
 use tempfile::TempDir;
 use wait_timeout::ChildExt;
 
@@ -21,11 +22,44 @@ const LUCET_WASI_FUZZ_ROOT: &'static str = env!("CARGO_MANIFEST_DIR");
 
 type Seed = c_ulong;
 
+#[derive(StructOpt, Debug)]
+#[structopt(name = "lucet-wasi-fuzz")]
+struct Config {
+    #[structopt(short = "n", long = "num-tests", default_value = "100")]
+    num_tests: usize,
+    #[structopt(long = "seed")]
+    seed: Option<Seed>,
+}
+
 fn main() {
     lucet_runtime::lucet_internal_ensure_linked();
 
-    let num_tests = 1000;
+    let config = Config::from_args();
 
+    if let Some(seed) = config.seed {
+        run_one_seed(seed);
+    } else {
+        run_many(config.num_tests);
+    }
+}
+
+fn run_one_seed(seed: Seed) {
+    match run_one(Some(seed)) {
+        Ok(TestResult::Passed) => println!("test passed"),
+        Ok(TestResult::Ignored) => println!("native build/execution failed"),
+        Ok(TestResult::Failed {
+            expected, actual, ..
+        }) => {
+            println!("test failed:\n");
+            println!("native: {}", String::from_utf8_lossy(&expected));
+            println!("lucet-wasi: {}", String::from_utf8_lossy(&actual));
+            std::process::exit(1);
+        }
+        Ok(TestResult::Errored { error }) | Err(error) => println!("test errored: {}", error),
+    }
+}
+
+fn run_many(num_tests: usize) {
     let mut progress = progress::Bar::new();
     progress.set_job_title(&format!("Running {} tests", num_tests));
 
@@ -34,7 +68,7 @@ fn main() {
 
     let res = (0..num_tests)
         .into_par_iter()
-        .try_for_each(|_| match run_one() {
+        .try_for_each(|_| match run_one(None) {
             Ok(TestResult::Passed) | Ok(TestResult::Ignored) => {
                 let mut num_finished = num_finished.lock().unwrap();
                 *num_finished += 1;
@@ -68,15 +102,14 @@ fn main() {
     }
 }
 
-fn gen_c<P: AsRef<Path>>(gen_c_path: P) -> Result<Seed, Error> {
-    let seed = random::<Seed>();
+fn gen_c<P: AsRef<Path>>(gen_c_path: P, seed: Seed) -> Result<(), Error> {
     Command::new("csmith")
         .arg("-s")
         .arg(format!("{}", seed))
         .arg("-o")
         .arg(gen_c_path.as_ref())
         .status()?;
-    Ok(seed)
+    Ok(())
 }
 
 fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<Vec<u8>>, Error> {
@@ -133,12 +166,13 @@ enum TestResult {
     },
 }
 
-fn run_one() -> Result<TestResult, Error> {
+fn run_one(seed: Option<Seed>) -> Result<TestResult, Error> {
     let tmpdir = TempDir::new().unwrap();
 
     let gen_c_path = tmpdir.path().join("gen.c");
 
-    let seed = gen_c(&gen_c_path)?;
+    let seed = seed.unwrap_or(random::<Seed>());
+    gen_c(&gen_c_path, seed)?;
 
     let native_stdout = if let Some(stdout) = run_native(&tmpdir, &gen_c_path)? {
         stdout
