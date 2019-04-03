@@ -14,7 +14,9 @@ RUN apt-get update \
 	ca-certificates \
 	software-properties-common \
 	libssl-dev \
-	pkg-config \
+        pkg-config \
+        csmith \
+        libcsmith-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # Setting a consistent LD_LIBRARY_PATH across the entire environment prevents unnecessary Cargo

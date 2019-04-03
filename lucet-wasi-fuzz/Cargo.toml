@@ -1,0 +1,21 @@
+[package]
+name = "lucet-wasi-fuzz"
+version = "0.1.0"
+authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.32"
+failure = "0.1"
+libc = "0.2"
+lucetc = { path = "../lucetc" }
+lucet-runtime = { path = "../lucet-runtime" }
+lucet-wasi = { path = "../lucet-wasi" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
+nix = "0.13"
+progress = "0.2"
+rand = "0.6"
+rayon = "1.0"
+structopt = "0.2"
+tempfile = "3.0"
+wait-timeout = "0.2"
