@@ -1,6 +1,7 @@
 use super::runtime::RuntimeFunc;
 use crate::decls::ModuleDecls;
 use crate::pointer::{NATIVE_POINTER, POINTER_SIZE};
+use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -96,7 +97,8 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     }
 
     fn make_heap(&mut self, func: &mut ir::Function, index: MemoryIndex) -> ir::Heap {
-        let heap_spec = self.module_decls.get_heap(index).expect("valid heap");
+        assert_eq!(index, MemoryIndex::new(0), "only memory 0 is supported");
+        let heap_spec = self.module_decls.get_heap().expect("valid heap");
         let vmctx = self.get_vmctx(func);
         func.create_heap(ir::HeapData {
             base: vmctx,

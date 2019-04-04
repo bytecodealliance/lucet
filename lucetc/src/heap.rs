@@ -14,14 +14,3 @@ impl Default for HeapSettings {
         }
     }
 }
-
-pub use lucet_module_data::HeapSpec;
-
-pub fn empty_heap_spec() -> HeapSpec {
-    HeapSpec {
-        reserved_size: 0,
-        guard_size: 0,
-        initial_size: 0,
-        max_size: None,
-    }
-}

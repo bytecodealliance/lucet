@@ -1,7 +1,7 @@
 use crate::bindings::Bindings;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::heap::HeapSettings;
-use crate::module::{DataInitializer, ModuleInfo};
+use crate::module::ModuleInfo;
 pub use crate::module::{Exportable, TableElems};
 use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
@@ -14,7 +14,10 @@ use cranelift_wasm::{
     Table, TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
-use lucet_module_data::{Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec};
+use lucet_module_data::{
+    owned::OwnedLinearMemorySpec, Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec,
+    ModuleData,
+};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -57,7 +60,8 @@ pub struct ModuleDecls<'a> {
     function_names: PrimaryMap<FuncIndex, Name>,
     table_names: PrimaryMap<TableIndex, (Name, Name)>,
     runtime_names: HashMap<RuntimeFunc, Name>,
-    heaps: PrimaryMap<MemoryIndex, HeapSpec>,
+    globals_spec: Vec<GlobalSpec<'a>>,
+    linear_memory_spec: Option<OwnedLinearMemorySpec>,
 }
 
 impl<'a> ModuleDecls<'a> {
@@ -71,14 +75,16 @@ impl<'a> ModuleDecls<'a> {
         let function_names = Self::declare_funcs(&info, clif_module, bindings)?;
         let table_names = Self::declare_tables(&info, clif_module)?;
         let runtime_names = Self::declare_runtime(&runtime, clif_module)?;
-        let heaps = Self::declare_heaps(&info, heap_settings)?;
+        let globals_spec = Self::declare_globals_spec(&info)?;
+        let linear_memory_spec = Self::declare_linear_memory_spec(&info, heap_settings)?;
         Ok(Self {
             info,
             function_names,
             table_names,
             runtime_names,
             runtime,
-            heaps,
+            globals_spec,
+            linear_memory_spec,
         })
     }
 
@@ -146,47 +152,6 @@ impl<'a> ModuleDecls<'a> {
         Ok(table_names)
     }
 
-    fn declare_heaps(
-        info: &ModuleInfo<'a>,
-        heap_settings: HeapSettings,
-    ) -> Result<PrimaryMap<MemoryIndex, HeapSpec>, LucetcError> {
-        let mut heaps = PrimaryMap::new();
-
-        for ix in 0..info.memories.len() {
-            let ix = MemoryIndex::new(ix);
-
-            if ix != MemoryIndex::new(0) {
-                Err(format_err!("lucetc only supports memory 0")).context(
-                    LucetcErrorKind::Unsupported("memories with index != 0".to_owned()),
-                )?
-            }
-
-            let memory = info.memories.get(ix).expect("memory in range").entity;
-
-            let wasm_page: u64 = 64 * 1024;
-            let initial_size = memory.minimum as u64 * wasm_page;
-
-            let reserved_size = std::cmp::max(initial_size, heap_settings.min_reserved_size);
-            if reserved_size > heap_settings.max_reserved_size {
-                Err(format_err!(
-                    "module reserved size ({}) exceeds max reserved size ({})",
-                    reserved_size,
-                    heap_settings.max_reserved_size
-                ))
-                .context(LucetcErrorKind::MemorySpecs)?;
-            }
-            // Find the max size permitted by the heap and the memory spec
-            let max_size = memory.maximum.map(|pages| pages as u64 * wasm_page);
-            heaps.push(HeapSpec {
-                reserved_size,
-                guard_size: heap_settings.guard_size,
-                initial_size: initial_size,
-                max_size: max_size,
-            });
-        }
-        Ok(heaps)
-    }
-
     fn declare_runtime<B: ClifBackend>(
         runtime: &Runtime,
         clif_module: &mut ClifModule<B>,
@@ -203,6 +168,93 @@ impl<'a> ModuleDecls<'a> {
         Ok(runtime_names)
     }
 
+    fn declare_linear_memory_spec(
+        info: &ModuleInfo<'a>,
+        heap_settings: HeapSettings,
+    ) -> Result<Option<OwnedLinearMemorySpec>, LucetcError> {
+        use crate::sparsedata::owned_sparse_data_from_initializers;
+        if let Some(heap_spec) = Self::declare_heap_spec(info, heap_settings)? {
+            let data_initializers = info
+                .data_initializers
+                .get(&MemoryIndex::new(0))
+                .expect("heap spec implies data initializers should exist");
+            let sparse_data = owned_sparse_data_from_initializers(data_initializers, &heap_spec)
+                .context(LucetcErrorKind::ModuleData)?;
+
+            Ok(Some(OwnedLinearMemorySpec {
+                heap: heap_spec,
+                initializer: sparse_data,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn declare_globals_spec(info: &ModuleInfo<'a>) -> Result<Vec<GlobalSpec<'a>>, LucetcError> {
+        let mut globals = Vec::new();
+        for ix in 0..info.globals.len() {
+            let ix = GlobalIndex::new(ix);
+            let g_decl = info.globals.get(ix).unwrap();
+            let g_import = info.imported_globals.get(ix);
+            let g_variant = if let Some((module, field)) = g_import {
+                GlobalVariant::Import { module, field }
+            } else {
+                let init_val = match g_decl.entity.initializer {
+                    // Need to fix global spec in ModuleData and the runtime to support more:
+                    GlobalInit::I32Const(i) => i as i64,
+                    GlobalInit::I64Const(i) => i,
+                    _ => Err(format_err!("global initializer {:?}", g_decl.entity)).context(
+                        LucetcErrorKind::Unsupported("non-integer global initializer".to_owned()),
+                    )?,
+                };
+                GlobalVariant::Def {
+                    def: GlobalDef::new(init_val),
+                }
+            };
+            globals.push(GlobalSpec::new(g_variant, None));
+        }
+        Ok(globals)
+    }
+
+    fn declare_heap_spec(
+        info: &ModuleInfo<'a>,
+        heap_settings: HeapSettings,
+    ) -> Result<Option<HeapSpec>, LucetcError> {
+        match info.memories.len() {
+            0 => Ok(None),
+            1 => {
+                let memory = info
+                    .memories
+                    .get(MemoryIndex::new(0))
+                    .expect("memory in range")
+                    .entity;
+
+                let wasm_page: u64 = 64 * 1024;
+                let initial_size = memory.minimum as u64 * wasm_page;
+
+                let reserved_size = std::cmp::max(initial_size, heap_settings.min_reserved_size);
+                if reserved_size > heap_settings.max_reserved_size {
+                    Err(format_err!(
+                        "module reserved size ({}) exceeds max reserved size ({})",
+                        reserved_size,
+                        heap_settings.max_reserved_size
+                    ))
+                    .context(LucetcErrorKind::MemorySpecs)?;
+                }
+                // Find the max size permitted by the heap and the memory spec
+                let max_size = memory.maximum.map(|pages| pages as u64 * wasm_page);
+                Ok(Some(HeapSpec {
+                    reserved_size,
+                    guard_size: heap_settings.guard_size,
+                    initial_size: initial_size,
+                    max_size: max_size,
+                }))
+            }
+            _ => Err(format_err!("lucetc only supports memory 0")).context(
+                LucetcErrorKind::Unsupported("memories with index != 0".to_owned()),
+            )?,
+        }
+    }
     // ********************* Public Interface **************************
 
     pub fn target_config(&self) -> TargetFrontendConfig {
@@ -285,46 +337,20 @@ impl<'a> ModuleDecls<'a> {
             .ok_or_else(|| format_err!("global out of bounds: {:?}", global_index))
     }
 
-    pub fn get_heap(&self, mem_index: MemoryIndex) -> Result<&HeapSpec, Error> {
-        self.heaps
-            .get(mem_index)
-            .ok_or_else(|| format_err!("linear memory out of bounds: {:?}", mem_index))
-    }
-
-    pub fn get_data_initializers(
-        &self,
-        mem_index: MemoryIndex,
-    ) -> Result<&[DataInitializer<'a>], Error> {
-        self.info
-            .data_initializers
-            .get(&mem_index)
-            .map(|v| v.as_slice())
-            .ok_or_else(|| format_err!("linear memory has no data initializers: {:?}", mem_index))
-    }
-
-    pub fn get_globals_spec(&self) -> Result<Vec<GlobalSpec<'a>>, LucetcError> {
-        let mut globals = Vec::new();
-        for ix in 0..self.info.globals.len() {
-            let ix = GlobalIndex::new(ix);
-            let g_decl = self.info.globals.get(ix).unwrap();
-            let g_import = self.info.imported_globals.get(ix);
-            let g_variant = if let Some((module, field)) = g_import {
-                GlobalVariant::Import { module, field }
-            } else {
-                let init_val = match g_decl.entity.initializer {
-                    // Need to fix global spec in ModuleData and the runtime to support more:
-                    GlobalInit::I32Const(i) => i as i64,
-                    GlobalInit::I64Const(i) => i,
-                    _ => Err(format_err!("global initializer {:?}", g_decl.entity)).context(
-                        LucetcErrorKind::Unsupported("non-integer global initializer".to_owned()),
-                    )?,
-                };
-                GlobalVariant::Def {
-                    def: GlobalDef::new(init_val),
-                }
-            };
-            globals.push(GlobalSpec::new(g_variant, None));
+    pub fn get_heap(&self) -> Option<&HeapSpec> {
+        if let Some(ref spec) = self.linear_memory_spec {
+            Some(&spec.heap)
+        } else {
+            None
         }
-        Ok(globals)
+    }
+
+    pub fn get_module_data(&self) -> ModuleData {
+        let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
+            Some(spec.to_ref())
+        } else {
+            None
+        };
+        ModuleData::new(linear_memory, self.globals_spec.clone())
     }
 }
