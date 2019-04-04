@@ -1,4 +1,4 @@
-use failure::{bail, format_err, Error};
+use failure::{bail, ensure, format_err, Error};
 use libc::c_ulong;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::host::__wasi_exitcode_t;
@@ -7,11 +7,12 @@ use lucet_wasi_sdk::Link;
 use lucetc::{Bindings, Lucetc};
 use rand::prelude::random;
 use rayon::prelude::*;
+use regex::Regex;
 use std::fs::File;
-use std::io::Read;
-use std::os::unix::io::{FromRawFd, IntoRawFd};
-use std::path::Path;
-use std::process::{Command, Stdio};
+use std::io::{Read, Write};
+use std::os::unix::prelude::{FromRawFd, IntoRawFd, OpenOptionsExt};
+use std::path::{Path, PathBuf};
+use std::process::{exit, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use structopt::StructOpt;
@@ -24,23 +25,158 @@ type Seed = c_ulong;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "lucet-wasi-fuzz")]
-struct Config {
-    #[structopt(short = "n", long = "num-tests", default_value = "100")]
-    num_tests: usize,
-    #[structopt(long = "seed")]
-    seed: Option<Seed>,
+enum Config {
+    /// Test the Lucet toolchain against native code execution using Csmith
+    #[structopt(name = "fuzz")]
+    Fuzz {
+        #[structopt(short = "n", long = "num-tests", default_value = "100")]
+        /// The number of tests to run
+        num_tests: usize,
+    },
+
+    /// Reduce a test case, starting from the given Csmith seed
+    #[structopt(name = "creduce")]
+    Creduce { seed: Seed },
+
+    /// Creduce interestingness check (probably not useful directly)
+    #[structopt(name = "creduce-interesting")]
+    CreduceInteresting { creduce_src: PathBuf },
+
+    /// Run a test case with the given Csmith seed
+    #[structopt(name = "test-seed")]
+    TestSeed { seed: Seed },
 }
 
 fn main() {
     lucet_runtime::lucet_internal_ensure_linked();
 
-    let config = Config::from_args();
-
-    if let Some(seed) = config.seed {
-        run_one_seed(seed);
-    } else {
-        run_many(config.num_tests);
+    match Config::from_args() {
+        Config::Fuzz { num_tests } => run_many(num_tests),
+        Config::Creduce { seed } => run_creduce_driver(seed),
+        Config::CreduceInteresting { creduce_src } => run_creduce_interestingness(creduce_src),
+        Config::TestSeed { seed } => run_one_seed(seed),
     }
+}
+
+fn run_creduce_driver(seed: Seed) {
+    let tmpdir = TempDir::new().unwrap();
+
+    // make the driver script
+
+    let mut script = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .mode(0o777)
+        .open(tmpdir.path().join("script.sh"))
+        .unwrap();
+
+    let current_exe = std::env::current_exe().unwrap();
+
+    write!(
+        script,
+        "{}",
+        format!(
+            "#!/usr/bin/env sh\n{} creduce-interesting gen.c",
+            current_exe.display()
+        ),
+    )
+    .unwrap();
+
+    drop(script);
+
+    // reproduce the generated program, and then preprocess it
+
+    let st = Command::new("csmith")
+        .arg("-s")
+        .arg(format!("{}", seed))
+        .arg("-o")
+        .arg(tmpdir.path().join("gen-original.c"))
+        .status()
+        .unwrap();
+    assert!(st.success());
+
+    let st = Command::new("clang")
+        .arg("-I/usr/include/csmith")
+        .arg("-m32")
+        .arg("-E")
+        .arg("-P")
+        .arg(tmpdir.path().join("gen-original.c"))
+        .arg("-o")
+        .arg(tmpdir.path().join("gen.c"))
+        .status()
+        .unwrap();
+    assert!(st.success());
+
+    let st = Command::new("creduce")
+        .current_dir(tmpdir.path())
+        .arg("--n")
+        .arg(format!("{}", std::cmp::max(1, num_cpus::get() - 1)))
+        .arg("script.sh")
+        .arg("gen.c")
+        .status()
+        .unwrap();
+    assert!(st.success());
+
+    print!(
+        "{}",
+        std::fs::read_to_string(tmpdir.path().join("gen.c")).unwrap()
+    );
+}
+
+fn run_creduce_interestingness<P: AsRef<Path>>(src: P) {
+    let tmpdir = TempDir::new().unwrap();
+
+    match run_both(&tmpdir, src, None) {
+        Ok(TestResult::Passed) => println!("test passed"),
+        Ok(TestResult::Ignored) => println!("native build/execution failed"),
+        Ok(TestResult::Failed {
+            expected, actual, ..
+        }) => {
+            println!("test failed:\n");
+            let expected = String::from_utf8_lossy(&expected);
+            let actual = String::from_utf8_lossy(&actual);
+            println!("native: {}", &expected);
+            println!("lucet-wasi: {}", &actual);
+
+            let re = Regex::new(r"^checksum = ([[:xdigit:]]{8})").unwrap();
+
+            // a coarse way to stop creduce from producing degenerate cases that happen to yield
+            // different output
+
+            let expected_checksum = if let Some(caps) = re.captures(&expected) {
+                if let Some(cap) = caps.get(1) {
+                    cap.as_str().to_owned()
+                } else {
+                    // not interesting: no checksum captured from native output
+                    exit(1);
+                }
+            } else {
+                // not interesting: no checksum captured from native output
+                exit(1);
+            };
+
+            let actual_checksum = if let Some(caps) = re.captures(&actual) {
+                if let Some(cap) = caps.get(1) {
+                    cap.as_str().to_owned()
+                } else {
+                    // interesting: checksum captured from native output but not wasm
+                    exit(0)
+                }
+            } else {
+                // interesting: checksum captured from native output but not wasm
+                exit(0)
+            };
+
+            if expected_checksum == actual_checksum {
+                // they match; not interesting
+                exit(1);
+            } else {
+                exit(0);
+            }
+        }
+        Ok(TestResult::Errored { error }) | Err(error) => println!("test errored: {}", error),
+    }
+    exit(1);
 }
 
 fn run_one_seed(seed: Seed) {
@@ -53,7 +189,7 @@ fn run_one_seed(seed: Seed) {
             println!("test failed:\n");
             println!("native: {}", String::from_utf8_lossy(&expected));
             println!("lucet-wasi: {}", String::from_utf8_lossy(&actual));
-            std::process::exit(1);
+            exit(1);
         }
         Ok(TestResult::Errored { error }) | Err(error) => println!("test errored: {}", error),
     }
@@ -91,10 +227,10 @@ fn run_many(num_tests: usize) {
             expected,
             actual,
         }) => {
-            println!("test failed with seed {}\n", seed);
+            println!("test failed with seed {}\n", seed.unwrap());
             println!("native: {}", String::from_utf8_lossy(&expected));
             println!("lucet-wasi: {}", String::from_utf8_lossy(&actual));
-            std::process::exit(1)
+            exit(1);
         }
         Err(TestResult::Errored { error }) => println!("test errored: {}", error),
         Err(_) => unreachable!(),
@@ -112,15 +248,51 @@ fn gen_c<P: AsRef<Path>>(gen_c_path: P, seed: Seed) -> Result<(), Error> {
     Ok(())
 }
 
+fn run_both<P: AsRef<Path>>(
+    tmpdir: &TempDir,
+    src: P,
+    seed: Option<Seed>,
+) -> Result<TestResult, Error> {
+    let native_stdout = if let Some(stdout) = run_native(&tmpdir, src.as_ref())? {
+        stdout
+    } else {
+        return Ok(TestResult::Ignored);
+    };
+
+    let (exitcode, wasm_stdout) = run_with_stdout(&tmpdir, src.as_ref())?;
+
+    assert_eq!(exitcode, 0);
+
+    if &wasm_stdout != &native_stdout {
+        Ok(TestResult::Failed {
+            seed,
+            expected: native_stdout,
+            actual: wasm_stdout,
+        })
+    } else {
+        Ok(TestResult::Passed)
+    }
+}
+
 fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<Vec<u8>>, Error> {
     let gen_path = tmpdir.path().join("gen");
 
-    Command::new("cc")
+    let res = Command::new("clang")
+        .arg("-m32")
+        .arg("-std=c11")
+        .arg("-Werror=format")
+        .arg("-Werror=uninitialized")
+        .arg("-Werror=conditional-uninitialized")
         .arg("-I/usr/include/csmith")
         .arg(gen_c_path.as_ref())
         .arg("-o")
         .arg(&gen_path)
         .output()?;
+    ensure!(res.status.success(), "native C compilation failed");
+
+    if String::from_utf8_lossy(&res.stderr).contains("too few arguments in call") {
+        bail!("saw \"too few arguments in call\" warning");
+    }
 
     let mut native_child = Command::new(&gen_path).stdout(Stdio::piped()).spawn()?;
 
@@ -157,7 +329,7 @@ enum TestResult {
     Passed,
     Ignored,
     Failed {
-        seed: Seed,
+        seed: Option<Seed>,
         expected: Vec<u8>,
         actual: Vec<u8>,
     },
@@ -174,25 +346,7 @@ fn run_one(seed: Option<Seed>) -> Result<TestResult, Error> {
     let seed = seed.unwrap_or(random::<Seed>());
     gen_c(&gen_c_path, seed)?;
 
-    let native_stdout = if let Some(stdout) = run_native(&tmpdir, &gen_c_path)? {
-        stdout
-    } else {
-        return Ok(TestResult::Ignored);
-    };
-
-    let (exitcode, wasm_stdout) = run_with_stdout(&tmpdir, &gen_c_path)?;
-
-    assert_eq!(exitcode, 0);
-
-    if &wasm_stdout != &native_stdout {
-        Ok(TestResult::Failed {
-            seed,
-            expected: native_stdout,
-            actual: wasm_stdout,
-        })
-    } else {
-        Ok(TestResult::Passed)
-    }
+    run_both(&tmpdir, &gen_c_path, Some(seed))
 }
 
 fn run_with_stdout<P: AsRef<Path>>(

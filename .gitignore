@@ -2,6 +2,3 @@ target/
 *.rs.bk
 *.pyc
 host
-
-# csmith-generated
-/platform.info
