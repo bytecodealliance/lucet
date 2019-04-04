@@ -131,7 +131,10 @@ impl RegionInternal for MmapRegion {
             }
         }
 
-        let initial_size = module.heap_spec().initial_size as usize;
+        let initial_size = module
+            .heap_spec()
+            .map(|h| h.initial_size as usize)
+            .unwrap_or(0);
 
         // reset the heap to the initial size, and mprotect those pages appropriately
         if alloc.heap_accessible_size != initial_size {

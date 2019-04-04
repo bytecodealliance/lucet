@@ -154,25 +154,25 @@ impl Alloc {
         // the above makes sure this expression does not underflow
         let guard_remaining = self.heap_inaccessible_size - expand_pagealigned as usize;
 
-        let heap_spec = module.heap_spec();
-        // The compiler specifies how much guard (memory which traps on access) must be beyond the
-        // end of the accessible memory. We cannot perform an expansion that would make this region
-        // smaller than the compiler expected it to be.
-        if guard_remaining < heap_spec.guard_size as usize {
-            bail_limits_exceeded!("expansion would leave guard memory too small");
-        }
+        if let Some(heap_spec) = module.heap_spec() {
+            // The compiler specifies how much guard (memory which traps on access) must be beyond the
+            // end of the accessible memory. We cannot perform an expansion that would make this region
+            // smaller than the compiler expected it to be.
+            if guard_remaining < heap_spec.guard_size as usize {
+                bail_limits_exceeded!("expansion would leave guard memory too small");
+            }
 
-        // The compiler indicates that the module has specified a maximum memory size. Don't let
-        // the heap expand beyond that:
-        if let Some(max_size) = heap_spec.max_size {
-            if self.heap_accessible_size + expand_pagealigned as usize > max_size as usize {
-                bail_limits_exceeded!(
-                    "expansion would exceed module-specified heap limit: {:?}",
-                    max_size
-                );
+            // The compiler indicates that the module has specified a maximum memory size. Don't let
+            // the heap expand beyond that:
+            if let Some(max_size) = heap_spec.max_size {
+                if self.heap_accessible_size + expand_pagealigned as usize > max_size as usize {
+                    bail_limits_exceeded!(
+                        "expansion would exceed module-specified heap limit: {:?}",
+                        max_size
+                    );
+                }
             }
         }
-
         // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let
         // the heap expand beyond that:
         if self.heap_accessible_size + expand_pagealigned as usize > slot.limits.heap_memory_size {

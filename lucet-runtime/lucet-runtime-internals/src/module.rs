@@ -89,7 +89,7 @@ pub struct AddrDetails {
 pub trait Module: ModuleInternal {}
 
 pub trait ModuleInternal: Send + Sync {
-    fn heap_spec(&self) -> &HeapSpec;
+    fn heap_spec(&self) -> Option<&HeapSpec>;
 
     /// Get the WebAssembly globals of the module.
     ///
@@ -143,32 +143,34 @@ pub trait ModuleInternal: Send + Sync {
     /// Returns a `Result<(), Error>` rather than a boolean in order to provide a richer accounting
     /// of what may be invalid.
     fn validate_runtime_spec(&self, limits: &Limits) -> Result<(), Error> {
-        let heap = self.heap_spec();
-        // Assure that the total reserved + guard regions fit in the address space.
-        // First check makes sure they fit our 32-bit model, and ensures the second
-        // check doesn't overflow.
-        if heap.reserved_size > std::u32::MAX as u64 + 1
-            || heap.guard_size > std::u32::MAX as u64 + 1
-        {
-            return Err(lucet_incorrect_module!(
-                "heap spec sizes would overflow: {:?}",
-                heap
-            ));
-        }
+        // Modules without heap specs will not access the heap
+        if let Some(heap) = self.heap_spec() {
+            // Assure that the total reserved + guard regions fit in the address space.
+            // First check makes sure they fit our 32-bit model, and ensures the second
+            // check doesn't overflow.
+            if heap.reserved_size > std::u32::MAX as u64 + 1
+                || heap.guard_size > std::u32::MAX as u64 + 1
+            {
+                return Err(lucet_incorrect_module!(
+                    "heap spec sizes would overflow: {:?}",
+                    heap
+                ));
+            }
 
-        if heap.reserved_size as usize + heap.guard_size as usize > limits.heap_address_space_size {
-            bail_limits_exceeded!("heap spec reserved and guard size: {:?}", heap);
-        }
+            if heap.reserved_size as usize + heap.guard_size as usize > limits.heap_address_space_size {
+                bail_limits_exceeded!("heap spec reserved and guard size: {:?}", heap);
+            }
 
-        if heap.initial_size as usize > limits.heap_memory_size {
-            bail_limits_exceeded!("heap spec initial size: {:?}", heap);
-        }
+            if heap.initial_size as usize > limits.heap_memory_size {
+                bail_limits_exceeded!("heap spec initial size: {:?}", heap);
+            }
 
-        if heap.initial_size > heap.reserved_size {
-            return Err(lucet_incorrect_module!(
-                "initial heap size greater than reserved size: {:?}",
-                heap
-            ));
+            if heap.initial_size > heap.reserved_size {
+                return Err(lucet_incorrect_module!(
+                    "initial heap size greater than reserved size: {:?}",
+                    heap
+                ));
+            }
         }
 
         if self.globals().len() * std::mem::size_of::<u64>() > limits.globals_size {
