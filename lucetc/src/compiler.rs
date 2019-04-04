@@ -19,6 +19,7 @@ use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator};
 use failure::ResultExt;
+use lucet_module_data::ModuleData;
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
@@ -92,6 +93,10 @@ impl<'a> Compiler<'a> {
             clif_module,
             opt_level,
         })
+    }
+
+    pub fn module_data(&self) -> ModuleData {
+        self.decls.get_module_data()
     }
 
     pub fn object_file(mut self) -> Result<ObjectFile, LucetcError> {
