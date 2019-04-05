@@ -19,12 +19,6 @@ install: build
 .PHONY: test
 test: indent-check
 	cargo test --no-fail-fast \
-            -p lucet-runtime-internals \
-            -p lucet-runtime \
-            -p lucet-module-data \
-            -p lucetc \
-            -p lucet-idl \
-            -p lucet-wasi-sdk \
             -p lucet-wasi
 
 .PHONY: bench
