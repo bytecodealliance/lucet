@@ -9,7 +9,6 @@ use std::path::Path;
 use tempfile::TempDir;
 
 #[test]
-#[ignore]
 fn hello() {
     io::stderr().write(b"hello\n");
     let ctx = WasiCtxBuilder::new().args(&["hello"]);
@@ -26,7 +25,6 @@ fn hello() {
 }
 
 #[test]
-#[ignore]
 fn hello_args() {
     io::stderr().write(b"hello_args\n");
     let ctx = WasiCtxBuilder::new().args(&["hello", "test suite"]);
@@ -43,7 +41,6 @@ fn hello_args() {
 }
 
 #[test]
-#[ignore]
 fn hello_env() {
     io::stderr().write(b"hello_env\n");
     let ctx = WasiCtxBuilder::new()
@@ -62,7 +59,6 @@ fn hello_env() {
 }
 
 #[test]
-#[ignore]
 fn exitcode() {
     io::stderr().write(b"exitcode\n");
     let ctx = WasiCtx::new(&["exitcode"]);
@@ -74,7 +70,6 @@ fn exitcode() {
 }
 
 #[test]
-#[ignore]
 fn clock_getres() {
     io::stderr().write(b"clock_getres\n");
     let ctx = WasiCtx::new(&["clock_getres"]);
@@ -86,7 +81,6 @@ fn clock_getres() {
 }
 
 #[test]
-#[ignore]
 fn getrusage() {
     io::stderr().write(b"getrusage\n");
     let ctx = WasiCtx::new(&["getrusage"]);
@@ -98,7 +92,6 @@ fn getrusage() {
 }
 
 #[test]
-#[ignore]
 fn gettimeofday() {
     io::stderr().write(b"gettimeofday\n");
     let ctx = WasiCtx::new(&["gettimeofday"]);
@@ -110,7 +103,6 @@ fn gettimeofday() {
 }
 
 #[test]
-#[ignore]
 fn getentropy() {
     io::stderr().write(b"getentropy\n");
     let ctx = WasiCtx::new(&["getentropy"]);
@@ -241,7 +233,6 @@ fn read_file_twice() {
 }
 
 #[test]
-#[ignore]
 fn cant_dotdot() {
     io::stderr().write(b"cant_dotdot\n");
     const MESSAGE: &'static str = "hello from file!";
@@ -297,7 +288,6 @@ fn notdir() {
 }
 
 #[test]
-#[ignore]
 fn follow_symlink() {
     io::stderr().write(b"follow_symlink\n");
     const MESSAGE: &'static str = "hello from file!";
