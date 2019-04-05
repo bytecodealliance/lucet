@@ -3,13 +3,18 @@ mod test_helpers;
 use crate::test_helpers::{run, run_with_stdout, LUCET_WASI_ROOT};
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
 use std::fs::File;
+use std::io;
+use std::io::Write;
 use std::path::Path;
 use tempfile::TempDir;
 
 #[test]
+#[ignore]
 fn hello() {
+    io::stderr().write(b"hello\n");
     let ctx = WasiCtxBuilder::new().args(&["hello"]);
 
+    io::stderr().write(b"hello built\n");
     let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
         ctx,
@@ -21,9 +26,12 @@ fn hello() {
 }
 
 #[test]
+#[ignore]
 fn hello_args() {
+    io::stderr().write(b"hello_args\n");
     let ctx = WasiCtxBuilder::new().args(&["hello", "test suite"]);
 
+    io::stderr().write(b"hello_args built\n");
     let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
         ctx,
@@ -35,11 +43,14 @@ fn hello_args() {
 }
 
 #[test]
+#[ignore]
 fn hello_env() {
+    io::stderr().write(b"hello_env\n");
     let ctx = WasiCtxBuilder::new()
         .args(&["hello", "test suite"])
         .env("GREETING", "goodbye");
 
+    io::stderr().write(b"hello_env\n");
     let (exitcode, stdout) = run_with_stdout(
         Path::new(LUCET_WASI_ROOT).join("examples").join("hello.c"),
         ctx,
@@ -51,45 +62,60 @@ fn hello_env() {
 }
 
 #[test]
+#[ignore]
 fn exitcode() {
+    io::stderr().write(b"exitcode\n");
     let ctx = WasiCtx::new(&["exitcode"]);
 
+    io::stderr().write(b"exitcode built\n");
     let exitcode = run("exitcode.c", ctx).unwrap();
 
     assert_eq!(exitcode, 120);
 }
 
 #[test]
+#[ignore]
 fn clock_getres() {
+    io::stderr().write(b"clock_getres\n");
     let ctx = WasiCtx::new(&["clock_getres"]);
 
+    io::stderr().write(b"clock_getres built\n");
     let exitcode = run("clock_getres.c", ctx).unwrap();
 
     assert_eq!(exitcode, 0);
 }
 
 #[test]
+#[ignore]
 fn getrusage() {
+    io::stderr().write(b"getrusage\n");
     let ctx = WasiCtx::new(&["getrusage"]);
 
+    io::stderr().write(b"getrusage built\n");
     let exitcode = run("getrusage.c", ctx).unwrap();
 
     assert_eq!(exitcode, 0);
 }
 
 #[test]
+#[ignore]
 fn gettimeofday() {
+    io::stderr().write(b"gettimeofday\n");
     let ctx = WasiCtx::new(&["gettimeofday"]);
 
+    io::stderr().write(b"gettimeofday built\n");
     let exitcode = run("gettimeofday.c", ctx).unwrap();
 
     assert_eq!(exitcode, 0);
 }
 
 #[test]
+#[ignore]
 fn getentropy() {
+    io::stderr().write(b"getentropy\n");
     let ctx = WasiCtx::new(&["getentropy"]);
 
+    io::stderr().write(b"getentropy built\n");
     let exitcode = run("getentropy.c", ctx).unwrap();
 
     assert_eq!(exitcode, 0);
@@ -97,6 +123,7 @@ fn getentropy() {
 
 #[test]
 fn stdin() {
+    io::stderr().write(b"stdin\n");
     use std::io::Write;
     use std::os::unix::io::FromRawFd;
 
@@ -107,6 +134,7 @@ fn stdin() {
     drop(stdin_file);
 
     let ctx = unsafe { WasiCtxBuilder::new().args(&["stdin"]).raw_fd(0, pipe_out) };
+    io::stderr().write(b"stdin built\n");
 
     let (exitcode, stdout) = run_with_stdout("stdin.c", ctx).unwrap();
 
@@ -116,6 +144,7 @@ fn stdin() {
 
 #[test]
 fn preopen_populates() {
+    io::stderr().write(b"preopen_populates\n");
     let tmpdir = TempDir::new().unwrap();
     let preopen_host_path = tmpdir.path().join("preopen");
     std::fs::create_dir(&preopen_host_path).unwrap();
@@ -127,6 +156,7 @@ fn preopen_populates() {
         .build()
         .expect("can build WasiCtx");
 
+    io::stderr().write(b"preopen_populates built\n");
     let exitcode = run("preopen_populates.c", ctx).unwrap();
 
     drop(tmpdir);
@@ -136,6 +166,7 @@ fn preopen_populates() {
 
 #[test]
 fn write_file() {
+    io::stderr().write(b"write_file\n");
     let tmpdir = TempDir::new().unwrap();
     let preopen_host_path = tmpdir.path().join("preopen");
     std::fs::create_dir(&preopen_host_path).unwrap();
@@ -147,6 +178,7 @@ fn write_file() {
         .build()
         .expect("can build WasiCtx");
 
+    io::stderr().write(b"write_file built\n");
     let exitcode = run("write_file.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 
@@ -159,6 +191,7 @@ fn write_file() {
 
 #[test]
 fn read_file() {
+    io::stderr().write(b"read_file\n");
     const MESSAGE: &'static str = "hello from file!";
     let tmpdir = TempDir::new().unwrap();
     let preopen_host_path = tmpdir.path().join("preopen");
@@ -171,6 +204,7 @@ fn read_file() {
     let ctx = WasiCtxBuilder::new()
         .args(&["read_file"])
         .preopened_dir(preopen_dir, "/sandbox");
+    io::stderr().write(b"read_file built\n");
 
     let (exitcode, stdout) = run_with_stdout("read_file.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
@@ -182,6 +216,7 @@ fn read_file() {
 
 #[test]
 fn read_file_twice() {
+    io::stderr().write(b"read_file_twice\n");
     const MESSAGE: &'static str = "hello from file!";
     let tmpdir = TempDir::new().unwrap();
     let preopen_host_path = tmpdir.path().join("preopen");
@@ -194,6 +229,7 @@ fn read_file_twice() {
     let ctx = WasiCtxBuilder::new()
         .args(&["read_file_twice"])
         .preopened_dir(preopen_dir, "/sandbox");
+    io::stderr().write(b"read_file_twice built\n");
 
     let (exitcode, stdout) = run_with_stdout("read_file_twice.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
@@ -205,7 +241,9 @@ fn read_file_twice() {
 }
 
 #[test]
+#[ignore]
 fn cant_dotdot() {
+    io::stderr().write(b"cant_dotdot\n");
     const MESSAGE: &'static str = "hello from file!";
     let tmpdir = TempDir::new().unwrap();
     let preopen_host_path = tmpdir.path().join("preopen");
@@ -219,6 +257,7 @@ fn cant_dotdot() {
 
     let preopen_dir = File::open(&preopen_host_path).unwrap();
 
+    io::stderr().write(b"cant_dotdot built\n");
     let ctx = WasiCtxBuilder::new()
         .args(&["cant_dotdot"])
         .preopened_dir(preopen_dir, "/sandbox")
@@ -234,6 +273,7 @@ fn cant_dotdot() {
 #[ignore] // needs fd_readdir
 #[test]
 fn notdir() {
+    io::stderr().write(b"notdir\n");
     const MESSAGE: &'static str = "hello from file!";
     let tmpdir = TempDir::new().unwrap();
     let preopen_host_path = tmpdir.path().join("preopen");
@@ -249,6 +289,7 @@ fn notdir() {
         .build()
         .unwrap();
 
+    io::stderr().write(b"notdir built\n");
     let exitcode = run("notdir.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 
@@ -256,7 +297,9 @@ fn notdir() {
 }
 
 #[test]
+#[ignore]
 fn follow_symlink() {
+    io::stderr().write(b"follow_symlink\n");
     const MESSAGE: &'static str = "hello from file!";
 
     let tmpdir = TempDir::new().unwrap();
@@ -276,6 +319,7 @@ fn follow_symlink() {
         .args(&["follow_symlink"])
         .preopened_dir(preopen_dir, "/sandbox");
 
+    io::stderr().write(b"follow_symlink built\n");
     let (exitcode, stdout) = run_with_stdout("follow_symlink.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
     assert_eq!(&stdout, MESSAGE);
@@ -285,6 +329,7 @@ fn follow_symlink() {
 
 #[test]
 fn symlink_loop() {
+    io::stderr().write(b"symlink_loop\n");
     let tmpdir = TempDir::new().unwrap();
     let preopen_host_path = tmpdir.path().join("preopen");
     let subdir1 = preopen_host_path.join("subdir1");
@@ -303,6 +348,7 @@ fn symlink_loop() {
         .build()
         .unwrap();
 
+    io::stderr().write(b"symlink_loop built\n");
     let exitcode = run("symlink_loop.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 
@@ -311,6 +357,7 @@ fn symlink_loop() {
 
 #[test]
 fn symlink_escape() {
+    io::stderr().write(b"symlink_escape\n");
     const MESSAGE: &'static str = "hello from file!";
 
     let tmpdir = TempDir::new().unwrap();
@@ -333,6 +380,7 @@ fn symlink_escape() {
         .build()
         .unwrap();
 
+    io::stderr().write(b"symlink_escape built\n");
     let exitcode = run("symlink_escape.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 
@@ -341,6 +389,7 @@ fn symlink_escape() {
 
 #[test]
 fn pseudoquine() {
+    io::stderr().write(b"pseudoquine\n");
     let examples_dir = Path::new(LUCET_WASI_ROOT).join("examples");
     let pseudoquine_c = examples_dir.join("pseudoquine.c");
 
@@ -348,6 +397,7 @@ fn pseudoquine() {
         .args(&["pseudoquine"])
         .preopened_dir(File::open(examples_dir).unwrap(), "/examples");
 
+    io::stderr().write(b"pseudoquine built\n");
     let (exitcode, stdout) = run_with_stdout(&pseudoquine_c, ctx).unwrap();
 
     assert_eq!(exitcode, 0);
@@ -359,7 +409,9 @@ fn pseudoquine() {
 
 #[test]
 fn poll() {
+    io::stderr().write(b"poll\n");
     let ctx = WasiCtxBuilder::new().args(&["poll"]).build().unwrap();
+    io::stderr().write(b"poll built\n");
     let exitcode = run("poll.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 }
