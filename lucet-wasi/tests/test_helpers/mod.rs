@@ -6,7 +6,8 @@ use lucet_wasi::{WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::Link;
 use lucetc::{Bindings, Lucetc};
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
+use std::io;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -58,13 +59,17 @@ pub fn wasi_test<P: AsRef<Path>>(c_file: P) -> Result<Arc<dyn Module>, Error> {
 }
 
 pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, Error> {
+    io::stderr().write(b"-- running\n");
     let region = MmapRegion::create(1, &Limits::default())?;
     let module = test_module_wasi(path)?;
+    io::stderr().write(b"-- got module wasi\n");
 
     let mut inst = region
         .new_instance_builder(module)
         .with_embed_ctx(ctx)
         .build()?;
+
+    io::stderr().write(b"-- built module\n");
 
     match inst.run(b"_start", &[]) {
         // normal termination implies 0 exit code
