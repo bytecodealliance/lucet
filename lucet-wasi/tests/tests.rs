@@ -182,6 +182,7 @@ fn write_file() {
 }
 
 #[test]
+#[ignore]
 fn read_file() {
     io::stderr().write(b"read_file\n");
     const MESSAGE: &'static str = "hello from file!";
