@@ -34,26 +34,46 @@ pub fn guest_file<P: AsRef<Path>>(path: P) -> PathBuf {
 }
 
 pub fn wasi_test<P: AsRef<Path>>(c_file: P) -> Result<Arc<dyn Module>, Error> {
+    let pathstr = c_file.as_ref().to_owned();
+    let blurb = |msg: &str| {
+        io::stderr().write(format!("{} -- {}\n", &pathstr.display(), msg).as_bytes());
+    };
+    blurb("wasi test");
+
     let workdir = TempDir::new().expect("create working directory");
+    blurb("working directory");
 
     let wasm_build = Link::new(&[c_file])
         .cflag("-Wall")
         .cflag("-Werror")
         .print_output(true);
 
+
     let wasm_file = workdir.path().join("out.wasm");
+
+    blurb("linking");
 
     wasm_build.link(wasm_file.clone())?;
 
+    blurb("linked");
+
     let bindings = Bindings::from_file(Path::new(LUCET_WASI_ROOT).join("bindings.json"))?;
+
+    blurb("bindings loaded");
 
     let native_build = Lucetc::new(wasm_file)?.bindings(bindings)?;
 
     let so_file = workdir.path().join("out.so");
 
+    blurb("running lucetc");
+
     native_build.shared_object_file(so_file.clone())?;
 
+    blurb(&format!("built to {}", so_file.display()));
+
     let dlmodule = DlModule::load(so_file)?;
+
+    blurb("loaded...");
 
     Ok(dlmodule as Arc<dyn Module>)
 }
@@ -65,6 +85,7 @@ pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, E
     };
     blurb("running");
     let region = MmapRegion::create(1, &Limits::default())?;
+    blurb("mapped");
     let module = test_module_wasi(path)?;
     blurb("got module wasi");
 
