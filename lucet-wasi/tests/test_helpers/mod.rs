@@ -59,21 +59,28 @@ pub fn wasi_test<P: AsRef<Path>>(c_file: P) -> Result<Arc<dyn Module>, Error> {
 }
 
 pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, Error> {
-    io::stderr().write(b"-- running\n");
+    let pathstr = path.as_ref().to_owned();
+    let blurb = |msg: &str| {
+        io::stderr().write(format!("{} -- {}\n", &pathstr.display(), msg).as_bytes());
+    };
+    blurb("running");
     let region = MmapRegion::create(1, &Limits::default())?;
     let module = test_module_wasi(path)?;
-    io::stderr().write(b"-- got module wasi\n");
+    blurb("got module wasi");
 
     let mut inst = region
         .new_instance_builder(module)
         .with_embed_ctx(ctx)
         .build()?;
 
-    io::stderr().write(b"-- built module\n");
+    blurb("built module");
 
     match inst.run(b"_start", &[]) {
         // normal termination implies 0 exit code
-        Ok(_) => Ok(0),
+        Ok(_) => {
+            blurb("run complete");
+            Ok(0)
+        },
         Err(lucet_runtime::Error::RuntimeTerminated(
             lucet_runtime::TerminationDetails::Provided(any),
         )) => Ok(*any
