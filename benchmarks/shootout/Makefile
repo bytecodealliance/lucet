@@ -16,7 +16,7 @@ SHOOTOUT_SRCS:=$(shell ls $(SHOOTOUT)/*.c)
 SHOOTOUT_NATIVE_OBJS:=
 SHOOTOUT_LUCET_OBJS:=
 
-LUCETC_FLAGS:=--opt-level best --reserved-size 4294967296
+LUCETC_FLAGS:=--opt-level best 
 COMMON_CFLAGS:=--std=c99 -Ofast -Wall -W -I$(SIGHTGLASS)/include
 
 SHOOTOUT_NATIVE_CFLAGS:=-march=native -fPIC \
