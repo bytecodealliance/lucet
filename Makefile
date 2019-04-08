@@ -19,7 +19,8 @@ install: build
 .PHONY: test
 test: indent-check
 	cargo test --no-fail-fast \
-            -p lucet-wasi
+            -p lucet-wasi \
+	    -- --nocapture
 
 .PHONY: bench
 bench:

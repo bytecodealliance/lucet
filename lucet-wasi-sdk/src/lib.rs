@@ -1,6 +1,7 @@
 use failure::Fail;
 use std::env;
 use std::io::Write;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -181,6 +182,10 @@ impl Link {
         for ldflag in self.ldflags.iter() {
             cmd.arg(format!("-Wl,{}", ldflag));
         }
+        io::stderr().write(format!("{} -- linking by {:?}\n", &output.as_ref().display(), cmd).as_bytes());
+        println!("{} -- dry-but-not-really run of the linker...", &output.as_ref().display());
+        let linker_code = cmd.spawn().expect("spawned linker").wait().expect("clang exits");
+        io::stderr().write(format!("{} -- dry-but-not-really run returned {:?}\n", &output.as_ref().display(), linker_code).as_bytes());
         let run = cmd.output().expect("clang executable exists");
         CompileError::check(run, self.print_output)
     }
