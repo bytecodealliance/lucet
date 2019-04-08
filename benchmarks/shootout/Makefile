@@ -1,6 +1,6 @@
 LUCET_ROOT:=$(abspath ../..)
 
-WASI_SDK?=/opt/wasi
+WASI_SDK?=/opt/wasi-sdk
 WASI_CC=$(WASI_SDK)/bin/clang
 
 LUCETC:=$(LUCET_ROOT)/target/release/lucetc
@@ -16,7 +16,7 @@ SHOOTOUT_SRCS:=$(shell ls $(SHOOTOUT)/*.c)
 SHOOTOUT_NATIVE_OBJS:=
 SHOOTOUT_LUCET_OBJS:=
 
-LUCETC_FLAGS:=--opt-level best --reserved-size 4294967296
+LUCETC_FLAGS:=--opt-level best --min-reserved-size 4294967296
 COMMON_CFLAGS:=--std=c99 -Ofast -Wall -W -I$(SIGHTGLASS)/include
 
 SHOOTOUT_NATIVE_CFLAGS:=-march=native -fPIC \
