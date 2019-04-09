@@ -141,10 +141,11 @@ impl Link {
     pub fn new<P: AsRef<Path>>(input: &[P]) -> Self {
         Link {
             input: input.iter().map(|p| PathBuf::from(p.as_ref())).collect(),
-            cflags: Vec::new(),
-            ldflags: Vec::new(),
+            cflags: vec![],
+            ldflags: vec![],
             print_output: false,
         }
+        .with_ldflag("--no-threads")
     }
 
     pub fn print_output(&mut self, print: bool) {
@@ -256,12 +257,7 @@ pub struct Lucetc {
 
 impl Lucetc {
     pub fn new<P: AsRef<Path>>(input: &[P]) -> Self {
-        let link = Link {
-            input: input.iter().map(|p| PathBuf::from(p.as_ref())).collect(),
-            cflags: Vec::new(),
-            ldflags: Vec::new(),
-            print_output: false,
-        };
+        let link = Link::new(input);
         let tmpdir = TempDir::new().expect("temporary directory creation failed");
         let wasm_file = tmpdir.path().join("out.wasm");
         let lucetc = lucetc::Lucetc::new(&wasm_file);
@@ -377,5 +373,20 @@ mod tests {
         linker.link(wasmfile.clone()).expect("link ab.wasm");
 
         assert!(wasmfile.exists(), "wasm file created");
+    }
+
+    #[test]
+    fn compile_to_lucet() {
+        let tmp = TempDir::new().expect("create temporary directory");
+
+        let mut lucetc = Lucetc::new(&[test_file("a.c"), test_file("b.c")]);
+        lucetc.cflag("-nostartfiles");
+        lucetc.ldflag("--no-entry");
+
+        let so_file = tmp.path().join("ab.so");
+
+        lucetc.build(&so_file).expect("compile ab.so");
+
+        assert!(so_file.exists(), "so file created");
     }
 }
