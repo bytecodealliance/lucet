@@ -34,6 +34,7 @@ fuzz:
 
 .PHONY: bench
 bench:
+	cargo bench -p lucet-microbenchmarks
 	make -C benchmarks/shootout clean
 	make -C benchmarks/shootout bench
 
