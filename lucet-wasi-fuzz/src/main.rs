@@ -3,8 +3,8 @@ use libc::c_ulong;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::host::__wasi_exitcode_t;
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
-use lucet_wasi_sdk::Link;
-use lucetc::{Bindings, Lucetc};
+use lucet_wasi_sdk::{CompileOpts, Link};
+use lucetc::{Bindings, Lucetc, LucetcOpts};
 use rand::prelude::random;
 use rayon::prelude::*;
 use std::fs::File;
@@ -241,7 +241,7 @@ fn run<P: AsRef<Path>>(
 }
 
 fn wasi_test<P: AsRef<Path>>(tmpdir: &TempDir, c_file: P) -> Result<Arc<dyn Module>, Error> {
-    let wasm_build = Link::new(&[c_file]).cflag("-I/usr/include/csmith");
+    let wasm_build = Link::new(&[c_file]).with_cflag("-I/usr/include/csmith");
 
     let wasm_file = tmpdir.path().join("out.wasm");
 
@@ -255,7 +255,7 @@ fn wasi_test<P: AsRef<Path>>(tmpdir: &TempDir, c_file: P) -> Result<Arc<dyn Modu
             .join("bindings.json"),
     )?;
 
-    let native_build = Lucetc::new(wasm_file)?.bindings(bindings)?;
+    let native_build = Lucetc::new(wasm_file).with_bindings(bindings);
 
     let so_file = tmpdir.path().join("out.so");
 

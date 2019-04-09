@@ -1,8 +1,9 @@
-use failure::Fail;
+use failure::{Error, Fail};
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use tempfile::TempDir;
 
 #[derive(Debug, Fail)]
 pub enum CompileError {
@@ -10,6 +11,22 @@ pub enum CompileError {
     FileNotFound(String),
     #[fail(display = "Clang reported error: {}", _0)]
     Execution { stdout: String, stderr: String },
+    #[fail(display = "Lucetc error: {}", _0)]
+    Lucetc {
+        #[cause]
+        e: Error,
+    },
+    #[fail(display = "IO error: {}", _0)]
+    IO {
+        #[cause]
+        e: std::io::Error,
+    },
+}
+
+impl From<std::io::Error> for CompileError {
+    fn from(e: std::io::Error) -> CompileError {
+        CompileError::IO { e }
+    }
 }
 
 impl CompileError {
@@ -42,6 +59,34 @@ pub struct Compile {
     print_output: bool,
 }
 
+pub trait CompileOpts {
+    fn cflag<S: AsRef<str>>(&mut self, cflag: S);
+    fn with_cflag<S: AsRef<str>>(self, cflag: S) -> Self;
+
+    fn include<S: AsRef<str>>(&mut self, include: S);
+    fn with_include<S: AsRef<str>>(self, include: S) -> Self;
+}
+
+impl CompileOpts for Compile {
+    fn cflag<S: AsRef<str>>(&mut self, cflag: S) {
+        self.cflags.push(cflag.as_ref().to_owned());
+    }
+
+    fn with_cflag<S: AsRef<str>>(mut self, cflag: S) -> Self {
+        self.cflag(cflag);
+        self
+    }
+
+    fn include<S: AsRef<str>>(&mut self, include: S) {
+        self.cflags.push(format!("-I{}", include.as_ref()));
+    }
+
+    fn with_include<S: AsRef<str>>(mut self, include: S) -> Self {
+        self.include(include);
+        self
+    }
+}
+
 impl Compile {
     pub fn new<P: AsRef<Path>>(input: P) -> Self {
         Compile {
@@ -51,26 +96,12 @@ impl Compile {
         }
     }
 
-    pub fn cflag<S: AsRef<str>>(mut self, cflag: S) -> Self {
-        self.with_cflag(cflag);
-        self
-    }
-
-    pub fn with_cflag<S: AsRef<str>>(&mut self, cflag: S) {
-        self.cflags.push(cflag.as_ref().to_owned());
-    }
-
-    pub fn include<S: AsRef<str>>(mut self, include: S) -> Self {
-        self.with_include(include);
-        self
-    }
-
-    pub fn with_include<S: AsRef<str>>(&mut self, include: S) {
-        self.cflags.push(format!("-I{}", include.as_ref()));
-    }
-
-    pub fn print_output(mut self, print: bool) -> Self {
+    pub fn print_output(&mut self, print: bool) {
         self.print_output = print;
+    }
+
+    pub fn with_print_output(mut self, print: bool) -> Self {
+        self.print_output(print);
         self
     }
 
@@ -116,44 +147,12 @@ impl Link {
         }
     }
 
-    pub fn cflag<S: AsRef<str>>(mut self, cflag: S) -> Self {
-        self.with_cflag(cflag);
-        self
-    }
-
-    pub fn with_cflag<S: AsRef<str>>(&mut self, cflag: S) {
-        self.cflags.push(cflag.as_ref().to_owned());
-    }
-
-    pub fn include<S: AsRef<str>>(mut self, include: S) -> Self {
-        self.with_include(include);
-        self
-    }
-
-    pub fn with_include<S: AsRef<str>>(&mut self, include: S) {
-        self.cflags.push(format!("-I{}", include.as_ref()));
-    }
-
-    pub fn ldflag<S: AsRef<str>>(mut self, ldflag: S) -> Self {
-        self.with_ldflag(ldflag);
-        self
-    }
-
-    pub fn with_ldflag<S: AsRef<str>>(&mut self, ldflag: S) {
-        self.ldflags.push(ldflag.as_ref().to_owned());
-    }
-
-    pub fn export<S: AsRef<str>>(mut self, export: S) -> Self {
-        self.with_export(export);
-        self
-    }
-
-    pub fn with_export<S: AsRef<str>>(&mut self, export: S) {
-        self.ldflags.push(format!("--export={}", export.as_ref()));
-    }
-
-    pub fn print_output(mut self, print: bool) -> Self {
+    pub fn print_output(&mut self, print: bool) {
         self.print_output = print;
+    }
+
+    pub fn with_print_output(mut self, print: bool) -> Self {
+        self.print_output(print);
         self
     }
 
@@ -183,6 +182,120 @@ impl Link {
         }
         let run = cmd.output().expect("clang executable exists");
         CompileError::check(run, self.print_output)
+    }
+}
+
+pub trait AsLink {
+    fn as_link(&mut self) -> &mut Link;
+}
+
+impl AsLink for Link {
+    fn as_link(&mut self) -> &mut Link {
+        self
+    }
+}
+
+pub trait LinkOpts {
+    fn ldflag<S: AsRef<str>>(&mut self, ldflag: S);
+    fn with_ldflag<S: AsRef<str>>(self, ldflag: S) -> Self;
+
+    fn export<S: AsRef<str>>(&mut self, export: S);
+    fn with_export<S: AsRef<str>>(self, export: S) -> Self;
+}
+
+impl<T: AsLink> LinkOpts for T {
+    fn ldflag<S: AsRef<str>>(&mut self, ldflag: S) {
+        self.as_link().ldflags.push(ldflag.as_ref().to_owned());
+    }
+
+    fn with_ldflag<S: AsRef<str>>(mut self, ldflag: S) -> Self {
+        self.ldflag(ldflag);
+        self
+    }
+
+    fn export<S: AsRef<str>>(&mut self, export: S) {
+        self.as_link()
+            .ldflags
+            .push(format!("--export={}", export.as_ref()));
+    }
+
+    fn with_export<S: AsRef<str>>(mut self, export: S) -> Self {
+        self.export(export);
+        self
+    }
+}
+
+impl<T: AsLink> CompileOpts for T {
+    fn cflag<S: AsRef<str>>(&mut self, cflag: S) {
+        self.as_link().cflags.push(cflag.as_ref().to_owned());
+    }
+
+    fn with_cflag<S: AsRef<str>>(mut self, cflag: S) -> Self {
+        self.cflag(cflag);
+        self
+    }
+
+    fn include<S: AsRef<str>>(&mut self, include: S) {
+        self.as_link()
+            .cflags
+            .push(format!("-I{}", include.as_ref()));
+    }
+
+    fn with_include<S: AsRef<str>>(mut self, include: S) -> Self {
+        self.include(include);
+        self
+    }
+}
+
+pub struct Lucetc {
+    link: Link,
+    lucetc: lucetc::Lucetc,
+    tmpdir: TempDir,
+    wasm_file: PathBuf,
+}
+
+impl Lucetc {
+    pub fn new<P: AsRef<Path>>(input: &[P]) -> Self {
+        let link = Link {
+            input: input.iter().map(|p| PathBuf::from(p.as_ref())).collect(),
+            cflags: Vec::new(),
+            ldflags: Vec::new(),
+            print_output: false,
+        };
+        let tmpdir = TempDir::new().expect("temporary directory creation failed");
+        let wasm_file = tmpdir.path().join("out.wasm");
+        let lucetc = lucetc::Lucetc::new(&wasm_file);
+        Lucetc {
+            link,
+            lucetc,
+            tmpdir,
+            wasm_file,
+        }
+    }
+
+    pub fn print_output(mut self, print: bool) -> Self {
+        self.link.print_output = print;
+        self
+    }
+
+    pub fn build<P: AsRef<Path>>(self, output: P) -> Result<(), CompileError> {
+        self.link.link(&self.wasm_file)?;
+        self.lucetc
+            .shared_object_file(output.as_ref())
+            .map_err(|e| CompileError::Lucetc { e })?;
+        Ok(self.tmpdir.close()?)
+    }
+}
+
+impl AsLink for Lucetc {
+    fn as_link(&mut self) -> &mut Link {
+        &mut self.link
+    }
+}
+
+impl lucetc::AsLucetc for Lucetc {
+    fn as_lucetc(&mut self) -> &mut lucetc::Lucetc {
+        &mut self.lucetc
     }
 }
 
@@ -217,8 +330,8 @@ mod tests {
         assert!(objfile.exists(), "object file created");
 
         let mut linker = Link::new(&[objfile]);
-        linker.with_cflag("-nostartfiles");
-        linker.with_ldflag("--no-entry");
+        linker.cflag("-nostartfiles");
+        linker.ldflag("--no-entry");
 
         let wasmfile = tmp.path().join("a.wasm");
 
@@ -240,9 +353,9 @@ mod tests {
         assert!(objfile.exists(), "object file created");
 
         let mut linker = Link::new(&[objfile]);
-        linker.with_cflag("-nostartfiles");
-        linker.with_ldflag("--no-entry");
-        linker.with_ldflag("--allow-undefined");
+        linker.cflag("-nostartfiles");
+        linker.ldflag("--no-entry");
+        linker.ldflag("--allow-undefined");
 
         let wasmfile = tmp.path().join("b.wasm");
 
@@ -256,8 +369,8 @@ mod tests {
         let tmp = TempDir::new().expect("create temporary directory");
 
         let mut linker = Link::new(&[test_file("a.c"), test_file("b.c")]);
-        linker.with_cflag("-nostartfiles");
-        linker.with_ldflag("--no-entry");
+        linker.cflag("-nostartfiles");
+        linker.ldflag("--no-entry");
 
         let wasmfile = tmp.path().join("ab.wasm");
 
