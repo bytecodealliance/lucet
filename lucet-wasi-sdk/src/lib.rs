@@ -108,12 +108,14 @@ pub struct Link {
 
 impl Link {
     pub fn new<P: AsRef<Path>>(input: &[P]) -> Self {
-        Link {
+        let mut link = Link {
             input: input.iter().map(|p| PathBuf::from(p.as_ref())).collect(),
             cflags: Vec::new(),
             ldflags: Vec::new(),
             print_output: false,
-        }
+        };
+        link.with_ldflag("--no-threads");
+        link
     }
 
     pub fn cflag<S: AsRef<str>>(mut self, cflag: S) -> Self {
