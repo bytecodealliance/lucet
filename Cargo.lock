@@ -572,6 +572,8 @@ dependencies = [
  "lucet-wasi 0.1.0",
  "lucet-wasi-sdk 0.1.0",
  "lucetc 0.1.0",
+ "num_cpus 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

@@ -55,6 +55,9 @@ pub struct InstanceHandle {
     inst: NonNull<Instance>,
 }
 
+// raw pointer lint
+unsafe impl Send for InstanceHandle {}
+
 /// Create a new `InstanceHandle`.
 ///
 /// This is not meant for public consumption, but rather is used to make implementations of
