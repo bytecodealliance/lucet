@@ -18,7 +18,7 @@ use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator, WasmError};
-use failure::{Fail, ResultExt};
+use failure::{format_err, Fail, ResultExt};
 use lucet_module_data::ModuleData;
 
 #[derive(Debug, Clone, Copy)]
@@ -61,8 +61,18 @@ impl<'a> Compiler<'a> {
 
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
+
+        // As of cranelift-wasm 0.29, which uses wasmparser 0.23, the parser used inside
+        // cranelift-wasm does not validate. We need to run the validating parser on the binary
+        // first. The InvalidWebAssembly error below will never trigger.
+        use wasmparser::validate;
+        if !validate(wasm_binary, None) {
+            Err(format_err!("wasmparser validation rejected module"))
+                .context(LucetcErrorKind::Validation)?;
+        }
+
         translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
-            WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation),
+            WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation), // This will trigger once cranelift-wasm upgrades to a validating wasm parser.
             WasmError::Unsupported { .. } => {
                 e.context(LucetcErrorKind::Unsupported("cranelift-wasm".to_owned()))
             }
@@ -214,7 +224,6 @@ fn write_startfunc_data<B: ClifBackend>(
     decls: &ModuleDecls,
 ) -> Result<(), LucetcError> {
     use cranelift_module::{DataContext, Linkage};
-    use failure::format_err;
 
     let error_kind = LucetcErrorKind::MetadataSerializer;
 

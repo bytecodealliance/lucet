@@ -23,6 +23,7 @@ cranelift-faerie = { path = "../cranelift/cranelift-faerie" }
 cranelift-wasm = { path = "../cranelift/cranelift-wasm" }
 target-lexicon = "0.3"
 lucet-module-data = { path = "../lucet-module-data" }
+wasmparser = "0.23"
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"
@@ -37,7 +38,6 @@ tempfile = "3.0"
 bimap = "0.2"
 human-size = "0.4"
 parity-wasm = "0.35"
-pwasm-validation = { path = "../pwasm-validation" }
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
