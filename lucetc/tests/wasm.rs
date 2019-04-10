@@ -70,101 +70,109 @@ mod module_data {
         );
         */
     }
-    /*
-        #[test]
-        fn icall_import() {
-            let m = load_wat_module("icall_import");
-            let b = Bindings::from_file(&PathBuf::from(
-                "tests/bindings/icall_import_test_bindings.json",
-            ))
-            .unwrap();
-            let h = HeapSettings::default();
-            let p = Program::new(m, b, h).expect(&format!("instantiating program"));
+    #[test]
+    fn icall_import() {
+        let m = load_wat_module("icall_import");
+        let b = Bindings::from_file(&PathBuf::from(
+            "tests/bindings/icall_import_test_bindings.json",
+        ))
+        .unwrap();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile icall");
+        let _module_data = c.module_data();
 
-            assert_eq!(p.import_functions().len(), 1);
-            assert_eq!(p.import_functions()[0].module(), "env");
-            assert_eq!(p.import_functions()[0].field(), "icalltarget");
-            assert_eq!(p.globals().len(), 0);
-            assert_eq!(p.defined_functions().len(), 4);
-            assert_eq!(
-                p.defined_functions().get(0).unwrap().symbol(),
-                "guest_func_launchpad"
-            );
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(0),
-                Some(&TableElem::FunctionIx(2))
-            ); // righttype1
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(1),
-                Some(&TableElem::FunctionIx(3))
-            ); // righttype2
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(2),
-                Some(&TableElem::FunctionIx(4))
-            ); // wrongtype
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(3),
-                Some(&TableElem::FunctionIx(0))
-            ); // righttype_imported
-            assert_eq!(p.get_table(0).unwrap().elements().get(4), None);
-        }
+        /*  TODO can't express these with module data
+        assert_eq!(p.import_functions().len(), 1);
+        assert_eq!(p.import_functions()[0].module(), "env");
+        assert_eq!(p.import_functions()[0].field(), "icalltarget");
+        assert_eq!(p.globals().len(), 0);
+        assert_eq!(p.defined_functions().len(), 4);
+        assert_eq!(
+            p.defined_functions().get(0).unwrap().symbol(),
+            "guest_func_launchpad"
+        );
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(0),
+            Some(&TableElem::FunctionIx(2))
+        ); // righttype1
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(1),
+            Some(&TableElem::FunctionIx(3))
+        ); // righttype2
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(2),
+            Some(&TableElem::FunctionIx(4))
+        ); // wrongtype
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(3),
+            Some(&TableElem::FunctionIx(0))
+        ); // righttype_imported
+        assert_eq!(p.get_table(0).unwrap().elements().get(4), None);
+        */
+    }
 
-        #[test]
-        fn icall() {
-            let m = load_wat_module("icall");
-            let b = Bindings::empty();
-            let h = HeapSettings::default();
-            let p = Program::new(m, b, h).expect(&format!("instantiating program"));
+    #[test]
+    fn icall() {
+        let m = load_wat_module("icall");
+        let b = Bindings::empty();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile icall");
+        let _module_data = c.module_data();
 
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(0),
-                Some(&TableElem::FunctionIx(1))
-            ); // righttype1
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(1),
-                Some(&TableElem::FunctionIx(2))
-            ); // righttype2
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(2),
-                Some(&TableElem::FunctionIx(3))
-            ); // wrongtype
-            assert_eq!(p.get_table(0).unwrap().elements().get(4), None);
-        }
+        /*  TODO can't express these with module data
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(0),
+            Some(&TableElem::FunctionIx(1))
+        ); // righttype1
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(1),
+            Some(&TableElem::FunctionIx(2))
+        ); // righttype2
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(2),
+            Some(&TableElem::FunctionIx(3))
+        ); // wrongtype
+        assert_eq!(p.get_table(0).unwrap().elements().get(4), None);
+        */
+    }
 
-        #[test]
-        fn icall_sparse() {
-            let m = load_wat_module("icall_sparse");
-            let b = Bindings::empty();
-            let h = HeapSettings::default();
-            let p = Program::new(m, b, h).expect(&format!("instantiating program"));
+    #[test]
+    fn icall_sparse() {
+        let m = load_wat_module("icall_sparse");
+        let b = Bindings::empty();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile icall_sparse");
+        let _module_data = c.module_data();
 
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(0),
-                Some(&TableElem::Empty)
-            );
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(1),
-                Some(&TableElem::FunctionIx(1))
-            ); // righttype1
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(2),
-                Some(&TableElem::FunctionIx(2))
-            ); // righttype2
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(3),
-                Some(&TableElem::FunctionIx(3))
-            ); // wrongtype
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(4),
-                Some(&TableElem::Empty)
-            );
-            assert_eq!(
-                p.get_table(0).unwrap().elements().get(5),
-                Some(&TableElem::Empty)
-            );
-            assert_eq!(p.get_table(0).unwrap().elements().get(6), None);
-        }
-    */
+        /*  TODO can't express these with module data
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(0),
+            Some(&TableElem::Empty)
+        );
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(1),
+            Some(&TableElem::FunctionIx(1))
+        ); // righttype1
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(2),
+            Some(&TableElem::FunctionIx(2))
+        ); // righttype2
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(3),
+            Some(&TableElem::FunctionIx(3))
+        ); // wrongtype
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(4),
+            Some(&TableElem::Empty)
+        );
+        assert_eq!(
+            p.get_table(0).unwrap().elements().get(5),
+            Some(&TableElem::Empty)
+        );
+        assert_eq!(p.get_table(0).unwrap().elements().get(6), None);
+        */
+    }
+
     #[test]
     fn globals_import() {
         use lucet_module_data::Global as GlobalVariant;
@@ -193,7 +201,8 @@ mod module_data {
         let m = load_wat_module("heap_spec_import");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h.clone()).expect("compiling heap_spec_import");
+        let c =
+            Compiler::new(&m, OptLevel::Best, &b, h.clone()).expect("compiling heap_spec_import");
 
         assert_eq!(
             c.module_data().heap_spec(),
@@ -215,7 +224,8 @@ mod module_data {
         let m = load_wat_module("heap_spec_definition");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h.clone()).expect("compiling heap_spec_definition");
+        let c = Compiler::new(&m, OptLevel::Best, &b, h.clone())
+            .expect("compiling heap_spec_definition");
 
         assert_eq!(
             c.module_data().heap_spec(),
@@ -237,10 +247,7 @@ mod module_data {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling heap_spec_none");
-        assert_eq!(
-            c.module_data().heap_spec(),
-            None,
-        );
+        assert_eq!(c.module_data().heap_spec(), None,);
     }
 
     #[test]
