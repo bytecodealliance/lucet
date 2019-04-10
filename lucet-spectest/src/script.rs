@@ -33,8 +33,9 @@ impl ScriptError {
     pub fn unsupported(&self) -> bool {
         match self {
             ScriptError::ProgramError(ref lucetc_err)
+            | ScriptError::ValidationError(ref lucetc_err)
             | ScriptError::CompileError(ref lucetc_err) => match lucetc_err.get_context() {
-                &LucetcErrorKind::Unsupported(_) => true,
+                &LucetcErrorKind::Unsupported => true,
                 _ => false,
             },
             _ => false,
@@ -67,11 +68,11 @@ impl ScriptEnv {
     }
     pub fn instantiate(
         &mut self,
-        module: Vec<u8>,
+        module: &[u8],
         name: &Option<String>,
     ) -> Result<(), ScriptError> {
         let bindings = bindings::spec_test_bindings();
-        let compiler = Compiler::new(&module, OptLevel::Best, &bindings, HeapSettings::default())
+        let compiler = Compiler::new(module, OptLevel::Best, &bindings, HeapSettings::default())
             .map_err(program_error)?;
 
         let dir = tempfile::Builder::new().prefix("codegen").tempdir()?;

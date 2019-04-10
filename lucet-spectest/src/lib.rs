@@ -37,6 +37,14 @@ pub fn run_spec_test(spec_path: &PathBuf) -> Result<SpecScriptResult, Error> {
     Ok(res)
 }
 
+fn unexpected_failure(e: ScriptError) -> SpecTestError {
+    if e.unsupported() {
+        Error::from(e).context(SpecTestErrorKind::UnsupportedLucetc).into()
+    } else {
+        Error::from(e).context(SpecTestErrorKind::UnexpectedFailure).into()
+    }
+}
+
 fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> {
     match cmd {
         CommandKind::Module {
@@ -44,52 +52,48 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
             ref name,
         } => {
             let module = module.clone().into_vec();
-            script.instantiate(module, name).map_err(|e| {
-                if e.unsupported() {
-                    Error::from(e).context(SpecTestErrorKind::UnsupportedLucetc)
-                } else {
-                    Error::from(e).context(SpecTestErrorKind::UnexpectedFailure)
-                }
-            })?;
+            script
+                .instantiate(&module, name)
+                .map_err(unexpected_failure)?;
             Ok(())
         }
 
         CommandKind::AssertInvalid { ref module, .. } => {
             let module = module.clone().into_vec();
-            match script.instantiate(module, &None) {
+            match script.instantiate(&module, &None) {
                 Err(ScriptError::ValidationError(_)) => Ok(()),
                 Ok(_) => {
                     script.delete_last();
                     Err(SpecTestErrorKind::UnexpectedSuccess)?
                 }
-                Err(e) => Err(Error::from(e).context(SpecTestErrorKind::UnexpectedFailure))?,
+                Err(e) => Err(unexpected_failure(e))?,
             }
         }
 
         CommandKind::AssertMalformed { ref module, .. } => {
             let module = module.clone().into_vec();
-            match script.instantiate(module, &None) {
+            match script.instantiate(&module, &None) {
                 Err(ScriptError::ValidationError(_)) => Ok(()),
                 Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
-                Err(e) => Err(Error::from(e).context(SpecTestErrorKind::UnexpectedFailure))?,
+                Err(e) => Err(unexpected_failure(e))?,
             }
         }
 
         CommandKind::AssertUninstantiable { module, .. } => {
             let module = module.clone().into_vec();
-            match script.instantiate(module, &None) {
-                Err(ScriptError::ValidationError(_)) => Ok(()), // XXX This is probably the wrong ScriptError to look for - FIXME
+            match script.instantiate(&module, &None) {
+                Err(ScriptError::ValidationError(_)) => Ok(()),
                 Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
-                Err(e) => Err(Error::from(e).context(SpecTestErrorKind::UnexpectedFailure))?,
+                Err(e) => Err(unexpected_failure(e))?,
             }
         }
 
         CommandKind::AssertUnlinkable { module, .. } => {
             let module = module.clone().into_vec();
-            match script.instantiate(module, &None) {
-                Err(ScriptError::CompileError(_)) => Ok(()), // XXX could other errors trigger this too?
+            match script.instantiate(&module, &None) {
+                Err(ScriptError::ValidationError(_)) => Ok(()),
                 Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
-                Err(e) => Err(Error::from(e).context(SpecTestErrorKind::UnexpectedFailure))?,
+                Err(e) => Err(unexpected_failure(e))?,
             }
         }
 
@@ -99,7 +103,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
         } => {
             script
                 .register(name, as_name)
-                .context(SpecTestErrorKind::UnexpectedFailure)?;
+                .map_err(unexpected_failure)?;
             Ok(())
         }
 
@@ -112,7 +116,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 let args = translate_args(args);
                 let _res = script
                     .run(module, field, args)
-                    .context(SpecTestErrorKind::UnexpectedFailure)?;
+                    .map_err(unexpected_failure)?;
                 Ok(())
             }
             _ => Err(SpecTestErrorKind::UnsupportedCommand)?,
@@ -140,7 +144,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                         }
                     }
 
-                    Err(e) => Err(Error::from(e).context(SpecTestErrorKind::UnexpectedFailure))?,
+                    Err(e) => Err(unexpected_failure(e))?,
                 }
             }
             _ => Err(SpecTestErrorKind::UnsupportedCommand)?,
@@ -158,7 +162,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 let args = translate_args(args);
                 let res = script
                     .run(module, field, args)
-                    .context(SpecTestErrorKind::UnexpectedFailure)?;
+                    .map_err(unexpected_failure)?;
                 check_retval(expected, res)?;
                 Ok(())
             }
@@ -175,7 +179,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 let args = translate_args(args);
                 let res = script
                     .run(module, field, args)
-                    .context(SpecTestErrorKind::UnexpectedFailure)?;
+                    .map_err(unexpected_failure)?;
                 if res.as_f32().is_nan() || res.as_f64().is_nan() {
                     Ok(())
                 } else {
@@ -196,7 +200,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 let res = script.run(module, field, args);
                 match res {
                     Err(ScriptError::RuntimeError(_luceterror)) => Ok(()),
-                    Err(e) => Err(Error::from(e).context(SpecTestErrorKind::UnexpectedFailure))?,
+                    Err(e) => Err(unexpected_failure(e)),
                     Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
                 }
             }
