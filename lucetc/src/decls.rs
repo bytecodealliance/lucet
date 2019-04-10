@@ -178,8 +178,7 @@ impl<'a> ModuleDecls<'a> {
                 .data_initializers
                 .get(&MemoryIndex::new(0))
                 .expect("heap spec implies data initializers should exist");
-            let sparse_data = owned_sparse_data_from_initializers(data_initializers, &heap_spec)
-                .context(LucetcErrorKind::ModuleData)?;
+            let sparse_data = owned_sparse_data_from_initializers(data_initializers, &heap_spec)?;
 
             Ok(Some(OwnedLinearMemorySpec {
                 heap: heap_spec,
@@ -203,9 +202,11 @@ impl<'a> ModuleDecls<'a> {
                     // Need to fix global spec in ModuleData and the runtime to support more:
                     GlobalInit::I32Const(i) => i as i64,
                     GlobalInit::I64Const(i) => i,
-                    _ => Err(format_err!("global initializer {:?}", g_decl.entity)).context(
-                        LucetcErrorKind::Unsupported("non-integer global initializer".to_owned()),
-                    )?,
+                    _ => Err(format_err!(
+                        "non-integer global initializer: {:?}",
+                        g_decl.entity
+                    ))
+                    .context(LucetcErrorKind::Unsupported)?,
                 };
                 GlobalVariant::Def {
                     def: GlobalDef::new(init_val),
@@ -250,9 +251,8 @@ impl<'a> ModuleDecls<'a> {
                     max_size: max_size,
                 }))
             }
-            _ => Err(format_err!("lucetc only supports memory 0")).context(
-                LucetcErrorKind::Unsupported("memories with index != 0".to_owned()),
-            )?,
+            _ => Err(format_err!("lucetc only supports memory 0"))
+                .context(LucetcErrorKind::Unsupported)?,
         }
     }
     // ********************* Public Interface **************************

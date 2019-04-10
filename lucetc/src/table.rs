@@ -17,18 +17,19 @@ enum Elem {
 fn table_elements(decl: &TableDecl) -> Result<Vec<Elem>, LucetcError> {
     match decl.table.ty {
         TableElementType::Func => Ok(()),
-        _ => Err(format_err!("table {:?}", decl)).context(LucetcErrorKind::Unsupported(
-            "table with non-function elements".to_owned(),
-        )),
+        _ => Err(format_err!("table with non-function elements: {:?}", decl))
+            .context(LucetcErrorKind::Unsupported),
     }?;
 
     let mut elems = Vec::new();
 
     for initializer in decl.elems.iter() {
         if initializer.base.is_some() {
-            Err(format_err!("elements {:?}", initializer)).context(LucetcErrorKind::Unsupported(
-                "table elements with global index base".to_owned(),
-            ))?
+            Err(format_err!(
+                "table elements with global index base: {:?}",
+                initializer
+            ))
+            .context(LucetcErrorKind::Unsupported)?
         }
         let final_len = initializer.offset + initializer.elements.len();
         if final_len > elems.len() {

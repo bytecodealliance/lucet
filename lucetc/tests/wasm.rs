@@ -260,7 +260,7 @@ mod module_data {
             c.is_err(),
             "compilation error because data initializers are oversized"
         );
-        assert_eq!(*c.err().unwrap().get_context(), LucetcErrorKind::ModuleData);
+        assert_eq!(*c.err().unwrap().get_context(), LucetcErrorKind::Validation);
     }
 
     // XXX adding more negative tests like the one above is valuable - lets do it

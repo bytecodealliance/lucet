@@ -73,9 +73,7 @@ impl<'a> Compiler<'a> {
 
         translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
             WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation), // This will trigger once cranelift-wasm upgrades to a validating wasm parser.
-            WasmError::Unsupported { .. } => {
-                e.context(LucetcErrorKind::Unsupported("cranelift-wasm".to_owned()))
-            }
+            WasmError::Unsupported { .. } => e.context(LucetcErrorKind::Unsupported),
             WasmError::ImplLimitExceeded { .. } => e.context(LucetcErrorKind::TranslatingModule),
         })?;
 
@@ -125,15 +123,13 @@ impl<'a> Compiler<'a> {
 
             func_translator
                 .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
-                .context(LucetcErrorKind::FunctionTranslation(
-                    func.name.symbol().to_owned(),
-                ))?;
+                .map_err(|e| format_err!("in {}: {:?}", func.name.symbol(), e))
+                .context(LucetcErrorKind::FunctionTranslation)?;
 
             self.clif_module
                 .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
-                .context(LucetcErrorKind::FunctionDefinition(
-                    func.name.symbol().to_owned(),
-                ))?;
+                .map_err(|e| format_err!("in {}: {:?}", func.name.symbol(), e))
+                .context(LucetcErrorKind::FunctionDefinition)?;
         }
 
         write_module_data(&mut self.clif_module, &self.decls)?;
@@ -158,9 +154,8 @@ impl<'a> Compiler<'a> {
 
             func_translator
                 .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
-                .context(LucetcErrorKind::FunctionTranslation(
-                    func.name.symbol().to_owned(),
-                ))?;
+                .map_err(|e| format_err!("in {}: {:?}", func.name.symbol(), e))
+                .context(LucetcErrorKind::FunctionTranslation)?;
 
             funcs.insert(func.name.clone(), clif_context.func);
         }

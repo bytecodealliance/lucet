@@ -1,5 +1,6 @@
+use crate::error::{LucetcError, LucetcErrorKind};
 use crate::module::DataInitializer;
-use failure::{format_err, Error};
+use failure::{format_err, ResultExt};
 use lucet_module_data::owned::OwnedSparseData;
 use lucet_module_data::HeapSpec;
 use std::collections::hash_map::Entry;
@@ -47,21 +48,23 @@ fn split<'a>(di: &DataInitializer<'a>) -> Vec<(usize, DataInitializer<'a>)> {
 pub fn owned_sparse_data_from_initializers<'a>(
     initializers: &[DataInitializer<'a>],
     heap: &HeapSpec,
-) -> Result<OwnedSparseData, Error> {
+) -> Result<OwnedSparseData, LucetcError> {
     let mut pagemap: HashMap<usize, Vec<u8>> = HashMap::new();
 
     for initializer in initializers {
         if initializer.base.is_some() {
             Err(format_err!(
                 "cannot create sparse data: data initializer uses global as base"
-            ))?
+            ))
+            .context(LucetcErrorKind::Unsupported)?
         }
         let chunks = split(initializer);
         for (pagenumber, chunk) in chunks {
             if pagenumber > heap.initial_size as usize / PAGE_SIZE {
                 Err(format_err!(
                     "cannot initialize data beyond linear memory's initial size"
-                ))?;
+                ))
+                .context(LucetcErrorKind::Validation)?;
             }
             let base = chunk.offset as usize;
             match pagemap.entry(pagenumber) {
@@ -97,6 +100,6 @@ pub fn owned_sparse_data_from_initializers<'a>(
         }
     }
     assert_eq!(out.len() * 4096, heap.initial_size as usize);
-    let o = OwnedSparseData::new(out)?;
+    let o = OwnedSparseData::new(out).context(LucetcErrorKind::ModuleData)?;
     Ok(o)
 }

@@ -53,17 +53,16 @@ pub enum LucetcErrorKind {
     ModuleData,
     #[fail(display = "Metadata Serializer")] // specifically non-ModuleData; this will go away soon
     MetadataSerializer,
-    #[fail(display = "Function Translation: {}", _0)]
-    FunctionTranslation(String),
-    #[fail(display = "Function Definition: {}", _0)]
-    FunctionDefinition(String),
+    #[fail(display = "Function Translation")]
+    FunctionTranslation,
+    #[fail(display = "Function Definition")]
+    FunctionDefinition,
     #[fail(display = "Table")]
     Table,
     #[fail(display = "Memory Specs")]
     MemorySpecs,
     #[fail(display = "Output")]
     Output,
-
-    #[fail(display = "Unsupported: {}", _0)]
-    Unsupported(String),
+    #[fail(display = "Unsupported")]
+    Unsupported,
 }
