@@ -157,7 +157,9 @@ pub trait ModuleInternal: Send + Sync {
                 ));
             }
 
-            if heap.reserved_size as usize + heap.guard_size as usize > limits.heap_address_space_size {
+            if heap.reserved_size as usize + heap.guard_size as usize
+                > limits.heap_address_space_size
+            {
                 bail_limits_exceeded!("heap spec reserved and guard size: {:?}", heap);
             }
 
