@@ -17,8 +17,8 @@ use cranelift_codegen::{
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
-use cranelift_wasm::{translate_module, FuncTranslator};
-use failure::ResultExt;
+use cranelift_wasm::{translate_module, FuncTranslator, WasmError};
+use failure::{Fail, ResultExt};
 use lucet_module_data::ModuleData;
 
 #[derive(Debug, Clone, Copy)]
@@ -61,8 +61,13 @@ impl<'a> Compiler<'a> {
 
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
-        translate_module(wasm_binary, &mut module_info)
-            .context(LucetcErrorKind::TranslatingModule)?;
+        translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
+            WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation),
+            WasmError::Unsupported { .. } => {
+                e.context(LucetcErrorKind::Unsupported("cranelift-wasm".to_owned()))
+            }
+            WasmError::ImplLimitExceeded { .. } => e.context(LucetcErrorKind::TranslatingModule),
+        })?;
 
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
@@ -110,11 +115,15 @@ impl<'a> Compiler<'a> {
 
             func_translator
                 .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
-                .context(LucetcErrorKind::FunctionTranslation(func.name.symbol().to_owned()))?;
+                .context(LucetcErrorKind::FunctionTranslation(
+                    func.name.symbol().to_owned(),
+                ))?;
 
             self.clif_module
                 .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
-                .context(LucetcErrorKind::FunctionDefinition(func.name.symbol().to_owned()))?;
+                .context(LucetcErrorKind::FunctionDefinition(
+                    func.name.symbol().to_owned(),
+                ))?;
         }
 
         write_module_data(&mut self.clif_module, &self.decls)?;
@@ -139,7 +148,9 @@ impl<'a> Compiler<'a> {
 
             func_translator
                 .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
-                .context(LucetcErrorKind::FunctionTranslation(func.name.symbol().to_owned()))?;
+                .context(LucetcErrorKind::FunctionTranslation(
+                    func.name.symbol().to_owned(),
+                ))?;
 
             funcs.insert(func.name.clone(), clif_context.func);
         }

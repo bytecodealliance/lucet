@@ -1,5 +1,4 @@
 use failure::{Backtrace, Context, Fail};
-use pwasm_validation;
 use std::fmt::{self, Display};
 
 #[derive(Debug)]
@@ -39,12 +38,6 @@ impl Fail for LucetcError {
 impl Display for LucetcError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Display::fmt(&self.inner, f)
-    }
-}
-
-impl From<pwasm_validation::Error> for LucetcError {
-    fn from(e: pwasm_validation::Error) -> LucetcError {
-        e.context(LucetcErrorKind::Validation).into()
     }
 }
 
