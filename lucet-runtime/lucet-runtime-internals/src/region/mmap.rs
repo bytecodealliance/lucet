@@ -3,7 +3,7 @@ use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle};
 use crate::module::Module;
-use crate::region::{Region, RegionInternal};
+use crate::region::{Region, RegionCreate, RegionInternal};
 use libc::{c_void, SIGSTKSZ};
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::ptr;
@@ -190,6 +190,12 @@ impl Drop for MmapRegion {
         for slot in self.freelist.get_mut().unwrap().drain(0..) {
             Self::free_slot(slot);
         }
+    }
+}
+
+impl RegionCreate for MmapRegion {
+    fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error> {
+        MmapRegion::create(instance_capacity, limits)
     }
 }
 

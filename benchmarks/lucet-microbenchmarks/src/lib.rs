@@ -1,14 +1,11 @@
-#[macro_use]
-extern crate criterion;
-
 mod modules;
 mod par;
 
-pub use par::par;
+pub use par::par_benches;
 
 use crate::modules::{compile_hello, fib_mock, many_args_mock, null_mock};
 use criterion::Criterion;
-use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Module, Region};
+use lucet_runtime::{DlModule, InstanceHandle, Limits, Module, Region, RegionCreate};
 use lucet_wasi::WasiCtxBuilder;
 use std::path::Path;
 use std::sync::Arc;
@@ -22,10 +19,10 @@ use tempfile::TempDir;
 ///
 /// To minimize the effects of filesystem cache on the `DlModule::load()`, this runs `sync` between
 /// each iteration.
-fn load_mkregion_and_instantiate(c: &mut Criterion) {
-    fn body(so_file: &Path) -> InstanceHandle {
+fn load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
+    fn body<R: RegionCreate + 'static>(so_file: &Path) -> InstanceHandle {
         let module = DlModule::load(so_file).unwrap();
-        let region = MmapRegion::create(1, &Limits::default()).unwrap();
+        let region = R::create(1, &Limits::default()).unwrap();
         region.new_instance(module).unwrap()
     }
 
@@ -37,7 +34,7 @@ fn load_mkregion_and_instantiate(c: &mut Criterion) {
     c.bench_function("load_mkregion_and_instantiate hello", move |b| {
         b.iter_batched(
             || nix::unistd::sync(),
-            |_| body(&so_file),
+            |_| body::<R>(&so_file),
             criterion::BatchSize::PerIteration,
         )
     });
@@ -49,8 +46,8 @@ fn load_mkregion_and_instantiate(c: &mut Criterion) {
 ///
 /// This simulates a typical case for a server process like Terrarium: the region and module stay
 /// initialized, but a new instance is created for each request.
-fn instantiate(c: &mut Criterion) {
-    fn body(module: Arc<dyn Module>, region: Arc<MmapRegion>) -> InstanceHandle {
+fn instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
+    fn body<R: Region>(module: Arc<dyn Module>, region: Arc<R>) -> InstanceHandle {
         region.new_instance(module).unwrap()
     }
 
@@ -60,7 +57,7 @@ fn instantiate(c: &mut Criterion) {
     compile_hello(&so_file);
 
     let module = DlModule::load(&so_file).unwrap();
-    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+    let region = R::create(1, &Limits::default()).unwrap();
 
     c.bench_function("instantiate hello", move |b| {
         b.iter(|| body(module.clone(), region.clone()))
@@ -72,7 +69,7 @@ fn instantiate(c: &mut Criterion) {
 /// Instance destruction.
 ///
 /// Instances have some cleanup to do with memory management and freeing their slot on their region.
-fn drop_instance(c: &mut Criterion) {
+fn drop_instance<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(_inst: InstanceHandle) {}
 
     let workdir = TempDir::new().expect("create working directory");
@@ -81,7 +78,7 @@ fn drop_instance(c: &mut Criterion) {
     compile_hello(&so_file);
 
     let module = DlModule::load(&so_file).unwrap();
-    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+    let region = R::create(1, &Limits::default()).unwrap();
 
     c.bench_function("drop_instance hello", move |b| {
         b.iter_batched(
@@ -98,13 +95,13 @@ fn drop_instance(c: &mut Criterion) {
 ///
 /// This is primarily a measurement of the signal handler installation and removal, and the context
 /// switching overhead.
-fn run_null(c: &mut Criterion) {
+fn run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
         inst.run(b"f", &[]).unwrap();
     }
 
     let module = null_mock();
-    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+    let region = R::create(1, &Limits::default()).unwrap();
 
     c.bench_function("run_null", move |b| {
         b.iter_batched_ref(
@@ -119,13 +116,13 @@ fn run_null(c: &mut Criterion) {
 ///
 /// Since this is running code in a mock module, the cost of the computation should overwhelm the
 /// cost of the Lucet runtime.
-fn run_fib(c: &mut Criterion) {
+fn run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
         inst.run(b"f", &[]).unwrap();
     }
 
     let module = fib_mock();
-    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+    let region = R::create(1, &Limits::default()).unwrap();
 
     c.bench_function("run_fib", move |b| {
         b.iter_batched_ref(
@@ -137,7 +134,7 @@ fn run_fib(c: &mut Criterion) {
 }
 
 /// Run a trivial WASI program.
-fn run_hello(c: &mut Criterion) {
+fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
         inst.run(b"_start", &[]).unwrap();
     }
@@ -148,7 +145,7 @@ fn run_hello(c: &mut Criterion) {
     compile_hello(&so_file);
 
     let module = DlModule::load(&so_file).unwrap();
-    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+    let region = R::create(1, &Limits::default()).unwrap();
 
     c.bench_function("run_hello", move |b| {
         b.iter_batched_ref(
@@ -177,7 +174,7 @@ fn run_hello(c: &mut Criterion) {
 /// installing the arguments into the guest registers and stack.
 ///
 /// `rustfmt` hates this function.
-fn run_many_args(c: &mut Criterion) {
+fn run_many_args<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
         inst.run(
             b"f",
@@ -254,7 +251,7 @@ fn run_many_args(c: &mut Criterion) {
     }
 
     let module = many_args_mock();
-    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+    let region = R::create(1, &Limits::default()).unwrap();
 
     c.bench_function("run_many_args", move |b| {
         b.iter_batched_ref(
@@ -265,16 +262,15 @@ fn run_many_args(c: &mut Criterion) {
     });
 }
 
-criterion_group!(
-    benches,
-    load_mkregion_and_instantiate,
-    instantiate,
-    drop_instance,
-    run_null,
-    run_fib,
-    run_hello,
-    run_many_args
-);
+pub fn seq_benches<R: RegionCreate + 'static>(c: &mut Criterion) {
+    load_mkregion_and_instantiate::<R>(c);
+    instantiate::<R>(c);
+    drop_instance::<R>(c);
+    run_null::<R>(c);
+    run_fib::<R>(c);
+    run_hello::<R>(c);
+    run_many_args::<R>(c);
+}
 
 #[no_mangle]
 extern "C" fn lucet_microbenchmarks_ensure_linked() {

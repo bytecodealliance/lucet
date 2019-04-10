@@ -1,6 +1,6 @@
 use crate::modules::{compile_hello, fib_mock, null_mock};
 use criterion::Criterion;
-use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Module, Region};
+use lucet_runtime::{DlModule, InstanceHandle, Limits, Module, Region, RegionCreate};
 use rayon::prelude::*;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -11,20 +11,20 @@ use tempfile::TempDir;
 /// threads. Scaling is not necessarily the point here, due to the locks on the region freelist and
 /// memory management syscalls, but we do want to make sure the concurrent case isn't slower than
 /// single-threaded.
-fn par_instantiate(c: &mut Criterion) {
+fn par_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     const INSTANCES_PER_RUN: usize = 2000;
 
-    fn setup() -> (Arc<MmapRegion>, Vec<Option<InstanceHandle>>) {
-        let region = MmapRegion::create(INSTANCES_PER_RUN, &Limits::default()).unwrap();
+    fn setup<R: RegionCreate + 'static>() -> (Arc<R>, Vec<Option<InstanceHandle>>) {
+        let region = R::create(INSTANCES_PER_RUN, &Limits::default()).unwrap();
         let mut handles = vec![];
         handles.resize_with(INSTANCES_PER_RUN, || None);
         (region, handles)
     }
 
-    fn body(
+    fn body<R: Region>(
         num_threads: usize,
         module: Arc<dyn Module>,
-        region: Arc<MmapRegion>,
+        region: Arc<R>,
         handles: &mut [Option<InstanceHandle>],
     ) {
         rayon::ThreadPoolBuilder::new()
@@ -50,7 +50,7 @@ fn par_instantiate(c: &mut Criterion) {
         move |b, &num_threads| {
             b.iter_batched(
                 setup,
-                |(region, mut handles)| {
+                |(region, mut handles): (Arc<R>, _)| {
                     body(num_threads, module.clone(), region, handles.as_mut_slice())
                 },
                 criterion::BatchSize::SmallInput,
@@ -66,9 +66,14 @@ fn par_instantiate(c: &mut Criterion) {
 }
 
 /// Run a function in parallel.
-fn par_run(name: &str, instances_per_run: usize, module: Arc<dyn Module>, c: &mut Criterion) {
+fn par_run<R: RegionCreate + 'static>(
+    name: &str,
+    instances_per_run: usize,
+    module: Arc<dyn Module>,
+    c: &mut Criterion,
+) {
     let setup = move || {
-        let region = MmapRegion::create(instances_per_run, &Limits::default()).unwrap();
+        let region = R::create(instances_per_run, &Limits::default()).unwrap();
 
         (0..instances_per_run)
             .into_iter()
@@ -110,16 +115,20 @@ fn par_run(name: &str, instances_per_run: usize, module: Arc<dyn Module>, c: &mu
 /// body of the function is empty, scaling is not necessarily the point here, rather we want to make
 /// sure that the locks for signal handling don't unduly slow the program down with multiple
 /// threads.
-fn par_run_null(c: &mut Criterion) {
-    par_run("par_run_null", 1000, null_mock(), c);
+fn par_run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
+    par_run::<R>("par_run_null", 1000, null_mock(), c);
 }
 
 /// Run a computation-heavy function in parallel.
 ///
 /// Since running multiple independent fibonaccis is embarassingly parallel, this should scale close
 /// to linearly.
-fn par_run_fib(c: &mut Criterion) {
-    par_run("par_run_fib", 1000, fib_mock(), c);
+fn par_run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
+    par_run::<R>("par_run_fib", 1000, fib_mock(), c);
 }
 
-criterion_group!(par, par_instantiate, par_run_null, par_run_fib,);
+pub fn par_benches<R: RegionCreate + 'static>(c: &mut Criterion) {
+    par_instantiate::<R>(c);
+    par_run_null::<R>(c);
+    par_run_fib::<R>(c);
+}

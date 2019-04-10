@@ -1,6 +1,12 @@
-#[macro_use]
-extern crate criterion;
+use criterion::Criterion;
+use lucet_microbenchmarks::{par_benches, seq_benches};
+use lucet_runtime::MmapRegion;
 
-use lucet_microbenchmarks::{benches, par};
+fn main() {
+    let mut c = Criterion::default().configure_from_args();
 
-criterion_main!(benches, par);
+    seq_benches::<MmapRegion>(&mut c);
+    par_benches::<MmapRegion>(&mut c);
+
+    c.final_summary();
+}
