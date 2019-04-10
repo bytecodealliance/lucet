@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate criterion;
 
-use lucet_microbenchmarks::benches;
+use lucet_microbenchmarks::{benches, par};
 
-criterion_main!(benches);
+criterion_main!(benches, par);

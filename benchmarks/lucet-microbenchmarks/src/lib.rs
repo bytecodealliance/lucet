@@ -1,29 +1,27 @@
 #[macro_use]
 extern crate criterion;
 
+mod modules;
+mod par;
+
+pub use par::par;
+
+use crate::modules::{compile_hello, fib_mock, many_args_mock, null_mock};
 use criterion::Criterion;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Module, Region};
-use lucet_wasi_sdk::{CompileOpts, Lucetc};
-use lucetc::{Bindings, LucetcOpts};
-use rayon::prelude::*;
+use lucet_wasi::WasiCtxBuilder;
 use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-fn wasi_bindings() -> Bindings {
-    Bindings::from_file("../../lucet-wasi/bindings.json").unwrap()
-}
-
-fn compile_hello<P: AsRef<Path>>(so_file: P) {
-    let wasm_build = Lucetc::new(&["../../lucet-wasi/examples/hello.c"])
-        .print_output(true)
-        .with_cflag("-Wall")
-        .with_cflag("-Werror")
-        .with_bindings(wasi_bindings());
-
-    wasm_build.build(&so_file).unwrap();
-}
-
+/// End-to-end instance instantiation.
+///
+/// This is meant to simulate our startup time when we start from scratch, with no module loaded and
+/// no region created at all. This would be unusual for a server application, but reflects what
+/// one-shot command-line tools like `lucet-wasi` do.
+///
+/// To minimize the effects of filesystem cache on the `DlModule::load()`, this runs `sync` between
+/// each iteration.
 fn load_mkregion_and_instantiate(c: &mut Criterion) {
     fn body(so_file: &Path) -> InstanceHandle {
         let module = DlModule::load(so_file).unwrap();
@@ -37,12 +35,20 @@ fn load_mkregion_and_instantiate(c: &mut Criterion) {
     compile_hello(&so_file);
 
     c.bench_function("load_mkregion_and_instantiate hello", move |b| {
-        b.iter(|| body(&so_file))
+        b.iter_batched(
+            || nix::unistd::sync(),
+            |_| body(&so_file),
+            criterion::BatchSize::PerIteration,
+        )
     });
 
     workdir.close().unwrap();
 }
 
+/// Instance instantiation.
+///
+/// This simulates a typical case for a server process like Terrarium: the region and module stay
+/// initialized, but a new instance is created for each request.
 fn instantiate(c: &mut Criterion) {
     fn body(module: Arc<dyn Module>, region: Arc<MmapRegion>) -> InstanceHandle {
         region.new_instance(module).unwrap()
@@ -63,31 +69,77 @@ fn instantiate(c: &mut Criterion) {
     workdir.close().unwrap();
 }
 
-fn par_instantiate(c: &mut Criterion) {
-    const INSTANCES_PER_RUN: usize = 2000;
+/// Instance destruction.
+///
+/// Instances have some cleanup to do with memory management and freeing their slot on their region.
+fn drop_instance(c: &mut Criterion) {
+    fn body(_inst: InstanceHandle) {}
 
-    fn setup() -> (Arc<MmapRegion>, Vec<Option<InstanceHandle>>) {
-        let region = MmapRegion::create(INSTANCES_PER_RUN, &Limits::default()).unwrap();
-        let mut handles = vec![];
-        handles.resize_with(INSTANCES_PER_RUN, || None);
-        (region, handles)
+    let workdir = TempDir::new().expect("create working directory");
+
+    let so_file = workdir.path().join("out.so");
+    compile_hello(&so_file);
+
+    let module = DlModule::load(&so_file).unwrap();
+    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+
+    c.bench_function("drop_instance hello", move |b| {
+        b.iter_batched(
+            || region.new_instance(module.clone()).unwrap(),
+            |inst| body(inst),
+            criterion::BatchSize::PerIteration,
+        )
+    });
+
+    workdir.close().unwrap();
+}
+
+/// Run a trivial guest function.
+///
+/// This is primarily a measurement of the signal handler installation and removal, and the context
+/// switching overhead.
+fn run_null(c: &mut Criterion) {
+    fn body(inst: &mut InstanceHandle) {
+        inst.run(b"f", &[]).unwrap();
     }
 
-    fn body(
-        num_threads: usize,
-        module: Arc<dyn Module>,
-        region: Arc<MmapRegion>,
-        handles: &mut [Option<InstanceHandle>],
-    ) {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build()
-            .unwrap()
-            .install(|| {
-                handles
-                    .par_iter_mut()
-                    .for_each(|handle| *handle = Some(region.new_instance(module.clone()).unwrap()))
-            })
+    let module = null_mock();
+    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+
+    c.bench_function("run_null", move |b| {
+        b.iter_batched_ref(
+            || region.new_instance(module.clone()).unwrap(),
+            |inst| body(inst),
+            criterion::BatchSize::PerIteration,
+        )
+    });
+}
+
+/// Run a computation-heavy guest function from a mock module.
+///
+/// Since this is running code in a mock module, the cost of the computation should overwhelm the
+/// cost of the Lucet runtime.
+fn run_fib(c: &mut Criterion) {
+    fn body(inst: &mut InstanceHandle) {
+        inst.run(b"f", &[]).unwrap();
+    }
+
+    let module = fib_mock();
+    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+
+    c.bench_function("run_fib", move |b| {
+        b.iter_batched_ref(
+            || region.new_instance(module.clone()).unwrap(),
+            |inst| body(inst),
+            criterion::BatchSize::PerIteration,
+        )
+    });
+}
+
+/// Run a trivial WASI program.
+fn run_hello(c: &mut Criterion) {
+    fn body(inst: &mut InstanceHandle) {
+        inst.run(b"_start", &[]).unwrap();
     }
 
     let workdir = TempDir::new().expect("create working directory");
@@ -96,32 +148,132 @@ fn par_instantiate(c: &mut Criterion) {
     compile_hello(&so_file);
 
     let module = DlModule::load(&so_file).unwrap();
+    let region = MmapRegion::create(1, &Limits::default()).unwrap();
 
-    let bench = criterion::ParameterizedBenchmark::new(
-        "par_instantiate hello",
-        move |b, &num_threads| {
-            b.iter_batched(
-                setup,
-                |(region, mut handles)| {
-                    body(num_threads, module.clone(), region, handles.as_mut_slice())
-                },
-                criterion::BatchSize::SmallInput,
-            )
-        },
-        (1..=num_cpus::get()).collect::<Vec<usize>>(),
-    )
-    .sample_size(10);
+    c.bench_function("run_hello", move |b| {
+        b.iter_batched_ref(
+            || {
+                let null = std::fs::File::open("/dev/null").unwrap();
+                let ctx = WasiCtxBuilder::new()
+                    .args(&["hello"])
+                    .fd(1, null)
+                    .build()
+                    .unwrap();
+                region
+                    .new_instance_builder(module.clone())
+                    .with_embed_ctx(ctx)
+                    .build()
+                    .unwrap()
+            },
+            |inst| body(inst),
+            criterion::BatchSize::PerIteration,
+        )
+    });
+}
 
-    c.bench("benches", bench);
+/// Run a trivial guest function that takes a bunch of arguments.
+///
+/// This is primarily interesting as a comparison to `run_null`; the difference is the overhead of
+/// installing the arguments into the guest registers and stack.
+///
+/// `rustfmt` hates this function.
+fn run_many_args(c: &mut Criterion) {
+    fn body(inst: &mut InstanceHandle) {
+        inst.run(
+            b"f",
+            &[
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+                0xAFu8.into(),
+                0xAFu16.into(),
+                0xAFu32.into(),
+                0xAFu64.into(),
+                175.0f32.into(),
+                175.0f64.into(),
+            ],
+        )
+        .unwrap();
+    }
 
-    workdir.close().unwrap();
+    let module = many_args_mock();
+    let region = MmapRegion::create(1, &Limits::default()).unwrap();
+
+    c.bench_function("run_many_args", move |b| {
+        b.iter_batched_ref(
+            || region.new_instance(module.clone()).unwrap(),
+            |inst| body(inst),
+            criterion::BatchSize::PerIteration,
+        )
+    });
 }
 
 criterion_group!(
     benches,
     load_mkregion_and_instantiate,
     instantiate,
-    par_instantiate
+    drop_instance,
+    run_null,
+    run_fib,
+    run_hello,
+    run_many_args
 );
 
 #[no_mangle]
