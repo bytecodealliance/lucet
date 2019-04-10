@@ -167,25 +167,24 @@ mod module_data {
     */
     #[test]
     fn globals_import() {
-        use lucetc::LucetcErrorKind;
+        use lucet_module_data::Global as GlobalVariant;
         let m = load_wat_module("globals_import");
         let b = Bindings::empty();
         let h = HeapSettings::default();
 
-        let c = Compiler::new(&m, OptLevel::Best, &b, h);
-        assert!(c.is_err());
-        assert_eq!(
-            *c.err().unwrap().get_context(),
-            LucetcErrorKind::Unsupported("import global".to_owned())
-        );
+        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile globals_import");
+        let module_data = c.module_data();
+        let gspec = module_data.globals_spec();
 
-        /*
-                assert_eq!(gspec.len(), 1);
-                let g = gspec[0].import().expect("global is an import");
-                assert_eq!(g.module(), "env");
-                assert_eq!(g.field(), "x");
-                assert_eq!(g.global_type.content_type(), ValueType::I32);
-        */
+        assert_eq!(gspec.len(), 1);
+        let g = gspec.get(0).unwrap().global();
+        match g {
+            GlobalVariant::Import { module, field } => {
+                assert_eq!(*module, "env");
+                assert_eq!(*field, "x");
+            }
+            _ => panic!("global should be an import"),
+        }
     }
 
     #[test]
@@ -194,15 +193,14 @@ mod module_data {
         let m = load_wat_module("heap_spec_import");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling heap_spec_import");
+        let c = Compiler::new(&m, OptLevel::Best, &b, h.clone()).expect("compiling heap_spec_import");
 
-        let default_heap = HeapSpec::default();
         assert_eq!(
             c.module_data().heap_spec(),
             Some(&HeapSpec {
-                // reserved and guard is default
-                reserved_size: default_heap.reserved_size,
-                guard_size: default_heap.guard_size,
+                // reserved and guard are given by HeapSettings
+                reserved_size: h.min_reserved_size,
+                guard_size: h.guard_size,
                 // initial size of import specified as 6 wasm pages
                 initial_size: 6 * 64 * 1024,
                 // max size of import is specified as 10 wasm pages
@@ -217,14 +215,14 @@ mod module_data {
         let m = load_wat_module("heap_spec_definition");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling heap_spec_definition");
-        let default_heap = HeapSpec::default();
+        let c = Compiler::new(&m, OptLevel::Best, &b, h.clone()).expect("compiling heap_spec_definition");
+
         assert_eq!(
             c.module_data().heap_spec(),
             Some(&HeapSpec {
-                // reserved and guard is default
-                reserved_size: default_heap.reserved_size,
-                guard_size: default_heap.guard_size,
+                // reserved and guard are given by HeapSettings
+                reserved_size: h.min_reserved_size,
+                guard_size: h.guard_size,
                 // initial size defined as 5 wasm pages
                 initial_size: 5 * 64 * 1024,
                 // no max size defined
@@ -235,19 +233,13 @@ mod module_data {
 
     #[test]
     fn heap_spec_none() {
-        use lucet_module_data::HeapSpec;
         let m = load_wat_module("heap_spec_none");
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling heap_spec_none");
         assert_eq!(
             c.module_data().heap_spec(),
-            Some(&HeapSpec {
-                reserved_size: 0,
-                guard_size: 0,
-                initial_size: 0,
-                max_size: None,
-            })
+            None,
         );
     }
 
