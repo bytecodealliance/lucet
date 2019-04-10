@@ -2,21 +2,13 @@ use crate::bindings;
 use crate::instance::Instance;
 use failure::{format_err, Error, Fail};
 use lucet_runtime::{self, MmapRegion, Module as LucetModule, Region, UntypedRetVal, Val};
-use lucetc::{
-    compile,
-    compiler::OptLevel,
-    error::{LucetcError, LucetcErrorKind},
-    program::{HeapSettings, Program},
-};
-use parity_wasm::{self, deserialize_buffer};
+use lucetc::{Compiler, HeapSettings, LucetcError, LucetcErrorKind, OptLevel};
 use std::io;
 use std::process::Command;
 use std::sync::Arc;
 
 #[derive(Fail, Debug)]
 pub enum ScriptError {
-    #[fail(display = "Deserialization error: {}", _0)]
-    DeserializeError(parity_wasm::elements::Error),
     #[fail(display = "Validation error: {}", _0)]
     ValidationError(LucetcError),
     #[fail(display = "Program creation error: {}", _0)]
@@ -79,30 +71,18 @@ impl ScriptEnv {
         name: &Option<String>,
     ) -> Result<(), ScriptError> {
         let bindings = bindings::spec_test_bindings();
-
-        let module = deserialize_buffer(&module).map_err(ScriptError::DeserializeError)?;
-
-        let program =
-            Program::new(module, bindings, HeapSettings::default()).map_err(program_error)?;
+        let compiler = Compiler::new(&module, OptLevel::Best, &bindings, HeapSettings::default())
+            .map_err(program_error)?;
 
         let dir = tempfile::Builder::new().prefix("codegen").tempdir()?;
         let objfile_path = dir.path().join("a.o");
         let sofile_path = dir.path().join("a.so");
 
-        {
-            let compiler = compile(
-                &program,
-                &name.clone().unwrap_or("default".to_owned()),
-                OptLevel::Default,
-            )
-            .map_err(ScriptError::CompileError)?;
-
-            let object = compiler.codegen().map_err(ScriptError::CodegenError)?;
-
-            object
-                .write(&objfile_path)
-                .map_err(ScriptError::CodegenError)?;
-        }
+        compiler
+            .object_file()
+            .map_err(ScriptError::CompileError)?
+            .write(&objfile_path)
+            .map_err(ScriptError::CodegenError)?;
 
         let mut cmd_ld = Command::new("ld");
         cmd_ld.arg(objfile_path.clone());
@@ -130,7 +110,7 @@ impl ScriptEnv {
 
         self.instances.push((
             name.clone(),
-            Instance::new(program, lucet_module, lucet_region, lucet_instance),
+            Instance::new(lucet_module, lucet_region, lucet_instance),
         ));
         Ok(())
     }

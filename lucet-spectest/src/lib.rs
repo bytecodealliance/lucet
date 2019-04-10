@@ -8,7 +8,6 @@ pub use crate::result::{command_description, SpecScriptResult};
 mod bindings;
 mod result;
 
-use crate::instance::{ExportType, ValueType};
 use crate::script::{ScriptEnv, ScriptError};
 use failure::{format_err, Error, ResultExt};
 use lucet_runtime::{Error as RuntimeError, TrapCodeType, UntypedRetVal, Val};
@@ -70,9 +69,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
         CommandKind::AssertMalformed { ref module, .. } => {
             let module = module.clone().into_vec();
             match script.instantiate(module, &None) {
-                Err(ScriptError::DeserializeError(_)) | Err(ScriptError::ValidationError(_)) => {
-                    Ok(())
-                }
+                Err(ScriptError::ValidationError(_)) => Ok(()),
                 Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
                 Err(e) => Err(Error::from(e).context(SpecTestErrorKind::UnexpectedFailure))?,
             }
@@ -81,7 +78,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
         CommandKind::AssertUninstantiable { module, .. } => {
             let module = module.clone().into_vec();
             match script.instantiate(module, &None) {
-                Err(ScriptError::DeserializeError(_)) => Ok(()), // XXX This is probably the wrong ScriptError to look for - FIXME
+                Err(ScriptError::ValidationError(_)) => Ok(()), // XXX This is probably the wrong ScriptError to look for - FIXME
                 Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
                 Err(e) => Err(Error::from(e).context(SpecTestErrorKind::UnexpectedFailure))?,
             }
@@ -179,33 +176,11 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 let res = script
                     .run(module, field, args)
                     .context(SpecTestErrorKind::UnexpectedFailure)?;
-                let res_type = script
-                    .instance_named(module)
-                    .expect("just used that instance")
-                    .type_of(field)
-                    .expect("field has type");
-                match res_type {
-                    ExportType::Function(_, Some(ValueType::F32)) => {
-                        if res.as_f32().is_nan() {
-                            Ok(())
-                        } else {
-                            Err(format_err!("expected NaN, got {}", res.as_f32()))
-                                .context(SpecTestErrorKind::IncorrectResult)?
-                        }
-                    }
-                    ExportType::Function(_, Some(ValueType::F64)) => {
-                        if res.as_f64().is_nan() {
-                            Ok(())
-                        } else {
-                            Err(format_err!("expected NaN, got {}", res.as_f64()))
-                                .context(SpecTestErrorKind::IncorrectResult)?
-                        }
-                    }
-                    _ => Err(format_err!(
-                        "expected a function returning point, got {:?}",
-                        res_type
-                    ))
-                    .context(SpecTestErrorKind::UnexpectedFailure)?,
+                if res.as_f32().is_nan() || res.as_f64().is_nan() {
+                    Ok(())
+                } else {
+                    Err(format_err!("expected NaN, got {}", res))
+                        .context(SpecTestErrorKind::IncorrectResult)?
                 }
             }
             _ => Err(format_err!("non-invoke action"))
