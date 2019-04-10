@@ -110,11 +110,11 @@ impl<'a> Compiler<'a> {
 
             func_translator
                 .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
-                .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
+                .context(LucetcErrorKind::FunctionTranslation(func.name.symbol().to_owned()))?;
 
             self.clif_module
                 .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
-                .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
+                .context(LucetcErrorKind::FunctionDefinition(func.name.symbol().to_owned()))?;
         }
 
         write_module_data(&mut self.clif_module, &self.decls)?;
@@ -139,7 +139,7 @@ impl<'a> Compiler<'a> {
 
             func_translator
                 .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
-                .context(LucetcErrorKind::Function(func.name.symbol().to_owned()))?;
+                .context(LucetcErrorKind::FunctionTranslation(func.name.symbol().to_owned()))?;
 
             funcs.insert(func.name.clone(), clif_context.func);
         }

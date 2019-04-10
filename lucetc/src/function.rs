@@ -107,7 +107,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             style: ir::HeapStyle::Static {
                 bound: heap_spec.reserved_size.into(),
             },
-            index_type: ir::types::I64,
+            index_type: ir::types::I32,
         })
     }
 
@@ -145,7 +145,8 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         callee: ir::Value,
         call_args: &[ir::Value],
     ) -> WasmResult<ir::Inst> {
-        let table_entry_addr = pos.ins().table_addr(NATIVE_POINTER, table, callee, 0);
+        let callee_u64 = pos.ins().sextend(ir::types::I64, callee);
+        let table_entry_addr = pos.ins().table_addr(ir::types::I64, table, callee_u64, 0);
         // First element at the table entry is the signature index of the function
         let table_entry_sig_offset = 0;
         let table_entry_sig_ix = pos.ins().load(
