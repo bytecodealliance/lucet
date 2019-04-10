@@ -58,6 +58,11 @@ pub fn owned_sparse_data_from_initializers<'a>(
         }
         let chunks = split(initializer);
         for (pagenumber, chunk) in chunks {
+            if pagenumber > heap.initial_size as usize / PAGE_SIZE {
+                Err(format_err!(
+                    "cannot initialize data beyond linear memory's initial size"
+                ))?;
+            }
             let base = chunk.offset as usize;
             match pagemap.entry(pagenumber) {
                 Entry::Occupied(occ) => {

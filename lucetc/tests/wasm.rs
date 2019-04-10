@@ -260,7 +260,7 @@ mod module_data {
             c.is_err(),
             "compilation error because data initializers are oversized"
         );
-        assert_eq!(*c.err().unwrap().get_context(), LucetcErrorKind::Validation); // XXX fixme
+        assert_eq!(*c.err().unwrap().get_context(), LucetcErrorKind::ModuleData);
     }
 
     // XXX adding more negative tests like the one above is valuable - lets do it
@@ -279,7 +279,8 @@ mod module_data {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h);
-        assert!(c.is_err(),
+        assert!(
+            c.is_err(),
             "compilation error because wasm module is invalid"
         );
         assert_eq!(*c.err().unwrap().get_context(), LucetcErrorKind::Validation);
