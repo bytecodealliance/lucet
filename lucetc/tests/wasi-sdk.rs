@@ -87,7 +87,7 @@ mod programs {
 
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile empty");
+        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a");
         let mdata = c.module_data();
 
         /* FIXME: module data doesn't contain the information to check these properties:
@@ -96,7 +96,7 @@ mod programs {
         assert_eq!(num_export_functions(&p), 1, "export functions");
         */
 
-        let _obj = c.object_file().expect("generate code from empty");
+        let _obj = c.object_file().expect("generate code from a");
     }
 
     #[test]
@@ -107,14 +107,14 @@ mod programs {
         env.insert("a".to_owned(), "a".to_owned());
         let b = Bindings::env(env);
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile empty");
+        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile b");
         let mdata = c.module_data();
         /* FIXME: module data doesn't contain the information to check these properties:
         assert_eq!(p.import_functions().len(), 1, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
         assert_eq!(num_export_functions(&p), 1, "export functions");
         */
-        let _obj = c.object_file().expect("generate code from empty");
+        let _obj = c.object_file().expect("generate code from b");
     }
 
     #[test]
@@ -122,14 +122,14 @@ mod programs {
         let m = module_from_c(&["a", "b"], &["a", "b"]).expect("build module for a & b");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile empty");
+        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a & b");
         let mdata = c.module_data();
         /* FIXME: module data doesn't contain the information to check these properties:
         assert_eq!(p.import_functions().len(), 0, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
         assert_eq!(num_export_functions(&p), 2, "export functions");
         */
-        let _obj = c.object_file().expect("generate code from empty");
+        let _obj = c.object_file().expect("generate code from a & b");
     }
 
 }

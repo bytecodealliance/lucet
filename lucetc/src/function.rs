@@ -1,8 +1,8 @@
 use super::runtime::RuntimeFunc;
 use crate::decls::ModuleDecls;
 use crate::pointer::{NATIVE_POINTER, POINTER_SIZE};
-use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::cursor::FuncCursor;
+use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
