@@ -49,7 +49,7 @@ struct TrapManifestRow {
 #[derive(Debug)]
 struct TrapSite {
     offset: u32,
-    reason: u32,
+    trapcode: u32,
 }
 
 #[derive(Debug)]
@@ -332,29 +332,28 @@ impl<'a> ArtifactSummary<'a> {
         for _ in 0..trap_manifest_len {
             let func_start = rdr.read_u64::<LittleEndian>().unwrap();
             let func_len = rdr.read_u64::<LittleEndian>().unwrap();
-            let _traps = rdr.read_u64::<LittleEndian>().unwrap();
+            let traps = rdr.read_u64::<LittleEndian>().unwrap();
             let traps_len = rdr.read_u64::<LittleEndian>().unwrap();
             let func_name = self
                 .get_func_name_for_addr(func_start)
                 .unwrap_or("(not found)");
 
-            let sites = Vec::new();
+            let mut sites = Vec::new();
 
-            // TODO: This doesn't work yet for unknown reasons
-            // // Find the table
-            // let serialized_table = self.read_memory(traps, 8 * traps_len).unwrap();
-            // let mut table_rdr = Cursor::new(serialized_table);
+            // Find the table
+            let serialized_table = self.read_memory(traps, 8 * traps_len).unwrap();
+            let mut table_rdr = Cursor::new(serialized_table);
 
             // Iterate through each site
-            // for _ in 0..traps_len {
-            //     let offset = table_rdr.read_u32::<LittleEndian>().unwrap();
-            //     let reason = table_rdr.read_u32::<LittleEndian>().unwrap();
+            for _ in 0..traps_len {
+                let offset = table_rdr.read_u32::<LittleEndian>().unwrap();
+                let trapcode = table_rdr.read_u32::<LittleEndian>().unwrap();
 
-            //     sites.push(TrapSite {
-            //         offset: offset,
-            //         reason: reason,
-            //     });
-            // }
+                sites.push(TrapSite {
+                    offset,
+                    trapcode,
+                });
+            }
 
             manifest.records.push(TrapManifestRow {
                 func_name: func_name.to_string(),
@@ -513,6 +512,7 @@ fn print_summary(summary: ArtifactSummary) {
     if let Some(trap_manifest) = summary.trap_manifest {
         for row in trap_manifest.records {
             println!("  {:25} {} traps", row.func_name, row.trap_count);
+            println!("      {:?}", row.sites);
         }
     } else {
         println!("  {}", "MISSING!".red().bold());
