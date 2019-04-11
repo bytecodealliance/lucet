@@ -11,7 +11,11 @@ fn main() {
 
     let wasi_sdk_core_h = wasi_sdk.join("share/sysroot/include/wasi/core.h");
 
-    assert!(wasi_sdk_core_h.exists(), "wasi-sdk core.h not present at {:?}", wasi_sdk_core_h);
+    assert!(
+        wasi_sdk_core_h.exists(),
+        "wasi-sdk core.h not present at {:?}",
+        wasi_sdk_core_h
+    );
 
     println!("cargo:rerun-if-changed={}", wasi_sdk_core_h.display());
 
@@ -34,7 +38,7 @@ fn main() {
         // something failed, but how?
         match sed_result.code() {
             Some(code) => panic!("sed failed with code {}", code),
-            None       => panic!("sed exited abnormally")
+            None => panic!("sed exited abnormally"),
         }
     }
 

@@ -32,7 +32,8 @@ impl Patcher {
         let symbols = match &config.builtins_path {
             None => ExtractedSymbols::from(vec![]),
             Some(builtins_path) => symbols::extract_symbols(&builtins_path)?,
-        }.merge_additional(&config.builtins_additional);
+        }
+        .merge_additional(&config.builtins_additional);
         let builtins_names = symbols.builtins_names();
         let (patched_module, patched_builtins_map) = patch_module(module, &builtins_names)?;
         let patcher = Patcher {
