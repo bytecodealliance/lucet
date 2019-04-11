@@ -194,12 +194,10 @@ impl Drop for MmapRegion {
 }
 
 impl RegionCreate for MmapRegion {
+    const TYPE_NAME: &'static str = "MmapRegion";
+
     fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error> {
         MmapRegion::create(instance_capacity, limits)
-    }
-
-    fn type_name() -> &'static str {
-        "MmapRegion"
     }
 }
 

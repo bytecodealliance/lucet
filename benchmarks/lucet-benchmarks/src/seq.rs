@@ -27,7 +27,7 @@ fn load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     compile_hello(&so_file);
 
     c.bench_function(
-        &format!("load_mkregion_and_instantiate ({})", R::type_name()),
+        &format!("load_mkregion_and_instantiate ({})", R::TYPE_NAME),
         move |b| {
             b.iter_batched(
                 || nix::unistd::sync(),
@@ -57,7 +57,7 @@ fn instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
 
-    c.bench_function(&format!("instantiate ({})", R::type_name()), move |b| {
+    c.bench_function(&format!("instantiate ({})", R::TYPE_NAME), move |b| {
         b.iter(|| body(module.clone(), region.clone()))
     });
 
@@ -80,7 +80,7 @@ fn instantiate_large_dense<R: RegionCreate + 'static>(c: &mut Criterion) {
     let region = R::create(1, &limits).unwrap();
 
     c.bench_function(
-        &format!("instantiate_large_dense ({})", R::type_name()),
+        &format!("instantiate_large_dense ({})", R::TYPE_NAME),
         move |b| b.iter(|| body(module.clone(), region.clone())),
     );
 }
@@ -101,7 +101,7 @@ fn instantiate_large_sparse<R: RegionCreate + 'static>(c: &mut Criterion) {
     let region = R::create(1, &limits).unwrap();
 
     c.bench_function(
-        &format!("instantiate_large_sparse ({})", R::type_name()),
+        &format!("instantiate_large_sparse ({})", R::TYPE_NAME),
         move |b| b.iter(|| body(module.clone(), region.clone())),
     );
 }
@@ -120,7 +120,7 @@ fn drop_instance<R: RegionCreate + 'static>(c: &mut Criterion) {
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
 
-    c.bench_function(&format!("drop_instance ({})", R::type_name()), move |b| {
+    c.bench_function(&format!("drop_instance ({})", R::TYPE_NAME), move |b| {
         b.iter_batched(
             || region.new_instance(module.clone()).unwrap(),
             |inst| body(inst),
@@ -144,7 +144,7 @@ fn drop_instance_large_dense<R: RegionCreate + 'static>(c: &mut Criterion) {
     let region = R::create(1, &limits).unwrap();
 
     c.bench_function(
-        &format!("drop_instance_large_dense ({})", R::type_name()),
+        &format!("drop_instance_large_dense ({})", R::TYPE_NAME),
         move |b| {
             b.iter_batched(
                 || region.new_instance(module.clone()).unwrap(),
@@ -168,7 +168,7 @@ fn drop_instance_large_sparse<R: RegionCreate + 'static>(c: &mut Criterion) {
     let region = R::create(1, &limits).unwrap();
 
     c.bench_function(
-        &format!("drop_instance_large_sparse ({})", R::type_name()),
+        &format!("drop_instance_large_sparse ({})", R::TYPE_NAME),
         move |b| {
             b.iter_batched(
                 || region.new_instance(module.clone()).unwrap(),
@@ -191,7 +191,7 @@ fn run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
     let module = null_mock();
     let region = R::create(1, &Limits::default()).unwrap();
 
-    c.bench_function(&format!("run_null ({})", R::type_name()), move |b| {
+    c.bench_function(&format!("run_null ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
             || region.new_instance(module.clone()).unwrap(),
             |inst| body(inst),
@@ -212,7 +212,7 @@ fn run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
     let module = fib_mock();
     let region = R::create(1, &Limits::default()).unwrap();
 
-    c.bench_function(&format!("run_fib ({})", R::type_name()), move |b| {
+    c.bench_function(&format!("run_fib ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
             || region.new_instance(module.clone()).unwrap(),
             |inst| body(inst),
@@ -235,7 +235,7 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
 
-    c.bench_function(&format!("run_hello ({})", R::type_name()), move |b| {
+    c.bench_function(&format!("run_hello ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
             || {
                 let null = std::fs::File::open("/dev/null").unwrap();
@@ -341,7 +341,7 @@ fn run_many_args<R: RegionCreate + 'static>(c: &mut Criterion) {
     let module = many_args_mock();
     let region = R::create(1, &Limits::default()).unwrap();
 
-    c.bench_function(&format!("run_many_args ({})", R::type_name()), move |b| {
+    c.bench_function(&format!("run_many_args ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
             || region.new_instance(module.clone()).unwrap(),
             |inst| body(inst),

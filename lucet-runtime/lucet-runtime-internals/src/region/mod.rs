@@ -59,12 +59,12 @@ pub trait RegionInternal: Send + Sync {
 /// This is not part of [`Region`](trait.Region.html) so that `Region` types can be made into trait
 /// objects.
 pub trait RegionCreate: Region {
+    /// The type name of the region; useful for testing.
+    const TYPE_NAME: &'static str;
+
     /// Create a new `Region` that can support a given number instances, each subject to the same
     /// runtime limits.
     fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error>;
-
-    /// Get the type name of the region; useful for testing.
-    fn type_name() -> &'static str;
 }
 
 /// A builder for instances; created by

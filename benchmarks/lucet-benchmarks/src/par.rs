@@ -46,7 +46,7 @@ fn par_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     let module = DlModule::load(&so_file).unwrap();
 
     let bench = criterion::ParameterizedBenchmark::new(
-        format!("par_instantiate ({})", R::type_name()),
+        format!("par_instantiate ({})", R::TYPE_NAME),
         move |b, &num_threads| {
             b.iter_batched(
                 setup,
@@ -117,7 +117,7 @@ fn par_run<R: RegionCreate + 'static>(
 /// threads.
 fn par_run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
     par_run::<R>(
-        &format!("par_run_null ({})", R::type_name()),
+        &format!("par_run_null ({})", R::TYPE_NAME),
         1000,
         null_mock(),
         c,
@@ -130,7 +130,7 @@ fn par_run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
 /// to linearly.
 fn par_run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
     par_run::<R>(
-        &format!("par_run_fib ({})", R::type_name()),
+        &format!("par_run_fib ({})", R::TYPE_NAME),
         1000,
         fib_mock(),
         c,
