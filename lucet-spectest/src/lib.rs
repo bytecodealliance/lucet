@@ -10,7 +10,7 @@ mod result;
 
 use crate::script::{ScriptEnv, ScriptError};
 use failure::{format_err, Error, ResultExt};
-use lucet_runtime::{Error as RuntimeError, TrapCodeType, UntypedRetVal, Val};
+use lucet_runtime::{Error as RuntimeError, TrapCode, UntypedRetVal, Val};
 use std::fs;
 use std::path::PathBuf;
 use wabt::script::{Action, CommandKind, ScriptParser, Value};
@@ -27,6 +27,7 @@ pub fn run_spec_test(spec_path: &PathBuf) -> Result<SpecScriptResult, Error> {
             Ok(()) => res.pass(cmd),
             Err(e) => match e.get_context() {
                 SpecTestErrorKind::UnsupportedCommand | SpecTestErrorKind::UnsupportedLucetc => {
+                    println!("skip unsupported");
                     res.skip(cmd, e)
                 }
                 _ => res.fail(cmd, e),
@@ -51,6 +52,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
             ref module,
             ref name,
         } => {
+            println!("module {:?}", name);
             let module = module.clone().into_vec();
             script
                 .instantiate(&module, name)
@@ -59,6 +61,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
         }
 
         CommandKind::AssertInvalid { ref module, .. } => {
+            println!("assert_invalid");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
                 Err(ScriptError::ValidationError(_)) => Ok(()),
@@ -71,6 +74,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
         }
 
         CommandKind::AssertMalformed { ref module, .. } => {
+            println!("assert_malformed");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
                 Err(ScriptError::ValidationError(_)) => Ok(()),
@@ -80,15 +84,17 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
         }
 
         CommandKind::AssertUninstantiable { module, .. } => {
+            println!("assert_uninstantiable");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
-                Err(ScriptError::ValidationError(_)) => Ok(()),
+                Err(ScriptError::InstantiateError(_)) => Ok(()),
                 Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
                 Err(e) => Err(unexpected_failure(e))?,
             }
         }
 
         CommandKind::AssertUnlinkable { module, .. } => {
+            println!("assert_unlinkable");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
                 Err(ScriptError::ValidationError(_)) => Ok(()),
@@ -101,6 +107,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
             ref name,
             ref as_name,
         } => {
+            println!("register {:?} {}", name, as_name);
             script
                 .register(name, as_name)
                 .map_err(unexpected_failure)?;
@@ -113,6 +120,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 ref field,
                 ref args,
             } => {
+                println!("invoke {:?} {} {:?}", module, field, args);
                 let args = translate_args(args);
                 let _res = script
                     .run(module, field, args)
@@ -128,14 +136,15 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 ref field,
                 ref args,
             } => {
+                println!("assert_exhaustion {:?} {} {:?}", module, field, args);
                 let args = translate_args(args);
                 let res = script.run(module, field, args);
                 match res {
                     Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
 
                     Err(ScriptError::RuntimeError(RuntimeError::RuntimeFault(details))) => {
-                        match details.trapcode.ty {
-                            TrapCodeType::StackOverflow => Ok(()),
+                        match details.trapcode {
+                            Some(TrapCode::StackOverflow) => Ok(()),
                             e => Err(format_err!(
                                 "AssertExhaustion expects stack overflow, got {:?}",
                                 e
@@ -159,6 +168,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 ref field,
                 ref args,
             } => {
+                println!("assert_return (invoke {:?} {} {:?}) {:?}", module, field, args, expected);
                 let args = translate_args(args);
                 let res = script
                     .run(module, field, args)
@@ -176,6 +186,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 ref field,
                 ref args,
             } => {
+                println!("assert_nan");
                 let args = translate_args(args);
                 let res = script
                     .run(module, field, args)
@@ -196,6 +207,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 field,
                 args,
             } => {
+                println!("assert_trap (invoke {:?} {} {:?})", module, field, args);
                 let args = translate_args(args);
                 let res = script.run(module, field, args);
                 match res {
