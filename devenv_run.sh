@@ -2,7 +2,7 @@
 
 . "$(dirname ${BASH_SOURCE:-$0})/config.inc"
 
-if ! docker ps -f name=lucet | grep -Fq lucet ; then
+if ! docker ps -f name='lucet' --format '{{.Names}}' | grep -q '^lucet$' ; then
 	${HOST_BASE_PREFIX}/devenv_start.sh
 fi
 
