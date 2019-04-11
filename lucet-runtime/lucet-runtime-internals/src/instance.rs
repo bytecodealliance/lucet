@@ -6,7 +6,7 @@ pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHa
 use crate::alloc::{Alloc, HOST_PAGE_SIZE_EXPECTED};
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
-use crate::error::Error;
+use crate::error::{Error};
 use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, Global, Module};
 use crate::sysdeps::UContext;
@@ -333,9 +333,14 @@ impl Instance {
     ///
     /// On success, returns the number of pages that existed before the call.
     pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
+        let additional_bytes = additional_pages
+            .checked_mul(WASM_PAGE_SIZE)
+            .ok_or(lucet_format_err!(
+                "additional pages larger than wasm address space",
+            ))?;
         let orig_len = self
             .alloc
-            .expand_heap(additional_pages * WASM_PAGE_SIZE, self.module.as_ref())?;
+            .expand_heap(additional_bytes, self.module.as_ref())?;
         Ok(orig_len / WASM_PAGE_SIZE)
     }
 
