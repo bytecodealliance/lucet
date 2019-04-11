@@ -6,10 +6,6 @@ env:
 services:
   - docker
 
-before_install:
-  - ./devenv_build_container.sh
-  - ./devenv_start.sh
-
 script:
   - ./devenv_run.sh make indent-check test audit
   - git diff --exit-code
