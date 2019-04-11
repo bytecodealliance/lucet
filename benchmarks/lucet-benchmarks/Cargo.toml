@@ -1,5 +1,5 @@
 [package]
-name = "lucet-microbenchmarks"
+name = "lucet-benchmarks"
 version = "0.1.0"
 authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
 edition = "2018"
@@ -20,5 +20,5 @@ tempfile = "3.0"
 bench = false
 
 [[bench]]
-name = "microbenchmarks"
+name = "benchmarks"
 harness = false

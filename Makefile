@@ -26,7 +26,7 @@ test: indent-check
             -p lucet-idl \
             -p lucet-wasi-sdk \
             -p lucet-wasi \
-            -p lucet-microbenchmarks
+            -p lucet-benchmarks
 	cargo run -p lucet-wasi-fuzz -- --num-tests=3
 
 .PHONY: fuzz
@@ -35,7 +35,7 @@ fuzz:
 
 .PHONY: bench
 bench:
-	cargo bench -p lucet-microbenchmarks
+	cargo bench -p lucet-benchmarks
 	make -C benchmarks/shootout clean
 	make -C benchmarks/shootout bench
 

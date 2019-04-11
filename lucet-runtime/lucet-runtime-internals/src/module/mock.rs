@@ -125,6 +125,11 @@ impl MockModuleBuilder {
     }
 
     pub fn build(self) -> Arc<dyn Module> {
+        assert!(
+            self.sparse_page_data.len() * 4096 <= self.heap_spec.initial_size as usize,
+            "heap must fit in heap spec initial size"
+        );
+
         let table_elements = self
             .table_elements
             .into_iter()

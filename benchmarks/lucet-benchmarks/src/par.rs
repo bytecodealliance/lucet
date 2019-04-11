@@ -46,7 +46,7 @@ fn par_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     let module = DlModule::load(&so_file).unwrap();
 
     let bench = criterion::ParameterizedBenchmark::new(
-        "par_instantiate hello",
+        format!("par_instantiate ({})", R::type_name()),
         move |b, &num_threads| {
             b.iter_batched(
                 setup,
@@ -116,7 +116,12 @@ fn par_run<R: RegionCreate + 'static>(
 /// sure that the locks for signal handling don't unduly slow the program down with multiple
 /// threads.
 fn par_run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
-    par_run::<R>("par_run_null", 1000, null_mock(), c);
+    par_run::<R>(
+        &format!("par_run_null ({})", R::type_name()),
+        1000,
+        null_mock(),
+        c,
+    );
 }
 
 /// Run a computation-heavy function in parallel.
@@ -124,7 +129,12 @@ fn par_run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
 /// Since running multiple independent fibonaccis is embarassingly parallel, this should scale close
 /// to linearly.
 fn par_run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
-    par_run::<R>("par_run_fib", 1000, fib_mock(), c);
+    par_run::<R>(
+        &format!("par_run_fib ({})", R::type_name()),
+        1000,
+        fib_mock(),
+        c,
+    );
 }
 
 pub fn par_benches<R: RegionCreate + 'static>(c: &mut Criterion) {
