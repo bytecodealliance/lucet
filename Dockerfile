@@ -6,7 +6,6 @@ RUN apt-get update \
 	curl \
 	git \
 	libbsd-dev \
-	libhwloc-dev \
 	doxygen \
 	python-sphinx \
 	cmake \

@@ -175,8 +175,7 @@ Lucet requires:
 * [`wasi-sdk`](https://github.com/CraneStation/wasi-sdk), providing a Clang
   toolchain with wasm-ld, the WASI reference sysroot, and a libc based on WASI
   syscalls.
-* GNU Make, CMake, & various standard Unix utilities for the build system
-* `libhwloc`, for sightglass to pin benchmarks to a single core
+* GNU Make, CMake, & various standard Unix utilities for the build system.
 
 ### Getting started
 
