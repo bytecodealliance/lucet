@@ -6,7 +6,7 @@ if ! docker image inspect lucet:latest > /dev/null; then
 	${HOST_BASE_PREFIX}/devenv_build_container.sh
 fi
 
-if docker ps -f name='^lucet$' | grep -Fq lucet ; then
+if docker ps -f name='lucet' --format '{{.Names}}' | grep -q '^lucet$' ; then
 	echo "container is already running" >&2
 	exit 1
 fi
