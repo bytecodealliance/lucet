@@ -137,7 +137,7 @@ impl RegionInternal for MmapRegion {
             .unwrap_or(0);
 
         // reset the heap to the initial size, and mprotect those pages appropriately
-        if alloc.heap_accessible_size != initial_size {
+        if initial_size > 0 {
             unsafe {
                 mprotect(
                     heap,
