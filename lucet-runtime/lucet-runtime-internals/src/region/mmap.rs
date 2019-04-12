@@ -145,10 +145,9 @@ impl RegionInternal for MmapRegion {
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 )?
             };
-            alloc.heap_accessible_size = initial_size;
-            alloc.heap_inaccessible_size =
-                alloc.slot().limits.heap_address_space_size - initial_size;
         }
+        alloc.heap_accessible_size = initial_size;
+        alloc.heap_inaccessible_size = alloc.slot().limits.heap_address_space_size - initial_size;
 
         // Initialize the heap using the module sparse page data. There cannot be more pages in the
         // sparse page data than will fit in the initial heap size.
