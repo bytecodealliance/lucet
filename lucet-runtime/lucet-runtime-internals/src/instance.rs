@@ -428,7 +428,13 @@ impl Instance {
     pub fn set_signal_handler<H>(&mut self, handler: H)
     where
         H: 'static
-            + Fn(&Instance, &Option<TrapCode>, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior,
+            + Fn(
+                &Instance,
+                &Option<TrapCode>,
+                libc::c_int,
+                *const siginfo_t,
+                *const c_void,
+            ) -> SignalBehavior,
     {
         self.signal_handler = Box::new(handler) as Box<SignalHandler>;
     }
@@ -513,8 +519,8 @@ impl Instance {
         args: &[Val],
     ) -> Result<UntypedRetVal, Error> {
         lucet_ensure!(
-            self.state.is_ready(),
-            "instance must be ready; this is a bug"
+            self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal()),
+            "instance must be ready or non-fatally faulted"
         );
         if func.is_null() {
             return Err(Error::InvalidArgument(
