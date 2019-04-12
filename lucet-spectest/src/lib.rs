@@ -1,5 +1,4 @@
 pub mod error;
-pub mod instance;
 pub mod script;
 
 pub use crate::error::{SpecTestError, SpecTestErrorKind};
@@ -27,10 +26,13 @@ pub fn run_spec_test(spec_path: &PathBuf) -> Result<SpecScriptResult, Error> {
             Ok(()) => res.pass(cmd),
             Err(e) => match e.get_context() {
                 SpecTestErrorKind::UnsupportedCommand | SpecTestErrorKind::UnsupportedLucetc => {
-                    println!("skip unsupported");
+                    println!("skipped unsupported command");
                     res.skip(cmd, e)
                 }
-                _ => res.fail(cmd, e),
+                _ => {
+                    println!("command failed");
+                    res.fail(cmd, e)
+                }
             },
         }
     }

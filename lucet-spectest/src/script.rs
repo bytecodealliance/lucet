@@ -1,5 +1,4 @@
 use crate::bindings;
-use crate::instance::Instance;
 use failure::{format_err, Error, Fail};
 use lucet_runtime::{self, MmapRegion, Module as LucetModule, Region, UntypedRetVal, Val};
 use lucetc::{Compiler, HeapSettings, LucetcError, LucetcErrorKind, OptLevel};
@@ -50,7 +49,7 @@ impl From<io::Error> for ScriptError {
 }
 
 pub struct ScriptEnv {
-    instances: Vec<(Option<String>, Instance)>,
+    instances: Vec<(Option<String>, lucet_runtime::InstanceHandle)>,
 }
 
 fn program_error(e: LucetcError) -> ScriptError {
@@ -66,11 +65,7 @@ impl ScriptEnv {
             instances: Vec::new(),
         }
     }
-    pub fn instantiate(
-        &mut self,
-        module: &[u8],
-        name: &Option<String>,
-    ) -> Result<(), ScriptError> {
+    pub fn instantiate(&mut self, module: &[u8], name: &Option<String>) -> Result<(), ScriptError> {
         let bindings = bindings::spec_test_bindings();
         let compiler = Compiler::new(module, OptLevel::Best, &bindings, HeapSettings::default())
             .map_err(program_error)?;
@@ -102,8 +97,14 @@ impl ScriptEnv {
         let lucet_module: Arc<dyn LucetModule> =
             lucet_runtime::DlModule::load(sofile_path).map_err(ScriptError::LoadError)?;
 
-        let lucet_region =
-            MmapRegion::create(1, &lucet_runtime::Limits::default()).expect("valid region");
+        let lucet_region = MmapRegion::create(
+            1,
+            &lucet_runtime::Limits {
+                heap_memory_size: 4 * 1024 * 1024 * 1024,
+                ..lucet_runtime::Limits::default()
+            },
+        )
+        .expect("valid region");
 
         let lucet_instance = lucet_region
             .new_instance(lucet_module.clone())
@@ -111,7 +112,7 @@ impl ScriptEnv {
 
         self.instances.push((
             name.clone(),
-            Instance::new(lucet_module, lucet_region, lucet_instance),
+            lucet_instance
         ));
         Ok(())
     }
@@ -119,7 +120,7 @@ impl ScriptEnv {
     fn instance_named_mut(
         &mut self,
         name: &Option<String>,
-    ) -> Result<&mut (Option<String>, Instance), ScriptError> {
+    ) -> Result<&mut (Option<String>, lucet_runtime::InstanceHandle), ScriptError> {
         Ok(match name {
             // None means the last defined module should be used
             None => self
@@ -134,7 +135,7 @@ impl ScriptEnv {
         })
     }
 
-    pub fn instance_named(&self, name: &Option<String>) -> Result<&Instance, ScriptError> {
+    pub fn instance_named(&self, name: &Option<String>) -> Result<&lucet_runtime::InstanceHandle, ScriptError> {
         Ok(match name {
             // None means the last defined module should be used
             None => self
@@ -158,7 +159,7 @@ impl ScriptEnv {
         args: Vec<Val>,
     ) -> Result<UntypedRetVal, ScriptError> {
         let (_, ref mut inst) = self.instance_named_mut(name)?;
-        inst.run(&field, &args)
+        inst.run(field.as_bytes(), &args)
             .map_err(|e| ScriptError::RuntimeError(e))
     }
 
