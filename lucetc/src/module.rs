@@ -5,7 +5,7 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
     FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
-    TableIndex, WasmResult,
+    TableElementType, TableIndex, WasmResult,
 };
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -228,10 +228,19 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         };
         match self.table_elems.entry(table_index) {
             Entry::Occupied(mut occ) => occ.get_mut().push(table_elems),
-            Entry::Vacant(_) => panic!(
-                "table elements for undeclared table {:?}: {:?}",
-                table_index, table_elems
-            ),
+            Entry::Vacant(vac) => {
+                if self.tables.len() == 0 && table_index == TableIndex::new(0) {
+                    let table = Table {
+                        ty: TableElementType::Func,
+                        minimum: 0,
+                        maximum: None,
+                    };
+                    self.tables.push(Exportable::new(table));
+                    vac.insert(vec![table_elems]);
+                } else {
+                    panic!("creation of elements for undeclared table! only table 0 is implicitly declared") // Do we implicitly declare them all???? i sure hope not
+                }
+            }
         }
     }
 
