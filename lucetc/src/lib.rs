@@ -18,6 +18,7 @@ use crate::program::Program;
 use failure::{format_err, Error, ResultExt};
 use parity_wasm::elements::Module;
 use std::collections::HashMap;
+use std::env;
 use std::path::{Path, PathBuf};
 use tempfile;
 
@@ -150,15 +151,26 @@ impl Lucetc {
     }
 }
 
+const LD_DEFAULT: &str = "ld";
+
+#[cfg(not(target_os = "macos"))]
+const LDFLAGS_DEFAULT: &str = "-shared";
+
+#[cfg(target_os = "macos")]
+const LDFLAGS_DEFAULT: &str = "-dylib -dead_strip -export_dynamic -undefined dynamic_lookup";
+
 fn link_so<P, Q>(objpath: P, sopath: Q) -> Result<(), Error>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
     use std::process::Command;
-    let mut cmd_ld = Command::new("ld");
+    let mut cmd_ld = Command::new(env::var("LD").unwrap_or(LD_DEFAULT.into()));
     cmd_ld.arg(objpath.as_ref());
-    cmd_ld.arg("-shared");
+    let env_ldflags = env::var("LDFLAGS").unwrap_or(LDFLAGS_DEFAULT.into());
+    for flag in env_ldflags.split_whitespace() {
+        cmd_ld.arg(flag);
+    }
     cmd_ld.arg("-o");
     cmd_ld.arg(sopath.as_ref());
 
