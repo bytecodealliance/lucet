@@ -3,7 +3,7 @@ use crate::instance::{
     FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
 };
 use crate::sysdeps::UContextPtr;
-use crate::trapcode::{TrapCode, TrapCodeType};
+use crate::trapcode::TrapCode;
 use failure::Error;
 use lazy_static::lazy_static;
 use libc::{c_int, c_void, siginfo_t};
@@ -30,11 +30,11 @@ pub enum SignalBehavior {
 }
 
 pub type SignalHandler =
-    dyn Fn(&Instance, &TrapCode, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior;
+    dyn Fn(&Instance, &Option<TrapCode>, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior;
 
 pub fn signal_handler_none(
     _inst: &Instance,
-    _trapcode: &TrapCode,
+    _trapcode: &Option<TrapCode>,
     _signum: libc::c_int,
     _siginfo_ptr: *const siginfo_t,
     _ucontext_ptr: *const c_void,
@@ -141,13 +141,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
 
         let trapcode = inst
             .module
-            .lookup_trapcode(rip)
-            // if we couldn't find a code in the manifest, return an unknown trapcode that will be
-            // converted to a fatal trap when we switch back to the host
-            .unwrap_or(TrapCode {
-                ty: TrapCodeType::Unknown,
-                tag: 0,
-            });
+            .lookup_trapcode(rip);
 
         let behavior = (inst.signal_handler)(inst, &trapcode, signum, siginfo_ptr, ucontext_ptr);
         match behavior {

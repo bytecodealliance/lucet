@@ -293,7 +293,7 @@ pub unsafe extern "C" fn lucet_instance_set_signal_handler(
     inst: *mut lucet_instance,
     signal_handler: lucet_signal_handler,
 ) -> lucet_error {
-    let handler = move |inst: &Instance, trap: &TrapCode, signum, siginfo, context| {
+    let handler = move |inst: &Instance, trap: &Option<TrapCode>, signum, siginfo, context| {
         let inst = inst as *const Instance as *mut lucet_instance;
         let trap = trap.into();
         let trap_ptr = &trap as *const lucet_state::lucet_trapcode;

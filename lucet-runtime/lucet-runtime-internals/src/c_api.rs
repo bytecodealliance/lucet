@@ -197,7 +197,7 @@ pub mod lucet_state {
     use crate::instance::{State, TerminationDetails};
     use crate::module::AddrDetails;
     use crate::sysdeps::UContext;
-    use crate::trapcode::{TrapCode, TrapCodeType};
+    use crate::trapcode::{TrapCode};
     use libc::{c_char, c_void};
     use num_derive::FromPrimitive;
     use std::ffi::CString;
@@ -225,7 +225,7 @@ pub mod lucet_state {
                     val: lucet_state_val {
                         fault: lucet_runtime_fault {
                             fatal: details.fatal,
-                            trapcode: details.trapcode.into(),
+                            trapcode: (&details.trapcode).into(),
                             rip_addr: details.rip_addr,
                             rip_addr_details: (&details.rip_addr_details).into(),
                             signal_info: *siginfo,
@@ -313,7 +313,7 @@ pub mod lucet_state {
 
     #[repr(C)]
     #[derive(Clone, Copy, Debug)]
-    pub enum lucet_trapcode_type {
+    pub enum lucet_trapcode {
         StackOverflow,
         HeapOutOfBounds,
         OutOfBounds,
@@ -324,53 +324,34 @@ pub mod lucet_state {
         BadConversionToInteger,
         Interrupt,
         TableOutOfBounds,
-        User,
+        Unreachable,
         Unknown,
     }
 
-    impl From<TrapCodeType> for lucet_trapcode_type {
-        fn from(ty: TrapCodeType) -> lucet_trapcode_type {
+    impl From<Option<TrapCode>> for lucet_trapcode {
+        fn from(ty: Option<TrapCode>) -> lucet_trapcode {
             (&ty).into()
         }
     }
 
-    impl From<&TrapCodeType> for lucet_trapcode_type {
-        fn from(ty: &TrapCodeType) -> lucet_trapcode_type {
-            match ty {
-                TrapCodeType::StackOverflow => lucet_trapcode_type::StackOverflow,
-                TrapCodeType::HeapOutOfBounds => lucet_trapcode_type::HeapOutOfBounds,
-                TrapCodeType::OutOfBounds => lucet_trapcode_type::OutOfBounds,
-                TrapCodeType::IndirectCallToNull => lucet_trapcode_type::IndirectCallToNull,
-                TrapCodeType::BadSignature => lucet_trapcode_type::BadSignature,
-                TrapCodeType::IntegerOverflow => lucet_trapcode_type::IntegerOverflow,
-                TrapCodeType::IntegerDivByZero => lucet_trapcode_type::IntegerDivByZero,
-                TrapCodeType::BadConversionToInteger => lucet_trapcode_type::BadConversionToInteger,
-                TrapCodeType::Interrupt => lucet_trapcode_type::Interrupt,
-                TrapCodeType::TableOutOfBounds => lucet_trapcode_type::TableOutOfBounds,
-                TrapCodeType::User => lucet_trapcode_type::User,
-                TrapCodeType::Unknown => lucet_trapcode_type::Unknown,
-            }
-        }
-    }
-
-    #[repr(C)]
-    #[derive(Clone, Copy, Debug)]
-    pub struct lucet_trapcode {
-        code: lucet_trapcode_type,
-        tag: u16,
-    }
-
-    impl From<TrapCode> for lucet_trapcode {
-        fn from(trap: TrapCode) -> lucet_trapcode {
-            (&trap).into()
-        }
-    }
-
-    impl From<&TrapCode> for lucet_trapcode {
-        fn from(trap: &TrapCode) -> lucet_trapcode {
-            lucet_trapcode {
-                code: trap.ty.into(),
-                tag: trap.tag,
+    impl From<&Option<TrapCode>> for lucet_trapcode {
+        fn from(ty: &Option<TrapCode>) -> lucet_trapcode {
+            if let Some(ty) = ty {
+                match ty {
+                    TrapCode::StackOverflow => lucet_trapcode::StackOverflow,
+                    TrapCode::HeapOutOfBounds => lucet_trapcode::HeapOutOfBounds,
+                    TrapCode::OutOfBounds => lucet_trapcode::OutOfBounds,
+                    TrapCode::IndirectCallToNull => lucet_trapcode::IndirectCallToNull,
+                    TrapCode::BadSignature => lucet_trapcode::BadSignature,
+                    TrapCode::IntegerOverflow => lucet_trapcode::IntegerOverflow,
+                    TrapCode::IntegerDivByZero => lucet_trapcode::IntegerDivByZero,
+                    TrapCode::BadConversionToInteger => lucet_trapcode::BadConversionToInteger,
+                    TrapCode::Interrupt => lucet_trapcode::Interrupt,
+                    TrapCode::TableOutOfBounds => lucet_trapcode::TableOutOfBounds,
+                    TrapCode::Unreachable => lucet_trapcode::Unreachable,
+                }
+            } else {
+                lucet_trapcode::Unknown
             }
         }
     }

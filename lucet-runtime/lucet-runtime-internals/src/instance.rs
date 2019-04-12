@@ -6,11 +6,11 @@ pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHa
 use crate::alloc::{Alloc, HOST_PAGE_SIZE_EXPECTED};
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
-use crate::error::{Error};
+use crate::error::Error;
 use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, Global, Module};
 use crate::sysdeps::UContext;
-use crate::trapcode::{TrapCode, TrapCodeType};
+use crate::trapcode::TrapCode;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
@@ -184,7 +184,7 @@ pub struct Instance {
     signal_handler: Box<
         dyn Fn(
             &Instance,
-            &TrapCode,
+            &Option<TrapCode>,
             libc::c_int,
             *const siginfo_t,
             *const c_void,
@@ -333,11 +333,12 @@ impl Instance {
     ///
     /// On success, returns the number of pages that existed before the call.
     pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
-        let additional_bytes = additional_pages
-            .checked_mul(WASM_PAGE_SIZE)
-            .ok_or(lucet_format_err!(
-                "additional pages larger than wasm address space",
-            ))?;
+        let additional_bytes =
+            additional_pages
+                .checked_mul(WASM_PAGE_SIZE)
+                .ok_or(lucet_format_err!(
+                    "additional pages larger than wasm address space",
+                ))?;
         let orig_len = self
             .alloc
             .expand_heap(additional_bytes, self.module.as_ref())?;
@@ -427,7 +428,7 @@ impl Instance {
     pub fn set_signal_handler<H>(&mut self, handler: H)
     where
         H: 'static
-            + Fn(&Instance, &TrapCode, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior,
+            + Fn(&Instance, &Option<TrapCode>, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior,
     {
         self.signal_handler = Box::new(handler) as Box<SignalHandler>;
     }
@@ -632,7 +633,7 @@ impl Instance {
             *rip_addr_details = self.module.addr_details(rip_addr as *const c_void)?.clone();
 
             // If the trap table lookup returned unknown, it is a fatal error
-            let unknown_fault = trapcode.ty == TrapCodeType::Unknown;
+            let unknown_fault = trapcode.is_none();
 
             // If the trap was a segv or bus fault and the addressed memory was outside the
             // guard pages, it is also a fatal error
@@ -669,7 +670,7 @@ pub struct FaultDetails {
     /// If true, the instance's `fatal_handler` will be called.
     pub fatal: bool,
     /// Information about the type of fault that occurred.
-    pub trapcode: TrapCode,
+    pub trapcode: Option<TrapCode>,
     /// The instruction pointer where the fault occurred.
     pub rip_addr: uintptr_t,
     /// Extra information about the instruction pointer's location, if available.
@@ -684,7 +685,11 @@ impl std::fmt::Display for FaultDetails {
             write!(f, "fault ")?;
         }
 
-        self.trapcode.fmt(f)?;
+        if let Some(trapcode) = self.trapcode {
+            write!(f, "{:?} ", trapcode)?;
+        } else {
+            write!(f, "TrapCode::UNKNOWN ")?;
+        }
 
         write!(f, "code at address {:p}", self.rip_addr as *const c_void)?;
 
