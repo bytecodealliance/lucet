@@ -156,6 +156,9 @@ Sightglass ships with a set of microbenchmarks called `shootout`. The scripts
 to build the shootout tests with native and various versions of the Lucet
 toolchain are in `/benchmarks/shootout`.
 
+Furthermore, there is a suite of benchmarks of various Lucet runtime functions,
+such as instance creation and teardown, in `/benchmarks/lucet-benchmarks`.
+
 ## Development Environment
 
 ### Operating System

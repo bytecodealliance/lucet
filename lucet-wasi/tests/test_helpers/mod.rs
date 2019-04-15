@@ -2,8 +2,8 @@ use failure::{bail, Error};
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::host::__wasi_exitcode_t;
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
-use lucet_wasi_sdk::Link;
-use lucetc::{Bindings, Lucetc};
+use lucet_wasi_sdk::{CompileOpts, Link};
+use lucetc::{Bindings, Lucetc, LucetcOpts};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
@@ -35,9 +35,9 @@ pub fn wasi_test<P: AsRef<Path>>(c_file: P) -> Result<Arc<dyn Module>, Error> {
     let workdir = TempDir::new().expect("create working directory");
 
     let wasm_build = Link::new(&[c_file])
-        .cflag("-Wall")
-        .cflag("-Werror")
-        .print_output(true);
+        .with_cflag("-Wall")
+        .with_cflag("-Werror")
+        .with_print_output(true);
 
     let wasm_file = workdir.path().join("out.wasm");
 
@@ -45,7 +45,7 @@ pub fn wasi_test<P: AsRef<Path>>(c_file: P) -> Result<Arc<dyn Module>, Error> {
 
     let bindings = Bindings::from_file(Path::new(LUCET_WASI_ROOT).join("bindings.json"))?;
 
-    let native_build = Lucetc::new(wasm_file)?.bindings(bindings)?;
+    let native_build = Lucetc::new(wasm_file).with_bindings(bindings);
 
     let so_file = workdir.path().join("out.so");
 

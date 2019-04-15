@@ -1,5 +1,5 @@
 use failure::{Error, ResultExt};
-use lucet_wasi_sdk::Link;
+use lucet_wasi_sdk::{CompileOpts, Link, LinkOpts};
 use lucetc::bindings::Bindings;
 use lucetc::load;
 use parity_wasm::elements::Module;
@@ -22,11 +22,11 @@ fn module_from_c(cfiles: &[&str], exports: &[&str]) -> Result<Module, Error> {
     wasm.push("out.wasm");
 
     let mut linker = Link::new(&cfiles)
-        .cflag("-nostartfiles")
-        .ldflag("--no-entry")
-        .ldflag("--allow-undefined");
+        .with_cflag("-nostartfiles")
+        .with_ldflag("--no-entry")
+        .with_ldflag("--allow-undefined");
     for export in exports {
-        linker.with_ldflag(&format!("--export={}", export));
+        linker.ldflag(&format!("--export={}", export));
     }
     linker.link(wasm.clone())?;
 

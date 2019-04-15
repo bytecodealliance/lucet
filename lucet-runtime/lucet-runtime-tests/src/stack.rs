@@ -14,7 +14,7 @@ pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, Error> {
     let mut wasm_file = File::create(&wasm_path)?;
     wasm_file.write_all(generate_test_wat(num_locals).as_bytes())?;
 
-    let native_build = Lucetc::new(wasm_path)?;
+    let native_build = Lucetc::new(wasm_path);
 
     let so_file = workdir.path().join("out.so");
 

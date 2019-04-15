@@ -7,6 +7,5 @@ license = "Apache-2.0 WITH LLVM-exception"
 
 [dependencies]
 failure = "0.1"
-
-[dev-dependencies]
+lucetc = { path = "../lucetc" }
 tempfile = "3.0"

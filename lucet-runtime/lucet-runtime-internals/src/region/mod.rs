@@ -1,6 +1,6 @@
 pub mod mmap;
 
-use crate::alloc::{Alloc, Slot};
+use crate::alloc::{Alloc, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::InstanceHandle;
@@ -52,6 +52,19 @@ pub trait RegionInternal: Send + Sync {
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error>;
 
     fn as_dyn_internal(&self) -> &dyn RegionInternal;
+}
+
+/// A trait for regions that are created with a fixed capacity and limits.
+///
+/// This is not part of [`Region`](trait.Region.html) so that `Region` types can be made into trait
+/// objects.
+pub trait RegionCreate: Region {
+    /// The type name of the region; useful for testing.
+    const TYPE_NAME: &'static str;
+
+    /// Create a new `Region` that can support a given number instances, each subject to the same
+    /// runtime limits.
+    fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error>;
 }
 
 /// A builder for instances; created by
