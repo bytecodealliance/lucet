@@ -236,7 +236,7 @@ impl MmapRegion {
                 ptr::null_mut(),
                 region.limits.total_memory_size(),
                 ProtFlags::PROT_NONE,
-                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
                 0,
                 0,
             )?

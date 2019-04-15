@@ -2,6 +2,7 @@ use crate::context::Context;
 use crate::instance::{
     FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
 };
+use crate::sysdeps::UContext;
 use crate::trapcode::{TrapCode, TrapCodeType};
 use failure::Error;
 use lazy_static::lazy_static;
@@ -109,12 +110,9 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
 
     // Safety: when using a SA_SIGINFO sigaction, the third argument can be cast to a `ucontext_t`
     // pointer per the manpage
-    let ctx = unsafe {
-        (ucontext_ptr as *mut libc::ucontext_t)
-            .as_ref()
-            .expect("ucontext must not be null")
-    };
-    let rip = ctx.uc_mcontext.gregs[libc::REG_RIP as usize] as *const c_void;
+    assert!(!ucontext_ptr.is_null());
+    let ctx = UContext::new(ucontext_ptr);
+    let rip = ctx.get_ip();
 
     let switch_to_host = CURRENT_INSTANCE.with(|current_instance| {
         let mut current_instance = current_instance.borrow_mut();
@@ -178,7 +176,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                     // safety: pointer is checked for null at the top of the function, and the
                     // manpage guarantees that a siginfo_t will be passed as the second argument
                     siginfo: unsafe { *siginfo_ptr },
-                    context: *ctx,
+                    context: ctx,
                 };
                 true
             }

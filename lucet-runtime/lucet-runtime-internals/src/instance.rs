@@ -9,6 +9,7 @@ use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, Global, Module};
+use crate::sysdeps::UContext;
 use crate::trapcode::{TrapCode, TrapCodeType};
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
@@ -623,7 +624,7 @@ pub enum State {
     Fault {
         details: FaultDetails,
         siginfo: libc::siginfo_t,
-        context: libc::ucontext_t,
+        context: UContext,
     },
     Terminated {
         details: TerminationDetails,
