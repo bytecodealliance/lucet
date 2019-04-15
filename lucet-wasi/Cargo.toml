@@ -29,6 +29,7 @@ name = "lucet_wasi"
 crate-type = ["rlib", "staticlib", "cdylib"]
 
 [package.metadata.deb]
+name = "fst-lucet-wasi"
 maintainer = "Adam C. Foltzer <acfoltzer@fastly.com>"
 depends = "$auto"
 priority = "optional"

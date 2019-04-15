@@ -26,6 +26,7 @@ name = "lucet_runtime"
 crate-type = ["rlib", "staticlib", "cdylib"]
 
 [package.metadata.deb]
+name = "fst-lucet-runtime"
 maintainer = "Adam C. Foltzer <acfoltzer@fastly.com>"
 depends = "$auto"
 priority = "optional"
@@ -34,5 +35,4 @@ assets = [
     ["target/release/liblucet_runtime.rlib", "/opt/fst-lucet-runtime/lib/", "644"],
     ["target/release/liblucet_runtime.so", "/opt/fst-lucet-runtime/lib/", "755"],
     ["include/*.h", "/opt/fst-lucet-runtime/include/", "644"],
-    ["README.rst", "/opt/fst-lucet-runtime/share/doc/lucet-runtime/", "644"],
 ]
