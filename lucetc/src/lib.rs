@@ -197,16 +197,9 @@ impl Lucetc {
     }
 
     pub fn clif_ir<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
-<<<<<<< c33d4920807f40a2a4d74ca84cf605f3bbb6f459
-        let (name, module, bindings) = self.build()?;
-
-        let prog = Program::new(module, bindings, self.heap.clone())?;
-        let comp = compile(&prog, &name, self.opt_level)?;
-=======
         let module_contents = serialize(self.module)?;
 
         let compiler = Compiler::new(&module_contents, self.opt_level, &self.bindings, self.heap)?;
->>>>>>> lucetc: output moved to new::
 
         compiler
             .cranelift_funcs()?
