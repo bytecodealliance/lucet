@@ -53,7 +53,8 @@ impl Instance {
             SigStackFlags::empty(),
             libc::SIGSTKSZ,
         );
-        let saved_sigstack = unsafe { sigaltstack(&guest_sigstack).expect("sigaltstack succeeds") };
+        let saved_sigstack =
+            unsafe { sigaltstack(&guest_sigstack).expect("saving sigaltstack succeeds") };
 
         let mut ostate = LUCET_SIGNAL_STATE.lock().unwrap();
         if let Some(ref mut state) = *ostate {
@@ -74,7 +75,7 @@ impl Instance {
             if state.counter == 0 {
                 unsafe {
                     // restore the host signal stack
-                    sigaltstack(&saved_sigstack).expect("sigaltstack succeeds");
+                    sigaltstack(&saved_sigstack).expect("sigaltstack restoration succeeds");
                     restore_host_signal_state(state);
                 }
                 true
