@@ -480,6 +480,13 @@ macro_rules! alloc_tests {
             assert_eq!(heap[reset_heap_len - 1], 0xFF);
         }
 
+        const GUARDLESS_HEAP: HeapSpec = HeapSpec {
+            reserved_size: SPEC_HEAP_RESERVED_SIZE,
+            guard_size: 0,
+            initial_size: ONEPAGE_INITIAL_SIZE,
+            max_size: None,
+        };
+
         /// This test shows the alloc works even with a zero guard size.
         #[test]
         fn guardless_heap_create() {

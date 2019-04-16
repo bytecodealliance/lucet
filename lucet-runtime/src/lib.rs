@@ -152,7 +152,7 @@
 //!
 //! fn signal_handler_count(
 //!     _inst: &Instance,
-//!     _trapcode: &TrapCode,
+//!     _trapcode: &Option<TrapCode>,
 //!     _signum: libc::c_int,
 //!     _siginfo_ptr: *const libc::siginfo_t,
 //!     _ucontext_ptr: *const libc::c_void,
