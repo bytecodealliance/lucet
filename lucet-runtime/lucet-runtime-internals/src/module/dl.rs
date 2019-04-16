@@ -136,17 +136,10 @@ impl ModuleInternal for DlModule {
         };
         let len = unsafe { **p_table_segment_len };
         let elem_size = mem::size_of::<TableElement>();
-        if len > std::u32::MAX as usize * elem_size {
+        if len > std::u32::MAX as usize {
             lucet_incorrect_module!("table segment too long: {}", len);
         }
-        if len % elem_size != 0 {
-            lucet_incorrect_module!(
-                "table segment length {} not a multiple of table element size: {}",
-                len,
-                elem_size
-            );
-        }
-        Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize / elem_size) })
+        Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize) })
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {
