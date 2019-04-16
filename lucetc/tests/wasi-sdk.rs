@@ -32,7 +32,7 @@ fn module_from_c(cfiles: &[&str], exports: &[&str]) -> Result<Vec<u8>, Error> {
 
     let mut wasm_file = File::open(wasm)?;
     let mut wasm_contents = Vec::new();
-    wasm_file.read_to_end(&mut wasm_contents);
+    wasm_file.read_to_end(&mut wasm_contents)?;
     Ok(wasm_contents)
 }
 
@@ -49,7 +49,6 @@ fn b_only_test_bindings() -> Bindings {
 
 mod programs {
     use super::{b_only_test_bindings, module_from_c};
-    use cranelift_module::Linkage;
     use lucetc::{Bindings, Compiler, HeapSettings, OptLevel};
 
     #[test]
@@ -88,7 +87,7 @@ mod programs {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a");
-        let mdata = c.module_data();
+        let _mdata = c.module_data();
 
         /* FIXME: module data doesn't contain the information to check these properties:
         assert_eq!(p.import_functions().len(), 0, "import functions");
@@ -101,14 +100,11 @@ mod programs {
 
     #[test]
     fn just_b() {
-        use std::collections::HashMap;
         let m = module_from_c(&["b"], &["b"]).expect("build module for b");
-        let mut env = HashMap::new();
-        env.insert("a".to_owned(), "a".to_owned());
-        let b = Bindings::env(env);
+        let b = b_only_test_bindings();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile b");
-        let mdata = c.module_data();
+        let _mdata = c.module_data();
         /* FIXME: module data doesn't contain the information to check these properties:
         assert_eq!(p.import_functions().len(), 1, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
@@ -123,7 +119,7 @@ mod programs {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a & b");
-        let mdata = c.module_data();
+        let _mdata = c.module_data();
         /* FIXME: module data doesn't contain the information to check these properties:
         assert_eq!(p.import_functions().len(), 0, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
