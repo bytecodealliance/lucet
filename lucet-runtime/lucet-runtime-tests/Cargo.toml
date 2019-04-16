@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
 edition = "2018"
 
+[lib]
+test = false
+
 [dependencies]
 failure = "0.1"
 lazy_static = "1.1"
