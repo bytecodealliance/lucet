@@ -42,9 +42,13 @@ pub fn run_spec_test(spec_path: &PathBuf) -> Result<SpecScriptResult, Error> {
 
 fn unexpected_failure(e: ScriptError) -> SpecTestError {
     if e.unsupported() {
-        Error::from(e).context(SpecTestErrorKind::UnsupportedLucetc).into()
+        Error::from(e)
+            .context(SpecTestErrorKind::UnsupportedLucetc)
+            .into()
     } else {
-        Error::from(e).context(SpecTestErrorKind::UnexpectedFailure).into()
+        Error::from(e)
+            .context(SpecTestErrorKind::UnexpectedFailure)
+            .into()
     }
 }
 
@@ -110,9 +114,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
             ref as_name,
         } => {
             println!("register {:?} {}", name, as_name);
-            script
-                .register(name, as_name)
-                .map_err(unexpected_failure)?;
+            script.register(name, as_name).map_err(unexpected_failure)?;
             Ok(())
         }
 
@@ -170,7 +172,10 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 ref field,
                 ref args,
             } => {
-                println!("assert_return (invoke {:?} {} {:?}) {:?}", module, field, args, expected);
+                println!(
+                    "assert_return (invoke {:?} {} {:?}) {:?}",
+                    module, field, args, expected
+                );
                 let args = translate_args(args);
                 let res = script
                     .run(module, field, args)

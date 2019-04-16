@@ -349,10 +349,7 @@ impl<'a> ArtifactSummary<'a> {
                 let offset = table_rdr.read_u32::<LittleEndian>().unwrap();
                 let trapcode = table_rdr.read_u32::<LittleEndian>().unwrap();
 
-                sites.push(TrapSite {
-                    offset,
-                    trapcode,
-                });
+                sites.push(TrapSite { offset, trapcode });
             }
 
             manifest.records.push(TrapManifestRow {

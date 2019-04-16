@@ -110,10 +110,7 @@ impl ScriptEnv {
             .new_instance(lucet_module.clone())
             .map_err(ScriptError::InstantiateError)?;
 
-        self.instances.push((
-            name.clone(),
-            lucet_instance
-        ));
+        self.instances.push((name.clone(), lucet_instance));
         Ok(())
     }
 
@@ -135,7 +132,10 @@ impl ScriptEnv {
         })
     }
 
-    pub fn instance_named(&self, name: &Option<String>) -> Result<&lucet_runtime::InstanceHandle, ScriptError> {
+    pub fn instance_named(
+        &self,
+        name: &Option<String>,
+    ) -> Result<&lucet_runtime::InstanceHandle, ScriptError> {
         Ok(match name {
             // None means the last defined module should be used
             None => self

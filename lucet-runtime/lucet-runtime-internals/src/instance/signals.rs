@@ -29,8 +29,13 @@ pub enum SignalBehavior {
     Terminate,
 }
 
-pub type SignalHandler =
-    dyn Fn(&Instance, &Option<TrapCode>, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior;
+pub type SignalHandler = dyn Fn(
+    &Instance,
+    &Option<TrapCode>,
+    libc::c_int,
+    *const siginfo_t,
+    *const c_void,
+) -> SignalBehavior;
 
 pub fn signal_handler_none(
     _inst: &Instance,
@@ -139,9 +144,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 .as_mut()
         };
 
-        let trapcode = inst
-            .module
-            .lookup_trapcode(rip);
+        let trapcode = inst.module.lookup_trapcode(rip);
 
         let behavior = (inst.signal_handler)(inst, &trapcode, signum, siginfo_ptr, ucontext_ptr);
         match behavior {

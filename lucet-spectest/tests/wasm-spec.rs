@@ -76,8 +76,8 @@ core_spec_test!(memory_grow); // FAIL but i think its because a test asked for 4
 core_spec_test!(memory_redundancy); // PASS
 core_spec_test!(memory_trap); // FAIL incorrect result
 core_spec_test!(memory); // FAIL panic related to heap guard
-// too noisy to keep enabled:
-// core_spec_test!(names); // FAIL hundreds of errors because we dont support unicode names yet. 
+                         // too noisy to keep enabled:
+                         // core_spec_test!(names); // FAIL hundreds of errors because we dont support unicode names yet.
 core_spec_test!(nop); // PASS
 core_spec_test!(return_, "return"); // PASS
 core_spec_test!(select); // PASS
