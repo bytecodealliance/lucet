@@ -61,6 +61,15 @@ pub trait LucetcOpts {
     fn max_reserved_size(&mut self, max_reserved_size: u64);
     fn with_max_reserved_size(self, max_reserved_size: u64) -> Self;
 
+    /// Set the reserved size exactly.
+    ///
+    /// Equivalent to setting the minimum and maximum reserved sizes to the same value.
+    fn reserved_size(&mut self, reserved_size: u64);
+    /// Set the reserved size exactly.
+    ///
+    /// Equivalent to setting the minimum and maximum reserved sizes to the same value.
+    fn with_reserved_size(self, reserved_size: u64) -> Self;
+
     fn guard_size(&mut self, guard_size: u64);
     fn with_guard_size(self, guard_size: u64) -> Self;
 }
@@ -110,6 +119,16 @@ impl<T: AsLucetc> LucetcOpts for T {
 
     fn with_max_reserved_size(mut self, max_reserved_size: u64) -> Self {
         self.max_reserved_size(max_reserved_size);
+        self
+    }
+
+    fn reserved_size(&mut self, reserved_size: u64) {
+        self.as_lucetc().heap.min_reserved_size = reserved_size;
+        self.as_lucetc().heap.max_reserved_size = reserved_size;
+    }
+
+    fn with_reserved_size(mut self, reserved_size: u64) -> Self {
+        self.reserved_size(reserved_size);
         self
     }
 
