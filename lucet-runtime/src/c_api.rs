@@ -1,7 +1,8 @@
 extern crate lucet_runtime_internals;
 
-use crate::{DlModule, Instance, Limits, MmapRegion, Module, Region, TrapCode};
+use crate::{DlModule, Instance, Limits, MmapRegion, Module, Region};
 use libc::{c_char, c_int, c_void};
+use lucet_module_data::TrapCode;
 use lucet_runtime_internals::c_api::*;
 use lucet_runtime_internals::instance::{
     instance_handle_from_raw, instance_handle_to_raw, InstanceInternal,

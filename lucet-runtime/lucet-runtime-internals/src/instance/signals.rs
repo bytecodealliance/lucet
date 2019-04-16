@@ -4,10 +4,10 @@ use crate::instance::{
     HOST_CTX,
 };
 use crate::sysdeps::UContextPtr;
-use crate::trapcode::TrapCode;
 use failure::Error;
 use lazy_static::lazy_static;
 use libc::{c_int, c_void, siginfo_t, SIGBUS, SIGSEGV};
+use lucet_module_data::TrapCode;
 use nix::sys::signal::{
     pthread_sigmask, raise, sigaction, SaFlags, SigAction, SigHandler, SigSet, SigmaskHow, Signal,
 };

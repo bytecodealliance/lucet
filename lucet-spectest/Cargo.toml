@@ -16,6 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 lucetc = { path = "../lucetc" }
+lucet-module-data = { path = "../lucet-module-data" }
 lucet-runtime = { path = "../lucet-runtime" }
 wabt = "0.7"
 serde = "1.0"

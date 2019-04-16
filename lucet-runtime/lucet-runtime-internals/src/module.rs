@@ -5,62 +5,11 @@ mod sparse_page_data;
 
 pub use crate::module::dl::DlModule;
 pub use crate::module::mock::MockModuleBuilder;
-pub use lucet_module_data::{Global, GlobalSpec, HeapSpec};
+pub use lucet_module_data::{FunctionSpec, Global, GlobalSpec, HeapSpec, TrapCode, TrapManifest};
 
 use crate::alloc::Limits;
 use crate::error::Error;
-use crate::trapcode::TrapCode;
 use libc::c_void;
-use std::slice::from_raw_parts;
-
-#[repr(C)]
-#[derive(Clone, Debug)]
-pub struct TrapManifestRecord {
-    pub func_addr: u64,
-    pub func_len: u64,
-    pub table_addr: u64,
-    pub table_len: u64,
-}
-
-impl TrapManifestRecord {
-    pub fn contains_addr(&self, addr: *const c_void) -> bool {
-        let addr = addr as u64;
-        // TODO: is this correct? off-by-one error?
-        addr >= self.func_addr && addr <= self.func_addr + self.func_len
-    }
-
-    pub fn trapsites(&self) -> &[TrapSite] {
-        let table_addr = self.table_addr as *const TrapSite;
-        assert!(!table_addr.is_null());
-        unsafe { from_raw_parts(table_addr, self.table_len as usize) }
-    }
-
-    pub fn lookup_addr(&self, addr: *const c_void) -> Option<TrapCode> {
-        if !self.contains_addr(addr) {
-            return None;
-        }
-
-        // predicate to find the trapsite for the addr via binary search
-        let f =
-            |ts: &TrapSite| (self.func_addr as usize + ts.offset as usize).cmp(&(addr as usize));
-
-        let trapsites = self.trapsites();
-        if let Ok(i) = trapsites.binary_search_by(f) {
-            let trapcode =
-                TrapCode::try_from_u32(trapsites[i].trapcode).expect("valid trapcode value");
-            Some(trapcode)
-        } else {
-            None
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct TrapSite {
-    pub offset: u32,
-    pub trapcode: u32,
-}
 
 #[repr(C)]
 #[derive(Clone, Debug)]
@@ -115,7 +64,7 @@ pub trait ModuleInternal: Send + Sync {
 
     fn get_start_func(&self) -> Result<Option<*const extern "C" fn()>, Error>;
 
-    fn trap_manifest(&self) -> &[TrapManifestRecord];
+    fn function_manifest(&self) -> &[FunctionSpec];
 
     fn addr_details(&self, addr: *const c_void) -> Result<Option<AddrDetails>, Error>;
 
@@ -123,16 +72,13 @@ pub trait ModuleInternal: Send + Sync {
     ///
     /// This function must be signal-safe.
     fn lookup_trapcode(&self, rip: *const c_void) -> Option<TrapCode> {
-        for record in self.trap_manifest() {
-            if record.contains_addr(rip) {
-                // the trap falls within a known function
-                if let Some(trapcode) = record.lookup_addr(rip) {
-                    return Some(trapcode);
-                } else {
-                    // stop looking through the rest of the trap manifests; only one function should
-                    // ever match
-                    break;
-                }
+        for fn_spec in self.function_manifest() {
+            if let Some(offset) = fn_spec.relative_addr(rip as u64) {
+                // the address falls in this trap manifest's function.
+                // `rip` can only lie in one function, so either
+                // there's a trap site in this manifest, and that's
+                // the one we want, or there's none
+                return fn_spec.traps().and_then(|traps| traps.lookup_addr(offset));
             }
         }
         None

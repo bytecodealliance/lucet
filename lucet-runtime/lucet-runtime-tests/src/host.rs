@@ -2,8 +2,9 @@
 macro_rules! host_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
+        use lucet_module_data::TrapCode;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-        use lucet_runtime::{DlModule, Error, Limits, Region, TrapCode};
+        use lucet_runtime::{DlModule, Error, Limits, Region};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
