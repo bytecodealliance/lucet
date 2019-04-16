@@ -63,8 +63,8 @@ pub trait CompileOpts {
     fn cflag<S: AsRef<str>>(&mut self, cflag: S);
     fn with_cflag<S: AsRef<str>>(self, cflag: S) -> Self;
 
-    fn include<S: AsRef<str>>(&mut self, include: S);
-    fn with_include<S: AsRef<str>>(self, include: S) -> Self;
+    fn include<S: AsRef<Path>>(&mut self, include: S);
+    fn with_include<S: AsRef<Path>>(self, include: S) -> Self;
 }
 
 impl CompileOpts for Compile {
@@ -77,11 +77,12 @@ impl CompileOpts for Compile {
         self
     }
 
-    fn include<S: AsRef<str>>(&mut self, include: S) {
-        self.cflags.push(format!("-I{}", include.as_ref()));
+    fn include<S: AsRef<Path>>(&mut self, include: S) {
+        self.cflags
+            .push(format!("-I{}", include.as_ref().display()));
     }
 
-    fn with_include<S: AsRef<str>>(mut self, include: S) -> Self {
+    fn with_include<S: AsRef<Path>>(mut self, include: S) -> Self {
         self.include(include);
         self
     }
@@ -124,6 +125,9 @@ impl Compile {
         cmd.arg(output.as_ref());
         for cflag in self.cflags.iter() {
             cmd.arg(cflag);
+        }
+        if self.print_output {
+            println!("running: {:?}", cmd);
         }
         let run = cmd.output().expect("clang executable exists");
         CompileError::check(run, self.print_output)
@@ -181,6 +185,9 @@ impl Link {
         for ldflag in self.ldflags.iter() {
             cmd.arg(format!("-Wl,{}", ldflag));
         }
+        if self.print_output {
+            println!("running: {:?}", cmd);
+        }
         let run = cmd.output().expect("clang executable exists");
         CompileError::check(run, self.print_output)
     }
@@ -236,13 +243,13 @@ impl<T: AsLink> CompileOpts for T {
         self
     }
 
-    fn include<S: AsRef<str>>(&mut self, include: S) {
+    fn include<S: AsRef<Path>>(&mut self, include: S) {
         self.as_link()
             .cflags
-            .push(format!("-I{}", include.as_ref()));
+            .push(format!("-I{}", include.as_ref().display()));
     }
 
-    fn with_include<S: AsRef<str>>(mut self, include: S) -> Self {
+    fn with_include<S: AsRef<Path>>(mut self, include: S) -> Self {
         self.include(include);
         self
     }
@@ -269,8 +276,12 @@ impl Lucetc {
         }
     }
 
-    pub fn print_output(mut self, print: bool) -> Self {
+    pub fn print_output(&mut self, print: bool) {
         self.link.print_output = print;
+    }
+
+    pub fn with_print_output(mut self, print: bool) -> Self {
+        self.print_output(print);
         self
     }
 
