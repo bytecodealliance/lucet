@@ -5,6 +5,8 @@ authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
 edition = "2018"
 
 [lib]
+# This crate only defines tests in macros, it does not contain any tests itself. This flag prevents
+# `cargo test -p lucet-runtime-tests` from trying to link an executable with undefined symbols.
 test = false
 
 [dependencies]
