@@ -137,13 +137,13 @@ impl<'a> ModuleDecls<'a> {
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id = clif_module
-                .declare_data(&def_symbol, Linkage::Local, false)
+                .declare_data(&def_symbol, Linkage::Export, false)
                 .context(LucetcErrorKind::TranslatingModule)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             let len_symbol = format!("guest_table_{}_len", ix);
             let len_data_id = clif_module
-                .declare_data(&len_symbol, Linkage::Local, false)
+                .declare_data(&len_symbol, Linkage::Export, false)
                 .context(LucetcErrorKind::TranslatingModule)?;
             let len_name = Name::new_data(len_symbol, len_data_id);
 
