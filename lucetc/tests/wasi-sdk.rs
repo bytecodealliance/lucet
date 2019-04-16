@@ -1,5 +1,5 @@
 use failure::{Error, ResultExt};
-use lucet_wasi_sdk::Link;
+use lucet_wasi_sdk::{CompileOpts, Link, LinkOpts};
 use lucetc::Bindings;
 use std::collections::HashMap;
 use std::fs::File;

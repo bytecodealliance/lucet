@@ -26,8 +26,6 @@ pub use crate::{
     patch::patch_module,
 };
 use failure::{format_err, Error, ResultExt};
-use parity_wasm::elements::serialize;
-use parity_wasm::elements::Module;
 use std::env;
 use std::path::{Path, PathBuf};
 use tempfile;
@@ -38,23 +36,6 @@ pub struct Lucetc {
     opt_level: OptLevel,
     heap: HeapSettings,
     builtins_paths: Vec<PathBuf>,
-    module: Module,
-    bindings: Bindings,
-    opt_level: OptLevel,
-    heap: HeapSettings,
-}
-
-impl Lucetc {
-    pub fn new<P: AsRef<Path>>(input: P) -> Result<Self, LucetcError> {
-        let input = input.as_ref();
-        let module = read_module(input).context(LucetcErrorKind::Input)?;
-        Ok(Self {
-            module,
-            bindings: Bindings::empty(),
-            opt_level: OptLevel::default(),
-            heap: HeapSettings::default(),
-        })
-    }
 }
 
 pub trait AsLucetc {
@@ -157,24 +138,20 @@ impl Lucetc {
         }
     }
 
-    fn build(&self) -> Result<(String, Module, Bindings), Error> {
-        let name = String::from(
-            self.input
-                .file_stem()
-                .ok_or(format_err!("input filename {:?} is empty", self.input))?
-                .to_str()
-                .ok_or(format_err!(
-                    "input filename {:?} is not valid utf8",
-                    self.input
-                ))?,
-        );
-        let mut builtins_bindings = vec![];
-        let mut module = read_module(&self.input)?;
+    fn build(&self) -> Result<(Vec<u8>, Bindings), Error> {
+        use parity_wasm::elements::{deserialize_buffer, serialize};
 
-        for builtins in self.builtins_paths.iter() {
-            let (newmodule, builtins_map) = patch_module(module, builtins)?;
-            module = newmodule;
-            builtins_bindings.push(Bindings::env(builtins_map));
+        let mut builtins_bindings = vec![];
+        let mut module_binary = read_module(&self.input)?;
+
+        if !self.builtins_paths.is_empty() {
+            let mut module = deserialize_buffer(&module_binary)?;
+            for builtins in self.builtins_paths.iter() {
+                let (newmodule, builtins_map) = patch_module(module, builtins)?;
+                module = newmodule;
+                builtins_bindings.push(Bindings::env(builtins_map));
+            }
+            module_binary = serialize(module)?;
         }
 
         let mut bindings = Bindings::empty();
@@ -183,23 +160,33 @@ impl Lucetc {
             bindings.extend(binding)?;
         }
 
-        Ok((name, module, bindings))
+        Ok((module_binary, bindings))
     }
 
-    pub fn object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
-        let module_contents = serialize(self.module)?;
+    pub fn object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+        let (module_contents, bindings) = self.build()?;
 
-        let compiler = Compiler::new(&module_contents, self.opt_level, &self.bindings, self.heap)?;
+        let compiler = Compiler::new(
+            &module_contents,
+            self.opt_level,
+            &bindings,
+            self.heap.clone(),
+        )?;
         let obj = compiler.object_file()?;
 
         obj.write(output.as_ref()).context("writing object file")?;
         Ok(())
     }
 
-    pub fn clif_ir<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
-        let module_contents = serialize(self.module)?;
+    pub fn clif_ir<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+        let (module_contents, bindings) = self.build()?;
 
-        let compiler = Compiler::new(&module_contents, self.opt_level, &self.bindings, self.heap)?;
+        let compiler = Compiler::new(
+            &module_contents,
+            self.opt_level,
+            &bindings,
+            self.heap.clone(),
+        )?;
 
         compiler
             .cranelift_funcs()?
@@ -209,7 +196,7 @@ impl Lucetc {
         Ok(())
     }
 
-    pub fn shared_object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
+    pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
