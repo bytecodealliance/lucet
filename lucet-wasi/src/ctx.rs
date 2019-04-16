@@ -19,15 +19,16 @@ pub struct WasiCtxBuilder {
 impl WasiCtxBuilder {
     /// Builder for a new `WasiCtx`.
     pub fn new() -> Self {
+        let null = dev_null();
         WasiCtxBuilder {
             fds: HashMap::new(),
             preopens: HashMap::new(),
             args: vec![],
             env: HashMap::new(),
         }
-        .fd_dup(0, stdin())
-        .fd_dup(1, stdout())
-        .fd_dup(2, stderr())
+        .fd_dup(0, &null)
+        .fd_dup(1, &null)
+        .fd_dup(2, &null)
     }
 
     pub fn args(mut self, args: &[&str]) -> Self {
@@ -55,6 +56,12 @@ impl WasiCtxBuilder {
     pub fn c_arg<S: AsRef<CStr>>(mut self, arg: S) -> Self {
         self.args.push(arg.as_ref().to_owned());
         self
+    }
+
+    pub fn inherit_stdio(self) -> Self {
+        self.fd_dup(0, &stdin())
+            .fd_dup(1, &stdout())
+            .fd_dup(2, &stderr())
     }
 
     pub fn inherit_env(mut self) -> Self {
@@ -104,7 +111,7 @@ impl WasiCtxBuilder {
     /// context, so it will not be closed when the `WasiCtx` is dropped.
     ///
     /// TODO: handle `dup` errors
-    pub fn fd_dup<F: AsRawFd>(self, wasm_fd: host::__wasi_fd_t, fd: F) -> Self {
+    pub fn fd_dup<F: AsRawFd>(self, wasm_fd: host::__wasi_fd_t, fd: &F) -> Self {
         // safe because we're getting a valid RawFd from the F directly
         unsafe { self.raw_fd(wasm_fd, dup(fd.as_raw_fd()).unwrap()) }
     }
@@ -189,6 +196,7 @@ impl WasiCtx {
     pub fn new(args: &[&str]) -> WasiCtx {
         WasiCtxBuilder::new()
             .args(args)
+            .inherit_stdio()
             .inherit_env()
             .build()
             .expect("default options don't fail")
@@ -229,4 +237,8 @@ impl WasiCtx {
         self.fds.insert(fd, fe);
         Ok(fd)
     }
+}
+
+fn dev_null() -> File {
+    File::open("/dev/null").expect("failed to open /dev/null")
 }

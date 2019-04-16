@@ -175,7 +175,10 @@ fn run(config: Config) {
         let args = std::iter::once(config.lucet_module)
             .chain(config.guest_args.into_iter())
             .collect::<Vec<&str>>();
-        let mut ctx = WasiCtxBuilder::new().args(&args).inherit_env();
+        let mut ctx = WasiCtxBuilder::new()
+            .args(&args)
+            .inherit_stdio()
+            .inherit_env();
         for (dir, guest_path) in config.preopen_dirs {
             ctx = ctx.preopened_dir(dir, guest_path);
         }
