@@ -194,6 +194,9 @@ pub struct Instance {
     /// Pointer to the function used as the entrypoint (for use in backtraces)
     entrypoint: *const extern "C" fn(),
 
+    /// `_padding` must be the last member of the structure.
+    /// This marks where the padding starts to make the structure exactly 4096 bytes long.
+    /// It is also used to compute the size of the structure up to that point, i.e. without padding.
     _padding: (),
 }
 
