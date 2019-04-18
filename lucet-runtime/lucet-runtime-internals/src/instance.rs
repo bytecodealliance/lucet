@@ -27,7 +27,7 @@ pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
 #[cfg(target_os = "linux")]
 pub const INSTANCE_PADDING: usize = 2328;
 #[cfg(target_os = "macos")]
-pub const INSTANCE_PADDING: usize = 2648;
+pub const INSTANCE_PADDING: usize = 2642;
 
 thread_local! {
     /// The host context.

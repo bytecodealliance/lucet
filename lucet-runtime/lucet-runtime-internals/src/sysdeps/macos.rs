@@ -119,7 +119,6 @@ pub struct ucontext_t {
     pub uc_link: *const ucontext_t,
     pub uc_mcsize: size_t,
     pub uc_mcontext: *const mcontext64,
-    mcontext_data: mcontext64,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -133,8 +132,8 @@ impl UContextPtr {
     }
 
     #[inline]
-    pub fn get_ip(&self) -> *const c_void {
-        let mcontext = &unsafe { *(self.0) }.mcontext_data;
+    pub fn get_ip(self) -> *const c_void {
+        let mcontext = &unsafe { *(*self.0).uc_mcontext };
         mcontext.ss.rip as *const _
     }
 }
@@ -142,33 +141,30 @@ impl UContextPtr {
 #[derive(Clone, Copy)]
 pub struct UContext {
     context: ucontext_t,
+    mcontext: mcontext64,
 }
 
 impl UContext {
     #[inline]
     pub fn new(ptr: *const c_void) -> Self {
-        UContext {
-            context: *unsafe {
-                (ptr as *const ucontext_t)
-                    .as_ref()
-                    .expect("non-null context")
-            },
-        }
+        let context = *unsafe {
+            (ptr as *const ucontext_t)
+                .as_ref()
+                .expect("non-null context")
+        };
+        let mcontext = unsafe { *context.uc_mcontext };
+        UContext { context, mcontext }
+    }
+
+    pub fn as_ptr(&mut self) -> UContextPtr {
+        self.context.uc_mcontext = &self.mcontext;
+        UContextPtr::new(&self.context as *const _ as *const _)
     }
 }
 
 impl Into<UContext> for UContextPtr {
     #[inline]
     fn into(self) -> UContext {
-        UContext {
-            context: unsafe { *(self.0) },
-        }
-    }
-}
-
-impl Into<UContextPtr> for UContext {
-    #[inline]
-    fn into(self) -> UContextPtr {
-        UContextPtr::new(&self.context as *const _ as *const _)
+        UContext::new(self.0 as *const _)
     }
 }

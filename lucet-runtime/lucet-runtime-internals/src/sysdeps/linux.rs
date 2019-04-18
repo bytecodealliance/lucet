@@ -11,7 +11,7 @@ impl UContextPtr {
     }
 
     #[inline]
-    pub fn get_ip(&self) -> *const c_void {
+    pub fn get_ip(self) -> *const c_void {
         let mcontext = &unsafe { *(self.0) }.uc_mcontext;
         mcontext.gregs[REG_RIP as usize] as *const _
     }
@@ -33,6 +33,10 @@ impl UContext {
             },
         }
     }
+
+    pub fn as_ptr(&mut self) -> UContextPtr {
+        UContextPtr::new(&self.context as *const _ as *const _)
+    }
 }
 
 impl Into<UContext> for UContextPtr {
@@ -41,12 +45,5 @@ impl Into<UContext> for UContextPtr {
         UContext {
             context: unsafe { *(self.0) },
         }
-    }
-}
-
-impl Into<UContextPtr> for UContext {
-    #[inline]
-    fn into(self) -> UContextPtr {
-        UContextPtr::new(&self.context as *const _ as *const _)
     }
 }
