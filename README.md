@@ -22,7 +22,8 @@ Lucet supports running WebAssembly programs written in C (via `clang`), Rust,
 and AssemblyScript. It does not yet support the entire WebAssembly spec, but
 full support is [coming in the near future](#lucet-spectest).
 
-Lucet's runtime currently only supports x86-64 based Linux systems.
+Lucet's runtime currently only supports x86-64 based Linux systems, with
+experimental support for macOS.
 
 ## Contents
 
@@ -163,12 +164,8 @@ such as instance creation and teardown, in `/benchmarks/lucet-benchmarks`.
 
 ### Operating System
 
-Lucet is developed and tested on Linux. We expect it to work on any POSIX
-system which supports ELF.
-
-Experimentally, we have shown that supporting Mac OS (which uses the Mach-O
-executable format instead of ELF) is possible, but it is not supported at this
-time.
+Lucet is developed and tested on Linux and macOS. We expect it to work on any
+POSIX system which supports shared libraries.
 
 ### Dependencies
 
