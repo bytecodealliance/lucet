@@ -3,7 +3,7 @@ pub mod signals;
 
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 
-use crate::alloc::{host_page_size, Alloc};
+use crate::alloc::{Alloc, HOST_PAGE_SIZE_EXPECTED};
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
@@ -14,6 +14,7 @@ use crate::trapcode::{TrapCode, TrapCodeType};
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
+use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{RefCell, UnsafeCell};
 use std::ffi::{CStr, CString};
@@ -23,11 +24,6 @@ use std::ptr::{self, NonNull};
 use std::sync::Arc;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
-
-#[cfg(target_os = "linux")]
-pub const INSTANCE_PADDING: usize = 2328;
-#[cfg(target_os = "macos")]
-pub const INSTANCE_PADDING: usize = 2642;
 
 thread_local! {
     /// The host context.
@@ -156,6 +152,7 @@ impl Drop for InstanceHandle {
 /// and their fields are never moved in memory, otherwise raw pointers in the metadata could be
 /// unsafely invalidated.
 #[repr(C)]
+#[repr(align(4096))]
 pub struct Instance {
     /// Used to catch bugs in pointer math used to find the address of the instance
     magic: u64,
@@ -197,14 +194,7 @@ pub struct Instance {
     /// Pointer to the function used as the entrypoint (for use in backtraces)
     entrypoint: *const extern "C" fn(),
 
-    /// Padding to ensure the pointer to globals at the end of the page occupied by the `Instance`
-    _reserved: [u8; INSTANCE_PADDING],
-
-    /// Pointer to the globals
-    ///
-    /// This is accessed through the `vmctx` pointer, which points to the heap that begins
-    /// immediately after this struct, so it has to come at the very end.
-    globals_ptr: *const i64,
+    _padding: (),
 }
 
 /// APIs that are internal, but useful to implementors of extension modules; you probably don't want
@@ -462,7 +452,7 @@ impl Instance {
 impl Instance {
     fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: CtxMap) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
-        let inst = Instance {
+        let mut inst = Instance {
             magic: LUCET_INSTANCE_MAGIC,
             embed_ctx: embed_ctx,
             module,
@@ -475,21 +465,36 @@ impl Instance {
             c_fatal_handler: None,
             signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
             entrypoint: ptr::null(),
-            _reserved: [0; INSTANCE_PADDING],
-            globals_ptr,
+            _padding: (),
         };
+        inst.set_globals_ptr(globals_ptr);
 
-        // Verify that globals_ptr is right before the end of a page, and that
-        // it is the last member of the structure.
-        let globals_ptr_offset =
-            &inst.globals_ptr as *const _ as usize - &inst as *const _ as usize;
-        let page_size = host_page_size();
-        assert_eq!(
-            globals_ptr_offset + std::mem::size_of_val(&inst.globals_ptr),
-            page_size
-        );
-        assert_eq!(std::mem::size_of_val(&inst), page_size);
+        assert_eq!(mem::size_of::<Instance>(), HOST_PAGE_SIZE_EXPECTED);
+        let unpadded_size = offset_of!(Instance, _padding);
+        assert!(unpadded_size <= HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>());
         inst
+    }
+
+    // The globals pointer must be stored right before the end of the structure, padded to the page size,
+    // so that it is 8 bytes before the heap.
+    // For this reason, the alignment of the structure is set to 4096, and we define accessors that
+    // read/write the globals pointer as bytes [4096-8..4096] of that structure represented as raw bytes.
+    #[inline]
+    pub fn get_globals_ptr(&self) -> *const i64 {
+        unsafe {
+            *((self as *const _ as *const u8)
+                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>()) as isize)
+                as *const *const i64)
+        }
+    }
+
+    #[inline]
+    pub fn set_globals_ptr(&mut self, globals_ptr: *const i64) {
+        unsafe {
+            *((self as *mut _ as *mut u8)
+                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>()) as isize)
+                as *mut *const i64) = globals_ptr;
+        }
     }
 
     /// Run a function in guest context at the given entrypoint.
@@ -843,26 +848,4 @@ extern "C" {
 // TODO: PR into `nix`
 fn strsignal_wrapper(sig: libc::c_int) -> CString {
     unsafe { CStr::from_ptr(strsignal(sig)).to_owned() }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use memoffset::offset_of;
-
-    #[test]
-    fn instance_size_correct() {
-        assert_eq!(mem::size_of::<Instance>(), 4096);
-    }
-
-    #[test]
-    fn instance_globals_offset_correct() {
-        let offset = offset_of!(Instance, globals_ptr) as isize;
-        if offset != 4096 - 8 {
-            let diff = 4096 - 8 - offset;
-            let new_padding = INSTANCE_PADDING as isize + diff;
-            panic!("new padding should be: {:?}", new_padding);
-        }
-        assert_eq!(offset_of!(Instance, globals_ptr), 4096 - 8);
-    }
 }

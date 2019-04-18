@@ -5,7 +5,7 @@ use libc::{c_void, SIGSTKSZ};
 use nix::unistd::{sysconf, SysconfVar};
 use std::sync::{Arc, Once, Weak};
 
-const HOST_PAGE_SIZE_EXPECTED: usize = 4096;
+pub const HOST_PAGE_SIZE_EXPECTED: usize = 4096;
 static mut HOST_PAGE_SIZE: usize = 0;
 static HOST_PAGE_SIZE_INIT: Once = Once::new();
 
