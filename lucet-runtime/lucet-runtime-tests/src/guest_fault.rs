@@ -143,7 +143,7 @@ macro_rules! guest_fault_tests {
                 ptr::null_mut(),
                 4096,
                 ProtFlags::PROT_NONE,
-                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
                 0,
                 0,
             )

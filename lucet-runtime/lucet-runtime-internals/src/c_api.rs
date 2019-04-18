@@ -196,6 +196,7 @@ pub mod lucet_state {
     use crate::c_api::lucet_val;
     use crate::instance::{State, TerminationDetails};
     use crate::module::AddrDetails;
+    use crate::sysdeps::UContext;
     use crate::trapcode::{TrapCode, TrapCodeType};
     use libc::{c_char, c_void};
     use num_derive::FromPrimitive;
@@ -307,7 +308,7 @@ pub mod lucet_state {
         pub rip_addr: libc::uintptr_t,
         pub rip_addr_details: lucet_module_addr_details,
         pub signal_info: libc::siginfo_t,
-        pub context: libc::ucontext_t,
+        pub context: UContext,
     }
 
     #[repr(C)]

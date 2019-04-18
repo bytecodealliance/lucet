@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::TempDir;
 
+const WASI_TARGET: &str = "wasm32-unknown-wasi";
+
 #[derive(Debug, Fail)]
 pub enum CompileError {
     #[fail(display = "File not found: {}", _0)]
@@ -46,11 +48,32 @@ impl CompileError {
     }
 }
 
-fn wasi_sdk_clang() -> PathBuf {
-    let mut base = PathBuf::from(env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned()));
-    base.push("bin");
-    base.push("clang");
-    base
+fn wasi_sdk() -> PathBuf {
+    Path::new(&env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned())).to_path_buf()
+}
+
+fn wasi_sysroot() -> PathBuf {
+    match env::var("WASI_SYSROOT") {
+        Ok(wasi_sysroot) => Path::new(&wasi_sysroot).to_path_buf(),
+        Err(_) => {
+            let mut path = wasi_sdk();
+            path.push("share");
+            path.push("sysroot");
+            path
+        }
+    }
+}
+
+fn wasm_clang() -> PathBuf {
+    match env::var("CLANG") {
+        Ok(clang) => Path::new(&clang).to_path_buf(),
+        Err(_) => {
+            let mut path = wasi_sdk();
+            path.push("bin");
+            path.push("clang");
+            path
+        }
+    }
 }
 
 pub struct Compile {
@@ -106,7 +129,7 @@ impl Compile {
     }
 
     pub fn compile<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
-        let clang = wasi_sdk_clang();
+        let clang = wasm_clang();
         if !clang.exists() {
             Err(CompileError::FileNotFound(
                 clang.to_string_lossy().into_owned(),
@@ -118,6 +141,8 @@ impl Compile {
             ))?;
         }
         let mut cmd = Command::new(clang);
+        cmd.arg(format!("--target={}", WASI_TARGET));
+        cmd.arg(format!("--sysroot={}", wasi_sysroot().display()));
         cmd.arg("-c");
         cmd.arg(self.input.clone());
         cmd.arg("-o");
@@ -158,7 +183,7 @@ impl Link {
     }
 
     pub fn link<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
-        let clang = wasi_sdk_clang();
+        let clang = wasm_clang();
         if !clang.exists() {
             Err(CompileError::FileNotFound(
                 clang.to_string_lossy().into_owned(),
@@ -301,7 +326,7 @@ mod tests {
     use tempfile::TempDir;
     #[test]
     fn wasi_sdk_installed() {
-        let clang = wasi_sdk_clang();
+        let clang = wasm_clang();
         assert!(clang.exists(), "clang executable exists");
     }
 
