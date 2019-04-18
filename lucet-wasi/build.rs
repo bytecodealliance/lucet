@@ -3,26 +3,47 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-fn main() {
-    let wasi_sdk =
-        Path::new(&env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned())).to_path_buf();
-    let wasi_sysroot = match env::var("WASI_SYSROOT") {
+fn wasi_sdk() -> PathBuf {
+    Path::new(&env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned())).to_path_buf()
+}
+
+fn wasi_sysroot() -> PathBuf {
+    match env::var("WASI_SYSROOT") {
         Ok(wasi_sysroot) => Path::new(&wasi_sysroot).to_path_buf(),
-        Err(_) => wasi_sdk.join("share/sysroot"),
-    };
-    let clang_root = match env::var("CLANG_ROOT") {
-        Ok(clang_root) => Path::new(&clang_root).to_path_buf(),
-        Err(_) => wasi_sdk.join("lib/clang/8.0.0"),
-    };
+        Err(_) => {
+            let mut path = wasi_sdk();
+            path.push("share");
+            path.push("sysroot");
+            path
+        }
+    }
+}
+
+fn wasm_clang_root() -> PathBuf {
+    match env::var("CLANG_ROOT") {
+        Ok(clang) => Path::new(&clang).to_path_buf(),
+        Err(_) => {
+            let mut path = wasi_sdk();
+            path.push("lib");
+            path.push("clang");
+            path.push("8.0.0");
+            path
+        }
+    }
+}
+
+fn main() {
+    let wasi_sysroot = wasi_sysroot();
+    let wasm_clang_root = wasm_clang_root();
     assert!(
         wasi_sysroot.exists(),
         "wasi-sysroot not present at {:?}",
         wasi_sysroot
     );
     assert!(
-        clang_root.exists(),
+        wasm_clang_root.exists(),
         "clang-root not present at {:?}",
-        clang_root
+        wasm_clang_root
     );
 
     let wasi_sysroot_core_h = wasi_sysroot.join("include/wasi/core.h");
@@ -62,7 +83,7 @@ fn main() {
         .clang_arg("-nostdinc")
         .clang_arg("-D__wasi__")
         .clang_arg(format!("-isystem={}/include/", wasi_sysroot.display()))
-        .clang_arg(format!("-I{}/include/", clang_root.display()))
+        .clang_arg(format!("-I{}/include/", wasm_clang_root.display()))
         .header(core_h_path.to_str().unwrap())
         .whitelist_type("__wasi_.*")
         .whitelist_var("__WASI_.*");

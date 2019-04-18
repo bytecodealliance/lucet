@@ -111,7 +111,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
 
     // Safety: when using a SA_SIGINFO sigaction, the third argument can be cast to a `ucontext_t`
     // pointer per the manpage
-    assert!(!ucontext_ptr.is_null());
+    assert!(!ucontext_ptr.is_null(), "ucontext_ptr must not be null");
     let ctx = UContextPtr::new(ucontext_ptr);
     let rip = ctx.get_ip();
 

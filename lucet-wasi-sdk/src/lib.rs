@@ -46,11 +46,20 @@ impl CompileError {
     }
 }
 
-fn wasi_sdk_clang() -> PathBuf {
-    let mut base = PathBuf::from(env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned()));
-    base.push("bin");
-    base.push("clang");
-    base
+fn wasi_sdk() -> PathBuf {
+    Path::new(&env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned())).to_path_buf()
+}
+
+fn wasm_clang() -> PathBuf {
+    match env::var("CLANG") {
+        Ok(clang) => Path::new(&clang).to_path_buf(),
+        Err(_) => {
+            let mut path = wasi_sdk();
+            path.push("bin");
+            path.push("clang");
+            path
+        }
+    }
 }
 
 pub struct Compile {
@@ -106,7 +115,7 @@ impl Compile {
     }
 
     pub fn compile<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
-        let clang = wasi_sdk_clang();
+        let clang = wasm_clang();
         if !clang.exists() {
             Err(CompileError::FileNotFound(
                 clang.to_string_lossy().into_owned(),
@@ -158,7 +167,7 @@ impl Link {
     }
 
     pub fn link<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
-        let clang = wasi_sdk_clang();
+        let clang = wasm_clang();
         if !clang.exists() {
             Err(CompileError::FileNotFound(
                 clang.to_string_lossy().into_owned(),
@@ -301,7 +310,7 @@ mod tests {
     use tempfile::TempDir;
     #[test]
     fn wasi_sdk_installed() {
-        let clang = wasi_sdk_clang();
+        let clang = wasm_clang();
         assert!(clang.exists(), "clang executable exists");
     }
 
