@@ -3,7 +3,7 @@ pub mod signals;
 
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 
-use crate::alloc::Alloc;
+use crate::alloc::{host_page_size, Alloc};
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
@@ -23,7 +23,11 @@ use std::ptr::{self, NonNull};
 use std::sync::Arc;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
+
+#[cfg(target_os = "linux")]
 pub const INSTANCE_PADDING: usize = 2328;
+#[cfg(target_os = "macos")]
+pub const INSTANCE_PADDING: usize = 2648;
 
 thread_local! {
     /// The host context.
@@ -458,7 +462,7 @@ impl Instance {
 impl Instance {
     fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: CtxMap) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
-        Instance {
+        let inst = Instance {
             magic: LUCET_INSTANCE_MAGIC,
             embed_ctx: embed_ctx,
             module,
@@ -473,7 +477,19 @@ impl Instance {
             entrypoint: ptr::null(),
             _reserved: [0; INSTANCE_PADDING],
             globals_ptr,
-        }
+        };
+
+        // Verify that globals_ptr is right before the end of a page, and that
+        // it is the last member of the structure.
+        let globals_ptr_offset =
+            &inst.globals_ptr as *const _ as usize - &inst as *const _ as usize;
+        let page_size = host_page_size();
+        assert_eq!(
+            globals_ptr_offset + std::mem::size_of_val(&inst.globals_ptr),
+            page_size
+        );
+        assert_eq!(std::mem::size_of_val(&inst), page_size);
+        inst
     }
 
     /// Run a function in guest context at the given entrypoint.
