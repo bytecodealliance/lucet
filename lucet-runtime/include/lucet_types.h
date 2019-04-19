@@ -9,7 +9,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <ucontext.h>
+
+#ifdef __APPLE__
+# include <sys/ucontext.h>
+#else
+# include <ucontext.h>
+#endif
 
 enum lucet_error {
     lucet_error_ok,
