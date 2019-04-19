@@ -135,7 +135,6 @@ impl ModuleInternal for DlModule {
             })?
         };
         let len = unsafe { **p_table_segment_len };
-        let elem_size = mem::size_of::<TableElement>();
         if len > std::u32::MAX as usize {
             lucet_incorrect_module!("table segment too long: {}", len);
         }
