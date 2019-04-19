@@ -1,10 +1,15 @@
 #ifndef LUCET_TYPES_H
 #define LUCET_TYPES_H
 
+#ifndef _XOPEN_SOURCE
+# define _XOPEN_SOURCE 500
+#endif
+
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <ucontext.h>
 
 enum lucet_error {
     lucet_error_ok,
