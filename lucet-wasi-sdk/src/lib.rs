@@ -198,6 +198,8 @@ impl Link {
             }
             cmd.arg(input.clone());
         }
+        cmd.arg(format!("--target={}", WASI_TARGET));
+        cmd.arg(format!("--sysroot={}", wasi_sysroot().display()));
         cmd.arg("-o");
         cmd.arg(output.as_ref());
         for cflag in self.cflags.iter() {
@@ -223,9 +225,6 @@ impl AsLink for Link {
 
 #[derive(Clone, Copy, Debug)]
 pub enum LinkOpt<'t> {
-    /// Allow references to an undefined function that will be resolved later by the dynamic linker
-    AllowUndefined(&'t str),
-
     /// Allow references to any undefined function. They will be resolved later by the dynamic linker
     AllowUndefinedAll,
 
@@ -252,32 +251,15 @@ pub enum LinkOpt<'t> {
 }
 
 impl<'t> LinkOpt<'t> {
-    #[cfg(target_os = "macos")]
     fn as_ldflags(&self) -> Vec<String> {
         match self {
-            LinkOpt::AllowUndefined(_symbol) => vec![],
-            LinkOpt::AllowUndefinedAll => vec!["-undefined,dynamic_lookup".to_string()],
-            LinkOpt::DefaultOpts => vec![],
-            LinkOpt::Export(symbol) => vec![format!("-exported_symbol,{}", symbol).to_string()],
-            LinkOpt::ExportAll => vec!["-export_dynamic".to_string()],
-            LinkOpt::NoDefaultEntryPoint => vec![],
-            LinkOpt::Shared => vec!["-dylib".to_string()],
-            LinkOpt::StripDebug => vec!["-S".to_string()],
-            LinkOpt::StripUnused => vec!["-dead_strip".to_string()],
-        }
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    fn as_ldflags(&self) -> Vec<String> {
-        match self {
-            LinkOpt::AllowUndefined(symbol) => vec![format!("-U,_{}", symbol).to_string()],
             LinkOpt::AllowUndefinedAll => vec!["--allow-undefined".to_string()],
             LinkOpt::DefaultOpts => vec!["--no-threads".to_string()],
             LinkOpt::Export(symbol) => vec![format!("--export={}", symbol).to_string()],
             LinkOpt::ExportAll => vec!["--export-all".to_string()],
             LinkOpt::NoDefaultEntryPoint => vec!["--no-entry".to_string()],
             LinkOpt::Shared => vec!["--shared".to_string()],
-            LinkOpt::StripDebug => vec!["-S".to_string()],
+            LinkOpt::StripDebug => vec!["--strip-debug".to_string()],
             LinkOpt::StripUnused => vec!["--strip-discarded".to_string()],
         }
     }
