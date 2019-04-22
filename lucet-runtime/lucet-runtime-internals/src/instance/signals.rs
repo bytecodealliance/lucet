@@ -1,12 +1,13 @@
 use crate::context::Context;
 use crate::instance::{
-    FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
+    siginfo_ext::SiginfoExt, FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE,
+    HOST_CTX,
 };
 use crate::sysdeps::UContextPtr;
 use crate::trapcode::TrapCode;
 use failure::Error;
 use lazy_static::lazy_static;
-use libc::{c_int, c_void, siginfo_t};
+use libc::{c_int, c_void, siginfo_t, SIGBUS, SIGSEGV};
 use nix::sys::signal::{
     pthread_sigmask, raise, sigaction, SaFlags, SigAction, SigHandler, SigSet, SigmaskHow, Signal,
 };
@@ -160,20 +161,29 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 true
             }
             SignalBehavior::Default => {
+                // safety: pointer is checked for null at the top of the function, and the
+                // manpage guarantees that a siginfo_t will be passed as the second argument
+                let siginfo = unsafe { *siginfo_ptr };
+                let rip_addr = rip as usize;
+                // If the trap table lookup returned unknown, it is a fatal error
+                let unknown_fault = trapcode.is_none();
+
+                // If the trap was a segv or bus fault and the addressed memory was outside the
+                // guard pages, it is also a fatal error
+                let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
+                    && !inst.alloc.addr_in_heap_guard(siginfo.si_addr());
+
                 // record the fault and jump back to the host context
                 inst.state = State::Fault {
                     details: FaultDetails {
-                        // fatal field is set false here by default - have to wait until
-                        // `verify_trap_safety` to have enough information to determine whether trap was
-                        // fatal. It is not signal safe to access some of the required information.
-                        fatal: false,
+                        fatal: unknown_fault || outside_guard,
                         trapcode: trapcode,
-                        rip_addr: rip as usize,
+                        rip_addr,
+                        // Details set to `None` here: have to wait until `verify_trap_safety` to
+                        // fill in these details, because access may not be signal safe.
                         rip_addr_details: None,
                     },
-                    // safety: pointer is checked for null at the top of the function, and the
-                    // manpage guarantees that a siginfo_t will be passed as the second argument
-                    siginfo: unsafe { *siginfo_ptr },
+                    siginfo,
                     context: ctx.into(),
                 };
                 true

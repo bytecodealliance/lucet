@@ -625,28 +625,17 @@ impl Instance {
             details:
                 FaultDetails {
                     rip_addr,
-                    trapcode,
-                    ref mut fatal,
                     ref mut rip_addr_details,
                     ..
                 },
-            siginfo,
             ..
         } = self.state
         {
             // We do this after returning from the signal handler because it requires `dladdr`
             // calls, which are not signal safe
+            // FIXME after lucet-module is complete it should be possible to fill this in without
+            // consulting the process symbol table
             *rip_addr_details = self.module.addr_details(rip_addr as *const c_void)?.clone();
-
-            // If the trap table lookup returned unknown, it is a fatal error
-            let unknown_fault = trapcode.is_none();
-
-            // If the trap was a segv or bus fault and the addressed memory was outside the
-            // guard pages, it is also a fatal error
-            let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
-                && !self.alloc.addr_in_heap_guard(siginfo.si_addr());
-
-            *fatal = unknown_fault || outside_guard;
         }
         Ok(())
     }
