@@ -56,3 +56,15 @@ indent:
 .PHONY: indent-check
 indent-check:
 	helpers/indent.sh check
+
+.PHONY: watch
+watch:
+	cargo watch --exec "test \
+            -p lucet-runtime-internals \
+            -p lucet-runtime \
+            -p lucet-module-data \
+            -p lucetc \
+            -p lucet-idl \
+            -p lucet-wasi-sdk \
+            -p lucet-wasi \
+            -p lucet-benchmarks"
