@@ -1,5 +1,10 @@
 #! /bin/sh
 
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "Installation on this operating system cannot be done using that script yet." >&2
+    exit 1
+fi
+
 LUCET_SRC_PREFIX=${LUCET_SRC_PREFIX:-"$(readlink -e $(dirname $(dirname ${0})))"}
 if [ ! -x "${LUCET_SRC_PREFIX}/helpers/install.sh" ]; then
     echo "Unable to find the current script base directory" >&2

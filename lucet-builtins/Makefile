@@ -17,6 +17,8 @@ build/%.o: src/%.c
 	$(CC) $(COMMON_CFLAGS) -c $^ -o $@
 
 build/libbuiltins.so: $(LIBBUILTINS_OBJS)
+	# -U is not supported by the GNU linker. Retry without this option if the first command fails.
+	$(CC) -Wl,-U,_lucet_vmctx_current_memory -Wl,-U,_lucet_vmctx_get_heap -shared $^ -o $@ 2> /dev/null || \
 	$(CC) -shared $^ -o $@
 
 .PHONY: clean
