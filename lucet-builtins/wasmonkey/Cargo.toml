@@ -11,7 +11,7 @@ categories = ["wasm"]
 [dependencies]
 clap = "2.32"
 failure = "0.1"
-goblin = "~0.0.19"
+goblin = "0.0.21"
 lazy_static = "1.2"
 parity-wasm = "0.35"
 serde = "1.0"
