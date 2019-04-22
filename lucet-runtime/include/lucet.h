@@ -6,7 +6,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <ucontext.h>
 
 #include "lucet_types.h"
 #include "lucet_val.h"

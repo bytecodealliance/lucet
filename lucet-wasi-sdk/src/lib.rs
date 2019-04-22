@@ -170,7 +170,7 @@ impl Link {
             ldflags: vec![],
             print_output: false,
         }
-        .with_ldflag("--no-threads")
+        .with_link_opt(LinkOpt::DefaultOpts)
     }
 
     pub fn print_output(&mut self, print: bool) {
@@ -198,6 +198,8 @@ impl Link {
             }
             cmd.arg(input.clone());
         }
+        cmd.arg(format!("--target={}", WASI_TARGET));
+        cmd.arg(format!("--sysroot={}", wasi_sysroot().display()));
         cmd.arg("-o");
         cmd.arg(output.as_ref());
         for cflag in self.cflags.iter() {
@@ -221,28 +223,68 @@ impl AsLink for Link {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum LinkOpt<'t> {
+    /// Allow references to any undefined function. They will be resolved later by the dynamic linker
+    AllowUndefinedAll,
+
+    /// Default options, possibly enabling workarounds for temporary bugs
+    DefaultOpts,
+
+    /// Export a symbol
+    Export(&'t str),
+
+    /// Preserve all the symbols during LTO, even if they are not used
+    ExportAll,
+
+    /// Do not assume that the library has a predefined entry point
+    NoDefaultEntryPoint,
+
+    /// Create a shared library
+    Shared,
+
+    /// Do not put debug information (STABS or DWARF) in the output file
+    StripDebug,
+
+    /// Remove functions and data that are unreachable by the entry point or exported symbols
+    StripUnused,
+}
+
+impl<'t> LinkOpt<'t> {
+    fn as_ldflags(&self) -> Vec<String> {
+        match self {
+            LinkOpt::AllowUndefinedAll => vec!["--allow-undefined".to_string()],
+            LinkOpt::DefaultOpts => vec!["--no-threads".to_string()],
+            LinkOpt::Export(symbol) => vec![format!("--export={}", symbol).to_string()],
+            LinkOpt::ExportAll => vec!["--export-all".to_string()],
+            LinkOpt::NoDefaultEntryPoint => vec!["--no-entry".to_string()],
+            LinkOpt::Shared => vec!["--shared".to_string()],
+            LinkOpt::StripDebug => vec!["--strip-debug".to_string()],
+            LinkOpt::StripUnused => vec!["--strip-discarded".to_string()],
+        }
+    }
+}
+
 pub trait LinkOpts {
-    fn ldflag<S: AsRef<str>>(&mut self, ldflag: S);
-    fn with_ldflag<S: AsRef<str>>(self, ldflag: S) -> Self;
+    fn link_opt(&mut self, link_opt: LinkOpt);
+    fn with_link_opt(self, link_opt: LinkOpt) -> Self;
 
     fn export<S: AsRef<str>>(&mut self, export: S);
     fn with_export<S: AsRef<str>>(self, export: S) -> Self;
 }
 
 impl<T: AsLink> LinkOpts for T {
-    fn ldflag<S: AsRef<str>>(&mut self, ldflag: S) {
-        self.as_link().ldflags.push(ldflag.as_ref().to_owned());
+    fn link_opt(&mut self, link_opt: LinkOpt) {
+        self.as_link().ldflags.extend(link_opt.as_ldflags());
     }
 
-    fn with_ldflag<S: AsRef<str>>(mut self, ldflag: S) -> Self {
-        self.ldflag(ldflag);
+    fn with_link_opt(mut self, link_opt: LinkOpt) -> Self {
+        self.link_opt(link_opt);
         self
     }
 
     fn export<S: AsRef<str>>(&mut self, export: S) {
-        self.as_link()
-            .ldflags
-            .push(format!("--export={}", export.as_ref()));
+        self.link_opt(LinkOpt::Export(export.as_ref()));
     }
 
     fn with_export<S: AsRef<str>>(mut self, export: S) -> Self {
@@ -352,7 +394,7 @@ mod tests {
 
         let mut linker = Link::new(&[objfile]);
         linker.cflag("-nostartfiles");
-        linker.ldflag("--no-entry");
+        linker.link_opt(LinkOpt::NoDefaultEntryPoint);
 
         let wasmfile = tmp.path().join("a.wasm");
 
@@ -375,8 +417,8 @@ mod tests {
 
         let mut linker = Link::new(&[objfile]);
         linker.cflag("-nostartfiles");
-        linker.ldflag("--no-entry");
-        linker.ldflag("--allow-undefined");
+        linker.link_opt(LinkOpt::NoDefaultEntryPoint);
+        linker.link_opt(LinkOpt::AllowUndefinedAll);
 
         let wasmfile = tmp.path().join("b.wasm");
 
@@ -391,7 +433,7 @@ mod tests {
 
         let mut linker = Link::new(&[test_file("a.c"), test_file("b.c")]);
         linker.cflag("-nostartfiles");
-        linker.ldflag("--no-entry");
+        linker.link_opt(LinkOpt::NoDefaultEntryPoint);
 
         let wasmfile = tmp.path().join("ab.wasm");
 
@@ -406,7 +448,7 @@ mod tests {
 
         let mut lucetc = Lucetc::new(&[test_file("a.c"), test_file("b.c")]);
         lucetc.cflag("-nostartfiles");
-        lucetc.ldflag("--no-entry");
+        lucetc.link_opt(LinkOpt::NoDefaultEntryPoint);
 
         let so_file = tmp.path().join("ab.so");
 

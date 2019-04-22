@@ -139,6 +139,7 @@ impl UContextPtr {
 }
 
 #[derive(Clone, Copy)]
+#[repr(C)]
 pub struct UContext {
     context: ucontext_t,
     mcontext: mcontext64,
