@@ -13,10 +13,15 @@ RUN apt-get update \
 	ca-certificates \
 	software-properties-common \
 	libssl-dev \
-        pkg-config \
-        csmith \
-        libcsmith-dev \
+    pkg-config \
+    csmith \
+    libcsmith-dev \
+    creduce \
+    gcc-multilib \
+    clang-6.0 \
  && rm -rf /var/lib/apt/lists/*
+
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
 
 # Setting a consistent LD_LIBRARY_PATH across the entire environment prevents unnecessary Cargo
 # rebuilds.
