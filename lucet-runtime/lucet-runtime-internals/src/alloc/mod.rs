@@ -173,7 +173,7 @@ impl Alloc {
                 }
             }
         } else {
-            bail_limits_exceeded!("no heap to expand");
+            return Err(Error::NoLinearMemory("cannot expand heap".to_owned()));
         }
         // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let
         // the heap expand beyond that:

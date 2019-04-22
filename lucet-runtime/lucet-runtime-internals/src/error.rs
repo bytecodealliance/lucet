@@ -20,6 +20,11 @@ pub enum Error {
     #[fail(display = "Instance limits exceeded: {}", _0)]
     LimitsExceeded(String),
 
+    /// A method call attempted to modify linear memory for an instance that
+    /// does not have linear memory
+    #[fail(display = "No linear memory available: {}", _0)]
+    NoLinearMemory(String),
+
     /// An attempt to look up a WebAssembly function by its symbol name failed.
     #[fail(display = "Symbol not found: {}", _0)]
     SymbolNotFound(String),

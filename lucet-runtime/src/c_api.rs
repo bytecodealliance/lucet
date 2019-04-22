@@ -39,6 +39,7 @@ pub extern "C" fn lucet_error_name(e: c_int) -> *const c_char {
             RegionFull => "lucet_error_region_full\0".as_ptr() as _,
             Module => "lucet_error_module\0".as_ptr() as _,
             LimitsExceeded => "lucet_error_limits_exceeded\0".as_ptr() as _,
+            NoLinearMemory => "lucet_error_no_linear_memory\0".as_ptr() as _,
             SymbolNotFound => "lucet_error_symbol_not_found\0".as_ptr() as _,
             FuncNotFound => "lucet_error_func_not_found\0".as_ptr() as _,
             RuntimeFault => "lucet_error_runtime_fault\0".as_ptr() as _,
