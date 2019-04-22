@@ -35,7 +35,7 @@ pub struct LocatedToken<'a> {
     pub location: Location,
 }
 
-fn token(token: Token, location: Location) -> Result<LocatedToken, LocatedError> {
+fn token(token: Token<'_>, location: Location) -> Result<LocatedToken<'_>, LocatedError> {
     Ok(LocatedToken { token, location })
 }
 
@@ -67,7 +67,7 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(s: &'a str) -> Lexer {
+    pub fn new(s: &'a str) -> Lexer<'_> {
         let mut lex = Lexer {
             source: s,
             chars: s.char_indices(),
@@ -207,6 +207,7 @@ impl<'a> Lexer<'a> {
         token(Token::Quote(text), loc)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<Result<LocatedToken<'a>, LocatedError>> {
         loop {
             let loc = self.loc();
@@ -260,10 +261,10 @@ mod tests {
     use super::*;
 
     fn token(
-        token: Token,
+        token: Token<'_>,
         line: usize,
         column: usize,
-    ) -> Option<Result<LocatedToken, LocatedError>> {
+    ) -> Option<Result<LocatedToken<'_>, LocatedError>> {
         Some(super::token(token, Location { line, column }))
     }
 

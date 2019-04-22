@@ -10,4 +10,11 @@ edition = "2018"
 [lib]
 crate-type=["rlib"]
 
+[[bin]]
+name = "lucet-idl"
+path = "src/main.rs"
+
 [dependencies]
+clap = "2"
+failure = "0.1"
+xfailure = "0.1"
