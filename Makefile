@@ -26,7 +26,8 @@ test: indent-check
             -p lucet-idl \
             -p lucet-wasi-sdk \
             -p lucet-wasi
-	cargo run -p lucet-wasi-fuzz -- fuzz --num-tests=3
+    # run a single seed through the fuzzer to stave off bitrot
+	cargo run -p lucet-wasi-fuzz -- test-seed 410757864950
 
 .PHONY: fuzz
 fuzz:
