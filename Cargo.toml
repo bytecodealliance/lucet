@@ -12,6 +12,7 @@ members = [
   "lucet-wasi-sdk",
   "lucetc",
   "sightglass",
+  "benchmarks/lucet-benchmarks",
 ]
 exclude = ["cranelift"]
 

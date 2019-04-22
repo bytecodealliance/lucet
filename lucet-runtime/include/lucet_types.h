@@ -1,10 +1,20 @@
 #ifndef LUCET_TYPES_H
 #define LUCET_TYPES_H
 
+#ifndef _XOPEN_SOURCE
+# define _XOPEN_SOURCE 500
+#endif
+
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#ifdef __APPLE__
+# include <sys/ucontext.h>
+#else
+# include <ucontext.h>
+#endif
 
 enum lucet_error {
     lucet_error_ok,

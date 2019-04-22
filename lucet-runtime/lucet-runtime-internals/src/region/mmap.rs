@@ -3,7 +3,7 @@ use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle};
 use crate::module::Module;
-use crate::region::{Region, RegionInternal};
+use crate::region::{Region, RegionCreate, RegionInternal};
 use libc::{c_void, SIGSTKSZ};
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::ptr;
@@ -193,6 +193,14 @@ impl Drop for MmapRegion {
     }
 }
 
+impl RegionCreate for MmapRegion {
+    const TYPE_NAME: &'static str = "MmapRegion";
+
+    fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error> {
+        MmapRegion::create(instance_capacity, limits)
+    }
+}
+
 impl MmapRegion {
     /// Create a new `MmapRegion` that can support a given number instances, each subject to the
     /// same runtime limits.
@@ -228,7 +236,7 @@ impl MmapRegion {
                 ptr::null_mut(),
                 region.limits.total_memory_size(),
                 ProtFlags::PROT_NONE,
-                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
                 0,
                 0,
             )?

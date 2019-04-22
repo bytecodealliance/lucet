@@ -22,7 +22,8 @@ Lucet supports running WebAssembly programs written in C (via `clang`), Rust,
 and AssemblyScript. It does not yet support the entire WebAssembly spec, but
 full support is [coming in the near future](#lucet-spectest).
 
-Lucet's runtime currently only supports x86-64 based Linux systems.
+Lucet's runtime currently only supports x86-64 based Linux systems, with
+experimental support for macOS.
 
 ## Contents
 
@@ -156,16 +157,15 @@ Sightglass ships with a set of microbenchmarks called `shootout`. The scripts
 to build the shootout tests with native and various versions of the Lucet
 toolchain are in `/benchmarks/shootout`.
 
+Furthermore, there is a suite of benchmarks of various Lucet runtime functions,
+such as instance creation and teardown, in `/benchmarks/lucet-benchmarks`.
+
 ## Development Environment
 
 ### Operating System
 
-Lucet is developed and tested on Linux. We expect it to work on any POSIX
-system which supports ELF.
-
-Experimentally, we have shown that supporting Mac OS (which uses the Mach-O
-executable format instead of ELF) is possible, but it is not supported at this
-time.
+Lucet is developed and tested on Linux and macOS. We expect it to work on any
+POSIX system which supports shared libraries.
 
 ### Dependencies
 
@@ -175,8 +175,7 @@ Lucet requires:
 * [`wasi-sdk`](https://github.com/CraneStation/wasi-sdk), providing a Clang
   toolchain with wasm-ld, the WASI reference sysroot, and a libc based on WASI
   syscalls.
-* GNU Make, CMake, & various standard Unix utilities for the build system
-* `libhwloc`, for sightglass to pin benchmarks to a single core
+* GNU Make, CMake, & various standard Unix utilities for the build system.
 
 ### Getting started
 
@@ -271,7 +270,7 @@ lucet-wasi hello.so
 * `./devenv_run.sh [<command>] [<arg>...]` runs a command in the container. If
   a command is not provided, an interactive shell is spawned. In this
   container, Lucet tools are installed in `/opt/lucet` by default. The command
-  `source /opt/lucet/bin/lucet_setenv.sh` can be used to initialize the
+  `source /opt/lucet/bin/devenv_setenv.sh` can be used to initialize the
   environment.
 * `./devenv_start.sh` and `./devenv_stop.sh` start and stop the container.
 

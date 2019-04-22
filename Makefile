@@ -25,7 +25,8 @@ test: indent-check
             -p lucetc \
             -p lucet-idl \
             -p lucet-wasi-sdk \
-            -p lucet-wasi
+            -p lucet-wasi \
+            -p lucet-benchmarks
     # run a single seed through the fuzzer to stave off bitrot
 	cargo run -p lucet-wasi-fuzz -- test-seed 410757864950
 
@@ -35,6 +36,7 @@ fuzz:
 
 .PHONY: bench
 bench:
+	cargo bench -p lucet-benchmarks
 	make -C benchmarks/shootout clean
 	make -C benchmarks/shootout bench
 

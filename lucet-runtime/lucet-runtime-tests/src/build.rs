@@ -1,7 +1,7 @@
 use failure::Error;
 use lucet_runtime_internals::module::DlModule;
-use lucet_wasi_sdk::Link;
-use lucetc::{Bindings, Lucetc};
+use lucet_wasi_sdk::{CompileOpts, Link, LinkOpt, LinkOpts};
+use lucetc::{Bindings, Lucetc, LucetcOpts};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -30,10 +30,10 @@ where
     let workdir = TempDir::new().expect("create working directory");
 
     let wasm_build = Link::new(&[c_file])
-        .cflag("-nostartfiles")
-        .ldflag("--no-entry")
-        .ldflag("--allow-undefined")
-        .ldflag("--export-all");
+        .with_cflag("-nostartfiles")
+        .with_link_opt(LinkOpt::NoDefaultEntryPoint)
+        .with_link_opt(LinkOpt::AllowUndefinedAll)
+        .with_link_opt(LinkOpt::ExportAll);
 
     let wasm_file = workdir.path().join("out.wasm");
 
@@ -41,7 +41,7 @@ where
 
     let bindings = Bindings::from_file(bindings_file.as_ref())?;
 
-    let native_build = Lucetc::new(wasm_file)?.bindings(bindings)?;
+    let native_build = Lucetc::new(wasm_file).with_bindings(bindings);
 
     let so_file = workdir.path().join("out.so");
 
@@ -67,7 +67,7 @@ where
 
     let bindings = Bindings::from_file(&bindings_file)?;
 
-    let native_build = Lucetc::new(wasm_file)?.bindings(bindings)?;
+    let native_build = Lucetc::new(wasm_file).with_bindings(bindings);
 
     let so_file = workdir.path().join("out.so");
 

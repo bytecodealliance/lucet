@@ -71,19 +71,19 @@ impl Bindings {
         Ok(Self::from_str(&contents)?)
     }
 
-    pub fn extend(&mut self, other: Bindings) -> Result<(), Error> {
+    pub fn extend(&mut self, other: &Bindings) -> Result<(), Error> {
         //self.bindings.extend(other.bindings);
-        for (modname, othermodbindings) in other.bindings {
-            match self.bindings.entry(modname) {
+        for (modname, othermodbindings) in other.bindings.iter() {
+            match self.bindings.entry(modname.clone()) {
                 Entry::Occupied(mut e) => {
                     let existing = e.get_mut();
                     for (bindname, binding) in othermodbindings {
-                        match existing.entry(bindname) {
+                        match existing.entry(bindname.clone()) {
                             Entry::Vacant(e) => {
-                                e.insert(binding);
+                                e.insert(binding.clone());
                             }
                             Entry::Occupied(e) => {
-                                if &binding != e.get() {
+                                if binding != e.get() {
                                     Err(format_err!(
                                         "cannot re-bind {} from {} to {}",
                                         e.key(),
@@ -96,7 +96,7 @@ impl Bindings {
                     }
                 }
                 Entry::Vacant(e) => {
-                    e.insert(othermodbindings);
+                    e.insert(othermodbindings.clone());
                 }
             }
         }

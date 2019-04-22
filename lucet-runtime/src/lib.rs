@@ -204,7 +204,7 @@ pub use lucet_runtime_internals::instance::{
 };
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
-pub use lucet_runtime_internals::region::{InstanceBuilder, Region};
+pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
 pub use lucet_runtime_internals::trapcode::{TrapCode, TrapCodeType};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
 pub use lucet_runtime_internals::WASM_PAGE_SIZE;

@@ -24,6 +24,12 @@ use std::os::unix::prelude::{FromRawFd, OsStrExt, OsStringExt, RawFd};
 use std::time::SystemTime;
 use std::{cmp, slice};
 
+#[cfg(target_os = "linux")]
+const O_RSYNC: nix::fcntl::OFlag = nix::fcntl::OFlag::O_RSYNC;
+
+#[cfg(not(target_os = "linux"))]
+const O_RSYNC: nix::fcntl::OFlag = nix::fcntl::OFlag::O_SYNC;
+
 #[no_mangle]
 pub extern "C" fn __wasi_proc_exit(vmctx: *mut lucet_vmctx, rval: wasm32::__wasi_exitcode_t) -> ! {
     let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
@@ -618,7 +624,7 @@ pub extern "C" fn __wasi_path_open(
     if nix_all_oflags.contains(OFlag::O_DSYNC) {
         needed_inheriting |= host::__WASI_RIGHT_FD_DATASYNC as host::__wasi_rights_t;
     }
-    if nix_all_oflags.intersects(OFlag::O_RSYNC | OFlag::O_SYNC) {
+    if nix_all_oflags.intersects(O_RSYNC | OFlag::O_SYNC) {
         needed_inheriting |= host::__WASI_RIGHT_FD_SYNC as host::__wasi_rights_t;
     }
 

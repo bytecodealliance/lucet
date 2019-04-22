@@ -1,0 +1,24 @@
+[package]
+name = "lucet-benchmarks"
+version = "0.1.0"
+authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+criterion = "0.2"
+lucetc = { path = "../../lucetc" }
+lucet-runtime = { path = "../../lucet-runtime" }
+lucet-runtime-internals = { path = "../../lucet-runtime/lucet-runtime-internals" }
+lucet-wasi = { path = "../../lucet-wasi" }
+lucet-wasi-sdk = { path = "../../lucet-wasi-sdk" }
+nix = "0.13"
+num_cpus = "1.0"
+rayon = "1.0"
+tempfile = "3.0"
+
+[lib]
+bench = false
+
+[[bench]]
+name = "benchmarks"
+harness = false

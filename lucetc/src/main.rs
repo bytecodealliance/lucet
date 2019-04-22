@@ -3,7 +3,7 @@ mod options;
 use crate::options::{CodegenOutput, Options};
 use failure::{format_err, Error, ResultExt};
 use log::info;
-use lucetc::{Bindings, Lucetc};
+use lucetc::{Bindings, Lucetc, LucetcOpts};
 
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -38,28 +38,28 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         let file_bindings =
             Bindings::from_file(file).context(format!("bindings file {:?}", file))?;
         bindings
-            .extend(file_bindings)
+            .extend(&file_bindings)
             .context(format!("adding bindings from {:?}", file))?;
     }
 
-    let mut c = Lucetc::new(PathBuf::from(input))?
-        .bindings(bindings)?
-        .opt_level(opts.opt_level);
+    let mut c = Lucetc::new(PathBuf::from(input))
+        .with_bindings(bindings)
+        .with_opt_level(opts.opt_level);
 
     if let Some(ref builtins) = opts.builtins_path {
-        c.with_builtins(builtins)?;
+        c.builtins(builtins);
     }
 
     if let Some(min_reserved_size) = opts.min_reserved_size {
-        c.with_min_reserved_size(min_reserved_size);
+        c.min_reserved_size(min_reserved_size);
     }
 
     if let Some(max_reserved_size) = opts.max_reserved_size {
-        c.with_max_reserved_size(max_reserved_size);
+        c.max_reserved_size(max_reserved_size);
     }
 
     if let Some(guard_size) = opts.guard_size {
-        c.with_guard_size(guard_size);
+        c.guard_size(guard_size);
     }
 
     match opts.codegen {
