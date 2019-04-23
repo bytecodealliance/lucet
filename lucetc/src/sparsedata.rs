@@ -68,14 +68,10 @@ pub fn owned_sparse_data_from_initializers<'a>(
             }
             let base = chunk.offset as usize;
             let page = match pagemap.entry(pagenumber) {
-                Entry::Occupied(occ) => {
-                    occ.into_mut()
-                }
-                Entry::Vacant(vac) => {
-                    vac.insert(vec![0; PAGE_SIZE])
-                }
+                Entry::Occupied(occ) => occ.into_mut(),
+                Entry::Vacant(vac) => vac.insert(vec![0; PAGE_SIZE]),
             };
-            page[base..base+chunk.data.len()].copy_from_slice(chunk.data);
+            page[base..base + chunk.data.len()].copy_from_slice(chunk.data);
             debug_assert!(page.len() == PAGE_SIZE);
         }
     }

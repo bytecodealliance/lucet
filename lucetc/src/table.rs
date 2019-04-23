@@ -56,9 +56,10 @@ pub fn write_table_data<B: ClifBackend>(
         let elements = table_elements(&table_decl)?;
 
         let mut table_data = Cursor::new(Vec::with_capacity(elements.len() * 2 * POINTER_SIZE));
-        let putelem = {
-            |table: &mut Cursor<Vec<u8>>, elem: u64| table.write_u64::<LittleEndian>(elem).unwrap()
-        };
+        fn putelem(table: &mut Cursor<Vec<u8>>, elem: u64) {
+            table.write_u64::<LittleEndian>(elem).unwrap()
+        }
+
         let mut table_ctx = DataContext::new();
 
         // table.elems is a vector that gives every entry of the table, either specifying the
