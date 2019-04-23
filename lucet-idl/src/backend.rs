@@ -1,0 +1,24 @@
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Backend {
+    C,
+}
+
+impl Default for Backend {
+    fn default() -> Self {
+        Backend::C
+    }
+}
+
+impl<T: AsRef<str>> From<T> for Backend {
+    fn from(s: T) -> Self {
+        match s.as_ref() {
+            "c" => Backend::C,
+            _ => Backend::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
+pub struct BackendConfig {
+    pub zero_native_pointers: bool,
+}

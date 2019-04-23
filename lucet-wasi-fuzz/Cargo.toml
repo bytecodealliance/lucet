@@ -13,8 +13,10 @@ lucet-runtime = { path = "../lucet-runtime" }
 lucet-wasi = { path = "../lucet-wasi" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 nix = "0.13"
+num_cpus = "1.10"
 progress = "0.2"
 rand = "0.6"
+regex = "1.1"
 rayon = "1.0"
 structopt = "0.2"
 tempfile = "3.0"

@@ -13,10 +13,15 @@ RUN apt-get update \
 	ca-certificates \
 	software-properties-common \
 	libssl-dev \
-        pkg-config \
-        csmith \
-        libcsmith-dev \
+    pkg-config \
+    csmith \
+    libcsmith-dev \
+    creduce \
+    gcc-multilib \
+    clang-6.0 \
  && rm -rf /var/lib/apt/lists/*
+
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
 
 # Setting a consistent LD_LIBRARY_PATH across the entire environment prevents unnecessary Cargo
 # rebuilds.
@@ -31,7 +36,7 @@ RUN curl -sS -L -O https://static.rust-lang.org/dist/rust-1.33.0-x86_64-unknown-
 ENV PATH=/usr/local/bin:$PATH
 RUN cargo install --root /usr/local cargo-audit cargo-watch
 
-RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-3/wasi-sdk_3.0_amd64.deb \
- && dpkg -i wasi-sdk_3.0_amd64.deb && rm -f wasi-sdk_3.0_amd64.deb
+RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-4/wasi-sdk_4.0_amd64.deb \
+ && dpkg -i wasi-sdk_4.0_amd64.deb && rm -f wasi-sdk_4.0_amd64.deb
 
 ENV WASI_SDK=/opt/wasi-sdk

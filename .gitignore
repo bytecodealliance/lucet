@@ -3,6 +3,3 @@ target/
 *.pyc
 host
 core.*
-
-# csmith-generated
-/platform.info

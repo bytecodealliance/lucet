@@ -5,7 +5,7 @@
 
 struct lucet_wasi_ctx;
 
-struct lucet_wasi_ctx *lucet_wasi_ctx_create();
+struct lucet_wasi_ctx *lucet_wasi_ctx_create(void);
 
 enum lucet_error lucet_wasi_ctx_args(struct lucet_wasi_ctx *wasi_ctx, size_t argc, char **argv);
 
