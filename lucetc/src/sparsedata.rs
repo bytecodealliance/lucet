@@ -67,23 +67,16 @@ pub fn owned_sparse_data_from_initializers<'a>(
                 .context(LucetcErrorKind::Validation)?;
             }
             let base = chunk.offset as usize;
-            match pagemap.entry(pagenumber) {
+            let page = match pagemap.entry(pagenumber) {
                 Entry::Occupied(occ) => {
-                    let occ = occ.into_mut();
-                    for (offs, data) in chunk.data.iter().enumerate() {
-                        occ[base + offs] = *data;
-                    }
-                    assert!(occ.len() == PAGE_SIZE);
+                    occ.into_mut()
                 }
                 Entry::Vacant(vac) => {
-                    let vac = vac.insert(Vec::new());
-                    vac.resize(PAGE_SIZE, 0);
-                    for (offs, data) in chunk.data.iter().enumerate() {
-                        vac[base + offs] = *data;
-                    }
-                    assert!(vac.len() == PAGE_SIZE);
+                    vac.insert(vec![0; PAGE_SIZE])
                 }
-            }
+            };
+            page[base..base+chunk.data.len()].copy_from_slice(chunk.data);
+            debug_assert!(page.len() == PAGE_SIZE);
         }
     }
 
