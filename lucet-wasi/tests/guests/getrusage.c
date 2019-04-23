@@ -1,6 +1,11 @@
 #include <assert.h>
 #include <sys/resource.h>
 
+// Temporary fix until
+// https://github.com/CraneStation/wasi-sysroot/pull/24/
+// is available in wasi-sdk package
+extern int getrusage(int who, struct rusage *usage);
+
 int main()
 {
     struct rusage ru1;
