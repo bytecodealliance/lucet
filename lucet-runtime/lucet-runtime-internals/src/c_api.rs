@@ -227,7 +227,7 @@ pub mod lucet_state {
                     val: lucet_state_val {
                         fault: lucet_runtime_fault {
                             fatal: details.fatal,
-                            trapcode: (&details.trapcode).into(),
+                            trapcode: details.trapcode.into(),
                             rip_addr: details.rip_addr,
                             rip_addr_details: (&details.rip_addr_details).into(),
                             signal_info: *siginfo,
