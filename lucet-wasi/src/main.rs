@@ -185,6 +185,14 @@ fn run(config: Config) {
             .build()
             .expect("instance can be created");
 
+        use std::thread;
+        use std::time::Duration;
+
+        thread::spawn(|| {
+            thread::sleep(Duration::from_millis(500));
+            inst.timeout();
+        });
+
         match inst.run(config.entrypoint.as_bytes(), &[]) {
             // normal termination implies 0 exit code
             Ok(_) => 0,

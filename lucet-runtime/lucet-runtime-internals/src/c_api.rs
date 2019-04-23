@@ -212,7 +212,7 @@ pub mod lucet_state {
                         returned: retval.into(),
                     },
                 },
-                State::Running => lucet_state {
+                State::Running { .. } => lucet_state {
                     tag: lucet_state_tag::Running,
                     val: lucet_state_val { running: true },
                 },

@@ -13,7 +13,9 @@ use crate::sysdeps::UContext;
 use crate::trapcode::{TrapCode, TrapCodeType};
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
-use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
+use libc::{
+    c_void, pthread_kill, pthread_self, pthread_t, siginfo_t, uintptr_t, SIGALRM, SIGBUS, SIGSEGV,
+};
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{RefCell, UnsafeCell};
@@ -530,7 +532,9 @@ impl Instance {
             )
         })?;
 
-        self.state = State::Running;
+        self.state = State::Running {
+            tid: unsafe { pthread_self() },
+        };
 
         // there should never be another instance running on this thread when we enter this function
         CURRENT_INSTANCE.with(|current_instance| {
@@ -563,7 +567,7 @@ impl Instance {
         // * function body returned: set state back to `Ready` with return value
 
         match &self.state {
-            State::Running => {
+            State::Running { .. } => {
                 let retval = self.ctx.get_untyped_retval();
                 self.state = State::Ready { retval };
                 Ok(retval)
@@ -598,6 +602,17 @@ impl Instance {
             State::Ready { .. } => {
                 panic!("instance in Ready state after returning from guest context")
             }
+        }
+    }
+
+    pub fn timeout(&self) -> Result<(), Error> {
+        if let State::Running { tid } = self.state {
+            unsafe {
+                pthread_kill(tid, SIGALRM);
+            };
+            Ok(())
+        } else {
+            Err(Error::InvalidArgument("Instance is not currently running"))
         }
     }
 
@@ -644,7 +659,9 @@ pub enum State {
     Ready {
         retval: UntypedRetVal,
     },
-    Running,
+    Running {
+        tid: pthread_t,
+    },
     Fault {
         details: FaultDetails,
         siginfo: libc::siginfo_t,
@@ -763,7 +780,7 @@ impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             State::Ready { .. } => write!(f, "ready"),
-            State::Running => write!(f, "running"),
+            State::Running { .. } => write!(f, "running"),
             State::Fault {
                 details, siginfo, ..
             } => {
@@ -802,7 +819,7 @@ impl State {
     }
 
     pub fn is_running(&self) -> bool {
-        if let State::Running = self {
+        if let State::Running { .. } = self {
             true
         } else {
             false
