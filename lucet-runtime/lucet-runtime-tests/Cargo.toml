@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
 edition = "2018"
 
+[lib]
+# This crate only defines tests in macros, it does not contain any tests itself. This flag prevents
+# `cargo test -p lucet-runtime-tests` from trying to link an executable with undefined symbols.
+test = false
+
 [dependencies]
 failure = "0.1"
 lazy_static = "1.1"
@@ -11,6 +16,7 @@ tempfile = "3.0"
 lucet-runtime-internals = { path = "../lucet-runtime-internals" }
 lucet-wasi-sdk = { path = "../../lucet-wasi-sdk" }
 lucetc = { path = "../../lucetc" }
+
 
 [build-dependencies]
 cc = "1.0"

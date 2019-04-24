@@ -3,7 +3,7 @@ macro_rules! host_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-        use lucet_runtime::{DlModule, Error, Limits, Region, TrapCodeType};
+        use lucet_runtime::{DlModule, Error, Limits, Region, TrapCode};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
@@ -112,7 +112,7 @@ macro_rules! host_tests {
 
             match inst.run(b"trigger_div_error", &[0u64.into()]) {
                 Err(Error::RuntimeFault(details)) => {
-                    assert_eq!(details.trapcode.ty, TrapCodeType::IntegerDivByZero);
+                    assert_eq!(details.trapcode, Some(TrapCode::IntegerDivByZero));
                 }
                 res => {
                     panic!("unexpected result: {:?}", res);

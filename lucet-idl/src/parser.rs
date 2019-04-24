@@ -96,7 +96,7 @@ pub struct ParseError {
 }
 
 impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Parse error at line {} column {}: {}",
@@ -146,7 +146,7 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(text: &'a str) -> Parser {
+    pub fn new(text: &'a str) -> Parser<'_> {
         Parser {
             lex: Lexer::new(text),
             lookahead: None,

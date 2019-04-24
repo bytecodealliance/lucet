@@ -1,31 +1,34 @@
-pub mod bindings;
-pub mod compiler;
-pub mod error;
-pub mod load;
-pub mod patch;
-pub mod program;
-
-use crate::compiler::data::{compile_data_initializers, compile_sparse_page_data};
-use crate::compiler::function::compile_function;
-use crate::compiler::globals::compile_global_specs;
-use crate::compiler::memory::compile_memory_specs;
-use crate::compiler::module_data::compile_module_data;
-use crate::compiler::table::compile_table;
-use crate::error::{LucetcError, LucetcErrorKind};
-use crate::load::read_module;
-use crate::patch::patch_module;
-use crate::program::Program;
-use failure::{format_err, Error, ResultExt};
-use parity_wasm::elements::Module;
-use std::env;
-use std::path::{Path, PathBuf};
-use tempfile;
+mod bindings;
+mod compiler;
+mod decls;
+mod error;
+mod function;
+mod heap;
+mod load;
+mod module;
+mod name;
+mod output;
+mod patch;
+mod pointer;
+mod runtime;
+mod sparsedata;
+mod stack_probe;
+mod table;
+mod traps;
 
 pub use crate::{
     bindings::Bindings,
-    compiler::{Compiler, OptLevel},
-    program::memory::HeapSettings,
+    compiler::Compiler,
+    compiler::OptLevel,
+    error::{LucetcError, LucetcErrorKind},
+    heap::HeapSettings,
+    load::read_module,
+    patch::patch_module,
 };
+use failure::{format_err, Error, ResultExt};
+use std::env;
+use std::path::{Path, PathBuf};
+use tempfile;
 
 pub struct Lucetc {
     input: PathBuf,
@@ -154,24 +157,20 @@ impl Lucetc {
         }
     }
 
-    fn build(&self) -> Result<(String, Module, Bindings), Error> {
-        let name = String::from(
-            self.input
-                .file_stem()
-                .ok_or(format_err!("input filename {:?} is empty", self.input))?
-                .to_str()
-                .ok_or(format_err!(
-                    "input filename {:?} is not valid utf8",
-                    self.input
-                ))?,
-        );
-        let mut builtins_bindings = vec![];
-        let mut module = read_module(&self.input)?;
+    fn build(&self) -> Result<(Vec<u8>, Bindings), Error> {
+        use parity_wasm::elements::{deserialize_buffer, serialize};
 
-        for builtins in self.builtins_paths.iter() {
-            let (newmodule, builtins_map) = patch_module(module, builtins)?;
-            module = newmodule;
-            builtins_bindings.push(Bindings::env(builtins_map));
+        let mut builtins_bindings = vec![];
+        let mut module_binary = read_module(&self.input)?;
+
+        if !self.builtins_paths.is_empty() {
+            let mut module = deserialize_buffer(&module_binary)?;
+            for builtins in self.builtins_paths.iter() {
+                let (newmodule, builtins_map) = patch_module(module, builtins)?;
+                module = newmodule;
+                builtins_bindings.push(Bindings::env(builtins_map));
+            }
+            module_binary = serialize(module)?;
         }
 
         let mut bindings = Bindings::empty();
@@ -180,35 +179,43 @@ impl Lucetc {
             bindings.extend(binding)?;
         }
 
-        Ok((name, module, bindings))
+        Ok((module_binary, bindings))
     }
 
-    pub fn object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
-        let (name, module, bindings) = self.build()?;
+    pub fn object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+        let (module_contents, bindings) = self.build()?;
 
-        let prog = Program::new(module, bindings, self.heap)?;
-        let comp = compile(&prog, &name, self.opt_level)?;
+        let compiler = Compiler::new(
+            &module_contents,
+            self.opt_level,
+            &bindings,
+            self.heap.clone(),
+        )?;
+        let obj = compiler.object_file()?;
 
-        let obj = comp.codegen()?;
         obj.write(output.as_ref()).context("writing object file")?;
-
         Ok(())
     }
 
-    pub fn clif_ir<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
-        let (name, module, bindings) = self.build()?;
+    pub fn clif_ir<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+        let (module_contents, bindings) = self.build()?;
 
-        let prog = Program::new(module, bindings, self.heap.clone())?;
-        let comp = compile(&prog, &name, self.opt_level)?;
+        let compiler = Compiler::new(
+            &module_contents,
+            self.opt_level,
+            &bindings,
+            self.heap.clone(),
+        )?;
 
-        comp.cranelift_funcs()
+        compiler
+            .cranelift_funcs()?
             .write(&output)
             .context("writing clif file")?;
 
         Ok(())
     }
 
-    pub fn shared_object_file<P: AsRef<Path>>(self, output: P) -> Result<(), Error> {
+    pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
@@ -252,30 +259,4 @@ where
         ))?;
     }
     Ok(())
-}
-
-pub fn compile<'p>(
-    program: &'p Program,
-    name: &str,
-    opt_level: OptLevel,
-) -> Result<Compiler<'p>, LucetcError> {
-    let mut compiler = Compiler::new(name.to_owned(), &program, opt_level)?;
-
-    compile_data_initializers(&mut compiler).context(LucetcErrorKind::DataInitializers)?;
-    compile_sparse_page_data(&mut compiler).context(LucetcErrorKind::DataInitializers)?;
-    compile_memory_specs(&mut compiler).context(LucetcErrorKind::MemorySpecs)?;
-    compile_global_specs(&mut compiler).context(LucetcErrorKind::GlobalSpecs)?;
-    compile_module_data(&mut compiler).context(LucetcErrorKind::ModuleData)?;
-
-    for function in program.defined_functions() {
-        let body = program.function_body(&function);
-        compile_function(&mut compiler, &function, body)
-            .context(LucetcErrorKind::Function(function.symbol().to_owned()))?;
-    }
-    for table in program.tables() {
-        compile_table(&mut compiler, &table)
-            .context(LucetcErrorKind::Table(table.symbol().to_owned()))?;
-    }
-
-    Ok(compiler)
 }

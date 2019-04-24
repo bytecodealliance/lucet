@@ -27,11 +27,12 @@ test: indent-check
             -p lucet-wasi-sdk \
             -p lucet-wasi \
             -p lucet-benchmarks
-	cargo run -p lucet-wasi-fuzz -- --num-tests=3
+    # run a single seed through the fuzzer to stave off bitrot
+	cargo run -p lucet-wasi-fuzz -- test-seed 410757864950
 
 .PHONY: fuzz
 fuzz:
-	cargo run --release -p lucet-wasi-fuzz -- --num-tests=1000
+	cargo run --release -p lucet-wasi-fuzz -- fuzz --num-tests=1000
 
 .PHONY: bench
 bench:
@@ -56,3 +57,15 @@ indent:
 .PHONY: indent-check
 indent-check:
 	helpers/indent.sh check
+
+.PHONY: watch
+watch:
+	cargo watch --exec "test \
+            -p lucet-runtime-internals \
+            -p lucet-runtime \
+            -p lucet-module-data \
+            -p lucetc \
+            -p lucet-idl \
+            -p lucet-wasi-sdk \
+            -p lucet-wasi \
+            -p lucet-benchmarks"

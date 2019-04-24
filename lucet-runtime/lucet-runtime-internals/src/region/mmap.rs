@@ -131,10 +131,13 @@ impl RegionInternal for MmapRegion {
             }
         }
 
-        let initial_size = module.heap_spec().initial_size as usize;
+        let initial_size = module
+            .heap_spec()
+            .map(|h| h.initial_size as usize)
+            .unwrap_or(0);
 
         // reset the heap to the initial size, and mprotect those pages appropriately
-        if alloc.heap_accessible_size != initial_size {
+        if initial_size > 0 {
             unsafe {
                 mprotect(
                     heap,
@@ -142,10 +145,9 @@ impl RegionInternal for MmapRegion {
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 )?
             };
-            alloc.heap_accessible_size = initial_size;
-            alloc.heap_inaccessible_size =
-                alloc.slot().limits.heap_address_space_size - initial_size;
         }
+        alloc.heap_accessible_size = initial_size;
+        alloc.heap_inaccessible_size = alloc.slot().limits.heap_address_space_size - initial_size;
 
         // Initialize the heap using the module sparse page data. There cannot be more pages in the
         // sparse page data than will fit in the initial heap size.
@@ -236,7 +238,7 @@ impl MmapRegion {
                 ptr::null_mut(),
                 region.limits.total_memory_size(),
                 ProtFlags::PROT_NONE,
-                MapFlags::MAP_ANONYMOUS | MapFlags::MAP_PRIVATE,
+                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
                 0,
                 0,
             )?

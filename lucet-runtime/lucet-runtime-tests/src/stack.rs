@@ -84,7 +84,7 @@ fn generate_test_wat(num_locals: usize) -> String {
 macro_rules! stack_tests {
     ( $TestRegion:path ) => {
         use lucet_runtime::{
-            DlModule, Error, InstanceHandle, Limits, Region, TrapCodeType, UntypedRetVal, Val,
+            DlModule, Error, InstanceHandle, Limits, Region, TrapCode, UntypedRetVal, Val,
         };
         use std::sync::Arc;
         use $TestRegion as TestRegion;
@@ -108,7 +108,7 @@ macro_rules! stack_tests {
                 Err(Error::RuntimeFault(details)) => {
                     // We should get a nonfatal trap due to the stack overflow.
                     assert_eq!(details.fatal, false);
-                    assert_eq!(details.trapcode.ty, TrapCodeType::StackOverflow);
+                    assert_eq!(details.trapcode, Some(TrapCode::StackOverflow));
                     if probestack {
                         // Make sure we overflowed in the stack probe as expected
                         //

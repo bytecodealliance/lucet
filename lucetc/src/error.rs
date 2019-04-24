@@ -1,5 +1,4 @@
-use failure::{Backtrace, Context, Error, Fail};
-use pwasm_validation;
+use failure::{Backtrace, Context, Fail};
 use std::fmt::{self, Display};
 
 #[derive(Debug)]
@@ -42,41 +41,28 @@ impl Display for LucetcError {
     }
 }
 
-impl From<Error> for LucetcError {
-    fn from(e: Error) -> LucetcError {
-        e.context(LucetcErrorKind::UnknownKind).into()
-    }
-}
-
-impl From<pwasm_validation::Error> for LucetcError {
-    fn from(e: pwasm_validation::Error) -> LucetcError {
-        e.context(LucetcErrorKind::Validation).into()
-    }
-}
-
-#[derive(Debug, Fail, PartialEq, Eq)]
+#[derive(Debug, Fail, PartialEq, Eq, Clone)]
 pub enum LucetcErrorKind {
-    #[fail(display = "Data Initializers")]
-    DataInitializers,
-    #[fail(display = "Memory specs")]
-    MemorySpecs,
-    #[fail(display = "Global specs")]
-    GlobalSpecs,
-    #[fail(display = "Module data")]
-    ModuleData,
-    #[fail(display = "Function {}", _0)]
-    Function(String),
-    #[fail(display = "Table {}", _0)]
-    Table(String),
+    #[fail(display = "Input")]
+    Input,
     #[fail(display = "Validation")]
     Validation,
-
-    #[fail(display = "Unsupported: {}", _0)]
-    Unsupported(String),
-
-    #[fail(display = "{}", _0)]
-    Other(String),
-
-    #[fail(display = "Unknown error:")]
-    UnknownKind,
+    #[fail(display = "Translating module")]
+    TranslatingModule,
+    #[fail(display = "Module data")]
+    ModuleData,
+    #[fail(display = "Metadata Serializer")] // specifically non-ModuleData; this will go away soon
+    MetadataSerializer,
+    #[fail(display = "Function Translation")]
+    FunctionTranslation,
+    #[fail(display = "Function Definition")]
+    FunctionDefinition,
+    #[fail(display = "Table")]
+    Table,
+    #[fail(display = "Memory Specs")]
+    MemorySpecs,
+    #[fail(display = "Output")]
+    Output,
+    #[fail(display = "Unsupported")]
+    Unsupported,
 }

@@ -4,20 +4,20 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct DatatypeId(pub usize);
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct DataTypeId(pub usize);
 
-impl fmt::Display for DatatypeId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl fmt::Display for DataTypeId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DatatypeRef {
-    Defined(DatatypeId),
+pub enum DataTypeRef {
+    Defined(DataTypeId),
     Atom(AtomType),
-    Ptr(Box<DatatypeRef>),
+    Ptr(Box<DataTypeRef>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -28,13 +28,13 @@ pub struct NamedMember<R> {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Datatype {
+pub enum DataType {
     Struct {
-        members: Vec<NamedMember<DatatypeRef>>,
+        members: Vec<NamedMember<DataTypeRef>>,
         attrs: Vec<Attr>,
     },
     TaggedUnion {
-        members: Vec<NamedMember<Option<DatatypeRef>>>,
+        members: Vec<NamedMember<Option<DataTypeRef>>>,
         attrs: Vec<Attr>,
     },
     Enum {
@@ -42,7 +42,7 @@ pub enum Datatype {
         attrs: Vec<Attr>,
     },
     Alias {
-        to: DatatypeRef,
+        to: DataTypeRef,
         attrs: Vec<Attr>,
     },
 }
@@ -53,10 +53,16 @@ pub struct Name {
     pub location: Location,
 }
 
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DataDescription {
     pub names: Vec<Name>,
-    pub datatypes: HashMap<usize, Datatype>,
+    pub data_types: HashMap<usize, DataType>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -81,7 +87,7 @@ pub enum ValidationError {
 }
 
 impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ValidationError::NameAlreadyExists {
                 name,
@@ -117,7 +123,7 @@ impl DataDescription {
     fn new() -> Self {
         Self {
             names: Vec::new(),
-            datatypes: HashMap::new(),
+            data_types: HashMap::new(),
         }
     }
 
@@ -125,7 +131,7 @@ impl DataDescription {
         &mut self,
         name: &str,
         location: &Location,
-    ) -> Result<DatatypeId, ValidationError> {
+    ) -> Result<DataTypeId, ValidationError> {
         if let Some(existing) = self.id_for_name(&name) {
             let prev = self
                 .names
@@ -142,25 +148,25 @@ impl DataDescription {
                 name: name.to_owned(),
                 location: *location,
             });
-            Ok(DatatypeId(id))
+            Ok(DataTypeId(id))
         }
     }
 
-    fn id_for_name(&self, name: &str) -> Option<DatatypeId> {
+    fn id_for_name(&self, name: &str) -> Option<DataTypeId> {
         for (id, n) in self.names.iter().enumerate() {
             if n.name == name {
-                return Some(DatatypeId(id));
+                return Some(DataTypeId(id));
             }
         }
         None
     }
 
-    fn get_ref(&self, syntax_ref: &SyntaxRef) -> Result<DatatypeRef, ValidationError> {
+    fn get_ref(&self, syntax_ref: &SyntaxRef) -> Result<DataTypeRef, ValidationError> {
         match syntax_ref {
-            SyntaxRef::Atom { atom, .. } => Ok(DatatypeRef::Atom(*atom)),
-            SyntaxRef::Ptr { to, .. } => Ok(DatatypeRef::Ptr(Box::new(self.get_ref(&to)?))),
+            SyntaxRef::Atom { atom, .. } => Ok(DataTypeRef::Atom(*atom)),
+            SyntaxRef::Ptr { to, .. } => Ok(DataTypeRef::Ptr(Box::new(self.get_ref(&to)?))),
             SyntaxRef::Name { name, location } => match self.id_for_name(name) {
-                Some(id) => Ok(DatatypeRef::Defined(id)),
+                Some(id) => Ok(DataTypeRef::Defined(id)),
                 None => Err(ValidationError::NameNotFound {
                     name: name.clone(),
                     use_location: *location,
@@ -169,13 +175,13 @@ impl DataDescription {
         }
     }
 
-    fn define_datatype(&mut self, id: DatatypeId, dt: Datatype) {
-        if let Some(prev_def) = self.datatypes.insert(id.0, dt) {
+    fn define_data_type(&mut self, id: DataTypeId, dt: DataType) {
+        if let Some(prev_def) = self.data_types.insert(id.0, dt) {
             panic!("id {} already defined: {:?}", id, prev_def)
         }
     }
 
-    fn define_decl(&mut self, id: DatatypeId, decl: &SyntaxDecl) -> Result<(), ValidationError> {
+    fn define_decl(&mut self, id: DataTypeId, decl: &SyntaxDecl) -> Result<(), ValidationError> {
         match decl {
             SyntaxDecl::Struct {
                 name,
@@ -200,7 +206,7 @@ impl DataDescription {
                             previous_location: existing.location,
                         })?
                     }
-                    // Get the DatatypeRef for the member, which ensures that it refers only to
+                    // Get the DataTypeRef for the member, which ensures that it refers only to
                     // defined types:
                     let type_ = self.get_ref(&mem.type_)?;
                     // build the struct with this as the member:
@@ -210,9 +216,9 @@ impl DataDescription {
                         attrs: mem.attrs.clone(),
                     })
                 }
-                self.define_datatype(
+                self.define_data_type(
                     id,
-                    Datatype::Struct {
+                    DataType::Struct {
                         members: dtype_members,
                         attrs: attrs.clone(),
                     },
@@ -241,7 +247,7 @@ impl DataDescription {
                             previous_location: existing.location,
                         })?
                     }
-                    // Get the DatatypeRef for the member, which ensures that it refers only to
+                    // Get the DataTypeRef for the member, which ensures that it refers only to
                     // defined types:
                     let type_ = if let Some(ref t) = var.type_ {
                         Some(self.get_ref(t)?)
@@ -255,9 +261,9 @@ impl DataDescription {
                         attrs: var.attrs.clone(),
                     })
                 }
-                self.define_datatype(
+                self.define_data_type(
                     id,
-                    Datatype::TaggedUnion {
+                    DataType::TaggedUnion {
                         members: dtype_members,
                         attrs: attrs.clone(),
                     },
@@ -293,9 +299,9 @@ impl DataDescription {
                         attrs: var.attrs.clone(),
                     })
                 }
-                self.define_datatype(
+                self.define_data_type(
                     id,
-                    Datatype::Enum {
+                    DataType::Enum {
                         members: dtype_members,
                         attrs: attrs.clone(),
                     },
@@ -303,9 +309,9 @@ impl DataDescription {
             }
             SyntaxDecl::Alias { what, attrs, .. } => {
                 let to = self.get_ref(what)?;
-                self.define_datatype(
+                self.define_data_type(
                     id,
-                    Datatype::Alias {
+                    DataType::Alias {
                         to,
                         attrs: attrs.clone(),
                     },
@@ -317,35 +323,35 @@ impl DataDescription {
 
     fn dfs_walk(
         &self,
-        id: DatatypeId,
+        id: DataTypeId,
         visited: &mut [bool],
-        ordered: &mut Option<&mut Vec<DatatypeId>>,
+        ordered: &mut Option<&mut Vec<DataTypeId>>,
     ) -> Result<(), ()> {
         if visited[id.0] {
             Err(())?
         }
         visited[id.0] = true;
-        match self.datatypes.get(&id.0).expect("datatype is defined") {
-            Datatype::Struct { members, .. } => {
+        match self.data_types.get(&id.0).expect("data_type is defined") {
+            DataType::Struct { members, .. } => {
                 for mem in members {
-                    if let DatatypeRef::Defined(id) = mem.type_ {
+                    if let DataTypeRef::Defined(id) = mem.type_ {
                         self.dfs_walk(id, visited, ordered)?
                     }
                 }
             }
-            Datatype::TaggedUnion { members, .. } => {
+            DataType::TaggedUnion { members, .. } => {
                 for mem in members {
-                    if let Some(DatatypeRef::Defined(id)) = mem.type_ {
+                    if let Some(DataTypeRef::Defined(id)) = mem.type_ {
                         self.dfs_walk(id, visited, ordered)?
                     }
                 }
             }
-            Datatype::Alias { to, .. } => {
-                if let DatatypeRef::Defined(id) = to {
+            DataType::Alias { to, .. } => {
+                if let DataTypeRef::Defined(id) = to {
                     self.dfs_walk(*id, visited, ordered)?
                 }
             }
-            Datatype::Enum { .. } => {}
+            DataType::Enum { .. } => {}
         }
         if let Some(ordered) = ordered.as_mut() {
             if !ordered.contains(&id) {
@@ -356,23 +362,23 @@ impl DataDescription {
         Ok(())
     }
 
-    pub fn ordered_dependencies(&self) -> Result<Vec<DatatypeId>, ()> {
+    pub fn ordered_dependencies(&self) -> Result<Vec<DataTypeId>, ()> {
         let mut visited = Vec::new();
         visited.resize(self.names.len(), false);
         let mut ordered = Vec::with_capacity(visited.capacity());
-        for id in self.datatypes.keys() {
-            let _ = self.dfs_walk(DatatypeId(*id), &mut visited, &mut Some(&mut ordered));
+        for id in self.data_types.keys() {
+            let _ = self.dfs_walk(DataTypeId(*id), &mut visited, &mut Some(&mut ordered));
         }
         Ok(ordered)
     }
 
-    fn dfs_find_cycle(&self, id: DatatypeId) -> Result<(), ()> {
+    fn dfs_find_cycle(&self, id: DataTypeId) -> Result<(), ()> {
         let mut visited = Vec::new();
         visited.resize(self.names.len(), false);
         self.dfs_walk(id, &mut visited, &mut None)
     }
 
-    fn ensure_finite(&self, id: DatatypeId, decl: &SyntaxDecl) -> Result<(), ValidationError> {
+    fn ensure_finite(&self, id: DataTypeId, decl: &SyntaxDecl) -> Result<(), ValidationError> {
         self.dfs_find_cycle(id)
             .map_err(|_| ValidationError::Infinite {
                 name: decl.name().to_owned(),
@@ -382,7 +388,7 @@ impl DataDescription {
 
     pub fn validate(decls: &[SyntaxDecl]) -> Result<DataDescription, ValidationError> {
         let mut desc = Self::new();
-        let mut idents: Vec<DatatypeId> = Vec::new();
+        let mut idents: Vec<DataTypeId> = Vec::new();
         for decl in decls {
             idents.push(desc.introduce_name(decl.name(), decl.location())?)
         }
@@ -417,18 +423,18 @@ mod tests {
 
         {
             let d = data_description("struct foo { a: i32, b: f32 }").unwrap();
-            let members = match &d.datatypes[&0] {
-                Datatype::Struct { members, .. } => members,
+            let members = match &d.data_types[&0] {
+                DataType::Struct { members, .. } => members,
                 _ => panic!("Unexpected type"),
             };
             assert_eq!(members[0].name, "a");
             assert_eq!(members[1].name, "b");
             match &members[0].type_ {
-                DatatypeRef::Atom(AtomType::I32) => (),
+                DataTypeRef::Atom(AtomType::I32) => (),
                 _ => panic!("Unexpected type"),
             };
             match &members[1].type_ {
-                DatatypeRef::Atom(AtomType::F32) => (),
+                DataTypeRef::Atom(AtomType::F32) => (),
                 _ => panic!("Unexpected type"),
             };
         }
@@ -493,14 +499,14 @@ mod tests {
 
         {
             let d = data_description("taggedunion foo { a: i32, b: () }").unwrap();
-            let members = match &d.datatypes[&0] {
-                Datatype::TaggedUnion { members, .. } => members,
+            let members = match &d.data_types[&0] {
+                DataType::TaggedUnion { members, .. } => members,
                 _ => panic!("Unexpected type"),
             };
             assert_eq!(members[0].name, "a");
             assert_eq!(members[1].name, "b");
             match &members[0].type_ {
-                Some(DatatypeRef::Atom(AtomType::I32)) => (),
+                Some(DataTypeRef::Atom(AtomType::I32)) => (),
                 _ => panic!("Unexpected type"),
             };
             match &members[1].type_ {
@@ -575,8 +581,8 @@ mod tests {
 
         {
             let d = data_description("enum foo { a, b }").unwrap();
-            let members = match &d.datatypes[&0] {
-                Datatype::Enum { members, .. } => members,
+            let members = match &d.data_types[&0] {
+                DataType::Enum { members, .. } => members,
                 _ => panic!("Unexpected type"),
             };
             assert_eq!(members[0].name, "a");

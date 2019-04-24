@@ -1,6 +1,6 @@
 use failure::Error;
 use lucet_runtime_internals::module::DlModule;
-use lucet_wasi_sdk::{CompileOpts, Link, LinkOpts};
+use lucet_wasi_sdk::{CompileOpts, Link, LinkOpt, LinkOpts};
 use lucetc::{Bindings, Lucetc, LucetcOpts};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -31,9 +31,9 @@ where
 
     let wasm_build = Link::new(&[c_file])
         .with_cflag("-nostartfiles")
-        .with_ldflag("--no-entry")
-        .with_ldflag("--allow-undefined")
-        .with_ldflag("--export-all");
+        .with_link_opt(LinkOpt::NoDefaultEntryPoint)
+        .with_link_opt(LinkOpt::AllowUndefinedAll)
+        .with_link_opt(LinkOpt::ExportAll);
 
     let wasm_file = workdir.path().join("out.wasm");
 

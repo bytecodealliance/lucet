@@ -30,7 +30,7 @@ fn load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
         &format!("load_mkregion_and_instantiate ({})", R::TYPE_NAME),
         move |b| {
             b.iter_batched(
-                || nix::unistd::sync(),
+                || unsafe { nix::libc::sync() },
                 |_| body::<R>(&so_file),
                 criterion::BatchSize::PerIteration,
             )
