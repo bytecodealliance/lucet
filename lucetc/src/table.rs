@@ -55,7 +55,8 @@ pub fn write_table_data<B: ClifBackend>(
         // This function creates that table as a section in the object.
         let elements = table_elements(&table_decl)?;
 
-        let mut table_data = Cursor::new(Vec::with_capacity(elements.len() * 2 * NATIVE_POINTER_SIZE));
+        let mut table_data =
+            Cursor::new(Vec::with_capacity(elements.len() * 2 * NATIVE_POINTER_SIZE));
         fn putelem(table: &mut Cursor<Vec<u8>>, elem: u64) {
             table.write_u64::<LittleEndian>(elem).unwrap()
         }
