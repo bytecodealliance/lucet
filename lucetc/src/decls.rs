@@ -39,6 +39,8 @@ impl<'a> FunctionDecl<'a> {
 }
 
 #[derive(Debug)]
+/// Function provided by lucet-runtime to be called from generated code, e.g. memory size & grow
+/// functions.
 pub struct RuntimeDecl<'a> {
     pub signature: &'a ir::Signature,
     pub name: Name,
