@@ -1,6 +1,6 @@
 use super::runtime::RuntimeFunc;
 use crate::decls::ModuleDecls;
-use crate::pointer::{NATIVE_POINTER, POINTER_SIZE};
+use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, InstBuilder};
@@ -12,8 +12,8 @@ use cranelift_wasm::{
 use std::collections::HashMap;
 
 // VMContext points directly to the heap (offset 0).
-// Directly before the heao is a pointer to the globals (offset -POINTER_SIZE).
-const GLOBAL_BASE_OFFSET: i32 = -1 * POINTER_SIZE as i32;
+// Directly before the heao is a pointer to the globals (offset -NATIVE_POINTER_SIZE).
+const GLOBAL_BASE_OFFSET: i32 = -1 * NATIVE_POINTER_SIZE as i32;
 
 pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
@@ -88,7 +88,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         let global_base = self.get_global_base(func);
         let global = self.module_decls.get_global(index).expect("valid global");
         let index = index.as_u32() as i32;
-        let offset = (index * POINTER_SIZE as i32).into();
+        let offset = (index * NATIVE_POINTER_SIZE as i32).into();
         GlobalVariable::Memory {
             gv: global_base,
             offset,
@@ -130,7 +130,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             offset: 0.into(),
             readonly: true,
         });
-        let element_size = ((POINTER_SIZE * 2) as u64).into();
+        let element_size = ((NATIVE_POINTER_SIZE * 2) as u64).into();
         let min_size = (table_decl.table.minimum as u64).into();
         func.create_table(ir::TableData {
             base_gv,
@@ -170,7 +170,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         pos.ins().trapz(valid_type, ir::TrapCode::BadSignature);
 
         // Second element at the table entry is the function pointer
-        let table_entry_fptr_offset = POINTER_SIZE as i32;
+        let table_entry_fptr_offset = NATIVE_POINTER_SIZE as i32;
         let table_entry_fptr = pos.ins().load(
             NATIVE_POINTER,
             ir::MemFlags::trusted(),
@@ -227,11 +227,12 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn translate_memory_grow(
         &mut self,
         mut pos: FuncCursor<'_>,
-        _index: MemoryIndex,
+        index: MemoryIndex,
         _heap: ir::Heap,
         val: ir::Value,
     ) -> WasmResult<ir::Value> {
-        // TODO memory grow functions dont take heap index as argument
+        assert!(index == MemoryIndex::new(0));
+        // TODO memory grow function doesnt take heap index as argument
         let mem_grow_func = self.get_runtime_func(RuntimeFunc::MemGrow, &mut pos.func);
         let vmctx = pos
             .func
@@ -244,9 +245,11 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn translate_memory_size(
         &mut self,
         mut pos: FuncCursor,
-        _index: MemoryIndex,
+        index: MemoryIndex,
         _heap: ir::Heap,
     ) -> WasmResult<ir::Value> {
+        assert!(index == MemoryIndex::new(0));
+        // TODO memory size function doesnt take heap index as argument
         let mem_size_func = self.get_runtime_func(RuntimeFunc::MemSize, &mut pos.func);
         let vmctx = pos
             .func
