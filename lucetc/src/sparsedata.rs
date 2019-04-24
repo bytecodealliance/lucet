@@ -12,15 +12,24 @@ const PAGE_SIZE: usize = 4096;
 
 fn linear_memory_range<'a>(di: &DataInitializer<'a>, start: usize, end: usize) -> &'a [u8] {
     let offs = di.offset as usize;
+    // The range of linear memory we're interested in is:
+    // valid: end is past the start
     assert!(end >= start);
+    // in this initializer: starts at or past the offset of this initializer,
     assert!(start >= offs);
+    // and before the end of this initializer,
     assert!(start < offs + di.data.len());
+    // ends past the offset of this initializer (redundant: implied by end >= start),
     assert!(end >= offs);
+    // and ends before or at the end of this initializer.
     assert!(end <= offs + di.data.len());
     &di.data[(start - offs)..(end - offs)]
 }
 
 fn split<'a>(di: &DataInitializer<'a>) -> Vec<(usize, DataInitializer<'a>)> {
+    // Divide a data initializer for linear memory into a set of data initializers for pages, and
+    // the index of the page they cover.
+    // The input initializer can cover many pages. Each output initializer covers exactly one.
     let start = di.offset as usize;
     let end = start + di.data.len();
     let mut offs = start;
