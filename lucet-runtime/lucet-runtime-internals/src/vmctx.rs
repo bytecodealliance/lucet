@@ -85,21 +85,34 @@ impl Vmctx {
     /// Get a reference to a context value of a particular type. If it does not exist,
     /// the context will terminate.
     pub fn get_embed_ctx<T: Any>(&self) -> &T {
-        unsafe { self.instance_mut().get_embed_ctx_or_term() }
+        match self.instance().embed_ctx.get::<T>() {
+            Some(t) => t,
+            None => {
+                // this value will be caught by the wrapper in `lucet_hostcalls!`
+                panic!(TerminationDetails::GetEmbedCtx)
+            }
+        }
     }
 
     /// Get a mutable reference to a context value of a particular type> If it does not exist,
     /// the context will terminate.
     pub fn get_embed_ctx_mut<T: Any>(&mut self) -> &mut T {
-        unsafe { self.instance_mut().get_embed_ctx_mut_or_term() }
+        match unsafe { self.instance_mut().embed_ctx.get_mut::<T>() } {
+            Some(t) => t,
+            None => {
+                // this value will be caught by the wrapper in `lucet_hostcalls!`
+                panic!(TerminationDetails::GetEmbedCtx)
+            }
+        }
     }
 
-    /// Terminate this guest and return to the host context.
+    /// Terminate this guest and return to the host context without unwinding.
     ///
-    /// This will return an `Error::RuntimeTerminated` value to the caller of `Instance::run()`.
-    pub fn terminate<I: Any>(&mut self, info: I) -> ! {
-        let details = TerminationDetails::provide(info);
-        unsafe { self.instance_mut().terminate(details) }
+    /// This is almost certainly not what you want to use to terminate an instance from a hostcall,
+    /// as any resources currently in scope will not be dropped. Instead, use
+    /// `lucet_hostcall_terminate!` which unwinds to the enclosing hostcall body.
+    pub unsafe fn terminate_no_unwind(&mut self, details: TerminationDetails) -> ! {
+        self.instance_mut().terminate(details)
     }
 
     /// Grow the guest memory by the given number of WebAssembly pages.
@@ -130,21 +143,24 @@ impl Vmctx {
     /// from its own context.
     ///
     /// ```no_run
+    /// use lucet_runtime_internals::{lucet_hostcalls, lucet_hostcall_terminate};
     /// use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
-    /// #[no_mangle]
-    /// extern "C" fn hostcall_call_binop(
-    ///     vmctx: *mut lucet_vmctx,
-    ///     binop_table_idx: u32,
-    ///     binop_func_idx: u32,
-    ///     operand1: u32,
-    ///     operand2: u32,
-    /// ) -> u32 {
-    ///     let mut ctx = unsafe { Vmctx::from_raw(vmctx) };
-    ///     if let Ok(binop) = ctx.get_func_from_idx(binop_table_idx, binop_func_idx) {
-    ///         let typed_binop = binop as *const extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32;
-    ///         unsafe { (*typed_binop)(vmctx, operand1, operand2) }
-    ///     } else {
-    ///         ctx.terminate("invalid function index")
+    ///
+    /// lucet_hostcalls! {
+    ///     #[no_mangle]
+    ///     pub unsafe extern "C" fn hostcall_call_binop(
+    ///         &mut vmctx,
+    ///         binop_table_idx: u32,
+    ///         binop_func_idx: u32,
+    ///         operand1: u32,
+    ///         operand2: u32,
+    ///     ) -> u32 {
+    ///         if let Ok(binop) = vmctx.get_func_from_idx(binop_table_idx, binop_func_idx) {
+    ///             let typed_binop = binop as *const extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32;
+    ///             unsafe { (*typed_binop)(vmctx.as_raw(), operand1, operand2) }
+    ///         } else {
+    ///             lucet_hostcall_terminate!("invalid function index")
+    ///         }
     ///     }
     /// }
     pub fn get_func_from_idx(
@@ -156,18 +172,6 @@ impl Vmctx {
             .module()
             .get_func_from_idx(table_idx, func_idx)
     }
-}
-
-/// Terminating an instance requires mutating the state field, and then jumping back to the
-/// host context. The mutable borrow may conflict with a mutable borrow of the embed_ctx if
-/// this is performed via a method call. We use a macro so we can convince the borrow checker that
-/// this is safe at each use site.
-macro_rules! inst_terminate {
-    ($self:ident, $details:expr) => {{
-        $self.state = State::Terminated { details: $details };
-        #[allow(unused_unsafe)] // The following unsafe will be incorrectly warned as unused
-        HOST_CTX.with(|host_ctx| unsafe { Context::set(&*host_ctx.get()) })
-    }};
 }
 
 /// Get an `Instance` from the `vmctx` pointer.
@@ -202,29 +206,14 @@ pub unsafe fn instance_from_vmctx<'a>(vmctx: *mut lucet_vmctx) -> &'a mut Instan
 }
 
 impl Instance {
-    /// Helper function specific to Vmctx::get_embed_ctx. From the vmctx interface,
-    /// there is no way to recover if the expected embedder ctx is not set, so we terminate
-    /// the instance.
-    fn get_embed_ctx_or_term<T: Any>(&mut self) -> &T {
-        match self.embed_ctx.get::<T>() {
-            Some(t) => t,
-            None => inst_terminate!(self, TerminationDetails::GetEmbedCtx),
-        }
-    }
-
-    /// Helper function specific to Vmctx::get_embed_ctx_mut. See above.
-    fn get_embed_ctx_mut_or_term<T: Any>(&mut self) -> &mut T {
-        match self.embed_ctx.get_mut::<T>() {
-            Some(t) => t,
-            None => inst_terminate!(self, TerminationDetails::GetEmbedCtx),
-        }
-    }
-
-    /// Terminate the guest and swap back to the host context.
+    /// Terminate the guest and swap back to the host context without unwinding.
     ///
-    /// Only safe to call from within the guest context.
+    /// This is almost certainly not what you want to use to terminate from a hostcall; use panics
+    /// with `TerminationDetails` instead.
     unsafe fn terminate(&mut self, details: TerminationDetails) -> ! {
-        inst_terminate!(self, details)
+        self.state = State::Terminated { details };
+        #[allow(unused_unsafe)] // The following unsafe will be incorrectly warned as unused
+        HOST_CTX.with(|host_ctx| unsafe { Context::set(&*host_ctx.get()) })
     }
 }
 

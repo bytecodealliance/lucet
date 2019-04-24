@@ -1,10 +1,13 @@
 #[macro_export]
 macro_rules! host_tests {
     ( $TestRegion:path ) => {
+        use lazy_static::lazy_static;
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-        use lucet_runtime::{DlModule, Error, Limits, Region, TrapCode};
-        use std::sync::Arc;
+        use lucet_runtime::{
+            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, Limits, Region, TrapCode,
+        };
+        use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
         #[test]
@@ -18,30 +21,48 @@ macro_rules! host_tests {
             assert!(module.is_err());
         }
 
-        #[no_mangle]
-        extern "C" fn hostcall_test_func_hello(
-            vmctx: *mut lucet_vmctx,
-            hello_ptr: u32,
-            hello_len: u32,
-        ) {
-            unsafe {
-                let mut vmctx = Vmctx::from_raw(vmctx);
+        const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
+
+        lazy_static! {
+            static ref HOSTCALL_MUTEX: Mutex<()> = Mutex::new(());
+        }
+
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_test_func_hello(
+                &mut vmctx,
+                hello_ptr: u32,
+                hello_len: u32,
+            ) -> () {
                 let heap = vmctx.heap();
                 let hello = heap.as_ptr() as usize + hello_ptr as usize;
                 if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
-                    vmctx.terminate("heap access");
+                    lucet_hostcall_terminate!("heap access");
                 }
                 let hello = std::slice::from_raw_parts(hello as *const u8, hello_len as usize);
                 if hello.starts_with(b"hello") {
                     *vmctx.get_embed_ctx_mut::<bool>() = true;
                 }
             }
-        }
 
-        const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
-        #[no_mangle]
-        extern "C" fn hostcall_test_func_hostcall_error(vmctx: *mut lucet_vmctx) {
-            unsafe { Vmctx::from_raw(vmctx).terminate(ERROR_MESSAGE) }
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_test_func_hostcall_error(
+                &mut _vmctx,
+            ) -> () {
+                lucet_hostcall_terminate!(ERROR_MESSAGE);
+            }
+
+            #[allow(unreachable_code)]
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_test_func_hostcall_error_unwind(
+                &mut vmctx,
+            ) -> () {
+                let lock = HOSTCALL_MUTEX.lock().unwrap();
+                unsafe {
+                    lucet_hostcall_terminate!(ERROR_MESSAGE);
+                }
+                drop(lock);
+            }
         }
 
         #[test]
@@ -100,6 +121,32 @@ macro_rules! host_tests {
                 }
                 res => panic!("unexpected result: {:?}", res),
             }
+        }
+
+        #[test]
+        fn run_hostcall_error_unwind() {
+            let module =
+                test_module_c("host", "hostcall_error_unwind.c").expect("build and load module");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(b"main", &[]) {
+                Err(Error::RuntimeTerminated(term)) => {
+                    assert_eq!(
+                        *term
+                            .provided_details()
+                            .expect("user provided termination reason")
+                            .downcast_ref::<&'static str>()
+                            .expect("error was static str"),
+                        ERROR_MESSAGE
+                    );
+                }
+                res => panic!("unexpected result: {:?}", res),
+            }
+
+            assert!(HOSTCALL_MUTEX.is_poisoned());
         }
 
         #[test]

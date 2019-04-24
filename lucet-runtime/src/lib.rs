@@ -65,23 +65,26 @@
 //! demo](https://wasm.fastly-labs.com/), hostcalls are provided for manipulating HTTP requests,
 //! accessing a key/value store, etc.
 //!
-//! Some simple hostcalls can be implemented simply as an exported C function that takes an opaque
-//! pointer argument (usually called `vmctx`). Hostcalls that require access to some underlying
-//! state, such as the key/value store in Terrarium, can access a custom embedder context through
-//! `vmctx`. For example, to make a `u32` available to hostcalls:
+//! Some simple hostcalls can be implemented by wrapping an externed C function with the
+//! [`lucet_hostcalls!`](macro.lucet_hostcalls.html] macro. The function must take a special `&mut
+//! vmctx` argument for the guest context, similar to `&mut self` on methods. Hostcalls that require
+//! access to some underlying state, such as the key/value store in Terrarium, can access a custom
+//! embedder context through `vmctx`. For example, to make a `u32` available to hostcalls:
 //!
 //! ```no_run
-//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
+//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region, lucet_hostcalls};
 //! use lucet_runtime::vmctx::{Vmctx, lucet_vmctx};
 //!
 //! struct MyContext { x: u32 }
 //!
-//! #[no_mangle]
-//! unsafe extern "C" fn foo(vmctx: *mut lucet_vmctx) {
-//!     let mut vmctx = Vmctx::from_raw(vmctx);
-//!     let hostcall_context = vmctx
-//!         .get_embed_ctx_mut::<MyContext>();
-//!     hostcall_context.x = 42;
+//! lucet_hostcalls! {
+//!     #[no_mangle]
+//!     pub unsafe extern "C" fn foo(
+//!         &mut vmctx,
+//!     ) -> () {
+//!         let hostcall_context = vmctx.get_embed_ctx_mut::<MyContext>();
+//!         hostcall_context.x = 42;
+//!     }
 //! }
 //!
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
@@ -195,7 +198,7 @@
 //! that, for example, a `SIGSEGV` on a non-Lucet thread of a host program will still likely abort
 //! the entire process.
 
-mod c_api;
+pub mod c_api;
 
 pub use lucet_runtime_internals::alloc::Limits;
 pub use lucet_runtime_internals::error::Error;
@@ -207,7 +210,7 @@ pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
 pub use lucet_runtime_internals::trapcode::TrapCode;
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
-pub use lucet_runtime_internals::WASM_PAGE_SIZE;
+pub use lucet_runtime_internals::{lucet_hostcall_terminate, lucet_hostcalls, WASM_PAGE_SIZE};
 
 pub mod vmctx {
     //! Functions for manipulating instances from hostcalls.

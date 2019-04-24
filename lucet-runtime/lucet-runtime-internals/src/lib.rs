@@ -6,6 +6,8 @@
 
 #[macro_use]
 pub mod error;
+#[macro_use]
+pub mod hostcall_macros;
 
 #[macro_use]
 #[cfg(test)]

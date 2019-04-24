@@ -1,48 +1,54 @@
 use crate::helpers::MockModuleBuilder;
+use lucet_runtime_internals::lucet_hostcalls;
 use lucet_runtime_internals::module::{Module, TrapManifestRecord, TrapSite};
-use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
+use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
 
 pub fn mock_traps_module() -> Arc<dyn Module> {
-    extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
-        123
-    }
-
-    extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) {
-        extern "C" {
-            // actually is defined in this file
-            fn hostcall_test(vmctx: *mut lucet_vmctx);
+    lucet_hostcalls! {
+        pub unsafe extern "C" fn onetwothree(
+            &mut _vmctx,
+        ) -> std::os::raw::c_int {
+            123
         }
-        unsafe {
-            hostcall_test(vmctx);
+
+        pub unsafe extern "C" fn hostcall_main(
+            &mut vmctx,
+        ) -> () {
+            extern "C" {
+                // actually is defined in this file
+                fn hostcall_test(vmctx: *mut lucet_vmctx);
+            }
+            hostcall_test(vmctx.as_raw());
             std::hint::unreachable_unchecked();
         }
-    }
 
-    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
-        loop {}
-    }
+        pub unsafe extern "C" fn infinite_loop(
+            &mut _vmctx,
+        ) -> () {
+            loop {}
+        }
 
-    extern "C" fn fatal(vmctx: *mut lucet_vmctx) {
-        let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
-        let heap_base = vmctx.heap_mut().as_mut_ptr();
+        pub unsafe extern "C" fn fatal(
+            &mut vmctx,
+        ) -> () {
+            let heap_base = vmctx.heap_mut().as_mut_ptr();
 
-        // Using the default limits, each instance as of this writing takes up 0x200026000 bytes
-        // worth of virtual address space. We want to access a point beyond all the instances, so
-        // that memory is unmapped. We assume no more than 16 instances are mapped
-        // concurrently. This may change as the library, test configuration, linker, phase of moon,
-        // etc change, but for now it works.
-        unsafe {
+            // Using the default limits, each instance as of this writing takes up 0x200026000 bytes
+            // worth of virtual address space. We want to access a point beyond all the instances, so
+            // that memory is unmapped. We assume no more than 16 instances are mapped
+            // concurrently. This may change as the library, test configuration, linker, phase of moon,
+            // etc change, but for now it works.
             *heap_base.offset(0x200026000 * 16) = 0;
         }
-    }
 
-    extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) {
-        use std::os::raw::c_char;
-        extern "C" {
-            fn guest_recoverable_get_ptr() -> *mut c_char;
-        }
-        unsafe {
+        pub unsafe extern "C" fn recoverable_fatal(
+            &mut _vmctx,
+        ) -> () {
+            use std::os::raw::c_char;
+            extern "C" {
+                fn guest_recoverable_get_ptr() -> *mut c_char;
+            }
             *guest_recoverable_get_ptr() = '\0' as c_char;
         }
     }
@@ -118,7 +124,8 @@ macro_rules! guest_fault_tests {
         use libc::{c_void, siginfo_t, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            DlModule, Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TrapCode,
+            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
+            Limits, Region, SignalBehavior, TrapCode,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -173,9 +180,13 @@ macro_rules! guest_fault_tests {
 
         static HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
 
-        #[no_mangle]
-        unsafe extern "C" fn hostcall_test(vmctx: *mut lucet_vmctx) {
-            Vmctx::from_raw(vmctx).terminate(HOSTCALL_TEST_ERROR);
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_test(
+                &mut _vmctx,
+            ) -> () {
+                lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
+            }
         }
 
         fn run_onetwothree(inst: &mut Instance) {
@@ -504,8 +515,12 @@ macro_rules! guest_fault_tests {
                 *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = true;
             }
 
-            extern "C" fn sleepy_guest(_vmctx: *const lucet_vmctx) {
-                std::thread::sleep(std::time::Duration::from_millis(20));
+            lucet_hostcalls! {
+                pub unsafe extern "C" fn sleepy_guest(
+                    &mut _vmctx,
+                ) -> () {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
             }
 
             test_ex(|| {

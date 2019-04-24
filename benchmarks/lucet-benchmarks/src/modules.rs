@@ -11,7 +11,7 @@ fn wasi_bindings() -> Bindings {
 
 pub fn compile_hello<P: AsRef<Path>>(so_file: P) {
     let wasm_build = Lucetc::new(&["guests/hello.c"])
-        .print_output(true)
+        .with_print_output(true)
         .with_cflag("-Wall")
         .with_cflag("-Werror")
         .with_bindings(wasi_bindings());
