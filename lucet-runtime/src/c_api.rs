@@ -39,6 +39,7 @@ pub extern "C" fn lucet_error_name(e: c_int) -> *const c_char {
             RegionFull => "lucet_error_region_full\0".as_ptr() as _,
             Module => "lucet_error_module\0".as_ptr() as _,
             LimitsExceeded => "lucet_error_limits_exceeded\0".as_ptr() as _,
+            NoLinearMemory => "lucet_error_no_linear_memory\0".as_ptr() as _,
             SymbolNotFound => "lucet_error_symbol_not_found\0".as_ptr() as _,
             FuncNotFound => "lucet_error_func_not_found\0".as_ptr() as _,
             RuntimeFault => "lucet_error_runtime_fault\0".as_ptr() as _,
@@ -293,7 +294,7 @@ pub unsafe extern "C" fn lucet_instance_set_signal_handler(
     inst: *mut lucet_instance,
     signal_handler: lucet_signal_handler,
 ) -> lucet_error {
-    let handler = move |inst: &Instance, trap: &TrapCode, signum, siginfo, context| {
+    let handler = move |inst: &Instance, trap: &Option<TrapCode>, signum, siginfo, context| {
         let inst = inst as *const Instance as *mut lucet_instance;
         let trap = trap.into();
         let trap_ptr = &trap as *const lucet_state::lucet_trapcode;

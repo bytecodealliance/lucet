@@ -1,6 +1,6 @@
 use crate::{
     globals::GlobalSpec,
-    linear_memory::{HeapSpec, SparseData},
+    linear_memory::{HeapSpec, LinearMemorySpec, SparseData},
     Error,
 };
 use serde::{Deserialize, Serialize};
@@ -15,32 +15,37 @@ use serde::{Deserialize, Serialize};
 /// functions themselves.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ModuleData<'a> {
-    heap_spec: HeapSpec,
     #[serde(borrow)]
-    sparse_data: SparseData<'a>,
+    linear_memory: Option<LinearMemorySpec<'a>>,
     #[serde(borrow)]
     globals_spec: Vec<GlobalSpec<'a>>,
 }
 
 impl<'a> ModuleData<'a> {
     pub fn new(
-        heap_spec: HeapSpec,
-        sparse_data: SparseData<'a>,
+        linear_memory: Option<LinearMemorySpec<'a>>,
         globals_spec: Vec<GlobalSpec<'a>>,
     ) -> Self {
         Self {
-            heap_spec,
-            sparse_data,
+            linear_memory,
             globals_spec,
         }
     }
 
-    pub fn heap_spec(&self) -> &HeapSpec {
-        &self.heap_spec
+    pub fn heap_spec(&self) -> Option<&HeapSpec> {
+        if let Some(ref linear_memory) = self.linear_memory {
+            Some(&linear_memory.heap)
+        } else {
+            None
+        }
     }
 
-    pub fn sparse_data(&self) -> &SparseData<'a> {
-        &self.sparse_data
+    pub fn sparse_data(&self) -> Option<&SparseData<'a>> {
+        if let Some(ref linear_memory) = self.linear_memory {
+            Some(&linear_memory.initializer)
+        } else {
+            None
+        }
     }
 
     pub fn globals_spec(&self) -> &[GlobalSpec<'a>] {
@@ -58,7 +63,10 @@ impl<'a> ModuleData<'a> {
     }
 }
 
-use crate::{globals::OwnedGlobalSpec, linear_memory::OwnedSparseData};
+use crate::{
+    globals::OwnedGlobalSpec,
+    linear_memory::{OwnedLinearMemorySpec, OwnedSparseData},
+};
 
 /// The metadata (and some data) for a Lucet module.
 ///
@@ -66,20 +74,17 @@ use crate::{globals::OwnedGlobalSpec, linear_memory::OwnedSparseData};
 /// rather than references to support zero-copy deserialization. This type is useful when directly
 /// building up a value to be serialized.
 pub struct OwnedModuleData {
-    heap_spec: HeapSpec,
-    sparse_data: OwnedSparseData,
+    linear_memory: Option<OwnedLinearMemorySpec>,
     globals_spec: Vec<OwnedGlobalSpec>,
 }
 
 impl OwnedModuleData {
     pub fn new(
-        heap_spec: HeapSpec,
-        sparse_data: OwnedSparseData,
+        linear_memory: Option<OwnedLinearMemorySpec>,
         globals_spec: Vec<OwnedGlobalSpec>,
     ) -> Self {
         Self {
-            heap_spec,
-            sparse_data,
+            linear_memory,
             globals_spec,
         }
     }
@@ -88,22 +93,28 @@ impl OwnedModuleData {
     /// `OwnedModuleData`.
     pub fn to_ref<'a>(&'a self) -> ModuleData<'a> {
         ModuleData::new(
-            self.heap_spec.clone(),
-            self.sparse_data.to_ref(),
+            if let Some(ref owned_linear_memory) = self.linear_memory {
+                Some(owned_linear_memory.to_ref())
+            } else {
+                None
+            },
             self.globals_spec.iter().map(|gs| gs.to_ref()).collect(),
         )
     }
 
     pub fn empty() -> Self {
-        Self::new(
-            HeapSpec::new(0, 0, 0, None),
-            OwnedSparseData::new(vec![]).unwrap(),
-            vec![],
-        )
+        Self::new(None, vec![])
     }
 
     pub fn with_heap_spec(mut self, heap_spec: HeapSpec) -> Self {
-        self.heap_spec = heap_spec;
+        if let Some(ref mut linear_memory) = self.linear_memory {
+            linear_memory.heap = heap_spec;
+        } else {
+            self.linear_memory = Some(OwnedLinearMemorySpec {
+                heap: heap_spec,
+                initializer: OwnedSparseData::new(vec![]).unwrap(),
+            });
+        }
         self
     }
 }

@@ -10,12 +10,12 @@ mod module_data;
 
 pub use crate::error::Error;
 pub use crate::globals::{Global, GlobalDef, GlobalSpec};
-pub use crate::linear_memory::{HeapSpec, SparseData};
+pub use crate::linear_memory::{HeapSpec, SparseData, LinearMemorySpec};
 pub use crate::module_data::ModuleData;
 
 /// Owned variants of the module data types, useful for serialization and testing.
 pub mod owned {
     pub use crate::globals::OwnedGlobalSpec;
-    pub use crate::linear_memory::OwnedSparseData;
+    pub use crate::linear_memory::{OwnedSparseData, OwnedLinearMemorySpec};
     pub use crate::module_data::OwnedModuleData;
 }

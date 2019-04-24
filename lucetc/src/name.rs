@@ -27,18 +27,22 @@ impl Name {
         &self.symbol
     }
 
-    pub fn into_funcid(&self) -> Option<FuncId> {
+    pub fn as_funcid(&self) -> Option<FuncId> {
         match self.id {
             FuncOrDataId::Func(id) => Some(id),
             FuncOrDataId::Data(_) => None,
         }
     }
 
-    pub fn into_dataid(&self) -> Option<DataId> {
+    pub fn as_dataid(&self) -> Option<DataId> {
         match self.id {
             FuncOrDataId::Data(id) => Some(id),
             FuncOrDataId::Func(_) => None,
         }
+    }
+
+    pub fn as_externalname(&self) -> ExternalName {
+        ExternalName::from(self.id)
     }
 }
 

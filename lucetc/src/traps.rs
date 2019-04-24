@@ -121,7 +121,7 @@ fn serialize_trapcode(code: ir::TrapCode) -> u32 {
         ir::TrapCode::BadConversionToInteger => 7,
         ir::TrapCode::Interrupt => 8,
         ir::TrapCode::TableOutOfBounds => 9,
-        ir::TrapCode::UnreachableCodeReached => (u16::max_value() - 1) as u32, // XXX this used to be User(0)
-        ir::TrapCode::User(x) => ((u16::max_value() - 1) as u32) | ((x as u32) << 16),
+        ir::TrapCode::UnreachableCodeReached => 10 as u32,
+        ir::TrapCode::User(_) => panic!("we should never emit a user trapcode"),
     }
 }

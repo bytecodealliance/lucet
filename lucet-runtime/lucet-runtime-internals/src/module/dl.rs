@@ -103,7 +103,7 @@ impl DlModule {
 impl Module for DlModule {}
 
 impl ModuleInternal for DlModule {
-    fn heap_spec(&self) -> &HeapSpec {
+    fn heap_spec(&self) -> Option<&HeapSpec> {
         self.module_data.heap_spec()
     }
 
@@ -112,11 +112,15 @@ impl ModuleInternal for DlModule {
     }
 
     fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]> {
-        *self.module_data.sparse_data().get_page(page)
+        if let Some(ref sparse_data) = self.module_data.sparse_data() {
+            *sparse_data.get_page(page)
+        } else {
+            None
+        }
     }
 
     fn sparse_page_data_len(&self) -> usize {
-        self.module_data.sparse_data().len()
+        self.module_data.sparse_data().map(|d| d.len()).unwrap_or(0)
     }
 
     fn table_elements(&self) -> Result<&[TableElement], Error> {
@@ -131,18 +135,10 @@ impl ModuleInternal for DlModule {
             })?
         };
         let len = unsafe { **p_table_segment_len };
-        let elem_size = mem::size_of::<TableElement>();
-        if len > std::u32::MAX as usize * elem_size {
+        if len > std::u32::MAX as usize {
             lucet_incorrect_module!("table segment too long: {}", len);
         }
-        if len % elem_size != 0 {
-            lucet_incorrect_module!(
-                "table segment length {} not a multiple of table element size: {}",
-                len,
-                elem_size
-            );
-        }
-        Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize / elem_size) })
+        Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize) })
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {

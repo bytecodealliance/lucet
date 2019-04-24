@@ -119,7 +119,6 @@ macro_rules! guest_fault_tests {
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             DlModule, Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TrapCode,
-            TrapCodeType,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -196,7 +195,7 @@ macro_rules! guest_fault_tests {
 
                 match inst.run(b"illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode.ty, TrapCodeType::BadSignature);
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
@@ -220,7 +219,7 @@ macro_rules! guest_fault_tests {
 
                 match inst.run(b"oob", &[]) {
                     Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode.ty, TrapCodeType::HeapOutOfBounds);
+                        assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
@@ -267,7 +266,7 @@ macro_rules! guest_fault_tests {
         fn fatal_continue_signal_handler() {
             fn signal_handler_continue(
                 _inst: &Instance,
-                _trapcode: &TrapCode,
+                _trapcode: &Option<TrapCode>,
                 signum: libc::c_int,
                 _siginfo_ptr: *const siginfo_t,
                 _ucontext_ptr: *const c_void,
@@ -314,7 +313,7 @@ macro_rules! guest_fault_tests {
         fn fatal_terminate_signal_handler() {
             fn signal_handler_terminate(
                 _inst: &Instance,
-                _trapcode: &TrapCode,
+                _trapcode: &Option<TrapCode>,
                 signum: libc::c_int,
                 _siginfo_ptr: *const siginfo_t,
                 _ucontext_ptr: *const c_void,
@@ -405,7 +404,7 @@ macro_rules! guest_fault_tests {
 
                 match inst.run(b"illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode.ty, TrapCodeType::BadSignature);
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
