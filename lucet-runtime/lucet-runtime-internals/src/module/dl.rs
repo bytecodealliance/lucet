@@ -216,7 +216,8 @@ impl ModuleInternal for DlModule {
 fn is_undefined_symbol(e: &std::io::Error) -> bool {
     // gross, but I'm not sure how else to differentiate this type of error from other
     // IO errors
-    format!("{}", e).contains("undefined symbol")
+    let msg = format!("{}", e);
+    msg.contains("undefined symbol") || msg.contains("symbol not found")
 }
 
 // TODO: PR to nix or libloading?
