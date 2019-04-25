@@ -9,7 +9,8 @@ mod result;
 
 use crate::script::{ScriptEnv, ScriptError};
 use failure::{format_err, Error, ResultExt};
-use lucet_runtime::{Error as RuntimeError, TrapCode, UntypedRetVal, Val};
+use lucet_module_data::TrapCode;
+use lucet_runtime::{Error as RuntimeError, UntypedRetVal, Val};
 use std::fs;
 use std::path::PathBuf;
 use wabt::script::{Action, CommandKind, ScriptParser, Value};

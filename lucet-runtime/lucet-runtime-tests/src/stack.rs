@@ -83,9 +83,8 @@ fn generate_test_wat(num_locals: usize) -> String {
 #[macro_export]
 macro_rules! stack_tests {
     ( $TestRegion:path ) => {
-        use lucet_runtime::{
-            DlModule, Error, InstanceHandle, Limits, Region, TrapCode, UntypedRetVal, Val,
-        };
+        use lucet_module_data::TrapCode;
+        use lucet_runtime::{DlModule, Error, InstanceHandle, Limits, Region, UntypedRetVal, Val};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::stack::stack_testcase;

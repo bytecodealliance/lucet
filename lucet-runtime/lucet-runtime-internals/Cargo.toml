@@ -8,6 +8,7 @@ edition = "2018"
 lucet-module-data = { path = "../../lucet-module-data" }
 
 bitflags = "1.0"
+bincode = "~1.0.1"
 failure = "0.1"
 lazy_static = "1.1"
 libc = "0.2.47"
