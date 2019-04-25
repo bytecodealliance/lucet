@@ -1,12 +1,4 @@
-use lucet_idl::cache::*;
-use lucet_idl::config::*;
-use lucet_idl::data_description_helper::*;
-use lucet_idl::errors::*;
-use lucet_idl::generators::*;
-use lucet_idl::parser::*;
-use lucet_idl::pretty_writer::*;
-use lucet_idl::validate::*;
-
+use lucet_idl::{run, IDLError, Config};
 use clap::{App, Arg};
 use std::fs::File;
 use std::io;
@@ -81,20 +73,9 @@ fn doit() -> Result<(), IDLError> {
     let exe_config = ExeConfig::parse()?;
     let mut source = String::new();
     File::open(&exe_config.input_path)?.read_to_string(&mut source)?;
-    let mut parser = Parser::new(&source);
-    let decls = parser.match_decls()?;
-    let data_description = DataDescription::validate(&decls)?;
-    let deps = data_description
-        .ordered_dependencies()
-        .map_err(|_| IDLError::InternalError("Unable to resolve dependencies"))?;
-    let data_description_helper = DataDescriptionHelper { data_description };
-    let mut cache = Cache::default();
-    let mut generator = Generators::c(&exe_config.config);
-    let mut pretty_writer = PrettyWriter::new(io::stdout());
-    generator.gen_prelude(&mut pretty_writer)?;
-    for id in deps {
-        data_description_helper.gen_for_id(&mut generator, &mut cache, &mut pretty_writer, id)?;
-    }
+
+    run(&exe_config.config, &source, io::stdout())?;
+
     Ok(())
 }
 
