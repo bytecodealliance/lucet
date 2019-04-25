@@ -30,10 +30,7 @@ impl FunctionSpec {
         self.traps_len
     }
     pub fn contains(&self, addr: u64) -> bool {
-        // TODO This *may* be an off by one - replicating the check in
-        // looking up trap manifest addresses. Need to verify if the
-        // length produced by Cranelift is of an inclusive or exclusive range
-        addr >= self.code_addr && (addr - self.code_addr) <= (self.code_len as u64)
+        addr >= self.code_addr && (addr - self.code_addr) < (self.code_len as u64)
     }
     pub fn relative_addr(&self, addr: u64) -> Option<u32> {
         if let Some(offset) = addr.checked_sub(self.code_addr) {
