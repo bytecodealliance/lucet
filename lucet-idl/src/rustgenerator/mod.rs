@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use super::backend::*;
-use super::cache::*;
-use super::data_description_helper::*;
-use super::errors::*;
-use super::generators::*;
-use super::pretty_writer::*;
-use super::target::*;
-use lucet_idl::validate::*;
+use crate::backend::*;
+use crate::cache::*;
+use crate::data_description_helper::*;
+use crate::errors::*;
+use crate::generators::*;
+use crate::pretty_writer::*;
+use crate::target::*;
+use crate::validate::*;
 use std::io::prelude::*;
 
 #[derive(Clone, Debug)]

@@ -1,5 +1,5 @@
-use super::super::target::*;
-use lucet_idl::types::*;
+use crate::target::*;
+use crate::types::*;
 
 /// Information about a C native type
 pub struct CAtom {

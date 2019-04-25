@@ -1,8 +1,8 @@
-use super::cache::*;
-use super::errors::*;
-use super::generators::*;
-use super::pretty_writer::*;
-use lucet_idl::validate::*;
+use crate::cache::*;
+use crate::errors::*;
+use crate::generators::*;
+use crate::pretty_writer::*;
+use crate::validate::*;
 use std::io::prelude::*;
 
 /// A convenient structure holding a data type, its name and

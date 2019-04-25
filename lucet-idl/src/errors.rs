@@ -1,4 +1,4 @@
-use lucet_idl::{parser, validate};
+use crate::{parser, validate};
 use std::io;
 
 #[allow(dead_code)]

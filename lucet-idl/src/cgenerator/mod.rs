@@ -16,15 +16,15 @@ mod gen_tagged_union;
 mod macros;
 
 pub(crate) use self::catom::*;
-use super::backend::*;
-use super::cache::*;
-use super::data_description_helper::*;
-use super::errors::*;
-use super::generators::*;
-use super::pretty_writer::*;
-use super::target::*;
-use lucet_idl::types::*;
-use lucet_idl::validate::*;
+use crate::backend::*;
+use crate::cache::*;
+use crate::data_description_helper::*;
+use crate::errors::*;
+use crate::generators::*;
+use crate::pretty_writer::*;
+use crate::target::*;
+use crate::types::*;
+use crate::validate::*;
 use std::io::prelude::*;
 
 #[derive(Clone, Debug)]

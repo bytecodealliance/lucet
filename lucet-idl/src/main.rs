@@ -1,32 +1,17 @@
-#[macro_use]
-extern crate failure;
-
-mod backend;
-mod cache;
-mod cgenerator;
-mod config;
-mod data_description_helper;
-mod errors;
-mod generators;
-mod pretty_writer;
-mod rustgenerator;
-mod target;
-
-use self::cache::*;
-use self::generators::*;
-
-use self::config::*;
-use self::data_description_helper::*;
-use self::errors::*;
-use self::pretty_writer::*;
+use lucet_idl::cache::*;
+use lucet_idl::config::*;
+use lucet_idl::data_description_helper::*;
+use lucet_idl::errors::*;
+use lucet_idl::generators::*;
 use lucet_idl::parser::*;
+use lucet_idl::pretty_writer::*;
 use lucet_idl::validate::*;
+
+use clap::{App, Arg};
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use clap::{App, Arg};
 use std::path::PathBuf;
-
 
 #[derive(Default, Clone, Debug)]
 pub struct ExeConfig {
@@ -80,9 +65,11 @@ impl ExeConfig {
                 .value_of("input_file")
                 .ok_or(IDLError::UsageError("Input file required"))?,
         );
-        let config = Config::parse(matches.value_of("target").unwrap(),
-                                    matches.value_of("backend").unwrap(),
-        matches.is_present("zero-native-pointers"));
+        let config = Config::parse(
+            matches.value_of("target").unwrap(),
+            matches.value_of("backend").unwrap(),
+            matches.is_present("zero-native-pointers"),
+        );
         Ok(ExeConfig {
             input_path,
             output_path: None,

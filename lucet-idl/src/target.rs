@@ -1,4 +1,4 @@
-use lucet_idl::types::*;
+use crate::types::*;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Target {
