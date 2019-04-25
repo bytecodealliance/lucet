@@ -27,12 +27,12 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
 # rebuilds.
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
-RUN curl -sS -L -O https://static.rust-lang.org/dist/rust-1.33.0-x86_64-unknown-linux-gnu.tar.gz \
-	&& tar xzf rust-1.33.0-x86_64-unknown-linux-gnu.tar.gz \
-	&& cd rust-1.33.0-x86_64-unknown-linux-gnu \
+RUN curl -sS -L -O https://static.rust-lang.org/dist/rust-1.34.1-x86_64-unknown-linux-gnu.tar.gz \
+	&& tar xzf rust-1.34.1-x86_64-unknown-linux-gnu.tar.gz \
+	&& cd rust-1.34.1-x86_64-unknown-linux-gnu \
 	&& ./install.sh \
 	&& cd .. \
-	&& rm -rf rust-1.33.0-x86_64-unknown-linux-gnu rust-1.33.0-x86_64-unknown-linux-gnu.tar.gz
+	&& rm -rf rust-1.34.1-x86_64-unknown-linux-gnu rust-1.34.1-x86_64-unknown-linux-gnu.tar.gz
 ENV PATH=/usr/local/bin:$PATH
 RUN cargo install --root /usr/local cargo-audit cargo-watch
 
