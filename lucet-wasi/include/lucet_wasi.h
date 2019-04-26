@@ -11,6 +11,8 @@ enum lucet_error lucet_wasi_ctx_args(struct lucet_wasi_ctx *wasi_ctx, size_t arg
 
 enum lucet_error lucet_wasi_ctx_inherit_env(struct lucet_wasi_ctx *wasi_ctx);
 
+enum lucet_error lucet_wasi_ctx_inherit_stdio(struct lucet_wasi_ctx *wasi_ctx);
+
 void lucet_wasi_ctx_destroy(struct lucet_wasi_ctx *wasi_ctx);
 
 enum lucet_error lucet_region_new_instance_with_wasi_ctx(const struct lucet_region *   region,
