@@ -147,7 +147,7 @@
 //!
 //! ```no_run
 //! use lucet_runtime::{
-//!     DlModule, Error, Instance, Limits, MmapRegion, Region, SignalBehavior, TrapCode
+//!     DlModule, Error, Instance, Limits, MmapRegion, Region, SignalBehavior, TrapCode,
 //! };
 //! use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 //!
@@ -200,6 +200,7 @@
 
 pub mod c_api;
 
+pub use lucet_module_data::TrapCode;
 pub use lucet_runtime_internals::alloc::Limits;
 pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::{
@@ -208,7 +209,6 @@ pub use lucet_runtime_internals::instance::{
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
-pub use lucet_runtime_internals::trapcode::TrapCode;
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
 pub use lucet_runtime_internals::{lucet_hostcall_terminate, lucet_hostcalls, WASM_PAGE_SIZE};
 

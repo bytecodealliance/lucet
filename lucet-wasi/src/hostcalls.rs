@@ -475,14 +475,12 @@ lucet_hostcalls! {
             .map(|iov| unsafe { host::ciovec_to_nix_mut(iov) })
             .collect();
 
-        let full_nread = iovs.iter().map(|iov| iov.as_slice().len()).sum();
-
         let host_nread = match readv(fe.fd_object.rawfd, &mut iovs) {
             Ok(len) => len,
             Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
         };
 
-        if host_nread < full_nread {
+        if host_nread == 0 {
             // we hit eof, so remove the fdentry from the context
             let mut fe = ctx.fds.remove(&fd).expect("file entry is still there");
             fe.fd_object.needs_close = false;
@@ -511,7 +509,7 @@ lucet_hostcalls! {
             Err(e) => return enc_errno(e),
         };
 
-        let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+        let ctx = vmctx.get_embed_ctx::<WasiCtx>();
         let fe = match ctx.get_fd_entry(fd, host::__WASI_RIGHT_FD_WRITE.into(), 0) {
             Ok(fe) => fe,
             Err(e) => return enc_errno(e),

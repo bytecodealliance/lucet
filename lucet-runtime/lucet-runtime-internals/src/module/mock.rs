@@ -1,12 +1,10 @@
 use crate::error::Error;
-use crate::module::{
-    AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement, TrapManifestRecord,
-};
+use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use lucet_module_data::owned::{
     OwnedGlobalSpec, OwnedLinearMemorySpec, OwnedModuleData, OwnedSparseData,
 };
-use lucet_module_data::ModuleData;
+use lucet_module_data::{FunctionSpec, ModuleData};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
@@ -19,7 +17,7 @@ pub struct MockModuleBuilder {
     export_funcs: HashMap<Vec<u8>, *const extern "C" fn()>,
     func_table: HashMap<(u32, u32), *const extern "C" fn()>,
     start_func: Option<extern "C" fn()>,
-    trap_manifest: Vec<TrapManifestRecord>,
+    function_manifest: Vec<FunctionSpec>,
 }
 
 impl MockModuleBuilder {
@@ -121,8 +119,8 @@ impl MockModuleBuilder {
         self
     }
 
-    pub fn with_trap_manifest(mut self, trap_manifest: &[TrapManifestRecord]) -> Self {
-        self.trap_manifest = trap_manifest.to_vec();
+    pub fn with_function_manifest(mut self, function_manifest: &[FunctionSpec]) -> Self {
+        self.function_manifest = function_manifest.to_vec();
         self
     }
 
@@ -178,7 +176,7 @@ impl MockModuleBuilder {
             export_funcs: self.export_funcs,
             func_table: self.func_table,
             start_func: self.start_func,
-            trap_manifest: self.trap_manifest,
+            function_manifest: self.function_manifest,
         };
         Arc::new(mock)
     }
@@ -192,7 +190,7 @@ pub struct MockModule {
     pub export_funcs: HashMap<Vec<u8>, *const extern "C" fn()>,
     pub func_table: HashMap<(u32, u32), *const extern "C" fn()>,
     pub start_func: Option<extern "C" fn()>,
-    pub trap_manifest: Vec<TrapManifestRecord>,
+    pub function_manifest: Vec<FunctionSpec>,
 }
 
 unsafe impl Send for MockModule {}
@@ -249,8 +247,8 @@ impl ModuleInternal for MockModule {
         Ok(self.start_func.map(|start| start as *const extern "C" fn()))
     }
 
-    fn trap_manifest(&self) -> &[TrapManifestRecord] {
-        &self.trap_manifest
+    fn function_manifest(&self) -> &[FunctionSpec] {
+        &self.function_manifest
     }
 
     fn addr_details(&self, _addr: *const c_void) -> Result<Option<AddrDetails>, Error> {

@@ -3,6 +3,7 @@ mod compiler;
 mod decls;
 mod error;
 mod function;
+mod function_manifest;
 mod heap;
 mod load;
 mod module;

@@ -19,7 +19,7 @@ use failure::Error;
 pub const STACK_PROBE_SYM: &'static str = "lucet_probestack";
 
 /// The binary of the stack probe.
-const STACK_PROBE_BINARY: &'static [u8] = &[
+pub const STACK_PROBE_BINARY: &'static [u8] = &[
     // 49 89 c3                     mov    %rax,%r11
     // 48 81 ec 00 10 00 00         sub    $0x1000,%rsp
     // 48 85 64 24 08               test   %rsp,0x8(%rsp)

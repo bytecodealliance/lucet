@@ -10,6 +10,7 @@ edition = "2018"
 [dependencies]
 libc = "0.2.48"
 lucet-runtime-internals = { path = "lucet-runtime-internals" }
+lucet-module-data = { path = "../lucet-module-data" }
 num-traits = "0.2"
 num-derive = "0.2"
 
@@ -17,7 +18,6 @@ num-derive = "0.2"
 byteorder = "1.2"
 failure = "0.1"
 lazy_static = "1.1"
-lucet-module-data = { path = "../lucet-module-data" }
 lucet-runtime-tests = { path = "lucet-runtime-tests" }
 nix = "0.13"
 

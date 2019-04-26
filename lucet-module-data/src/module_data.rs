@@ -52,7 +52,7 @@ impl<'a> ModuleData<'a> {
         &self.globals_spec
     }
 
-    /// Serialize to (https://github.com/TyOverby/bincode).
+    /// Serialize to [`bincode`](https://github.com/TyOverby/bincode).
     pub fn serialize(&self) -> Result<Vec<u8>, Error> {
         bincode::serialize(self).map_err(Error::SerializationError)
     }
