@@ -7,12 +7,12 @@ mod types;
 mod module;
 mod backend;
 mod cache;
-mod cgenerator;
+mod c;
 mod config;
 mod errors;
 mod generator;
 mod pretty_writer;
-mod rustgenerator;
+mod rust;
 mod target;
 
 pub use crate::backend::{Backend, BackendConfig};

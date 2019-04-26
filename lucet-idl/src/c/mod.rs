@@ -2,17 +2,12 @@
 #![allow(unused_variables)]
 
 mod catom;
-mod gen_accessors_alias;
-mod gen_accessors_atom;
-mod gen_accessors_enum;
-mod gen_accessors_ptr;
-mod gen_accessors_struct;
-mod gen_accessors_tagged_union;
-mod gen_alias;
-mod gen_enum;
-mod gen_prelude;
-mod gen_struct;
-mod gen_tagged_union;
+mod accessors;
+mod alias;
+mod r#enum;
+mod prelude;
+mod r#struct;
+mod tagged_union;
 mod macros;
 
 pub(crate) use self::catom::*;
@@ -23,7 +18,6 @@ use crate::errors::*;
 use crate::generator::{Generator, Hierarchy};
 use crate::pretty_writer::*;
 use crate::target::*;
-use crate::types::*;
 use crate::module::{DataTypeRef, DataTypeEntry, Module};
 use std::io::prelude::*;
 
@@ -53,7 +47,7 @@ impl<W: Write> Generator<W> for CGenerator {
             .eob()?
             .write_line(b"// ---------- Prelude ----------")?
             .eob()?;
-        gen_prelude::generate(pretty_writer, self.target, self.backend_config)?;
+        prelude::generate(pretty_writer, self.target, self.backend_config)?;
         Ok(())
     }
 
@@ -82,7 +76,7 @@ impl<W: Write> Generator<W> for CGenerator {
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        gen_alias::generate(
+        alias::generate(
             self,
             module,
             cache,
@@ -98,7 +92,7 @@ impl<W: Write> Generator<W> for CGenerator {
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        gen_struct::generate(
+        r#struct::generate(
             self,
             module,
             cache,
@@ -116,7 +110,7 @@ impl<W: Write> Generator<W> for CGenerator {
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        gen_enum::generate(
+        r#enum::generate(
             self,
             module,
             cache,
@@ -132,7 +126,7 @@ impl<W: Write> Generator<W> for CGenerator {
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        gen_tagged_union::generate(
+        tagged_union::generate(
             self,
             module,
             cache,
@@ -149,7 +143,7 @@ impl<W: Write> Generator<W> for CGenerator {
         data_type_entry: &DataTypeEntry<'_>,
         hierarchy: &Hierarchy,
     ) -> Result<(), IDLError> {
-        gen_accessors_struct::generate(
+        accessors::r#struct::generate(
             self,
             module,
             cache,
@@ -178,7 +172,7 @@ impl<W: Write> Generator<W> for CGenerator {
         };
         for (i, named_member) in named_members.iter().enumerate() {
             let internal_union_type_id = 1 + i;
-            gen_accessors_tagged_union::generate(
+            accessors::tagged_union::generate(
                 self,
                 data_type_entry,
                 module,
@@ -200,7 +194,7 @@ impl<W: Write> Generator<W> for CGenerator {
         data_type_entry: &DataTypeEntry<'_>,
         hierarchy: &Hierarchy,
     ) -> Result<(), IDLError> {
-        gen_accessors_enum::generate(
+        accessors::r#enum::generate(
             self,
             module,
             cache,
@@ -218,7 +212,7 @@ impl<W: Write> Generator<W> for CGenerator {
         data_type_entry: &DataTypeEntry<'_>,
         hierarchy: &Hierarchy,
     ) -> Result<(), IDLError> {
-        gen_accessors_alias::generate(
+        accessors::alias::generate(
             self,
             module,
             cache,
@@ -387,14 +381,14 @@ impl CGenerator {
     ) -> Result<(), IDLError> {
         let type_ = self.unalias(module, type_);
         match type_ {
-            DataTypeRef::Atom(atom_type) => gen_accessors_atom::generate(
+            DataTypeRef::Atom(atom_type) => accessors::atom::generate(
                 self,
                 module,
                 pretty_writer,
                 *atom_type,
                 &hierarchy,
             ),
-            DataTypeRef::Ptr(type_) => gen_accessors_ptr::generate(
+            DataTypeRef::Ptr(type_) => accessors::ptr::generate(
                 self,
                 module,
                 cache,

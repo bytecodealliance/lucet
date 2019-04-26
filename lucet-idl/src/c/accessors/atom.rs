@@ -1,4 +1,12 @@
-use super::*;
+use crate::c::catom::CAtom;
+use crate::c::macros;
+use crate::c::CGenerator;
+use crate::errors::IDLError;
+use crate::generator::Hierarchy;
+use crate::module::Module;
+use crate::pretty_writer::PrettyWriter;
+use crate::types::AtomType;
+use std::io::prelude::*;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,

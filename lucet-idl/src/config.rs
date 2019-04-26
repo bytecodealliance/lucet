@@ -1,8 +1,8 @@
 use super::backend::{Backend, BackendConfig};
 use super::target::Target;
 use crate::generator::Generator;
-use crate::rustgenerator::RustGenerator;
-use crate::cgenerator::CGenerator;
+use crate::rust::RustGenerator;
+use crate::c::CGenerator;
 use std::io::Write;
 
 #[derive(Default, Clone, Debug)]

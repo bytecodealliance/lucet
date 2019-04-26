@@ -1,4 +1,10 @@
-use super::*;
+use crate::c::CGenerator;
+use crate::cache::Cache;
+use crate::errors::IDLError;
+use crate::generator::Hierarchy;
+use crate::module::{Module, DataTypeRef};
+use crate::pretty_writer::PrettyWriter;
+use std::io::prelude::*;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
@@ -9,8 +15,7 @@ pub fn generate<W: Write>(
     hierarchy: &Hierarchy,
 ) -> Result<(), IDLError> {
     let type_info = cgenerator.type_info(module, cache, type_);
-    let leaf_type_info =
-        cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
+    let leaf_type_info = cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
     assert_eq!(leaf_type_info.indirections, 0);
     if type_info.indirections > 1 {
         pretty_writer.write_line(
