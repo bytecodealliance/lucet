@@ -4,6 +4,8 @@ use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle};
 use crate::module::Module;
 use crate::region::{Region, RegionCreate, RegionInternal};
+#[cfg(not(target_os = "linux"))]
+use libc::memset;
 use libc::{c_void, SIGSTKSZ};
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::ptr;
@@ -126,6 +128,17 @@ impl RegionInternal for MmapRegion {
             let heap_size = alloc.slot().limits.heap_address_space_size;
 
             unsafe {
+                // `mprotect()` and `madvise()` are sufficient to zero a page on Linux,
+                // but not necessarily on all POSIX operating systems, and on macOS in particular.
+                #[cfg(not(target_os = "linux"))]
+                {
+                    mprotect(
+                        heap,
+                        alloc.heap_accessible_size,
+                        ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                    )?;
+                    memset(heap, 0, alloc.heap_accessible_size);
+                }
                 mprotect(heap, heap_size, ProtFlags::PROT_NONE)?;
                 madvise(heap, heap_size, MmapAdvise::MADV_DONTNEED)?;
             }

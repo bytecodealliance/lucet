@@ -689,6 +689,37 @@ macro_rules! guest_fault_tests {
             })
         }
 
+        #[test]
+        fn sigaltstack_restores() {
+            use libc::*;
+
+            test_nonex(|| {
+                // any alternate stack present before a thread runs an instance should be restored
+                // after the instance returns
+                let beforestack = unsafe {
+                    let mut beforestack = std::mem::uninitialized::<stack_t>();
+                    sigaltstack(std::ptr::null(), &mut beforestack as *mut stack_t);
+                    beforestack
+                };
+
+                let module = mock_traps_module();
+                let region =
+                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let mut inst = region
+                    .new_instance(module)
+                    .expect("instance can be created");
+                run_onetwothree(&mut inst);
+
+                let afterstack = unsafe {
+                    let mut afterstack = std::mem::uninitialized::<stack_t>();
+                    sigaltstack(std::ptr::null(), &mut afterstack as *mut stack_t);
+                    afterstack
+                };
+
+                assert_eq!(beforestack.ss_sp, afterstack.ss_sp);
+            })
+        }
+
         // TODO: remove this once `nix` PR https://github.com/nix-rust/nix/pull/991 is merged
         pub unsafe fn mprotect(
             addr: *mut c_void,
