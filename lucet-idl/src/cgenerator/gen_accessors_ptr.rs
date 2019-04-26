@@ -2,15 +2,15 @@ use super::*;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    data_description_helper: &DataDescriptionHelper,
+    module: &Module,
     cache: &Cache,
     pretty_writer: &mut PrettyWriter<W>,
     type_: &DataTypeRef,
     hierarchy: &Hierarchy,
 ) -> Result<(), IDLError> {
-    let type_info = cgenerator.type_info(data_description_helper, cache, type_);
+    let type_info = cgenerator.type_info(module, cache, type_);
     let leaf_type_info =
-        cgenerator.type_info(data_description_helper, cache, type_info.leaf_data_type_ref);
+        cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
     assert_eq!(leaf_type_info.indirections, 0);
     if type_info.indirections > 1 {
         pretty_writer.write_line(

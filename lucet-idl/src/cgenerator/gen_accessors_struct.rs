@@ -2,7 +2,7 @@ use super::*;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    data_description_helper: &DataDescriptionHelper,
+    module: &Module,
     cache: &Cache,
     pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &DataTypeEntry<'_>,
@@ -41,7 +41,7 @@ pub fn generate<W: Write>(
         let type_: &DataTypeRef = &named_member.type_;
         let hierarchy = hierarchy.push(named_member.name.to_string(), current_offset + offset);
         cgenerator.gen_accessors_for_data_type_ref(
-            data_description_helper,
+            module,
             cache,
             &mut pretty_writer.new_block(),
             type_,
@@ -104,7 +104,7 @@ pub fn generate<W: Write>(
             let fn_name = hierarchy.fn_name();
             let type_ = &named_member.type_;
             let is_eventually_an_atom_or_enum =
-                cgenerator.is_type_eventually_an_atom_or_enum(data_description_helper, type_);
+                cgenerator.is_type_eventually_an_atom_or_enum(module, type_);
             if let DataTypeRef::Ptr(_) = type_ {
                 pretty_writer_preprocessor.write_line(b"# ifdef ZERO_NATIVE_POINTERS")?;
                 pretty_writer_i1.write_line(

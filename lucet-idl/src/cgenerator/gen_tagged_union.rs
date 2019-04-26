@@ -2,7 +2,7 @@ use super::*;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    data_description_helper: &DataDescriptionHelper,
+    module: &Module,
     cache: &mut Cache,
     pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &DataTypeEntry<'_>,
@@ -68,7 +68,7 @@ pub fn generate<W: Write>(
     let mut max_size = 0;
     for named_member in named_members {
         if let Some(type_) = named_member.type_.as_ref() {
-            let type_info = cgenerator.type_info(data_description_helper, cache, type_);
+            let type_info = cgenerator.type_info(module, cache, type_);
             if type_info.type_align > max_align {
                 max_align = type_info.type_align;
             }
@@ -108,7 +108,7 @@ pub fn generate<W: Write>(
             continue;
         }
         let type_ = named_member.type_.as_ref().unwrap();
-        let type_info = cgenerator.type_info(data_description_helper, cache, type_);
+        let type_info = cgenerator.type_info(module, cache, type_);
         pretty_writer_i2.indent()?;
         pretty_writer_i2.write(type_info.type_name.as_bytes())?;
         pretty_writer_i2.space()?;

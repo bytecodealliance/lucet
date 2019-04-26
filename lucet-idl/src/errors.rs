@@ -1,4 +1,4 @@
-use crate::{parser, validate};
+use crate::{parser, module};
 use std::io;
 
 #[allow(dead_code)]
@@ -11,7 +11,7 @@ pub enum IDLError {
     #[fail(display = "{}", _0)]
     ParseError(#[cause] parser::ParseError),
     #[fail(display = "{}", _0)]
-    ValidationError(#[cause] validate::ValidationError),
+    ValidationError(#[cause] module::ValidationError),
     #[fail(display = "{}", _0)]
     Io(#[cause] io::Error),
 }
@@ -28,8 +28,8 @@ impl From<parser::ParseError> for IDLError {
     }
 }
 
-impl From<validate::ValidationError> for IDLError {
-    fn from(e: validate::ValidationError) -> Self {
+impl From<module::ValidationError> for IDLError {
+    fn from(e: module::ValidationError) -> Self {
         IDLError::ValidationError(e)
     }
 }

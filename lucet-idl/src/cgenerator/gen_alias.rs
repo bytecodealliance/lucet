@@ -4,7 +4,7 @@ use super::*;
 // and alignment rules of what it ultimately points to
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    data_description_helper: &DataDescriptionHelper,
+    module: &Module,
     cache: &mut Cache,
     pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &DataTypeEntry<'_>,
@@ -14,7 +14,7 @@ pub fn generate<W: Write>(
     } else {
         unreachable!()
     };
-    let type_info = cgenerator.type_info(data_description_helper, cache, type_);
+    let type_info = cgenerator.type_info(module, cache, type_);
     pretty_writer.indent()?;
     pretty_writer.write(format!("typedef {}", type_info.type_name).as_bytes())?;
     pretty_writer.space()?;
@@ -25,7 +25,7 @@ pub fn generate<W: Write>(
     pretty_writer.write(b";")?;
     if type_info.indirections == 0 {
         let leaf_type_info =
-            cgenerator.type_info(data_description_helper, cache, type_info.leaf_data_type_ref);
+            cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
         if leaf_type_info.type_name != type_info.type_name {
             pretty_writer.write(b" // equivalent to ")?;
             pretty_writer.write(leaf_type_info.type_name.as_bytes())?;

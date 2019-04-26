@@ -3,12 +3,11 @@
 
 use crate::backend::*;
 use crate::cache::*;
-use crate::data_description_helper::*;
 use crate::errors::*;
 use crate::generators::*;
 use crate::pretty_writer::*;
 use crate::target::*;
-use crate::validate::*;
+use crate::module::{Module, DataTypeEntry, DataTypeRef};
 use std::io::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -38,7 +37,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_type_header(
         &mut self,
-        _data_description_helper: &DataDescriptionHelper,
+        _module: &Module,
         _cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -50,7 +49,7 @@ impl<W: Write> Generator<W> for RustGenerator {
     // and alignment rules of what it ultimately points to
     fn gen_alias(
         &mut self,
-        data_description_helper: &DataDescriptionHelper,
+        module: &Module,
         cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -60,7 +59,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_struct(
         &mut self,
-        data_description_helper: &DataDescriptionHelper,
+        module: &Module,
         cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -72,7 +71,7 @@ impl<W: Write> Generator<W> for RustGenerator {
     // The typedef is required to use a native type which is consistent across all architectures
     fn gen_enum(
         &mut self,
-        data_description_helper: &DataDescriptionHelper,
+        module: &Module,
         cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -82,7 +81,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_tagged_union(
         &mut self,
-        data_description_helper: &DataDescriptionHelper,
+        module: &Module,
         cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -92,7 +91,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_accessors_struct(
         &mut self,
-        data_description_helper: &DataDescriptionHelper,
+        module: &Module,
         cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -103,7 +102,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_accessors_tagged_union(
         &mut self,
-        data_description_helper: &DataDescriptionHelper,
+        module: &Module,
         cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -114,7 +113,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_accessors_enum(
         &mut self,
-        data_description_helper: &DataDescriptionHelper,
+        module: &Module,
         cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -125,7 +124,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_accessors_alias(
         &mut self,
-        data_description_helper: &DataDescriptionHelper,
+        module: &Module,
         cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,

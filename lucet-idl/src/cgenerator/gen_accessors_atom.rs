@@ -2,7 +2,7 @@ use super::*;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    _data_description_helper: &DataDescriptionHelper,
+    _module: &Module,
     pretty_writer: &mut PrettyWriter<W>,
     atom_type: AtomType,
     hierarchy: &Hierarchy,

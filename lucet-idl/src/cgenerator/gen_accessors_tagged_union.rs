@@ -3,7 +3,7 @@ use super::*;
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
     data_type_entry: &DataTypeEntry<'_>,
-    data_description_helper: &DataDescriptionHelper,
+    module: &Module,
     cache: &Cache,
     pretty_writer: &mut PrettyWriter<W>,
     internal_union_type_id: usize,
@@ -24,14 +24,14 @@ pub fn generate<W: Write>(
         .offset;
     let mut member_type_size = 0;
     if let Some(member_type) = member_type {
-        let type_info = cgenerator.type_info(data_description_helper, cache, member_type);
+        let type_info = cgenerator.type_info(module, cache, member_type);
         member_type_size = type_info.type_size;
     }
     let mut pretty_writer_i1 = pretty_writer.new_block();
     let mut pretty_writer_preprocessor = pretty_writer.new_from_writer();
     let member_macro_size_name = if let Some(member_type) = member_type {
-        let unaliased_member_type = cgenerator.unalias(data_description_helper, member_type);
-        macros::macro_for_data_type_ref(data_description_helper, "BYTES", unaliased_member_type)
+        let unaliased_member_type = cgenerator.unalias(module, member_type);
+        macros::macro_for_data_type_ref(module, "BYTES", unaliased_member_type)
     } else {
         CAtom::tagged_union_type().native_type_size.to_string()
     };
@@ -160,7 +160,7 @@ pub fn generate<W: Write>(
     let type_ = member_type.expect("Empty member");
     let hierarchy1 = hierarchy.push(named_member.name.to_string(), first_member_offset);
     cgenerator.gen_accessors_for_data_type_ref(
-        data_description_helper,
+        module,
         cache,
         pretty_writer,
         type_,
@@ -173,7 +173,7 @@ pub fn generate<W: Write>(
     let type_size = cached_type_entry.type_size;
     let union_macro_size_name = macros::macro_for("BYTES", &fn_name);
     let is_eventually_an_atom_or_enum =
-        cgenerator.is_type_eventually_an_atom_or_enum(data_description_helper, type_);
+        cgenerator.is_type_eventually_an_atom_or_enum(module, type_);
 
     pretty_writer
         .write_line(
