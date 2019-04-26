@@ -132,11 +132,12 @@ impl DerefMut for InstanceHandle {
 
 impl Drop for InstanceHandle {
     fn drop(&mut self) {
-        // eprintln!("InstanceHandle::drop()");
-        // zero out magic, then run the destructor by taking and dropping the inner `Instance`
-        self.magic = 0;
+        // run the destructor by taking and dropping the inner `Instance`
         unsafe {
             mem::replace(self.inst.as_mut(), mem::uninitialized());
+            // make sure magic is zeroed, as we can't depend on `uninitialized` throwing away the
+            // magic
+            self.inst.as_mut().magic = 0;
         }
     }
 }
