@@ -91,7 +91,8 @@ impl RegionInternal for MmapRegion {
 
         // clear and disable access to the heap, stack, globals, and sigstack
         for (ptr, len) in [
-            (slot.heap, slot.limits.heap_address_space_size),
+            // We don't ever shrink the heap, so we only need to zero up until the accessible size
+            (slot.heap, alloc.heap_accessible_size),
             (slot.stack, slot.limits.stack_size),
             (slot.globals, slot.limits.globals_size),
             (slot.sigstack, SIGSTKSZ),
