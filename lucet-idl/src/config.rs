@@ -1,5 +1,9 @@
 use super::backend::{Backend, BackendConfig};
 use super::target::Target;
+use crate::generator::Generator;
+use crate::rustgenerator::RustGenerator;
+use crate::cgenerator::CGenerator;
+use std::io::Write;
 
 #[derive(Default, Clone, Debug)]
 pub struct Config {
@@ -24,4 +28,20 @@ impl Config {
             backend_config,
         }
     }
+
+    pub fn generator<W: Write>(&self) -> Box<dyn Generator<W>> {
+        match self.backend {
+            Backend::C => Box::new(CGenerator {
+                target: self.target,
+                backend_config: self.backend_config,
+            }),
+
+            Backend::Rust => Box::new(RustGenerator {
+                target: self.target,
+                backend_config: self.backend_config,
+            })
+        }
+    }
 }
+
+

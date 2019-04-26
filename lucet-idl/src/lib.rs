@@ -10,7 +10,7 @@ mod cache;
 mod cgenerator;
 mod config;
 mod errors;
-mod generators;
+mod generator;
 mod pretty_writer;
 mod rustgenerator;
 mod target;
@@ -22,7 +22,6 @@ pub use crate::errors::IDLError;
 
 use crate::parser::Parser;
 use crate::cache::Cache;
-use crate::generators::{Generators, Generator};
 use crate::pretty_writer::PrettyWriter;
 use crate::module::Module;
 use std::io::Write;
@@ -37,7 +36,7 @@ pub fn run<W: Write>(config: &Config, input: &str, output: W) -> Result<(), IDLE
         .map_err(|_| IDLError::InternalError("Unable to resolve dependencies"))?;
 
     let mut cache = Cache::default();
-    let mut generator = Generators::c(config);
+    let mut generator = config.generator();
 
     let mut pretty_writer = PrettyWriter::new(output);
     generator.gen_prelude(&mut pretty_writer)?;

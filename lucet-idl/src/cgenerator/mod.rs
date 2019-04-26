@@ -20,7 +20,7 @@ use crate::backend::*;
 use crate::cache::*;
 use crate::module::*;
 use crate::errors::*;
-use crate::generators::*;
+use crate::generator::{Generator, Hierarchy};
 use crate::pretty_writer::*;
 use crate::target::*;
 use crate::types::*;
