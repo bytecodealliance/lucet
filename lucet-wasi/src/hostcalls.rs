@@ -47,7 +47,7 @@ lucet_hostcalls! {
         argv_ptr: wasm32::uintptr_t,
         argv_buf: wasm32::uintptr_t,
     ) -> wasm32::__wasi_errno_t {
-        let ctx: &WasiCtx = vmctx.get_embed_ctx();
+        let ctx = vmctx.get_embed_ctx::<WasiCtx>();
 
         let mut argv_buf_offset = 0;
         let mut argv = vec![];
@@ -56,10 +56,7 @@ lucet_hostcalls! {
             let arg_bytes = arg.as_bytes_with_nul();
             let arg_ptr = argv_buf + argv_buf_offset;
 
-            // nasty aliasing here, but we aren't interfering with the borrow for `ctx`
-            // TODO: rework vmctx interface to avoid this
-            let mut vmctx = unsafe { Vmctx::from_raw(vmctx.as_raw()) };
-            if let Err(e) = unsafe { enc_slice_of(&mut vmctx, arg_bytes, arg_ptr) } {
+            if let Err(e) = unsafe { enc_slice_of(vmctx, arg_bytes, arg_ptr) } {
                 return enc_errno(e);
             }
 
@@ -88,7 +85,7 @@ lucet_hostcalls! {
         argc_ptr: wasm32::uintptr_t,
         argv_buf_size_ptr: wasm32::uintptr_t,
     ) -> wasm32::__wasi_errno_t {
-        let ctx: &WasiCtx = vmctx.get_embed_ctx();
+        let ctx = vmctx.get_embed_ctx::<WasiCtx>();
 
         let argc = ctx.args.len();
         let argv_size = ctx
@@ -195,7 +192,7 @@ lucet_hostcalls! {
         environ_ptr: wasm32::uintptr_t,
         environ_buf: wasm32::uintptr_t,
     ) -> wasm32::__wasi_errno_t {
-        let ctx: &WasiCtx = vmctx.get_embed_ctx();
+        let ctx = vmctx.get_embed_ctx::<WasiCtx>();
 
         let mut environ_buf_offset = 0;
         let mut environ = vec![];
@@ -204,10 +201,7 @@ lucet_hostcalls! {
             let env_bytes = pair.as_bytes_with_nul();
             let env_ptr = environ_buf + environ_buf_offset;
 
-            // nasty aliasing here, but we aren't interfering with the borrow for `ctx`
-            // TODO: rework vmctx interface to avoid this
-            let mut vmctx = unsafe { Vmctx::from_raw(vmctx.as_raw()) };
-            if let Err(e) = unsafe { enc_slice_of(&mut vmctx, env_bytes, env_ptr) } {
+            if let Err(e) = unsafe { enc_slice_of(vmctx, env_bytes, env_ptr) } {
                 return enc_errno(e);
             }
 
@@ -236,7 +230,7 @@ lucet_hostcalls! {
         environ_count_ptr: wasm32::uintptr_t,
         environ_size_ptr: wasm32::uintptr_t,
     ) -> wasm32::__wasi_errno_t {
-        let ctx: &WasiCtx = vmctx.get_embed_ctx();
+        let ctx = vmctx.get_embed_ctx::<WasiCtx>();
 
         let environ_count = ctx.env.len();
         if let Some(environ_size) = ctx.env.iter().try_fold(0, |acc: u32, pair| {
@@ -261,7 +255,7 @@ lucet_hostcalls! {
         &mut vmctx,
         fd: wasm32::__wasi_fd_t,
     ) -> wasm32::__wasi_errno_t {
-        let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
+        let mut ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
         let fd = dec_fd(fd);
         if let Some(fdent) = ctx.fds.get(&fd) {
             // can't close preopened files
@@ -292,7 +286,7 @@ lucet_hostcalls! {
             Err(e) => return enc_errno(e),
         };
 
-        let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
+        let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
         let errno = if let Some(fe) = ctx.fds.get(&host_fd) {
             host_fdstat.fs_filetype = fe.fd_object.ty;
             host_fdstat.fs_rights_base = fe.rights_base;
@@ -327,7 +321,7 @@ lucet_hostcalls! {
         let host_fdflags = dec_fdflags(fdflags);
         let nix_flags = host::nix_from_fdflags(host_fdflags);
 
-        let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
+        let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
 
         if let Some(fe) = ctx.fds.get(&host_fd) {
             match nix::fcntl::fcntl(fe.fd_object.rawfd, nix::fcntl::F_SETFL(nix_flags)) {
@@ -347,7 +341,7 @@ lucet_hostcalls! {
         whence: wasm32::__wasi_whence_t,
         newoffset: wasm32::uintptr_t,
     ) -> wasm32::__wasi_errno_t {
-        let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
+        let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
         let fd = dec_fd(fd);
         let offset = dec_filedelta(offset);
         let whence = dec_whence(whence);
@@ -388,7 +382,7 @@ lucet_hostcalls! {
         fd: wasm32::__wasi_fd_t,
         prestat_ptr: wasm32::uintptr_t,
     ) -> wasm32::__wasi_errno_t {
-        let ctx: &WasiCtx = vmctx.get_embed_ctx();
+        let ctx = vmctx.get_embed_ctx::<WasiCtx>();
         let fd = dec_fd(fd);
         // TODO: is this the correct right for this?
         match ctx.get_fd_entry(fd, host::__WASI_RIGHT_PATH_OPEN.into(), 0) {
@@ -397,11 +391,9 @@ lucet_hostcalls! {
                     if fe.fd_object.ty != host::__WASI_FILETYPE_DIRECTORY as host::__wasi_filetype_t {
                         return wasm32::__WASI_ENOTDIR;
                     }
-                    // nasty aliasing here, but we aren't interfering with the borrow for `ctx`
-                    // TODO: rework vmctx interface to avoid this
                     unsafe {
                         enc_prestat_byref(
-                            &mut Vmctx::from_raw(vmctx.as_raw()),
+                            vmctx,
                             prestat_ptr,
                             host::__wasi_prestat_t {
                                 pr_type: host::__WASI_PREOPENTYPE_DIR as host::__wasi_preopentype_t,
@@ -431,7 +423,7 @@ lucet_hostcalls! {
         path_ptr: wasm32::uintptr_t,
         path_len: wasm32::size_t,
     ) -> wasm32::__wasi_errno_t {
-        let ctx: &WasiCtx = vmctx.get_embed_ctx();
+        let ctx = vmctx.get_embed_ctx::<WasiCtx>();
         let fd = dec_fd(fd);
         match ctx.get_fd_entry(fd, host::__WASI_RIGHT_PATH_OPEN.into(), 0) {
             Ok(fe) => {
@@ -443,10 +435,8 @@ lucet_hostcalls! {
                     if path_bytes.len() > dec_usize(path_len) {
                         return wasm32::__WASI_ENAMETOOLONG;
                     }
-                    // nasty aliasing here, but we aren't interfering with the borrow for `ctx`
-                    // TODO: rework vmctx interface to avoid this
                     unsafe {
-                        enc_slice_of(&mut Vmctx::from_raw(vmctx.as_raw()), path_bytes, path_ptr)
+                        enc_slice_of(vmctx, path_bytes, path_ptr)
                             .map(|_| wasm32::__WASI_ESUCCESS)
                             .unwrap_or_else(|e| e)
                     }
@@ -474,7 +464,7 @@ lucet_hostcalls! {
             Err(e) => return enc_errno(e),
         };
 
-        let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
+        let mut ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
         let fe = match ctx.get_fd_entry(fd, host::__WASI_RIGHT_FD_READ.into(), 0) {
             Ok(fe) => fe,
             Err(e) => return enc_errno(e),
@@ -521,7 +511,7 @@ lucet_hostcalls! {
             Err(e) => return enc_errno(e),
         };
 
-        let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
+        let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
         let fe = match ctx.get_fd_entry(fd, host::__WASI_RIGHT_FD_WRITE.into(), 0) {
             Ok(fe) => fe,
             Err(e) => return enc_errno(e),
@@ -989,7 +979,7 @@ pub fn path_get<P: AsRef<OsStr>>(
         Err(errno)
     }
 
-    let ctx: &WasiCtx = vmctx.get_embed_ctx();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
 
     let dirfe = ctx.get_fd_entry(dirfd, needed_base, needed_inheriting)?;
 

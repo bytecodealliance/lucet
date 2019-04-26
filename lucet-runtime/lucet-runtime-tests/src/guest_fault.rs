@@ -1,54 +1,52 @@
 use crate::helpers::MockModuleBuilder;
-use lucet_runtime_internals::lucet_hostcalls;
 use lucet_runtime_internals::module::{Module, TrapManifestRecord, TrapSite};
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
 
 pub fn mock_traps_module() -> Arc<dyn Module> {
-    lucet_hostcalls! {
-        pub unsafe extern "C" fn onetwothree(
-            &mut _vmctx,
-        ) -> std::os::raw::c_int {
-            123
-        }
+    extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
+        123
+    }
 
-        pub unsafe extern "C" fn hostcall_main(
-            &mut vmctx,
-        ) -> () {
-            extern "C" {
-                // actually is defined in this file
-                fn hostcall_test(vmctx: *mut lucet_vmctx);
-            }
-            hostcall_test(vmctx.as_raw());
+    extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) -> () {
+        extern "C" {
+            // actually is defined in this file
+            fn hostcall_test(vmctx: *mut lucet_vmctx);
+        }
+        unsafe {
+            hostcall_test(vmctx);
             std::hint::unreachable_unchecked();
         }
+    }
 
-        pub unsafe extern "C" fn infinite_loop(
-            &mut _vmctx,
-        ) -> () {
-            loop {}
+    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) -> () {
+        loop {}
+    }
+
+    extern "C" fn fatal(vmctx: *mut lucet_vmctx) -> () {
+        extern "C" {
+            fn lucet_vmctx_get_heap(vmctx: *mut lucet_vmctx) -> *mut u8;
         }
 
-        pub unsafe extern "C" fn fatal(
-            &mut vmctx,
-        ) -> () {
-            let heap_base = vmctx.heap_mut().as_mut_ptr();
+        unsafe {
+            let heap_base = lucet_vmctx_get_heap(vmctx);
 
             // Using the default limits, each instance as of this writing takes up 0x200026000 bytes
-            // worth of virtual address space. We want to access a point beyond all the instances, so
-            // that memory is unmapped. We assume no more than 16 instances are mapped
-            // concurrently. This may change as the library, test configuration, linker, phase of moon,
-            // etc change, but for now it works.
+            // worth of virtual address space. We want to access a point beyond all the instances,
+            // so that memory is unmapped. We assume no more than 16 instances are mapped
+            // concurrently. This may change as the library, test configuration, linker, phase of
+            // moon, etc change, but for now it works.
             *heap_base.offset(0x200026000 * 16) = 0;
         }
+    }
 
-        pub unsafe extern "C" fn recoverable_fatal(
-            &mut _vmctx,
-        ) -> () {
-            use std::os::raw::c_char;
-            extern "C" {
-                fn guest_recoverable_get_ptr() -> *mut c_char;
-            }
+    extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) -> () {
+        use std::os::raw::c_char;
+        extern "C" {
+            fn guest_recoverable_get_ptr() -> *mut c_char;
+        }
+
+        unsafe {
             *guest_recoverable_get_ptr() = '\0' as c_char;
         }
     }

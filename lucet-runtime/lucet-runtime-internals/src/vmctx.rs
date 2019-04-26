@@ -13,11 +13,24 @@ use crate::instance::{
     HOST_CTX,
 };
 use std::any::Any;
+use std::borrow::{Borrow, BorrowMut};
+use std::cell::{Ref, RefCell, RefMut};
 
 /// An opaque handle to a running instance's context.
 #[derive(Debug)]
 pub struct Vmctx {
     vmctx: *mut lucet_vmctx,
+    heap: RefCell<Box<[u8]>>,
+    globals: RefCell<Box<[i64]>>,
+}
+
+impl Drop for Vmctx {
+    fn drop(&mut self) {
+        let heap = self.heap.replace(Box::new([]));
+        let globals = self.globals.replace(Box::new([]));
+        Box::leak(heap);
+        Box::leak(globals);
+    }
 }
 
 pub trait VmctxInternal {
@@ -48,11 +61,18 @@ impl VmctxInternal for Vmctx {
 impl Vmctx {
     /// Create a `Vmctx` from the compiler-inserted `vmctx` argument in a guest
     /// function.
+    ///
+    /// This is almost certainly not what you want to use to get a `Vmctx`; instead use the `&mut
+    /// Vmctx` argument to a `lucet_hostcalls!`-wrapped function.
     pub unsafe fn from_raw(vmctx: *mut lucet_vmctx) -> Vmctx {
-        let res = Vmctx { vmctx };
-        // we don't actually need the instance for this call, but asking for it here causes an
-        // earlier failure if the pointer isn't valid
-        assert!(res.instance().valid_magic());
+        let inst = instance_from_vmctx(vmctx);
+        assert!(inst.valid_magic());
+
+        let res = Vmctx {
+            vmctx,
+            heap: RefCell::new(Box::<[u8]>::from_raw(inst.heap_mut())),
+            globals: RefCell::new(Box::<[i64]>::from_raw(inst.globals_mut())),
+        };
         res
     }
 
@@ -62,13 +82,27 @@ impl Vmctx {
     }
 
     /// Return the WebAssembly heap as a slice of bytes.
-    pub fn heap(&self) -> &[u8] {
-        self.instance().heap()
+    ///
+    /// If the heap is already mutably borrowed by `heap_mut()`, the instance will
+    /// terminate with `TerminationDetails::BorrowError`.
+    pub fn heap(&self) -> Ref<[u8]> {
+        let r = self
+            .heap
+            .try_borrow()
+            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("heap")));
+        Ref::map(r, |b| b.borrow())
     }
 
     /// Return the WebAssembly heap as a mutable slice of bytes.
-    pub fn heap_mut(&mut self) -> &mut [u8] {
-        unsafe { self.instance_mut().heap_mut() }
+    ///
+    /// If the heap is already borrowed by `heap()` or `heap_mut()`, the instance will terminate
+    /// with `TerminationDetails::BorrowError`.
+    pub fn heap_mut(&self) -> RefMut<[u8]> {
+        let r = self
+            .heap
+            .try_borrow_mut()
+            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("heap_mut")));
+        RefMut::map(r, |b| b.borrow_mut())
     }
 
     /// Check whether a given range in the host address space overlaps with the memory that backs
@@ -82,27 +116,33 @@ impl Vmctx {
         self.instance().contains_embed_ctx::<T>()
     }
 
-    /// Get a reference to a context value of a particular type. If it does not exist,
-    /// the context will terminate.
-    pub fn get_embed_ctx<T: Any>(&self) -> &T {
-        match self.instance().embed_ctx.get::<T>() {
-            Some(t) => t,
-            None => {
-                // this value will be caught by the wrapper in `lucet_hostcalls!`
-                panic!(TerminationDetails::GetEmbedCtx)
-            }
+    /// Get a reference to a context value of a particular type.
+    ///
+    /// If a context of that type does not exist, the instance will terminate with
+    /// `TerminationDetails::CtxNotFound`.
+    ///
+    /// If the context is already mutably borrowed by `get_embed_ctx_mut`, the instance will
+    /// terminate with `TerminationDetails::BorrowError`.
+    pub fn get_embed_ctx<T: Any>(&self) -> Ref<T> {
+        match self.instance().embed_ctx.try_get::<T>() {
+            Some(Ok(t)) => t,
+            Some(Err(_)) => panic!(TerminationDetails::BorrowError("get_embed_ctx")),
+            None => panic!(TerminationDetails::CtxNotFound),
         }
     }
 
-    /// Get a mutable reference to a context value of a particular type> If it does not exist,
-    /// the context will terminate.
-    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> &mut T {
-        match unsafe { self.instance_mut().embed_ctx.get_mut::<T>() } {
-            Some(t) => t,
-            None => {
-                // this value will be caught by the wrapper in `lucet_hostcalls!`
-                panic!(TerminationDetails::GetEmbedCtx)
-            }
+    /// Get a mutable reference to a context value of a particular type.
+    ///
+    /// If a context of that type does not exist, the instance will terminate with
+    /// `TerminationDetails::CtxNotFound`.
+    ///
+    /// If the context is already borrowed by some other use of `get_embed_ctx` or
+    /// `get_embed_ctx_mut`, the instance will terminate with `TerminationDetails::BorrowError`.
+    pub fn get_embed_ctx_mut<T: Any>(&self) -> RefMut<T> {
+        match unsafe { self.instance_mut().embed_ctx.try_get_mut::<T>() } {
+            Some(Ok(t)) => t,
+            Some(Err(_)) => panic!(TerminationDetails::BorrowError("get_embed_ctx_mut")),
+            None => panic!(TerminationDetails::CtxNotFound),
         }
     }
 
@@ -123,13 +163,27 @@ impl Vmctx {
     }
 
     /// Return the WebAssembly globals as a slice of `i64`s.
-    pub fn globals(&self) -> &[i64] {
-        self.instance().globals()
+    ///
+    /// If the globals are already mutably borrowed by `globals_mut()`, the instance will terminate
+    /// with `TerminationDetails::BorrowError`.
+    pub fn globals(&self) -> Ref<[i64]> {
+        let r = self
+            .globals
+            .try_borrow()
+            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("globals")));
+        Ref::map(r, |b| b.borrow())
     }
 
     /// Return the WebAssembly globals as a mutable slice of `i64`s.
-    pub fn globals_mut(&mut self) -> &mut [i64] {
-        unsafe { self.instance_mut().globals_mut() }
+    ///
+    /// If the globals are already borrowed by `globals()` or `globals_mut()`, the instance will
+    /// terminate with `TerminationDetails::BorrowError`.
+    pub fn globals_mut(&self) -> RefMut<[i64]> {
+        let r = self
+            .globals
+            .try_borrow_mut()
+            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("globals_mut")));
+        RefMut::map(r, |b| b.borrow_mut())
     }
 
     /// Get a function pointer by WebAssembly table and function index.

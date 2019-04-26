@@ -5,11 +5,13 @@ macro_rules! host_tests {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, Limits, Region, TrapCode,
+            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, Limits, Region,
+            TerminationDetails, TrapCode,
         };
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
+        use $crate::helpers::MockModuleBuilder;
         #[test]
         fn load_module() {
             let _module = test_module_c("host", "trivial.c").expect("build and load module");
@@ -63,6 +65,41 @@ macro_rules! host_tests {
                 }
                 drop(lock);
             }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_bad_borrow(
+                &mut vmctx,
+            ) -> bool {
+                let heap = vmctx.heap();
+                let mut other_heap = vmctx.heap_mut();
+                heap[0] == other_heap[0]
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_missing_embed_ctx(
+                &mut vmctx,
+            ) -> bool {
+                struct S {
+                    x: bool
+                }
+                let ctx = vmctx.get_embed_ctx::<S>();
+                ctx.x
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_multiple_vmctx(
+                &mut vmctx,
+            ) -> bool {
+                let mut vmctx1 = Vmctx::from_raw(vmctx.as_raw());
+                vmctx1.heap_mut()[0] = 0xAF;
+                drop(vmctx1);
+
+                let mut vmctx2 = Vmctx::from_raw(vmctx.as_raw());
+                let res = vmctx2.heap()[0] == 0xAF;
+                drop(vmctx2);
+
+                res
+            }
         }
 
         #[test]
@@ -97,7 +134,7 @@ macro_rules! host_tests {
 
             inst.run(b"main", &[]).expect("instance runs");
 
-            assert!(inst.get_embed_ctx::<bool>().unwrap());
+            assert!(*inst.get_embed_ctx::<bool>().unwrap().unwrap());
         }
 
         #[test]
@@ -165,6 +202,87 @@ macro_rules! host_tests {
                     panic!("unexpected result: {:?}", res);
                 }
             }
+        }
+
+        #[test]
+        fn run_hostcall_bad_borrow() {
+            extern "C" {
+                fn hostcall_bad_borrow(vmctx: *mut lucet_vmctx) -> bool;
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                hostcall_bad_borrow(vmctx);
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(b"f", f as *const extern "C" fn())
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(b"f", &[]) {
+                Err(Error::RuntimeTerminated(details)) => {
+                    assert_eq!(details, TerminationDetails::BorrowError("heap_mut"));
+                }
+                res => {
+                    panic!("unexpected result: {:?}", res);
+                }
+            }
+        }
+
+        #[test]
+        fn run_hostcall_missing_embed_ctx() {
+            extern "C" {
+                fn hostcall_missing_embed_ctx(vmctx: *mut lucet_vmctx) -> bool;
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                hostcall_missing_embed_ctx(vmctx);
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(b"f", f as *const extern "C" fn())
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(b"f", &[]) {
+                Err(Error::RuntimeTerminated(details)) => {
+                    assert_eq!(details, TerminationDetails::CtxNotFound);
+                }
+                res => {
+                    panic!("unexpected result: {:?}", res);
+                }
+            }
+        }
+
+        #[test]
+        fn run_hostcall_multiple_vmctx() {
+            extern "C" {
+                fn hostcall_multiple_vmctx(vmctx: *mut lucet_vmctx) -> bool;
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                hostcall_multiple_vmctx(vmctx);
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(b"f", f as *const extern "C" fn())
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            let retval = inst.run(b"f", &[]).expect("instance runs");
+            assert_eq!(bool::from(retval), true);
         }
     };
 }

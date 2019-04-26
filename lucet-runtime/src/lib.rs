@@ -82,7 +82,7 @@
 //!     pub unsafe extern "C" fn foo(
 //!         &mut vmctx,
 //!     ) -> () {
-//!         let hostcall_context = vmctx.get_embed_ctx_mut::<MyContext>();
+//!         let mut hostcall_context = vmctx.get_embed_ctx_mut::<MyContext>();
 //!         hostcall_context.x = 42;
 //!     }
 //! }
@@ -97,7 +97,7 @@
 //!
 //! inst.run(b"call_foo", &[]).unwrap();
 //!
-//! let context_after = inst.get_embed_ctx::<MyContext>().unwrap();
+//! let context_after = inst.get_embed_ctx::<MyContext>().unwrap().unwrap();
 //! assert_eq!(context_after.x, 42);
 //! ```
 //!

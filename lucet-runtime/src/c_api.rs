@@ -283,7 +283,7 @@ pub unsafe extern "C" fn lucet_instance_grow_heap(
 pub unsafe extern "C" fn lucet_instance_embed_ctx(inst: *mut lucet_instance) -> *mut c_void {
     with_instance_ptr_unchecked!(inst, {
         inst.get_embed_ctx::<*mut c_void>()
-            .map(|p| *p)
+            .map(|r| r.map(|p| *p).unwrap_or(ptr::null_mut()))
             .unwrap_or(ptr::null_mut())
     })
 }
@@ -442,7 +442,7 @@ lucet_hostcalls! {
     ) -> *mut c_void {
         vmctx.instance()
             .get_embed_ctx::<*mut c_void>()
-            .map(|p| *p)
+            .map(|r| r.map(|p| *p).unwrap_or(ptr::null_mut()))
             .unwrap_or(std::ptr::null_mut())
     }
 }
