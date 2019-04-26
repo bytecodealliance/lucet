@@ -4,7 +4,9 @@ use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle};
 use crate::module::Module;
 use crate::region::{Region, RegionCreate, RegionInternal};
-use libc::{c_void, memset, SIGSTKSZ};
+#[cfg(not(target_os = "linux"))]
+use libc::memset;
+use libc::{c_void, SIGSTKSZ};
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::ptr;
 use std::sync::{Arc, Mutex, Weak};
