@@ -31,7 +31,7 @@ if docker image inspect lucet:latest > /dev/null; then
 fi
 
 echo "Now creating lucet:latest on top of lucet-dev:latest"
-docker run --name=lucet-dev --detach --mount type=bind,src="$(cd $(dirname ${0}); pwd -P),target=/lucet" \
+docker run --name=lucet-dev --detach --mount type=bind,src="$(cd $(dirname ${0}); pwd),target=/lucet" \
         lucet-dev:latest /bin/sleep 99999999 > /dev/null
 
 echo "Building and installing optimized files in [$HOST_LUCET_MOUNT_POINT]"
