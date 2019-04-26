@@ -100,6 +100,13 @@ impl RegionInternal for MmapRegion {
         {
             // eprintln!("setting none {:p}[{:x}]", *ptr, len);
             unsafe {
+                // MADV_DONTNEED is not guaranteed to clear pages on non-Linux systems
+                #[cfg(not(target_os = "linux"))]
+                {
+                    mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)
+                        .expect("mprotect succeeds during drop");
+                    memset(*ptr, 0, *len);
+                }
                 mprotect(*ptr, *len, ProtFlags::PROT_NONE).expect("mprotect succeeds during drop");
                 madvise(*ptr, *len, MmapAdvise::MADV_DONTNEED)
                     .expect("madvise succeeds during drop");
