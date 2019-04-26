@@ -1,4 +1,5 @@
-use lucet_runtime::vmctx::lucet_vmctx;
+use lucet_runtime::vmctx::{Vmctx, lucet_vmctx};
+use lucet_runtime::lucet_hostcalls;
 use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder, Module};
 use lucet_wasi_sdk::{CompileOpts, Lucetc};
 use lucetc::{Bindings, LucetcOpts};
@@ -173,5 +174,37 @@ pub fn many_args_mock() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(b"f", f as *const extern "C" fn())
+        .build()
+}
+
+pub fn hostcalls_mock() -> Arc<dyn Module> {
+    lucet_hostcalls! {
+        pub unsafe extern "C" fn hostcall_wrapped(
+            &mut vmctx,
+        ) -> () {
+            assert_eq!(vmctx.heap()[0], 0);
+        }
+    }
+
+    unsafe extern "C" fn hostcall_raw(vmctx: *mut lucet_vmctx) {
+        let vmctx = Vmctx::from_raw(vmctx);
+        assert_eq!(vmctx.heap()[0], 0);
+    }
+
+    unsafe extern "C" fn wrapped(vmctx: *mut lucet_vmctx) {
+        for _ in 0..1000 {
+            hostcall_wrapped(vmctx);
+        }
+    }
+
+    unsafe extern "C" fn raw(vmctx: *mut lucet_vmctx) {
+        for _ in 0..1000 {
+            hostcall_raw(vmctx);
+        }
+    }
+
+    MockModuleBuilder::new()
+        .with_export_func(b"wrapped", wrapped as *const extern "C" fn())
+        .with_export_func(b"raw", raw as *const extern "C" fn())
         .build()
 }
