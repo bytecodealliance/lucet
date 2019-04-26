@@ -38,13 +38,14 @@ macro_rules! lucet_hostcalls {
                 vmctx_raw: *mut $crate::vmctx::lucet_vmctx,
                 $( $arg: $arg_ty ),*
             ) -> $ret_ty {
+                #[inline(always)]
                 unsafe fn hostcall_impl(
                     $vmctx: &mut $crate::vmctx::Vmctx,
                     $( $arg : $arg_ty ),*
                 ) -> $ret_ty {
                     $($body)*
                 }
-                let res = std::panic::catch_unwind(|| {
+                let res = std::panic::catch_unwind(move || {
                     hostcall_impl(&mut $crate::vmctx::Vmctx::from_raw(vmctx_raw), $( $arg ),*)
                 });
                 match res {
