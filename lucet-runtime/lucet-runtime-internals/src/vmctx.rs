@@ -9,8 +9,7 @@ use crate::alloc::instance_heap_offset;
 use crate::context::Context;
 use crate::error::Error;
 use crate::instance::{
-    Instance, InstanceHandle, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE,
-    HOST_CTX,
+    Instance, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
 };
 use std::any::Any;
 use std::borrow::{Borrow, BorrowMut};
@@ -22,9 +21,6 @@ pub struct Vmctx {
     vmctx: *mut lucet_vmctx,
     heap: RefCell<Box<[u8]>>,
     globals: RefCell<Box<[i64]>>,
-
-    // only used for the `vmctx_from_mock_instance` fake vmctxs
-    check_instance: bool,
 }
 
 impl Drop for Vmctx {
@@ -53,11 +49,11 @@ pub trait VmctxInternal {
 
 impl VmctxInternal for Vmctx {
     fn instance(&self) -> &Instance {
-        unsafe { instance_from_vmctx(self.vmctx, self.check_instance) }
+        unsafe { instance_from_vmctx(self.vmctx) }
     }
 
     unsafe fn instance_mut(&self) -> &mut Instance {
-        instance_from_vmctx(self.vmctx, self.check_instance)
+        instance_from_vmctx(self.vmctx)
     }
 }
 
@@ -67,14 +63,13 @@ impl Vmctx {
     /// This is almost certainly not what you want to use to get a `Vmctx`; instead use the `&mut
     /// Vmctx` argument to a `lucet_hostcalls!`-wrapped function.
     pub unsafe fn from_raw(vmctx: *mut lucet_vmctx) -> Vmctx {
-        let inst = instance_from_vmctx(vmctx, true);
+        let inst = instance_from_vmctx(vmctx);
         assert!(inst.valid_magic());
 
         let res = Vmctx {
             vmctx,
             heap: RefCell::new(Box::<[u8]>::from_raw(inst.heap_mut())),
             globals: RefCell::new(Box::<[i64]>::from_raw(inst.globals_mut())),
-            check_instance: true,
         };
         res
     }
@@ -234,33 +229,28 @@ impl Vmctx {
 /// Get an `Instance` from the `vmctx` pointer.
 ///
 /// Only safe to call from within the guest context.
-pub unsafe fn instance_from_vmctx<'a>(
-    vmctx: *mut lucet_vmctx,
-    check_instance: bool,
-) -> &'a mut Instance {
+pub unsafe fn instance_from_vmctx<'a>(vmctx: *mut lucet_vmctx) -> &'a mut Instance {
     assert!(!vmctx.is_null(), "vmctx is not null");
 
     let inst_ptr = (vmctx as usize - instance_heap_offset()) as *mut Instance;
 
-    if check_instance {
-        // We shouldn't actually need to access the thread local, only the exception handler should
-        // need to. But, as long as the thread local exists, we should make sure that the guest
-        // hasn't pulled any shenanigans and passed a bad vmctx. (Codegen should ensure the guest
-        // cant pull any shenanigans but there have been bugs before.)
-        CURRENT_INSTANCE.with(|current_instance| {
-            if let Some(current_inst_ptr) = current_instance.borrow().map(|nn| nn.as_ptr()) {
-                assert_eq!(
-                    inst_ptr, current_inst_ptr,
-                    "vmctx corresponds to current instance"
-                );
-            } else {
-                panic!(
-                    "current instance is not set; thread local storage failure can indicate \
-                     dynamic linking issues"
-                );
-            }
-        });
-    }
+    // We shouldn't actually need to access the thread local, only the exception handler should
+    // need to. But, as long as the thread local exists, we should make sure that the guest
+    // hasn't pulled any shenanigans and passed a bad vmctx. (Codegen should ensure the guest
+    // cant pull any shenanigans but there have been bugs before.)
+    CURRENT_INSTANCE.with(|current_instance| {
+        if let Some(current_inst_ptr) = current_instance.borrow().map(|nn| nn.as_ptr()) {
+            assert_eq!(
+                inst_ptr, current_inst_ptr,
+                "vmctx corresponds to current instance"
+            );
+        } else {
+            panic!(
+                "current instance is not set; thread local storage failure can indicate \
+                 dynamic linking issues"
+            );
+        }
+    });
 
     let inst = inst_ptr.as_mut().unwrap();
     assert!(inst.valid_magic());
@@ -276,32 +266,5 @@ impl Instance {
         self.state = State::Terminated { details };
         #[allow(unused_unsafe)] // The following unsafe will be incorrectly warned as unused
         HOST_CTX.with(|host_ctx| unsafe { Context::set(&*host_ctx.get()) })
-    }
-}
-
-/// Unsafely get a `Vmctx` from an `InstanceHandle` without checking the current instance TLS
-/// variable.
-///
-/// This is provided for compatibility with the Terrarium memory management test suite, but should
-/// absolutely not be used in newer code.
-#[deprecated]
-#[allow(deprecated)]
-pub unsafe fn vmctx_from_mock_instance(inst: &InstanceHandle) -> Vmctx {
-    Vmctx::from_raw_unchecked(inst.alloc().slot().heap as *mut lucet_vmctx)
-}
-
-impl Vmctx {
-    #[deprecated]
-    unsafe fn from_raw_unchecked(vmctx: *mut lucet_vmctx) -> Vmctx {
-        let inst = instance_from_vmctx(vmctx, false);
-        assert!(inst.valid_magic());
-
-        let res = Vmctx {
-            vmctx,
-            heap: RefCell::new(Box::<[u8]>::from_raw(inst.heap_mut())),
-            globals: RefCell::new(Box::<[i64]>::from_raw(inst.globals_mut())),
-            check_instance: false,
-        };
-        res
     }
 }
