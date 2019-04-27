@@ -26,7 +26,7 @@ use crate::pretty_writer::PrettyWriter;
 use crate::module::Module;
 use std::io::Write;
 
-pub fn run<W: Write>(config: &Config, input: &str, output: W) -> Result<(), IDLError> {
+pub fn run<W: Write>(config: &Config, input: &str, output: W) -> Result<W, IDLError> {
     let mut parser = Parser::new(&input);
     let decls = parser.match_decls()?;
 
@@ -43,5 +43,5 @@ pub fn run<W: Write>(config: &Config, input: &str, output: W) -> Result<(), IDLE
     for id in deps {
         generator.gen_for_id(&module, &mut cache, &mut pretty_writer, id)?;
     }
-    Ok(())
+    Ok(pretty_writer.into_inner().expect("outermost pretty_writer can unwrap"))
 }

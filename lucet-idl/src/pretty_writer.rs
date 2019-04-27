@@ -102,4 +102,8 @@ impl<W: Write> PrettyWriter<W> {
     pub fn write_line(&mut self, buf: &[u8]) -> Result<&mut Self, IDLError> {
         self.indent()?.write(buf)?.eol()
     }
+
+    pub fn into_inner(self) -> Option<W> {
+        Rc::try_unwrap(self.writer).ok().map(|w| w.into_inner())
+    }
 }
