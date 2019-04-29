@@ -54,6 +54,7 @@ thread_local! {
 /// though it were a `&mut Instance`.
 pub struct InstanceHandle {
     inst: NonNull<Instance>,
+    needs_inst_drop: bool,
 }
 
 // raw pointer lint
@@ -77,13 +78,15 @@ pub fn new_instance_handle(
     let inst = NonNull::new(instance)
         .ok_or(lucet_format_err!("instance pointer is null; this is a bug"))?;
 
-    // do this check first so we don't run `InstanceHandle::drop()` for a failure
     lucet_ensure!(
         unsafe { inst.as_ref().magic } != LUCET_INSTANCE_MAGIC,
         "created a new instance handle in memory with existing instance magic; this is a bug"
     );
 
-    let mut handle = InstanceHandle { inst };
+    let mut handle = InstanceHandle {
+        inst,
+        needs_inst_drop: false,
+    };
 
     let inst = Instance::new(alloc, module, embed_ctx);
 
@@ -96,20 +99,25 @@ pub fn new_instance_handle(
         ptr::write(&mut *handle, inst);
     };
 
+    handle.needs_inst_drop = true;
+
     handle.reset()?;
 
     Ok(handle)
 }
 
-pub fn instance_handle_to_raw(inst: InstanceHandle) -> *mut Instance {
-    let ptr = inst.inst.as_ptr();
-    std::mem::forget(inst);
-    ptr
+pub fn instance_handle_to_raw(mut inst: InstanceHandle) -> *mut Instance {
+    inst.needs_inst_drop = false;
+    inst.inst.as_ptr()
 }
 
-pub unsafe fn instance_handle_from_raw(ptr: *mut Instance) -> InstanceHandle {
+pub unsafe fn instance_handle_from_raw(
+    ptr: *mut Instance,
+    needs_inst_drop: bool,
+) -> InstanceHandle {
     InstanceHandle {
         inst: NonNull::new_unchecked(ptr),
+        needs_inst_drop,
     }
 }
 
@@ -132,12 +140,14 @@ impl DerefMut for InstanceHandle {
 
 impl Drop for InstanceHandle {
     fn drop(&mut self) {
-        // run the destructor by taking and dropping the inner `Instance`
-        unsafe {
-            // make sure magic is zeroed, but allow everything else to be uninitialized
-            let mut uninit: Instance = mem::uninitialized();
-            uninit.magic = 0;
-            mem::replace(self.inst.as_mut(), uninit);
+        if self.needs_inst_drop {
+            // run the destructor by taking and dropping the inner `Instance`
+            unsafe {
+                // make sure magic is zeroed, but allow everything else to be uninitialized
+                let mut uninit: Instance = mem::uninitialized();
+                uninit.magic = 0;
+                mem::replace(self.inst.as_mut(), uninit);
+            }
         }
     }
 }
