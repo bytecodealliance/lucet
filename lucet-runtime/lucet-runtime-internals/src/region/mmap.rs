@@ -91,7 +91,8 @@ impl RegionInternal for MmapRegion {
 
         // clear and disable access to the heap, stack, globals, and sigstack
         for (ptr, len) in [
-            (slot.heap, slot.limits.heap_address_space_size),
+            // We don't ever shrink the heap, so we only need to zero up until the accessible size
+            (slot.heap, alloc.heap_accessible_size),
             (slot.stack, slot.limits.stack_size),
             (slot.globals, slot.limits.globals_size),
             (slot.sigstack, SIGSTKSZ),
@@ -100,6 +101,13 @@ impl RegionInternal for MmapRegion {
         {
             // eprintln!("setting none {:p}[{:x}]", *ptr, len);
             unsafe {
+                // MADV_DONTNEED is not guaranteed to clear pages on non-Linux systems
+                #[cfg(not(target_os = "linux"))]
+                {
+                    mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)
+                        .expect("mprotect succeeds during drop");
+                    memset(*ptr, 0, *len);
+                }
                 mprotect(*ptr, *len, ProtFlags::PROT_NONE).expect("mprotect succeeds during drop");
                 madvise(*ptr, *len, MmapAdvise::MADV_DONTNEED)
                     .expect("madvise succeeds during drop");
