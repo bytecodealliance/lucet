@@ -20,4 +20,4 @@ exclude = ["cranelift"]
 rpath = true
 
 [replace]
-"faerie:0.9.1" = { path = "faerie" }
+"faerie:0.10.0" = { path = "faerie" }
