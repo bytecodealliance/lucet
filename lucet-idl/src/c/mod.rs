@@ -1,24 +1,24 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-mod catom;
 mod accessors;
 mod alias;
+mod catom;
 mod r#enum;
+mod macros;
 mod prelude;
 mod r#struct;
 mod tagged_union;
-mod macros;
 
 pub(crate) use self::catom::*;
 use crate::backend::*;
 use crate::cache::*;
-use crate::module::*;
 use crate::errors::*;
 use crate::generator::{Generator, Hierarchy};
+use crate::module::*;
+use crate::module::{DataTypeEntry, DataTypeRef, Module};
 use crate::pretty_writer::*;
 use crate::target::*;
-use crate::module::{DataTypeRef, DataTypeEntry, Module};
 use std::io::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -76,13 +76,7 @@ impl<W: Write> Generator<W> for CGenerator {
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        alias::generate(
-            self,
-            module,
-            cache,
-            pretty_writer,
-            data_type_entry,
-        )
+        alias::generate(self, module, cache, pretty_writer, data_type_entry)
     }
 
     fn gen_struct(
@@ -92,13 +86,7 @@ impl<W: Write> Generator<W> for CGenerator {
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        r#struct::generate(
-            self,
-            module,
-            cache,
-            pretty_writer,
-            data_type_entry,
-        )
+        r#struct::generate(self, module, cache, pretty_writer, data_type_entry)
     }
 
     // Enums generate both a specific typedef, and a traditional C-style enum
@@ -110,13 +98,7 @@ impl<W: Write> Generator<W> for CGenerator {
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        r#enum::generate(
-            self,
-            module,
-            cache,
-            pretty_writer,
-            data_type_entry,
-        )
+        r#enum::generate(self, module, cache, pretty_writer, data_type_entry)
     }
 
     fn gen_tagged_union(
@@ -126,13 +108,7 @@ impl<W: Write> Generator<W> for CGenerator {
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        tagged_union::generate(
-            self,
-            module,
-            cache,
-            pretty_writer,
-            data_type_entry,
-        )
+        tagged_union::generate(self, module, cache, pretty_writer, data_type_entry)
     }
 
     fn gen_accessors_struct(
@@ -303,11 +279,7 @@ impl CGenerator {
     }
 
     // Return `true` if the type is an atom, an emum, or an alias to one of these
-    pub fn is_type_eventually_an_atom_or_enum(
-        &self,
-        module: &Module,
-        type_: &DataTypeRef,
-    ) -> bool {
+    pub fn is_type_eventually_an_atom_or_enum(&self, module: &Module, type_: &DataTypeRef) -> bool {
         let inner_type = match type_ {
             DataTypeRef::Atom(_) => return true,
             DataTypeRef::Ptr(_) => return false,
@@ -318,18 +290,12 @@ impl CGenerator {
         match inner_data_type {
             DataType::Struct { .. } | DataType::TaggedUnion { .. } => false,
             DataType::Enum { .. } => true,
-            DataType::Alias { to, .. } => {
-                self.is_type_eventually_an_atom_or_enum(module, to)
-            }
+            DataType::Alias { to, .. } => self.is_type_eventually_an_atom_or_enum(module, to),
         }
     }
 
     /// Return the type refererence, with aliases being resolved
-    pub fn unalias<'t>(
-        &self,
-        module: &'t Module,
-        type_: &'t DataTypeRef,
-    ) -> &'t DataTypeRef {
+    pub fn unalias<'t>(&self, module: &'t Module, type_: &'t DataTypeRef) -> &'t DataTypeRef {
         let inner_type = match type_ {
             DataTypeRef::Atom(_) | DataTypeRef::Ptr(_) => return type_,
             DataTypeRef::Defined(inner_type) => inner_type,
@@ -381,28 +347,15 @@ impl CGenerator {
     ) -> Result<(), IDLError> {
         let type_ = self.unalias(module, type_);
         match type_ {
-            DataTypeRef::Atom(atom_type) => accessors::atom::generate(
-                self,
-                module,
-                pretty_writer,
-                *atom_type,
-                &hierarchy,
-            ),
-            DataTypeRef::Ptr(type_) => accessors::ptr::generate(
-                self,
-                module,
-                cache,
-                pretty_writer,
-                type_,
-                &hierarchy,
-            ),
-            DataTypeRef::Defined(data_type_id) => self.gen_accessors_for_id(
-                module,
-                cache,
-                pretty_writer,
-                *data_type_id,
-                &hierarchy,
-            ),
+            DataTypeRef::Atom(atom_type) => {
+                accessors::atom::generate(self, module, pretty_writer, *atom_type, &hierarchy)
+            }
+            DataTypeRef::Ptr(type_) => {
+                accessors::ptr::generate(self, module, cache, pretty_writer, type_, &hierarchy)
+            }
+            DataTypeRef::Defined(data_type_id) => {
+                self.gen_accessors_for_id(module, cache, pretty_writer, *data_type_id, &hierarchy)
+            }
         }
     }
 }

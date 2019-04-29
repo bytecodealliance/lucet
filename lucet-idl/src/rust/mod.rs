@@ -5,9 +5,9 @@ use crate::backend::*;
 use crate::cache::*;
 use crate::errors::*;
 use crate::generator::{Generator, Hierarchy};
+use crate::module::{DataTypeEntry, DataTypeRef, Module};
 use crate::pretty_writer::*;
 use crate::target::*;
-use crate::module::{Module, DataTypeEntry, DataTypeRef};
 use std::io::prelude::*;
 
 #[derive(Clone, Debug)]

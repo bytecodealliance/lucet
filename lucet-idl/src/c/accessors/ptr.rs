@@ -2,7 +2,7 @@ use crate::c::CGenerator;
 use crate::cache::Cache;
 use crate::errors::IDLError;
 use crate::generator::Hierarchy;
-use crate::module::{Module, DataTypeRef};
+use crate::module::{DataTypeRef, Module};
 use crate::pretty_writer::PrettyWriter;
 use std::io::prelude::*;
 

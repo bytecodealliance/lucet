@@ -59,7 +59,6 @@ impl fmt::Display for Name {
     }
 }
 
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Module {
     pub names: Vec<Name>,
@@ -424,7 +423,6 @@ impl Module {
             data_type,
         }
     }
-
 }
 
 #[cfg(test)]
@@ -480,9 +478,7 @@ mod tests {
 
         // Duplicate member in struct
         assert_eq!(
-            module("struct foo { \na: i32, \na: f64}")
-                .err()
-                .unwrap(),
+            module("struct foo { \na: i32, \na: f64}").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "a".to_owned(),
                 at_location: Location { line: 3, column: 0 },
@@ -541,15 +537,9 @@ mod tests {
         assert!(module("taggedunion cons { succ: *cons, nil: () }").is_ok());
 
         // Refer to a taggedunion defined previously:
-        assert!(
-            module("taggedunion foo { a: i32, b: f64 } taggedunion bar { a: foo }")
-                .is_ok()
-        );
+        assert!(module("taggedunion foo { a: i32, b: f64 } taggedunion bar { a: foo }").is_ok());
         // Refer to a taggedunion defined afterwards:
-        assert!(
-            module("taggedunion foo { a: i32, b: bar} taggedunion bar { a: i32 }")
-                .is_ok()
-        );
+        assert!(module("taggedunion foo { a: i32, b: bar} taggedunion bar { a: i32 }").is_ok());
 
         // No members
         assert_eq!(
@@ -586,9 +576,7 @@ mod tests {
 
         // Refer to type that is not declared
         assert_eq!(
-            module("taggedunion foo { \nb: bar }")
-                .err()
-                .unwrap(),
+            module("taggedunion foo { \nb: bar }").err().unwrap(),
             ValidationError::NameNotFound {
                 name: "bar".to_owned(),
                 use_location: Location { line: 2, column: 3 },
@@ -632,9 +620,7 @@ mod tests {
 
         // Duplicate definition of enum
         assert_eq!(
-            module("enum foo { a }\nenum foo { a } ")
-                .err()
-                .unwrap(),
+            module("enum foo { a }\nenum foo { a } ").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "foo".to_owned(),
                 at_location: Location { line: 2, column: 0 },
@@ -651,17 +637,13 @@ mod tests {
 
         assert!(module("type foo = *bar\nenum bar { a }").is_ok());
 
-        assert!(
-            module("type link = *list\nstruct list { next: link, thing: i32 }").is_ok()
-        );
+        assert!(module("type link = *list\nstruct list { next: link, thing: i32 }").is_ok());
     }
 
     #[test]
     fn infinite() {
         assert_eq!(
-            module("type foo = bar\ntype bar = foo")
-                .err()
-                .unwrap(),
+            module("type foo = bar\ntype bar = foo").err().unwrap(),
             ValidationError::Infinite {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
@@ -679,11 +661,9 @@ mod tests {
         );
 
         assert_eq!(
-            module(
-                "type foo = bar\nstruct bar { a: baz }\ntaggedunion baz { c: i32, e: foo }"
-            )
-            .err()
-            .unwrap(),
+            module("type foo = bar\nstruct bar { a: baz }\ntaggedunion baz { c: i32, e: foo }")
+                .err()
+                .unwrap(),
             ValidationError::Infinite {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },

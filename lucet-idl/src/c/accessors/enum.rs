@@ -1,11 +1,11 @@
-use crate::c::CGenerator;
 use crate::c::catom::CAtom;
 use crate::c::macros;
-use crate::module::{Module, DataTypeEntry, DataType};
+use crate::c::CGenerator;
 use crate::cache::Cache;
-use crate::pretty_writer::PrettyWriter;
-use crate::generator::Hierarchy;
 use crate::errors::IDLError;
+use crate::generator::Hierarchy;
+use crate::module::{DataType, DataTypeEntry, Module};
+use crate::pretty_writer::PrettyWriter;
 use std::io::prelude::*;
 
 pub fn generate<W: Write>(

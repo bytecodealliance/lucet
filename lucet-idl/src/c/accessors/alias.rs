@@ -1,9 +1,9 @@
 use crate::c::CGenerator;
-use crate::module::{Module, DataTypeEntry, DataType};
 use crate::cache::Cache;
-use crate::pretty_writer::PrettyWriter;
-use crate::generator::Hierarchy;
 use crate::errors::IDLError;
+use crate::generator::Hierarchy;
+use crate::module::{DataType, DataTypeEntry, Module};
+use crate::pretty_writer::PrettyWriter;
 use std::io::prelude::*;
 
 pub fn generate<W: Write>(
@@ -29,8 +29,7 @@ pub fn generate<W: Write>(
     pretty_writer
         .write(format!("// `{}` is an alias for `{}`", name, type_info.type_name).as_ref())?;
     if type_info.indirections == 0 {
-        let leaf_type_info =
-            cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
+        let leaf_type_info = cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
         if leaf_type_info.type_name != type_info.type_name {
             pretty_writer
                 .write(format!(", itself equivalent to `{}`", leaf_type_info.type_name).as_ref())?;

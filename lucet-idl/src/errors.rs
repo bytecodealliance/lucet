@@ -1,4 +1,4 @@
-use crate::{parser, module};
+use crate::{module, parser};
 use std::io;
 
 #[allow(dead_code)]

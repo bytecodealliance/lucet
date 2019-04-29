@@ -1,5 +1,5 @@
-use lucet_idl::{run, IDLError, Config};
 use clap::{App, Arg};
+use lucet_idl::{run, Config, IDLError};
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;

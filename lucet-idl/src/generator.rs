@@ -1,7 +1,7 @@
 use crate::cache::Cache;
 use crate::errors::IDLError;
+use crate::module::{DataType, DataTypeEntry, DataTypeId, Module};
 use crate::pretty_writer::PrettyWriter;
-use crate::module::{DataTypeEntry, DataType, DataTypeId, Module};
 use std::io::Write;
 use std::rc::Rc;
 
@@ -147,7 +147,6 @@ pub trait Generator<W: Write> {
         Ok(())
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct HierarchyEntry {

@@ -24,8 +24,7 @@ pub fn generate<W: Write>(
     pretty_writer.write(data_type_entry.name.name.as_bytes())?;
     pretty_writer.write(b";")?;
     if type_info.indirections == 0 {
-        let leaf_type_info =
-            cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
+        let leaf_type_info = cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
         if leaf_type_info.type_name != type_info.type_name {
             pretty_writer.write(b" // equivalent to ")?;
             pretty_writer.write(leaf_type_info.type_name.as_bytes())?;
