@@ -658,6 +658,16 @@ macro_rules! alloc_tests {
                 }
             }
         }
+
+        #[test]
+        fn drop_region_first() {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let inst = region
+                .new_instance(MockModuleBuilder::new().build())
+                .expect("new_instance succeeds");
+            drop(region);
+            drop(inst);
+        }
     };
 }
 

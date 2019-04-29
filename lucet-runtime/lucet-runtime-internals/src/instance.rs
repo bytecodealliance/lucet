@@ -134,10 +134,10 @@ impl Drop for InstanceHandle {
     fn drop(&mut self) {
         // run the destructor by taking and dropping the inner `Instance`
         unsafe {
-            mem::replace(self.inst.as_mut(), mem::uninitialized());
-            // make sure magic is zeroed, as we can't depend on `uninitialized` throwing away the
-            // magic
-            self.inst.as_mut().magic = 0;
+            // make sure magic is zeroed, but allow everything else to be uninitialized
+            let mut uninit: Instance = mem::uninitialized();
+            uninit.magic = 0;
+            mem::replace(self.inst.as_mut(), uninit);
         }
     }
 }
