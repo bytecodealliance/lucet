@@ -84,6 +84,9 @@ impl Vmctx {
     /// If the heap is already mutably borrowed by `heap_mut()`, the instance will
     /// terminate with `TerminationDetails::BorrowError`.
     pub fn heap(&self) -> Ref<[u8]> {
+        unsafe {
+            self.reconstitute_heap_if_needed();
+        }
         let r = self
             .heap
             .try_borrow()
@@ -96,11 +99,22 @@ impl Vmctx {
     /// If the heap is already borrowed by `heap()` or `heap_mut()`, the instance will terminate
     /// with `TerminationDetails::BorrowError`.
     pub fn heap_mut(&self) -> RefMut<[u8]> {
+        unsafe {
+            self.reconstitute_heap_if_needed();
+        }
         let r = self
             .heap
             .try_borrow_mut()
             .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("heap_mut")));
         RefMut::map(r, |b| b.borrow_mut())
+    }
+
+    unsafe fn reconstitute_heap_if_needed(&self) {
+        let inst = self.instance_mut();
+        if inst.heap_mut().len() != self.heap.borrow().len() {
+            let old_heap = self.heap.replace(Box::<[u8]>::from_raw(inst.heap_mut()));
+            Box::leak(old_heap);
+        }
     }
 
     /// Check whether a given range in the host address space overlaps with the memory that backs

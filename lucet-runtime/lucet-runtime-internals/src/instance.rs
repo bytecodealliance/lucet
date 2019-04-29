@@ -723,11 +723,11 @@ pub enum TerminationDetails {
     /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
     BorrowError(&'static str),
     /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
-    Provided(Arc<dyn Any>),
+    Provided(Arc<dyn Any + 'static + Send + Sync>),
 }
 
 impl TerminationDetails {
-    pub fn provide<A: Any>(details: A) -> Self {
+    pub fn provide<A: Any + 'static + Send + Sync>(details: A) -> Self {
         TerminationDetails::Provided(Arc::new(details))
     }
     pub fn provided_details(&self) -> Option<&dyn Any> {

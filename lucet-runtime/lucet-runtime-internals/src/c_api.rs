@@ -195,8 +195,15 @@ pub type lucet_signal_handler = unsafe extern "C" fn(
 
 pub type lucet_fatal_handler = unsafe extern "C" fn(inst: *mut lucet_instance);
 
+pub struct CTerminationDetails {
+    pub details: *mut c_void,
+}
+
+unsafe impl Send for CTerminationDetails {}
+unsafe impl Sync for CTerminationDetails {}
+
 pub mod lucet_state {
-    use crate::c_api::lucet_val;
+    use crate::c_api::{lucet_val, CTerminationDetails};
     use crate::instance::{State, TerminationDetails};
     use crate::module::AddrDetails;
     use crate::sysdeps::UContext;
@@ -256,7 +263,7 @@ pub mod lucet_state {
                                 reason: lucet_terminated_reason::Provided,
                                 provided: p
                                     .downcast_ref()
-                                    .map(|v| *v)
+                                    .map(|CTerminationDetails { details }| *details)
                                     .unwrap_or(std::ptr::null_mut()),
                             },
                         },

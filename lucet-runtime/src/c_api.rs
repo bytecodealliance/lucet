@@ -429,9 +429,9 @@ lucet_hostcalls! {
     #[no_mangle]
     pub unsafe extern "C" fn lucet_vmctx_terminate(
         &mut _vmctx,
-        info: *mut c_void,
+        details: *mut c_void,
     ) -> () {
-        lucet_hostcall_terminate!(info);
+        lucet_hostcall_terminate!(CTerminationDetails { details});
     }
 
     #[no_mangle]
