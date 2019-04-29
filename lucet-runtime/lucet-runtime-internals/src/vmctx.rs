@@ -109,6 +109,16 @@ impl Vmctx {
         RefMut::map(r, |b| b.borrow_mut())
     }
 
+    /// Check whether the heap has grown, and replace the heap view if it has.
+    ///
+    /// This handles the case where `Vmctx::grow_memory()` and `Vmctx::heap()` are called in
+    /// sequence. Since `Vmctx::grow_memory()` takes `&mut self`, heap references cannot live across
+    /// it.
+    ///
+    /// TODO: There is still an unsound case, though, when a heap reference is held across a call
+    /// back into the guest via `Vmctx::get_func_from_idx()`. That guest code may grow the heap as
+    /// well, causing any outstanding heap references to become invalid. We will address this when
+    /// we rework the interface for calling back into the guest.
     unsafe fn reconstitute_heap_if_needed(&self) {
         let inst = self.instance_mut();
         if inst.heap_mut().len() != self.heap.borrow().len() {
