@@ -23,7 +23,7 @@ use std::ffi::{CStr, CString};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, Weak};
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
 
@@ -171,6 +171,9 @@ pub struct Instance {
 
     /// Instance state and error information
     pub(crate) state: State,
+
+    /// Small mutexed state used for remote kill switch functionality
+    kill_state: Arc<Mutex<KillState>>,
 
     /// The memory allocated for this instance
     alloc: Alloc,
@@ -465,6 +468,7 @@ impl Instance {
             state: State::Ready {
                 retval: UntypedRetVal::default(),
             },
+            kill_state: Arc::new(Mutex::new(KillState::NotStarted)),
             alloc,
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
@@ -536,6 +540,11 @@ impl Instance {
             tid: unsafe { pthread_self() },
         };
 
+        {
+            let mut kill_state = self.kill_state.lock().unwrap();
+            *kill_state = KillState::Running(unsafe { pthread_self() });
+        }
+
         // there should never be another instance running on this thread when we enter this function
         CURRENT_INSTANCE.with(|current_instance| {
             let mut current_instance = current_instance.borrow_mut();
@@ -565,6 +574,11 @@ impl Instance {
         //
         // * trapped, or called hostcall_error: state tag changed to something other than `Running`
         // * function body returned: set state back to `Ready` with return value
+
+        {
+            let mut kill_state = self.kill_state.lock().unwrap();
+            *kill_state = KillState::Exited;
+        }
 
         match &self.state {
             State::Running { .. } => {
@@ -868,4 +882,30 @@ extern "C" {
 // TODO: PR into `nix`
 fn strsignal_wrapper(sig: libc::c_int) -> CString {
     unsafe { CStr::from_ptr(strsignal(sig)).to_owned() }
+}
+
+enum KillState {
+    NotStarted,
+    Running(usize),
+    Exited,
+}
+
+struct KillSwitch {
+    kill_state: Weak<Mutex<KillState>>,
+}
+
+impl KillSwitch {
+    fn terminate(&self) -> Option<()> {
+        let kill_state = self.kill_state.upgrade().unwrap();
+        let kill_state = kill_state.lock().unwrap();
+        match *kill_state {
+            KillState::Running(thread_id) => {
+                unsafe {
+                    libc::pthread_kill(thread_id, 14 /* SIGALRM */);
+                }
+                Some(())
+            }
+            _ => None,
+        }
+    }
 }
