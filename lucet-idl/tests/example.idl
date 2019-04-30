@@ -22,11 +22,3 @@ struct st {
     self: *st
 }
 
-// Tagged unions
-
-taggedunion mixedbag {
-    a: col,
-    b: f64,
-    c: st,
-    d: ()
-}

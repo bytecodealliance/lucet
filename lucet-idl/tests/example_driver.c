@@ -16,19 +16,5 @@ int main (int argc, char *argv[]) {
         .self = &s,
     };
 
-    char *mixedbag = malloc(BYTES_MIXEDBAG);
-
-    store_mixedbag_a(mixedbag, c1);
-    assert(is_mixedbag_a(mixedbag));
-
-    store_mixedbag_b(mixedbag, 420.0);
-    assert(is_mixedbag_b(mixedbag));
-
-    store_mixedbag_c(mixedbag, &s);
-    assert(is_mixedbag_c(mixedbag));
-
-    set_mixedbag_d(mixedbag);
-    assert(is_mixedbag_d(mixedbag));
-
     return 0;
 }
