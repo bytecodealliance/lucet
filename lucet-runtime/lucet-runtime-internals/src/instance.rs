@@ -9,6 +9,7 @@ use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, Global, Module};
+use crate::region::RegionInternal;
 use crate::sysdeps::UContext;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
@@ -54,6 +55,7 @@ thread_local! {
 /// though it were a `&mut Instance`.
 pub struct InstanceHandle {
     inst: NonNull<Instance>,
+    needs_inst_drop: bool,
 }
 
 // raw pointer lint
@@ -77,13 +79,15 @@ pub fn new_instance_handle(
     let inst = NonNull::new(instance)
         .ok_or(lucet_format_err!("instance pointer is null; this is a bug"))?;
 
-    // do this check first so we don't run `InstanceHandle::drop()` for a failure
     lucet_ensure!(
         unsafe { inst.as_ref().magic } != LUCET_INSTANCE_MAGIC,
         "created a new instance handle in memory with existing instance magic; this is a bug"
     );
 
-    let mut handle = InstanceHandle { inst };
+    let mut handle = InstanceHandle {
+        inst,
+        needs_inst_drop: false,
+    };
 
     let inst = Instance::new(alloc, module, embed_ctx);
 
@@ -96,20 +100,25 @@ pub fn new_instance_handle(
         ptr::write(&mut *handle, inst);
     };
 
+    handle.needs_inst_drop = true;
+
     handle.reset()?;
 
     Ok(handle)
 }
 
-pub fn instance_handle_to_raw(inst: InstanceHandle) -> *mut Instance {
-    let ptr = inst.inst.as_ptr();
-    std::mem::forget(inst);
-    ptr
+pub fn instance_handle_to_raw(mut inst: InstanceHandle) -> *mut Instance {
+    inst.needs_inst_drop = false;
+    inst.inst.as_ptr()
 }
 
-pub unsafe fn instance_handle_from_raw(ptr: *mut Instance) -> InstanceHandle {
+pub unsafe fn instance_handle_from_raw(
+    ptr: *mut Instance,
+    needs_inst_drop: bool,
+) -> InstanceHandle {
     InstanceHandle {
         inst: NonNull::new_unchecked(ptr),
+        needs_inst_drop,
     }
 }
 
@@ -132,12 +141,25 @@ impl DerefMut for InstanceHandle {
 
 impl Drop for InstanceHandle {
     fn drop(&mut self) {
-        // run the destructor by taking and dropping the inner `Instance`
-        unsafe {
-            mem::replace(self.inst.as_mut(), mem::uninitialized());
-            // make sure magic is zeroed, as we can't depend on `uninitialized` throwing away the
-            // magic
-            self.inst.as_mut().magic = 0;
+        if self.needs_inst_drop {
+            unsafe {
+                let inst = self.inst.as_mut();
+
+                // Grab a handle to the region to ensure it outlives `inst`.
+                //
+                // This ensures that the region won't be dropped by `inst` being
+                // dropped, which could result in `inst` being unmapped by the
+                // Region *during* drop of the Instance's fields.
+                let region: Arc<dyn RegionInternal> = inst.alloc().region.clone();
+
+                // drop the actual instance
+                std::ptr::drop_in_place(inst);
+
+                // and now we can drop what may be the last Arc<Region>. If it is
+                // it can safely do what it needs with memory; we're not running
+                // destructors on it anymore.
+                mem::drop(region);
+            }
         }
     }
 }
@@ -199,6 +221,21 @@ pub struct Instance {
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
     /// It is also used to compute the size of the structure up to that point, i.e. without padding.
     _padding: (),
+}
+
+/// Users of `Instance` must be very careful about when instances are dropped!
+///
+/// Typically you will not have to worry about this, as InstanceHandle will robustly handle
+/// Instance drop semantics. If an instance is dropped, and the Region it's in has already dropped,
+/// it may contain the last reference counted pointer to its Region. If so, when Instance's
+/// destructor runs, Region will be dropped, and may free or otherwise invalidate the memory that
+/// this Instance exists in, *while* the Instance destructor is executing.
+impl Drop for Instance {
+    fn drop(&mut self) {
+        // Reset magic to indicate this instance
+        // is no longer valid
+        self.magic = 0;
+    }
 }
 
 /// APIs that are internal, but useful to implementors of extension modules; you probably don't want

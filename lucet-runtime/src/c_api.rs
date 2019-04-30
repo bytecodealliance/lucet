@@ -239,7 +239,7 @@ pub unsafe extern "C" fn lucet_instance_reset(inst: *mut lucet_instance) -> luce
 
 #[no_mangle]
 pub unsafe extern "C" fn lucet_instance_release(inst: *mut lucet_instance) {
-    instance_handle_from_raw(inst as *mut Instance);
+    instance_handle_from_raw(inst as *mut Instance, true);
 }
 
 #[no_mangle]
