@@ -8,6 +8,7 @@ use lucet_runtime_internals::module::ModuleInternal;
 use lucet_wasi::{hostcalls, WasiCtxBuilder};
 use std::fs::File;
 use std::sync::Arc;
+use std::time::Duration;
 
 struct Config<'a> {
     lucet_module: &'a str,
@@ -15,6 +16,7 @@ struct Config<'a> {
     entrypoint: &'a str,
     preopen_dirs: Vec<(File, &'a str)>,
     limits: Limits,
+    timeout: Option<Duration>,
 }
 
 fn main() {
@@ -81,6 +83,9 @@ fn main() {
                 .help("Maximum stack size (must be a multiple of 4 KiB)"),
         )
         .arg(
+            Arg::with_name("timeout").long("timeout").takes_value(true).help("Number of milliseconds the instance will be allowed to run")
+            )
+        .arg(
             Arg::with_name("guest_args")
                 .required(false)
                 .multiple(true)
@@ -131,6 +136,10 @@ fn main() {
         .into::<Byte>()
         .value() as usize;
 
+    let timeout = matches
+        .value_of("timeout")
+        .map(|t| Duration::from_millis(t.parse::<u64>().unwrap()));
+
     let limits = Limits {
         heap_memory_size,
         heap_address_space_size,
@@ -149,6 +158,7 @@ fn main() {
         entrypoint,
         preopen_dirs,
         limits,
+        timeout,
     };
 
     run(config)
@@ -186,12 +196,15 @@ fn run(config: Config) {
             .expect("instance can be created");
 
         use std::thread;
-        use std::time::Duration;
 
-        thread::spawn(|| {
-            thread::sleep(Duration::from_millis(500));
-            inst.timeout();
-        });
+        if let Some(timeout) = config.timeout {
+            let kill_switch = inst.kill_switch();
+            thread::spawn(move || {
+                thread::sleep(timeout);
+                println!("Time out!");
+                kill_switch.terminate();
+            });
+        }
 
         match inst.run(config.entrypoint.as_bytes(), &[]) {
             // normal termination implies 0 exit code

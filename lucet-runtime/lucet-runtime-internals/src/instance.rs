@@ -454,6 +454,12 @@ impl Instance {
     pub fn set_c_fatal_handler(&mut self, handler: unsafe extern "C" fn(*mut Instance)) {
         self.c_fatal_handler = Some(handler);
     }
+
+    pub fn kill_switch(&self) -> KillSwitch {
+        KillSwitch {
+            state: Arc::downgrade(&self.kill_state),
+        }
+    }
 }
 
 // Private API
@@ -616,17 +622,6 @@ impl Instance {
             State::Ready { .. } => {
                 panic!("instance in Ready state after returning from guest context")
             }
-        }
-    }
-
-    pub fn timeout(&self) -> Result<(), Error> {
-        if let State::Running { tid } = self.state {
-            unsafe {
-                pthread_kill(tid, SIGALRM);
-            };
-            Ok(())
-        } else {
-            Err(Error::InvalidArgument("Instance is not currently running"))
         }
     }
 
@@ -886,22 +881,22 @@ fn strsignal_wrapper(sig: libc::c_int) -> CString {
 
 enum KillState {
     NotStarted,
-    Running(usize),
+    Running(u64),
     Exited,
 }
 
-struct KillSwitch {
-    kill_state: Weak<Mutex<KillState>>,
+pub struct KillSwitch {
+    state: Weak<Mutex<KillState>>,
 }
 
 impl KillSwitch {
-    fn terminate(&self) -> Option<()> {
-        let kill_state = self.kill_state.upgrade().unwrap();
-        let kill_state = kill_state.lock().unwrap();
-        match *kill_state {
+    pub fn terminate(&self) -> Option<()> {
+        let state = self.state.upgrade().unwrap();
+        let state = state.lock().unwrap();
+        match *state {
             KillState::Running(thread_id) => {
                 unsafe {
-                    libc::pthread_kill(thread_id, 14 /* SIGALRM */);
+                    pthread_kill(thread_id, SIGALRM);
                 }
                 Some(())
             }
