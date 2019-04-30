@@ -23,9 +23,9 @@ pub enum Token<'a> {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Keyword {
-    Struct,      // 'struct'
-    Enum,        // 'enum'
-    Type,        // 'type'
+    Struct, // 'struct'
+    Enum,   // 'enum'
+    Type,   // 'type'
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
