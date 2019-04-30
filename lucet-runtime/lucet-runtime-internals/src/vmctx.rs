@@ -19,16 +19,28 @@ use std::cell::{Ref, RefCell, RefMut};
 #[derive(Debug)]
 pub struct Vmctx {
     vmctx: *mut lucet_vmctx,
-    heap: RefCell<Box<[u8]>>,
-    globals: RefCell<Box<[i64]>>,
+    /// A view of the underlying instance's heap.
+    ///
+    /// This must never be dropped automatically, as the view does not own the heap. Rather, this is
+    /// a value used to implement dynamic borrowing of the heap contents that are owned and managed
+    /// by the instance and its `Alloc`.
+    heap_view: RefCell<Box<[u8]>>,
+    /// A view of the underlying instance's globals.
+    ///
+    /// This must never be dropped automatically, as the view does not own the globals. Rather, this
+    /// is a value used to implement dynamic borrowing of the globals that are owned and managed by
+    /// the instance and its `Alloc`.
+    globals_view: RefCell<Box<[i64]>>,
 }
 
 impl Drop for Vmctx {
     fn drop(&mut self) {
-        let heap = self.heap.replace(Box::new([]));
-        let globals = self.globals.replace(Box::new([]));
-        Box::leak(heap);
-        Box::leak(globals);
+        let heap_view = self.heap_view.replace(Box::new([]));
+        let globals_view = self.globals_view.replace(Box::new([]));
+        // as described in the definition of `Vmctx`, we cannot allow the boxed views of the heap
+        // and globals to be dropped
+        Box::leak(heap_view);
+        Box::leak(globals_view);
     }
 }
 
@@ -68,8 +80,8 @@ impl Vmctx {
 
         let res = Vmctx {
             vmctx,
-            heap: RefCell::new(Box::<[u8]>::from_raw(inst.heap_mut())),
-            globals: RefCell::new(Box::<[i64]>::from_raw(inst.globals_mut())),
+            heap_view: RefCell::new(Box::<[u8]>::from_raw(inst.heap_mut())),
+            globals_view: RefCell::new(Box::<[i64]>::from_raw(inst.globals_mut())),
         };
         res
     }
@@ -85,10 +97,10 @@ impl Vmctx {
     /// terminate with `TerminationDetails::BorrowError`.
     pub fn heap(&self) -> Ref<[u8]> {
         unsafe {
-            self.reconstitute_heap_if_needed();
+            self.reconstitute_heap_view_if_needed();
         }
         let r = self
-            .heap
+            .heap_view
             .try_borrow()
             .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("heap")));
         Ref::map(r, |b| b.borrow())
@@ -100,10 +112,10 @@ impl Vmctx {
     /// with `TerminationDetails::BorrowError`.
     pub fn heap_mut(&self) -> RefMut<[u8]> {
         unsafe {
-            self.reconstitute_heap_if_needed();
+            self.reconstitute_heap_view_if_needed();
         }
         let r = self
-            .heap
+            .heap_view
             .try_borrow_mut()
             .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("heap_mut")));
         RefMut::map(r, |b| b.borrow_mut())
@@ -119,11 +131,15 @@ impl Vmctx {
     /// back into the guest via `Vmctx::get_func_from_idx()`. That guest code may grow the heap as
     /// well, causing any outstanding heap references to become invalid. We will address this when
     /// we rework the interface for calling back into the guest.
-    unsafe fn reconstitute_heap_if_needed(&self) {
+    unsafe fn reconstitute_heap_view_if_needed(&self) {
         let inst = self.instance_mut();
-        if inst.heap_mut().len() != self.heap.borrow().len() {
-            let old_heap = self.heap.replace(Box::<[u8]>::from_raw(inst.heap_mut()));
-            Box::leak(old_heap);
+        if inst.heap_mut().len() != self.heap_view.borrow().len() {
+            let old_heap_view = self
+                .heap_view
+                .replace(Box::<[u8]>::from_raw(inst.heap_mut()));
+            // as described in the definition of `Vmctx`, we cannot allow the boxed view of the heap
+            // to be dropped
+            Box::leak(old_heap_view);
         }
     }
 
@@ -190,7 +206,7 @@ impl Vmctx {
     /// with `TerminationDetails::BorrowError`.
     pub fn globals(&self) -> Ref<[i64]> {
         let r = self
-            .globals
+            .globals_view
             .try_borrow()
             .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("globals")));
         Ref::map(r, |b| b.borrow())
@@ -202,7 +218,7 @@ impl Vmctx {
     /// terminate with `TerminationDetails::BorrowError`.
     pub fn globals_mut(&self) -> RefMut<[i64]> {
         let r = self
-            .globals
+            .globals_view
             .try_borrow_mut()
             .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("globals_mut")));
         RefMut::map(r, |b| b.borrow_mut())
