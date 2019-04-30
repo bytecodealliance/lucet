@@ -79,28 +79,7 @@ impl<W: Write> Generator<W> for RustGenerator {
         unimplemented!()
     }
 
-    fn gen_tagged_union(
-        &mut self,
-        module: &Module,
-        cache: &mut Cache,
-        pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
-    ) -> Result<(), IDLError> {
-        unimplemented!()
-    }
-
     fn gen_accessors_struct(
-        &mut self,
-        module: &Module,
-        cache: &Cache,
-        pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
-        hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError> {
-        unimplemented!()
-    }
-
-    fn gen_accessors_tagged_union(
         &mut self,
         module: &Module,
         cache: &Cache,

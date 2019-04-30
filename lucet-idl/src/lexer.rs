@@ -24,7 +24,6 @@ pub enum Token<'a> {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Keyword {
     Struct,      // 'struct'
-    TaggedUnion, // 'taggedunion'
     Enum,        // 'enum'
     Type,        // 'type'
 }
@@ -145,7 +144,6 @@ impl<'a> Lexer<'a> {
         token(
             match text {
                 "struct" => Token::Keyword(Keyword::Struct),
-                "taggedunion" => Token::Keyword(Keyword::TaggedUnion),
                 "enum" => Token::Keyword(Keyword::Enum),
                 "type" => Token::Keyword(Keyword::Type),
                 "i8" => Token::Atom(AtomType::I8),
@@ -294,12 +292,8 @@ mod tests {
 
     #[test]
     fn keywords() {
-        let mut lex = Lexer::new("struct\ntaggedunion\nenum type");
+        let mut lex = Lexer::new("struct\n\nenum type");
         assert_eq!(lex.next(), token(Token::Keyword(Keyword::Struct), 1, 0));
-        assert_eq!(
-            lex.next(),
-            token(Token::Keyword(Keyword::TaggedUnion), 2, 0)
-        );
         assert_eq!(lex.next(), token(Token::Keyword(Keyword::Enum), 3, 0));
         assert_eq!(lex.next(), token(Token::Keyword(Keyword::Type), 3, 5));
         assert_eq!(lex.next(), None);

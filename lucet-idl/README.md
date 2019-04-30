@@ -44,15 +44,6 @@ struct st {
     c: color,
     self: *st
 }
-
-// Tagged unions
-
-taggedunion mixedbag {
-    a: col,
-    b: f64,
-    c: st,
-    d: ()
-}
 ```
 
 ## Sample output
@@ -106,34 +97,6 @@ enum ___color {
 #define BYTES_COLOR 8
 ```
 
-### Tagged unions
-
-Tagged unions allow different types to be stored in the same memory space.
-
-The `mixedbag` tagged union generates the following definition:
-
-```c
-#define TYPE_MIXEDBAG_A 1
-#define TYPE_MIXEDBAG_B 2
-#define TYPE_MIXEDBAG_C 3
-
-struct mixedbag {
-    uint32_t ___type; // tagged union type, should be in the [1...4] range
-    uint8_t ___pad8_4[4];
-    union {
-        col a; // - type 1
-        double b; // - type 2
-        struct st c; // - type 3
-        // void d; - type 4
-    } variant;
-};
-
-#define BYTES_MIXEDBAG 40
-```
-
-Like structures, explicit padding is added to try to match the alignment rules of the reference platform.
-
-`BYTES_MIXEDBAG` is the number of bytes required to store the whole tagged union.
 
 ## Accessors (C)
 
@@ -156,61 +119,7 @@ On other platforms, individual values are re-aligned and byte-swapped accordingl
 
 Accessors for individual values are also generated.
 
-The suffix of a function name represents the hierarchy of the value. For example, the
-following functions can directly access the `a` value of the `st` structure `b` within
-the `mixedbag` tagged union:
-
-```c
-static inline void store_mixedbag_c_a(unsigned char buf[static BYTES_MIXEDBAG], const int8_t v);
-
-static inline void load_mixedbag_c_a(int8_t *v_p, const unsigned char buf[static BYTES_MIXEDBAG]);
-```
-
 Subsets of types can thus be directly loaded and modified from a serialized representation.
-
-Tagged unions generate different sets of functions:
-
-### Tagged unions: non-void members
-
-```c
-static inline bool is_mixedbag_a(const unsigned char buf[static BYTES_COLOR]);
-```
-
-This returns `TRUE` if the current type is `a`.
-
-```c
-static inline void ref_mixedbag_a(
-    const unsigned char **ibuf_p,
-    const unsigned char buf[static BYTES_MIXEDBAG]);
-
-static inline void mut_mixedbag_a(
-    unsigned char **ibuf_p,
-    unsigned char buf[static BYTES_MIXEDBAG]);
-```
-
-These functions return a pointer to a serialized representation of the tagged union,
-assuming that it currently olds the `a` type. If this is not the case, an
-`assert()`ion will be hit.
-
-```c
-static inline void store_mixedbag_as_a(
-    unsigned char buf[static BYTES_MIXEDBAG],
-    const struct mixedbag *t);
-```
-
-This function serializes the tagged union into `buf`, possibly forcing the type to be `a`.
-
-### Tagged union: void members
-
-Member `d` of the `mixedbag` tagged union doesn't have any value.
-
-The following set of accessors are generated:
-
-```c
-static inline bool is_mixedbag_d(const unsigned char buf[static 4]);
-
-static inline void set_mixedbag_d(unsigned char buf[static 4]);
-```
 
 ## Pointers
 

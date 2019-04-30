@@ -75,11 +75,6 @@ impl CAtom {
         }
     }
 
-    /// Native type used for the type in tagged unions
-    pub fn tagged_union_type() -> Self {
-        CAtom::from(AtomType::U32)
-    }
-
     /// Native type used for enums
     /// It can't be an `int` as it would not be portable across architectures
     pub fn enum_() -> Self {

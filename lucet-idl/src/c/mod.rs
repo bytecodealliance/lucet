@@ -8,7 +8,6 @@ mod r#enum;
 mod macros;
 mod prelude;
 mod r#struct;
-mod tagged_union;
 
 pub(crate) use self::catom::*;
 use crate::backend::*;
@@ -101,16 +100,6 @@ impl<W: Write> Generator<W> for CGenerator {
         r#enum::generate(self, module, cache, pretty_writer, data_type_entry)
     }
 
-    fn gen_tagged_union(
-        &mut self,
-        module: &Module,
-        cache: &mut Cache,
-        pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
-    ) -> Result<(), IDLError> {
-        tagged_union::generate(self, module, cache, pretty_writer, data_type_entry)
-    }
-
     fn gen_accessors_struct(
         &mut self,
         module: &Module,
@@ -127,39 +116,6 @@ impl<W: Write> Generator<W> for CGenerator {
             data_type_entry,
             hierarchy,
         )
-    }
-
-    fn gen_accessors_tagged_union(
-        &mut self,
-        module: &Module,
-        cache: &Cache,
-        pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
-        hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError> {
-        let (named_members, _attrs) = if let DataType::TaggedUnion {
-            members: named_members,
-            attrs,
-        } = &data_type_entry.data_type
-        {
-            (named_members, attrs)
-        } else {
-            unreachable!()
-        };
-        for (i, named_member) in named_members.iter().enumerate() {
-            let internal_union_type_id = 1 + i;
-            accessors::tagged_union::generate(
-                self,
-                data_type_entry,
-                module,
-                cache,
-                pretty_writer,
-                internal_union_type_id,
-                &named_member,
-                &hierarchy,
-            )?;
-        }
-        Ok(())
     }
 
     fn gen_accessors_enum(
@@ -241,10 +197,6 @@ impl CGenerator {
                             type_name = type_name
                                 .or_else(|| Some(format!("struct {}", data_type_entry.name.name)))
                         }
-                        DataType::TaggedUnion { .. } => {
-                            type_name = type_name
-                                .or_else(|| Some(format!("struct {}", data_type_entry.name.name)))
-                        }
                         DataType::Enum { .. } => {
                             type_name = type_name.or_else(|| {
                                 Some(format!(
@@ -288,7 +240,7 @@ impl CGenerator {
         let inner_data_type_entry = module.get_datatype(*inner_type);
         let inner_data_type = inner_data_type_entry.data_type;
         match inner_data_type {
-            DataType::Struct { .. } | DataType::TaggedUnion { .. } => false,
+            DataType::Struct { .. } => false,
             DataType::Enum { .. } => true,
             DataType::Alias { to, .. } => self.is_type_eventually_an_atom_or_enum(module, to),
         }

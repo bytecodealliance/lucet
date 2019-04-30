@@ -33,10 +33,6 @@ pub enum DataType {
         members: Vec<NamedMember<DataTypeRef>>,
         attrs: Vec<Attr>,
     },
-    TaggedUnion {
-        members: Vec<NamedMember<Option<DataTypeRef>>>,
-        attrs: Vec<Attr>,
-    },
     Enum {
         members: Vec<NamedMember<()>>,
         attrs: Vec<Attr>,
@@ -233,51 +229,6 @@ impl Module {
                     },
                 )
             }
-            SyntaxDecl::TaggedUnion {
-                name,
-                variants,
-                attrs,
-                location,
-            } => {
-                let mut uniq_vars = HashMap::new();
-                let mut dtype_members = Vec::new();
-                if variants.is_empty() {
-                    Err(ValidationError::Empty {
-                        name: name.clone(),
-                        location: *location,
-                    })?
-                }
-                for var in variants {
-                    // Ensure that each member name is unique:
-                    if let Some(existing) = uniq_vars.insert(var.name.clone(), var) {
-                        Err(ValidationError::NameAlreadyExists {
-                            name: var.name.clone(),
-                            at_location: var.location,
-                            previous_location: existing.location,
-                        })?
-                    }
-                    // Get the DataTypeRef for the member, which ensures that it refers only to
-                    // defined types:
-                    let type_ = if let Some(ref t) = var.type_ {
-                        Some(self.get_ref(t)?)
-                    } else {
-                        None
-                    };
-                    // build the struct with this as the member:
-                    dtype_members.push(NamedMember {
-                        type_,
-                        name: var.name.clone(),
-                        attrs: var.attrs.clone(),
-                    })
-                }
-                self.define_data_type(
-                    id,
-                    DataType::TaggedUnion {
-                        members: dtype_members,
-                        attrs: attrs.clone(),
-                    },
-                )
-            }
             SyntaxDecl::Enum {
                 name,
                 variants,
@@ -344,13 +295,6 @@ impl Module {
             DataType::Struct { members, .. } => {
                 for mem in members {
                     if let DataTypeRef::Defined(id) = mem.type_ {
-                        self.dfs_walk(id, visited, ordered)?
-                    }
-                }
-            }
-            DataType::TaggedUnion { members, .. } => {
-                for mem in members {
-                    if let Some(DataTypeRef::Defined(id)) = mem.type_ {
                         self.dfs_walk(id, visited, ordered)?
                     }
                 }
@@ -501,82 +445,6 @@ mod tests {
         // Refer to type that is not declared
         assert_eq!(
             module("struct foo { \nb: bar }").err().unwrap(),
-            ValidationError::NameNotFound {
-                name: "bar".to_owned(),
-                use_location: Location { line: 2, column: 3 },
-            }
-        );
-    }
-
-    #[test]
-    fn tagged_unions() {
-        assert!(module("taggedunion foo { a: () }").is_ok());
-        assert!(module("taggedunion foo { a: i32 }").is_ok());
-        assert!(module("taggedunion foo { a: i32, b: f32 }").is_ok());
-        assert!(module("taggedunion foo { a: i32, b: () }").is_ok());
-
-        {
-            let d = module("taggedunion foo { a: i32, b: () }").unwrap();
-            let members = match &d.data_types[&0] {
-                DataType::TaggedUnion { members, .. } => members,
-                _ => panic!("Unexpected type"),
-            };
-            assert_eq!(members[0].name, "a");
-            assert_eq!(members[1].name, "b");
-            match &members[0].type_ {
-                Some(DataTypeRef::Atom(AtomType::I32)) => (),
-                _ => panic!("Unexpected type"),
-            };
-            match &members[1].type_ {
-                None => (),
-                _ => panic!("Unexpected type"),
-            };
-        }
-
-        // Recursive
-        assert!(module("taggedunion cons { succ: *cons, nil: () }").is_ok());
-
-        // Refer to a taggedunion defined previously:
-        assert!(module("taggedunion foo { a: i32, b: f64 } taggedunion bar { a: foo }").is_ok());
-        // Refer to a taggedunion defined afterwards:
-        assert!(module("taggedunion foo { a: i32, b: bar} taggedunion bar { a: i32 }").is_ok());
-
-        // No members
-        assert_eq!(
-            module("taggedunion foo {}").err().unwrap(),
-            ValidationError::Empty {
-                name: "foo".to_owned(),
-                location: Location { line: 1, column: 0 },
-            }
-        );
-
-        // Duplicate member in taggedunion
-        assert_eq!(
-            module("taggedunion foo { \na: i32, \na: f64}")
-                .err()
-                .unwrap(),
-            ValidationError::NameAlreadyExists {
-                name: "a".to_owned(),
-                at_location: Location { line: 3, column: 0 },
-                previous_location: Location { line: 2, column: 0 },
-            }
-        );
-
-        // Duplicate definition of name "foo"
-        assert_eq!(
-            module("taggedunion foo { a: i32 }\nstruct foo { a: i32 } ")
-                .err()
-                .unwrap(),
-            ValidationError::NameAlreadyExists {
-                name: "foo".to_owned(),
-                at_location: Location { line: 2, column: 0 },
-                previous_location: Location { line: 1, column: 0 },
-            }
-        );
-
-        // Refer to type that is not declared
-        assert_eq!(
-            module("taggedunion foo { \nb: bar }").err().unwrap(),
             ValidationError::NameNotFound {
                 name: "bar".to_owned(),
                 use_location: Location { line: 2, column: 3 },

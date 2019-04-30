@@ -40,24 +40,7 @@ pub trait Generator<W: Write> {
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError>;
 
-    fn gen_tagged_union(
-        &mut self,
-        module: &Module,
-        cache: &mut Cache,
-        pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
-    ) -> Result<(), IDLError>;
-
     fn gen_accessors_struct(
-        &mut self,
-        module: &Module,
-        cache: &Cache,
-        pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
-        hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError>;
-
-    fn gen_accessors_tagged_union(
         &mut self,
         module: &Module,
         cache: &Cache,
@@ -97,9 +80,6 @@ pub trait Generator<W: Write> {
             DataType::Struct { .. } => {
                 self.gen_struct(module, cache, pretty_writer, &data_type_entry)
             }
-            DataType::TaggedUnion { .. } => {
-                self.gen_tagged_union(module, cache, pretty_writer, &data_type_entry)
-            }
             DataType::Alias { .. } => {
                 self.gen_alias(module, cache, pretty_writer, &data_type_entry)
             }
@@ -130,13 +110,6 @@ pub trait Generator<W: Write> {
             DataType::Struct { .. } => {
                 self.gen_accessors_struct(module, cache, pretty_writer, &data_type_entry, hierarchy)
             }
-            DataType::TaggedUnion { .. } => self.gen_accessors_tagged_union(
-                module,
-                cache,
-                pretty_writer,
-                &data_type_entry,
-                hierarchy,
-            ),
             DataType::Alias { .. } => {
                 self.gen_accessors_alias(module, cache, pretty_writer, &data_type_entry, hierarchy)
             }
