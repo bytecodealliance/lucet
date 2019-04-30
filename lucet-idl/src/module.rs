@@ -529,7 +529,7 @@ mod tests {
         );
 
         assert_eq!(
-            module("type foo = bar\nstruct bar { a: baz }\ntaggedunion baz { c: i32, e: foo }")
+            module("type foo = bar\nstruct bar { a: baz }\nstruct baz { c: i32, e: foo }")
                 .err()
                 .unwrap(),
             ValidationError::Infinite {
