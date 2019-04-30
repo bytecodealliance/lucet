@@ -54,7 +54,9 @@ impl Instance {
     where
         F: FnOnce(&mut Instance) -> Result<R, Error>,
     {
-        // setup signal stack for this thread
+        // Set up the signal stack for this thread. Note that because signal stacks are per-thread,
+        // rather than per-process, we do this for every run, while the signal handler is installed
+        // only once per process.
         let guest_sigstack = SigStack::new(
             self.alloc.slot().sigstack,
             SigStackFlags::empty(),
@@ -88,13 +90,6 @@ impl Instance {
             state.counter -= 1;
             if state.counter == 0 {
                 unsafe {
-                    // restore the host signal stack
-                    if !altstack_flags()
-                        .expect("the current stack flags could be retrieved")
-                        .contains(SigStackFlags::SS_ONSTACK)
-                    {
-                        sigaltstack(previous_sigstack).expect("sigaltstack restoration succeeds");
-                    }
                     restore_host_signal_state(state);
                 }
                 true
@@ -106,6 +101,16 @@ impl Instance {
         };
         if counter_zero {
             *ostate = None;
+        }
+
+        unsafe {
+            // restore the host signal stack for this thread
+            if !altstack_flags()
+                .expect("the current stack flags could be retrieved")
+                .contains(SigStackFlags::SS_ONSTACK)
+            {
+                sigaltstack(previous_sigstack).expect("sigaltstack restoration succeeds");
+            }
         }
 
         res
