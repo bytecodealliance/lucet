@@ -11,12 +11,6 @@ pub enum SyntaxDecl {
         attrs: Vec<Attr>,
         location: Location,
     },
-    TaggedUnion {
-        name: String,
-        variants: Vec<UnionVariant>,
-        attrs: Vec<Attr>,
-        location: Location,
-    },
     Enum {
         name: String,
         variants: Vec<EnumVariant>,
@@ -35,7 +29,6 @@ impl SyntaxDecl {
     pub fn name(&self) -> &str {
         match self {
             SyntaxDecl::Struct { name, .. } => &name,
-            SyntaxDecl::TaggedUnion { name, .. } => &name,
             SyntaxDecl::Enum { name, .. } => &name,
             SyntaxDecl::Alias { name, .. } => &name,
         }
@@ -43,7 +36,6 @@ impl SyntaxDecl {
     pub fn location(&self) -> &Location {
         match self {
             SyntaxDecl::Struct { location, .. } => &location,
-            SyntaxDecl::TaggedUnion { location, .. } => &location,
             SyntaxDecl::Enum { location, .. } => &location,
             SyntaxDecl::Alias { location, .. } => &location,
         }
@@ -251,58 +243,6 @@ impl<'a> Parser<'a> {
         Ok(members)
     }
 
-    fn match_tagged_union_body(&mut self) -> Result<Vec<UnionVariant>, ParseError> {
-        let mut variants = Vec::new();
-        let mut attrs = Vec::new();
-        loop {
-            match self.token() {
-                Some(Token::RBrace) => {
-                    self.consume();
-                    break;
-                }
-                Some(Token::Hash) => {
-                    self.consume();
-                    attrs.push(self.match_attr_body()?);
-                }
-                Some(Token::Word(variant_name)) => {
-                    let location = self.location;
-                    self.consume();
-                    self.match_token(Token::Colon, "expected :")?;
-
-                    let type_ = match self.token() {
-                        Some(Token::LPar) => {
-                            self.consume();
-                            self.match_token(Token::RPar, "expected )")?;
-                            None
-                        }
-                        _ => Some(self.match_ref("expected member type or ()")?),
-                    };
-
-                    variants.push(UnionVariant {
-                        name: variant_name.to_owned(),
-                        type_,
-                        attrs: attrs.clone(),
-                        location,
-                    });
-                    attrs.clear();
-                    match self.token() {
-                        Some(Token::Comma) => {
-                            self.consume();
-                            continue;
-                        }
-                        Some(Token::RBrace) => {
-                            self.consume();
-                            break;
-                        }
-                        _ => parse_err!(self.location, "expected , or }}")?,
-                    }
-                }
-                _ => parse_err!(self.location, "expected variant")?,
-            }
-        }
-        Ok(variants)
-    }
-
     fn match_enum_body(&mut self) -> Result<Vec<EnumVariant>, ParseError> {
         let mut names = Vec::new();
         let mut attrs = Vec::new();
@@ -356,19 +296,6 @@ impl<'a> Parser<'a> {
                     return Ok(Some(SyntaxDecl::Struct {
                         name: name.to_owned(),
                         members,
-                        attrs,
-                        location,
-                    }));
-                }
-                Some(Token::Keyword(Keyword::TaggedUnion)) => {
-                    let location = self.location;
-                    self.consume();
-                    let name = err_ctx!(err_msg, self.match_a_word("expected tagged union name"))?;
-                    err_ctx!(err_msg, self.match_token(Token::LBrace, "expected {"))?;
-                    let variants = err_ctx!(err_msg, self.match_tagged_union_body())?;
-                    return Ok(Some(SyntaxDecl::TaggedUnion {
-                        name: name.to_owned(),
-                        variants,
                         attrs,
                         location,
                     }));
@@ -653,189 +580,6 @@ mod tests {
                 attrs: Vec::new(), //
                 location: Location { line: 1, column: 0 },
             }
-        );
-    }
-
-    #[test]
-    fn tagged_unions() {
-        let mut parser = Parser::new("taggedunion foo {}");
-        assert_eq!(
-            parser
-                .match_decl("empty tagged union")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::TaggedUnion {
-                name: "foo".to_owned(),
-                variants: Vec::new(),
-                attrs: Vec::new(),
-                location: Location { line: 1, column: 0 },
-            },
-        );
-        let mut parser = Parser::new("taggedunion bar {a: (), }");
-        //                            0           12   17
-        assert_eq!(
-            parser
-                .match_decl("tagged union, trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::TaggedUnion {
-                name: "bar".to_owned(),
-                variants: vec![UnionVariant {
-                    name: "a".to_owned(),
-                    type_: None,
-                    attrs: Vec::new(),
-                    location: Location {
-                        line: 1,
-                        column: 17,
-                    },
-                }],
-                attrs: Vec::new(),
-                location: Location { line: 1, column: 0 },
-            },
-        );
-        let mut parser = Parser::new("taggedunion bat {a : ( ) }");
-        //                            0           12   17
-        assert_eq!(
-            parser
-                .match_decl("tagged union, no trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::TaggedUnion {
-                name: "bat".to_owned(),
-                variants: vec![UnionVariant {
-                    name: "a".to_owned(),
-                    type_: None,
-                    attrs: Vec::new(),
-                    location: Location {
-                        line: 1,
-                        column: 17,
-                    },
-                }],
-                attrs: Vec::new(),
-                location: Location { line: 1, column: 0 },
-            },
-        );
-        let mut parser = Parser::new("taggedunion baz {a:(), b:f32, }");
-        //                            0           12   17    23
-        assert_eq!(
-            parser
-                .match_decl("2 member tagged union, trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::TaggedUnion {
-                name: "baz".to_owned(),
-                variants: vec![
-                    UnionVariant {
-                        name: "a".to_owned(),
-                        type_: None,
-                        attrs: Vec::new(),
-                        location: Location {
-                            line: 1,
-                            column: 17,
-                        },
-                    },
-                    UnionVariant {
-                        name: "b".to_owned(),
-                        type_: Some(SyntaxRef::Atom {
-                            atom: AtomType::F32,
-                            location: Location {
-                                line: 1,
-                                column: 25,
-                            },
-                        }),
-                        attrs: Vec::new(),
-                        location: Location {
-                            line: 1,
-                            column: 23,
-                        },
-                    },
-                ],
-                attrs: Vec::new(),
-                location: Location { line: 1, column: 0 },
-            },
-        );
-        let mut parser = Parser::new("taggedunion acab {a:(), b: something_else }");
-        //                            0           12    18    24 27
-        assert_eq!(
-            parser
-                .match_decl("2 member tagged union, no trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::TaggedUnion {
-                name: "acab".to_owned(),
-                variants: vec![
-                    UnionVariant {
-                        name: "a".to_owned(),
-                        type_: None,
-                        attrs: Vec::new(),
-                        location: Location {
-                            line: 1,
-                            column: 18,
-                        },
-                    },
-                    UnionVariant {
-                        name: "b".to_owned(),
-                        type_: Some(SyntaxRef::Name {
-                            name: "something_else".to_owned(),
-                            location: Location {
-                                line: 1,
-                                column: 27,
-                            },
-                        }),
-                        attrs: Vec::new(),
-                        location: Location {
-                            line: 1,
-                            column: 24,
-                        },
-                    },
-                ],
-                attrs: Vec::new(),
-                location: Location { line: 1, column: 0 },
-            },
-        );
-
-        let mut parser = Parser::new("#[attr1=ftp]\ntaggedunion acab {\n#[yes=\"all of them\"] are_complicit: (),\n#[especially= PPB\n]and_always: lie}");
-        assert_eq!(
-            parser
-                .match_decl("2 member tagged union, no trailing comma, with attributes")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::TaggedUnion {
-                name: "acab".to_owned(),
-                variants: vec![
-                    UnionVariant {
-                        name: "are_complicit".to_owned(),
-                        type_: None,
-                        attrs: vec![Attr::new(
-                            "yes",
-                            "all of them",
-                            Location { line: 3, column: 0 },
-                        )],
-                        location: Location {
-                            line: 3,
-                            column: 21,
-                        },
-                    },
-                    UnionVariant {
-                        name: "and_always".to_owned(),
-                        type_: Some(SyntaxRef::Name {
-                            name: "lie".to_owned(),
-                            location: Location {
-                                line: 5,
-                                column: 13,
-                            },
-                        }),
-                        attrs: vec![Attr::new(
-                            "especially",
-                            "PPB",
-                            Location { line: 4, column: 0 },
-                        )],
-                        location: Location { line: 5, column: 1 },
-                    },
-                ],
-                attrs: vec![Attr::new("attr1", "ftp", Location { line: 1, column: 0 })],
-                location: Location { line: 2, column: 0 },
-            },
         );
     }
 
