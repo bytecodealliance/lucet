@@ -29,18 +29,8 @@ fn write_relocated_slice(
 ///
 /// Writes a manifest of functions, with relocations, to the artifact.
 ///
-/// THIS IS NOT CURRENTLY A COMPLETE LIST OF FUNCTIONS.
-///
-/// Currently the manifest returned here is the subset of functions
-/// that happen to have traps. This manifest is only used, right now,
-/// to look up trap manifest mappings, so this all lines up.
-///
-/// The *order* of these functions are not (currently) guaranteed either!
-/// Just that at the moment this order happens to be the same order as
-/// `FaerieTrapManifest` lists.
-///
 pub fn write_function_manifest(
-    functions: &[(&str, FunctionSpec)],
+    functions: &[(String, FunctionSpec)],
     obj: &mut Artifact,
 ) -> Result<(), Error> {
     let manifest_len_sym = "lucet_function_manifest_len";
