@@ -190,6 +190,69 @@ dec_enc_scalar!(
     enc_fdflags,
     enc_fdflags_byref
 );
+dec_enc_scalar!(
+    __wasi_device_t,
+    dec_device,
+    dev_device_byref,
+    enc_device,
+    enc_device_byref
+);
+dec_enc_scalar!(
+    __wasi_inode_t,
+    dec_inode,
+    dev_inode_byref,
+    enc_inode,
+    enc_inode_byref
+);
+dec_enc_scalar!(
+    __wasi_linkcount_t,
+    dec_linkcount,
+    dev_linkcount_byref,
+    enc_linkcount,
+    enc_linkcount_byref
+);
+
+pub fn dec_filestat(filestat: wasm32::__wasi_filestat_t) -> host::__wasi_filestat_t {
+    host::__wasi_filestat_t {
+        st_dev: dec_device(filestat.st_dev),
+        st_ino: dec_inode(filestat.st_ino),
+        st_filetype: dec_filetype(filestat.st_filetype),
+        st_nlink: dec_linkcount(filestat.st_nlink),
+        st_size: dec_filesize(filestat.st_size),
+        st_atim: dec_timestamp(filestat.st_atim),
+        st_mtim: dec_timestamp(filestat.st_mtim),
+        st_ctim: dec_timestamp(filestat.st_ctim),
+    }
+}
+
+pub unsafe fn dec_filestat_byref(
+    vmctx: &mut Vmctx,
+    filestat_ptr: wasm32::uintptr_t,
+) -> Result<host::__wasi_filestat_t, host::__wasi_errno_t> {
+    dec_pointee::<wasm32::__wasi_filestat_t>(vmctx, filestat_ptr).map(dec_filestat)
+}
+
+pub fn enc_filestat(filestat: host::__wasi_filestat_t) -> wasm32::__wasi_filestat_t {
+    wasm32::__wasi_filestat_t {
+        st_dev: enc_device(filestat.st_dev),
+        st_ino: enc_inode(filestat.st_ino),
+        st_filetype: enc_filetype(filestat.st_filetype),
+        st_nlink: enc_linkcount(filestat.st_nlink),
+        st_size: enc_filesize(filestat.st_size),
+        st_atim: enc_timestamp(filestat.st_atim),
+        st_mtim: enc_timestamp(filestat.st_mtim),
+        st_ctim: enc_timestamp(filestat.st_ctim),
+    }
+}
+
+pub unsafe fn enc_filestat_byref(
+    vmctx: &mut Vmctx,
+    filestat_ptr: wasm32::uintptr_t,
+    host_filestat: host::__wasi_filestat_t,
+) -> Result<(), host::__wasi_errno_t> {
+    let filestat = enc_filestat(host_filestat);
+    enc_pointee::<wasm32::__wasi_filestat_t>(vmctx, filestat_ptr, filestat)
+}
 
 pub fn dec_fdstat(fdstat: wasm32::__wasi_fdstat_t) -> host::__wasi_fdstat_t {
     host::__wasi_fdstat_t {

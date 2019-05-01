@@ -558,6 +558,160 @@ pub extern "C" fn __wasi_fd_write(
 }
 
 #[no_mangle]
+pub extern "C" fn __wasi_fd_filestat_get(
+    vmctx: *mut lucet_vmctx,
+    fd: wasm32::__wasi_fd_t,
+    filestat_ptr: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    use nix::sys::stat::fstat;
+
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+    let host_fd = dec_fd(fd);
+    let ctx: &mut WasiCtx = vmctx.get_embed_ctx_mut();
+
+    let errno = if let Some(fe) = ctx.fds.get(&host_fd) {
+        match fstat(fe.fd_object.rawfd) {
+            Err(e) => wasm32::errno_from_nix(e.as_errno().unwrap()),
+            Ok(filestat) => {
+                let host_filestat = host::filestat_from_nix(filestat);
+                unsafe {
+                    enc_filestat_byref(&mut vmctx, filestat_ptr, host_filestat)
+                        .expect("can write into the pointer");
+                }
+                wasm32::__WASI_ESUCCESS
+            }
+        }
+    } else {
+        wasm32::__WASI_EBADF
+    };
+    errno
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_path_filestat_get(
+    vmctx: *mut lucet_vmctx,
+    dirfd: wasm32::__wasi_fd_t,
+    dirflags: wasm32::__wasi_lookupflags_t,
+    path_ptr: wasm32::uintptr_t,
+    path_len: wasm32::size_t,
+    filestat_ptr: wasm32::uintptr_t,
+) -> wasm32::__wasi_errno_t {
+    use nix::fcntl::AtFlags;
+    use nix::sys::stat::fstatat;
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+    let dirfd = dec_fd(dirfd);
+    let dirflags = dec_lookupflags(dirflags);
+    let path = match unsafe { dec_slice_of::<u8>(&mut vmctx, path_ptr, path_len) } {
+        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+        Err(e) => return enc_errno(e),
+    };
+    let (dir, path) = match path_get(
+        &vmctx,
+        dirfd,
+        dirflags,
+        path,
+        host::__WASI_RIGHT_PATH_FILESTAT_GET as host::__wasi_rights_t,
+        0,
+        false,
+    ) {
+        Ok((dir, path)) => (dir, path),
+        Err(e) => return enc_errno(e),
+    };
+    let atflags = match dirflags {
+        0 => AtFlags::empty(),
+        _ => AtFlags::AT_SYMLINK_NOFOLLOW,
+    };
+    match fstatat(dir, path.as_os_str(), atflags) {
+        Err(e) => wasm32::errno_from_nix(e.as_errno().unwrap()),
+        Ok(filestat) => {
+            let host_filestat = host::filestat_from_nix(filestat);
+            unsafe {
+                enc_filestat_byref(&mut vmctx, filestat_ptr, host_filestat)
+                    .expect("can write into the pointer");
+            }
+            wasm32::__WASI_ESUCCESS
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_path_create_directory(
+    vmctx: *mut lucet_vmctx,
+    dirfd: wasm32::__wasi_fd_t,
+    path_ptr: wasm32::uintptr_t,
+    path_len: wasm32::size_t,
+) -> wasm32::__wasi_errno_t {
+    use nix::errno;
+    use nix::libc::mkdirat;
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+    let dirfd = dec_fd(dirfd);
+    let path = match unsafe { dec_slice_of::<u8>(&mut vmctx, path_ptr, path_len) } {
+        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+        Err(e) => return enc_errno(e),
+    };
+    let (dir, path) = match path_get(
+        &vmctx,
+        dirfd,
+        0,
+        path,
+        (host::__WASI_RIGHT_PATH_OPEN | host::__WASI_RIGHT_PATH_CREATE_DIRECTORY)
+            as host::__wasi_rights_t,
+        0,
+        false,
+    ) {
+        Ok((dir, path)) => (dir, path),
+        Err(e) => return enc_errno(e),
+    };
+    let path_cstr = match std::ffi::CString::new(path.as_os_str().as_bytes()) {
+        Ok(path_cstr) => path_cstr,
+        Err(_) => return wasm32::__WASI_EINVAL,
+    };
+    // nix doesn't expose mkdirat() yet
+    match unsafe { mkdirat(dir, path_cstr.as_ptr(), 0o777) } {
+        0 => wasm32::__WASI_ESUCCESS,
+        _ => wasm32::errno_from_nix(errno::Errno::last()),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __wasi_path_unlink_file(
+    vmctx: *mut lucet_vmctx,
+    dirfd: wasm32::__wasi_fd_t,
+    path_ptr: wasm32::uintptr_t,
+    path_len: wasm32::size_t,
+) -> wasm32::__wasi_errno_t {
+    use nix::errno;
+    use nix::libc::unlinkat;
+    let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
+    let dirfd = dec_fd(dirfd);
+    let path = match unsafe { dec_slice_of::<u8>(&mut vmctx, path_ptr, path_len) } {
+        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+        Err(e) => return enc_errno(e),
+    };
+    let (dir, path) = match path_get(
+        &vmctx,
+        dirfd,
+        0,
+        path,
+        host::__WASI_RIGHT_PATH_UNLINK_FILE as host::__wasi_rights_t,
+        0,
+        false,
+    ) {
+        Ok((dir, path)) => (dir, path),
+        Err(e) => return enc_errno(e),
+    };
+    let path_cstr = match std::ffi::CString::new(path.as_os_str().as_bytes()) {
+        Ok(path_cstr) => path_cstr,
+        Err(_) => return wasm32::__WASI_EINVAL,
+    };
+    // nix doesn't expose unlinkat() yet
+    match unsafe { unlinkat(dir, path_cstr.as_ptr(), 0) } {
+        0 => wasm32::__WASI_ESUCCESS,
+        _ => wasm32::errno_from_nix(errno::Errno::last()),
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn __wasi_path_open(
     vmctx: *mut lucet_vmctx,
     dirfd: wasm32::__wasi_fd_t,
