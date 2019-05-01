@@ -363,3 +363,18 @@ fn poll() {
     let exitcode = run("poll.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 }
+
+#[test]
+fn stat() {
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    std::fs::create_dir(&preopen_host_path).unwrap();
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+    let ctx = WasiCtxBuilder::new()
+        .args(&["stat"])
+        .preopened_dir(preopen_dir, "/sandbox")
+        .build()
+        .expect("can build WasiCtx");
+    let exitcode = run("stat.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+}
