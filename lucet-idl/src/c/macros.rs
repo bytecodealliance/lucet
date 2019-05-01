@@ -39,7 +39,7 @@ pub fn define<W: Write, V: ToString>(
 // Return a macro name for a type reference
 
 pub fn macro_for_data_type_ref(
-    data_description_helper: &DataDescriptionHelper,
+    module: &Module,
     prefix: &str,
     data_type_ref: &DataTypeRef,
 ) -> String {
@@ -50,7 +50,7 @@ pub fn macro_for_data_type_ref(
         }
         DataTypeRef::Ptr(_) => macro_for(prefix, "PTR"),
         DataTypeRef::Defined(data_type_id) => {
-            let data_type_entry = data_description_helper.get(*data_type_id);
+            let data_type_entry = module.get_datatype(*data_type_id);
             macro_for(prefix, &data_type_entry.name.name)
         }
     }

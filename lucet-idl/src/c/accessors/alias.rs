@@ -1,8 +1,14 @@
-use super::*;
+use crate::c::CGenerator;
+use crate::cache::Cache;
+use crate::errors::IDLError;
+use crate::generator::Hierarchy;
+use crate::module::{DataType, DataTypeEntry, Module};
+use crate::pretty_writer::PrettyWriter;
+use std::io::prelude::*;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    data_description_helper: &DataDescriptionHelper,
+    module: &Module,
     cache: &Cache,
     pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &DataTypeEntry<'_>,
@@ -17,14 +23,13 @@ pub fn generate<W: Write>(
     } else {
         unreachable!()
     };
-    let type_info = cgenerator.type_info(data_description_helper, cache, type_);
+    let type_info = cgenerator.type_info(module, cache, type_);
 
     pretty_writer.indent()?;
     pretty_writer
         .write(format!("// `{}` is an alias for `{}`", name, type_info.type_name).as_ref())?;
     if type_info.indirections == 0 {
-        let leaf_type_info =
-            cgenerator.type_info(data_description_helper, cache, type_info.leaf_data_type_ref);
+        let leaf_type_info = cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
         if leaf_type_info.type_name != type_info.type_name {
             pretty_writer
                 .write(format!(", itself equivalent to `{}`", leaf_type_info.type_name).as_ref())?;

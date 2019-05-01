@@ -1,22 +1,64 @@
-use super::*;
+use crate::c::catom::CAtom;
+use crate::c::macros;
+use crate::c::CGenerator;
+use crate::cache::Cache;
+use crate::errors::IDLError;
+use crate::generator::Hierarchy;
+use crate::module::{DataType, DataTypeEntry, Module};
+use crate::pretty_writer::PrettyWriter;
+use std::io::prelude::*;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    _data_description_helper: &DataDescriptionHelper,
+    module: &Module,
+    cache: &Cache,
     pretty_writer: &mut PrettyWriter<W>,
-    atom_type: AtomType,
+    data_type_entry: &DataTypeEntry<'_>,
     hierarchy: &Hierarchy,
 ) -> Result<(), IDLError> {
-    let fn_name = hierarchy.fn_name();
+    let (named_members, _attrs) = if let DataType::Enum {
+        members: named_members,
+        attrs,
+    } = &data_type_entry.data_type
+    {
+        (named_members, attrs)
+    } else {
+        unreachable!()
+    };
     let root_name = hierarchy.root_name();
+    let fn_name = hierarchy.fn_name();
     let root_macro_size_name = macros::macro_for("BYTES", &root_name);
     let current_offset = hierarchy.current_offset();
-    let catom = CAtom::from(atom_type);
-    let mut pretty_writer_i1 = pretty_writer.new_block();
+
+    let catom = CAtom::enum_();
     let mut preprocessor_writer = PrettyWriter::new_from_writer(pretty_writer);
     let uses_reference_target_endianness = cgenerator
         .target
-        .uses_reference_target_endianness_for_atom_type(atom_type);
+        .uses_reference_target_endianness_for_atom_type(catom.as_atom_type().unwrap());
+
+    pretty_writer.eob()?;
+
+    if hierarchy.depth() > 1 {
+        pretty_writer.write_line(
+            format!(
+                "// Accessors for the `{}` enumeration in `{}`",
+                data_type_entry.name,
+                hierarchy.idl_name()
+            )
+            .as_bytes(),
+        )?;
+    } else {
+        pretty_writer.write_line(
+            format!(
+                "// Platform-independent accessors for the `{}` enumeration",
+                data_type_entry.name
+            )
+            .as_bytes(),
+        )?;
+    }
+    pretty_writer.eob()?;
+
+    let mut pretty_writer_i1 = pretty_writer.new_block();
 
     // --- store_*()
 
@@ -36,6 +78,9 @@ pub fn generate<W: Write>(
         )
         .as_bytes(),
     )?;
+    pretty_writer_i1
+        .write_line(format!("assert(v >= 0 && v < {});", named_members.len()).as_ref())?
+        .eob()?;
     if !uses_reference_target_endianness {
         preprocessor_writer.write_line(b"#ifdef ___REFERENCE_COMPATIBLE_ENCODING")?;
     }
@@ -67,7 +112,6 @@ pub fn generate<W: Write>(
             )?;
         preprocessor_writer.write_line(b"#endif")?;
     }
-
     pretty_writer.write_line(b"}")?.eob()?;
 
     // --- load_*()
@@ -114,6 +158,8 @@ pub fn generate<W: Write>(
             )?;
         preprocessor_writer.write_line(b"#endif")?;
     }
+    pretty_writer_i1
+        .write_line(format!("assert(*v_p >= 0 && *v_p < {});", named_members.len()).as_ref())?;
     pretty_writer.write_line(b"}")?.eob()?;
 
     Ok(())

@@ -164,6 +164,64 @@ pub fn nix_from_oflags(oflags: __wasi_oflags_t) -> nix::fcntl::OFlag {
     nix_flags
 }
 
+pub fn filetype_from_nix(sflags: nix::sys::stat::SFlag) -> __wasi_filetype_t {
+    use nix::sys::stat::SFlag;
+    if sflags.contains(SFlag::S_IFCHR) {
+        __WASI_FILETYPE_CHARACTER_DEVICE as __wasi_filetype_t
+    } else if sflags.contains(SFlag::S_IFBLK) {
+        __WASI_FILETYPE_BLOCK_DEVICE as __wasi_filetype_t
+    } else if sflags.contains(SFlag::S_IFIFO) | sflags.contains(SFlag::S_IFSOCK) {
+        __WASI_FILETYPE_SOCKET_STREAM as __wasi_filetype_t
+    } else if sflags.contains(SFlag::S_IFDIR) {
+        __WASI_FILETYPE_DIRECTORY as __wasi_filetype_t
+    } else if sflags.contains(SFlag::S_IFREG) {
+        __WASI_FILETYPE_REGULAR_FILE as __wasi_filetype_t
+    } else if sflags.contains(SFlag::S_IFLNK) {
+        __WASI_FILETYPE_SYMBOLIC_LINK as __wasi_filetype_t
+    } else {
+        __WASI_FILETYPE_UNKNOWN as __wasi_filetype_t
+    }
+}
+
+pub fn nix_from_filetype(sflags: __wasi_filetype_t) -> nix::sys::stat::SFlag {
+    use nix::sys::stat::SFlag;
+    let mut nix_sflags = SFlag::empty();
+    if sflags & (__WASI_FILETYPE_CHARACTER_DEVICE as __wasi_filetype_t) != 0 {
+        nix_sflags.insert(SFlag::S_IFCHR);
+    }
+    if sflags & (__WASI_FILETYPE_BLOCK_DEVICE as __wasi_filetype_t) != 0 {
+        nix_sflags.insert(SFlag::S_IFBLK);
+    }
+    if sflags & (__WASI_FILETYPE_SOCKET_STREAM as __wasi_filetype_t) != 0 {
+        nix_sflags.insert(SFlag::S_IFIFO);
+        nix_sflags.insert(SFlag::S_IFSOCK);
+    }
+    if sflags & (__WASI_FILETYPE_DIRECTORY as __wasi_filetype_t) != 0 {
+        nix_sflags.insert(SFlag::S_IFDIR);
+    }
+    if sflags & (__WASI_FILETYPE_REGULAR_FILE as __wasi_filetype_t) != 0 {
+        nix_sflags.insert(SFlag::S_IFREG);
+    }
+    if sflags & (__WASI_FILETYPE_SYMBOLIC_LINK as __wasi_filetype_t) != 0 {
+        nix_sflags.insert(SFlag::S_IFLNK);
+    }
+    nix_sflags
+}
+
+pub fn filestat_from_nix(filestat: nix::sys::stat::FileStat) -> __wasi_filestat_t {
+    let filetype = nix::sys::stat::SFlag::from_bits_truncate(filestat.st_mode);
+    __wasi_filestat_t {
+        st_dev: filestat.st_dev as __wasi_device_t,
+        st_ino: filestat.st_ino as __wasi_inode_t,
+        st_nlink: filestat.st_nlink as __wasi_linkcount_t,
+        st_size: filestat.st_size as __wasi_filesize_t,
+        st_atim: filestat.st_atime as __wasi_timestamp_t,
+        st_ctim: filestat.st_ctime as __wasi_timestamp_t,
+        st_mtim: filestat.st_mtime as __wasi_timestamp_t,
+        st_filetype: filetype_from_nix(filetype),
+    }
+}
+
 // Rights sets from wasmtime-wasi sandboxed system primitives. Transcribed because bindgen can't
 // parse the #defines.
 

@@ -33,10 +33,6 @@ pub enum DataType {
         members: Vec<NamedMember<DataTypeRef>>,
         attrs: Vec<Attr>,
     },
-    TaggedUnion {
-        members: Vec<NamedMember<Option<DataTypeRef>>>,
-        attrs: Vec<Attr>,
-    },
     Enum {
         members: Vec<NamedMember<()>>,
         attrs: Vec<Attr>,
@@ -60,7 +56,7 @@ impl fmt::Display for Name {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct DataDescription {
+pub struct Module {
     pub names: Vec<Name>,
     pub data_types: HashMap<usize, DataType>,
 }
@@ -113,13 +109,22 @@ impl fmt::Display for ValidationError {
     }
 }
 
+/// A convenient structure holding a data type, its name and
+/// its internal IDL representation
+#[derive(Debug, Clone)]
+pub struct DataTypeEntry<'t> {
+    pub id: DataTypeId,
+    pub name: &'t Name,
+    pub data_type: &'t DataType,
+}
+
 impl Error for ValidationError {
     fn description(&self) -> &str {
         "Validation error"
     }
 }
 
-impl DataDescription {
+impl Module {
     fn new() -> Self {
         Self {
             names: Vec::new(),
@@ -224,51 +229,6 @@ impl DataDescription {
                     },
                 )
             }
-            SyntaxDecl::TaggedUnion {
-                name,
-                variants,
-                attrs,
-                location,
-            } => {
-                let mut uniq_vars = HashMap::new();
-                let mut dtype_members = Vec::new();
-                if variants.is_empty() {
-                    Err(ValidationError::Empty {
-                        name: name.clone(),
-                        location: *location,
-                    })?
-                }
-                for var in variants {
-                    // Ensure that each member name is unique:
-                    if let Some(existing) = uniq_vars.insert(var.name.clone(), var) {
-                        Err(ValidationError::NameAlreadyExists {
-                            name: var.name.clone(),
-                            at_location: var.location,
-                            previous_location: existing.location,
-                        })?
-                    }
-                    // Get the DataTypeRef for the member, which ensures that it refers only to
-                    // defined types:
-                    let type_ = if let Some(ref t) = var.type_ {
-                        Some(self.get_ref(t)?)
-                    } else {
-                        None
-                    };
-                    // build the struct with this as the member:
-                    dtype_members.push(NamedMember {
-                        type_,
-                        name: var.name.clone(),
-                        attrs: var.attrs.clone(),
-                    })
-                }
-                self.define_data_type(
-                    id,
-                    DataType::TaggedUnion {
-                        members: dtype_members,
-                        attrs: attrs.clone(),
-                    },
-                )
-            }
             SyntaxDecl::Enum {
                 name,
                 variants,
@@ -339,13 +299,6 @@ impl DataDescription {
                     }
                 }
             }
-            DataType::TaggedUnion { members, .. } => {
-                for mem in members {
-                    if let Some(DataTypeRef::Defined(id)) = mem.type_ {
-                        self.dfs_walk(id, visited, ordered)?
-                    }
-                }
-            }
             DataType::Alias { to, .. } => {
                 if let DataTypeRef::Defined(id) = to {
                     self.dfs_walk(*id, visited, ordered)?
@@ -386,7 +339,7 @@ impl DataDescription {
             })
     }
 
-    pub fn validate(decls: &[SyntaxDecl]) -> Result<DataDescription, ValidationError> {
+    pub fn from_declarations(decls: &[SyntaxDecl]) -> Result<Module, ValidationError> {
         let mut desc = Self::new();
         let mut idents: Vec<DataTypeId> = Vec::new();
         for decl in decls {
@@ -403,6 +356,17 @@ impl DataDescription {
 
         Ok(desc)
     }
+
+    /// Retrieve information about a data type given its identifier
+    pub fn get_datatype(&self, id: DataTypeId) -> DataTypeEntry<'_> {
+        let name = &self.names[id.0];
+        let data_type = &self.data_types[&id.0];
+        DataTypeEntry {
+            id,
+            name,
+            data_type,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -410,19 +374,19 @@ mod tests {
     use super::super::parser::Parser;
     use super::*;
 
-    fn data_description(syntax: &str) -> Result<DataDescription, ValidationError> {
+    fn module(syntax: &str) -> Result<Module, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
-        DataDescription::validate(&decls)
+        Module::from_declarations(&decls)
     }
 
     #[test]
     fn structs() {
-        assert!(data_description("struct foo { a: i32}").is_ok());
-        assert!(data_description("struct foo { a: i32, b: f32 }").is_ok());
+        assert!(module("struct foo { a: i32}").is_ok());
+        assert!(module("struct foo { a: i32, b: f32 }").is_ok());
 
         {
-            let d = data_description("struct foo { a: i32, b: f32 }").unwrap();
+            let d = module("struct foo { a: i32, b: f32 }").unwrap();
             let members = match &d.data_types[&0] {
                 DataType::Struct { members, .. } => members,
                 _ => panic!("Unexpected type"),
@@ -440,16 +404,16 @@ mod tests {
         }
 
         // Refer to a struct defined previously:
-        assert!(data_description("struct foo { a: i32, b: f64 } struct bar { a: foo }").is_ok());
+        assert!(module("struct foo { a: i32, b: f64 } struct bar { a: foo }").is_ok());
         // Refer to a struct defined afterwards:
-        assert!(data_description("struct foo { a: i32, b: bar} struct bar { a: i32 }").is_ok());
+        assert!(module("struct foo { a: i32, b: bar} struct bar { a: i32 }").is_ok());
 
         // Refer to itself
-        assert!(data_description("struct list { next: *list, thing: i32 }").is_ok());
+        assert!(module("struct list { next: *list, thing: i32 }").is_ok());
 
         // No members
         assert_eq!(
-            data_description("struct foo {}").err().unwrap(),
+            module("struct foo {}").err().unwrap(),
             ValidationError::Empty {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
@@ -458,9 +422,7 @@ mod tests {
 
         // Duplicate member in struct
         assert_eq!(
-            data_description("struct foo { \na: i32, \na: f64}")
-                .err()
-                .unwrap(),
+            module("struct foo { \na: i32, \na: f64}").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "a".to_owned(),
                 at_location: Location { line: 3, column: 0 },
@@ -470,7 +432,7 @@ mod tests {
 
         // Duplicate definition of struct
         assert_eq!(
-            data_description("struct foo { a: i32 }\nstruct foo { a: i32 } ")
+            module("struct foo { a: i32 }\nstruct foo { a: i32 } ")
                 .err()
                 .unwrap(),
             ValidationError::NameAlreadyExists {
@@ -482,91 +444,7 @@ mod tests {
 
         // Refer to type that is not declared
         assert_eq!(
-            data_description("struct foo { \nb: bar }").err().unwrap(),
-            ValidationError::NameNotFound {
-                name: "bar".to_owned(),
-                use_location: Location { line: 2, column: 3 },
-            }
-        );
-    }
-
-    #[test]
-    fn tagged_unions() {
-        assert!(data_description("taggedunion foo { a: () }").is_ok());
-        assert!(data_description("taggedunion foo { a: i32 }").is_ok());
-        assert!(data_description("taggedunion foo { a: i32, b: f32 }").is_ok());
-        assert!(data_description("taggedunion foo { a: i32, b: () }").is_ok());
-
-        {
-            let d = data_description("taggedunion foo { a: i32, b: () }").unwrap();
-            let members = match &d.data_types[&0] {
-                DataType::TaggedUnion { members, .. } => members,
-                _ => panic!("Unexpected type"),
-            };
-            assert_eq!(members[0].name, "a");
-            assert_eq!(members[1].name, "b");
-            match &members[0].type_ {
-                Some(DataTypeRef::Atom(AtomType::I32)) => (),
-                _ => panic!("Unexpected type"),
-            };
-            match &members[1].type_ {
-                None => (),
-                _ => panic!("Unexpected type"),
-            };
-        }
-
-        // Recursive
-        assert!(data_description("taggedunion cons { succ: *cons, nil: () }").is_ok());
-
-        // Refer to a taggedunion defined previously:
-        assert!(
-            data_description("taggedunion foo { a: i32, b: f64 } taggedunion bar { a: foo }")
-                .is_ok()
-        );
-        // Refer to a taggedunion defined afterwards:
-        assert!(
-            data_description("taggedunion foo { a: i32, b: bar} taggedunion bar { a: i32 }")
-                .is_ok()
-        );
-
-        // No members
-        assert_eq!(
-            data_description("taggedunion foo {}").err().unwrap(),
-            ValidationError::Empty {
-                name: "foo".to_owned(),
-                location: Location { line: 1, column: 0 },
-            }
-        );
-
-        // Duplicate member in taggedunion
-        assert_eq!(
-            data_description("taggedunion foo { \na: i32, \na: f64}")
-                .err()
-                .unwrap(),
-            ValidationError::NameAlreadyExists {
-                name: "a".to_owned(),
-                at_location: Location { line: 3, column: 0 },
-                previous_location: Location { line: 2, column: 0 },
-            }
-        );
-
-        // Duplicate definition of name "foo"
-        assert_eq!(
-            data_description("taggedunion foo { a: i32 }\nstruct foo { a: i32 } ")
-                .err()
-                .unwrap(),
-            ValidationError::NameAlreadyExists {
-                name: "foo".to_owned(),
-                at_location: Location { line: 2, column: 0 },
-                previous_location: Location { line: 1, column: 0 },
-            }
-        );
-
-        // Refer to type that is not declared
-        assert_eq!(
-            data_description("taggedunion foo { \nb: bar }")
-                .err()
-                .unwrap(),
+            module("struct foo { \nb: bar }").err().unwrap(),
             ValidationError::NameNotFound {
                 name: "bar".to_owned(),
                 use_location: Location { line: 2, column: 3 },
@@ -576,11 +454,11 @@ mod tests {
 
     #[test]
     fn enums() {
-        assert!(data_description("enum foo { a }").is_ok());
-        assert!(data_description("enum foo { a, b }").is_ok());
+        assert!(module("enum foo { a }").is_ok());
+        assert!(module("enum foo { a, b }").is_ok());
 
         {
-            let d = data_description("enum foo { a, b }").unwrap();
+            let d = module("enum foo { a, b }").unwrap();
             let members = match &d.data_types[&0] {
                 DataType::Enum { members, .. } => members,
                 _ => panic!("Unexpected type"),
@@ -591,7 +469,7 @@ mod tests {
 
         // No members
         assert_eq!(
-            data_description("enum foo {}").err().unwrap(),
+            module("enum foo {}").err().unwrap(),
             ValidationError::Empty {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
@@ -600,7 +478,7 @@ mod tests {
 
         // Duplicate member in enum
         assert_eq!(
-            data_description("enum foo { \na,\na }").err().unwrap(),
+            module("enum foo { \na,\na }").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "a".to_owned(),
                 at_location: Location { line: 3, column: 0 },
@@ -610,9 +488,7 @@ mod tests {
 
         // Duplicate definition of enum
         assert_eq!(
-            data_description("enum foo { a }\nenum foo { a } ")
-                .err()
-                .unwrap(),
+            module("enum foo { a }\nenum foo { a } ").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "foo".to_owned(),
                 at_location: Location { line: 2, column: 0 },
@@ -623,21 +499,27 @@ mod tests {
 
     #[test]
     fn aliases() {
-        assert!(data_description("type foo = i32").is_ok());
-        assert!(data_description("type foo = *f64").is_ok());
-        assert!(data_description("type foo = ************f64").is_ok());
+        assert!(module("type foo = i32").is_ok());
+        assert!(module("type foo = *f64").is_ok());
+        assert!(module("type foo = ************f64").is_ok());
 
-        assert!(data_description("type foo = *bar\nenum bar { a }").is_ok());
+        assert!(module("type foo = *bar\nenum bar { a }").is_ok());
 
-        assert!(
-            data_description("type link = *list\nstruct list { next: link, thing: i32 }").is_ok()
-        );
+        assert!(module("type link = *list\nstruct list { next: link, thing: i32 }").is_ok());
     }
 
     #[test]
     fn infinite() {
         assert_eq!(
-            data_description("type foo = bar\ntype bar = foo")
+            module("type foo = bar\ntype bar = foo").err().unwrap(),
+            ValidationError::Infinite {
+                name: "foo".to_owned(),
+                location: Location { line: 1, column: 0 },
+            }
+        );
+
+        assert_eq!(
+            module("type foo = bar\nstruct bar { a: foo }")
                 .err()
                 .unwrap(),
             ValidationError::Infinite {
@@ -647,21 +529,9 @@ mod tests {
         );
 
         assert_eq!(
-            data_description("type foo = bar\nstruct bar { a: foo }")
+            module("type foo = bar\nstruct bar { a: baz }\nstruct baz { c: i32, e: foo }")
                 .err()
                 .unwrap(),
-            ValidationError::Infinite {
-                name: "foo".to_owned(),
-                location: Location { line: 1, column: 0 },
-            }
-        );
-
-        assert_eq!(
-            data_description(
-                "type foo = bar\nstruct bar { a: baz }\ntaggedunion baz { c: i32, e: foo }"
-            )
-            .err()
-            .unwrap(),
             ValidationError::Infinite {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },

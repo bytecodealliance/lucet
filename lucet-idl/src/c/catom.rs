@@ -1,5 +1,5 @@
-use super::super::target::*;
-use lucet_idl::types::*;
+use crate::target::*;
+use crate::types::*;
 
 /// Information about a C native type
 pub struct CAtom {
@@ -73,11 +73,6 @@ impl CAtom {
             native_type_size: 8,
             native_type_align: 8, // x86_64 alignment rule
         }
-    }
-
-    /// Native type used for the type in tagged unions
-    pub fn tagged_union_type() -> Self {
-        CAtom::from(AtomType::U32)
     }
 
     /// Native type used for enums
