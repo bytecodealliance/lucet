@@ -66,19 +66,10 @@ impl From<AtomType> for CAtom {
 }
 
 impl CAtom {
-    /// Native type used for pointers
-    pub fn ptr() -> Self {
-        CAtom {
-            native_type_name: "void *",
-            native_type_size: 8,
-            native_type_align: 8, // x86_64 alignment rule
-        }
-    }
-
     /// Native type used for enums
-    /// It can't be an `int` as it would not be portable across architectures
+    /// X86_64 ABI says its an U32, wasm32 seems to agree
     pub fn enum_() -> Self {
-        CAtom::from(AtomType::I64)
+        CAtom::from(AtomType::U32)
     }
 
     /// C atom type to generic atom type

@@ -44,18 +44,8 @@ impl SyntaxDecl {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SyntaxRef {
-    Atom {
-        atom: AtomType,
-        location: Location,
-    },
-    Ptr {
-        to: Box<SyntaxRef>,
-        location: Location,
-    },
-    Name {
-        name: String,
-        location: Location,
-    },
+    Atom { atom: AtomType, location: Location },
+    Name { name: String, location: Location },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -364,18 +354,9 @@ impl<'a> Parser<'a> {
                     location,
                 })
             }
-            Some(Token::Star) => {
-                let location = self.location;
-                self.consume();
-                let ref_of = self.match_ref(err_msg)?;
-                Ok(SyntaxRef::Ptr {
-                    to: Box::new(ref_of),
-                    location,
-                })
-            }
             _ => err_ctx!(
                 err_msg,
-                parse_err!(self.location, "expected atom, ref, or type name")
+                parse_err!(self.location, "expected atom, or type name")
             ),
         }
     }
@@ -385,7 +366,7 @@ impl<'a> Parser<'a> {
 mod tests {
     use super::*;
     #[test]
-    fn structs() {
+    fn struct_empty() {
         let mut parser = Parser::new("struct foo {}");
         assert_eq!(
             parser
@@ -399,6 +380,9 @@ mod tests {
                 location: Location { line: 1, column: 0 },
             }
         );
+    }
+    #[test]
+    fn struct_one_int_member() {
         let mut parser = Parser::new("struct foo {a: i32 }");
         // column ruler:              0      7    12 15
         assert_eq!(
@@ -427,6 +411,9 @@ mod tests {
                 location: Location { line: 1, column: 0 },
             }
         );
+    }
+    #[test]
+    fn struct_one_int_member_trailing_comma() {
         let mut parser = Parser::new("struct foo {b: i32, }");
         //                            0      7    12 15
         assert_eq!(
@@ -455,7 +442,10 @@ mod tests {
                 location: Location { line: 1, column: 0 },
             }
         );
-        let mut parser = Parser::new("struct c { d: f64, e: *u8 }");
+    }
+    #[test]
+    fn struct_two_int_members() {
+        let mut parser = Parser::new("struct c { d: f64, e: u8 }");
         //                            0      7   11 14   19 22
         assert_eq!(
             parser
@@ -482,14 +472,8 @@ mod tests {
                     },
                     StructMember {
                         name: "e".to_owned(),
-                        type_: SyntaxRef::Ptr {
-                            to: Box::new(SyntaxRef::Atom {
-                                atom: AtomType::U8,
-                                location: Location {
-                                    line: 1,
-                                    column: 23,
-                                },
-                            }),
+                        type_: SyntaxRef::Atom {
+                            atom: AtomType::U8,
                             location: Location {
                                 line: 1,
                                 column: 22,
@@ -507,6 +491,9 @@ mod tests {
             }
         );
 
+    }
+    #[test]
+    fn struct_empty_one_attribute() {
         // Test out attributes:
         let mut parser = Parser::new("#[key1=val1] struct foo {}");
         assert_eq!(
@@ -524,6 +511,9 @@ mod tests {
                 },
             }
         );
+    }
+    #[test]
+    fn struct_empty_one_attribute_with_spaces() {
         let mut parser = Parser::new("#[key2=\"1 value with spaces!\"]\nstruct foo {}");
         assert_eq!(
             parser
@@ -541,6 +531,9 @@ mod tests {
                 location: Location { line: 2, column: 0 },
             }
         );
+    }
+    #[test]
+    fn struct_empty_multiple_attributes() {
         let mut parser = Parser::new("#[key1=val1]\n\t#[key2 = \"val2\"   ]\nstruct foo {}");
         assert_eq!(
             parser
@@ -557,6 +550,9 @@ mod tests {
                 location: Location { line: 3, column: 0 },
             }
         );
+    }
+    #[test]
+    fn struct_member_attribute() {
         let mut parser = Parser::new("struct foo {\n\t#[key=val]\n\tmem: f32,\n}");
         assert_eq!(
             parser

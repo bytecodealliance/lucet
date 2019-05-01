@@ -18,17 +18,12 @@ pub fn generate<W: Write>(
     pretty_writer.indent()?;
     pretty_writer.write(format!("typedef {}", type_info.type_name).as_bytes())?;
     pretty_writer.space()?;
-    for _ in 0..type_info.indirections {
-        pretty_writer.write(b"*")?;
-    }
     pretty_writer.write(data_type_entry.name.name.as_bytes())?;
     pretty_writer.write(b";")?;
-    if type_info.indirections == 0 {
-        let leaf_type_info = cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
-        if leaf_type_info.type_name != type_info.type_name {
-            pretty_writer.write(b" // equivalent to ")?;
-            pretty_writer.write(leaf_type_info.type_name.as_bytes())?;
-        }
+    let leaf_type_info = cgenerator.type_info(module, cache, type_info.leaf_data_type_ref);
+    if leaf_type_info.type_name != type_info.type_name {
+        pretty_writer.write(b" // equivalent to ")?;
+        pretty_writer.write(leaf_type_info.type_name.as_bytes())?;
     }
     pretty_writer.eol()?;
     pretty_writer.eob()?;
@@ -42,16 +37,14 @@ pub fn generate<W: Write>(
     );
 
     // Add an assertion to check that resolved size is the one we computed
-    if type_info.indirections == 0 {
-        pretty_writer.write_line(
-            format!(
-                "_Static_assert(sizeof({}) == {}, \"unexpected alias size\");",
-                data_type_entry.name.name, type_info.type_size
-            )
-            .as_bytes(),
-        )?;
-        pretty_writer.eob()?;
-    }
+    pretty_writer.write_line(
+        format!(
+            "_Static_assert(sizeof({}) == {}, \"unexpected alias size\");",
+            data_type_entry.name.name, type_info.type_size
+        )
+        .as_bytes(),
+    )?;
+    pretty_writer.eob()?;
 
     Ok(())
 }

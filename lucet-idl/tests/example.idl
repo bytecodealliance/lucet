@@ -17,8 +17,7 @@ type col = colour
 
 struct st {
     a: i8,
-    b: **i32,
+    b: i32,
     c: color,
-    self: *st
 }
 

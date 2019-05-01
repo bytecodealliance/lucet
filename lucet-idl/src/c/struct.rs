@@ -37,19 +37,9 @@ pub fn generate<W: Write>(
         pretty_writer_i1.indent()?;
         pretty_writer_i1.write(type_info.type_name.as_bytes())?;
         pretty_writer_i1.space()?;
-        for _ in 0..type_info.indirections {
-            pretty_writer_i1.write(b"*")?;
-        }
         pretty_writer_i1.write(named_member.name.as_bytes())?;
         pretty_writer_i1.write(b";")?;
         pretty_writer_i1.eol()?;
-
-        cgenerator.pointer_pad(
-            &mut pretty_writer_i1,
-            type_info.indirections,
-            offset,
-            &named_member.name,
-        )?;
 
         offset += type_size;
         first_member_align = cmp::max(first_member_align, type_align);

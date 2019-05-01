@@ -48,7 +48,6 @@ pub fn macro_for_data_type_ref(
             let native_type_size = CAtom::from(*atom_type).native_type_size;
             format!("{}", native_type_size)
         }
-        DataTypeRef::Ptr(_) => macro_for(prefix, "PTR"),
         DataTypeRef::Defined(data_type_id) => {
             let data_type_entry = module.get_datatype(*data_type_id);
             macro_for(prefix, &data_type_entry.name.name)

@@ -36,10 +36,10 @@ impl Config {
                 backend_config: self.backend_config,
             }),
 
-            Backend::Rust => Box::new(RustGenerator {
-                target: self.target,
-                backend_config: self.backend_config,
-            }),
+            Backend::Rust => Box::new(RustGenerator::new(
+                self.target,
+                self.backend_config,
+            )),
         }
     }
 }

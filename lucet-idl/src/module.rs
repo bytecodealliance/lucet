@@ -1,5 +1,5 @@
-use super::parser::{SyntaxDecl, SyntaxRef};
-use super::types::{AtomType, Attr, Location};
+use crate::parser::{SyntaxDecl, SyntaxRef};
+use crate::types::{AtomType, Attr, Location};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -17,7 +17,6 @@ impl fmt::Display for DataTypeId {
 pub enum DataTypeRef {
     Defined(DataTypeId),
     Atom(AtomType),
-    Ptr(Box<DataTypeRef>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -169,7 +168,6 @@ impl Module {
     fn get_ref(&self, syntax_ref: &SyntaxRef) -> Result<DataTypeRef, ValidationError> {
         match syntax_ref {
             SyntaxRef::Atom { atom, .. } => Ok(DataTypeRef::Atom(*atom)),
-            SyntaxRef::Ptr { to, .. } => Ok(DataTypeRef::Ptr(Box::new(self.get_ref(&to)?))),
             SyntaxRef::Name { name, location } => match self.id_for_name(name) {
                 Some(id) => Ok(DataTypeRef::Defined(id)),
                 None => Err(ValidationError::NameNotFound {
@@ -381,10 +379,14 @@ mod tests {
     }
 
     #[test]
-    fn structs() {
+    fn structs_basic() {
         assert!(module("struct foo { a: i32}").is_ok());
         assert!(module("struct foo { a: i32, b: f32 }").is_ok());
 
+    }
+
+    #[test]
+    fn struct_two_atoms() {
         {
             let d = module("struct foo { a: i32, b: f32 }").unwrap();
             let members = match &d.data_types[&0] {
@@ -403,14 +405,30 @@ mod tests {
             };
         }
 
+    }
+
+    #[test]
+    fn struct_prev_definition() {
         // Refer to a struct defined previously:
         assert!(module("struct foo { a: i32, b: f64 } struct bar { a: foo }").is_ok());
+    }
+
+    #[test]
+    fn struct_next_definition() {
         // Refer to a struct defined afterwards:
         assert!(module("struct foo { a: i32, b: bar} struct bar { a: i32 }").is_ok());
 
-        // Refer to itself
-        assert!(module("struct list { next: *list, thing: i32 }").is_ok());
+    }
 
+    #[test]
+    fn struct_self_referential() {
+        // Refer to itself
+        assert!(module("struct list { next: list, thing: i32 }").is_err());
+
+    }
+
+    #[test]
+    fn struct_empty() {
         // No members
         assert_eq!(
             module("struct foo {}").err().unwrap(),
@@ -420,6 +438,10 @@ mod tests {
             }
         );
 
+    }
+
+    #[test]
+    fn struct_duplicate_member() {
         // Duplicate member in struct
         assert_eq!(
             module("struct foo { \na: i32, \na: f64}").err().unwrap(),
@@ -430,6 +452,10 @@ mod tests {
             }
         );
 
+    }
+
+    #[test]
+    fn struct_duplicate_definition() {
         // Duplicate definition of struct
         assert_eq!(
             module("struct foo { a: i32 }\nstruct foo { a: i32 } ")
@@ -442,6 +468,10 @@ mod tests {
             }
         );
 
+    }
+
+    #[test]
+    fn struct_undeclared_member() {
         // Refer to type that is not declared
         assert_eq!(
             module("struct foo { \nb: bar }").err().unwrap(),
@@ -500,12 +530,12 @@ mod tests {
     #[test]
     fn aliases() {
         assert!(module("type foo = i32").is_ok());
-        assert!(module("type foo = *f64").is_ok());
-        assert!(module("type foo = ************f64").is_ok());
+        assert!(module("type foo = f64").is_ok());
+        assert!(module("type foo = u8").is_ok());
 
-        assert!(module("type foo = *bar\nenum bar { a }").is_ok());
+        assert!(module("type foo = bar\nenum bar { a }").is_ok());
 
-        assert!(module("type link = *list\nstruct list { next: link, thing: i32 }").is_ok());
+        assert!(module("type link = u32\nstruct list { next: link, thing: i32 }").is_ok());
     }
 
     #[test]
