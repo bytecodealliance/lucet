@@ -135,13 +135,20 @@ macro_rules! entrypoint_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-        use lucet_runtime::{DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::{
+            lucet_hostcalls, DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE,
+        };
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::entrypoint::{mock_calculator_module, wat_calculator_module};
 
-        #[no_mangle]
-        extern "C" fn black_box(_vmctx: *mut lucet_vmctx, _val: *mut c_void) {}
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn black_box(
+                &mut _vmctx,
+                _val: *mut c_void,
+            ) -> () {}
+        }
 
         #[test]
         fn mock_calc_add_2() {
@@ -711,14 +718,19 @@ macro_rules! entrypoint_tests {
                 .expect("instance runs");
         }
 
-        #[no_mangle]
-        extern "C" fn callback_hostcall(vmctx: *mut lucet_vmctx, cb_idx: u32, x: u64) -> u64 {
-            let vmctx = unsafe { Vmctx::from_raw(vmctx) };
-            let func = vmctx
-                .get_func_from_idx(0, cb_idx)
-                .expect("can get function by index");
-            let func = func as *const extern "C" fn(*mut lucet_vmctx, u64) -> u64;
-            unsafe { (*func)(vmctx.as_raw(), x) + 1 }
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn callback_hostcall(
+                &mut vmctx,
+                cb_idx: u32,
+                x: u64,
+            ) -> u64 {
+                let func = vmctx
+                    .get_func_from_idx(0, cb_idx)
+                    .expect("can get function by index");
+                let func = func as *const extern "C" fn(*mut lucet_vmctx, u64) -> u64;
+                (*func)(vmctx.as_raw(), x) + 1
+            }
         }
 
         #[test]

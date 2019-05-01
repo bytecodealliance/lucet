@@ -1,5 +1,4 @@
 mod dl;
-mod globals;
 mod mock;
 mod sparse_page_data;
 

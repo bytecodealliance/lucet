@@ -55,7 +55,8 @@ macro_rules! with_ffi_arcs {
 
 /// Marker type for the `vmctx` pointer argument.
 ///
-/// This type should only be used with [`Vmctx::from_raw()`](struct.Vmctx.html#method.from_raw).
+/// This type should only be used with [`Vmctx::from_raw()`](struct.Vmctx.html#method.from_raw) or
+/// the C API.
 #[repr(C)]
 pub struct lucet_vmctx {
     _unused: [u8; 0],
@@ -194,8 +195,15 @@ pub type lucet_signal_handler = unsafe extern "C" fn(
 
 pub type lucet_fatal_handler = unsafe extern "C" fn(inst: *mut lucet_instance);
 
+pub struct CTerminationDetails {
+    pub details: *mut c_void,
+}
+
+unsafe impl Send for CTerminationDetails {}
+unsafe impl Sync for CTerminationDetails {}
+
 pub mod lucet_state {
-    use crate::c_api::lucet_val;
+    use crate::c_api::{lucet_val, CTerminationDetails};
     use crate::instance::{State, TerminationDetails};
     use crate::module::AddrDetails;
     use crate::sysdeps::UContext;
@@ -243,15 +251,19 @@ pub mod lucet_state {
                                 reason: lucet_terminated_reason::Signal,
                                 provided: std::ptr::null_mut(),
                             },
-                            TerminationDetails::GetEmbedCtx => lucet_terminated {
-                                reason: lucet_terminated_reason::GetEmbedCtx,
+                            TerminationDetails::CtxNotFound => lucet_terminated {
+                                reason: lucet_terminated_reason::CtxNotFound,
+                                provided: std::ptr::null_mut(),
+                            },
+                            TerminationDetails::BorrowError(_) => lucet_terminated {
+                                reason: lucet_terminated_reason::BorrowError,
                                 provided: std::ptr::null_mut(),
                             },
                             TerminationDetails::Provided(p) => lucet_terminated {
                                 reason: lucet_terminated_reason::Provided,
                                 provided: p
                                     .downcast_ref()
-                                    .map(|v| *v)
+                                    .map(|CTerminationDetails { details }| *details)
                                     .unwrap_or(std::ptr::null_mut()),
                             },
                         },
@@ -298,7 +310,8 @@ pub mod lucet_state {
     #[derive(Clone, Copy)]
     pub enum lucet_terminated_reason {
         Signal,
-        GetEmbedCtx,
+        CtxNotFound,
+        BorrowError,
         Provided,
     }
 

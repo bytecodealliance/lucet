@@ -58,6 +58,11 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.max_reserved_size(max_reserved_size);
     }
 
+    // this comes after min and max, so it overrides them if present
+    if let Some(reserved_size) = opts.reserved_size {
+        c.reserved_size(reserved_size);
+    }
+
     if let Some(guard_size) = opts.guard_size {
         c.guard_size(guard_size);
     }

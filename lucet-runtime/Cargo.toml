@@ -26,6 +26,7 @@ name = "lucet_runtime"
 crate-type = ["rlib", "staticlib", "cdylib"]
 
 [package.metadata.deb]
+name = "fst-lucet-runtime"
 maintainer = "Adam C. Foltzer <acfoltzer@fastly.com>"
 depends = "$auto"
 priority = "optional"

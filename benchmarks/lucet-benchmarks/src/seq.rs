@@ -350,6 +350,40 @@ fn run_many_args<R: RegionCreate + 'static>(c: &mut Criterion) {
     });
 }
 
+fn run_hostcall_wrapped<R: RegionCreate + 'static>(c: &mut Criterion) {
+    fn body(inst: &mut InstanceHandle) {
+        inst.run(b"wrapped", &[]).unwrap();
+    }
+
+    let module = hostcalls_mock();
+    let region = R::create(1, &Limits::default()).unwrap();
+
+    c.bench_function(&format!("run_hostcall_wrapped ({})", R::TYPE_NAME), move |b| {
+        b.iter_batched_ref(
+            || region.new_instance(module.clone()).unwrap(),
+            |inst| body(inst),
+            criterion::BatchSize::PerIteration,
+        )
+    });
+}
+
+fn run_hostcall_raw<R: RegionCreate + 'static>(c: &mut Criterion) {
+    fn body(inst: &mut InstanceHandle) {
+        inst.run(b"raw", &[]).unwrap();
+    }
+
+    let module = hostcalls_mock();
+    let region = R::create(1, &Limits::default()).unwrap();
+
+    c.bench_function(&format!("run_hostcall_raw ({})", R::TYPE_NAME), move |b| {
+        b.iter_batched_ref(
+            || region.new_instance(module.clone()).unwrap(),
+            |inst| body(inst),
+            criterion::BatchSize::PerIteration,
+        )
+    });
+}
+
 pub fn seq_benches<R: RegionCreate + 'static>(c: &mut Criterion) {
     load_mkregion_and_instantiate::<R>(c);
     instantiate::<R>(c);
@@ -362,4 +396,6 @@ pub fn seq_benches<R: RegionCreate + 'static>(c: &mut Criterion) {
     run_fib::<R>(c);
     run_hello::<R>(c);
     run_many_args::<R>(c);
+    run_hostcall_wrapped::<R>(c);
+    run_hostcall_raw::<R>(c);
 }

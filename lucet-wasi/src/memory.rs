@@ -23,11 +23,11 @@ macro_rules! bail_errno {
 }
 
 pub unsafe fn dec_ptr(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     ptr: wasm32::uintptr_t,
     len: usize,
 ) -> Result<*mut u8, host::__wasi_errno_t> {
-    let heap = vmctx.heap_mut();
+    let mut heap = vmctx.heap_mut();
 
     // check that `len` fits in the wasm32 address space
     if len > wasm32::UINTPTR_MAX as usize {
@@ -44,7 +44,7 @@ pub unsafe fn dec_ptr(
 }
 
 pub unsafe fn dec_ptr_to<T>(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     ptr: wasm32::uintptr_t,
 ) -> Result<*mut T, host::__wasi_errno_t> {
     // check that the ptr is aligned
@@ -55,14 +55,14 @@ pub unsafe fn dec_ptr_to<T>(
 }
 
 pub unsafe fn dec_pointee<T>(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     ptr: wasm32::uintptr_t,
 ) -> Result<T, host::__wasi_errno_t> {
     dec_ptr_to::<T>(vmctx, ptr).map(|p| p.read())
 }
 
 pub unsafe fn enc_pointee<T>(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     ptr: wasm32::uintptr_t,
     t: T,
 ) -> Result<(), host::__wasi_errno_t> {
@@ -70,7 +70,7 @@ pub unsafe fn enc_pointee<T>(
 }
 
 pub unsafe fn dec_slice_of<T>(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     ptr: wasm32::uintptr_t,
     len: wasm32::size_t,
 ) -> Result<(*mut T, usize), host::__wasi_errno_t> {
@@ -91,7 +91,7 @@ pub unsafe fn dec_slice_of<T>(
 }
 
 pub unsafe fn enc_slice_of<T>(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     slice: &[T],
     ptr: wasm32::uintptr_t,
 ) -> Result<(), host::__wasi_errno_t> {
@@ -120,7 +120,7 @@ macro_rules! dec_enc_scalar {
         }
 
         pub unsafe fn $dec_byref(
-            vmctx: &mut Vmctx,
+            vmctx: &Vmctx,
             ptr: wasm32::uintptr_t,
         ) -> Result<host::$ty, host::__wasi_errno_t> {
             dec_pointee::<wasm32::$ty>(vmctx, ptr).map($dec)
@@ -131,7 +131,7 @@ macro_rules! dec_enc_scalar {
         }
 
         pub unsafe fn $enc_byref(
-            vmctx: &mut Vmctx,
+            vmctx: &Vmctx,
             ptr: wasm32::uintptr_t,
             x: host::$ty,
         ) -> Result<(), host::__wasi_errno_t> {
@@ -141,7 +141,7 @@ macro_rules! dec_enc_scalar {
 }
 
 pub unsafe fn dec_ciovec(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     ciovec: &wasm32::__wasi_ciovec_t,
 ) -> Result<host::__wasi_ciovec_t, host::__wasi_errno_t> {
     let len = dec_usize(ciovec.buf_len);
@@ -152,7 +152,7 @@ pub unsafe fn dec_ciovec(
 }
 
 pub unsafe fn dec_ciovec_slice(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     ptr: wasm32::uintptr_t,
     len: wasm32::size_t,
 ) -> Result<Vec<host::__wasi_ciovec_t>, host::__wasi_errno_t> {
@@ -226,7 +226,7 @@ pub fn dec_filestat(filestat: wasm32::__wasi_filestat_t) -> host::__wasi_filesta
 }
 
 pub unsafe fn dec_filestat_byref(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     filestat_ptr: wasm32::uintptr_t,
 ) -> Result<host::__wasi_filestat_t, host::__wasi_errno_t> {
     dec_pointee::<wasm32::__wasi_filestat_t>(vmctx, filestat_ptr).map(dec_filestat)
@@ -246,7 +246,7 @@ pub fn enc_filestat(filestat: host::__wasi_filestat_t) -> wasm32::__wasi_filesta
 }
 
 pub unsafe fn enc_filestat_byref(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     filestat_ptr: wasm32::uintptr_t,
     host_filestat: host::__wasi_filestat_t,
 ) -> Result<(), host::__wasi_errno_t> {
@@ -264,7 +264,7 @@ pub fn dec_fdstat(fdstat: wasm32::__wasi_fdstat_t) -> host::__wasi_fdstat_t {
 }
 
 pub unsafe fn dec_fdstat_byref(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     fdstat_ptr: wasm32::uintptr_t,
 ) -> Result<host::__wasi_fdstat_t, host::__wasi_errno_t> {
     dec_pointee::<wasm32::__wasi_fdstat_t>(vmctx, fdstat_ptr).map(dec_fdstat)
@@ -281,7 +281,7 @@ pub fn enc_fdstat(fdstat: host::__wasi_fdstat_t) -> wasm32::__wasi_fdstat_t {
 }
 
 pub unsafe fn enc_fdstat_byref(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     fdstat_ptr: wasm32::uintptr_t,
     host_fdstat: host::__wasi_fdstat_t,
 ) -> Result<(), host::__wasi_errno_t> {
@@ -348,7 +348,7 @@ pub fn dec_prestat(
 }
 
 pub unsafe fn dec_prestat_byref(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     prestat_ptr: wasm32::uintptr_t,
 ) -> Result<host::__wasi_prestat_t, host::__wasi_errno_t> {
     dec_pointee::<wasm32::__wasi_prestat_t>(vmctx, prestat_ptr).and_then(dec_prestat)
@@ -374,7 +374,7 @@ pub fn enc_prestat(
 }
 
 pub unsafe fn enc_prestat_byref(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     prestat_ptr: wasm32::uintptr_t,
     host_prestat: host::__wasi_prestat_t,
 ) -> Result<(), host::__wasi_errno_t> {
@@ -406,7 +406,7 @@ pub fn enc_usize(size: usize) -> wasm32::size_t {
 }
 
 pub unsafe fn enc_usize_byref(
-    vmctx: &mut Vmctx,
+    vmctx: &Vmctx,
     usize_ptr: wasm32::uintptr_t,
     host_usize: usize,
 ) -> Result<(), host::__wasi_errno_t> {

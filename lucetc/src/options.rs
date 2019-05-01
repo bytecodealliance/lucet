@@ -38,6 +38,7 @@ pub struct Options {
     pub builtins_path: Option<PathBuf>,
     pub min_reserved_size: Option<u64>,
     pub max_reserved_size: Option<u64>,
+    pub reserved_size: Option<u64>,
     pub guard_size: Option<u64>,
     pub opt_level: OptLevel,
 }
@@ -80,6 +81,12 @@ impl Options {
             None
         };
 
+        let reserved_size = if let Some(reserved_str) = m.value_of("reserved_size") {
+            Some(parse_humansized(reserved_str)?)
+        } else {
+            None
+        };
+
         let guard_size = if let Some(guard_str) = m.value_of("guard_size") {
             Some(parse_humansized(guard_str)?)
         } else {
@@ -102,6 +109,7 @@ impl Options {
             builtins_path,
             min_reserved_size,
             max_reserved_size,
+            reserved_size,
             guard_size,
             opt_level,
         })
@@ -153,6 +161,13 @@ impl Options {
                     .takes_value(true)
                     .multiple(false)
                     .help("maximum size of usable linear memory region. must be multiple of 4k. default: 4 GiB"),
+            )
+            .arg(
+                Arg::with_name("reserved_size")
+                    .long("--reserved-size")
+                    .takes_value(true)
+                    .multiple(false)
+                    .help("exact size of usable linear memory region, overriding --{min,max}-reserved-size. must be multiple of 4k"),
             )
             .arg(
                 Arg::with_name("guard_size")

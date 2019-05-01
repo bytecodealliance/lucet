@@ -3,16 +3,20 @@ macro_rules! strcmp_tests {
     ( $TestRegion:path ) => {
         use libc::{c_char, c_int, c_void, strcmp, uint64_t};
         use lucet_runtime::vmctx::lucet_vmctx;
-        use lucet_runtime::{Error, Limits, Region, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::{lucet_hostcalls, Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use std::ffi::CString;
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
 
-        #[no_mangle]
-        unsafe extern "C" fn hostcall_host_fault(_vmctx: *const lucet_vmctx) {
-            let oob = (-1isize) as *mut c_char;
-            *oob = 'x' as c_char;
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_host_fault(
+                &mut _vmctx,
+            ) -> () {
+                let oob = (-1isize) as *mut c_char;
+                *oob = 'x' as c_char;
+            }
         }
 
         fn strcmp_compare(s1: &str, s2: &str) {

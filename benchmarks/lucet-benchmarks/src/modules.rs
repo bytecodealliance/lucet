@@ -1,4 +1,5 @@
-use lucet_runtime::vmctx::lucet_vmctx;
+use lucet_runtime::lucet_hostcalls;
+use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder, Module};
 use lucet_wasi_sdk::{CompileOpts, Lucetc};
 use lucetc::{Bindings, LucetcOpts};
@@ -11,7 +12,7 @@ fn wasi_bindings() -> Bindings {
 
 pub fn compile_hello<P: AsRef<Path>>(so_file: P) {
     let wasm_build = Lucetc::new(&["guests/hello.c"])
-        .print_output(true)
+        .with_print_output(true)
         .with_cflag("-Wall")
         .with_cflag("-Werror")
         .with_bindings(wasi_bindings());
@@ -173,5 +174,81 @@ pub fn many_args_mock() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(b"f", f as *const extern "C" fn())
+        .build()
+}
+
+pub fn hostcalls_mock() -> Arc<dyn Module> {
+    lucet_hostcalls! {
+        #[inline(never)]
+        #[no_mangle]
+        pub unsafe extern "C" fn hostcall_wrapped(
+            &mut vmctx,
+            x1: u64,
+            x2: u64,
+            x3: u64,
+            x4: u64,
+            x5: u64,
+            x6: u64,
+            x7: u64,
+            x8: u64,
+            x9: u64,
+            x10: u64,
+            x11: u64,
+            x12: u64,
+            x13: u64,
+            x14: u64,
+            x15: u64,
+            x16: u64,
+        ) -> () {
+            vmctx.heap_mut()[0] =
+                (x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + x11 + x12 + x13 + x14 + x15 + x16)
+                    as u8;
+            assert_eq!(vmctx.heap()[0], 136);
+        }
+    }
+
+    #[inline(never)]
+    #[no_mangle]
+    pub unsafe extern "C" fn hostcall_raw(
+        vmctx: *mut lucet_vmctx,
+        x1: u64,
+        x2: u64,
+        x3: u64,
+        x4: u64,
+        x5: u64,
+        x6: u64,
+        x7: u64,
+        x8: u64,
+        x9: u64,
+        x10: u64,
+        x11: u64,
+        x12: u64,
+        x13: u64,
+        x14: u64,
+        x15: u64,
+        x16: u64,
+    ) {
+        let vmctx = Vmctx::from_raw(vmctx);
+        vmctx.heap_mut()[0] =
+            (x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + x11 + x12 + x13 + x14 + x15 + x16)
+                as u8;
+        assert_eq!(vmctx.heap()[0], 136);
+    }
+
+    unsafe extern "C" fn wrapped(vmctx: *mut lucet_vmctx) {
+        for _ in 0..1000 {
+            hostcall_wrapped(vmctx, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+        }
+    }
+
+    unsafe extern "C" fn raw(vmctx: *mut lucet_vmctx) {
+        for _ in 0..1000 {
+            hostcall_raw(vmctx, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+        }
+    }
+
+    MockModuleBuilder::new()
+        .with_export_func(b"wrapped", wrapped as *const extern "C" fn())
+        .with_export_func(b"raw", raw as *const extern "C" fn())
         .build()
 }

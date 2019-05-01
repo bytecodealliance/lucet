@@ -11,7 +11,8 @@ use lucet_module_data::TrapCode;
 use nix::sys::signal::{
     pthread_sigmask, raise, sigaction, SaFlags, SigAction, SigHandler, SigSet, SigmaskHow, Signal,
 };
-use std::sync::Mutex;
+use std::panic;
+use std::sync::{Arc, Mutex};
 
 lazy_static! {
     // TODO: work out an alternative to this that is signal-safe for `reraise_host_signal_in_handler`
@@ -223,6 +224,7 @@ struct SignalState {
     saved_sigfpe: SigAction,
     saved_sigill: SigAction,
     saved_sigsegv: SigAction,
+    saved_panic_hook: Option<Arc<Box<dyn Fn(&panic::PanicInfo) + Sync + Send + 'static>>>,
 }
 
 // raw pointers in the saved types
@@ -246,13 +248,35 @@ unsafe fn setup_guest_signal_state(ostate: &mut Option<SignalState>) {
     let saved_sigill = sigaction(Signal::SIGILL, &sa).expect("sigaction succeeds");
     let saved_sigsegv = sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds");
 
+    let saved_panic_hook = Some(setup_guest_panic_hook());
+
     *ostate = Some(SignalState {
         counter: 1,
         saved_sigbus,
         saved_sigfpe,
         saved_sigill,
         saved_sigsegv,
+        saved_panic_hook,
     });
+}
+
+fn setup_guest_panic_hook() -> Arc<Box<dyn Fn(&panic::PanicInfo) + Sync + Send + 'static>> {
+    let saved_panic_hook = Arc::new(panic::take_hook());
+    let closure_saved_panic_hook = saved_panic_hook.clone();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        if panic_info
+            .payload()
+            .downcast_ref::<TerminationDetails>()
+            .is_none()
+        {
+            closure_saved_panic_hook(panic_info);
+        } else {
+            // this is a panic used to implement instance termination (such as
+            // `lucet_hostcall_terminate!`), so we don't want to print a backtrace; instead, we do
+            // nothing
+        }
+    }));
+    saved_panic_hook
 }
 
 unsafe fn restore_host_signal_state(state: &mut SignalState) {
@@ -261,6 +285,13 @@ unsafe fn restore_host_signal_state(state: &mut SignalState) {
     sigaction(Signal::SIGFPE, &state.saved_sigfpe).expect("sigaction succeeds");
     sigaction(Signal::SIGILL, &state.saved_sigill).expect("sigaction succeeds");
     sigaction(Signal::SIGSEGV, &state.saved_sigsegv).expect("sigaction succeeds");
+
+    // restore panic hook
+    drop(panic::take_hook());
+    state
+        .saved_panic_hook
+        .take()
+        .map(|hook| Arc::try_unwrap(hook).map(|hook| panic::set_hook(hook)));
 }
 
 unsafe fn reraise_host_signal_in_handler(

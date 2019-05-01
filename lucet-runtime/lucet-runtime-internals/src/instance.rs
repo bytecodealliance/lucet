@@ -17,7 +17,7 @@ use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
 use lucet_module_data::TrapCode;
 use memoffset::offset_of;
 use std::any::Any;
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
 use std::ffi::{CStr, CString};
 use std::mem;
 use std::ops::{Deref, DerefMut};
@@ -425,13 +425,13 @@ impl Instance {
     }
 
     /// Get a reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx<T: Any>(&self) -> Option<&T> {
-        self.embed_ctx.get::<T>()
+    pub fn get_embed_ctx<T: Any>(&self) -> Option<Result<Ref<T>, BorrowError>> {
+        self.embed_ctx.try_get::<T>()
     }
 
     /// Get a mutable reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<&mut T> {
-        self.embed_ctx.get_mut::<T>()
+    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<Result<RefMut<T>, BorrowMutError>> {
+        self.embed_ctx.try_get_mut::<T>()
     }
 
     /// Insert a context value.
@@ -753,15 +753,18 @@ impl std::fmt::Display for FaultDetails {
 /// error has occurred in a hostcall, rather than in WebAssembly code.
 #[derive(Clone)]
 pub enum TerminationDetails {
+    /// Returned when a signal handler terminates the instance.
     Signal,
-    GetEmbedCtx,
-    /// Calls to `Vmctx::terminate()` may attach an arbitrary pointer for extra debugging
-    /// information.
-    Provided(Arc<dyn Any>),
+    /// Returned when `get_embed_ctx` or `get_embed_ctx_mut` are used with a type that is not present.
+    CtxNotFound,
+    /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
+    BorrowError(&'static str),
+    /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
+    Provided(Arc<dyn Any + 'static + Send + Sync>),
 }
 
 impl TerminationDetails {
-    pub fn provide<A: Any>(details: A) -> Self {
+    pub fn provide<A: Any + 'static + Send + Sync>(details: A) -> Self {
         TerminationDetails::Provided(Arc::new(details))
     }
     pub fn provided_details(&self) -> Option<&dyn Any> {
@@ -785,17 +788,28 @@ fn termination_details_any_typing() {
     );
 }
 
+impl PartialEq for TerminationDetails {
+    fn eq(&self, rhs: &TerminationDetails) -> bool {
+        use TerminationDetails::*;
+        match (self, rhs) {
+            (Signal, Signal) => true,
+            (BorrowError(msg1), BorrowError(msg2)) => msg1 == msg2,
+            (CtxNotFound, CtxNotFound) => true,
+            // can't compare `Any`
+            _ => false,
+        }
+    }
+}
+
 impl std::fmt::Debug for TerminationDetails {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "TerminationDetails::{}",
-            match self {
-                TerminationDetails::Signal => "Signal",
-                TerminationDetails::GetEmbedCtx => "GetEmbedCtx",
-                TerminationDetails::Provided(_) => "Provided(Any)",
-            }
-        )
+        write!(f, "TerminationDetails::")?;
+        match self {
+            TerminationDetails::Signal => write!(f, "Signal"),
+            TerminationDetails::BorrowError(msg) => write!(f, "BorrowError({})", msg),
+            TerminationDetails::CtxNotFound => write!(f, "CtxNotFound"),
+            TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
+        }
     }
 }
 
