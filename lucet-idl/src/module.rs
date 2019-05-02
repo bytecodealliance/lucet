@@ -275,6 +275,9 @@ impl Module {
                     },
                 );
             }
+            SyntaxDecl::Module { .. } => {
+                unreachable!()
+            }
         }
         Ok(())
     }

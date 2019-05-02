@@ -1,4 +1,4 @@
-use super::lexer::{Keyword, LexError, Lexer, LocatedError, LocatedToken, Token};
+use super::lexer::{LexError, Lexer, LocatedError, LocatedToken, Token};
 use super::types::{AtomType, Attr, Location};
 use std::error::Error;
 use std::fmt;
@@ -23,6 +23,12 @@ pub enum SyntaxDecl {
         attrs: Vec<Attr>,
         location: Location,
     },
+    Module {
+        name: String,
+        decls: Vec<Box<SyntaxDecl>>,
+        attrs: Vec<Attr>,
+        location: Location,
+    }
 }
 
 impl SyntaxDecl {
@@ -31,6 +37,7 @@ impl SyntaxDecl {
             SyntaxDecl::Struct { name, .. } => &name,
             SyntaxDecl::Enum { name, .. } => &name,
             SyntaxDecl::Alias { name, .. } => &name,
+            SyntaxDecl::Module { name, .. } => &name,
         }
     }
     pub fn location(&self) -> &Location {
@@ -38,6 +45,7 @@ impl SyntaxDecl {
             SyntaxDecl::Struct { location, .. } => &location,
             SyntaxDecl::Enum { location, .. } => &location,
             SyntaxDecl::Alias { location, .. } => &location,
+            SyntaxDecl::Module { location, .. } => &location,
         }
     }
 }
@@ -167,7 +175,7 @@ impl<'a> Parser<'a> {
 
     fn match_a_word(&mut self, err_msg: &str) -> Result<&'a str, ParseError> {
         match self.token() {
-            Some(Token::Word(text)) => {
+            Some(Token::Word(text)) | Some(Token::Keyword(text)) => {
                 self.consume();
                 Ok(text)
             }
@@ -203,7 +211,7 @@ impl<'a> Parser<'a> {
                     self.consume();
                     attrs.push(self.match_attr_body()?);
                 }
-                Some(Token::Word(member_name)) => {
+                Some(Token::Word(member_name)) | Some(Token::Keyword(member_name)) => {
                     let location = self.location;
                     self.consume();
                     self.match_token(Token::Colon, "expected :")?;
@@ -224,10 +232,10 @@ impl<'a> Parser<'a> {
                             self.consume();
                             break;
                         }
-                        _ => parse_err!(self.location, "in struct body:\nexpected , or }}")?,
+                        _ => parse_err!(self.location, "in struct body:\nexpected , or '}'")?,
                     }
                 }
-                _ => parse_err!(self.location, "in struct body:\nexpected member name or }}")?,
+                _ => parse_err!(self.location, "in struct body:\nexpected member name or '}'")?,
             }
         }
         Ok(members)
@@ -277,7 +285,7 @@ impl<'a> Parser<'a> {
         let mut attrs = Vec::new();
         loop {
             match self.token() {
-                Some(Token::Keyword(Keyword::Struct)) => {
+                Some(Token::Keyword("struct")) => {
                     let location = self.location;
                     self.consume();
                     let name = err_ctx!(err_msg, self.match_a_word("expected struct name"))?;
@@ -290,7 +298,7 @@ impl<'a> Parser<'a> {
                         location,
                     }));
                 }
-                Some(Token::Keyword(Keyword::Enum)) => {
+                Some(Token::Keyword("enum")) => {
                     let location = self.location;
                     self.consume();
                     let name = err_ctx!(err_msg, self.match_a_word("expected enum name"))?;
@@ -303,7 +311,7 @@ impl<'a> Parser<'a> {
                         location,
                     }));
                 }
-                Some(Token::Keyword(Keyword::Type)) => {
+                Some(Token::Keyword("type")) => {
                     let location = self.location;
                     self.consume();
                     let name = err_ctx!(err_msg, self.match_a_word("expected type name"))?;
@@ -346,11 +354,11 @@ impl<'a> Parser<'a> {
                 self.consume();
                 Ok(SyntaxRef::Atom { atom, location })
             }
-            Some(Token::Word(name)) => {
+            Some(Token::Word(name)) | Some(Token::Keyword(name)) => {
                 let location = self.location;
                 self.consume();
                 Ok(SyntaxRef::Name {
-                    name: name.to_owned(),
+                    name: name.to_string(),
                     location,
                 })
             }
@@ -579,6 +587,52 @@ mod tests {
         );
     }
 
+    #[test]
+    fn struct_reserved_members() {
+        let mut parser = Parser::new("struct foo {a: mod, struct: enum }");
+        // column ruler:              0      7    12 15   21      30
+        assert_eq!(
+            parser
+                .match_decl("foo a i32")
+                .expect("valid parse")
+                .expect("valid decl"),
+            SyntaxDecl::Struct {
+                name: "foo".to_string(),
+                members: vec![StructMember {
+                    name: "a".to_owned(),
+                    type_: SyntaxRef::Name {
+                        name: "mod".to_owned(),
+                        location: Location {
+                            line: 1,
+                            column: 15,
+                        },
+                    },
+                    attrs: Vec::new(),
+                    location: Location {
+                        line: 1,
+                        column: 12,
+                    },
+                },
+                StructMember {
+                    name: "struct".to_owned(),
+                    type_: SyntaxRef::Name {
+                        name: "enum".to_owned(),
+                        location: Location {
+                            line: 1,
+                            column: 28,
+                        },
+                    },
+                    attrs: Vec::new(),
+                    location: Location {
+                        line: 1,
+                        column: 20,
+                    },
+                }],
+                attrs: Vec::new(),
+                location: Location { line: 1, column: 0 },
+            }
+        );
+    }
     #[test]
     fn enums() {
         let mut parser = Parser::new("enum foo {}");
