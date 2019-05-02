@@ -161,11 +161,18 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             table_entry_addr,
             table_entry_sig_offset,
         );
-        // Check it against sig_index, trap if wrong
+
+        // Translate from the module's non-unique signature space to our internal unique space
+        let unique_sig_index = self
+            .module_decls
+            .get_signature_uid(sig_index)
+            .expect("signature index must be valid");
+
+        // Check it against the unique sig_index, trap if wrong
         let valid_type = pos.ins().icmp_imm(
             ir::condcodes::IntCC::Equal,
             table_entry_sig_ix,
-            sig_index.as_u32() as i64,
+            unique_sig_index.as_u32() as i64,
         );
         pos.ins().trapz(valid_type, ir::TrapCode::BadSignature);
 

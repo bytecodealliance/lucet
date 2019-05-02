@@ -41,7 +41,7 @@ mod module_data {
         let b = super::test_bindings();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling fibonacci");
-        assert_eq!(c.module_data().globals_spec().len(), 0);
+        assert_eq!(c.module_data().unwrap().globals_spec().len(), 0);
 
         /* TODO can't express these with module data
         assert_eq!(p.import_functions().len(), 0);
@@ -59,7 +59,7 @@ mod module_data {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling arith");
-        assert_eq!(c.module_data().globals_spec().len(), 0);
+        assert_eq!(c.module_data().unwrap().globals_spec().len(), 0);
 
         /* TODO can't express these with module data
         assert_eq!(p.import_functions().len(), 0);
@@ -181,7 +181,7 @@ mod module_data {
         let h = HeapSettings::default();
 
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile globals_import");
-        let module_data = c.module_data();
+        let module_data = c.module_data().unwrap();
         let gspec = module_data.globals_spec();
 
         assert_eq!(gspec.len(), 1);
@@ -205,7 +205,7 @@ mod module_data {
             Compiler::new(&m, OptLevel::Best, &b, h.clone()).expect("compiling heap_spec_import");
 
         assert_eq!(
-            c.module_data().heap_spec(),
+            c.module_data().unwrap().heap_spec(),
             Some(&HeapSpec {
                 // reserved and guard are given by HeapSettings
                 reserved_size: h.min_reserved_size,
@@ -228,7 +228,7 @@ mod module_data {
             .expect("compiling heap_spec_definition");
 
         assert_eq!(
-            c.module_data().heap_spec(),
+            c.module_data().unwrap().heap_spec(),
             Some(&HeapSpec {
                 // reserved and guard are given by HeapSettings
                 reserved_size: h.min_reserved_size,
@@ -247,7 +247,7 @@ mod module_data {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling heap_spec_none");
-        assert_eq!(c.module_data().heap_spec(), None,);
+        assert_eq!(c.module_data().unwrap().heap_spec(), None,);
     }
 
     #[test]

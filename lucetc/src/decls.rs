@@ -5,7 +5,7 @@ use crate::module::ModuleInfo;
 pub use crate::module::{Exportable, TableElems};
 use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
-use cranelift_codegen::entity::{EntityRef, PrimaryMap};
+use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
@@ -20,11 +20,18 @@ use lucet_module_data::{
 };
 use std::collections::HashMap;
 
+/// UniqueSignatureIndex names a signature after collapsing duplicate signatures to a single
+/// identifier, whereas SignatureIndex is directly what the original module specifies, and may
+/// specify duplicates of types that are structurally equal.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+pub struct UniqueSignatureIndex(u32);
+entity_impl!(UniqueSignatureIndex);
+
 #[derive(Debug)]
 pub struct FunctionDecl<'a> {
     pub import_name: Option<(&'a str, &'a str)>,
     pub export_names: Vec<&'a str>,
-    pub signature_index: SignatureIndex,
+    pub signature_index: UniqueSignatureIndex,
     pub signature: &'a ir::Signature,
     pub name: Name,
 }
@@ -101,7 +108,8 @@ impl<'a> ModuleDecls<'a> {
         for ix in 0..info.functions.len() {
             let func_index = FuncIndex::new(ix);
             let exportable_sigix = info.functions.get(func_index).unwrap();
-            let signature = info.signatures.get(exportable_sigix.entity).unwrap();
+            let inner_sig_index = info.signature_mapping.get(exportable_sigix.entity).unwrap();
+            let signature = info.signatures.get(*inner_sig_index).unwrap();
             let name = if let Some((import_mod, import_field)) = info.imported_funcs.get(func_index)
             {
                 let import_symbol = bindings
@@ -278,7 +286,7 @@ impl<'a> ModuleDecls<'a> {
             .get(func_index)
             .ok_or_else(|| format_err!("func index out of bounds: {:?}", func_index))?;
         let exportable_sigix = self.info.functions.get(func_index).unwrap();
-        let signature_index = exportable_sigix.entity;
+        let signature_index = self.get_signature_uid(exportable_sigix.entity).unwrap();
         let signature = self.info.signatures.get(signature_index).unwrap();
         let import_name = self.info.imported_funcs.get(func_index);
         Ok(FunctionDecl {
@@ -326,9 +334,22 @@ impl<'a> ModuleDecls<'a> {
     }
 
     pub fn get_signature(&self, signature_index: SignatureIndex) -> Result<&ir::Signature, Error> {
+        self.get_signature_uid(signature_index).and_then(|uid| {
+            self.info
+                .signatures
+                .get(uid)
+                .ok_or_else(|| format_err!("signature out of bounds: {:?}", uid))
+        })
+    }
+
+    pub fn get_signature_uid(
+        &self,
+        signature_index: SignatureIndex,
+    ) -> Result<UniqueSignatureIndex, Error> {
         self.info
-            .signatures
+            .signature_mapping
             .get(signature_index)
+            .map(|x| *x)
             .ok_or_else(|| format_err!("signature out of bounds: {:?}", signature_index))
     }
 
@@ -347,12 +368,12 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    pub fn get_module_data(&self) -> ModuleData {
+    pub fn get_module_data(&self) -> Result<ModuleData, LucetcError> {
         let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
             Some(spec.to_ref())
         } else {
             None
         };
-        ModuleData::new(linear_memory, self.globals_spec.clone())
+        Ok(ModuleData::new(linear_memory, self.globals_spec.clone()))
     }
 }
