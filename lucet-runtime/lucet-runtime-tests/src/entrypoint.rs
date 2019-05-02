@@ -1,5 +1,6 @@
 use crate::build::test_module_wasm;
 use crate::helpers::MockModuleBuilder;
+use lucet_module_data::{Signature, ValueType};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
@@ -119,14 +120,99 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
     }
 
     MockModuleBuilder::new()
-        .with_export_func(b"add_2", add_2 as *const extern "C" fn())
-        .with_export_func(b"add_10", add_10 as *const extern "C" fn())
-        .with_export_func(b"mul_2", mul_2 as *const extern "C" fn())
-        .with_export_func(b"add_f32_2", add_f32_2 as *const extern "C" fn())
-        .with_export_func(b"add_f64_2", add_f64_2 as *const extern "C" fn())
-        .with_export_func(b"add_f32_10", add_f32_10 as *const extern "C" fn())
-        .with_export_func(b"add_f64_10", add_f64_10 as *const extern "C" fn())
-        .with_export_func(b"add_mixed_20", add_mixed_20 as *const extern "C" fn())
+        .with_export_func(
+            b"add_2",
+            function_bytes_slice!(add_2),
+            &[],
+            Signature {
+                params: [ValueType::I64; 2].to_vec(),
+                ret_ty: Some(ValueType::I64),
+            },
+        )
+        .with_export_func(
+            b"add_10",
+            function_bytes_slice!(add_10),
+            &[],
+            Signature {
+                params: [ValueType::I64; 10].to_vec(),
+                ret_ty: Some(ValueType::I64),
+            },
+        )
+        .with_export_func(
+            b"mul_2",
+            function_bytes_slice!(mul_2),
+            &[],
+            Signature {
+                params: [ValueType::I64; 2].to_vec(),
+                ret_ty: Some(ValueType::I64),
+            },
+        )
+        .with_export_func(
+            b"add_f32_2",
+            function_bytes_slice!(add_f32_2),
+            &[],
+            Signature {
+                params: [ValueType::F32; 2].to_vec(),
+                ret_ty: Some(ValueType::F32),
+            },
+        )
+        .with_export_func(
+            b"add_f64_2",
+            function_bytes_slice!(add_f64_2),
+            &[],
+            Signature {
+                params: [ValueType::F64; 2].to_vec(),
+                ret_ty: Some(ValueType::F64),
+            },
+        )
+        .with_export_func(
+            b"add_f32_10",
+            function_bytes_slice!(add_f32_10),
+            &[],
+            Signature {
+                params: [ValueType::F32; 10].to_vec(),
+                ret_ty: Some(ValueType::F32),
+            },
+        )
+        .with_export_func(
+            b"add_f64_10",
+            function_bytes_slice!(add_f64_10),
+            &[],
+            Signature {
+                params: [ValueType::F64; 10].to_vec(),
+                ret_ty: Some(ValueType::F64),
+            },
+        )
+        .with_export_func(
+            b"add_mixed_20",
+            function_bytes_slice!(add_mixed_20),
+            &[],
+            Signature {
+                params: vec![
+                    ValueType::F64,
+                    ValueType::I32,
+                    ValueType::F32,
+                    ValueType::F64,
+                    ValueType::I32,
+                    ValueType::F32,
+                    ValueType::F64,
+                    ValueType::I32,
+                    ValueType::F32,
+                    ValueType::F64,
+                    ValueType::I32,
+                    ValueType::F32,
+                    ValueType::F64,
+                    ValueType::I32,
+                    ValueType::F32,
+                    ValueType::F64,
+                    ValueType::I64,
+                    ValueType::F32,
+                    ValueType::F64,
+                    ValueType::I64,
+                ],
+                ret_ty: Some(ValueType::F64),
+            },
+        )
         .build()
 }
 
@@ -466,6 +552,72 @@ macro_rules! entrypoint_tests {
                     + 18.1f64
                     + 19u64 as f64
             );
+        }
+
+        #[test]
+        fn mock_typecheck_entrypoint_wrong_args() {
+            typecheck_entrypoint_wrong_args(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_typecheck_entrypoint_wrong_args() {
+            typecheck_entrypoint_wrong_args(wat_calculator_module())
+        }
+
+        fn typecheck_entrypoint_wrong_args(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(b"add_2", &[123.0f64.into(), 456.0f64.into()]) {
+                Err(Error::InvalidArgument(err)) => assert_eq!(err, "entrypoint function signature mismatch"),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
+        #[test]
+        fn mock_typecheck_entrypoint_too_few_args() {
+            typecheck_entrypoint_too_few_args(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_typecheck_entrypoint_too_few_args() {
+            typecheck_entrypoint_too_few_args(wat_calculator_module())
+        }
+
+        fn typecheck_entrypoint_too_few_args(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(b"add_2", &[123u64.into()]) {
+                Err(Error::InvalidArgument(err)) => assert_eq!(err, "entrypoint function signature mismatch (number of arguments is incorrect)"),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
+        #[test]
+        fn mock_typecheck_entrypoint_too_many_args() {
+            typecheck_entrypoint_too_many_args(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_typecheck_entrypoint_too_many_args() {
+            typecheck_entrypoint_too_many_args(wat_calculator_module())
+        }
+
+        fn typecheck_entrypoint_too_many_args(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(b"add_2", &[123u64.into(), 456u64.into(), 789u64.into()]) {
+                Err(Error::InvalidArgument(err)) => assert_eq!(err, "entrypoint function signature mismatch (number of arguments is incorrect)"),
+                res => panic!("unexpected result: {:?}", res),
+            }
         }
 
         use $crate::build::test_module_c;

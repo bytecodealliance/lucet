@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use libloading::{Library, Symbol};
-use lucet_module_data::{FunctionSpec, ModuleData};
+use lucet_module_data::{FunctionSpec, ModuleData, Signature};
 use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
@@ -234,6 +234,10 @@ impl ModuleInternal for DlModule {
         } else {
             Ok(None)
         }
+    }
+
+    fn get_signature(&self, fn_id: u32) -> Result<&Signature, Error> {
+        self.module_data.get_signature(fn_id).ok_or(lucet_incorrect_module!("Signature lookup failed for function index {}. This is very likely a bug in module data contents.", fn_id))
     }
 }
 

@@ -2,9 +2,9 @@ use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use lucet_module_data::owned::{
-    OwnedGlobalSpec, OwnedLinearMemorySpec, OwnedModuleData, OwnedSparseData,
+    OwnedFunctionMetadata, OwnedGlobalSpec, OwnedLinearMemorySpec, OwnedModuleData, OwnedSparseData,
 };
-use lucet_module_data::{FunctionSpec, ModuleData};
+use lucet_module_data::{FunctionSpec, ModuleData, Signature, TrapSite, UniqueSignatureIndex};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
@@ -18,6 +18,8 @@ pub struct MockModuleBuilder {
     func_table: HashMap<(u32, u32), *const extern "C" fn()>,
     start_func: Option<extern "C" fn()>,
     function_manifest: Vec<FunctionSpec>,
+    function_info: Vec<OwnedFunctionMetadata>,
+    signatures: Vec<Signature>,
 }
 
 impl MockModuleBuilder {
@@ -99,8 +101,40 @@ impl MockModuleBuilder {
         self
     }
 
-    pub fn with_export_func(mut self, sym: &[u8], func: *const extern "C" fn()) -> Self {
-        self.export_funcs.insert(sym.to_vec(), func);
+    fn record_sig(&mut self, sig: Signature) -> UniqueSignatureIndex {
+        let idx = self
+            .signatures
+            .iter()
+            .enumerate()
+            .find(|(_, known_sig)| known_sig == &&sig)
+            .map(|(i, _)| i)
+            .unwrap_or_else(|| {
+                self.signatures.push(sig);
+                self.signatures.len() - 1
+            });
+        UniqueSignatureIndex::from_u32(idx as u32)
+    }
+
+    pub fn with_export_func(
+        mut self,
+        sym: &[u8],
+        func: &[u8],
+        traps: &[TrapSite],
+        sig: Signature,
+    ) -> Self {
+        self.export_funcs
+            .insert(sym.to_vec(), func.as_ptr() as *const extern "C" fn());
+        let sig_idx = self.record_sig(sig);
+        self.function_info.push(OwnedFunctionMetadata {
+            signature: sig_idx,
+            name: Some(std::str::from_utf8(sym).unwrap().to_string()),
+        });
+        self.function_manifest.push(FunctionSpec::new(
+            func.as_ptr() as u64,
+            func.len() as u32,
+            traps.as_ptr() as u64,
+            traps.len() as u64,
+        ));
         self
     }
 
@@ -116,11 +150,6 @@ impl MockModuleBuilder {
 
     pub fn with_start_func(mut self, func: extern "C" fn()) -> Self {
         self.start_func = Some(func);
-        self
-    }
-
-    pub fn with_function_manifest(mut self, function_manifest: &[FunctionSpec]) -> Self {
-        self.function_manifest = function_manifest.to_vec();
         self
     }
 
@@ -161,6 +190,8 @@ impl MockModuleBuilder {
                     .expect("sparse data pages are valid"),
             }),
             globals_spec,
+            self.function_info.clone(),
+            self.signatures.clone(),
         );
         let serialized_module_data = owned_module_data
             .to_ref()
@@ -255,5 +286,9 @@ impl ModuleInternal for MockModule {
         // we can call `dladdr` on Rust code, but unless we inspect the stack I don't think there's
         // a way to determine whether or not we're in "module" code; punt for now
         Ok(None)
+    }
+
+    fn get_signature(&self, fn_id: u32) -> Result<&Signature, Error> {
+        self.module_data.get_signature(fn_id).ok_or(lucet_incorrect_module!("Signature lookup failed for function index {}. This is very likely a bug in module data contents.", fn_id))
     }
 }

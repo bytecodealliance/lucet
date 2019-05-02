@@ -1,5 +1,4 @@
 //! Implements ModuleEnvironment for cranelift-wasm. Code derived from cranelift-wasm/environ/dummy.rs
-use crate::decls::UniqueSignatureIndex;
 use crate::pointer::NATIVE_POINTER;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
@@ -8,6 +7,7 @@ use cranelift_wasm::{
     FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
     TableElementType, TableIndex, WasmResult,
 };
+use lucet_module_data::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Debug, Clone)]

@@ -1,5 +1,5 @@
 use crate::helpers::MockModuleBuilder;
-use lucet_module_data::{FunctionSpec, TrapCode, TrapSite};
+use lucet_module_data::{Signature, TrapCode, TrapSite, ValueType};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
@@ -83,36 +83,70 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         code: TrapCode::HeapOutOfBounds,
     }];
 
-    let function_manifest = &[
-        FunctionSpec::new(
-            guest_func_illegal_instr as *const extern "C" fn() as u64,
-            11,
-            ILLEGAL_INSTR_TRAPS.as_ptr() as u64,
-            ILLEGAL_INSTR_TRAPS.len() as u64,
-        ),
-        FunctionSpec::new(
-            guest_func_oob as *const extern "C" fn() as u64,
-            41,
-            OOB_TRAPS.as_ptr() as u64,
-            OOB_TRAPS.len() as u64,
-        ),
-    ];
-
     MockModuleBuilder::new()
-        .with_export_func(b"onetwothree", onetwothree as *const extern "C" fn())
+        .with_export_func(
+            b"onetwothree",
+            function_bytes_slice!(onetwothree),
+            &[],
+            Signature {
+                params: vec![],
+                ret_ty: Some(ValueType::I32),
+            },
+        )
         .with_export_func(
             b"illegal_instr",
-            guest_func_illegal_instr as *const extern "C" fn(),
+            function_bytes_slice!(guest_func_illegal_instr, 11),
+            ILLEGAL_INSTR_TRAPS,
+            Signature {
+                params: vec![],
+                ret_ty: None,
+            },
         )
-        .with_export_func(b"oob", guest_func_oob as *const extern "C" fn())
-        .with_export_func(b"hostcall_main", hostcall_main as *const extern "C" fn())
-        .with_export_func(b"infinite_loop", infinite_loop as *const extern "C" fn())
-        .with_export_func(b"fatal", fatal as *const extern "C" fn())
+        .with_export_func(
+            b"oob",
+            function_bytes_slice!(guest_func_oob, 41),
+            OOB_TRAPS,
+            Signature {
+                params: vec![],
+                ret_ty: None,
+            },
+        )
+        .with_export_func(
+            b"hostcall_main",
+            function_bytes_slice!(hostcall_main),
+            &[],
+            Signature {
+                params: vec![],
+                ret_ty: None,
+            },
+        )
+        .with_export_func(
+            b"infinite_loop",
+            function_bytes_slice!(infinite_loop),
+            &[],
+            Signature {
+                params: vec![],
+                ret_ty: None,
+            },
+        )
+        .with_export_func(
+            b"fatal",
+            function_bytes_slice!(fatal),
+            &[],
+            Signature {
+                params: vec![],
+                ret_ty: None,
+            },
+        )
         .with_export_func(
             b"recoverable_fatal",
-            recoverable_fatal as *const extern "C" fn(),
+            function_bytes_slice!(recoverable_fatal),
+            &[],
+            Signature {
+                params: vec![],
+                ret_ty: None,
+            },
         )
-        .with_function_manifest(function_manifest)
         .build()
 }
 
@@ -121,6 +155,7 @@ macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, siginfo_t, SIGSEGV};
+        use lucet_module_data::Signature;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
@@ -540,7 +575,15 @@ macro_rules! guest_fault_tests {
                 // therefore testing that the host signal gets re-raised.
                 let child = std::thread::spawn(|| {
                     let module = MockModuleBuilder::new()
-                        .with_export_func(b"sleepy_guest", sleepy_guest as *const extern "C" fn())
+                        .with_export_func(
+                            b"sleepy_guest",
+                            function_bytes_slice!(sleepy_guest),
+                            &[],
+                            Signature {
+                                params: vec![],
+                                ret_ty: None,
+                            },
+                        )
                         .build();
                     let region =
                         TestRegion::create(1, &Limits::default()).expect("region can be created");

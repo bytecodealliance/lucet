@@ -4,7 +4,9 @@ mod sparse_page_data;
 
 pub use crate::module::dl::DlModule;
 pub use crate::module::mock::MockModuleBuilder;
-pub use lucet_module_data::{FunctionSpec, Global, GlobalSpec, HeapSpec, TrapCode, TrapManifest};
+pub use lucet_module_data::{
+    FunctionSpec, Global, GlobalSpec, HeapSpec, Signature, TrapCode, TrapManifest, ValueType,
+};
 
 use crate::alloc::Limits;
 use crate::error::Error;
@@ -66,6 +68,8 @@ pub trait ModuleInternal: Send + Sync {
     fn function_manifest(&self) -> &[FunctionSpec];
 
     fn addr_details(&self, addr: *const c_void) -> Result<Option<AddrDetails>, Error>;
+
+    fn get_signature(&self, fn_id: u32) -> Result<&Signature, Error>;
 
     /// Look up an instruction pointer in the trap manifest.
     ///

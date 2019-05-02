@@ -1,6 +1,43 @@
 use crate::traps::{TrapManifest, TrapSite};
+use cranelift_codegen::entity::entity_impl;
+use serde::{Deserialize, Serialize};
 
 use std::slice::from_raw_parts;
+
+/// UniqueSignatureIndex names a signature after collapsing duplicate signatures to a single
+/// identifier, whereas SignatureIndex is directly what the original module specifies, and may
+/// specify duplicates of types that are structurally equal.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Serialize, Deserialize)]
+pub struct UniqueSignatureIndex(u32);
+entity_impl!(UniqueSignatureIndex);
+
+/// Information about the corresponding function.
+///
+/// This is split from but closely related to a [`FunctionSpec`]. The distinction is largely for
+/// serialization/deserialization simplicity, as [`FunctionSpec`] contains fields that need
+/// cooperation from a loader, with manual layout and serialization as a result.
+/// [`FunctionMetadata`] is the remainder of fields that can be automatically
+/// serialized/deserialied and are small enough copying isn't a large concern.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FunctionMetadata<'a> {
+    pub signature: UniqueSignatureIndex,
+    pub name: Option<&'a str>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OwnedFunctionMetadata {
+    pub signature: UniqueSignatureIndex,
+    pub name: Option<String>,
+}
+
+impl OwnedFunctionMetadata {
+    pub fn to_ref<'a>(&'a self) -> FunctionMetadata<'a> {
+        FunctionMetadata {
+            signature: self.signature.clone(),
+            name: self.name.as_ref().map(|s| &**s).clone(),
+        }
+    }
+}
 
 // The layout of this struct is very tightly coupled to lucetc's `write_function_manifest`!
 //

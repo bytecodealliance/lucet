@@ -565,6 +565,37 @@ impl Instance {
                 "entrypoint function cannot be null; this is probably a malformed module",
             ));
         }
+
+        let fn_id: u32 = self
+            .module
+            .function_manifest()
+            .iter()
+            .enumerate()
+            .find(|(_, fn_spec)| fn_spec.relative_addr(func as u64) == Some(0))
+            .map(|(fn_id, _)| fn_id as u32)
+            .ok_or(Error::InvalidArgument(
+                "entrypoint function must be the start of a function declared in this module",
+            ))?;
+
+        let sig = self.module.get_signature(fn_id)?;
+
+        // in typechecking these values, we can only really check that arguments are correct.
+        // in the future we might want to make return value use more type safe as well.
+
+        if sig.params.len() != args.len() {
+            return Err(Error::InvalidArgument(
+                "entrypoint function signature mismatch (number of arguments is incorrect)",
+            ));
+        }
+
+        for (param_ty, arg) in sig.params.iter().zip(args.iter()) {
+            if param_ty != &arg.value_type() {
+                return Err(Error::InvalidArgument(
+                    "entrypoint function signature mismatch",
+                ));
+            }
+        }
+
         self.entrypoint = func;
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
