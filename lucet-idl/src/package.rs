@@ -55,7 +55,7 @@ impl fmt::Display for Name {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Module {
+pub struct Package {
     pub names: Vec<Name>,
     pub data_types: HashMap<usize, DataType>,
 }
@@ -123,7 +123,7 @@ impl Error for ValidationError {
     }
 }
 
-impl Module {
+impl Package {
     fn new() -> Self {
         Self {
             names: Vec::new(),
@@ -275,8 +275,8 @@ impl Module {
                     },
                 );
             }
-            SyntaxDecl::Module { .. } => {
-                unreachable!()
+            SyntaxDecl::Module{ .. } => {
+                unimplemented!()
             }
         }
         Ok(())
@@ -340,7 +340,7 @@ impl Module {
             })
     }
 
-    pub fn from_declarations(decls: &[SyntaxDecl]) -> Result<Module, ValidationError> {
+    pub fn from_declarations(decls: &[SyntaxDecl]) -> Result<Package, ValidationError> {
         let mut desc = Self::new();
         let mut idents: Vec<DataTypeId> = Vec::new();
         for decl in decls {
@@ -375,23 +375,23 @@ mod tests {
     use super::super::parser::Parser;
     use super::*;
 
-    fn module(syntax: &str) -> Result<Module, ValidationError> {
+    fn pkg(syntax: &str) -> Result<Package, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
-        Module::from_declarations(&decls)
+        Package::from_declarations(&decls)
     }
 
     #[test]
     fn structs_basic() {
-        assert!(module("struct foo { a: i32}").is_ok());
-        assert!(module("struct foo { a: i32, b: f32 }").is_ok());
+        assert!(pkg("struct foo { a: i32}").is_ok());
+        assert!(pkg("struct foo { a: i32, b: f32 }").is_ok());
 
     }
 
     #[test]
     fn struct_two_atoms() {
         {
-            let d = module("struct foo { a: i32, b: f32 }").unwrap();
+            let d = pkg("struct foo { a: i32, b: f32 }").unwrap();
             let members = match &d.data_types[&0] {
                 DataType::Struct { members, .. } => members,
                 _ => panic!("Unexpected type"),
@@ -413,20 +413,20 @@ mod tests {
     #[test]
     fn struct_prev_definition() {
         // Refer to a struct defined previously:
-        assert!(module("struct foo { a: i32, b: f64 } struct bar { a: foo }").is_ok());
+        assert!(pkg("struct foo { a: i32, b: f64 } struct bar { a: foo }").is_ok());
     }
 
     #[test]
     fn struct_next_definition() {
         // Refer to a struct defined afterwards:
-        assert!(module("struct foo { a: i32, b: bar} struct bar { a: i32 }").is_ok());
+        assert!(pkg("struct foo { a: i32, b: bar} struct bar { a: i32 }").is_ok());
 
     }
 
     #[test]
     fn struct_self_referential() {
         // Refer to itself
-        assert!(module("struct list { next: list, thing: i32 }").is_err());
+        assert!(pkg("struct list { next: list, thing: i32 }").is_err());
 
     }
 
@@ -434,7 +434,7 @@ mod tests {
     fn struct_empty() {
         // No members
         assert_eq!(
-            module("struct foo {}").err().unwrap(),
+            pkg("struct foo {}").err().unwrap(),
             ValidationError::Empty {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
@@ -447,7 +447,7 @@ mod tests {
     fn struct_duplicate_member() {
         // Duplicate member in struct
         assert_eq!(
-            module("struct foo { \na: i32, \na: f64}").err().unwrap(),
+            pkg("struct foo { \na: i32, \na: f64}").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "a".to_owned(),
                 at_location: Location { line: 3, column: 0 },
@@ -461,7 +461,7 @@ mod tests {
     fn struct_duplicate_definition() {
         // Duplicate definition of struct
         assert_eq!(
-            module("struct foo { a: i32 }\nstruct foo { a: i32 } ")
+            pkg("struct foo { a: i32 }\nstruct foo { a: i32 } ")
                 .err()
                 .unwrap(),
             ValidationError::NameAlreadyExists {
@@ -477,7 +477,7 @@ mod tests {
     fn struct_undeclared_member() {
         // Refer to type that is not declared
         assert_eq!(
-            module("struct foo { \nb: bar }").err().unwrap(),
+            pkg("struct foo { \nb: bar }").err().unwrap(),
             ValidationError::NameNotFound {
                 name: "bar".to_owned(),
                 use_location: Location { line: 2, column: 3 },
@@ -487,11 +487,11 @@ mod tests {
 
     #[test]
     fn enums() {
-        assert!(module("enum foo { a }").is_ok());
-        assert!(module("enum foo { a, b }").is_ok());
+        assert!(pkg("enum foo { a }").is_ok());
+        assert!(pkg("enum foo { a, b }").is_ok());
 
         {
-            let d = module("enum foo { a, b }").unwrap();
+            let d = pkg("enum foo { a, b }").unwrap();
             let members = match &d.data_types[&0] {
                 DataType::Enum { members, .. } => members,
                 _ => panic!("Unexpected type"),
@@ -502,7 +502,7 @@ mod tests {
 
         // No members
         assert_eq!(
-            module("enum foo {}").err().unwrap(),
+            pkg("enum foo {}").err().unwrap(),
             ValidationError::Empty {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
@@ -511,7 +511,7 @@ mod tests {
 
         // Duplicate member in enum
         assert_eq!(
-            module("enum foo { \na,\na }").err().unwrap(),
+            pkg("enum foo { \na,\na }").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "a".to_owned(),
                 at_location: Location { line: 3, column: 0 },
@@ -521,7 +521,7 @@ mod tests {
 
         // Duplicate definition of enum
         assert_eq!(
-            module("enum foo { a }\nenum foo { a } ").err().unwrap(),
+            pkg("enum foo { a }\nenum foo { a } ").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "foo".to_owned(),
                 at_location: Location { line: 2, column: 0 },
@@ -532,19 +532,19 @@ mod tests {
 
     #[test]
     fn aliases() {
-        assert!(module("type foo = i32").is_ok());
-        assert!(module("type foo = f64").is_ok());
-        assert!(module("type foo = u8").is_ok());
+        assert!(pkg("type foo = i32").is_ok());
+        assert!(pkg("type foo = f64").is_ok());
+        assert!(pkg("type foo = u8").is_ok());
 
-        assert!(module("type foo = bar\nenum bar { a }").is_ok());
+        assert!(pkg("type foo = bar\nenum bar { a }").is_ok());
 
-        assert!(module("type link = u32\nstruct list { next: link, thing: i32 }").is_ok());
+        assert!(pkg("type link = u32\nstruct list { next: link, thing: i32 }").is_ok());
     }
 
     #[test]
     fn infinite() {
         assert_eq!(
-            module("type foo = bar\ntype bar = foo").err().unwrap(),
+            pkg("type foo = bar\ntype bar = foo").err().unwrap(),
             ValidationError::Infinite {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
@@ -552,7 +552,7 @@ mod tests {
         );
 
         assert_eq!(
-            module("type foo = bar\nstruct bar { a: foo }")
+            pkg("type foo = bar\nstruct bar { a: foo }")
                 .err()
                 .unwrap(),
             ValidationError::Infinite {
@@ -562,7 +562,7 @@ mod tests {
         );
 
         assert_eq!(
-            module("type foo = bar\nstruct bar { a: baz }\nstruct baz { c: i32, e: foo }")
+            pkg("type foo = bar\nstruct bar { a: baz }\nstruct baz { c: i32, e: foo }")
                 .err()
                 .unwrap(),
             ValidationError::Infinite {

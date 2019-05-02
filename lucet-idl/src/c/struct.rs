@@ -3,7 +3,7 @@ use std::cmp;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    module: &Module,
+    package: &Package,
     cache: &mut Cache,
     pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &DataTypeEntry<'_>,
@@ -23,7 +23,7 @@ pub fn generate<W: Write>(
     let mut first_member_align = 0;
     let mut members_offsets = vec![];
     for named_member in named_members {
-        let type_info = cgenerator.type_info(module, cache, &named_member.type_);
+        let type_info = cgenerator.type_info(package, cache, &named_member.type_);
         let type_align = type_info.type_align;
         let type_size = type_info.type_size;
         let padding = (type_align - 1) - ((offset + (type_align - 1)) % type_align);

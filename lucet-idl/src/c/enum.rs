@@ -4,7 +4,7 @@ use super::*;
 // The typedef is required to use a native type which is consistent across all architectures
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    _module: &Module,
+    _package: &Package,
     cache: &mut Cache,
     pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &DataTypeEntry<'_>,

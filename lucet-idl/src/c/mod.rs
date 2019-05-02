@@ -14,8 +14,7 @@ use crate::backend::*;
 use crate::cache::*;
 use crate::errors::*;
 use crate::generator::{Generator, Hierarchy};
-use crate::module::*;
-use crate::module::{DataTypeEntry, DataTypeRef, Module};
+use crate::package::{DataType, DataTypeEntry, DataTypeRef, Package};
 use crate::pretty_writer::*;
 use crate::target::*;
 use std::io::prelude::*;
@@ -50,7 +49,7 @@ impl<W: Write> Generator<W> for CGenerator {
 
     fn gen_type_header(
         &mut self,
-        _module: &Module,
+        _package: &Package,
         _cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -68,39 +67,39 @@ impl<W: Write> Generator<W> for CGenerator {
     // and alignment rules of what it ultimately points to
     fn gen_alias(
         &mut self,
-        module: &Module,
+        package: &Package,
         cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        alias::generate(self, module, cache, pretty_writer, data_type_entry)
+        alias::generate(self, package, cache, pretty_writer, data_type_entry)
     }
 
     fn gen_struct(
         &mut self,
-        module: &Module,
+        package: &Package,
         cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        r#struct::generate(self, module, cache, pretty_writer, data_type_entry)
+        r#struct::generate(self, package, cache, pretty_writer, data_type_entry)
     }
 
     // Enums generate both a specific typedef, and a traditional C-style enum
     // The typedef is required to use a native type which is consistent across all architectures
     fn gen_enum(
         &mut self,
-        module: &Module,
+        package: &Package,
         cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        r#enum::generate(self, module, cache, pretty_writer, data_type_entry)
+        r#enum::generate(self, package, cache, pretty_writer, data_type_entry)
     }
 
     fn gen_accessors_struct(
         &mut self,
-        module: &Module,
+        package: &Package,
         cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -121,7 +120,7 @@ impl<W: Write> Generator<W> for CGenerator {
 
     fn gen_accessors_enum(
         &mut self,
-        module: &Module,
+        package: &Package,
         cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -130,7 +129,7 @@ impl<W: Write> Generator<W> for CGenerator {
         /*
         accessors::r#enum::generate(
             self,
-            module,
+            package,
             cache,
             pretty_writer,
             data_type_entry,
@@ -142,7 +141,7 @@ impl<W: Write> Generator<W> for CGenerator {
 
     fn gen_accessors_alias(
         &mut self,
-        module: &Module,
+        package: &Package,
         cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
@@ -168,7 +167,7 @@ impl CGenerator {
     /// for this data type
     fn type_info<'t>(
         &self,
-        module: &'t Module,
+        package: &'t Package,
         cache: &Cache,
         mut type_: &'t DataTypeRef,
     ) -> CTypeInfo<'t> {
@@ -184,10 +183,10 @@ impl CGenerator {
                         type_name.or_else(|| Some(native_atom.native_type_name.to_string()));
                 }
                 DataTypeRef::Defined(data_type_id) => {
-                        let cached = cache.load_type(*data_type_id).unwrap();
-                        type_align = type_align.or_else(|| Some(cached.type_align));
-                        type_size = type_size.or_else(|| Some(cached.type_size));
-                    let data_type_entry = module.get_datatype(*data_type_id);
+                    let cached = cache.load_type(*data_type_id).unwrap();
+                    type_align = type_align.or_else(|| Some(cached.type_align));
+                    type_size = type_size.or_else(|| Some(cached.type_size));
+                    let data_type_entry = package.get_datatype(*data_type_id);
                     match data_type_entry.data_type {
                         DataType::Struct { .. } => {
                             type_name = type_name
@@ -221,30 +220,34 @@ impl CGenerator {
     }
 
     // Return `true` if the type is an atom, an emum, or an alias to one of these
-    pub fn is_type_eventually_an_atom_or_enum(&self, module: &Module, type_: &DataTypeRef) -> bool {
+    pub fn is_type_eventually_an_atom_or_enum(
+        &self,
+        package: &Package,
+        type_: &DataTypeRef,
+    ) -> bool {
         let inner_type = match type_ {
             DataTypeRef::Atom(_) => return true,
             DataTypeRef::Defined(inner_type) => inner_type,
         };
-        let inner_data_type_entry = module.get_datatype(*inner_type);
+        let inner_data_type_entry = package.get_datatype(*inner_type);
         let inner_data_type = inner_data_type_entry.data_type;
         match inner_data_type {
             DataType::Struct { .. } => false,
             DataType::Enum { .. } => true,
-            DataType::Alias { to, .. } => self.is_type_eventually_an_atom_or_enum(module, to),
+            DataType::Alias { to, .. } => self.is_type_eventually_an_atom_or_enum(package, to),
         }
     }
 
     /// Return the type refererence, with aliases being resolved
-    pub fn unalias<'t>(&self, module: &'t Module, type_: &'t DataTypeRef) -> &'t DataTypeRef {
+    pub fn unalias<'t>(&self, package: &'t Package, type_: &'t DataTypeRef) -> &'t DataTypeRef {
         let inner_type = match type_ {
             DataTypeRef::Atom(_) => return type_,
             DataTypeRef::Defined(inner_type) => inner_type,
         };
-        let inner_data_type_entry = module.get_datatype(*inner_type);
+        let inner_data_type_entry = package.get_datatype(*inner_type);
         let inner_data_type = inner_data_type_entry.data_type;
         if let DataType::Alias { to, .. } = inner_data_type {
-            self.unalias(module, to)
+            self.unalias(package, to)
         } else {
             type_
         }
