@@ -28,7 +28,7 @@ pub enum SyntaxDecl {
         decls: Vec<Box<SyntaxDecl>>,
         attrs: Vec<Attr>,
         location: Location,
-    }
+    },
 }
 
 impl SyntaxDecl {
@@ -235,7 +235,10 @@ impl<'a> Parser<'a> {
                         _ => parse_err!(self.location, "in struct body:\nexpected , or '}'")?,
                     }
                 }
-                _ => parse_err!(self.location, "in struct body:\nexpected member name or '}'")?,
+                _ => parse_err!(
+                    self.location,
+                    "in struct body:\nexpected member name or '}'"
+                )?,
             }
         }
         Ok(members)
@@ -320,6 +323,33 @@ impl<'a> Parser<'a> {
                     return Ok(Some(SyntaxDecl::Alias {
                         name: name.to_owned(),
                         what,
+                        attrs,
+                        location,
+                    }));
+                }
+                Some(Token::Keyword("mod")) => {
+                    let location = self.location;
+                    self.consume();
+                    let name = err_ctx!(err_msg, self.match_a_word("expected module name"))?;
+                    err_ctx!(err_msg, self.match_token(Token::LBrace, "expected {"))?;
+
+                    let mut decls = Vec::new();
+                    loop {
+                        if let Some(Token::RBrace) = self.token() {
+                            self.consume();
+                            break;
+                        } else {
+                            match self.match_decl("declaration") {
+                                Ok(Some(decl)) => decls.push(Box::new(decl)),
+                                Ok(None) => parse_err!(self.location, "missing close brace '}'")?,
+                                Err(e) => Err(e)?,
+                            }
+                        }
+                    }
+
+                    return Ok(Some(SyntaxDecl::Module {
+                        name: name.to_owned(),
+                        decls,
                         attrs,
                         location,
                     }));
@@ -498,7 +528,6 @@ mod tests {
                 location: Location { line: 1, column: 0 },
             }
         );
-
     }
     #[test]
     fn struct_empty_one_attribute() {
@@ -598,43 +627,45 @@ mod tests {
                 .expect("valid decl"),
             SyntaxDecl::Struct {
                 name: "foo".to_string(),
-                members: vec![StructMember {
-                    name: "a".to_owned(),
-                    type_: SyntaxRef::Name {
-                        name: "mod".to_owned(),
+                members: vec![
+                    StructMember {
+                        name: "a".to_owned(),
+                        type_: SyntaxRef::Name {
+                            name: "mod".to_owned(),
+                            location: Location {
+                                line: 1,
+                                column: 15,
+                            },
+                        },
+                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
-                            column: 15,
+                            column: 12,
                         },
                     },
-                    attrs: Vec::new(),
-                    location: Location {
-                        line: 1,
-                        column: 12,
-                    },
-                },
-                StructMember {
-                    name: "struct".to_owned(),
-                    type_: SyntaxRef::Name {
-                        name: "enum".to_owned(),
+                    StructMember {
+                        name: "struct".to_owned(),
+                        type_: SyntaxRef::Name {
+                            name: "enum".to_owned(),
+                            location: Location {
+                                line: 1,
+                                column: 28,
+                            },
+                        },
+                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
-                            column: 28,
+                            column: 20,
                         },
-                    },
-                    attrs: Vec::new(),
-                    location: Location {
-                        line: 1,
-                        column: 20,
-                    },
-                }],
+                    }
+                ],
                 attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
         );
     }
     #[test]
-    fn enums() {
+    fn enum_empty() {
         let mut parser = Parser::new("enum foo {}");
         //                            0    5
         assert_eq!(
@@ -649,6 +680,9 @@ mod tests {
                 location: Location { line: 1, column: 0 },
             },
         );
+    }
+    #[test]
+    fn enum_one_entry_trailing_comma() {
         let mut parser = Parser::new("enum foo {first,}");
         //                            0    5    10
         assert_eq!(
@@ -670,6 +704,9 @@ mod tests {
                 location: Location { line: 1, column: 0 },
             },
         );
+    }
+    #[test]
+    fn enum_one_entry() {
         let mut parser = Parser::new("enum bar {first}");
         //                            0    5    10
         assert_eq!(
@@ -691,6 +728,9 @@ mod tests {
                 location: Location { line: 1, column: 0 },
             },
         );
+    }
+    #[test]
+    fn enum_four_entry() {
         let mut parser = Parser::new("enum baz { one, two, three\n, four, }");
         //                            0    5     11   16   21     0 2
         assert_eq!(
@@ -734,6 +774,95 @@ mod tests {
                 attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             },
+        );
+    }
+
+    #[test]
+    fn mod_empty() {
+        let mut parser = Parser::new("mod empty {}");
+        //                            0    5    10
+        assert_eq!(
+            parser
+                .match_decl("empty module")
+                .expect("valid parse")
+                .expect("valid decl"),
+            SyntaxDecl::Module {
+                name: "empty".to_owned(),
+                decls: Vec::new(),
+                attrs: Vec::new(),
+                location: Location { line: 1, column: 0 },
+            }
+        );
+    }
+
+    #[test]
+    fn mod_nesting() {
+        let mut parser = Parser::new("mod one { mod two { mod three { } } }");
+        //                            0    5    10   15   20
+        assert_eq!(
+            parser
+                .match_decl("nested modules")
+                .expect("valid parse")
+                .expect("valid decl"),
+            SyntaxDecl::Module {
+                name: "one".to_owned(),
+                decls: vec![Box::new(SyntaxDecl::Module {
+                    name: "two".to_owned(),
+                    decls: vec![Box::new(SyntaxDecl::Module {
+                        name: "three".to_owned(),
+                        decls: Vec::new(),
+                        attrs: Vec::new(),
+                        location: Location {
+                            line: 1,
+                            column: 20
+                        },
+                    })],
+                    attrs: Vec::new(),
+                    location: Location {
+                        line: 1,
+                        column: 10
+                    },
+                })],
+                attrs: Vec::new(),
+                location: Location { line: 1, column: 0 },
+            }
+        );
+    }
+
+    #[test]
+    fn mod_types() {
+        let mut parser = Parser::new("mod one { enum foo {} struct bar {} }");
+        //                            0    5    10   15   20
+        assert_eq!(
+            parser
+                .match_decl("module with types")
+                .expect("valid parse")
+                .expect("valid decl"),
+            SyntaxDecl::Module {
+                name: "one".to_owned(),
+                decls: vec![
+                    Box::new(SyntaxDecl::Enum {
+                        name: "foo".to_owned(),
+                        variants: Vec::new(),
+                        attrs: Vec::new(),
+                        location: Location {
+                            line: 1,
+                            column: 10
+                        },
+                    }),
+                    Box::new(SyntaxDecl::Struct {
+                        name: "bar".to_owned(),
+                        members: Vec::new(),
+                        attrs: Vec::new(),
+                        location: Location {
+                            line: 1,
+                            column: 22
+                        },
+                    })
+                ],
+                attrs: Vec::new(),
+                location: Location { line: 1, column: 0 },
+            }
         );
     }
 }
