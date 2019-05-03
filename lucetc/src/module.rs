@@ -1,4 +1,5 @@
 //! Implements ModuleEnvironment for cranelift-wasm. Code derived from cranelift-wasm/environ/dummy.rs
+use crate::decls::UniqueSignatureIndex;
 use crate::pointer::NATIVE_POINTER;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
@@ -44,8 +45,11 @@ pub struct DataInitializer<'a> {
 pub struct ModuleInfo<'a> {
     /// Target description used for codegen
     pub target_config: TargetFrontendConfig,
+    /// This mapping lets us merge duplicate types (permitted by the wasm spec) as they're
+    /// declared.
+    pub signature_mapping: PrimaryMap<SignatureIndex, UniqueSignatureIndex>,
     /// Provided by `declare_signature`
-    pub signatures: PrimaryMap<SignatureIndex, ir::Signature>,
+    pub signatures: PrimaryMap<UniqueSignatureIndex, ir::Signature>,
     /// Provided by `declare_func_import`
     pub imported_funcs: PrimaryMap<FuncIndex, (&'a str, &'a str)>,
     /// Provided by `declare_global_import`
@@ -79,6 +83,7 @@ impl<'a> ModuleInfo<'a> {
     pub fn new(target_config: TargetFrontendConfig) -> Self {
         Self {
             target_config,
+            signature_mapping: PrimaryMap::new(),
             signatures: PrimaryMap::new(),
             imported_funcs: PrimaryMap::new(),
             imported_globals: PrimaryMap::new(),
@@ -106,7 +111,19 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             0,
             ir::AbiParam::special(NATIVE_POINTER, ir::ArgumentPurpose::VMContext),
         );
-        self.signatures.push(sig);
+
+        let match_key = self
+            .signatures
+            .iter()
+            .find(|(_, v)| *v == &sig)
+            .map(|(key, _)| key)
+            .unwrap_or_else(|| {
+                let lucet_sig_ix = UniqueSignatureIndex::from_u32(self.signatures.len() as u32);
+                self.signatures.push(sig);
+                lucet_sig_ix
+            });
+
+        self.signature_mapping.push(match_key);
     }
 
     fn declare_func_import(&mut self, sig_index: SignatureIndex, module: &'a str, field: &'a str) {

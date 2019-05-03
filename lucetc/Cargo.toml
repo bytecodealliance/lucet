@@ -17,6 +17,7 @@ path = "src/main.rs"
 [dependencies]
 bincode = "~1.0.1"
 cranelift-codegen = { path = "../cranelift/cranelift-codegen" }
+cranelift-entity = { path = "../cranelift/cranelift-entity" }
 cranelift-native = { path = "../cranelift/cranelift-native" }
 cranelift-frontend = { path = "../cranelift/cranelift-frontend" }
 cranelift-module = { path = "../cranelift/cranelift-module" }
