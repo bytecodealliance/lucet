@@ -112,19 +112,16 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             ir::AbiParam::special(NATIVE_POINTER, ir::ArgumentPurpose::VMContext),
         );
 
-        let mut maybe_match_key: Option<UniqueSignatureIndex> = None;
-
-        for (k, v) in self.signatures.iter() {
-            if v == &sig {
-                maybe_match_key = Some(k);
-            }
-        }
-
-        let match_key = maybe_match_key.unwrap_or_else(|| {
-            let lucet_sig_ix = UniqueSignatureIndex::from_u32(self.signatures.len() as u32);
-            self.signatures.push(sig);
-            lucet_sig_ix
-        });
+        let match_key = self
+            .signatures
+            .iter()
+            .find(|(_, v)| *v == &sig)
+            .map(|(key, _)| key)
+            .unwrap_or_else(|| {
+                let lucet_sig_ix = UniqueSignatureIndex::from_u32(self.signatures.len() as u32);
+                self.signatures.push(sig);
+                lucet_sig_ix
+            });
 
         self.signature_mapping.push(match_key);
     }

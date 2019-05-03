@@ -108,7 +108,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
-    pub fn module_data(&self) -> Result<ModuleData, LucetcError> {
+    pub fn module_data(&self) -> ModuleData {
         self.decls.get_module_data()
     }
 
@@ -195,7 +195,7 @@ fn write_module_data<B: ClifBackend>(
     use cranelift_module::{DataContext, Linkage};
 
     let module_data_serialized: Vec<u8> = decls
-        .get_module_data()?
+        .get_module_data()
         .serialize()
         .context(LucetcErrorKind::ModuleData)?;
     {

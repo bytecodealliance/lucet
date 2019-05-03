@@ -368,12 +368,12 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    pub fn get_module_data(&self) -> Result<ModuleData, LucetcError> {
+    pub fn get_module_data(&self) -> ModuleData {
         let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
             Some(spec.to_ref())
         } else {
             None
         };
-        Ok(ModuleData::new(linear_memory, self.globals_spec.clone()))
+        ModuleData::new(linear_memory, self.globals_spec.clone())
     }
 }

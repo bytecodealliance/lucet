@@ -57,7 +57,7 @@ mod programs {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile empty");
-        let mdata = c.module_data().unwrap();
+        let mdata = c.module_data();
         assert!(mdata.heap_spec().is_some());
         // clang creates 3 globals, all internal:
         assert_eq!(mdata.globals_spec().len(), 3);
