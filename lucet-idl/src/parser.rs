@@ -29,6 +29,13 @@ pub enum SyntaxDecl {
         attrs: Vec<Attr>,
         location: Location,
     },
+    Function {
+        name: String,
+        args: Vec<FuncArg>,
+        rets: Vec<FuncRet>,
+        attrs: Vec<Attr>,
+        location: Location,
+    },
 }
 
 impl SyntaxDecl {
@@ -38,6 +45,7 @@ impl SyntaxDecl {
             SyntaxDecl::Enum { name, .. } => &name,
             SyntaxDecl::Alias { name, .. } => &name,
             SyntaxDecl::Module { name, .. } => &name,
+            SyntaxDecl::Function { name, .. } => &name,
         }
     }
     pub fn location(&self) -> &Location {
@@ -46,6 +54,7 @@ impl SyntaxDecl {
             SyntaxDecl::Enum { location, .. } => &location,
             SyntaxDecl::Alias { location, .. } => &location,
             SyntaxDecl::Module { location, .. } => &location,
+            SyntaxDecl::Function { location, .. } => &location,
         }
     }
 }
@@ -65,16 +74,23 @@ pub struct StructMember {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct UnionVariant {
+pub struct EnumVariant {
     pub name: String,
-    pub type_: Option<SyntaxRef>,
     pub attrs: Vec<Attr>,
     pub location: Location,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct EnumVariant {
+pub struct FuncArg {
     pub name: String,
+    pub type_: SyntaxRef,
+    pub attrs: Vec<Attr>,
+    pub location: Location,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct FuncRet {
+    pub type_: SyntaxRef,
     pub attrs: Vec<Attr>,
     pub location: Location,
 }
@@ -175,7 +191,7 @@ impl<'a> Parser<'a> {
 
     fn match_a_word(&mut self, err_msg: &str) -> Result<&'a str, ParseError> {
         match self.token() {
-            Some(Token::Word(text)) | Some(Token::Keyword(text)) => {
+            Some(Token::Word(text)) => {
                 self.consume();
                 Ok(text)
             }
@@ -211,7 +227,7 @@ impl<'a> Parser<'a> {
                     self.consume();
                     attrs.push(self.match_attr_body()?);
                 }
-                Some(Token::Word(member_name)) | Some(Token::Keyword(member_name)) => {
+                Some(Token::Word(member_name)) => {
                     let location = self.location;
                     self.consume();
                     self.match_token(Token::Colon, "expected :")?;
@@ -281,14 +297,112 @@ impl<'a> Parser<'a> {
                 _ => parse_err!(self.location, "expected variant")?,
             }
         }
+        if !attrs.is_empty() {
+            parse_err!(self.location, "attributes unattached to an enum variant")?
+        }
         Ok(names)
+    }
+
+    fn match_func_args(&mut self) -> Result<Vec<FuncArg>, ParseError> {
+        let mut args = Vec::new();
+        let mut attrs = Vec::new();
+        loop {
+            match self.token() {
+                Some(Token::RPar) => {
+                    self.consume();
+                    break;
+                }
+                Some(Token::Hash) => {
+                    self.consume();
+                    attrs.push(self.match_attr_body()?);
+                }
+                Some(Token::Word(name)) => {
+                    let location = self.location;
+                    self.consume();
+                    self.match_token(Token::Colon, "expected :")?;
+                    let type_ref = self.match_ref("expected type")?;
+
+                    args.push(FuncArg {
+                        name: name.to_string(),
+                        type_: type_ref,
+                        attrs: attrs.clone(),
+                        location,
+                    });
+                    attrs.clear();
+                    match self.token() {
+                        Some(Token::Comma) => {
+                            self.consume();
+                            continue;
+                        }
+                        Some(Token::RPar) => {
+                            self.consume();
+                            break;
+                        }
+                        _ => parse_err!(self.location, "expected , or )")?,
+                    }
+                }
+                _ => parse_err!(self.location, "expected argument, or )")?,
+            }
+        }
+        if !attrs.is_empty() {
+            parse_err!(
+                self.location,
+                "attributes unattached to a function argument"
+            )?
+        }
+        Ok(args)
+    }
+
+    fn match_func_rets(&mut self) -> Result<Vec<FuncRet>, ParseError> {
+        let mut args = Vec::new();
+        let mut attrs = Vec::new();
+        loop {
+            match self.token() {
+                Some(Token::Semi) => {
+                    self.consume();
+                    break;
+                }
+                Some(Token::Hash) => {
+                    self.consume();
+                    attrs.push(self.match_attr_body()?);
+                }
+                _ => {
+                    let location = self.location;
+                    let type_ref = self.match_ref("expected type, attribute, or ;")?;
+                    args.push(FuncRet {
+                        type_: type_ref,
+                        attrs: attrs.clone(),
+                        location,
+                    });
+                    attrs.clear();
+                    match self.token() {
+                        Some(Token::Comma) => {
+                            self.consume();
+                            continue;
+                        }
+                        Some(Token::Semi) => {
+                            self.consume();
+                            break;
+                        }
+                        _ => parse_err!(self.location, "expected , or ;")?,
+                    }
+                }
+            }
+        }
+        if !attrs.is_empty() {
+            parse_err!(
+                self.location,
+                "attributes unattached to a function return type"
+            )?
+        }
+        Ok(args)
     }
 
     pub fn match_decl(&mut self, err_msg: &str) -> Result<Option<SyntaxDecl>, ParseError> {
         let mut attrs = Vec::new();
         loop {
             match self.token() {
-                Some(Token::Keyword("struct")) => {
+                Some(Token::Word("struct")) => {
                     let location = self.location;
                     self.consume();
                     let name = err_ctx!(err_msg, self.match_a_word("expected struct name"))?;
@@ -301,7 +415,7 @@ impl<'a> Parser<'a> {
                         location,
                     }));
                 }
-                Some(Token::Keyword("enum")) => {
+                Some(Token::Word("enum")) => {
                     let location = self.location;
                     self.consume();
                     let name = err_ctx!(err_msg, self.match_a_word("expected enum name"))?;
@@ -314,7 +428,7 @@ impl<'a> Parser<'a> {
                         location,
                     }));
                 }
-                Some(Token::Keyword("type")) => {
+                Some(Token::Word("type")) => {
                     let location = self.location;
                     self.consume();
                     let name = err_ctx!(err_msg, self.match_a_word("expected type name"))?;
@@ -327,7 +441,7 @@ impl<'a> Parser<'a> {
                         location,
                     }));
                 }
-                Some(Token::Keyword("mod")) => {
+                Some(Token::Word("mod")) => {
                     let location = self.location;
                     self.consume();
                     let name = err_ctx!(err_msg, self.match_a_word("expected module name"))?;
@@ -354,13 +468,52 @@ impl<'a> Parser<'a> {
                         location,
                     }));
                 }
+                Some(Token::Word("fn")) => {
+                    let location = self.location;
+                    self.consume();
+                    let name = err_ctx!(err_msg, self.match_a_word("expected function name"))?;
+
+                    err_ctx!(err_msg, self.match_token(Token::LPar, "expected ("))?;
+                    let args = err_ctx!(err_msg, self.match_func_args())?;
+
+                    let rets = match self.token() {
+                        Some(Token::Arrow) => {
+                            self.consume();
+                            err_ctx!(err_msg, self.match_func_rets())?
+                        }
+                        Some(Token::Semi) => Vec::new(),
+                        t => err_ctx!(
+                            err_msg,
+                            parse_err!(self.location, "expected -> or ;, got {:?}", t)
+                        )?,
+                    };
+
+                    return Ok(Some(SyntaxDecl::Function {
+                        name: name.to_owned(),
+                        args,
+                        rets,
+                        attrs,
+                        location,
+                    }));
+                }
                 Some(Token::Hash) => {
                     self.consume();
                     attrs.push(self.match_attr_body()?);
                     continue;
                 }
-                Some(_) => return parse_err!(self.location, "expected keyword or attribute"),
-                None => return Ok(None),
+                Some(_) => {
+                    return parse_err!(
+                        self.location,
+                        "in {}\nexpected keyword or attribute",
+                        err_msg
+                    )
+                }
+                None => {
+                    if !attrs.is_empty() {
+                        parse_err!(self.location, "attributes unattached to a declaration")?
+                    }
+                    return Ok(None);
+                }
             }
         }
     }
@@ -384,7 +537,7 @@ impl<'a> Parser<'a> {
                 self.consume();
                 Ok(SyntaxRef::Atom { atom, location })
             }
-            Some(Token::Word(name)) | Some(Token::Keyword(name)) => {
+            Some(Token::Word(name)) => {
                 let location = self.location;
                 self.consume();
                 Ok(SyntaxRef::Name {
@@ -730,6 +883,49 @@ mod tests {
         );
     }
     #[test]
+    fn enum_one_entry_with_attr() {
+        let mut parser = Parser::new("enum bar { #[a=b] first}");
+        //                            0    5    10
+        assert_eq!(
+            parser
+                .match_decl("one entry enum, no trailing comma")
+                .expect("valid parse")
+                .expect("valid decl"),
+            SyntaxDecl::Enum {
+                name: "bar".to_owned(),
+                variants: vec![EnumVariant {
+                    name: "first".to_owned(),
+                    attrs: vec![Attr::new(
+                        "a",
+                        "b",
+                        Location {
+                            line: 1,
+                            column: 11
+                        }
+                    ),],
+                    location: Location {
+                        line: 1,
+                        column: 18,
+                    },
+                }],
+                attrs: Vec::new(),
+                location: Location { line: 1, column: 0 },
+            },
+        );
+    }
+    #[test]
+    fn enum_one_entry_trailing_attr() {
+        assert!(Parser::new("enum bar { #[a=b] first, #[c=d] }")
+            .match_decl("one entry enum")
+            .is_err());
+    }
+    #[test]
+    fn enum_no_entry_attr() {
+        assert!(Parser::new("enum bar { #[c=d] }")
+            .match_decl("zero entry enum")
+            .is_err());
+    }
+    #[test]
     fn enum_four_entry() {
         let mut parser = Parser::new("enum baz { one, two, three\n, four, }");
         //                            0    5     11   16   21     0 2
@@ -859,6 +1055,372 @@ mod tests {
                             column: 22
                         },
                     })
+                ],
+                attrs: Vec::new(),
+                location: Location { line: 1, column: 0 },
+            }
+        );
+    }
+
+    #[test]
+    fn mod_attrs() {
+        let mut parser = Parser::new("#[a=b]\nmod one { #[c=d] enum foo {} struct bar {} }");
+        //                                    0    5    10   15   20   25   30
+        assert_eq!(
+            parser
+                .match_decl("module with types")
+                .expect("valid parse")
+                .expect("valid decl"),
+            SyntaxDecl::Module {
+                name: "one".to_owned(),
+                decls: vec![
+                    Box::new(SyntaxDecl::Enum {
+                        name: "foo".to_owned(),
+                        variants: Vec::new(),
+                        attrs: vec![Attr::new(
+                            "c",
+                            "d",
+                            Location {
+                                line: 2,
+                                column: 10
+                            }
+                        ),],
+                        location: Location {
+                            line: 2,
+                            column: 17
+                        },
+                    }),
+                    Box::new(SyntaxDecl::Struct {
+                        name: "bar".to_owned(),
+                        members: Vec::new(),
+                        attrs: Vec::new(),
+                        location: Location {
+                            line: 2,
+                            column: 29
+                        },
+                    })
+                ],
+                attrs: vec![Attr::new("a", "b", Location { line: 1, column: 0 }),],
+                location: Location { line: 2, column: 0 },
+            }
+        );
+    }
+
+    #[test]
+    fn fn_trivial() {
+        let canonical = SyntaxDecl::Function {
+            name: "trivial".to_owned(),
+            args: Vec::new(),
+            rets: Vec::new(),
+            attrs: Vec::new(),
+            location: Location { line: 1, column: 0 },
+        };
+        assert_eq!(
+            Parser::new("fn trivial();")
+                //               0    5    10
+                .match_decl("trivial func")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical,
+        );
+        assert_eq!(
+            Parser::new("fn trivial ( ) ;")
+                //               0    5    10
+                .match_decl("trivial func")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical,
+        );
+        assert_eq!(
+            Parser::new("fn trivial()->;")
+                //               0    5    10
+                .match_decl("trivial func")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical,
+        );
+    }
+
+    #[test]
+    fn fn_return_u8() {
+        let canonical = SyntaxDecl::Function {
+            name: "getch".to_owned(),
+            args: Vec::new(),
+            rets: vec![FuncRet {
+                type_: SyntaxRef::Atom {
+                    atom: AtomType::U8,
+                    location: Location {
+                        line: 1,
+                        column: 14,
+                    },
+                },
+                attrs: vec![],
+                location: Location {
+                    line: 1,
+                    column: 14,
+                },
+            }],
+            attrs: Vec::new(),
+            location: Location { line: 1, column: 0 },
+        };
+        assert_eq!(
+            Parser::new("fn getch() -> u8;")
+                //       0    5    10
+                .match_decl("returns u8")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical
+        );
+        assert_eq!(
+            Parser::new("fn getch() -> u8,;")
+                //       0    5    10
+                .match_decl("returns u8")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical
+        );
+        assert_eq!(
+            Parser::new("fn getch() -> u8  , ;")
+                //       0    5    10
+                .match_decl("returns u8")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical
+        );
+    }
+
+    #[test]
+    fn fn_one_arg() {
+        let canonical = SyntaxDecl::Function {
+            name: "foo".to_owned(),
+            args: vec![FuncArg {
+                type_: SyntaxRef::Atom {
+                    atom: AtomType::U8,
+                    location: Location {
+                        line: 1,
+                        column: 10,
+                    },
+                },
+                name: "a".to_owned(),
+                attrs: Vec::new(),
+                location: Location { line: 1, column: 7 },
+            }],
+            rets: Vec::new(),
+            attrs: Vec::new(),
+            location: Location { line: 1, column: 0 },
+        };
+        assert_eq!(
+            Parser::new("fn foo(a: u8);")
+                //       0    5    10   15   20    25
+                .match_decl("returns u8")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical
+        );
+        assert_eq!(
+            Parser::new("fn foo(a: u8,);")
+                //       0    5    10   15   20    25
+                .match_decl("returns u8")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical
+        );
+    }
+
+    #[test]
+    fn fn_multi_arg() {
+        let canonical = SyntaxDecl::Function {
+            name: "foo".to_owned(),
+            args: vec![
+                FuncArg {
+                    type_: SyntaxRef::Atom {
+                        atom: AtomType::U8,
+                        location: Location {
+                            line: 1,
+                            column: 10,
+                        },
+                    },
+                    name: "a".to_owned(),
+                    attrs: Vec::new(),
+                    location: Location { line: 1, column: 7 },
+                },
+                FuncArg {
+                    type_: SyntaxRef::Atom {
+                        atom: AtomType::F64,
+                        location: Location {
+                            line: 1,
+                            column: 17,
+                        },
+                    },
+                    name: "b".to_owned(),
+                    attrs: Vec::new(),
+                    location: Location {
+                        line: 1,
+                        column: 14,
+                    },
+                },
+            ],
+            rets: Vec::new(),
+            attrs: Vec::new(),
+            location: Location { line: 1, column: 0 },
+        };
+        assert_eq!(
+            Parser::new("fn foo(a: u8, b: f64);")
+                //       0    5    10   15   20    25
+                .match_decl("returns u8")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical
+        );
+        assert_eq!(
+            Parser::new("fn foo(a: u8, b: f64, );")
+                //       0    5    10   15   20    25
+                .match_decl("returns u8")
+                .expect("valid parse")
+                .expect("valid decl"),
+            canonical
+        );
+    }
+
+    #[test]
+    fn fn_many_returns() {
+        assert_eq!(
+            Parser::new("fn getch() -> u8, u16, u32;")
+                //       0    5    10   15   20    25
+                .match_decl("returns u8")
+                .expect("valid parse")
+                .expect("valid decl"),
+            SyntaxDecl::Function {
+                name: "getch".to_owned(),
+                args: Vec::new(),
+                rets: vec![
+                    FuncRet {
+                        type_: SyntaxRef::Atom {
+                            atom: AtomType::U8,
+                            location: Location {
+                                line: 1,
+                                column: 14,
+                            },
+                        },
+                        attrs: vec![],
+                        location: Location {
+                            line: 1,
+                            column: 14,
+                        },
+                    },
+                    FuncRet {
+                        type_: SyntaxRef::Atom {
+                            atom: AtomType::U16,
+                            location: Location {
+                                line: 1,
+                                column: 18,
+                            },
+                        },
+                        attrs: vec![],
+                        location: Location {
+                            line: 1,
+                            column: 18,
+                        },
+                    },
+                    FuncRet {
+                        type_: SyntaxRef::Atom {
+                            atom: AtomType::U32,
+                            location: Location {
+                                line: 1,
+                                column: 23,
+                            },
+                        },
+                        attrs: vec![],
+                        location: Location {
+                            line: 1,
+                            column: 23,
+                        },
+                    },
+                ],
+                attrs: Vec::new(),
+                location: Location { line: 1, column: 0 },
+            }
+        );
+    }
+
+    #[test]
+    fn fn_many_returns_with_attrs() {
+        assert_eq!(
+            Parser::new("fn getch() -> #[a=b] u8, #[c=d] #[e=f] u16, u32;")
+                //       0    5    10   15   20   25   30   35   40   45
+                .match_decl("returns u8")
+                .expect("valid parse")
+                .expect("valid decl"),
+            SyntaxDecl::Function {
+                name: "getch".to_owned(),
+                args: Vec::new(),
+                rets: vec![
+                    FuncRet {
+                        type_: SyntaxRef::Atom {
+                            atom: AtomType::U8,
+                            location: Location {
+                                line: 1,
+                                column: 21,
+                            },
+                        },
+                        attrs: vec![Attr::new(
+                            "a",
+                            "b",
+                            Location {
+                                line: 1,
+                                column: 14
+                            }
+                        )],
+                        location: Location {
+                            line: 1,
+                            column: 21,
+                        },
+                    },
+                    FuncRet {
+                        type_: SyntaxRef::Atom {
+                            atom: AtomType::U16,
+                            location: Location {
+                                line: 1,
+                                column: 39,
+                            },
+                        },
+                        attrs: vec![
+                            Attr::new(
+                                "c",
+                                "d",
+                                Location {
+                                    line: 1,
+                                    column: 25
+                                }
+                            ),
+                            Attr::new(
+                                "e",
+                                "f",
+                                Location {
+                                    line: 1,
+                                    column: 32
+                                }
+                            ),
+                        ],
+                        location: Location {
+                            line: 1,
+                            column: 39,
+                        },
+                    },
+                    FuncRet {
+                        type_: SyntaxRef::Atom {
+                            atom: AtomType::U32,
+                            location: Location {
+                                line: 1,
+                                column: 44,
+                            },
+                        },
+                        attrs: vec![],
+                        location: Location {
+                            line: 1,
+                            column: 44,
+                        },
+                    },
                 ],
                 attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },

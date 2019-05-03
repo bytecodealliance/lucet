@@ -278,6 +278,9 @@ impl Package {
             SyntaxDecl::Module{ .. } => {
                 unimplemented!()
             }
+            SyntaxDecl::Function{ .. } => {
+                unimplemented!()
+            }
         }
         Ok(())
     }

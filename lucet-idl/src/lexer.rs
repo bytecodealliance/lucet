@@ -15,7 +15,7 @@ pub enum Token<'a> {
     Comma,    // ,
     Hash,     // #
     Equals,   // =
-    Keyword(&'a str),
+    Arrow,    // ->
     Atom(AtomType),
     Word(&'a str),
     Quote(&'a str), // Found between balanced "". No escaping.
@@ -136,10 +136,6 @@ impl<'a> Lexer<'a> {
         let text = &self.source[begin..self.pos];
         token(
             match text {
-                "struct" => Token::Keyword(text),
-                "enum" => Token::Keyword(text),
-                "type" => Token::Keyword(text),
-                "mod" => Token::Keyword(text),
                 "i8" => Token::Atom(AtomType::I8),
                 "i16" => Token::Atom(AtomType::I16),
                 "i32" => Token::Atom(AtomType::I32),
@@ -218,6 +214,16 @@ impl<'a> Lexer<'a> {
                     ',' => self.scan_char(Token::Comma),
                     '#' => self.scan_char(Token::Hash),
                     '=' => self.scan_char(Token::Equals),
+                    '-' => {
+                        if self.looking_at("->") {
+                            self.next_ch(); // Consume -
+                            self.next_ch(); // Consume >
+                            token(Token::Arrow, loc)
+                        } else {
+                            self.next_ch();
+                            error(LexError::InvalidChar('/'), loc)
+                        }
+                    }
                     '/' => {
                         if self.looking_at("//") {
                             self.rest_of_line();
@@ -281,16 +287,6 @@ mod tests {
         assert_eq!(lex.next(), token(Token::Atom(AtomType::U64), 2, 11));
         assert_eq!(lex.next(), token(Token::Atom(AtomType::F32), 3, 0));
         assert_eq!(lex.next(), token(Token::Atom(AtomType::F64), 3, 4));
-        assert_eq!(lex.next(), None);
-    }
-
-    #[test]
-    fn keywords() {
-        let mut lex = Lexer::new("struct\n\nenum type mod");
-        assert_eq!(lex.next(), token(Token::Keyword("struct"), 1, 0));
-        assert_eq!(lex.next(), token(Token::Keyword("enum"), 3, 0));
-        assert_eq!(lex.next(), token(Token::Keyword("type"), 3, 5));
-        assert_eq!(lex.next(), token(Token::Keyword("mod"), 3, 10));
         assert_eq!(lex.next(), None);
     }
 
