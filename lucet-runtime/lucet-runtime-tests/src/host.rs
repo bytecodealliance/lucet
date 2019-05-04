@@ -4,7 +4,7 @@ macro_rules! host_tests {
         use libc::c_void;
         use lucet_module_data::TrapCode;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-        use lucet_runtime::{DlModule, Error, Limits, Region};
+        use lucet_runtime::{DlModule, Error, Limits, Region, TerminationDetails};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
@@ -115,6 +115,34 @@ macro_rules! host_tests {
                 Err(Error::RuntimeFault(details)) => {
                     assert_eq!(details.trapcode, Some(TrapCode::IntegerDivByZero));
                 }
+                res => {
+                    panic!("unexpected result: {:?}", res);
+                }
+            }
+        }
+
+        #[test]
+        fn run_kill_switch() {
+            let module = test_module_c("host", "inf_loop.c").expect("build and load module");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            use std::time::Duration;
+            let kill_switch = inst.kill_switch();
+
+            use std::thread;
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(100));
+                kill_switch.terminate();
+            });
+
+            match inst.run(b"main", &[]) {
+                Err(Error::RuntimeTerminated(details)) => match details {
+                    TerminationDetails::Remote => {}
+                    _ => panic!(),
+                },
                 res => {
                     panic!("unexpected result: {:?}", res);
                 }

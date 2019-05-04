@@ -8,6 +8,7 @@ use lucet_runtime_internals::module::ModuleInternal;
 use lucet_wasi::{hostcalls, WasiCtxBuilder};
 use std::fs::File;
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 
 struct Config<'a> {
@@ -195,14 +196,15 @@ fn run(config: Config) {
             .build()
             .expect("instance can be created");
 
-        use std::thread;
-
         if let Some(timeout) = config.timeout {
             let kill_switch = inst.kill_switch();
             thread::spawn(move || {
                 thread::sleep(timeout);
-                println!("Time out!");
-                kill_switch.terminate();
+                if kill_switch.terminate() {
+                    println!("Timed out!");
+                } else {
+                    println!("Failed to time out?!");
+                }
             });
         }
 
@@ -214,6 +216,12 @@ fn run(config: Config) {
             )) => *any
                 .downcast_ref::<lucet_wasi::host::__wasi_exitcode_t>()
                 .expect("termination yields an exitcode"),
+            Err(lucet_runtime::Error::RuntimeTerminated(
+                lucet_runtime::TerminationDetails::Remote,
+            )) => {
+                println!("Terminated via remote kill switch (likely a timeout)");
+                std::u32::MAX
+            }
             Err(e) => panic!("lucet-wasi runtime error: {}", e),
         }
     };

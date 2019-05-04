@@ -13,7 +13,9 @@ use crate::region::RegionInternal;
 use crate::sysdeps::UContext;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
-use libc::{c_void, siginfo_t, uintptr_t, SIGALRM, SIGBUS, SIGSEGV};
+use libc::{
+    c_void, pthread_kill, pthread_self, pthread_t, siginfo_t, uintptr_t, SIGALRM, SIGBUS, SIGSEGV,
+};
 use lucet_module_data::TrapCode;
 
 use memoffset::offset_of;
@@ -783,6 +785,7 @@ pub enum TerminationDetails {
     /// Calls to `Vmctx::terminate()` may attach an arbitrary pointer for extra debugging
     /// information.
     Provided(Arc<dyn Any>),
+    Remote,
 }
 
 impl TerminationDetails {
@@ -819,6 +822,7 @@ impl std::fmt::Debug for TerminationDetails {
                 TerminationDetails::Signal => "Signal",
                 TerminationDetails::GetEmbedCtx => "GetEmbedCtx",
                 TerminationDetails::Provided(_) => "Provided(Any)",
+                TerminationDetails::Remote => "Remote",
             }
         )
     }
@@ -932,17 +936,15 @@ pub struct KillSwitch {
 }
 
 impl KillSwitch {
-    pub fn terminate(&self) -> Option<()> {
-        let state = self.state.upgrade().unwrap();
-        let state = state.lock().unwrap();
-        match *state {
-            KillState::Running(thread_id) => {
+    pub fn terminate(&self) -> bool {
+        if let Some(state) = self.state.upgrade() {
+            if let KillState::Running(thread_id) = *state.lock().unwrap() {
                 unsafe {
                     pthread_kill(thread_id, SIGALRM);
                 }
-                Some(())
+                return true;
             }
-            _ => None,
         }
+        false
     }
 }

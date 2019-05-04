@@ -254,6 +254,10 @@ pub mod lucet_state {
                                     .map(|v| *v)
                                     .unwrap_or(std::ptr::null_mut()),
                             },
+                            TerminationDetails::Remote => lucet_terminated {
+                                reason: lucet_terminated_reason::Remote,
+                                provided: std::ptr::null_mut(),
+                            },
                         },
                     },
                 },
@@ -300,6 +304,7 @@ pub mod lucet_state {
         Signal,
         GetEmbedCtx,
         Provided,
+        Remote,
     }
 
     #[repr(C)]
