@@ -4,6 +4,8 @@ use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle};
 use crate::module::Module;
 use crate::region::{Region, RegionCreate, RegionInternal};
+#[cfg(not(target_os = "linux"))]
+use libc::memset;
 use libc::{c_void, SIGSTKSZ};
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::ptr;
@@ -89,7 +91,8 @@ impl RegionInternal for MmapRegion {
 
         // clear and disable access to the heap, stack, globals, and sigstack
         for (ptr, len) in [
-            (slot.heap, slot.limits.heap_address_space_size),
+            // We don't ever shrink the heap, so we only need to zero up until the accessible size
+            (slot.heap, alloc.heap_accessible_size),
             (slot.stack, slot.limits.stack_size),
             (slot.globals, slot.limits.globals_size),
             (slot.sigstack, SIGSTKSZ),
@@ -98,6 +101,13 @@ impl RegionInternal for MmapRegion {
         {
             // eprintln!("setting none {:p}[{:x}]", *ptr, len);
             unsafe {
+                // MADV_DONTNEED is not guaranteed to clear pages on non-Linux systems
+                #[cfg(not(target_os = "linux"))]
+                {
+                    mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)
+                        .expect("mprotect succeeds during drop");
+                    memset(*ptr, 0, *len);
+                }
                 mprotect(*ptr, *len, ProtFlags::PROT_NONE).expect("mprotect succeeds during drop");
                 madvise(*ptr, *len, MmapAdvise::MADV_DONTNEED)
                     .expect("madvise succeeds during drop");
@@ -126,15 +136,29 @@ impl RegionInternal for MmapRegion {
             let heap_size = alloc.slot().limits.heap_address_space_size;
 
             unsafe {
+                // `mprotect()` and `madvise()` are sufficient to zero a page on Linux,
+                // but not necessarily on all POSIX operating systems, and on macOS in particular.
+                #[cfg(not(target_os = "linux"))]
+                {
+                    mprotect(
+                        heap,
+                        alloc.heap_accessible_size,
+                        ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                    )?;
+                    memset(heap, 0, alloc.heap_accessible_size);
+                }
                 mprotect(heap, heap_size, ProtFlags::PROT_NONE)?;
                 madvise(heap, heap_size, MmapAdvise::MADV_DONTNEED)?;
             }
         }
 
-        let initial_size = module.heap_spec().initial_size as usize;
+        let initial_size = module
+            .heap_spec()
+            .map(|h| h.initial_size as usize)
+            .unwrap_or(0);
 
         // reset the heap to the initial size, and mprotect those pages appropriately
-        if alloc.heap_accessible_size != initial_size {
+        if initial_size > 0 {
             unsafe {
                 mprotect(
                     heap,
@@ -142,10 +166,9 @@ impl RegionInternal for MmapRegion {
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 )?
             };
-            alloc.heap_accessible_size = initial_size;
-            alloc.heap_inaccessible_size =
-                alloc.slot().limits.heap_address_space_size - initial_size;
         }
+        alloc.heap_accessible_size = initial_size;
+        alloc.heap_inaccessible_size = alloc.slot().limits.heap_address_space_size - initial_size;
 
         // Initialize the heap using the module sparse page data. There cannot be more pages in the
         // sparse page data than will fit in the initial heap size.

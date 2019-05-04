@@ -1,10 +1,8 @@
 use crate::error::Error;
-use crate::module::{
-    AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement, TrapManifestRecord,
-};
+use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use libloading::{Library, Symbol};
-use lucet_module_data::ModuleData;
+use lucet_module_data::{FunctionSpec, ModuleData};
 use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
@@ -22,7 +20,7 @@ pub struct DlModule {
     /// Metadata decoded from inside the module
     module_data: ModuleData<'static>,
 
-    trap_manifest: &'static [TrapManifestRecord],
+    function_manifest: &'static [FunctionSpec],
 }
 
 // for the one raw pointer only
@@ -71,23 +69,49 @@ impl DlModule {
             std::ptr::null()
         };
 
-        let trap_manifest = unsafe {
-            if let Ok(len_ptr) = lib.get::<*const u32>(b"lucet_trap_manifest_len") {
-                let len = len_ptr.as_ref().ok_or(lucet_incorrect_module!(
-                    "`lucet_trap_manifest_len` is defined but null"
-                ))?;
-                let records = lib
-                    .get::<*const TrapManifestRecord>(b"lucet_trap_manifest")
-                    .map_err(|e| {
-                        lucet_incorrect_module!("error loading symbol `lucet_trap_manifest`: {}", e)
-                    })?
-                    .as_ref()
-                    .ok_or(lucet_incorrect_module!(
-                        "`lucet_trap_manifest` is defined but null"
+        let function_manifest = unsafe {
+            let manifest_len_ptr = lib.get::<*const u32>(b"lucet_function_manifest_len");
+            let manifest_ptr = lib.get::<*const FunctionSpec>(b"lucet_function_manifest");
+
+            match (manifest_ptr, manifest_len_ptr) {
+                (Ok(ptr), Ok(len_ptr)) => {
+                    let manifest_len = len_ptr.as_ref().ok_or(lucet_incorrect_module!(
+                        "`lucet_function_manifest_len` is defined but null"
                     ))?;
-                from_raw_parts(records, *len as usize)
-            } else {
-                &[]
+                    let manifest = ptr.as_ref().ok_or(lucet_incorrect_module!(
+                        "`lucet_function_manifest` is defined but null"
+                    ))?;
+
+                    from_raw_parts(manifest, *manifest_len as usize)
+                }
+                (Err(ptr_err), Err(len_err)) => {
+                    if is_undefined_symbol(&ptr_err) && is_undefined_symbol(&len_err) {
+                        &[]
+                    } else {
+                        // This is an unfortunate situation. Both attempts to look up symbols
+                        // failed, but at least one is not due to an undefined symbol.
+                        if !is_undefined_symbol(&ptr_err) {
+                            // This returns `ptr_err` (rather than `len_err` or some mix) because
+                            // of the following hunch: if both failed, and neither are undefined
+                            // symbols, they are probably the same error.
+                            return Err(Error::DlError(ptr_err));
+                        } else {
+                            return Err(Error::DlError(len_err));
+                        }
+                    }
+                }
+                (Ok(_), Err(e)) => {
+                    return Err(lucet_incorrect_module!(
+                        "error loading symbol `lucet_function_manifest_len`: {}",
+                        e
+                    ));
+                }
+                (Err(e), Ok(_)) => {
+                    return Err(lucet_incorrect_module!(
+                        "error loading symbol `lucet_function_manifest`: {}",
+                        e
+                    ));
+                }
             }
         };
 
@@ -95,7 +119,7 @@ impl DlModule {
             lib,
             fbase,
             module_data,
-            trap_manifest,
+            function_manifest,
         }))
     }
 }
@@ -103,7 +127,7 @@ impl DlModule {
 impl Module for DlModule {}
 
 impl ModuleInternal for DlModule {
-    fn heap_spec(&self) -> &HeapSpec {
+    fn heap_spec(&self) -> Option<&HeapSpec> {
         self.module_data.heap_spec()
     }
 
@@ -112,11 +136,15 @@ impl ModuleInternal for DlModule {
     }
 
     fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]> {
-        *self.module_data.sparse_data().get_page(page)
+        if let Some(ref sparse_data) = self.module_data.sparse_data() {
+            *sparse_data.get_page(page)
+        } else {
+            None
+        }
     }
 
     fn sparse_page_data_len(&self) -> usize {
-        self.module_data.sparse_data().len()
+        self.module_data.sparse_data().map(|d| d.len()).unwrap_or(0)
     }
 
     fn table_elements(&self) -> Result<&[TableElement], Error> {
@@ -131,18 +159,10 @@ impl ModuleInternal for DlModule {
             })?
         };
         let len = unsafe { **p_table_segment_len };
-        let elem_size = mem::size_of::<TableElement>();
-        if len > std::u32::MAX as usize * elem_size {
+        if len > std::u32::MAX as usize {
             lucet_incorrect_module!("table segment too long: {}", len);
         }
-        if len % elem_size != 0 {
-            lucet_incorrect_module!(
-                "table segment length {} not a multiple of table element size: {}",
-                len,
-                elem_size
-            );
-        }
-        Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize / elem_size) })
+        Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize) })
     }
 
     fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {
@@ -190,8 +210,8 @@ impl ModuleInternal for DlModule {
         }
     }
 
-    fn trap_manifest(&self) -> &[TrapManifestRecord] {
-        self.trap_manifest
+    fn function_manifest(&self) -> &[FunctionSpec] {
+        self.function_manifest
     }
 
     fn addr_details(&self, addr: *const c_void) -> Result<Option<AddrDetails>, Error> {
@@ -220,7 +240,8 @@ impl ModuleInternal for DlModule {
 fn is_undefined_symbol(e: &std::io::Error) -> bool {
     // gross, but I'm not sure how else to differentiate this type of error from other
     // IO errors
-    format!("{}", e).contains("undefined symbol")
+    let msg = format!("{}", e);
+    msg.contains("undefined symbol") || msg.contains("symbol not found")
 }
 
 // TODO: PR to nix or libloading?

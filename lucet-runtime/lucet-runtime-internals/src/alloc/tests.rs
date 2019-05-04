@@ -377,10 +377,55 @@ macro_rules! alloc_tests {
             peek_n_poke(&region);
         }
 
-        /// This test shows that the reset method clears the heap and restores it to the spec
-        /// initial size.
+        /// This test shows that the reset method clears the heap and resets its protections.
         #[test]
         fn alloc_reset() {
+            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let module = MockModuleBuilder::new()
+                .with_heap_spec(THREE_PAGE_MAX_HEAP)
+                .build();
+            let mut inst = region
+                .new_instance(module.clone())
+                .expect("new_instance succeeds");
+
+            let heap_len = inst.alloc().heap_len();
+            assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
+
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
+
+            assert_eq!(heap[0], 0);
+            heap[0] = 0xFF;
+            assert_eq!(heap[0], 0xFF);
+
+            assert_eq!(heap[heap_len - 1], 0);
+            heap[heap_len - 1] = 0xFF;
+            assert_eq!(heap[heap_len - 1], 0xFF);
+
+            // Making a new mock module here because the borrow checker doesn't like referencing
+            // `inst.module` while `inst.alloc()` is borrowed mutably. The `Instance` tests don't have
+            // this weirdness
+            inst.alloc_mut()
+                .reset_heap(module.as_ref())
+                .expect("reset succeeds");
+
+            let reset_heap_len = inst.alloc().heap_len();
+            assert_eq!(reset_heap_len, THREEPAGE_INITIAL_SIZE as usize);
+
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
+
+            assert_eq!(heap[0], 0);
+            heap[0] = 0xFF;
+            assert_eq!(heap[0], 0xFF);
+
+            assert_eq!(heap[reset_heap_len - 1], 0);
+            heap[reset_heap_len - 1] = 0xFF;
+            assert_eq!(heap[reset_heap_len - 1], 0xFF);
+        }
+
+        /// This test shows that the reset method clears the heap and restores it to the spec
+        /// initial size after growing the heap.
+        #[test]
+        fn alloc_grow_reset() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
@@ -612,6 +657,16 @@ macro_rules! alloc_tests {
                     assert_eq!(stack_pattern[i], (i % 256) as u8);
                 }
             }
+        }
+
+        #[test]
+        fn drop_region_first() {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let inst = region
+                .new_instance(MockModuleBuilder::new().build())
+                .expect("new_instance succeeds");
+            drop(region);
+            drop(inst);
         }
     };
 }

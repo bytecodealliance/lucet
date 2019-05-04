@@ -1,5 +1,6 @@
 use crate::helpers::MockModuleBuilder;
-use lucet_runtime_internals::module::{Module, TrapManifestRecord, TrapSite};
+use lucet_module_data::{FunctionSpec, TrapCode, TrapSite};
+use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
 use std::sync::Arc;
 
@@ -70,27 +71,27 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
 
     static ILLEGAL_INSTR_TRAPS: &'static [TrapSite] = &[TrapSite {
         offset: 8,
-        trapcode: 4, /* BadSignature */
+        code: TrapCode::BadSignature,
     }];
 
     static OOB_TRAPS: &'static [TrapSite] = &[TrapSite {
         offset: 29,
-        trapcode: 1, /* HeapOutOfBounds */
+        code: TrapCode::HeapOutOfBounds,
     }];
 
-    let trap_manifest = &[
-        TrapManifestRecord {
-            func_addr: guest_func_illegal_instr as *const extern "C" fn() as u64,
-            func_len: 11,
-            table_addr: ILLEGAL_INSTR_TRAPS.as_ptr() as u64,
-            table_len: 1,
-        },
-        TrapManifestRecord {
-            func_addr: guest_func_oob as *const extern "C" fn() as u64,
-            func_len: 41,
-            table_addr: OOB_TRAPS.as_ptr() as u64,
-            table_len: 1,
-        },
+    let function_manifest = &[
+        FunctionSpec::new(
+            guest_func_illegal_instr as *const extern "C" fn() as u64,
+            11,
+            ILLEGAL_INSTR_TRAPS.as_ptr() as u64,
+            ILLEGAL_INSTR_TRAPS.len() as u64,
+        ),
+        FunctionSpec::new(
+            guest_func_oob as *const extern "C" fn() as u64,
+            41,
+            OOB_TRAPS.as_ptr() as u64,
+            OOB_TRAPS.len() as u64,
+        ),
     ];
 
     MockModuleBuilder::new()
@@ -107,7 +108,7 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
             b"recoverable_fatal",
             recoverable_fatal as *const extern "C" fn(),
         )
-        .with_trap_manifest(trap_manifest)
+        .with_function_manifest(function_manifest)
         .build()
 }
 
@@ -116,10 +117,10 @@ macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, siginfo_t, SIGSEGV};
+        use lucet_module_data::TrapCode;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            DlModule, Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TrapCode,
-            TrapCodeType,
+            DlModule, Error, FaultDetails, Instance, Limits, Region, SignalBehavior,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -196,7 +197,7 @@ macro_rules! guest_fault_tests {
 
                 match inst.run(b"illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode.ty, TrapCodeType::BadSignature);
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
@@ -220,7 +221,7 @@ macro_rules! guest_fault_tests {
 
                 match inst.run(b"oob", &[]) {
                     Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode.ty, TrapCodeType::HeapOutOfBounds);
+                        assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
@@ -267,7 +268,7 @@ macro_rules! guest_fault_tests {
         fn fatal_continue_signal_handler() {
             fn signal_handler_continue(
                 _inst: &Instance,
-                _trapcode: &TrapCode,
+                _trapcode: &Option<TrapCode>,
                 signum: libc::c_int,
                 _siginfo_ptr: *const siginfo_t,
                 _ucontext_ptr: *const c_void,
@@ -314,7 +315,7 @@ macro_rules! guest_fault_tests {
         fn fatal_terminate_signal_handler() {
             fn signal_handler_terminate(
                 _inst: &Instance,
-                _trapcode: &TrapCode,
+                _trapcode: &Option<TrapCode>,
                 signum: libc::c_int,
                 _siginfo_ptr: *const siginfo_t,
                 _ucontext_ptr: *const c_void,
@@ -405,7 +406,7 @@ macro_rules! guest_fault_tests {
 
                 match inst.run(b"illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode.ty, TrapCodeType::BadSignature);
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
@@ -673,6 +674,37 @@ macro_rules! guest_fault_tests {
                         }
                     }
                 }
+            })
+        }
+
+        #[test]
+        fn sigaltstack_restores() {
+            use libc::*;
+
+            test_nonex(|| {
+                // any alternate stack present before a thread runs an instance should be restored
+                // after the instance returns
+                let beforestack = unsafe {
+                    let mut beforestack = std::mem::uninitialized::<stack_t>();
+                    sigaltstack(std::ptr::null(), &mut beforestack as *mut stack_t);
+                    beforestack
+                };
+
+                let module = mock_traps_module();
+                let region =
+                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let mut inst = region
+                    .new_instance(module)
+                    .expect("instance can be created");
+                run_onetwothree(&mut inst);
+
+                let afterstack = unsafe {
+                    let mut afterstack = std::mem::uninitialized::<stack_t>();
+                    sigaltstack(std::ptr::null(), &mut afterstack as *mut stack_t);
+                    afterstack
+                };
+
+                assert_eq!(beforestack.ss_sp, afterstack.ss_sp);
             })
         }
 

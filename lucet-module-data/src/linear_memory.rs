@@ -1,6 +1,38 @@
 use crate::Error;
 use serde::{Deserialize, Serialize};
 
+/// Specification of the linear memory of a module
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinearMemorySpec<'a> {
+    /// Specification of the heap used to implement the linear memory
+    pub heap: HeapSpec,
+    /// Initialization values for linear memory
+    #[serde(borrow)]
+    pub initializer: SparseData<'a>,
+}
+
+/// Specification of the linear memory of a module
+///
+/// This is a version of [`LinearMemorySpec`](../struct.LinearMemorySpec.html) with an
+/// `OwnedSparseData` for the initializer.
+/// This type is useful when directly building up a value to be serialized.
+pub struct OwnedLinearMemorySpec {
+    /// Specification of the heap used to implement the linear memory
+    pub heap: HeapSpec,
+    /// Initialization values for linear memory
+    pub initializer: OwnedSparseData,
+}
+
+
+impl OwnedLinearMemorySpec {
+    pub fn to_ref<'a>(&'a self) -> LinearMemorySpec<'a> {
+        LinearMemorySpec {
+            heap: self.heap.clone(),
+            initializer: self.initializer.to_ref(),
+        }
+    }
+}
+
 /// Specifications about the heap of a Lucet module.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeapSpec {

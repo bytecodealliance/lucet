@@ -1,12 +1,13 @@
 use crate::context::Context;
 use crate::instance::{
-    FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
+    siginfo_ext::SiginfoExt, FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE,
+    HOST_CTX,
 };
 use crate::sysdeps::UContextPtr;
-use crate::trapcode::{TrapCode, TrapCodeType};
 use failure::Error;
 use lazy_static::lazy_static;
-use libc::{c_int, c_void, siginfo_t};
+use libc::{c_int, c_void, siginfo_t, SIGBUS, SIGSEGV};
+use lucet_module_data::TrapCode;
 use nix::sys::signal::{
     pthread_sigmask, raise, sigaction, SaFlags, SigAction, SigHandler, SigSet, SigmaskHow, Signal,
 };
@@ -29,12 +30,17 @@ pub enum SignalBehavior {
     Terminate,
 }
 
-pub type SignalHandler =
-    dyn Fn(&Instance, &TrapCode, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior;
+pub type SignalHandler = dyn Fn(
+    &Instance,
+    &Option<TrapCode>,
+    libc::c_int,
+    *const siginfo_t,
+    *const c_void,
+) -> SignalBehavior;
 
 pub fn signal_handler_none(
     _inst: &Instance,
-    _trapcode: &TrapCode,
+    _trapcode: &Option<TrapCode>,
     _signum: libc::c_int,
     _siginfo_ptr: *const siginfo_t,
     _ucontext_ptr: *const c_void,
@@ -47,15 +53,24 @@ impl Instance {
     where
         F: FnOnce(&mut Instance) -> Result<R, Error>,
     {
-        // setup signal stack for this thread
+        // Set up the signal stack for this thread. Note that because signal stacks are per-thread,
+        // rather than per-process, we do this for every run, while the signal handler is installed
+        // only once per process.
         let guest_sigstack = SigStack::new(
             self.alloc.slot().sigstack,
             SigStackFlags::empty(),
             libc::SIGSTKSZ,
         );
-        let saved_sigstack =
-            unsafe { sigaltstack(&guest_sigstack).expect("saving sigaltstack succeeds") };
-
+        let previous_sigstack = unsafe { sigaltstack(Some(guest_sigstack)) }
+            .expect("enabling or changing the signal stack succeeds");
+        if let Some(previous_sigstack) = previous_sigstack {
+            assert!(
+                !previous_sigstack
+                    .flags()
+                    .contains(SigStackFlags::SS_ONSTACK),
+                "an instance was created with a signal stack"
+            );
+        }
         let mut ostate = LUCET_SIGNAL_STATE.lock().unwrap();
         if let Some(ref mut state) = *ostate {
             state.counter += 1;
@@ -74,8 +89,6 @@ impl Instance {
             state.counter -= 1;
             if state.counter == 0 {
                 unsafe {
-                    // restore the host signal stack
-                    sigaltstack(&saved_sigstack).expect("sigaltstack restoration succeeds");
                     restore_host_signal_state(state);
                 }
                 true
@@ -87,6 +100,16 @@ impl Instance {
         };
         if counter_zero {
             *ostate = None;
+        }
+
+        unsafe {
+            // restore the host signal stack for this thread
+            if !altstack_flags()
+                .expect("the current stack flags could be retrieved")
+                .contains(SigStackFlags::SS_ONSTACK)
+            {
+                sigaltstack(previous_sigstack).expect("sigaltstack restoration succeeds");
+            }
         }
 
         res
@@ -139,15 +162,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 .as_mut()
         };
 
-        let trapcode = inst
-            .module
-            .lookup_trapcode(rip)
-            // if we couldn't find a code in the manifest, return an unknown trapcode that will be
-            // converted to a fatal trap when we switch back to the host
-            .unwrap_or(TrapCode {
-                ty: TrapCodeType::Unknown,
-                tag: 0,
-            });
+        let trapcode = inst.module.lookup_trapcode(rip);
 
         let behavior = (inst.signal_handler)(inst, &trapcode, signum, siginfo_ptr, ucontext_ptr);
         match behavior {
@@ -163,20 +178,29 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 true
             }
             SignalBehavior::Default => {
+                // safety: pointer is checked for null at the top of the function, and the
+                // manpage guarantees that a siginfo_t will be passed as the second argument
+                let siginfo = unsafe { *siginfo_ptr };
+                let rip_addr = rip as usize;
+                // If the trap table lookup returned unknown, it is a fatal error
+                let unknown_fault = trapcode.is_none();
+
+                // If the trap was a segv or bus fault and the addressed memory was outside the
+                // guard pages, it is also a fatal error
+                let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
+                    && !inst.alloc.addr_in_heap_guard(siginfo.si_addr());
+
                 // record the fault and jump back to the host context
                 inst.state = State::Fault {
                     details: FaultDetails {
-                        // fatal field is set false here by default - have to wait until
-                        // `verify_trap_safety` to have enough information to determine whether trap was
-                        // fatal. It is not signal safe to access some of the required information.
-                        fatal: false,
+                        fatal: unknown_fault || outside_guard,
                         trapcode: trapcode,
-                        rip_addr: rip as usize,
+                        rip_addr,
+                        // Details set to `None` here: have to wait until `verify_trap_safety` to
+                        // fill in these details, because access may not be signal safe.
                         rip_addr_details: None,
                     },
-                    // safety: pointer is checked for null at the top of the function, and the
-                    // manpage guarantees that a siginfo_t will be passed as the second argument
-                    siginfo: unsafe { *siginfo_ptr },
+                    siginfo,
                     context: ctx.into(),
                 };
                 true
@@ -326,6 +350,14 @@ impl SigStack {
         SigStack { stack }
     }
 
+    pub fn disabled() -> SigStack {
+        let mut stack = unsafe { std::mem::uninitialized::<libc::stack_t>() };
+        stack.ss_sp = std::ptr::null_mut();
+        stack.ss_flags = SigStackFlags::SS_DISABLE.bits();
+        stack.ss_size = libc::SIGSTKSZ;
+        SigStack { stack }
+    }
+
     pub fn flags(&self) -> SigStackFlags {
         SigStackFlags::from_bits_truncate(self.stack.ss_flags)
     }
@@ -350,13 +382,35 @@ bitflags! {
     }
 }
 
-pub unsafe fn sigaltstack(ss: &SigStack) -> nix::Result<SigStack> {
-    let mut oldstack = std::mem::uninitialized::<libc::stack_t>();
-
+pub unsafe fn sigaltstack(new_sigstack: Option<SigStack>) -> nix::Result<Option<SigStack>> {
+    let mut previous_stack = std::mem::uninitialized::<libc::stack_t>();
+    let disabled_sigstack = SigStack::disabled();
+    let new_stack = match new_sigstack {
+        None => &disabled_sigstack.stack,
+        Some(ref new_stack) => &new_stack.stack,
+    };
     let res = libc::sigaltstack(
-        &ss.stack as *const libc::stack_t,
-        &mut oldstack as *mut libc::stack_t,
+        new_stack as *const libc::stack_t,
+        &mut previous_stack as *mut libc::stack_t,
     );
+    nix::errno::Errno::result(res).map(|_| {
+        let sigstack = SigStack {
+            stack: previous_stack,
+        };
+        if sigstack.flags().contains(SigStackFlags::SS_DISABLE) {
+            None
+        } else {
+            Some(sigstack)
+        }
+    })
+}
 
-    nix::errno::Errno::result(res).map(|_| SigStack { stack: oldstack })
+pub unsafe fn altstack_flags() -> nix::Result<SigStackFlags> {
+    let mut current_stack = std::mem::uninitialized::<libc::stack_t>();
+    let res = libc::sigaltstack(
+        std::ptr::null_mut(),
+        &mut current_stack as *mut libc::stack_t,
+    );
+    nix::errno::Errno::result(res)
+        .map(|_| SigStackFlags::from_bits_truncate(current_stack.ss_flags))
 }

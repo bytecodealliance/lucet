@@ -9,13 +9,13 @@ use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, Global, Module};
+use crate::region::RegionInternal;
 use crate::sysdeps::UContext;
-use crate::trapcode::{TrapCode, TrapCodeType};
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
-use libc::{
-    c_void, pthread_kill, pthread_self, pthread_t, siginfo_t, uintptr_t, SIGALRM, SIGBUS, SIGSEGV,
-};
+use libc::{c_void, siginfo_t, uintptr_t, SIGALRM, SIGBUS, SIGSEGV};
+use lucet_module_data::TrapCode;
+
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{RefCell, UnsafeCell};
@@ -56,6 +56,7 @@ thread_local! {
 /// though it were a `&mut Instance`.
 pub struct InstanceHandle {
     inst: NonNull<Instance>,
+    needs_inst_drop: bool,
 }
 
 // raw pointer lint
@@ -79,13 +80,15 @@ pub fn new_instance_handle(
     let inst = NonNull::new(instance)
         .ok_or(lucet_format_err!("instance pointer is null; this is a bug"))?;
 
-    // do this check first so we don't run `InstanceHandle::drop()` for a failure
     lucet_ensure!(
         unsafe { inst.as_ref().magic } != LUCET_INSTANCE_MAGIC,
         "created a new instance handle in memory with existing instance magic; this is a bug"
     );
 
-    let mut handle = InstanceHandle { inst };
+    let mut handle = InstanceHandle {
+        inst,
+        needs_inst_drop: false,
+    };
 
     let inst = Instance::new(alloc, module, embed_ctx);
 
@@ -98,20 +101,25 @@ pub fn new_instance_handle(
         ptr::write(&mut *handle, inst);
     };
 
+    handle.needs_inst_drop = true;
+
     handle.reset()?;
 
     Ok(handle)
 }
 
-pub fn instance_handle_to_raw(inst: InstanceHandle) -> *mut Instance {
-    let ptr = inst.inst.as_ptr();
-    std::mem::forget(inst);
-    ptr
+pub fn instance_handle_to_raw(mut inst: InstanceHandle) -> *mut Instance {
+    inst.needs_inst_drop = false;
+    inst.inst.as_ptr()
 }
 
-pub unsafe fn instance_handle_from_raw(ptr: *mut Instance) -> InstanceHandle {
+pub unsafe fn instance_handle_from_raw(
+    ptr: *mut Instance,
+    needs_inst_drop: bool,
+) -> InstanceHandle {
     InstanceHandle {
         inst: NonNull::new_unchecked(ptr),
+        needs_inst_drop,
     }
 }
 
@@ -134,11 +142,25 @@ impl DerefMut for InstanceHandle {
 
 impl Drop for InstanceHandle {
     fn drop(&mut self) {
-        // eprintln!("InstanceHandle::drop()");
-        // zero out magic, then run the destructor by taking and dropping the inner `Instance`
-        self.magic = 0;
-        unsafe {
-            mem::replace(self.inst.as_mut(), mem::uninitialized());
+        if self.needs_inst_drop {
+            unsafe {
+                let inst = self.inst.as_mut();
+
+                // Grab a handle to the region to ensure it outlives `inst`.
+                //
+                // This ensures that the region won't be dropped by `inst` being
+                // dropped, which could result in `inst` being unmapped by the
+                // Region *during* drop of the Instance's fields.
+                let region: Arc<dyn RegionInternal> = inst.alloc().region.clone();
+
+                // drop the actual instance
+                std::ptr::drop_in_place(inst);
+
+                // and now we can drop what may be the last Arc<Region>. If it is
+                // it can safely do what it needs with memory; we're not running
+                // destructors on it anymore.
+                mem::drop(region);
+            }
         }
     }
 }
@@ -189,7 +211,7 @@ pub struct Instance {
     signal_handler: Box<
         dyn Fn(
             &Instance,
-            &TrapCode,
+            &Option<TrapCode>,
             libc::c_int,
             *const siginfo_t,
             *const c_void,
@@ -203,6 +225,21 @@ pub struct Instance {
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
     /// It is also used to compute the size of the structure up to that point, i.e. without padding.
     _padding: (),
+}
+
+/// Users of `Instance` must be very careful about when instances are dropped!
+///
+/// Typically you will not have to worry about this, as InstanceHandle will robustly handle
+/// Instance drop semantics. If an instance is dropped, and the Region it's in has already dropped,
+/// it may contain the last reference counted pointer to its Region. If so, when Instance's
+/// destructor runs, Region will be dropped, and may free or otherwise invalidate the memory that
+/// this Instance exists in, *while* the Instance destructor is executing.
+impl Drop for Instance {
+    fn drop(&mut self) {
+        // Reset magic to indicate this instance
+        // is no longer valid
+        self.magic = 0;
+    }
 }
 
 /// APIs that are internal, but useful to implementors of extension modules; you probably don't want
@@ -338,9 +375,15 @@ impl Instance {
     ///
     /// On success, returns the number of pages that existed before the call.
     pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
+        let additional_bytes =
+            additional_pages
+                .checked_mul(WASM_PAGE_SIZE)
+                .ok_or(lucet_format_err!(
+                    "additional pages larger than wasm address space",
+                ))?;
         let orig_len = self
             .alloc
-            .expand_heap(additional_pages * WASM_PAGE_SIZE, self.module.as_ref())?;
+            .expand_heap(additional_bytes, self.module.as_ref())?;
         Ok(orig_len / WASM_PAGE_SIZE)
     }
 
@@ -427,7 +470,13 @@ impl Instance {
     pub fn set_signal_handler<H>(&mut self, handler: H)
     where
         H: 'static
-            + Fn(&Instance, &TrapCode, libc::c_int, *const siginfo_t, *const c_void) -> SignalBehavior,
+            + Fn(
+                &Instance,
+                &Option<TrapCode>,
+                libc::c_int,
+                *const siginfo_t,
+                *const c_void,
+            ) -> SignalBehavior,
     {
         self.signal_handler = Box::new(handler) as Box<SignalHandler>;
     }
@@ -519,8 +568,8 @@ impl Instance {
         args: &[Val],
     ) -> Result<UntypedRetVal, Error> {
         lucet_ensure!(
-            self.state.is_ready(),
-            "instance must be ready; this is a bug"
+            self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal()),
+            "instance must be ready or non-fatally faulted"
         );
         if func.is_null() {
             return Err(Error::InvalidArgument(
@@ -637,28 +686,17 @@ impl Instance {
             details:
                 FaultDetails {
                     rip_addr,
-                    trapcode,
-                    ref mut fatal,
                     ref mut rip_addr_details,
                     ..
                 },
-            siginfo,
             ..
         } = self.state
         {
             // We do this after returning from the signal handler because it requires `dladdr`
             // calls, which are not signal safe
+            // FIXME after lucet-module is complete it should be possible to fill this in without
+            // consulting the process symbol table
             *rip_addr_details = self.module.addr_details(rip_addr as *const c_void)?.clone();
-
-            // If the trap table lookup returned unknown, it is a fatal error
-            let unknown_fault = trapcode.ty == TrapCodeType::Unknown;
-
-            // If the trap was a segv or bus fault and the addressed memory was outside the
-            // guard pages, it is also a fatal error
-            let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
-                && !self.alloc.addr_in_heap_guard(siginfo.si_addr());
-
-            *fatal = unknown_fault || outside_guard;
         }
         Ok(())
     }
@@ -690,7 +728,7 @@ pub struct FaultDetails {
     /// If true, the instance's `fatal_handler` will be called.
     pub fatal: bool,
     /// Information about the type of fault that occurred.
-    pub trapcode: TrapCode,
+    pub trapcode: Option<TrapCode>,
     /// The instruction pointer where the fault occurred.
     pub rip_addr: uintptr_t,
     /// Extra information about the instruction pointer's location, if available.
@@ -705,7 +743,11 @@ impl std::fmt::Display for FaultDetails {
             write!(f, "fault ")?;
         }
 
-        self.trapcode.fmt(f)?;
+        if let Some(trapcode) = self.trapcode {
+            write!(f, "{:?} ", trapcode)?;
+        } else {
+            write!(f, "TrapCode::UNKNOWN ")?;
+        }
 
         write!(f, "code at address {:p}", self.rip_addr as *const c_void)?;
 
@@ -881,7 +923,7 @@ fn strsignal_wrapper(sig: libc::c_int) -> CString {
 
 enum KillState {
     NotStarted,
-    Running(u64),
+    Running(pthread_t),
     Exited,
 }
 

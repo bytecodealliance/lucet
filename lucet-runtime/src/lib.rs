@@ -143,8 +143,9 @@
 //! signal handler increments a counter of signals it has seen before setting the fault state:
 //!
 //! ```no_run
+//! use lucet_module_data::TrapCode;
 //! use lucet_runtime::{
-//!     DlModule, Error, Instance, Limits, MmapRegion, Region, SignalBehavior, TrapCode
+//!     DlModule, Error, Instance, Limits, MmapRegion, Region, SignalBehavior
 //! };
 //! use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 //!
@@ -152,7 +153,7 @@
 //!
 //! fn signal_handler_count(
 //!     _inst: &Instance,
-//!     _trapcode: &TrapCode,
+//!     _trapcode: &Option<TrapCode>,
 //!     _signum: libc::c_int,
 //!     _siginfo_ptr: *const libc::siginfo_t,
 //!     _ucontext_ptr: *const libc::c_void,
@@ -205,7 +206,6 @@ pub use lucet_runtime_internals::instance::{
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
-pub use lucet_runtime_internals::trapcode::{TrapCode, TrapCodeType};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
 pub use lucet_runtime_internals::WASM_PAGE_SIZE;
 

@@ -1,4 +1,4 @@
-use lucet_idl::validate::*;
+use crate::module::DataTypeId;
 use std::collections::HashMap;
 
 /// Cached information for a given structure member

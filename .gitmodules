@@ -7,9 +7,6 @@
 [submodule "lucet-spectest/spec"]
 	path = lucet-spectest/spec
 	url = https://github.com/webassembly/spec
-[submodule "pwasm-validation"]
-	path = pwasm-validation
-	url = https://github.com/pchickey/pwasm-validator
 [submodule "sightglass"]
 	path = sightglass
 	url = https://github.com/fastly/sightglass

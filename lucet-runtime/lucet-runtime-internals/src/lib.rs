@@ -19,7 +19,6 @@ pub mod instance;
 pub mod module;
 pub mod region;
 pub mod sysdeps;
-pub mod trapcode;
 pub mod val;
 pub mod vmctx;
 
