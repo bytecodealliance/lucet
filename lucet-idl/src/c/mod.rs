@@ -11,12 +11,13 @@ mod r#struct;
 
 pub(crate) use self::catom::*;
 use crate::backend::*;
-use crate::cache::*;
-use crate::errors::*;
+use crate::cache::{Cache, CachedStructMemberEntry, CachedTypeEntry};
+use crate::error::IDLError;
 use crate::generator::{Generator, Hierarchy};
-use crate::package::{DataType, DataTypeEntry, DataTypeRef, Package};
-use crate::pretty_writer::*;
-use crate::target::*;
+use crate::package::Package;
+use crate::pretty_writer::PrettyWriter;
+use crate::target::Target;
+use crate::types::{DataType, DataTypeEntry, DataTypeRef};
 use std::io::prelude::*;
 
 #[derive(Clone, Debug)]

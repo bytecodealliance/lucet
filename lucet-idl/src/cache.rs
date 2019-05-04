@@ -1,4 +1,4 @@
-use crate::package::DataTypeId;
+use crate::types::DataTypeId;
 use std::collections::HashMap;
 
 /// Cached information for a given structure member

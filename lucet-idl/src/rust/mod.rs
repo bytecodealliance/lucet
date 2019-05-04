@@ -3,12 +3,13 @@
 
 use crate::backend::BackendConfig;
 use crate::cache::Cache;
-use crate::errors::IDLError;
+use crate::error::IDLError;
 use crate::generator::{Generator, Hierarchy};
-use crate::package::{DataType, DataTypeEntry, DataTypeId, DataTypeRef, Package};
+use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
 use crate::types::AtomType;
+use crate::types::{DataType, DataTypeEntry, DataTypeId, DataTypeRef};
 use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
 use std::io::Write;

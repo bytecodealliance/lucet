@@ -1,126 +1,12 @@
+use crate::error::ValidationError;
 use crate::parser::{SyntaxDecl, SyntaxRef};
-use crate::types::{AtomType, Attr, Location};
+use crate::types::{DataType, DataTypeEntry, DataTypeId, DataTypeRef, Location, Name, NamedMember};
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct DataTypeId(pub usize);
-
-impl fmt::Display for DataTypeId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataTypeRef {
-    Defined(DataTypeId),
-    Atom(AtomType),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct NamedMember<R> {
-    pub type_: R,
-    pub name: String,
-    pub attrs: Vec<Attr>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataType {
-    Struct {
-        members: Vec<NamedMember<DataTypeRef>>,
-        attrs: Vec<Attr>,
-    },
-    Enum {
-        members: Vec<NamedMember<()>>,
-        attrs: Vec<Attr>,
-    },
-    Alias {
-        to: DataTypeRef,
-        attrs: Vec<Attr>,
-    },
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Name {
-    pub name: String,
-    pub location: Location,
-}
-
-impl fmt::Display for Name {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Package {
     pub names: Vec<Name>,
     pub data_types: HashMap<usize, DataType>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ValidationError {
-    NameAlreadyExists {
-        name: String,
-        at_location: Location,
-        previous_location: Location,
-    },
-    NameNotFound {
-        name: String,
-        use_location: Location,
-    },
-    Empty {
-        name: String,
-        location: Location,
-    },
-    Infinite {
-        name: String,
-        location: Location,
-    },
-}
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ValidationError::NameAlreadyExists {
-                name,
-                at_location,
-                previous_location,
-            } => write!(
-                f,
-                "Redefinition of name {} at line {} - previous definition was at line {}",
-                name, at_location.line, previous_location.line
-            ),
-            ValidationError::NameNotFound { name, use_location } => {
-                write!(f, "Name {} not found at line {}", name, use_location.line)
-            }
-            ValidationError::Empty { name, location } => {
-                write!(f, "Empty definition for {} at line {}", name, location.line)
-            }
-            ValidationError::Infinite { name, location } => write!(
-                f,
-                "Circular reference for {} at line {}",
-                name, location.line
-            ),
-        }
-    }
-}
-
-/// A convenient structure holding a data type, its name and
-/// its internal IDL representation
-#[derive(Debug, Clone)]
-pub struct DataTypeEntry<'t> {
-    pub id: DataTypeId,
-    pub name: &'t Name,
-    pub data_type: &'t DataType,
-}
-
-impl Error for ValidationError {
-    fn description(&self) -> &str {
-        "Validation error"
-    }
 }
 
 impl Package {
@@ -275,12 +161,8 @@ impl Package {
                     },
                 );
             }
-            SyntaxDecl::Module{ .. } => {
-                unimplemented!()
-            }
-            SyntaxDecl::Function{ .. } => {
-                unimplemented!()
-            }
+            SyntaxDecl::Module { .. } => unimplemented!(),
+            SyntaxDecl::Function { .. } => unimplemented!(),
         }
         Ok(())
     }
@@ -377,6 +259,7 @@ impl Package {
 mod tests {
     use super::super::parser::Parser;
     use super::*;
+    use crate::types::AtomType;
 
     fn pkg(syntax: &str) -> Result<Package, ValidationError> {
         let mut parser = Parser::new(syntax);
@@ -388,7 +271,6 @@ mod tests {
     fn structs_basic() {
         assert!(pkg("struct foo { a: i32}").is_ok());
         assert!(pkg("struct foo { a: i32, b: f32 }").is_ok());
-
     }
 
     #[test]
@@ -410,7 +292,6 @@ mod tests {
                 _ => panic!("Unexpected type"),
             };
         }
-
     }
 
     #[test]
@@ -423,14 +304,12 @@ mod tests {
     fn struct_next_definition() {
         // Refer to a struct defined afterwards:
         assert!(pkg("struct foo { a: i32, b: bar} struct bar { a: i32 }").is_ok());
-
     }
 
     #[test]
     fn struct_self_referential() {
         // Refer to itself
         assert!(pkg("struct list { next: list, thing: i32 }").is_err());
-
     }
 
     #[test]
@@ -443,7 +322,6 @@ mod tests {
                 location: Location { line: 1, column: 0 },
             }
         );
-
     }
 
     #[test]
@@ -457,7 +335,6 @@ mod tests {
                 previous_location: Location { line: 2, column: 0 },
             }
         );
-
     }
 
     #[test]
@@ -473,7 +350,6 @@ mod tests {
                 previous_location: Location { line: 1, column: 0 },
             }
         );
-
     }
 
     #[test]
@@ -555,9 +431,7 @@ mod tests {
         );
 
         assert_eq!(
-            pkg("type foo = bar\nstruct bar { a: foo }")
-                .err()
-                .unwrap(),
+            pkg("type foo = bar\nstruct bar { a: foo }").err().unwrap(),
             ValidationError::Infinite {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },

@@ -1,7 +1,8 @@
 use crate::cache::Cache;
-use crate::errors::IDLError;
-use crate::package::{DataType, DataTypeEntry, DataTypeId, Package};
+use crate::error::IDLError;
+use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
+use crate::types::{DataType, DataTypeEntry, DataTypeId};
 use std::io::Write;
 use std::rc::Rc;
 
@@ -107,9 +108,13 @@ pub trait Generator<W: Write> {
     ) -> Result<(), IDLError> {
         let data_type_entry = package.get_datatype(id);
         match &data_type_entry.data_type {
-            DataType::Struct { .. } => {
-                self.gen_accessors_struct(package, cache, pretty_writer, &data_type_entry, hierarchy)
-            }
+            DataType::Struct { .. } => self.gen_accessors_struct(
+                package,
+                cache,
+                pretty_writer,
+                &data_type_entry,
+                hierarchy,
+            ),
             DataType::Alias { .. } => {
                 self.gen_accessors_alias(package, cache, pretty_writer, &data_type_entry, hierarchy)
             }

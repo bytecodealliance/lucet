@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum AtomType {
     U8,
@@ -33,4 +35,63 @@ impl Attr {
             location,
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct DataTypeId(pub usize);
+
+impl fmt::Display for DataTypeId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DataTypeRef {
+    Defined(DataTypeId),
+    Atom(AtomType),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct NamedMember<R> {
+    pub type_: R,
+    pub name: String,
+    pub attrs: Vec<Attr>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DataType {
+    Struct {
+        members: Vec<NamedMember<DataTypeRef>>,
+        attrs: Vec<Attr>,
+    },
+    Enum {
+        members: Vec<NamedMember<()>>,
+        attrs: Vec<Attr>,
+    },
+    Alias {
+        to: DataTypeRef,
+        attrs: Vec<Attr>,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Name {
+    pub name: String,
+    pub location: Location,
+}
+
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+/// A convenient structure holding a data type, its name and
+/// its internal IDL representation
+#[derive(Debug, Clone)]
+pub struct DataTypeEntry<'t> {
+    pub id: DataTypeId,
+    pub name: &'t Name,
+    pub data_type: &'t DataType,
 }
