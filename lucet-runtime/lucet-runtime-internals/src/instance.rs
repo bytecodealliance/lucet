@@ -839,7 +839,7 @@ impl std::fmt::Display for State {
                     write!(
                         f,
                         " accessed memory at {:p} (inside heap guard)",
-                        siginfo.si_addr()
+                        siginfo.si_addr_ext()
                     )?;
                 }
                 Ok(())

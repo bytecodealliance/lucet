@@ -189,7 +189,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 // If the trap was a segv or bus fault and the addressed memory was outside the
                 // guard pages, it is also a fatal error
                 let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
-                    && !inst.alloc.addr_in_heap_guard(siginfo.si_addr());
+                    && !inst.alloc.addr_in_heap_guard(siginfo.si_addr_ext());
 
                 // record the fault and jump back to the host context
                 inst.state = State::Fault {
