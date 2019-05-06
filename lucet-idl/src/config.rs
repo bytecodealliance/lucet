@@ -1,8 +1,8 @@
 use super::backend::{Backend, BackendConfig};
 use super::target::Target;
-use crate::c::CGenerator;
+//use crate::c::CGenerator;
 use crate::generator::Generator;
-use crate::rust::RustGenerator;
+//use crate::rust::RustGenerator;
 use std::io::Write;
 
 #[derive(Default, Clone, Debug)]
@@ -30,6 +30,8 @@ impl Config {
     }
 
     pub fn generator<W: Write>(&self) -> Box<dyn Generator<W>> {
+        unimplemented!()
+            /* disabled while module / pkg representation in flux
         match self.backend {
             Backend::C => Box::new(CGenerator {
                 target: self.target,
@@ -38,5 +40,6 @@ impl Config {
 
             Backend::Rust => Box::new(RustGenerator::new(self.target, self.backend_config)),
         }
+        */
     }
 }

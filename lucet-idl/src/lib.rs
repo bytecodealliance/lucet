@@ -4,16 +4,17 @@
 extern crate failure;
 
 mod backend;
-mod c;
+//mod c;
 mod cache;
 mod config;
 mod error;
 mod generator;
 mod lexer;
+mod module;
 mod package;
 mod parser;
 mod pretty_writer;
-mod rust;
+//mod rust;
 mod target;
 mod types;
 
@@ -32,18 +33,21 @@ pub fn run<W: Write>(config: &Config, input: &str, output: W) -> Result<W, IDLEr
     let mut parser = Parser::new(&input);
     let decls = parser.match_decls()?;
 
-    let pkg = Package::from_declarations(&decls)?;
-    let deps = pkg
-        .ordered_dependencies()
-        .map_err(|_| IDLError::InternalError("Unable to resolve dependencies"))?;
-
-    let mut cache = Cache::default();
-    let mut generator = config.generator();
-
     let mut pretty_writer = PrettyWriter::new(output);
-    generator.gen_prelude(&mut pretty_writer)?;
-    for id in deps {
-        generator.gen_for_id(&pkg, &mut cache, &mut pretty_writer, id)?;
+    let pkg = Package::from_declarations(&decls)?;
+
+    for (_ident, mod_) in pkg.modules {
+        let deps = mod_
+            .ordered_dependencies()
+            .map_err(|_| IDLError::InternalError("Unable to resolve dependencies"))?;
+
+        let mut cache = Cache::default();
+        let mut generator = config.generator();
+
+        generator.gen_prelude(&mut pretty_writer)?;
+        for id in deps {
+            generator.gen_for_id(&mod_, &mut cache, &mut pretty_writer, id)?;
+        }
     }
     Ok(pretty_writer
         .into_inner()

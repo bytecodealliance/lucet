@@ -1,23 +1,26 @@
+mod example {
+    // Primitive types:
+    // `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`.
 
-// Primitive types:
-// `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`.
+    // Enumerations
 
-// Enumerations
+    enum color {
+        red,
+        blue,
+        green,
+    }
 
-enum color {
-    red, blue, green
+    // Aliases
+
+    type colour = color;
+    type col = colour;
+
+    // Structures
+
+    struct st {
+        a: i8,
+        b: i32,
+        c: color,
+    }
+
 }
-
-// Aliases
-
-type colour = color
-type col = colour
-
-// Structures
-
-struct st {
-    a: i8,
-    b: i32,
-    c: color,
-}
-

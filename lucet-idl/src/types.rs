@@ -38,9 +38,9 @@ impl Attr {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct DataTypeId(pub usize);
+pub struct Ident(pub usize);
 
-impl fmt::Display for DataTypeId {
+impl fmt::Display for Ident {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -48,7 +48,7 @@ impl fmt::Display for DataTypeId {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DataTypeRef {
-    Defined(DataTypeId),
+    Defined(Ident),
     Atom(AtomType),
 }
 
@@ -91,7 +91,7 @@ impl fmt::Display for Name {
 /// its internal IDL representation
 #[derive(Debug, Clone)]
 pub struct DataTypeEntry<'t> {
-    pub id: DataTypeId,
+    pub id: Ident,
     pub name: &'t Name,
     pub data_type: &'t DataType,
 }

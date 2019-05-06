@@ -1,4 +1,4 @@
-use crate::types::DataTypeId;
+use crate::types::Ident;
 use std::collections::HashMap;
 
 /// Cached information for a given structure member
@@ -28,18 +28,18 @@ impl CachedTypeEntry {
 /// Cache information about a type given its id
 #[derive(Clone, Debug, Default)]
 pub struct Cache {
-    type_map: HashMap<DataTypeId, CachedTypeEntry>,
+    type_map: HashMap<Ident, CachedTypeEntry>,
 }
 
 impl Cache {
-    pub fn store_type(&mut self, id: DataTypeId, entry: CachedTypeEntry) -> &mut CachedTypeEntry {
+    pub fn store_type(&mut self, id: Ident, entry: CachedTypeEntry) -> &mut CachedTypeEntry {
         if self.type_map.insert(id, entry).is_some() {
             panic!("Type {:?} had already been cached", id)
         }
         self.type_map.get_mut(&id).unwrap()
     }
 
-    pub fn load_type(&self, id: DataTypeId) -> Option<&CachedTypeEntry> {
+    pub fn load_type(&self, id: Ident) -> Option<&CachedTypeEntry> {
         self.type_map.get(&id)
     }
 }

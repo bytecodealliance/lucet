@@ -25,7 +25,7 @@ pub enum SyntaxDecl {
     },
     Module {
         name: String,
-        decls: Vec<Box<SyntaxDecl>>,
+        decls: Vec<SyntaxDecl>,
         attrs: Vec<Attr>,
         location: Location,
     },
@@ -434,6 +434,7 @@ impl<'a> Parser<'a> {
                     let name = err_ctx!(err_msg, self.match_a_word("expected type name"))?;
                     err_ctx!(err_msg, self.match_token(Token::Equals, "expected ="))?;
                     let what = self.match_ref("type value")?;
+                    err_ctx!(err_msg, self.match_token(Token::Semi, "expected ;"))?;
                     return Ok(Some(SyntaxDecl::Alias {
                         name: name.to_owned(),
                         what,
@@ -454,7 +455,7 @@ impl<'a> Parser<'a> {
                             break;
                         } else {
                             match self.match_decl("declaration") {
-                                Ok(Some(decl)) => decls.push(Box::new(decl)),
+                                Ok(Some(decl)) => decls.push(decl),
                                 Ok(None) => parse_err!(self.location, "missing close brace '}'")?,
                                 Err(e) => Err(e)?,
                             }
@@ -1002,9 +1003,9 @@ mod tests {
                 .expect("valid decl"),
             SyntaxDecl::Module {
                 name: "one".to_owned(),
-                decls: vec![Box::new(SyntaxDecl::Module {
+                decls: vec![SyntaxDecl::Module {
                     name: "two".to_owned(),
-                    decls: vec![Box::new(SyntaxDecl::Module {
+                    decls: vec![SyntaxDecl::Module {
                         name: "three".to_owned(),
                         decls: Vec::new(),
                         attrs: Vec::new(),
@@ -1012,13 +1013,13 @@ mod tests {
                             line: 1,
                             column: 20
                         },
-                    })],
+                    }],
                     attrs: Vec::new(),
                     location: Location {
                         line: 1,
                         column: 10
                     },
-                })],
+                }],
                 attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
@@ -1037,7 +1038,7 @@ mod tests {
             SyntaxDecl::Module {
                 name: "one".to_owned(),
                 decls: vec![
-                    Box::new(SyntaxDecl::Enum {
+                    SyntaxDecl::Enum {
                         name: "foo".to_owned(),
                         variants: Vec::new(),
                         attrs: Vec::new(),
@@ -1045,8 +1046,8 @@ mod tests {
                             line: 1,
                             column: 10
                         },
-                    }),
-                    Box::new(SyntaxDecl::Struct {
+                    },
+                    SyntaxDecl::Struct {
                         name: "bar".to_owned(),
                         members: Vec::new(),
                         attrs: Vec::new(),
@@ -1054,7 +1055,7 @@ mod tests {
                             line: 1,
                             column: 22
                         },
-                    })
+                    }
                 ],
                 attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
@@ -1074,7 +1075,7 @@ mod tests {
             SyntaxDecl::Module {
                 name: "one".to_owned(),
                 decls: vec![
-                    Box::new(SyntaxDecl::Enum {
+                    SyntaxDecl::Enum {
                         name: "foo".to_owned(),
                         variants: Vec::new(),
                         attrs: vec![Attr::new(
@@ -1089,8 +1090,8 @@ mod tests {
                             line: 2,
                             column: 17
                         },
-                    }),
-                    Box::new(SyntaxDecl::Struct {
+                    },
+                    SyntaxDecl::Struct {
                         name: "bar".to_owned(),
                         members: Vec::new(),
                         attrs: Vec::new(),
@@ -1098,7 +1099,7 @@ mod tests {
                             line: 2,
                             column: 29
                         },
-                    })
+                    }
                 ],
                 attrs: vec![Attr::new("a", "b", Location { line: 1, column: 0 }),],
                 location: Location { line: 2, column: 0 },

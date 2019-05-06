@@ -9,7 +9,7 @@ use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
 use crate::types::AtomType;
-use crate::types::{DataType, DataTypeEntry, DataTypeId, DataTypeRef};
+use crate::types::{DataType, DataTypeEntry, DataTypeRef, Ident};
 use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
 use std::io::Write;
@@ -30,7 +30,7 @@ struct CTypeInfo<'t> {
 pub struct RustGenerator {
     pub target: Target,
     pub backend_config: BackendConfig,
-    pub defined: HashMap<DataTypeId, String>,
+    pub defined: HashMap<Ident, String>,
 }
 
 impl RustGenerator {
