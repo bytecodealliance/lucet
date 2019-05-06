@@ -7,11 +7,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 fn wasi_bindings() -> Bindings {
-    Bindings::from_file("../../lucet-wasi/bindings.json").unwrap()
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lucet-wasi/bindings.json");
+    Bindings::from_file(&path).unwrap()
 }
 
 pub fn compile_hello<P: AsRef<Path>>(so_file: P) {
-    let wasm_build = Lucetc::new(&["guests/hello.c"])
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("guests/hello.c");
+    let wasm_build = Lucetc::new(&[&path])
         .with_print_output(true)
         .with_cflag("-Wall")
         .with_cflag("-Werror")
