@@ -31,8 +31,8 @@ pub enum SyntaxDecl {
     },
     Function {
         name: String,
-        args: Vec<FuncArg>,
-        rets: Vec<FuncRet>,
+        args: Vec<FuncArgSyntax>,
+        rets: Vec<FuncRetSyntax>,
         attrs: Vec<Attr>,
         location: Location,
     },
@@ -55,6 +55,12 @@ impl SyntaxDecl {
             SyntaxDecl::Alias { location, .. } => &location,
             SyntaxDecl::Module { location, .. } => &location,
             SyntaxDecl::Function { location, .. } => &location,
+        }
+    }
+    pub fn is_datatype(&self) -> bool {
+        match self {
+            SyntaxDecl::Struct { .. } | SyntaxDecl::Enum { .. } | SyntaxDecl::Alias { .. } => true,
+            _ => false,
         }
     }
 }
@@ -81,7 +87,7 @@ pub struct EnumVariant {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FuncArg {
+pub struct FuncArgSyntax {
     pub name: String,
     pub type_: SyntaxRef,
     pub attrs: Vec<Attr>,
@@ -89,7 +95,7 @@ pub struct FuncArg {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FuncRet {
+pub struct FuncRetSyntax {
     pub type_: SyntaxRef,
     pub attrs: Vec<Attr>,
     pub location: Location,
@@ -303,7 +309,7 @@ impl<'a> Parser<'a> {
         Ok(names)
     }
 
-    fn match_func_args(&mut self) -> Result<Vec<FuncArg>, ParseError> {
+    fn match_func_args(&mut self) -> Result<Vec<FuncArgSyntax>, ParseError> {
         let mut args = Vec::new();
         let mut attrs = Vec::new();
         loop {
@@ -322,7 +328,7 @@ impl<'a> Parser<'a> {
                     self.match_token(Token::Colon, "expected :")?;
                     let type_ref = self.match_ref("expected type")?;
 
-                    args.push(FuncArg {
+                    args.push(FuncArgSyntax {
                         name: name.to_string(),
                         type_: type_ref,
                         attrs: attrs.clone(),
@@ -353,7 +359,7 @@ impl<'a> Parser<'a> {
         Ok(args)
     }
 
-    fn match_func_rets(&mut self) -> Result<Vec<FuncRet>, ParseError> {
+    fn match_func_rets(&mut self) -> Result<Vec<FuncRetSyntax>, ParseError> {
         let mut args = Vec::new();
         let mut attrs = Vec::new();
         loop {
@@ -369,7 +375,7 @@ impl<'a> Parser<'a> {
                 _ => {
                     let location = self.location;
                     let type_ref = self.match_ref("expected type, attribute, or ;")?;
-                    args.push(FuncRet {
+                    args.push(FuncRetSyntax {
                         type_: type_ref,
                         attrs: attrs.clone(),
                         location,
@@ -482,7 +488,10 @@ impl<'a> Parser<'a> {
                             self.consume();
                             err_ctx!(err_msg, self.match_func_rets())?
                         }
-                        Some(Token::Semi) => Vec::new(),
+                        Some(Token::Semi) => {
+                            self.consume();
+                            Vec::new()
+                        }
                         t => err_ctx!(
                             err_msg,
                             parse_err!(self.location, "expected -> or ;, got {:?}", t)
@@ -1109,45 +1118,42 @@ mod tests {
 
     #[test]
     fn fn_trivial() {
-        let canonical = SyntaxDecl::Function {
+        let canonical = vec![SyntaxDecl::Function {
             name: "trivial".to_owned(),
             args: Vec::new(),
             rets: Vec::new(),
             attrs: Vec::new(),
             location: Location { line: 1, column: 0 },
-        };
+        }];
         assert_eq!(
             Parser::new("fn trivial();")
                 //               0    5    10
-                .match_decl("trivial func")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_decls()
+                .expect("valid parse"),
             canonical,
         );
         assert_eq!(
             Parser::new("fn trivial ( ) ;")
                 //               0    5    10
-                .match_decl("trivial func")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_decls()
+                .expect("valid parse"),
             canonical,
         );
         assert_eq!(
             Parser::new("fn trivial()->;")
                 //               0    5    10
-                .match_decl("trivial func")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_decls()
+                .expect("valid parse"),
             canonical,
         );
     }
 
     #[test]
     fn fn_return_u8() {
-        let canonical = SyntaxDecl::Function {
+        let canonical = vec![SyntaxDecl::Function {
             name: "getch".to_owned(),
             args: Vec::new(),
-            rets: vec![FuncRet {
+            rets: vec![FuncRetSyntax {
                 type_: SyntaxRef::Atom {
                     atom: AtomType::U8,
                     location: Location {
@@ -1163,29 +1169,26 @@ mod tests {
             }],
             attrs: Vec::new(),
             location: Location { line: 1, column: 0 },
-        };
+        }];
         assert_eq!(
             Parser::new("fn getch() -> u8;")
                 //       0    5    10
-                .match_decl("returns u8")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_decls()
+                .expect("valid decls"),
             canonical
         );
         assert_eq!(
             Parser::new("fn getch() -> u8,;")
                 //       0    5    10
-                .match_decl("returns u8")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_decls()
+                .expect("valid decls"),
             canonical
         );
         assert_eq!(
             Parser::new("fn getch() -> u8  , ;")
                 //       0    5    10
-                .match_decl("returns u8")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_decls()
+                .expect("valid decls"),
             canonical
         );
     }
@@ -1194,7 +1197,7 @@ mod tests {
     fn fn_one_arg() {
         let canonical = SyntaxDecl::Function {
             name: "foo".to_owned(),
-            args: vec![FuncArg {
+            args: vec![FuncArgSyntax {
                 type_: SyntaxRef::Atom {
                     atom: AtomType::U8,
                     location: Location {
@@ -1233,7 +1236,7 @@ mod tests {
         let canonical = SyntaxDecl::Function {
             name: "foo".to_owned(),
             args: vec![
-                FuncArg {
+                FuncArgSyntax {
                     type_: SyntaxRef::Atom {
                         atom: AtomType::U8,
                         location: Location {
@@ -1245,7 +1248,7 @@ mod tests {
                     attrs: Vec::new(),
                     location: Location { line: 1, column: 7 },
                 },
-                FuncArg {
+                FuncArgSyntax {
                     type_: SyntaxRef::Atom {
                         atom: AtomType::F64,
                         location: Location {
@@ -1295,7 +1298,7 @@ mod tests {
                 name: "getch".to_owned(),
                 args: Vec::new(),
                 rets: vec![
-                    FuncRet {
+                    FuncRetSyntax {
                         type_: SyntaxRef::Atom {
                             atom: AtomType::U8,
                             location: Location {
@@ -1309,7 +1312,7 @@ mod tests {
                             column: 14,
                         },
                     },
-                    FuncRet {
+                    FuncRetSyntax {
                         type_: SyntaxRef::Atom {
                             atom: AtomType::U16,
                             location: Location {
@@ -1323,7 +1326,7 @@ mod tests {
                             column: 18,
                         },
                     },
-                    FuncRet {
+                    FuncRetSyntax {
                         type_: SyntaxRef::Atom {
                             atom: AtomType::U32,
                             location: Location {
@@ -1356,7 +1359,7 @@ mod tests {
                 name: "getch".to_owned(),
                 args: Vec::new(),
                 rets: vec![
-                    FuncRet {
+                    FuncRetSyntax {
                         type_: SyntaxRef::Atom {
                             atom: AtomType::U8,
                             location: Location {
@@ -1377,7 +1380,7 @@ mod tests {
                             column: 21,
                         },
                     },
-                    FuncRet {
+                    FuncRetSyntax {
                         type_: SyntaxRef::Atom {
                             atom: AtomType::U16,
                             location: Location {
@@ -1408,7 +1411,7 @@ mod tests {
                             column: 39,
                         },
                     },
-                    FuncRet {
+                    FuncRetSyntax {
                         type_: SyntaxRef::Atom {
                             atom: AtomType::U32,
                             location: Location {

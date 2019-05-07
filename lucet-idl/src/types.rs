@@ -76,6 +76,20 @@ pub enum DataType {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct FuncDecl {
+    pub args: Vec<NamedMember<DataTypeRef>>,
+    pub rets: Vec<FuncRet>,
+    pub attrs: Vec<Attr>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct FuncRet {
+    pub type_: DataTypeRef,
+    pub attrs: Vec<Attr>,
+}
+
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Name {
     pub name: String,
     pub location: Location,

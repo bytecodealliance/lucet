@@ -116,6 +116,7 @@ mod test {
                     names: Vec::new(),
                     attrs: Vec::new(),
                     data_types: HashMap::new(),
+                    funcs: HashMap::new(),
                 }
             )]
             .into_iter()
@@ -158,6 +159,7 @@ mod test {
                         names: Vec::new(),
                         attrs: Vec::new(),
                         data_types: HashMap::new(),
+                        funcs: HashMap::new(),
                     }
                 ),
                 (
@@ -166,6 +168,7 @@ mod test {
                         names: Vec::new(),
                         attrs: Vec::new(),
                         data_types: HashMap::new(),
+                        funcs: HashMap::new(),
                     }
                 ),
                 (
@@ -174,6 +177,7 @@ mod test {
                         names: Vec::new(),
                         attrs: Vec::new(),
                         data_types: HashMap::new(),
+                        funcs: HashMap::new(),
                     }
                 )
             ]
@@ -205,6 +209,7 @@ mod test {
                         }
                     }],
                     attrs: Vec::new(),
+                    funcs: HashMap::new(),
                     data_types: vec![(
                         Ident(0),
                         DataType::Alias {

@@ -1,7 +1,8 @@
 use crate::error::ValidationError;
 use crate::parser::{SyntaxDecl, SyntaxRef};
 use crate::types::{
-    Attr, DataType, DataTypeEntry, DataTypeRef, Ident, Location, Name, NamedMember,
+    Attr, DataType, DataTypeEntry, DataTypeRef, FuncDecl, FuncRet, Ident, Location, Name,
+    NamedMember,
 };
 use std::collections::HashMap;
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -9,6 +10,7 @@ pub struct Module {
     pub names: Vec<Name>,
     pub attrs: Vec<Attr>,
     pub data_types: HashMap<Ident, DataType>,
+    pub funcs: HashMap<Ident, FuncDecl>,
 }
 
 impl Module {
@@ -17,6 +19,7 @@ impl Module {
             names: Vec::new(),
             attrs: attrs.to_vec(),
             data_types: HashMap::new(),
+            funcs: HashMap::new(),
         }
     }
 
@@ -69,6 +72,12 @@ impl Module {
 
     fn define_data_type(&mut self, id: Ident, dt: DataType) {
         if let Some(prev_def) = self.data_types.insert(id, dt) {
+            panic!("id {} already defined: {:?}", id, prev_def)
+        }
+    }
+
+    fn define_function(&mut self, id: Ident, decl: FuncDecl) {
+        if let Some(prev_def) = self.funcs.insert(id, decl) {
             panic!("id {} already defined: {:?}", id, prev_def)
         }
     }
@@ -164,8 +173,52 @@ impl Module {
                     },
                 );
             }
-            SyntaxDecl::Module { .. } => unimplemented!(),
-            SyntaxDecl::Function { .. } => unimplemented!(),
+            SyntaxDecl::Function {
+                args, rets, attrs, ..
+            } => {
+                let mut arg_names: HashMap<String, Location> = HashMap::new();
+                let args = args
+                    .iter()
+                    .map(|arg_syntax| {
+                        let type_ = self.get_ref(&arg_syntax.type_)?;
+                        if let Some(previous_location) = arg_names.get(&arg_syntax.name) {
+                            Err(ValidationError::NameAlreadyExists {
+                                name: arg_syntax.name.clone(),
+                                at_location: arg_syntax.location,
+                                previous_location: previous_location.clone(),
+                            })?;
+                        } else {
+                            arg_names.insert(arg_syntax.name.clone(), arg_syntax.location.clone());
+                        }
+                        Ok(NamedMember {
+                            name: arg_syntax.name.clone(),
+                            type_,
+                            attrs: arg_syntax.attrs.clone(),
+                        })
+                    })
+                    .collect::<Result<Vec<NamedMember<DataTypeRef>>, _>>()?;
+
+                let rets = rets
+                    .iter()
+                    .map(|ret_syntax| {
+                        let type_ = self.get_ref(&ret_syntax.type_)?;
+                        Ok(FuncRet {
+                            type_,
+                            attrs: ret_syntax.attrs.clone(),
+                        })
+                    })
+                    .collect::<Result<Vec<FuncRet>, _>>()?;
+
+                self.define_function(
+                    id,
+                    FuncDecl {
+                        args,
+                        rets,
+                        attrs: attrs.clone(),
+                    },
+                );
+            }
+            SyntaxDecl::Module { .. } => unreachable!(), // Should be excluded by from_declarations constructor
         }
         Ok(())
     }
@@ -220,7 +273,7 @@ impl Module {
         self.dfs_walk(id, &mut visited, &mut None)
     }
 
-    fn ensure_finite(&self, id: Ident, decl: &SyntaxDecl) -> Result<(), ValidationError> {
+    fn ensure_finite_datatype(&self, id: Ident, decl: &SyntaxDecl) -> Result<(), ValidationError> {
         self.dfs_find_cycle(id)
             .map_err(|_| ValidationError::Infinite {
                 name: decl.name().to_owned(),
@@ -249,7 +302,9 @@ impl Module {
         }
 
         for (decl, id) in decls.iter().zip(idents) {
-            mod_.ensure_finite(id, decl)?
+            if decl.is_datatype() {
+                mod_.ensure_finite_datatype(id, decl)?
+            }
         }
 
         Ok(mod_)
@@ -463,4 +518,172 @@ mod tests {
         );
     }
 
+    #[test]
+    fn func_trivial() {
+        assert_eq!(
+            mod_("fn trivial();").ok().unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        args: Vec::new(),
+                        rets: Vec::new(),
+                        attrs: Vec::new(),
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                attrs: Vec::new(),
+            }
+        );
+    }
+    #[test]
+    fn func_one_arg() {
+        assert_eq!(
+            mod_("fn trivial(a: u8);").ok().unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        args: vec![NamedMember {
+                            type_: DataTypeRef::Atom(AtomType::U8),
+                            name: "a".to_owned(),
+                            attrs: Vec::new(),
+                        }],
+                        rets: Vec::new(),
+                        attrs: Vec::new(),
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                attrs: Vec::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_ret() {
+        assert_eq!(
+            mod_("fn trivial() -> u8;").ok().unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        args: Vec::new(),
+                        rets: vec![FuncRet {
+                            type_: DataTypeRef::Atom(AtomType::U8),
+                            attrs: Vec::new(),
+                        }],
+                        attrs: Vec::new(),
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                attrs: Vec::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_ret_defined_type() {
+        assert_eq!(
+            mod_("fn trivial() -> foo;\ntype foo = u8;").ok().unwrap(),
+            Module {
+                names: vec![
+                    Name {
+                        name: "trivial".to_owned(),
+                        location: Location { line: 1, column: 0 }
+                    },
+                    Name {
+                        name: "foo".to_owned(),
+                        location: Location { line: 2, column: 0 }
+                    }
+                ],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        args: Vec::new(),
+                        rets: vec![FuncRet {
+                            type_: DataTypeRef::Defined(Ident(1)),
+                            attrs: Vec::new(),
+                        }],
+                        attrs: Vec::new(),
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: vec![(
+                    Ident(1),
+                    DataType::Alias {
+                        to: DataTypeRef::Atom(AtomType::U8),
+                        attrs: Vec::new()
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                attrs: Vec::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn func_unknown_arg_type() {
+        assert_eq!(
+            mod_("fn trivial(a: foo);").err().unwrap(),
+            ValidationError::NameNotFound {
+                name: "foo".to_owned(),
+                use_location: Location {
+                    line: 1,
+                    column: 14
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn func_unknown_ret_type() {
+        assert_eq!(
+            mod_("fn trivial(a: u8) -> foo;").err().unwrap(),
+            ValidationError::NameNotFound {
+                name: "foo".to_owned(),
+                use_location: Location {
+                    line: 1,
+                    column: 21
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn func_duplicate_arg() {
+        assert_eq!(
+            mod_("fn trivial(a: u8, a: u8);").err().unwrap(),
+            ValidationError::NameAlreadyExists {
+                name: "a".to_owned(),
+                at_location: Location {
+                    line: 1,
+                    column: 18
+                },
+                previous_location: Location {
+                    line: 1,
+                    column: 11
+                },
+            }
+        );
+    }
 }
