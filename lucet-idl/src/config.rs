@@ -2,7 +2,7 @@ use super::backend::{Backend, BackendConfig};
 use super::target::Target;
 use crate::c::CGenerator;
 use crate::generator::Generator;
-//use crate::rust::RustGenerator;
+use crate::rust::RustGenerator;
 use std::io::Write;
 
 #[derive(Default, Clone, Debug)]
@@ -31,11 +31,8 @@ impl Config {
 
     pub fn generator<W: Write>(&self) -> Box<dyn Generator<W>> {
         match self.backend {
-            Backend::C => Box::new(CGenerator::new(
-                self.target,
-                self.backend_config,
-            )),
-            Backend::Rust => unimplemented!(), //Box::new(RustGenerator::new(self.target, self.backend_config)),
+            Backend::C => Box::new(CGenerator::new(self.target, self.backend_config)),
+            Backend::Rust => Box::new(RustGenerator::new(self.target, self.backend_config)),
         }
     }
 }

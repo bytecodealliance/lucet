@@ -2,10 +2,9 @@
 #![allow(unused_variables)]
 
 use crate::backend::BackendConfig;
-use crate::cache::Cache;
 use crate::error::IDLError;
 use crate::generator::{Generator, Hierarchy};
-use crate::package::Package;
+use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
 use crate::types::AtomType;
@@ -79,8 +78,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_type_header(
         &mut self,
-        _package: &Package,
-        _cache: &mut Cache,
+        _module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
@@ -90,12 +88,9 @@ impl<W: Write> Generator<W> for RustGenerator {
         Ok(())
     }
 
-    // The most important thing in alias generation is to cache the size
-    // and alignment rules of what it ultimately points to
     fn gen_alias(
         &mut self,
-        package: &Package,
-        cache: &mut Cache,
+        module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
@@ -117,8 +112,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_struct(
         &mut self,
-        package: &Package,
-        cache: &mut Cache,
+        module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
@@ -158,8 +152,7 @@ impl<W: Write> Generator<W> for RustGenerator {
     // The typedef is required to use a native type which is consistent across all architectures
     fn gen_enum(
         &mut self,
-        package: &Package,
-        cache: &mut Cache,
+        module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
@@ -191,8 +184,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_accessors_struct(
         &mut self,
-        _package: &Package,
-        _cache: &Cache,
+        _module: &Module,
         _pretty_writer: &mut PrettyWriter<W>,
         _data_type_entry: &DataTypeEntry<'_>,
         _hierarchy: &Hierarchy,
@@ -202,8 +194,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_accessors_enum(
         &mut self,
-        _package: &Package,
-        _cache: &Cache,
+        _module: &Module,
         _pretty_writer: &mut PrettyWriter<W>,
         _data_type_entry: &DataTypeEntry<'_>,
         _hierarchy: &Hierarchy,
@@ -213,8 +204,7 @@ impl<W: Write> Generator<W> for RustGenerator {
 
     fn gen_accessors_alias(
         &mut self,
-        _package: &Package,
-        _cache: &Cache,
+        _module: &Module,
         _pretty_writer: &mut PrettyWriter<W>,
         _data_type_entry: &DataTypeEntry<'_>,
         _hierarchy: &Hierarchy,
