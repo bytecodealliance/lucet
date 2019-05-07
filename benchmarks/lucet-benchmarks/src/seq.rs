@@ -85,7 +85,7 @@ fn instantiate_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
             b.iter(|| body(module.clone(), region.clone()))
         },
         // heap sizes in KiB
-        &[512, 1024, 2 * 1024, 4 * 1024],
+        &[0, 512, 1024, 2 * 1024, 4 * 1024],
     );
 }
 
@@ -110,7 +110,7 @@ fn instantiate_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
             b.iter(|| body(module.clone(), region.clone()))
         },
         // heap sizes in KiB
-        &[512, 1024, 2 * 1024, 4 * 1024],
+        &[0, 512, 1024, 2 * 1024, 4 * 1024],
     );
 }
 
@@ -164,7 +164,7 @@ fn drop_instance_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
             )
         },
         // heap sizes in KiB
-        &[512, 1024, 2 * 1024, 4 * 1024],
+        &[0, 512, 1024, 2 * 1024, 4 * 1024],
     );
 }
 
@@ -191,7 +191,7 @@ fn drop_instance_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) 
             )
         },
         // heap sizes in KiB
-        &[512, 1024, 2 * 1024, 4 * 1024],
+        &[0, 512, 1024, 2 * 1024, 4 * 1024],
     );
 }
 
