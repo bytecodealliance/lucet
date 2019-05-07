@@ -88,7 +88,6 @@ pub struct FuncRet {
     pub attrs: Vec<Attr>,
 }
 
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Name {
     pub name: String,

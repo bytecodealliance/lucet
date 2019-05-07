@@ -31,7 +31,7 @@ impl Config {
 
     pub fn generator<W: Write>(&self) -> Box<dyn Generator<W>> {
         unimplemented!()
-            /* disabled while module / pkg representation in flux
+        /* disabled while module / pkg representation in flux
         match self.backend {
             Backend::C => Box::new(CGenerator {
                 target: self.target,

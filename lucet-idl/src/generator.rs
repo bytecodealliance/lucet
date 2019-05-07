@@ -108,13 +108,9 @@ pub trait Generator<W: Write> {
     ) -> Result<(), IDLError> {
         let data_type_entry = module.get_datatype(id);
         match &data_type_entry.data_type {
-            DataType::Struct { .. } => self.gen_accessors_struct(
-                module,
-                cache,
-                pretty_writer,
-                &data_type_entry,
-                hierarchy,
-            ),
+            DataType::Struct { .. } => {
+                self.gen_accessors_struct(module, cache, pretty_writer, &data_type_entry, hierarchy)
+            }
             DataType::Alias { .. } => {
                 self.gen_accessors_alias(module, cache, pretty_writer, &data_type_entry, hierarchy)
             }

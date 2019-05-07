@@ -59,7 +59,7 @@ pub enum ValidationError {
     Syntax {
         expected: &'static str,
         location: Location,
-    }
+    },
 }
 
 impl fmt::Display for ValidationError {
@@ -85,9 +85,11 @@ impl fmt::Display for ValidationError {
                 "Circular reference for {} at line {}",
                 name, location.line
             ),
-            ValidationError::Syntax { expected, location } => {
-                write!(f, "Invalid syntax: expected {} at line {}", expected, location.line)
-            }
+            ValidationError::Syntax { expected, location } => write!(
+                f,
+                "Invalid syntax: expected {} at line {}",
+                expected, location.line
+            ),
         }
     }
 }
