@@ -1,8 +1,10 @@
+mod compile;
 mod context;
 mod modules;
 mod par;
 mod seq;
 
+pub use compile::compile_benches;
 pub use context::context_benches;
 pub use par::par_benches;
 pub use seq::seq_benches;

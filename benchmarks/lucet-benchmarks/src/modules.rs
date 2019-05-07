@@ -2,7 +2,7 @@ use lucet_runtime::lucet_hostcalls;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder, Module};
 use lucet_wasi_sdk::{CompileOpts, Lucetc};
-use lucetc::{Bindings, LucetcOpts};
+use lucetc::{Bindings, LucetcOpts, OptLevel};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -11,13 +11,13 @@ fn wasi_bindings() -> Bindings {
     Bindings::from_file(&path).unwrap()
 }
 
-pub fn compile_hello<P: AsRef<Path>>(so_file: P) {
+pub fn compile_hello<P: AsRef<Path>>(so_file: P, opt_level: OptLevel) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("guests/hello.c");
     let wasm_build = Lucetc::new(&[&path])
-        .with_print_output(true)
         .with_cflag("-Wall")
         .with_cflag("-Werror")
-        .with_bindings(wasi_bindings());
+        .with_bindings(wasi_bindings())
+        .with_opt_level(opt_level);
 
     wasm_build.build(&so_file).unwrap();
 }
@@ -30,46 +30,48 @@ pub fn null_mock() -> Arc<dyn Module> {
         .build()
 }
 
-pub fn large_dense_heap_mock() -> Arc<dyn Module> {
+pub fn large_dense_heap_mock(heap_kb: usize) -> Arc<dyn Module> {
     extern "C" fn f(_vmctx: *mut lucet_vmctx) {}
 
-    const HEAP_LEN: usize = 4 * 1024 * 1024;
-    const HEAP_SPEC: HeapSpec = HeapSpec {
-        reserved_size: HEAP_LEN as u64,
+    let heap_len = heap_kb * 1024;
+
+    let heap_spec = HeapSpec {
+        reserved_size: heap_len as u64,
         guard_size: 4 * 1024 * 1024,
-        initial_size: HEAP_LEN as u64,
+        initial_size: heap_len as u64,
         max_size: None,
     };
 
-    let mut heap = vec![0x00; HEAP_LEN];
-    (0..HEAP_LEN).into_iter().for_each(|i| {
+    let mut heap = vec![0x00; heap_len];
+    (0..heap_len).into_iter().for_each(|i| {
         heap[i] = (i % 256) as u8;
     });
 
     MockModuleBuilder::new()
         .with_export_func(b"f", f as *const extern "C" fn())
         .with_initial_heap(heap.as_slice())
-        .with_heap_spec(HEAP_SPEC)
+        .with_heap_spec(heap_spec)
         .build()
 }
 
-pub fn large_sparse_heap_mock() -> Arc<dyn Module> {
+pub fn large_sparse_heap_mock(heap_kb: usize, stride: usize) -> Arc<dyn Module> {
     extern "C" fn f(_vmctx: *mut lucet_vmctx) {}
 
-    const HEAP_LEN: usize = 4 * 1024 * 1024;
-    const HEAP_SPEC: HeapSpec = HeapSpec {
-        reserved_size: HEAP_LEN as u64,
+    let heap_len = heap_kb * 1024;
+
+    let heap_spec = HeapSpec {
+        reserved_size: heap_len as u64,
         guard_size: 4 * 1024 * 1024,
-        initial_size: HEAP_LEN as u64,
+        initial_size: heap_len as u64,
         max_size: None,
     };
 
-    let mut heap = vec![0x00; HEAP_LEN];
+    let mut heap = vec![0x00; heap_len];
 
-    // fill every eighth page with data
-    (0..HEAP_LEN)
+    // fill every `stride`th page with data
+    (0..heap_len)
         .into_iter()
-        .step_by(4096 * 8)
+        .step_by(4096 * stride)
         .for_each(|base| {
             for i in base..base + 4096 {
                 heap[i] = (i % 256) as u8;
@@ -79,7 +81,7 @@ pub fn large_sparse_heap_mock() -> Arc<dyn Module> {
     MockModuleBuilder::new()
         .with_export_func(b"f", f as *const extern "C" fn())
         .with_initial_heap(heap.as_slice())
-        .with_heap_spec(HEAP_SPEC)
+        .with_heap_spec(heap_spec)
         .build()
 }
 
