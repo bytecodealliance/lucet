@@ -2,6 +2,7 @@ use crate::modules::*;
 use criterion::Criterion;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, Module, Region, RegionCreate};
 use lucet_wasi::WasiCtxBuilder;
+use lucetc::OptLevel;
 use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -14,7 +15,7 @@ use tempfile::TempDir;
 ///
 /// To minimize the effects of filesystem cache on the `DlModule::load()`, this runs `sync` between
 /// each iteration.
-fn load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
+fn hello_load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body<R: RegionCreate + 'static>(so_file: &Path) -> InstanceHandle {
         let module = DlModule::load(so_file).unwrap();
         let region = R::create(1, &Limits::default()).unwrap();
@@ -24,10 +25,10 @@ fn load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file);
+    compile_hello(&so_file, OptLevel::Best);
 
     c.bench_function(
-        &format!("load_mkregion_and_instantiate ({})", R::TYPE_NAME),
+        &format!("hello_load_mkregion_and_instantiate ({})", R::TYPE_NAME),
         move |b| {
             b.iter_batched(
                 || unsafe { nix::libc::sync() },
@@ -44,7 +45,7 @@ fn load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
 ///
 /// This simulates a typical case for a server process like Terrarium: the region and module stay
 /// initialized, but a new instance is created for each request.
-fn instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
+fn hello_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body<R: Region>(module: Arc<dyn Module>, region: Arc<R>) -> InstanceHandle {
         region.new_instance(module).unwrap()
     }
@@ -52,12 +53,12 @@ fn instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file);
+    compile_hello(&so_file, OptLevel::Best);
 
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
 
-    c.bench_function(&format!("instantiate ({})", R::TYPE_NAME), move |b| {
+    c.bench_function(&format!("hello_instantiate ({})", R::TYPE_NAME), move |b| {
         b.iter(|| body(module.clone(), region.clone()))
     });
 
@@ -65,12 +66,10 @@ fn instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
 }
 
 /// Instance instantiation with a large, dense heap.
-fn instantiate_large_dense<R: RegionCreate + 'static>(c: &mut Criterion) {
+fn instantiate_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body<R: Region>(module: Arc<dyn Module>, region: Arc<R>) -> InstanceHandle {
         region.new_instance(module).unwrap()
     }
-
-    let module = large_dense_heap_mock();
 
     let limits = Limits {
         heap_memory_size: 1024 * 1024 * 1024,
@@ -79,19 +78,22 @@ fn instantiate_large_dense<R: RegionCreate + 'static>(c: &mut Criterion) {
 
     let region = R::create(1, &limits).unwrap();
 
-    c.bench_function(
-        &format!("instantiate_large_dense ({})", R::TYPE_NAME),
-        move |b| b.iter(|| body(module.clone(), region.clone())),
+    c.bench_function_over_inputs(
+        &format!("instantiate_with_dense_heap ({})", R::TYPE_NAME),
+        move |b, &&heap_kb| {
+            let module = large_dense_heap_mock(heap_kb);
+            b.iter(|| body(module.clone(), region.clone()))
+        },
+        // heap sizes in KiB
+        &[512, 1024, 2 * 1024, 4 * 1024],
     );
 }
 
 /// Instance instantiation with a large, sparse heap.
-fn instantiate_large_sparse<R: RegionCreate + 'static>(c: &mut Criterion) {
+fn instantiate_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body<R: Region>(module: Arc<dyn Module>, region: Arc<R>) -> InstanceHandle {
         region.new_instance(module).unwrap()
     }
-
-    let module = large_sparse_heap_mock();
 
     let limits = Limits {
         heap_memory_size: 1024 * 1024 * 1024,
@@ -100,51 +102,34 @@ fn instantiate_large_sparse<R: RegionCreate + 'static>(c: &mut Criterion) {
 
     let region = R::create(1, &limits).unwrap();
 
-    c.bench_function(
-        &format!("instantiate_large_sparse ({})", R::TYPE_NAME),
-        move |b| b.iter(|| body(module.clone(), region.clone())),
+    c.bench_function_over_inputs(
+        &format!("instantiate_with_sparse_heap ({})", R::TYPE_NAME),
+        move |b, &&heap_kb| {
+            // 8 means that only every eighth page has non-zero data
+            let module = large_sparse_heap_mock(heap_kb, 8);
+            b.iter(|| body(module.clone(), region.clone()))
+        },
+        // heap sizes in KiB
+        &[512, 1024, 2 * 1024, 4 * 1024],
     );
 }
 
 /// Instance destruction.
 ///
 /// Instances have some cleanup to do with memory management and freeing their slot on their region.
-fn drop_instance<R: RegionCreate + 'static>(c: &mut Criterion) {
+fn hello_drop_instance<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(_inst: InstanceHandle) {}
 
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file);
+    compile_hello(&so_file, OptLevel::Best);
 
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
 
-    c.bench_function(&format!("drop_instance ({})", R::TYPE_NAME), move |b| {
-        b.iter_batched(
-            || region.new_instance(module.clone()).unwrap(),
-            |inst| body(inst),
-            criterion::BatchSize::PerIteration,
-        )
-    });
-
-    workdir.close().unwrap();
-}
-
-/// Instance destruction with a large, dense heap.
-fn drop_instance_large_dense<R: RegionCreate + 'static>(c: &mut Criterion) {
-    fn body(_inst: InstanceHandle) {}
-
-    let limits = Limits {
-        heap_memory_size: 1024 * 1024 * 1024,
-        ..Limits::default()
-    };
-
-    let module = large_dense_heap_mock();
-    let region = R::create(1, &limits).unwrap();
-
     c.bench_function(
-        &format!("drop_instance_large_dense ({})", R::TYPE_NAME),
+        &format!("hello_drop_instance ({})", R::TYPE_NAME),
         move |b| {
             b.iter_batched(
                 || region.new_instance(module.clone()).unwrap(),
@@ -153,10 +138,12 @@ fn drop_instance_large_dense<R: RegionCreate + 'static>(c: &mut Criterion) {
             )
         },
     );
+
+    workdir.close().unwrap();
 }
 
-/// Instance destruction with a large, sparse heap.
-fn drop_instance_large_sparse<R: RegionCreate + 'static>(c: &mut Criterion) {
+/// Instance destruction with a large, dense heap.
+fn drop_instance_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(_inst: InstanceHandle) {}
 
     let limits = Limits {
@@ -164,18 +151,47 @@ fn drop_instance_large_sparse<R: RegionCreate + 'static>(c: &mut Criterion) {
         ..Limits::default()
     };
 
-    let module = large_sparse_heap_mock();
     let region = R::create(1, &limits).unwrap();
 
-    c.bench_function(
-        &format!("drop_instance_large_sparse ({})", R::TYPE_NAME),
-        move |b| {
+    c.bench_function_over_inputs(
+        &format!("drop_instance_with_dense_heap ({})", R::TYPE_NAME),
+        move |b, &&heap_kb| {
+            let module = large_dense_heap_mock(heap_kb);
             b.iter_batched(
-                || region.new_instance(module.clone()).unwrap(),
+                || region.clone().new_instance(module.clone()).unwrap(),
                 |inst| body(inst),
                 criterion::BatchSize::PerIteration,
             )
         },
+        // heap sizes in KiB
+        &[512, 1024, 2 * 1024, 4 * 1024],
+    );
+}
+
+/// Instance destruction with a large, sparse heap.
+fn drop_instance_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
+    fn body(_inst: InstanceHandle) {}
+
+    let limits = Limits {
+        heap_memory_size: 1024 * 1024 * 1024,
+        ..Limits::default()
+    };
+
+    let region = R::create(1, &limits).unwrap();
+
+    c.bench_function_over_inputs(
+        &format!("drop_instance_with_sparse_heap ({})", R::TYPE_NAME),
+        move |b, &&heap_kb| {
+            // 8 means that only every eighth page has non-zero data
+            let module = large_sparse_heap_mock(heap_kb, 8);
+            b.iter_batched(
+                || region.clone().new_instance(module.clone()).unwrap(),
+                |inst| body(inst),
+                criterion::BatchSize::PerIteration,
+            )
+        },
+        // heap sizes in KiB
+        &[512, 1024, 2 * 1024, 4 * 1024],
     );
 }
 
@@ -230,7 +246,7 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file);
+    compile_hello(&so_file, OptLevel::Best);
 
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
@@ -358,13 +374,16 @@ fn run_hostcall_wrapped<R: RegionCreate + 'static>(c: &mut Criterion) {
     let module = hostcalls_mock();
     let region = R::create(1, &Limits::default()).unwrap();
 
-    c.bench_function(&format!("run_hostcall_wrapped ({})", R::TYPE_NAME), move |b| {
-        b.iter_batched_ref(
-            || region.new_instance(module.clone()).unwrap(),
-            |inst| body(inst),
-            criterion::BatchSize::PerIteration,
-        )
-    });
+    c.bench_function(
+        &format!("run_hostcall_wrapped ({})", R::TYPE_NAME),
+        move |b| {
+            b.iter_batched_ref(
+                || region.new_instance(module.clone()).unwrap(),
+                |inst| body(inst),
+                criterion::BatchSize::PerIteration,
+            )
+        },
+    );
 }
 
 fn run_hostcall_raw<R: RegionCreate + 'static>(c: &mut Criterion) {
@@ -385,13 +404,13 @@ fn run_hostcall_raw<R: RegionCreate + 'static>(c: &mut Criterion) {
 }
 
 pub fn seq_benches<R: RegionCreate + 'static>(c: &mut Criterion) {
-    load_mkregion_and_instantiate::<R>(c);
-    instantiate::<R>(c);
-    instantiate_large_dense::<R>(c);
-    instantiate_large_sparse::<R>(c);
-    drop_instance::<R>(c);
-    drop_instance_large_dense::<R>(c);
-    drop_instance_large_sparse::<R>(c);
+    hello_load_mkregion_and_instantiate::<R>(c);
+    hello_instantiate::<R>(c);
+    instantiate_with_dense_heap::<R>(c);
+    instantiate_with_sparse_heap::<R>(c);
+    hello_drop_instance::<R>(c);
+    drop_instance_with_dense_heap::<R>(c);
+    drop_instance_with_sparse_heap::<R>(c);
     run_null::<R>(c);
     run_fib::<R>(c);
     run_hello::<R>(c);

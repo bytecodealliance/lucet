@@ -1,6 +1,7 @@
 use crate::modules::{compile_hello, fib_mock, null_mock};
 use criterion::Criterion;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, Module, Region, RegionCreate};
+use lucetc::OptLevel;
 use rayon::prelude::*;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -41,7 +42,7 @@ fn par_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file);
+    compile_hello(&so_file, OptLevel::Best);
 
     let module = DlModule::load(&so_file).unwrap();
 
