@@ -39,6 +39,9 @@
 .align 16
 lucet_context_bootstrap:
 _lucet_context_bootstrap:
+        /* Set flag indicating that the context switch is done */
+        movb $1, (%rdx)
+        
 	/* Move each of the context-saved registers into the corresponding call
 	 * argument register. See lucet_register enum for docs  */
 	mov %r12, %rsi

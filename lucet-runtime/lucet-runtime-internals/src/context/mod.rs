@@ -10,6 +10,7 @@ use nix::sys::signal;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::mem;
 use std::ptr::NonNull;
+use std::sync::atomic::AtomicBool;
 use xfailure::xbail;
 
 /// Callee-saved general-purpose registers in the AMD64 ABI.
@@ -444,8 +445,12 @@ impl Context {
     /// unsafe { Context::swap(&mut parent, &child); }
     /// ```
     #[inline]
-    pub unsafe fn swap(from: &mut Context, to: &Context) {
-        lucet_context_swap(from as *mut Context, to as *const Context);
+    pub unsafe fn swap(from: &mut Context, to: &Context, flag: &AtomicBool) {
+        lucet_context_swap(
+            from as *mut Context,
+            to as *const Context,
+            flag as *const AtomicBool,
+        );
     }
 
     /// Swap to another context without saving the current context.
@@ -626,7 +631,7 @@ extern "C" {
     fn lucet_context_backstop();
 
     /// Saves the current context and performs the context switch. Implemented in assembly.
-    fn lucet_context_swap(from: *mut Context, to: *const Context);
+    fn lucet_context_swap(from: *mut Context, to: *const Context, flag: *const AtomicBool);
 
     /// Performs the context switch; implemented in assembly.
     ///

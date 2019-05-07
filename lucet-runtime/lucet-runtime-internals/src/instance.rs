@@ -25,6 +25,7 @@ use std::ffi::{CStr, CString};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
@@ -197,7 +198,7 @@ pub struct Instance {
     pub(crate) state: State,
 
     /// Small mutexed state used for remote kill switch functionality
-    kill_state: Arc<Mutex<KillState>>,
+    kill_state: Arc<KillState>,
 
     /// The memory allocated for this instance
     alloc: Alloc,
@@ -525,7 +526,11 @@ impl Instance {
             state: State::Ready {
                 retval: UntypedRetVal::default(),
             },
-            kill_state: Arc::new(Mutex::new(KillState::NotStarted)),
+            kill_state: Arc::new(KillState {
+                should_terminate: AtomicBool::new(false),
+                ctx_switch_done: AtomicBool::new(false),
+                thread_id: Mutex::new(None),
+            }),
             alloc,
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
@@ -598,8 +603,8 @@ impl Instance {
         };
 
         {
-            let mut kill_state = self.kill_state.lock().unwrap();
-            *kill_state = KillState::Running(unsafe { pthread_self() });
+            let mut kill_state = self.kill_state.thread_id.lock().unwrap();
+            *kill_state = Some(unsafe { pthread_self() });
         }
 
         // there should never be another instance running on this thread when we enter this function
@@ -618,7 +623,13 @@ impl Instance {
                 // Save the current context into `host_ctx`, and jump to the guest context. The
                 // lucet context is linked to host_ctx, so it will return here after it finishes,
                 // successfully or otherwise.
-                unsafe { Context::swap(&mut *host_ctx.get(), &mut i.ctx) };
+                unsafe {
+                    Context::swap(
+                        &mut *host_ctx.get(),
+                        &mut i.ctx,
+                        &i.kill_state.ctx_switch_done,
+                    )
+                };
                 Ok(())
             })
         })?;
@@ -633,8 +644,8 @@ impl Instance {
         // * function body returned: set state back to `Ready` with return value
 
         {
-            let mut kill_state = self.kill_state.lock().unwrap();
-            *kill_state = KillState::Exited;
+            let mut kill_state = self.kill_state.thread_id.lock().unwrap();
+            *kill_state = None;
         }
 
         match &self.state {
@@ -925,26 +936,36 @@ fn strsignal_wrapper(sig: libc::c_int) -> CString {
     unsafe { CStr::from_ptr(strsignal(sig)).to_owned() }
 }
 
-enum KillState {
-    NotStarted,
-    Running(pthread_t),
-    Exited,
+struct KillState {
+    ctx_switch_done: AtomicBool,
+    should_terminate: AtomicBool,
+    thread_id: Mutex<Option<pthread_t>>,
 }
 
 pub struct KillSwitch {
-    state: Weak<Mutex<KillState>>,
+    state: Weak<KillState>,
 }
 
+/// An object that can be used to terminate an instance's execution from a separate thread.
+///
+///
 impl KillSwitch {
-    pub fn terminate(&self) -> bool {
+    pub fn terminate(&self) {
         if let Some(state) = self.state.upgrade() {
-            if let KillState::Running(thread_id) = *state.lock().unwrap() {
+            state.should_terminate.store(true, Ordering::SeqCst);
+
+            if !state.ctx_switch_done.load(Ordering::SeqCst) {
+                println!("KillSwitch::terminate - context switch isn't done yet");
+                return;
+            } else {
+                println!("KillSwitch::terminate - context switch IS done!");
+            }
+
+            if let Some(thread_id) = *state.thread_id.lock().unwrap() {
                 unsafe {
                     pthread_kill(thread_id, SIGALRM);
                 }
-                return true;
             }
         }
-        false
     }
 }

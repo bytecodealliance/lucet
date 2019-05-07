@@ -134,9 +134,12 @@ macro_rules! host_tests {
 
             use std::thread;
             thread::spawn(move || {
+                kill_switch.terminate();
                 thread::sleep(Duration::from_millis(100));
                 kill_switch.terminate();
             });
+
+            thread::sleep(Duration::from_millis(10));
 
             match inst.run(b"main", &[]) {
                 Err(Error::RuntimeTerminated(details)) => match details {
