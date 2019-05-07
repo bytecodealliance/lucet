@@ -1,4 +1,3 @@
-use crate::cache::Cache;
 use crate::error::IDLError;
 use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
@@ -12,7 +11,6 @@ pub trait Generator<W: Write> {
     fn gen_type_header(
         &mut self,
         module: &Module,
-        _cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError>;
@@ -20,7 +18,6 @@ pub trait Generator<W: Write> {
     fn gen_alias(
         &mut self,
         module: &Module,
-        cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError>;
@@ -28,7 +25,6 @@ pub trait Generator<W: Write> {
     fn gen_struct(
         &mut self,
         module: &Module,
-        cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError>;
@@ -36,7 +32,6 @@ pub trait Generator<W: Write> {
     fn gen_enum(
         &mut self,
         module: &Module,
-        cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError>;
@@ -44,7 +39,6 @@ pub trait Generator<W: Write> {
     fn gen_accessors_struct(
         &mut self,
         module: &Module,
-        cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
         hierarchy: &Hierarchy,
@@ -53,7 +47,6 @@ pub trait Generator<W: Write> {
     fn gen_accessors_enum(
         &mut self,
         module: &Module,
-        cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
         hierarchy: &Hierarchy,
@@ -62,7 +55,6 @@ pub trait Generator<W: Write> {
     fn gen_accessors_alias(
         &mut self,
         module: &Module,
-        cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
         hierarchy: &Hierarchy,
@@ -71,24 +63,22 @@ pub trait Generator<W: Write> {
     fn gen_for_id(
         &mut self,
         module: &Module,
-        cache: &mut Cache,
         pretty_writer: &mut PrettyWriter<W>,
         id: Ident,
     ) -> Result<(), IDLError> {
         let data_type_entry = module.get_datatype(id);
-        self.gen_type_header(module, cache, pretty_writer, &data_type_entry)?;
+        self.gen_type_header(module, pretty_writer, &data_type_entry)?;
         match &data_type_entry.data_type {
             DataType::Struct { .. } => {
-                self.gen_struct(module, cache, pretty_writer, &data_type_entry)
+                self.gen_struct(module, pretty_writer, &data_type_entry)
             }
             DataType::Alias { .. } => {
-                self.gen_alias(module, cache, pretty_writer, &data_type_entry)
+                self.gen_alias(module, pretty_writer, &data_type_entry)
             }
-            DataType::Enum { .. } => self.gen_enum(module, cache, pretty_writer, &data_type_entry),
+            DataType::Enum { .. } => self.gen_enum(module, pretty_writer, &data_type_entry),
         }?;
         self.gen_accessors_for_id(
             module,
-            cache,
             pretty_writer,
             id,
             &Hierarchy::new(data_type_entry.name.name.to_string(), 0),
@@ -101,7 +91,6 @@ pub trait Generator<W: Write> {
     fn gen_accessors_for_id(
         &mut self,
         module: &Module,
-        cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         id: Ident,
         hierarchy: &Hierarchy,
@@ -109,13 +98,13 @@ pub trait Generator<W: Write> {
         let data_type_entry = module.get_datatype(id);
         match &data_type_entry.data_type {
             DataType::Struct { .. } => {
-                self.gen_accessors_struct(module, cache, pretty_writer, &data_type_entry, hierarchy)
+                self.gen_accessors_struct(module, pretty_writer, &data_type_entry, hierarchy)
             }
             DataType::Alias { .. } => {
-                self.gen_accessors_alias(module, cache, pretty_writer, &data_type_entry, hierarchy)
+                self.gen_accessors_alias(module, pretty_writer, &data_type_entry, hierarchy)
             }
             DataType::Enum { .. } => {
-                self.gen_accessors_enum(module, cache, pretty_writer, &data_type_entry, hierarchy)
+                self.gen_accessors_enum(module, pretty_writer, &data_type_entry, hierarchy)
             }
         }?;
         Ok(())

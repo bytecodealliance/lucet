@@ -3,8 +3,7 @@ use std::cmp;
 
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    package: &Package,
-    cache: &mut Cache,
+    module: &Module,
     pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &DataTypeEntry<'_>,
 ) -> Result<(), IDLError> {
@@ -23,7 +22,7 @@ pub fn generate<W: Write>(
     let mut first_member_align = 0;
     let mut members_offsets = vec![];
     for named_member in named_members {
-        let type_info = cgenerator.type_info(package, cache, &named_member.type_);
+        let type_info = cgenerator.type_info(module, &named_member.type_);
         let type_align = type_info.type_align;
         let type_size = type_info.type_size;
         let padding = (type_align - 1) - ((offset + (type_align - 1)) % type_align);
@@ -51,7 +50,7 @@ pub fn generate<W: Write>(
     // to the alignment of the first member of that structure
     let struct_align = first_member_align;
     let struct_size = offset;
-    let cached = cache.store_type(
+    let cached = cgenerator.cache.store_type(
         data_type_entry.id,
         CachedTypeEntry {
             type_size: struct_size,

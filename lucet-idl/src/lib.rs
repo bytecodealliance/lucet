@@ -4,8 +4,7 @@
 extern crate failure;
 
 mod backend;
-//mod c;
-mod cache;
+mod c;
 mod config;
 mod error;
 mod generator;
@@ -23,7 +22,6 @@ pub use crate::config::Config;
 pub use crate::error::IDLError;
 pub use crate::target::Target;
 
-use crate::cache::Cache;
 use crate::package::Package;
 use crate::parser::Parser;
 use crate::pretty_writer::PrettyWriter;
@@ -41,12 +39,11 @@ pub fn run<W: Write>(config: &Config, input: &str, output: W) -> Result<W, IDLEr
             .ordered_dependencies()
             .map_err(|_| IDLError::InternalError("Unable to resolve dependencies"))?;
 
-        let mut cache = Cache::default();
         let mut generator = config.generator();
 
         generator.gen_prelude(&mut pretty_writer)?;
         for id in deps {
-            generator.gen_for_id(&mod_, &mut cache, &mut pretty_writer, id)?;
+            generator.gen_for_id(&mod_, &mut pretty_writer, id)?;
         }
     }
     Ok(pretty_writer

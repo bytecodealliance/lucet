@@ -3,6 +3,7 @@
 
 // mod accessors;
 mod alias;
+mod cache;
 mod catom;
 mod r#enum;
 mod macros;
@@ -11,10 +12,10 @@ mod r#struct;
 
 pub(crate) use self::catom::*;
 use crate::backend::*;
-use crate::cache::{Cache, CachedStructMemberEntry, CachedTypeEntry};
+use self::cache::{Cache, CachedStructMemberEntry, CachedTypeEntry};
 use crate::error::IDLError;
 use crate::generator::{Generator, Hierarchy};
-use crate::package::Package;
+use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
 use crate::types::{DataType, DataTypeEntry, DataTypeRef};
@@ -36,6 +37,7 @@ struct CTypeInfo<'t> {
 pub struct CGenerator {
     pub target: Target,
     pub backend_config: BackendConfig,
+    pub cache: Cache,
 }
 
 impl<W: Write> Generator<W> for CGenerator {
@@ -50,8 +52,7 @@ impl<W: Write> Generator<W> for CGenerator {
 
     fn gen_type_header(
         &mut self,
-        _package: &Package,
-        _cache: &mut Cache,
+        _module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
@@ -68,40 +69,36 @@ impl<W: Write> Generator<W> for CGenerator {
     // and alignment rules of what it ultimately points to
     fn gen_alias(
         &mut self,
-        package: &Package,
-        cache: &mut Cache,
+        module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        alias::generate(self, package, cache, pretty_writer, data_type_entry)
+        alias::generate(self, module, pretty_writer, data_type_entry)
     }
 
     fn gen_struct(
         &mut self,
-        package: &Package,
-        cache: &mut Cache,
+        module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        r#struct::generate(self, package, cache, pretty_writer, data_type_entry)
+        r#struct::generate(self, module, pretty_writer, data_type_entry)
     }
 
     // Enums generate both a specific typedef, and a traditional C-style enum
     // The typedef is required to use a native type which is consistent across all architectures
     fn gen_enum(
         &mut self,
-        package: &Package,
-        cache: &mut Cache,
+        module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
-        r#enum::generate(self, package, cache, pretty_writer, data_type_entry)
+        r#enum::generate(self, module, pretty_writer, data_type_entry)
     }
 
     fn gen_accessors_struct(
         &mut self,
-        package: &Package,
-        cache: &Cache,
+        module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
         hierarchy: &Hierarchy,
@@ -110,7 +107,6 @@ impl<W: Write> Generator<W> for CGenerator {
         accessors::r#struct::generate(
             self,
             module,
-            cache,
             pretty_writer,
             data_type_entry,
             hierarchy,
@@ -121,8 +117,7 @@ impl<W: Write> Generator<W> for CGenerator {
 
     fn gen_accessors_enum(
         &mut self,
-        package: &Package,
-        cache: &Cache,
+        module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
         hierarchy: &Hierarchy,
@@ -130,8 +125,7 @@ impl<W: Write> Generator<W> for CGenerator {
         /*
         accessors::r#enum::generate(
             self,
-            package,
-            cache,
+            module,
             pretty_writer,
             data_type_entry,
             hierarchy,
@@ -142,8 +136,7 @@ impl<W: Write> Generator<W> for CGenerator {
 
     fn gen_accessors_alias(
         &mut self,
-        package: &Package,
-        cache: &Cache,
+        module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &DataTypeEntry<'_>,
         hierarchy: &Hierarchy,
@@ -152,7 +145,6 @@ impl<W: Write> Generator<W> for CGenerator {
         accessors::alias::generate(
             self,
             module,
-            cache,
             pretty_writer,
             data_type_entry,
             hierarchy,
@@ -163,13 +155,21 @@ impl<W: Write> Generator<W> for CGenerator {
 }
 
 impl CGenerator {
+    pub fn new(
+        target: Target,
+        backend_config: BackendConfig) -> Self {
+        Self {
+            target,
+            backend_config,
+            cache: Cache::default(),
+        }
+    }
     /// Traverse a `DataTypeRef` chain, and return information
     /// about the leaf node as well as the native type to use
     /// for this data type
     fn type_info<'t>(
         &self,
-        package: &'t Package,
-        cache: &Cache,
+        module: &'t Module,
         mut type_: &'t DataTypeRef,
     ) -> CTypeInfo<'t> {
         let (mut type_align, mut type_size) = (None, None);
@@ -184,10 +184,10 @@ impl CGenerator {
                         type_name.or_else(|| Some(native_atom.native_type_name.to_string()));
                 }
                 DataTypeRef::Defined(data_type_id) => {
-                    let cached = cache.load_type(*data_type_id).unwrap();
+                    let cached = self.cache.load_type(*data_type_id).unwrap();
                     type_align = type_align.or_else(|| Some(cached.type_align));
                     type_size = type_size.or_else(|| Some(cached.type_size));
-                    let data_type_entry = package.get_datatype(*data_type_id);
+                    let data_type_entry = module.get_datatype(*data_type_id);
                     match data_type_entry.data_type {
                         DataType::Struct { .. } => {
                             type_name = type_name
@@ -223,32 +223,32 @@ impl CGenerator {
     // Return `true` if the type is an atom, an emum, or an alias to one of these
     pub fn is_type_eventually_an_atom_or_enum(
         &self,
-        package: &Package,
+        module: &Module,
         type_: &DataTypeRef,
     ) -> bool {
         let inner_type = match type_ {
             DataTypeRef::Atom(_) => return true,
             DataTypeRef::Defined(inner_type) => inner_type,
         };
-        let inner_data_type_entry = package.get_datatype(*inner_type);
+        let inner_data_type_entry = module.get_datatype(*inner_type);
         let inner_data_type = inner_data_type_entry.data_type;
         match inner_data_type {
             DataType::Struct { .. } => false,
             DataType::Enum { .. } => true,
-            DataType::Alias { to, .. } => self.is_type_eventually_an_atom_or_enum(package, to),
+            DataType::Alias { to, .. } => self.is_type_eventually_an_atom_or_enum(module, to),
         }
     }
 
     /// Return the type refererence, with aliases being resolved
-    pub fn unalias<'t>(&self, package: &'t Package, type_: &'t DataTypeRef) -> &'t DataTypeRef {
+    pub fn unalias<'t>(&self, module: &'t Module, type_: &'t DataTypeRef) -> &'t DataTypeRef {
         let inner_type = match type_ {
             DataTypeRef::Atom(_) => return type_,
             DataTypeRef::Defined(inner_type) => inner_type,
         };
-        let inner_data_type_entry = package.get_datatype(*inner_type);
+        let inner_data_type_entry = module.get_datatype(*inner_type);
         let inner_data_type = inner_data_type_entry.data_type;
         if let DataType::Alias { to, .. } = inner_data_type {
-            self.unalias(package, to)
+            self.unalias(module, to)
         } else {
             type_
         }
@@ -258,7 +258,6 @@ impl CGenerator {
     fn gen_accessors_for_data_type_ref<W: Write>(
         &mut self,
         module: &Module,
-        cache: &Cache,
         pretty_writer: &mut PrettyWriter<W>,
         type_: &DataTypeRef,
         name: &str,
@@ -270,7 +269,7 @@ impl CGenerator {
                 accessors::atom::generate(self, module, pretty_writer, *atom_type, &hierarchy)
             }
             DataTypeRef::Defined(data_type_id) => {
-                self.gen_accessors_for_id(module, cache, pretty_writer, *data_type_id, &hierarchy)
+                self.gen_accessors_for_id(module, pretty_writer, *data_type_id, &hierarchy)
             }
         }
     }

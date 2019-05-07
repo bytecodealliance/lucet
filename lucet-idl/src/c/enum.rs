@@ -4,8 +4,7 @@ use super::*;
 // The typedef is required to use a native type which is consistent across all architectures
 pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
-    _package: &Package,
-    cache: &mut Cache,
+    _module: &Module,
     pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &DataTypeEntry<'_>,
 ) -> Result<(), IDLError> {
@@ -66,7 +65,7 @@ pub fn generate<W: Write>(
     )?;
     pretty_writer.eob()?;
 
-    cache.store_type(
+    cgenerator.cache.store_type(
         data_type_entry.id,
         CachedTypeEntry {
             type_size,
