@@ -936,8 +936,11 @@ fn strsignal_wrapper(sig: libc::c_int) -> CString {
     unsafe { CStr::from_ptr(strsignal(sig)).to_owned() }
 }
 
+/// Instance state related to remote kill switch functionality.
+///
+///n
 struct KillState {
-    ctx_switch_done: AtomicBool,
+    signal_safe_flag: AtomicBool,
     should_terminate: AtomicBool,
     thread_id: Mutex<Option<pthread_t>>,
 }
