@@ -7,7 +7,9 @@ use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-const HEAP_SIZES_KB: &'static [usize] = &[0, 32, 128, 512, 1024, 2 * 1024, 4 * 1024];
+const DENSE_HEAP_SIZES_KB: &'static [usize] = &[0, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2 * 1024, 4 * 1024];
+
+const SPARSE_HEAP_SIZES_KB: &'static [usize] = &[0, 256, 512, 1024, 2 * 1024, 4 * 1024];
 
 /// End-to-end instance instantiation.
 ///
@@ -86,7 +88,7 @@ fn instantiate_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
             let module = large_dense_heap_mock(heap_kb);
             b.iter(|| body(module.clone(), region.clone()))
         },
-        HEAP_SIZES_KB,
+        DENSE_HEAP_SIZES_KB,
     );
 }
 
@@ -110,7 +112,7 @@ fn instantiate_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
             let module = large_sparse_heap_mock(heap_kb, 8);
             b.iter(|| body(module.clone(), region.clone()))
         },
-        HEAP_SIZES_KB,
+        SPARSE_HEAP_SIZES_KB,
     );
 }
 
@@ -163,7 +165,7 @@ fn drop_instance_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
                 criterion::BatchSize::PerIteration,
             )
         },
-        HEAP_SIZES_KB,
+        DENSE_HEAP_SIZES_KB,
     );
 }
 
@@ -189,7 +191,7 @@ fn drop_instance_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) 
                 criterion::BatchSize::PerIteration,
             )
         },
-        HEAP_SIZES_KB,
+        SPARSE_HEAP_SIZES_KB,
     );
 }
 
