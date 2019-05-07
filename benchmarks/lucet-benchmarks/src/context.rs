@@ -48,8 +48,32 @@ fn context_swap_return(c: &mut Criterion) {
     });
 }
 
+/// Time initialization plus swap and return.
+fn context_init_swap_return(c: &mut Criterion) {
+    extern "C" fn f() {}
+
+    c.bench_function("context_init_swap_return", move |b| {
+        b.iter_batched(
+            || vec![0u64; 1024].into_boxed_slice(),
+            |mut stack| {
+                let mut parent = ContextHandle::new();
+                let child = ContextHandle::create_and_init(
+                    &mut *stack,
+                    &mut parent,
+                    f as *const extern "C" fn(),
+                    &[],
+                )
+                .unwrap();
+                unsafe { Context::swap(&mut parent, &child) };
+                stack
+            },
+            criterion::BatchSize::PerIteration,
+        )
+    });
+}
+
 /// Swap to a trivial guest function that takes a bunch of arguments.
-fn context_swap_return_many_args(c: &mut Criterion) {
+fn context_init_swap_return_many_args(c: &mut Criterion) {
     extern "C" fn f(
         _: u8,
         _: u16,
@@ -321,10 +345,10 @@ fn context_swap_return_many_args(c: &mut Criterion) {
         175.0f64.into(),
     ];
 
-    c.bench_function("context_swap_return_many_args", move |b| {
+    c.bench_function("context_init_swap_return_many_args", move |b| {
         b.iter_batched(
-            || {
-                let mut stack = vec![0u64; 1024].into_boxed_slice();
+            || vec![0u64; 1024].into_boxed_slice(),
+            |mut stack| {
                 let mut parent = ContextHandle::new();
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
@@ -333,10 +357,7 @@ fn context_swap_return_many_args(c: &mut Criterion) {
                     &args,
                 )
                 .unwrap();
-                (stack, parent, child)
-            },
-            |(stack, mut parent, child)| unsafe {
-                Context::swap(&mut parent, &child);
+                unsafe { Context::swap(&mut parent, &child) };
                 stack
             },
             criterion::BatchSize::PerIteration,
@@ -362,6 +383,7 @@ fn context_sigprocmask(c: &mut Criterion) {
 pub fn context_benches(c: &mut Criterion) {
     context_init(c);
     context_swap_return(c);
-    context_swap_return_many_args(c);
+    context_init_swap_return(c);
+    context_init_swap_return_many_args(c);
     context_sigprocmask(c);
 }
