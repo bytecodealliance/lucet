@@ -49,7 +49,7 @@ pub fn macro_for_data_type_ref(
             format!("{}", native_type_size)
         }
         DataTypeRef::Defined(data_type_id) => {
-            let data_type_entry = module.get_datatype(*data_type_id);
+            let data_type_entry = module.get_datatype(*data_type_id).expect("defined datatype");
             macro_for(prefix, &data_type_entry.name.name)
         }
     }

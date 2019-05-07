@@ -187,7 +187,7 @@ impl CGenerator {
                     let cached = self.cache.load_type(*data_type_id).unwrap();
                     type_align = type_align.or_else(|| Some(cached.type_align));
                     type_size = type_size.or_else(|| Some(cached.type_size));
-                    let data_type_entry = module.get_datatype(*data_type_id);
+                    let data_type_entry = module.get_datatype(*data_type_id).expect("defined datatype");
                     match data_type_entry.data_type {
                         DataType::Struct { .. } => {
                             type_name = type_name
@@ -230,7 +230,7 @@ impl CGenerator {
             DataTypeRef::Atom(_) => return true,
             DataTypeRef::Defined(inner_type) => inner_type,
         };
-        let inner_data_type_entry = module.get_datatype(*inner_type);
+        let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
         let inner_data_type = inner_data_type_entry.data_type;
         match inner_data_type {
             DataType::Struct { .. } => false,
@@ -245,7 +245,7 @@ impl CGenerator {
             DataTypeRef::Atom(_) => return type_,
             DataTypeRef::Defined(inner_type) => inner_type,
         };
-        let inner_data_type_entry = module.get_datatype(*inner_type);
+        let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
         let inner_data_type = inner_data_type_entry.data_type;
         if let DataType::Alias { to, .. } = inner_data_type {
             self.unalias(module, to)

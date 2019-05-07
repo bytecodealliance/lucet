@@ -311,13 +311,16 @@ impl Module {
     }
 
     /// Retrieve information about a data type given its identifier
-    pub fn get_datatype(&self, id: Ident) -> DataTypeEntry<'_> {
+    pub fn get_datatype(&self, id: Ident) -> Option<DataTypeEntry<'_>> {
         let name = &self.names[id.0];
-        let data_type = &self.data_types[&id];
-        DataTypeEntry {
-            id,
-            name,
-            data_type,
+        if let Some(data_type) = &self.data_types.get(&id) {
+            Some(DataTypeEntry {
+                id,
+                name,
+                data_type,
+            })
+        } else {
+            None
         }
     }
 }
