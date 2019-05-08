@@ -256,7 +256,7 @@ impl Module {
         Ok(())
     }
 
-    pub fn ordered_dependencies(&self) -> Result<Vec<Ident>, ()> {
+    pub fn ordered_datatype_idents(&self) -> Result<Vec<Ident>, ()> {
         let mut visited = Vec::new();
         visited.resize(self.names.len(), false);
         let mut ordered = Vec::with_capacity(visited.capacity());
@@ -317,6 +317,20 @@ impl Module {
                 id,
                 name,
                 entity: data_type,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Retrieve information about a function declaration  given its identifier
+    pub fn get_func_decl(&self, id: Ident) -> Option<Named<FuncDecl>> {
+        let name = &self.names[id.0];
+        if let Some(func_decl) = &self.funcs.get(&id) {
+            Some(Named {
+                id,
+                name,
+                entity: func_decl,
             })
         } else {
             None

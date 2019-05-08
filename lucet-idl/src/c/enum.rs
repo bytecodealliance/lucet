@@ -2,10 +2,9 @@ use super::*;
 
 // Enums generate both a specific typedef, and a traditional C-style enum
 // The typedef is required to use a native type which is consistent across all architectures
-pub fn generate<W: Write>(
-    cgenerator: &mut CGenerator,
+pub fn generate(
+    gen: &mut CGenerator,
     _module: &Module,
-    pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &Named<DataType>,
 ) -> Result<(), IDLError> {
     let (named_members, _attrs) = if let DataType::Enum {
@@ -25,7 +24,7 @@ pub fn generate<W: Write>(
         enum_native_type.native_type_name,
     );
 
-    pretty_writer.write_line(
+    gen.w.write_line(
         format!(
             "typedef {} {}; // enum, should be in the [0...{}] range",
             type_name,
@@ -34,8 +33,9 @@ pub fn generate<W: Write>(
         )
         .as_bytes(),
     )?;
-    pretty_writer.write_line(format!("enum ___{} {{", data_type_entry.name.name).as_bytes())?;
-    let mut pretty_writer_i1 = pretty_writer.new_block();
+    gen.w
+        .write_line(format!("enum ___{} {{", data_type_entry.name.name).as_bytes())?;
+    let mut pretty_writer_i1 = gen.w.new_block();
     for (i, named_member) in named_members.iter().enumerate() {
         pretty_writer_i1.write_line(
             format!(
@@ -46,26 +46,20 @@ pub fn generate<W: Write>(
             .as_bytes(),
         )?;
     }
-    pretty_writer.write_line(b"};")?;
-    pretty_writer.eob()?;
-    pretty_writer.write_line(
+    gen.w.write_line(b"};")?;
+    gen.w.eob()?;
+    gen.w.write_line(
         format!(
             "_Static_assert(sizeof({}) == {}, \"unexpected enumeration size\");",
             data_type_entry.name.name, type_size
         )
         .as_bytes(),
     )?;
-    pretty_writer.eob()?;
-    macros::define(
-        cgenerator,
-        pretty_writer,
-        "BYTES",
-        &data_type_entry.name.name,
-        type_size,
-    )?;
-    pretty_writer.eob()?;
+    gen.w.eob()?;
+    macros::define(gen, "BYTES", &data_type_entry.name.name, type_size)?;
+    gen.w.eob()?;
 
-    cgenerator.cache.store_type(
+    gen.cache.store_type(
         data_type_entry.id,
         CachedTypeEntry {
             type_size,

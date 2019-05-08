@@ -29,10 +29,10 @@ impl Config {
         }
     }
 
-    pub fn generator<W: Write>(&self) -> Box<dyn Generator<W>> {
+    pub fn generator(&self, w: Box<dyn Write>) -> Box<dyn Generator> {
         match self.backend {
-            Backend::C => Box::new(CGenerator::new(self.target, self.backend_config)),
-            Backend::Rust => Box::new(RustGenerator::new(self.target, self.backend_config)),
+            Backend::C => Box::new(CGenerator::new(self.target, self.backend_config, w)),
+            Backend::Rust => Box::new(RustGenerator::new(self.target, self.backend_config, w)),
         }
     }
 }

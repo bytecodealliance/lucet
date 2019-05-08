@@ -1,7 +1,7 @@
 use super::*;
 
-pub fn generate<W: Write>(
-    pretty_writer: &mut PrettyWriter<W>,
+pub fn generate(
+    pretty_writer: &mut PrettyWriter,
     target: Target,
     backend_config: BackendConfig,
 ) -> Result<(), IDLError> {

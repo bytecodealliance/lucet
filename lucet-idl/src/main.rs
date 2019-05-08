@@ -74,7 +74,7 @@ fn doit() -> Result<(), IDLError> {
     let mut source = String::new();
     File::open(&exe_config.input_path)?.read_to_string(&mut source)?;
 
-    run(&exe_config.config, &source, io::stdout())?;
+    run(&exe_config.config, &source, Box::new(io::stdout()))?;
 
     Ok(())
 }

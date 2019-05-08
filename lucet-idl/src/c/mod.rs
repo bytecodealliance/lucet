@@ -17,7 +17,7 @@ use crate::generator::Generator;
 use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
-use crate::types::{DataType, DataTypeRef, Named};
+use crate::types::{DataType, DataTypeRef, FuncDecl, Named};
 use std::io::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -37,25 +37,16 @@ pub struct CGenerator {
     pub target: Target,
     pub backend_config: BackendConfig,
     pub cache: Cache,
+    pub w: PrettyWriter,
 }
 
-impl<W: Write> Generator<W> for CGenerator {
-    fn gen_prelude(&mut self, pretty_writer: &mut PrettyWriter<W>) -> Result<(), IDLError> {
-        pretty_writer
-            .eob()?
-            .write_line(b"// ---------- Prelude ----------")?
-            .eob()?;
-        prelude::generate(pretty_writer, self.target, self.backend_config)?;
-        Ok(())
-    }
-
+impl Generator for CGenerator {
     fn gen_type_header(
         &mut self,
         _module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
-        pretty_writer
+        self.w
             .eob()?
             .write_line(
                 format!("// ---------- {} ----------", data_type_entry.name.name).as_bytes(),
@@ -69,19 +60,17 @@ impl<W: Write> Generator<W> for CGenerator {
     fn gen_alias(
         &mut self,
         module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
-        alias::generate(self, module, pretty_writer, data_type_entry)
+        alias::generate(self, module, data_type_entry)
     }
 
     fn gen_struct(
         &mut self,
         module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
-        r#struct::generate(self, module, pretty_writer, data_type_entry)
+        r#struct::generate(self, module, data_type_entry)
     }
 
     // Enums generate both a specific typedef, and a traditional C-style enum
@@ -89,19 +78,27 @@ impl<W: Write> Generator<W> for CGenerator {
     fn gen_enum(
         &mut self,
         module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
-        r#enum::generate(self, module, pretty_writer, data_type_entry)
+        r#enum::generate(self, module, data_type_entry)
+    }
+
+    fn gen_function(
+        &mut self,
+        module: &Module,
+        func_decl_entry: &Named<FuncDecl>,
+    ) -> Result<(), IDLError> {
+        unimplemented!();
     }
 }
 
 impl CGenerator {
-    pub fn new(target: Target, backend_config: BackendConfig) -> Self {
+    pub fn new(target: Target, backend_config: BackendConfig, w: Box<dyn Write>) -> Self {
         Self {
             target,
             backend_config,
             cache: Cache::default(),
+            w: PrettyWriter::new(w),
         }
     }
     /// Traverse a `DataTypeRef` chain, and return information

@@ -2,10 +2,9 @@ use super::*;
 
 // The most important thing in alias generation is to cache the size
 // and alignment rules of what it ultimately points to
-pub fn generate<W: Write>(
-    cgenerator: &mut CGenerator,
+pub fn generate(
+    gen: &mut CGenerator,
     module: &Module,
-    pretty_writer: &mut PrettyWriter<W>,
     data_type_entry: &Named<DataType>,
 ) -> Result<(), IDLError> {
     let (type_, _attrs) = if let DataType::Alias { to: type_, attrs } = &data_type_entry.entity {
@@ -13,20 +12,21 @@ pub fn generate<W: Write>(
     } else {
         unreachable!()
     };
-    let type_info = cgenerator.type_info(module, type_);
-    pretty_writer.indent()?;
-    pretty_writer.write(format!("typedef {}", type_info.type_name).as_bytes())?;
-    pretty_writer.space()?;
-    pretty_writer.write(data_type_entry.name.name.as_bytes())?;
-    pretty_writer.write(b";")?;
-    let leaf_type_info = cgenerator.type_info(module, type_info.leaf_data_type_ref);
+    let type_info = gen.type_info(module, type_);
+    gen.w.indent()?;
+    gen.w
+        .write(format!("typedef {}", type_info.type_name).as_bytes())?;
+    gen.w.space()?;
+    gen.w.write(data_type_entry.name.name.as_bytes())?;
+    gen.w.write(b";")?;
+    let leaf_type_info = gen.type_info(module, type_info.leaf_data_type_ref);
     if leaf_type_info.type_name != type_info.type_name {
-        pretty_writer.write(b" // equivalent to ")?;
-        pretty_writer.write(leaf_type_info.type_name.as_bytes())?;
+        gen.w.write(b" // equivalent to ")?;
+        gen.w.write(leaf_type_info.type_name.as_bytes())?;
     }
-    pretty_writer.eol()?;
-    pretty_writer.eob()?;
-    cgenerator.cache.store_type(
+    gen.w.eol()?;
+    gen.w.eob()?;
+    gen.cache.store_type(
         data_type_entry.id,
         CachedTypeEntry {
             type_size: type_info.type_size,
@@ -36,14 +36,14 @@ pub fn generate<W: Write>(
     );
 
     // Add an assertion to check that resolved size is the one we computed
-    pretty_writer.write_line(
+    gen.w.write_line(
         format!(
             "_Static_assert(sizeof({}) == {}, \"unexpected alias size\");",
             data_type_entry.name.name, type_info.type_size
         )
         .as_bytes(),
     )?;
-    pretty_writer.eob()?;
+    gen.w.eob()?;
 
     Ok(())
 }

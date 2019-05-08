@@ -24,29 +24,24 @@ pub use crate::target::Target;
 
 use crate::package::Package;
 use crate::parser::Parser;
-use crate::pretty_writer::PrettyWriter;
 use std::io::Write;
 
-pub fn run<W: Write>(config: &Config, input: &str, output: W) -> Result<W, IDLError> {
+pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
     let mut parser = Parser::new(&input);
     let decls = parser.match_decls()?;
 
-    let mut pretty_writer = PrettyWriter::new(output);
     let pkg = Package::from_declarations(&decls)?;
+
+    let mut generator = config.generator(output);
 
     for (_ident, mod_) in pkg.modules {
         let deps = mod_
-            .ordered_dependencies()
+            .ordered_datatype_idents()
             .map_err(|_| IDLError::InternalError("Unable to resolve dependencies"))?;
 
-        let mut generator = config.generator();
-
-        generator.gen_prelude(&mut pretty_writer)?;
         for id in deps {
-            generator.gen_for_id(&mod_, &mut pretty_writer, id)?;
+            generator.gen_for_id(&mod_, id)?;
         }
     }
-    Ok(pretty_writer
-        .into_inner()
-        .expect("outermost pretty_writer can unwrap"))
+    Ok(())
 }

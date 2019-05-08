@@ -8,7 +8,7 @@ use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
 use crate::types::AtomType;
-use crate::types::{DataType, DataTypeRef, Ident, Named};
+use crate::types::{DataType, DataTypeRef, FuncDecl, Ident, Named};
 use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
 use std::io::Write;
@@ -30,14 +30,16 @@ pub struct RustGenerator {
     pub target: Target,
     pub backend_config: BackendConfig,
     pub defined: HashMap<Ident, String>,
+    pub w: PrettyWriter,
 }
 
 impl RustGenerator {
-    pub fn new(target: Target, backend_config: BackendConfig) -> Self {
+    pub fn new(target: Target, backend_config: BackendConfig, w: Box<dyn Write>) -> Self {
         Self {
             target,
             backend_config,
             defined: HashMap::new(),
+            w: PrettyWriter::new(w),
         }
     }
 
@@ -72,18 +74,13 @@ impl RustGenerator {
     }
 }
 
-impl<W: Write> Generator<W> for RustGenerator {
-    fn gen_prelude(&mut self, _pretty_writer: &mut PrettyWriter<W>) -> Result<(), IDLError> {
-        Ok(())
-    }
-
+impl Generator for RustGenerator {
     fn gen_type_header(
         &mut self,
         _module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
-        pretty_writer.eob()?.write_line(
+        self.w.eob()?.write_line(
             format!("/// {}: {:?}", data_type_entry.name.name, data_type_entry).as_bytes(),
         )?;
         Ok(())
@@ -92,7 +89,6 @@ impl<W: Write> Generator<W> for RustGenerator {
     fn gen_alias(
         &mut self,
         module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         let (pointee, _attrs) =
@@ -105,7 +101,7 @@ impl<W: Write> Generator<W> for RustGenerator {
         let typename = self.define_name(data_type_entry);
         let pointee_name = self.get_defined_name(pointee);
 
-        pretty_writer
+        self.w
             .write_line(format!("type {} = {};", typename, pointee_name).as_bytes())?
             .eob()?;
         Ok(())
@@ -114,7 +110,6 @@ impl<W: Write> Generator<W> for RustGenerator {
     fn gen_struct(
         &mut self,
         module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         let (named_members, _attrs) = if let DataType::Struct {
@@ -130,14 +125,15 @@ impl<W: Write> Generator<W> for RustGenerator {
         let typename = data_type_entry.name.name.to_camel_case();
         self.defined.insert(data_type_entry.id, typename.clone());
 
-        pretty_writer
+        self.w
             .write_line("#[repr(C)]".as_bytes())?
             .write_line(format!("struct {} {{", typename).as_bytes())?;
 
+        let mut w = self.w.new_block();
         for m in named_members {
-            pretty_writer.write_line(
+            w.write_line(
                 format!(
-                    "    {}: {},",
+                    "{}: {},",
                     m.name.to_snake_case(),
                     self.get_defined_name(&m.type_)
                 )
@@ -145,7 +141,7 @@ impl<W: Write> Generator<W> for RustGenerator {
             )?;
         }
 
-        pretty_writer.write_line("}".as_bytes())?.eob()?;
+        self.w.write_line("}".as_bytes())?.eob()?;
         Ok(())
     }
 
@@ -154,7 +150,6 @@ impl<W: Write> Generator<W> for RustGenerator {
     fn gen_enum(
         &mut self,
         module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
         data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         let (named_members, _attrs) = if let DataType::Enum {
@@ -170,16 +165,25 @@ impl<W: Write> Generator<W> for RustGenerator {
         let typename = data_type_entry.name.name.to_camel_case();
         self.defined.insert(data_type_entry.id, typename.clone());
 
-        pretty_writer
+        self.w
             .write_line("#[repr(C)]".as_bytes())?
             .write_line("#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]".as_bytes())?
             .write_line(format!("enum {} {{", typename).as_bytes())?;
 
+        let mut w = self.w.new_block();
         for m in named_members {
-            pretty_writer.write_line(format!("    {},", m.name.to_camel_case()).as_bytes())?;
+            w.write_line(format!("{},", m.name.to_camel_case()).as_bytes())?;
         }
 
-        pretty_writer.write_line("}".as_bytes())?.eob()?;
+        self.w.write_line("}".as_bytes())?.eob()?;
         Ok(())
+    }
+
+    fn gen_function(
+        &mut self,
+        module: &Module,
+        func_decl_entry: &Named<FuncDecl>,
+    ) -> Result<(), IDLError> {
+        unimplemented!();
     }
 }

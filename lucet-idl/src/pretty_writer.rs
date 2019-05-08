@@ -6,15 +6,15 @@ use std::rc::Rc;
 
 /// Write indented code
 /// #[derive(Clone)]
-pub struct PrettyWriter<W: Write> {
-    writer: Rc<RefCell<W>>,
+pub struct PrettyWriter {
+    writer: Rc<RefCell<Box<dyn Write>>>,
     indent: u32,
     indent_bytes: Vec<u8>,
 }
 
-impl<W: Write> PrettyWriter<W> {
+impl PrettyWriter {
     /// Create a new `PrettyWriter` with `indent` initial units of indentation
-    pub fn new_with_indent(writer: W, indent: u32) -> Self {
+    pub fn new_with_indent(writer: Box<dyn Write>, indent: u32) -> Self {
         PrettyWriter {
             writer: Rc::new(RefCell::new(writer)),
             indent,
@@ -23,17 +23,8 @@ impl<W: Write> PrettyWriter<W> {
     }
 
     /// Create a new `PrettyWriter` with no initial indentation
-    pub fn new(writer: W) -> Self {
+    pub fn new(writer: Box<dyn Write>) -> Self {
         PrettyWriter::new_with_indent(writer, 0)
-    }
-
-    /// Create a writer based on a existing writer, but with no indentation`
-    pub fn new_from_writer(&mut self) -> Self {
-        PrettyWriter {
-            writer: self.writer.clone(),
-            indent: 0,
-            indent_bytes: self.indent_bytes.clone(),
-        }
     }
 
     /// Create an indented block within the current `PrettyWriter`
@@ -45,8 +36,8 @@ impl<W: Write> PrettyWriter<W> {
         }
     }
 
-    fn _write_all(writer: &mut W, buf: &[u8]) -> Result<(), IDLError> {
-        writer.write_all(buf).map_err(Into::into)
+    fn _write_all(&mut self, buf: &[u8]) -> Result<(), IDLError> {
+        self.writer.borrow_mut().write_all(buf).map_err(Into::into)
     }
 
     /// Return the current indentation level
@@ -59,9 +50,8 @@ impl<W: Write> PrettyWriter<W> {
     pub fn indent(&mut self) -> Result<&mut Self, IDLError> {
         let indent_bytes = &self.indent_bytes.clone();
         {
-            let mut writer = self.writer.borrow_mut();
             for _ in 0..self.indent {
-                Self::_write_all(&mut writer, indent_bytes)?
+                self._write_all(indent_bytes)?
             }
         }
         Ok(self)
@@ -69,13 +59,13 @@ impl<W: Write> PrettyWriter<W> {
 
     /// Output a space
     pub fn space(&mut self) -> Result<&mut Self, IDLError> {
-        Self::_write_all(&mut self.writer.borrow_mut(), b" ")?;
+        self._write_all(b" ")?;
         Ok(self)
     }
 
     /// Output an end of line
     pub fn eol(&mut self) -> Result<&mut Self, IDLError> {
-        Self::_write_all(&mut self.writer.borrow_mut(), b"\n")?;
+        self._write_all(b"\n")?;
         Ok(self)
     }
 
@@ -84,26 +74,14 @@ impl<W: Write> PrettyWriter<W> {
         self.eol()
     }
 
-    /// Continuation
-    pub fn continuation(&mut self) -> Result<&mut Self, IDLError> {
-        self.indent()?;
-        let indent_bytes = &self.indent_bytes.clone();
-        Self::_write_all(&mut self.writer.borrow_mut(), indent_bytes)?;
-        Ok(self)
-    }
-
     /// Write raw data
     pub fn write(&mut self, buf: &[u8]) -> Result<&mut Self, IDLError> {
-        Self::_write_all(&mut self.writer.borrow_mut(), buf)?;
+        self._write_all(buf)?;
         Ok(self)
     }
 
     /// Indent, write raw data and terminate with an end of line
     pub fn write_line(&mut self, buf: &[u8]) -> Result<&mut Self, IDLError> {
         self.indent()?.write(buf)?.eol()
-    }
-
-    pub fn into_inner(self) -> Option<W> {
-        Rc::try_unwrap(self.writer).ok().map(|w| w.into_inner())
     }
 }

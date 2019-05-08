@@ -22,16 +22,14 @@ pub fn macro_for(prefix: &str, name: &str) -> String {
 
 // Generate a macro definition
 
-pub fn define<W: Write, V: ToString>(
-    _cgenerator: &mut CGenerator,
-    pretty_writer: &mut PrettyWriter<W>,
+pub fn define<V: ToString>(
+    gen: &mut CGenerator,
     prefix: &str,
     name: &str,
     value: V,
 ) -> Result<(), IDLError> {
     let macro_name = macro_for(prefix, name);
-    let mut pretty_writer_preprocessor = pretty_writer.new_from_writer();
-    pretty_writer_preprocessor
+    gen.w
         .write_line(format!("#define {} {}", macro_name, value.to_string()).as_ref())?;
     Ok(())
 }
