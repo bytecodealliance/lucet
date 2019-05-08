@@ -57,6 +57,7 @@ impl RustGenerator {
     fn atom_name(atom_type: &AtomType) -> &'static str {
         use AtomType::*;
         match atom_type {
+            Bool => "bool",
             U8 => "u8",
             U16 => "u16",
             U32 => "u32",

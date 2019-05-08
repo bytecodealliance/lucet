@@ -136,6 +136,7 @@ impl<'a> Lexer<'a> {
         let text = &self.source[begin..self.pos];
         token(
             match text {
+                "bool" => Token::Atom(AtomType::Bool),
                 "i8" => Token::Atom(AtomType::I8),
                 "i16" => Token::Atom(AtomType::I16),
                 "i32" => Token::Atom(AtomType::I32),

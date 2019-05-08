@@ -69,12 +69,8 @@ pub trait Generator<W: Write> {
         if let Some(data_type_entry) = module.get_datatype(id) {
             self.gen_type_header(module, pretty_writer, &data_type_entry)?;
             match &data_type_entry.data_type {
-                DataType::Struct { .. } => {
-                    self.gen_struct(module, pretty_writer, &data_type_entry)
-                }
-                DataType::Alias { .. } => {
-                    self.gen_alias(module, pretty_writer, &data_type_entry)
-                }
+                DataType::Struct { .. } => self.gen_struct(module, pretty_writer, &data_type_entry),
+                DataType::Alias { .. } => self.gen_alias(module, pretty_writer, &data_type_entry),
                 DataType::Enum { .. } => self.gen_enum(module, pretty_writer, &data_type_entry),
             }?;
             self.gen_accessors_for_id(

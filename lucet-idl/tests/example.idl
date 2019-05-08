@@ -23,4 +23,9 @@ mod example {
         c: color,
     }
 
+    // functions
+
+    fn set_color(to: color) -> bool;
+
+    fn get_structure(for: color) -> st;
 }

@@ -11,6 +11,11 @@ pub struct CAtom {
 impl From<AtomType> for CAtom {
     fn from(atom_type: AtomType) -> Self {
         match atom_type {
+            AtomType::Bool => CAtom {
+                native_type_name: "bool",
+                native_type_size: 1,
+                native_type_align: 1,
+            },
             AtomType::U8 => CAtom {
                 native_type_name: "uint8_t",
                 native_type_size: 1,

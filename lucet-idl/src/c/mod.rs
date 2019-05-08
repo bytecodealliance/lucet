@@ -10,9 +10,9 @@ mod macros;
 mod prelude;
 mod r#struct;
 
+use self::cache::{Cache, CachedStructMemberEntry, CachedTypeEntry};
 pub(crate) use self::catom::*;
 use crate::backend::*;
-use self::cache::{Cache, CachedStructMemberEntry, CachedTypeEntry};
 use crate::error::IDLError;
 use crate::generator::{Generator, Hierarchy};
 use crate::module::Module;
@@ -155,9 +155,7 @@ impl<W: Write> Generator<W> for CGenerator {
 }
 
 impl CGenerator {
-    pub fn new(
-        target: Target,
-        backend_config: BackendConfig) -> Self {
+    pub fn new(target: Target, backend_config: BackendConfig) -> Self {
         Self {
             target,
             backend_config,
@@ -167,11 +165,7 @@ impl CGenerator {
     /// Traverse a `DataTypeRef` chain, and return information
     /// about the leaf node as well as the native type to use
     /// for this data type
-    fn type_info<'t>(
-        &self,
-        module: &'t Module,
-        mut type_: &'t DataTypeRef,
-    ) -> CTypeInfo<'t> {
+    fn type_info<'t>(&self, module: &'t Module, mut type_: &'t DataTypeRef) -> CTypeInfo<'t> {
         let (mut type_align, mut type_size) = (None, None);
         let mut type_name = None;
         loop {
@@ -187,7 +181,9 @@ impl CGenerator {
                     let cached = self.cache.load_type(*data_type_id).unwrap();
                     type_align = type_align.or_else(|| Some(cached.type_align));
                     type_size = type_size.or_else(|| Some(cached.type_size));
-                    let data_type_entry = module.get_datatype(*data_type_id).expect("defined datatype");
+                    let data_type_entry = module
+                        .get_datatype(*data_type_id)
+                        .expect("defined datatype");
                     match data_type_entry.data_type {
                         DataType::Struct { .. } => {
                             type_name = type_name
@@ -221,11 +217,7 @@ impl CGenerator {
     }
 
     // Return `true` if the type is an atom, an emum, or an alias to one of these
-    pub fn is_type_eventually_an_atom_or_enum(
-        &self,
-        module: &Module,
-        type_: &DataTypeRef,
-    ) -> bool {
+    pub fn is_type_eventually_an_atom_or_enum(&self, module: &Module, type_: &DataTypeRef) -> bool {
         let inner_type = match type_ {
             DataTypeRef::Atom(_) => return true,
             DataTypeRef::Defined(inner_type) => inner_type,
