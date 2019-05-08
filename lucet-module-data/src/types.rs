@@ -61,6 +61,28 @@ pub struct Signature {
     pub ret_ty: Option<ValueType>,
 }
 
+#[macro_export]
+macro_rules! lucet_signature {
+    ((() -> ())) => {
+        $crate::Signature {
+            params: vec![],
+            ret_ty: None
+        }
+    };
+    (($($arg_ty:ident),*) -> ()) => {
+        $crate::Signature {
+            params: vec![$($crate::ValueType::$arg_ty),*],
+            ret_ty: None,
+        }
+    };
+    (($($arg_ty:ident),*) -> $ret_ty:ident) => {
+        $crate::Signature {
+            params: vec![$($crate::ValueType::$arg_ty),*],
+            ret_ty: Some($crate::ValueType::$ret_ty),
+        }
+    };
+}
+
 #[derive(Debug)]
 pub enum SignatureError {
     BadElement(ir::AbiParam, ValueError),

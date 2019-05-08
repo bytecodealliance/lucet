@@ -1,6 +1,6 @@
 use crate::build::test_module_wasm;
 use crate::helpers::{MockExportBuilder, MockModuleBuilder};
-use lucet_module_data::{Signature, ValueType};
+use lucet_module_data::lucet_signature;
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
@@ -121,84 +121,45 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"add_2", add_2 as *const extern "C" fn()).with_sig(Signature {
-                params: vec![ValueType::I64; 2],
-                ret_ty: Some(ValueType::I64),
-            }),
+            MockExportBuilder::new(b"add_2", add_2 as *const extern "C" fn())
+                .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_10", add_10 as *const extern "C" fn()).with_sig(
-                Signature {
-                    params: vec![ValueType::I64; 10],
-                    ret_ty: Some(ValueType::I64),
-                },
-            ),
+            MockExportBuilder::new(b"add_10", add_10 as *const extern "C" fn())
+                .with_sig(lucet_signature!(
+                    (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"mul_2", mul_2 as *const extern "C" fn()).with_sig(Signature {
-                params: vec![ValueType::I64; 2],
-                ret_ty: Some(ValueType::I64),
-            }),
+            MockExportBuilder::new(b"mul_2", mul_2 as *const extern "C" fn())
+                .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f32_2", add_f32_2 as *const extern "C" fn()).with_sig(
-                Signature {
-                    params: vec![ValueType::F32; 2],
-                    ret_ty: Some(ValueType::F32),
-                },
-            ),
+            MockExportBuilder::new(b"add_f32_2", add_f32_2 as *const extern "C" fn())
+                .with_sig(lucet_signature!((F32, F32) -> F32)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f64_2", add_f64_2 as *const extern "C" fn()).with_sig(
-                Signature {
-                    params: vec![ValueType::F64; 2],
-                    ret_ty: Some(ValueType::F64),
-                },
-            ),
+            MockExportBuilder::new(b"add_f64_2", add_f64_2 as *const extern "C" fn())
+                .with_sig(lucet_signature!((F64, F64) -> F64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f32_10", add_f32_10 as *const extern "C" fn()).with_sig(
-                Signature {
-                    params: vec![ValueType::F32; 10],
-                    ret_ty: Some(ValueType::F32),
-                },
-            ),
+            MockExportBuilder::new(b"add_f32_10", add_f32_10 as *const extern "C" fn())
+                .with_sig(lucet_signature!(
+                    (F32, F32, F32, F32, F32, F32, F32, F32, F32, F32) -> F32)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f64_10", add_f64_10 as *const extern "C" fn()).with_sig(
-                Signature {
-                    params: vec![ValueType::F64; 10],
-                    ret_ty: Some(ValueType::F64),
-                },
-            ),
+            MockExportBuilder::new(b"add_f64_10", add_f64_10 as *const extern "C" fn())
+                .with_sig(lucet_signature!(
+                    (F64, F64, F64, F64, F64, F64, F64, F64, F64, F64) -> F64)),
         )
         .with_export_func(
             MockExportBuilder::new(b"add_mixed_20", add_mixed_20 as *const extern "C" fn())
-                .with_sig(Signature {
-                    params: vec![
-                        ValueType::F64,
-                        ValueType::I32,
-                        ValueType::F32,
-                        ValueType::F64,
-                        ValueType::I32,
-                        ValueType::F32,
-                        ValueType::F64,
-                        ValueType::I32,
-                        ValueType::F32,
-                        ValueType::F64,
-                        ValueType::I32,
-                        ValueType::F32,
-                        ValueType::F64,
-                        ValueType::I32,
-                        ValueType::F32,
-                        ValueType::F64,
-                        ValueType::I64,
-                        ValueType::F32,
-                        ValueType::F64,
-                        ValueType::I64,
-                    ],
-                    ret_ty: Some(ValueType::F64),
-                }),
+                .with_sig(lucet_signature!(
+                    (
+                        F64, I32, F32, F64, I32, F32,
+                        F64, I32, F32, F64, I32, F32,
+                        F64, I32, F32, F64, I64, F32,
+                        F64, I64
+                    ) -> F64)),
         )
         .build()
 }
