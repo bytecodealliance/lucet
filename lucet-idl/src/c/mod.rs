@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-// mod accessors;
 mod alias;
 mod cache;
 mod catom;
@@ -14,7 +13,7 @@ use self::cache::{Cache, CachedStructMemberEntry, CachedTypeEntry};
 pub(crate) use self::catom::*;
 use crate::backend::*;
 use crate::error::IDLError;
-use crate::generator::{Generator, Hierarchy};
+use crate::generator::Generator;
 use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
@@ -94,63 +93,6 @@ impl<W: Write> Generator<W> for CGenerator {
         data_type_entry: &DataTypeEntry<'_>,
     ) -> Result<(), IDLError> {
         r#enum::generate(self, module, pretty_writer, data_type_entry)
-    }
-
-    fn gen_accessors_struct(
-        &mut self,
-        module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
-        hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError> {
-        /*
-        accessors::r#struct::generate(
-            self,
-            module,
-            pretty_writer,
-            data_type_entry,
-            hierarchy,
-        )
-        */
-        Ok(())
-    }
-
-    fn gen_accessors_enum(
-        &mut self,
-        module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
-        hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError> {
-        /*
-        accessors::r#enum::generate(
-            self,
-            module,
-            pretty_writer,
-            data_type_entry,
-            hierarchy,
-        )
-        */
-        Ok(())
-    }
-
-    fn gen_accessors_alias(
-        &mut self,
-        module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
-        hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError> {
-        /*
-        accessors::alias::generate(
-            self,
-            module,
-            pretty_writer,
-            data_type_entry,
-            hierarchy,
-        )
-        */
-        Ok(())
     }
 }
 
@@ -245,25 +187,4 @@ impl CGenerator {
             type_
         }
     }
-
-    /*
-    fn gen_accessors_for_data_type_ref<W: Write>(
-        &mut self,
-        module: &Module,
-        pretty_writer: &mut PrettyWriter<W>,
-        type_: &DataTypeRef,
-        name: &str,
-        hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError> {
-        let type_ = self.unalias(module, type_);
-        match type_ {
-            DataTypeRef::Atom(atom_type) => {
-                accessors::atom::generate(self, module, pretty_writer, *atom_type, &hierarchy)
-            }
-            DataTypeRef::Defined(data_type_id) => {
-                self.gen_accessors_for_id(module, pretty_writer, *data_type_id, &hierarchy)
-            }
-        }
-    }
-    */
 }

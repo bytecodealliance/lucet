@@ -3,7 +3,7 @@
 
 use crate::backend::BackendConfig;
 use crate::error::IDLError;
-use crate::generator::{Generator, Hierarchy};
+use crate::generator::Generator;
 use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
@@ -180,36 +180,6 @@ impl<W: Write> Generator<W> for RustGenerator {
         }
 
         pretty_writer.write_line("}".as_bytes())?.eob()?;
-        Ok(())
-    }
-
-    fn gen_accessors_struct(
-        &mut self,
-        _module: &Module,
-        _pretty_writer: &mut PrettyWriter<W>,
-        _data_type_entry: &DataTypeEntry<'_>,
-        _hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError> {
-        Ok(())
-    }
-
-    fn gen_accessors_enum(
-        &mut self,
-        _module: &Module,
-        _pretty_writer: &mut PrettyWriter<W>,
-        _data_type_entry: &DataTypeEntry<'_>,
-        _hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError> {
-        Ok(())
-    }
-
-    fn gen_accessors_alias(
-        &mut self,
-        _module: &Module,
-        _pretty_writer: &mut PrettyWriter<W>,
-        _data_type_entry: &DataTypeEntry<'_>,
-        _hierarchy: &Hierarchy,
-    ) -> Result<(), IDLError> {
         Ok(())
     }
 }
