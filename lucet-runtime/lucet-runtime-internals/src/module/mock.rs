@@ -106,8 +106,8 @@ impl MockModuleBuilder {
             .signatures
             .iter()
             .enumerate()
-            .find(|(_, known_sig)| known_sig == &&sig)
-            .map(|(i, _)| i)
+            .find(|(_, v)| *v == &sig)
+            .map(|(key, _)| key)
             .unwrap_or_else(|| {
                 self.signatures.push(sig);
                 self.signatures.len() - 1
