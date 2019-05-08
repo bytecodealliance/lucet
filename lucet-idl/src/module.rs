@@ -1,8 +1,7 @@
 use crate::error::ValidationError;
 use crate::parser::{SyntaxDecl, SyntaxRef};
 use crate::types::{
-    Attr, DataType, DataTypeEntry, DataTypeRef, FuncDecl, FuncRet, Ident, Location, Name,
-    NamedMember,
+    Attr, DataType, DataTypeRef, FuncDecl, FuncRet, Ident, Location, Name, Named, NamedMember,
 };
 use std::collections::HashMap;
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -311,13 +310,13 @@ impl Module {
     }
 
     /// Retrieve information about a data type given its identifier
-    pub fn get_datatype(&self, id: Ident) -> Option<DataTypeEntry<'_>> {
+    pub fn get_datatype(&self, id: Ident) -> Option<Named<DataType>> {
         let name = &self.names[id.0];
         if let Some(data_type) = &self.data_types.get(&id) {
-            Some(DataTypeEntry {
+            Some(Named {
                 id,
                 name,
-                data_type,
+                entity: data_type,
             })
         } else {
             None

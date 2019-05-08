@@ -5,12 +5,12 @@ pub fn generate<W: Write>(
     cgenerator: &mut CGenerator,
     module: &Module,
     pretty_writer: &mut PrettyWriter<W>,
-    data_type_entry: &DataTypeEntry<'_>,
+    data_type_entry: &Named<DataType>,
 ) -> Result<(), IDLError> {
     let (named_members, _attrs) = if let DataType::Struct {
         members: named_members,
         attrs,
-    } = &data_type_entry.data_type
+    } = &data_type_entry.entity
     {
         (named_members, attrs)
     } else {

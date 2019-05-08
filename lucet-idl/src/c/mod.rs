@@ -17,7 +17,7 @@ use crate::generator::Generator;
 use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
-use crate::types::{DataType, DataTypeEntry, DataTypeRef};
+use crate::types::{DataType, DataTypeRef, Named};
 use std::io::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -53,7 +53,7 @@ impl<W: Write> Generator<W> for CGenerator {
         &mut self,
         _module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
+        data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         pretty_writer
             .eob()?
@@ -70,7 +70,7 @@ impl<W: Write> Generator<W> for CGenerator {
         &mut self,
         module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
+        data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         alias::generate(self, module, pretty_writer, data_type_entry)
     }
@@ -79,7 +79,7 @@ impl<W: Write> Generator<W> for CGenerator {
         &mut self,
         module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
+        data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         r#struct::generate(self, module, pretty_writer, data_type_entry)
     }
@@ -90,7 +90,7 @@ impl<W: Write> Generator<W> for CGenerator {
         &mut self,
         module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
+        data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         r#enum::generate(self, module, pretty_writer, data_type_entry)
     }
@@ -126,7 +126,7 @@ impl CGenerator {
                     let data_type_entry = module
                         .get_datatype(*data_type_id)
                         .expect("defined datatype");
-                    match data_type_entry.data_type {
+                    match data_type_entry.entity {
                         DataType::Struct { .. } => {
                             type_name = type_name
                                 .or_else(|| Some(format!("struct {}", data_type_entry.name.name)))
@@ -165,7 +165,7 @@ impl CGenerator {
             DataTypeRef::Defined(inner_type) => inner_type,
         };
         let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
-        let inner_data_type = inner_data_type_entry.data_type;
+        let inner_data_type = inner_data_type_entry.entity;
         match inner_data_type {
             DataType::Struct { .. } => false,
             DataType::Enum { .. } => true,
@@ -180,7 +180,7 @@ impl CGenerator {
             DataTypeRef::Defined(inner_type) => inner_type,
         };
         let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
-        let inner_data_type = inner_data_type_entry.data_type;
+        let inner_data_type = inner_data_type_entry.entity;
         if let DataType::Alias { to, .. } = inner_data_type {
             self.unalias(module, to)
         } else {

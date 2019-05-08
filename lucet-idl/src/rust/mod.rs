@@ -8,7 +8,7 @@ use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
 use crate::types::AtomType;
-use crate::types::{DataType, DataTypeEntry, DataTypeRef, Ident};
+use crate::types::{DataType, DataTypeRef, Ident, Named};
 use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
 use std::io::Write;
@@ -41,7 +41,7 @@ impl RustGenerator {
         }
     }
 
-    fn define_name(&mut self, data_type_entry: &DataTypeEntry) -> String {
+    fn define_name(&mut self, data_type_entry: &Named<DataType>) -> String {
         let typename = data_type_entry.name.name.to_camel_case();
         self.defined.insert(data_type_entry.id, typename.clone());
         typename
@@ -81,7 +81,7 @@ impl<W: Write> Generator<W> for RustGenerator {
         &mut self,
         _module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
+        data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         pretty_writer.eob()?.write_line(
             format!("/// {}: {:?}", data_type_entry.name.name, data_type_entry).as_bytes(),
@@ -93,10 +93,10 @@ impl<W: Write> Generator<W> for RustGenerator {
         &mut self,
         module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
+        data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         let (pointee, _attrs) =
-            if let DataType::Alias { to: pointee, attrs } = &data_type_entry.data_type {
+            if let DataType::Alias { to: pointee, attrs } = &data_type_entry.entity {
                 (pointee, attrs)
             } else {
                 unreachable!()
@@ -115,12 +115,12 @@ impl<W: Write> Generator<W> for RustGenerator {
         &mut self,
         module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
+        data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         let (named_members, _attrs) = if let DataType::Struct {
             members: named_members,
             attrs,
-        } = &data_type_entry.data_type
+        } = &data_type_entry.entity
         {
             (named_members, attrs)
         } else {
@@ -155,12 +155,12 @@ impl<W: Write> Generator<W> for RustGenerator {
         &mut self,
         module: &Module,
         pretty_writer: &mut PrettyWriter<W>,
-        data_type_entry: &DataTypeEntry<'_>,
+        data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
         let (named_members, _attrs) = if let DataType::Enum {
             members: named_members,
             attrs,
-        } = &data_type_entry.data_type
+        } = &data_type_entry.entity
         {
             (named_members, attrs)
         } else {

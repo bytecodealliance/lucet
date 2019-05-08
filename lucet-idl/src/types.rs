@@ -104,8 +104,8 @@ impl fmt::Display for Name {
 /// A convenient structure holding a data type, its name and
 /// its internal IDL representation
 #[derive(Debug, Clone)]
-pub struct DataTypeEntry<'t> {
+pub struct Named<'t, E> {
     pub id: Ident,
     pub name: &'t Name,
-    pub data_type: &'t DataType,
+    pub entity: &'t E,
 }
