@@ -80,9 +80,10 @@ impl Generator for RustGenerator {
         _module: &Module,
         data_type_entry: &Named<DataType>,
     ) -> Result<(), IDLError> {
-        self.w.eob()?.write_line(
-            format!("/// {}: {:?}", data_type_entry.name.name, data_type_entry).as_bytes(),
-        )?;
+        self.w.eob()?.writeln(format!(
+            "/// {}: {:?}",
+            data_type_entry.name.name, data_type_entry
+        ))?;
         Ok(())
     }
 
@@ -102,7 +103,7 @@ impl Generator for RustGenerator {
         let pointee_name = self.get_defined_name(pointee);
 
         self.w
-            .write_line(format!("type {} = {};", typename, pointee_name).as_bytes())?
+            .writeln(format!("type {} = {};", typename, pointee_name))?
             .eob()?;
         Ok(())
     }
@@ -126,22 +127,19 @@ impl Generator for RustGenerator {
         self.defined.insert(data_type_entry.id, typename.clone());
 
         self.w
-            .write_line("#[repr(C)]".as_bytes())?
-            .write_line(format!("struct {} {{", typename).as_bytes())?;
+            .writeln("#[repr(C)]")?
+            .writeln(format!("struct {} {{", typename))?;
 
         let mut w = self.w.new_block();
         for m in named_members {
-            w.write_line(
-                format!(
-                    "{}: {},",
-                    m.name.to_snake_case(),
-                    self.get_defined_name(&m.type_)
-                )
-                .as_bytes(),
-            )?;
+            w.writeln(format!(
+                "{}: {},",
+                m.name.to_snake_case(),
+                self.get_defined_name(&m.type_)
+            ))?;
         }
 
-        self.w.write_line("}".as_bytes())?.eob()?;
+        self.w.writeln("}")?.eob()?;
         Ok(())
     }
 
@@ -166,16 +164,16 @@ impl Generator for RustGenerator {
         self.defined.insert(data_type_entry.id, typename.clone());
 
         self.w
-            .write_line("#[repr(C)]".as_bytes())?
-            .write_line("#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]".as_bytes())?
-            .write_line(format!("enum {} {{", typename).as_bytes())?;
+            .writeln("#[repr(C)]")?
+            .writeln("#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]")?
+            .writeln(format!("enum {} {{", typename))?;
 
         let mut w = self.w.new_block();
         for m in named_members {
-            w.write_line(format!("{},", m.name.to_camel_case()).as_bytes())?;
+            w.writeln(format!("{},", m.name.to_camel_case()))?;
         }
 
-        self.w.write_line("}".as_bytes())?.eob()?;
+        self.w.writeln("}")?.eob()?;
         Ok(())
     }
 
@@ -184,6 +182,8 @@ impl Generator for RustGenerator {
         module: &Module,
         func_decl_entry: &Named<FuncDecl>,
     ) -> Result<(), IDLError> {
-        unimplemented!();
+        self.w
+            .write_line(format!("// {:?}", func_decl_entry).as_bytes())?;
+        Ok(())
     }
 }

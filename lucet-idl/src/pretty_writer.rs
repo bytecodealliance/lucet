@@ -84,4 +84,9 @@ impl PrettyWriter {
     pub fn write_line(&mut self, buf: &[u8]) -> Result<&mut Self, IDLError> {
         self.indent()?.write(buf)?.eol()
     }
+
+    /// Indent, write raw data and terminate with an end of line
+    pub fn writeln<S: AsRef<str>>(&mut self, buf: S) -> Result<&mut Self, IDLError> {
+        self.write_line(buf.as_ref().as_bytes())
+    }
 }

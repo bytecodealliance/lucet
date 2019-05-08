@@ -35,12 +35,11 @@ pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), I
     let mut generator = config.generator(output);
 
     for (_ident, mod_) in pkg.modules {
-        let deps = mod_
-            .ordered_datatype_idents()
-            .map_err(|_| IDLError::InternalError("Unable to resolve dependencies"))?;
-
-        for id in deps {
-            generator.gen_for_id(&mod_, id)?;
+        for dt in mod_.datatypes() {
+            generator.gen_datatype(&mod_, &dt)?;
+        }
+        for fdecl in mod_.func_decls() {
+            generator.gen_function(&mod_, &fdecl)?;
         }
     }
     Ok(())

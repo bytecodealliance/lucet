@@ -256,16 +256,6 @@ impl Module {
         Ok(())
     }
 
-    pub fn ordered_datatype_idents(&self) -> Result<Vec<Ident>, ()> {
-        let mut visited = Vec::new();
-        visited.resize(self.names.len(), false);
-        let mut ordered = Vec::with_capacity(visited.capacity());
-        for id in self.data_types.keys() {
-            let _ = self.dfs_walk(*id, &mut visited, &mut Some(&mut ordered));
-        }
-        Ok(ordered)
-    }
-
     fn dfs_find_cycle(&self, id: Ident) -> Result<(), ()> {
         let mut visited = Vec::new();
         visited.resize(self.names.len(), false);
@@ -335,6 +325,29 @@ impl Module {
         } else {
             None
         }
+    }
+
+    fn ordered_datatype_idents(&self) -> Vec<Ident> {
+        let mut visited = Vec::new();
+        visited.resize(self.names.len(), false);
+        let mut ordered = Vec::with_capacity(visited.capacity());
+        for id in self.data_types.keys() {
+            let _ = self.dfs_walk(*id, &mut visited, &mut Some(&mut ordered));
+        }
+        ordered
+    }
+
+    pub fn datatypes(&self) -> impl Iterator<Item = Named<DataType>> {
+        let idents = self.ordered_datatype_idents();
+        idents
+            .into_iter()
+            .map(move |i| self.get_datatype(i).unwrap())
+    }
+
+    pub fn func_decls(&self) -> impl Iterator<Item = Named<FuncDecl>> {
+        self.funcs
+            .iter()
+            .map(move |(i, _)| self.get_func_decl(*i).unwrap())
     }
 }
 
