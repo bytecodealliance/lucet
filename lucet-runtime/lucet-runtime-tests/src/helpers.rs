@@ -1,5 +1,5 @@
 // re-export types that should only be used for testing
-pub use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder};
+pub use lucet_runtime_internals::module::{HeapSpec, MockExportBuilder, MockModuleBuilder};
 
 use lazy_static::lazy_static;
 use std::sync::RwLock;

@@ -1,5 +1,5 @@
-use crate::helpers::MockModuleBuilder;
-use lucet_module_data::{Signature, TrapCode, TrapSite, ValueType};
+use crate::helpers::{MockExportBuilder, MockModuleBuilder};
+use lucet_module_data::{TrapCode, TrapSite};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
@@ -84,69 +84,39 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
     }];
 
     MockModuleBuilder::new()
-        .with_export_func(
+        .with_export_func(MockExportBuilder::new(
             b"onetwothree",
-            function_bytes_slice!(onetwothree),
-            &[],
-            Signature {
-                params: vec![],
-                ret_ty: Some(ValueType::I32),
-            },
+            onetwothree as *const extern "C" fn(),
+        ))
+        .with_export_func(
+            MockExportBuilder::new(
+                b"illegal_instr",
+                guest_func_illegal_instr as *const extern "C" fn(),
+            )
+            .with_func_len(11)
+            .with_traps(ILLEGAL_INSTR_TRAPS),
         )
         .with_export_func(
-            b"illegal_instr",
-            function_bytes_slice!(guest_func_illegal_instr, 11),
-            ILLEGAL_INSTR_TRAPS,
-            Signature {
-                params: vec![],
-                ret_ty: None,
-            },
+            MockExportBuilder::new(b"oob", guest_func_oob as *const extern "C" fn())
+                .with_func_len(41)
+                .with_traps(OOB_TRAPS),
         )
-        .with_export_func(
-            b"oob",
-            function_bytes_slice!(guest_func_oob, 41),
-            OOB_TRAPS,
-            Signature {
-                params: vec![],
-                ret_ty: None,
-            },
-        )
-        .with_export_func(
+        .with_export_func(MockExportBuilder::new(
             b"hostcall_main",
-            function_bytes_slice!(hostcall_main),
-            &[],
-            Signature {
-                params: vec![],
-                ret_ty: None,
-            },
-        )
-        .with_export_func(
+            hostcall_main as *const extern "C" fn(),
+        ))
+        .with_export_func(MockExportBuilder::new(
             b"infinite_loop",
-            function_bytes_slice!(infinite_loop),
-            &[],
-            Signature {
-                params: vec![],
-                ret_ty: None,
-            },
-        )
-        .with_export_func(
+            infinite_loop as *const extern "C" fn(),
+        ))
+        .with_export_func(MockExportBuilder::new(
             b"fatal",
-            function_bytes_slice!(fatal),
-            &[],
-            Signature {
-                params: vec![],
-                ret_ty: None,
-            },
-        )
-        .with_export_func(
+            fatal as *const extern "C" fn(),
+        ))
+        .with_export_func(MockExportBuilder::new(
             b"recoverable_fatal",
-            function_bytes_slice!(recoverable_fatal),
-            &[],
-            Signature {
-                params: vec![],
-                ret_ty: None,
-            },
-        )
+            recoverable_fatal as *const extern "C" fn(),
+        ))
         .build()
 }
 
@@ -169,7 +139,7 @@ macro_rules! guest_fault_tests {
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::guest_fault::mock_traps_module;
-        use $crate::helpers::{test_ex, test_nonex, MockModuleBuilder};
+        use $crate::helpers::{test_ex, test_nonex, MockExportBuilder, MockModuleBuilder};
 
         lazy_static! {
             static ref RECOVERABLE_PTR_LOCK: Mutex<()> = Mutex::new(());
@@ -575,15 +545,10 @@ macro_rules! guest_fault_tests {
                 // therefore testing that the host signal gets re-raised.
                 let child = std::thread::spawn(|| {
                     let module = MockModuleBuilder::new()
-                        .with_export_func(
+                        .with_export_func(MockExportBuilder::new(
                             b"sleepy_guest",
-                            function_bytes_slice!(sleepy_guest),
-                            &[],
-                            Signature {
-                                params: vec![],
-                                ret_ty: None,
-                            },
-                        )
+                            sleepy_guest as *const extern "C" fn(),
+                        ))
                         .build();
                     let region =
                         TestRegion::create(1, &Limits::default()).expect("region can be created");

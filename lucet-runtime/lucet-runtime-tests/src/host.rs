@@ -12,7 +12,7 @@ macro_rules! host_tests {
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
-        use $crate::helpers::MockModuleBuilder;
+        use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
         #[test]
         fn load_module() {
             let _module = test_module_c("host", "trivial.c").expect("build and load module");
@@ -218,15 +218,7 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(
-                    b"f",
-                    function_bytes_slice!(f),
-                    &[],
-                    Signature {
-                        params: vec![],
-                        ret_ty: None,
-                    },
-                )
+                .with_export_func(MockExportBuilder::new(b"f", f as *const extern "C" fn()))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -255,15 +247,7 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(
-                    b"f",
-                    function_bytes_slice!(f),
-                    &[],
-                    Signature {
-                        params: vec![],
-                        ret_ty: None,
-                    },
-                )
+                .with_export_func(MockExportBuilder::new(b"f", f as *const extern "C" fn()))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -292,15 +276,7 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(
-                    b"f",
-                    function_bytes_slice!(f),
-                    &[],
-                    Signature {
-                        params: vec![],
-                        ret_ty: None,
-                    },
-                )
+                .with_export_func(MockExportBuilder::new(b"f", f as *const extern "C" fn()))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");

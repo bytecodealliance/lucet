@@ -3,7 +3,7 @@ mod mock;
 mod sparse_page_data;
 
 pub use crate::module::dl::DlModule;
-pub use crate::module::mock::MockModuleBuilder;
+pub use crate::module::mock::{MockExportBuilder, MockModuleBuilder};
 pub use lucet_module_data::{
     FunctionSpec, Global, GlobalSpec, HeapSpec, Signature, TrapCode, TrapManifest, ValueType,
 };

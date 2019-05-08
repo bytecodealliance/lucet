@@ -1,7 +1,7 @@
 use lucet_runtime::lucet_hostcalls;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder, Module};
-use lucet_runtime_internals::module::Signature;
+use lucet_runtime_tests::helpers::MockExportBuilder;
 use lucet_wasi_sdk::{CompileOpts, Lucetc};
 use lucetc::{Bindings, LucetcOpts, OptLevel};
 use std::path::Path;
@@ -27,12 +27,7 @@ pub fn null_mock() -> Arc<dyn Module> {
     extern "C" fn f(_vmctx: *mut lucet_vmctx) {}
 
     MockModuleBuilder::new()
-        .with_export_func(
-            b"f",
-            unsafe { std::slice::from_raw_parts(f as *const extern "C" fn() as *const u8, 1) },
-            &[],
-            Signature { params: vec![], ret_ty: None }
-        )
+        .with_export_func(MockExportBuilder::new(b"f", f as *const extern "C" fn()))
         .build()
 }
 
@@ -55,10 +50,7 @@ pub fn large_dense_heap_mock(heap_kb: usize) -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            b"f",
-            unsafe { std::slice::from_raw_parts(f as *const extern "C" fn() as *const u8, 1) },
-            &[],
-            Signature { params: vec![], ret_ty: None }
+            MockExportBuilder::new(b"f", f as *const extern "C" fn())
         )
         .with_initial_heap(heap.as_slice())
         .with_heap_spec(heap_spec)
@@ -91,10 +83,7 @@ pub fn large_sparse_heap_mock(heap_kb: usize, stride: usize) -> Arc<dyn Module> 
 
     MockModuleBuilder::new()
         .with_export_func(
-            b"f",
-            unsafe { std::slice::from_raw_parts(f as *const extern "C" fn() as *const u8, 1) },
-            &[],
-            Signature { params: vec![], ret_ty: None }
+            MockExportBuilder::new(b"f", f as *const extern "C" fn())
         )
         .with_initial_heap(heap.as_slice())
         .with_heap_spec(heap_spec)
@@ -117,10 +106,7 @@ pub fn fib_mock() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            b"f",
-            unsafe { std::slice::from_raw_parts(f as *const extern "C" fn() as *const u8, 1) },
-            &[],
-            Signature { params: vec![], ret_ty: None }
+            MockExportBuilder::new(b"f", f as *const extern "C" fn())
         )
         .build()
 }
@@ -199,10 +185,7 @@ pub fn many_args_mock() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            b"f",
-            unsafe { std::slice::from_raw_parts(f as *const extern "C" fn() as *const u8, 1) },
-            &[],
-            Signature { params: vec![], ret_ty: None }
+            MockExportBuilder::new(b"f", f as *const extern "C" fn())
         )
         .build()
 }
@@ -279,16 +262,10 @@ pub fn hostcalls_mock() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            b"wrapped",
-            unsafe { std::slice::from_raw_parts(wrapped as *const extern "C" fn() as *const u8, 1) },
-            &[],
-            Signature { params: vec![], ret_ty: None }
+            MockExportBuilder::new(b"wrapped", wrapped as *const extern "C" fn())
         )
         .with_export_func(
-            b"raw",
-            unsafe { std::slice::from_raw_parts(raw as *const extern "C" fn() as *const u8, 1) },
-            &[],
-            Signature { params: vec![], ret_ty: None }
+            MockExportBuilder::new(b"raw", raw as *const extern "C" fn())
         )
         .build()
 }

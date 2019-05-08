@@ -8,7 +8,7 @@ macro_rules! globals_tests {
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_wasm;
-        use $crate::helpers::MockModuleBuilder;
+        use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
 
         #[test]
         fn defined_globals() {
@@ -85,31 +85,25 @@ macro_rules! globals_tests {
                 .with_global(0, -1)
                 .with_global(1, 420)
                 .with_export_func(
-                    b"get_global0",
-                    function_bytes_slice!(get_global0),
-                    &[],
-                    Signature {
-                        params: vec![],
-                        ret_ty: Some(ValueType::I64),
-                    },
+                    MockExportBuilder::new(b"get_global0", get_global0 as *const extern "C" fn())
+                        .with_sig(Signature {
+                            params: vec![],
+                            ret_ty: Some(ValueType::I64),
+                        }),
                 )
                 .with_export_func(
-                    b"set_global0",
-                    function_bytes_slice!(set_global0),
-                    &[],
-                    Signature {
-                        params: vec![ValueType::I64],
-                        ret_ty: None,
-                    },
+                    MockExportBuilder::new(b"set_global0", set_global0 as *const extern "C" fn())
+                        .with_sig(Signature {
+                            params: vec![ValueType::I64],
+                            ret_ty: None,
+                        }),
                 )
                 .with_export_func(
-                    b"get_global1",
-                    function_bytes_slice!(get_global1),
-                    &[],
-                    Signature {
-                        params: vec![],
-                        ret_ty: Some(ValueType::I64),
-                    },
+                    MockExportBuilder::new(b"get_global1", get_global1 as *const extern "C" fn())
+                        .with_sig(Signature {
+                            params: vec![],
+                            ret_ty: Some(ValueType::I64),
+                        }),
                 )
                 .build()
         }

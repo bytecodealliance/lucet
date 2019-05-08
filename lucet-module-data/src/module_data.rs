@@ -66,8 +66,8 @@ impl<'a> ModuleData<'a> {
     //
     // This is an index of all functions in the module.
     pub fn get_signature(&self, fn_id: u32) -> Option<&Signature> {
-        self.function_info.get(fn_id as usize).and_then(|func| {
-            self.signatures().get(func.signature.as_u32() as usize)
+        self.function_info.get(fn_id as usize).map(|func| {
+            self.signatures().get(func.signature.as_u32() as usize).expect("functions have a signature")
         })
     }
 

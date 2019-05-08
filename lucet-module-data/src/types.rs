@@ -54,8 +54,6 @@ impl TryFrom<&ir::AbiParam> for ValueType {
 ///
 /// Note that this does not explicitly name VMContext as a parameter! It is assumed that all wasm
 /// functions take VMContext as their first parameter.
-// VMContext is not explicitly named specifically so that value types can be tagged with eight bits
-// per parameter, letting us perfectly hash functions of up to eight parameters + return values.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Signature {
     pub params: Vec<ValueType>,

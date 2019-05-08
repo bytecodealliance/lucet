@@ -115,25 +115,19 @@ impl MockModuleBuilder {
         UniqueSignatureIndex::from_u32(idx as u32)
     }
 
-    pub fn with_export_func(
-        mut self,
-        sym: &[u8],
-        func: &[u8],
-        traps: &[TrapSite],
-        sig: Signature,
-    ) -> Self {
+    pub fn with_export_func(mut self, export: MockExportBuilder) -> Self {
         self.export_funcs
-            .insert(sym.to_vec(), func.as_ptr() as *const extern "C" fn());
-        let sig_idx = self.record_sig(sig);
+            .insert(export.sym().to_vec(), export.func());
+        let sig_idx = self.record_sig(export.sig());
         self.function_info.push(OwnedFunctionMetadata {
             signature: sig_idx,
-            name: Some(std::str::from_utf8(sym).unwrap().to_string()),
+            name: Some(std::str::from_utf8(export.sym()).unwrap().to_string()),
         });
         self.function_manifest.push(FunctionSpec::new(
-            func.as_ptr() as u64,
-            func.len() as u32,
-            traps.as_ptr() as u64,
-            traps.len() as u64,
+            export.func() as u64,
+            export.func_len() as u32,
+            export.traps().as_ptr() as u64,
+            export.traps().len() as u64,
         ));
         self
     }
@@ -290,5 +284,64 @@ impl ModuleInternal for MockModule {
 
     fn get_signature(&self, fn_id: u32) -> Result<&Signature, Error> {
         self.module_data.get_signature(fn_id).ok_or(lucet_incorrect_module!("Signature lookup failed for function index {}. This is very likely a bug in module data contents.", fn_id))
+    }
+}
+
+pub struct MockExportBuilder {
+    sym: &'static [u8],
+    func: *const extern "C" fn(),
+    func_len: Option<usize>,
+    traps: Option<&'static [TrapSite]>,
+    sig: Signature,
+}
+
+impl MockExportBuilder {
+    pub fn new(name: &'static [u8], func: *const extern "C" fn()) -> MockExportBuilder {
+        MockExportBuilder {
+            sym: name,
+            func: func,
+            func_len: None,
+            traps: None,
+            sig: Signature {
+                params: vec![],
+                ret_ty: None,
+            },
+        }
+    }
+
+    pub fn with_func(mut self, f: *const extern "C" fn()) -> MockExportBuilder {
+        self.func = f;
+        self
+    }
+
+    pub fn with_func_len(mut self, len: usize) -> MockExportBuilder {
+        self.func_len = Some(len);
+        self
+    }
+
+    pub fn with_traps(mut self, traps: &'static [TrapSite]) -> MockExportBuilder {
+        self.traps = Some(traps);
+        self
+    }
+
+    pub fn with_sig(mut self, sig: Signature) -> MockExportBuilder {
+        self.sig = sig;
+        self
+    }
+
+    pub fn sym(&self) -> &'static [u8] {
+        self.sym
+    }
+    pub fn func(&self) -> *const extern "C" fn() {
+        self.func
+    }
+    pub fn func_len(&self) -> usize {
+        self.func_len.unwrap_or(1)
+    }
+    pub fn traps(&self) -> &'static [TrapSite] {
+        self.traps.unwrap_or(&[])
+    }
+    pub fn sig(&self) -> Signature {
+        self.sig.clone()
     }
 }
