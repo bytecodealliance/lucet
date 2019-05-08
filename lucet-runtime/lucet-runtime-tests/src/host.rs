@@ -8,7 +8,6 @@ macro_rules! host_tests {
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, Limits, Region,
             TerminationDetails, TrapCode,
         };
-        use lucet_runtime_internals::{module::Signature, val::Val};
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
@@ -119,7 +118,7 @@ macro_rules! host_tests {
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
-            inst.run(b"main", &[Val::GuestPtr(0), Val::I32(0)])
+            inst.run(b"main", &[0u32.into(), 0i32.into()])
                 .expect("instance runs");
         }
 
@@ -134,7 +133,7 @@ macro_rules! host_tests {
                 .build()
                 .expect("instance can be created");
 
-            inst.run(b"main", &[Val::GuestPtr(0), Val::I32(0)])
+            inst.run(b"main", &[0u32.into(), 0i32.into()])
                 .expect("instance runs");
 
             assert!(*inst.get_embed_ctx::<bool>().unwrap().unwrap());
@@ -148,7 +147,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"main", &[Val::GuestPtr(0), Val::I32(0)]) {
+            match inst.run(b"main", &[0u32.into(), 0i32.into()]) {
                 Err(Error::RuntimeTerminated(term)) => {
                     assert_eq!(
                         *term

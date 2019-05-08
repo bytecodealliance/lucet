@@ -185,7 +185,7 @@ impl MockModuleBuilder {
             }),
             globals_spec,
             self.function_info.clone(),
-            self.signatures.clone(),
+            self.signatures,
         );
         let serialized_module_data = owned_module_data
             .to_ref()
