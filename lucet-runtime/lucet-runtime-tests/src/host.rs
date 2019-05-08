@@ -222,7 +222,10 @@ macro_rules! host_tests {
                     b"f",
                     function_bytes_slice!(f),
                     &[],
-                    Signature { params: vec![], ret_ty: None },
+                    Signature {
+                        params: vec![],
+                        ret_ty: None,
+                    },
                 )
                 .build();
 
@@ -256,7 +259,10 @@ macro_rules! host_tests {
                     b"f",
                     function_bytes_slice!(f),
                     &[],
-                    Signature { params: vec![], ret_ty: None },
+                    Signature {
+                        params: vec![],
+                        ret_ty: None,
+                    },
                 )
                 .build();
 
@@ -290,7 +296,10 @@ macro_rules! host_tests {
                     b"f",
                     function_bytes_slice!(f),
                     &[],
-                    Signature { params: vec![], ret_ty: None },
+                    Signature {
+                        params: vec![],
+                        ret_ty: None,
+                    },
                 )
                 .build();
 

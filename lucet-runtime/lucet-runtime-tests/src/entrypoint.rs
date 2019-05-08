@@ -571,7 +571,9 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             match inst.run(b"add_2", &[123.0f64.into(), 456.0f64.into()]) {
-                Err(Error::InvalidArgument(err)) => assert_eq!(err, "entrypoint function signature mismatch"),
+                Err(Error::InvalidArgument(err)) => {
+                    assert_eq!(err, "entrypoint function signature mismatch")
+                }
                 res => panic!("unexpected result: {:?}", res),
             }
         }
@@ -593,7 +595,10 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             match inst.run(b"add_2", &[123u64.into()]) {
-                Err(Error::InvalidArgument(err)) => assert_eq!(err, "entrypoint function signature mismatch (number of arguments is incorrect)"),
+                Err(Error::InvalidArgument(err)) => assert_eq!(
+                    err,
+                    "entrypoint function signature mismatch (number of arguments is incorrect)"
+                ),
                 res => panic!("unexpected result: {:?}", res),
             }
         }
@@ -615,7 +620,10 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             match inst.run(b"add_2", &[123u64.into(), 456u64.into(), 789u64.into()]) {
-                Err(Error::InvalidArgument(err)) => assert_eq!(err, "entrypoint function signature mismatch (number of arguments is incorrect)"),
+                Err(Error::InvalidArgument(err)) => assert_eq!(
+                    err,
+                    "entrypoint function signature mismatch (number of arguments is incorrect)"
+                ),
                 res => panic!("unexpected result: {:?}", res),
             }
         }

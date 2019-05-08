@@ -1,10 +1,10 @@
 #[macro_export]
 macro_rules! globals_tests {
     ( $TestRegion:path ) => {
+        use lucet_module_data::ValueType;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{Error, Limits, Module, Region};
         use lucet_runtime_internals::module::Signature;
-        use lucet_module_data::ValueType;
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_wasm;
@@ -88,19 +88,28 @@ macro_rules! globals_tests {
                     b"get_global0",
                     function_bytes_slice!(get_global0),
                     &[],
-                    Signature { params: vec![], ret_ty: Some(ValueType::I64) },
+                    Signature {
+                        params: vec![],
+                        ret_ty: Some(ValueType::I64),
+                    },
                 )
                 .with_export_func(
                     b"set_global0",
                     function_bytes_slice!(set_global0),
                     &[],
-                    Signature { params: vec![ValueType::I64], ret_ty: None },
+                    Signature {
+                        params: vec![ValueType::I64],
+                        ret_ty: None,
+                    },
                 )
                 .with_export_func(
                     b"get_global1",
                     function_bytes_slice!(get_global1),
                     &[],
-                    Signature { params: vec![], ret_ty: Some(ValueType::I64) },
+                    Signature {
+                        params: vec![],
+                        ret_ty: Some(ValueType::I64),
+                    },
                 )
                 .build()
         }
