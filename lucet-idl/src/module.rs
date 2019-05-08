@@ -173,7 +173,11 @@ impl Module {
                 );
             }
             SyntaxDecl::Function {
-                args, rets, attrs, ..
+                args,
+                rets,
+                attrs,
+                location,
+                ..
             } => {
                 let mut arg_names: HashMap<String, Location> = HashMap::new();
                 let args = args
@@ -207,7 +211,12 @@ impl Module {
                         })
                     })
                     .collect::<Result<Vec<FuncRet>, _>>()?;
-
+                if rets.len() > 1 {
+                    Err(ValidationError::Syntax {
+                        expected: "at most one return value",
+                        location: location.clone(),
+                    })?
+                }
                 self.define_function(
                     id,
                     FuncDecl {
@@ -694,6 +703,17 @@ mod tests {
                     line: 1,
                     column: 21
                 },
+            }
+        );
+    }
+
+    #[test]
+    fn func_multiple_returns() {
+        assert_eq!(
+            mod_("fn trivial(a: u8) -> bool, bool;").err().unwrap(),
+            ValidationError::Syntax {
+                expected: "at most one return value",
+                location: Location { line: 1, column: 0 },
             }
         );
     }

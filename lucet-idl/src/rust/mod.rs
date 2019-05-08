@@ -49,7 +49,7 @@ impl RustGenerator {
         typename
     }
 
-    fn get_defined_name(&self, data_type_ref: &DataTypeRef) -> &str {
+    fn get_defined_typename(&self, data_type_ref: &DataTypeRef) -> &str {
         match data_type_ref {
             DataTypeRef::Defined(id) => self.defined.get(id).expect("definition exists"),
             DataTypeRef::Atom(a) => Self::atom_name(a),
@@ -100,10 +100,10 @@ impl Generator for RustGenerator {
             };
 
         let typename = self.define_name(data_type_entry);
-        let pointee_name = self.get_defined_name(pointee);
+        let pointee_name = self.get_defined_typename(pointee);
 
         self.w
-            .writeln(format!("type {} = {};", typename, pointee_name))?
+            .writeln(format!("pub type {} = {};", typename, pointee_name))?
             .eob()?;
         Ok(())
     }
@@ -128,14 +128,14 @@ impl Generator for RustGenerator {
 
         self.w
             .writeln("#[repr(C)]")?
-            .writeln(format!("struct {} {{", typename))?;
+            .writeln(format!("pub struct {} {{", typename))?;
 
         let mut w = self.w.new_block();
         for m in named_members {
             w.writeln(format!(
                 "{}: {},",
                 m.name.to_snake_case(),
-                self.get_defined_name(&m.type_)
+                self.get_defined_typename(&m.type_)
             ))?;
         }
 
@@ -166,7 +166,7 @@ impl Generator for RustGenerator {
         self.w
             .writeln("#[repr(C)]")?
             .writeln("#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]")?
-            .writeln(format!("enum {} {{", typename))?;
+            .writeln(format!("pub enum {} {{", typename))?;
 
         let mut w = self.w.new_block();
         for m in named_members {
@@ -184,6 +184,34 @@ impl Generator for RustGenerator {
     ) -> Result<(), IDLError> {
         self.w
             .write_line(format!("// {:?}", func_decl_entry).as_bytes())?;
+
+        let name = func_decl_entry.name.name.to_snake_case();
+        let mut args = String::new();
+        for a in func_decl_entry.entity.args.iter() {
+            args += &format!(
+                "{}: {},",
+                a.name.to_snake_case(),
+                self.get_defined_typename(&a.type_)
+            );
+        }
+
+        let func_rets = &func_decl_entry.entity.rets;
+        let rets = if func_rets.len() == 0 {
+            "()".to_owned()
+        } else {
+            assert_eq!(func_rets.len(), 1);
+            self.get_defined_typename(&func_rets[0].type_).to_owned()
+        };
+
+        self.w
+            .writeln("#[no_mangle]")?
+            .writeln(format!("pub fn {}({}) -> {} {{", name, args, rets))?;
+
+        let mut w = self.w.new_block();
+        w.writeln("unimplemented!()")?;
+
+        self.w.writeln("}")?.eob()?;
+
         Ok(())
     }
 }

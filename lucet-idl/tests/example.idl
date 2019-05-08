@@ -27,5 +27,5 @@ mod example {
 
     fn set_color(to: color) -> bool;
 
-    fn get_structure(for: color) -> st;
+    fn get_structure(of: color) -> st;
 }

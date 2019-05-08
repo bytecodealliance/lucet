@@ -23,7 +23,7 @@ fn compile_and_run_c() {
     lucet_idl::run(
         &config,
         &source,
-        File::create(tempdir.path().join("example.h")).expect("create file"),
+        Box::new(File::create(tempdir.path().join("example.h")).expect("create file")),
     )
     .expect("run lucet_idl");
 
@@ -65,7 +65,7 @@ fn compile_and_run_rust() {
     lucet_idl::run(
         &config,
         &source,
-        File::create(gen_file.clone()).expect("create file"),
+        Box::new(File::create(gen_file.clone()).expect("create file")),
     )
     .expect("run lucet_idl");
 
