@@ -11,6 +11,7 @@ use crate::error::Error;
 use crate::instance::{
     Instance, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
 };
+use lucet_module_data::FunctionHandle;
 use std::any::Any;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Ref, RefCell, RefMut};
@@ -248,7 +249,7 @@ impl Vmctx {
     ///         operand2: u32,
     ///     ) -> u32 {
     ///         if let Ok(binop) = vmctx.get_func_from_idx(binop_table_idx, binop_func_idx) {
-    ///             let typed_binop = binop as *const extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32;
+    ///             let typed_binop = binop.as_ptr() as *const extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32;
     ///             unsafe { (*typed_binop)(vmctx.as_raw(), operand1, operand2) }
     ///         } else {
     ///             lucet_hostcall_terminate!("invalid function index")
@@ -259,7 +260,7 @@ impl Vmctx {
         &self,
         table_idx: u32,
         func_idx: u32,
-    ) -> Result<*const extern "C" fn(), Error> {
+    ) -> Result<FunctionHandle, Error> {
         self.instance()
             .module()
             .get_func_from_idx(table_idx, func_idx)

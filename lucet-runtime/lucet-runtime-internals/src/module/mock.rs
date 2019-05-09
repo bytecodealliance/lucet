@@ -4,7 +4,9 @@ use libc::c_void;
 use lucet_module_data::owned::{
     OwnedFunctionMetadata, OwnedGlobalSpec, OwnedLinearMemorySpec, OwnedModuleData, OwnedSparseData,
 };
-use lucet_module_data::{FunctionSpec, ModuleData, Signature, TrapSite, UniqueSignatureIndex};
+use lucet_module_data::{
+    FunctionHandle, FunctionSpec, ModuleData, Signature, TrapSite, UniqueSignatureIndex,
+};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
@@ -121,7 +123,7 @@ impl MockModuleBuilder {
         let sig_idx = self.record_sig(export.sig());
         self.function_info.push(OwnedFunctionMetadata {
             signature: sig_idx,
-            name: Some(std::str::from_utf8(export.sym()).unwrap().to_string()),
+            sym: Some(export.sym().to_vec()),
         });
         self.function_manifest.push(FunctionSpec::new(
             export.func() as u64,
@@ -248,28 +250,28 @@ impl ModuleInternal for MockModule {
         Ok(&self.table_elements)
     }
 
-    fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {
-        self.export_funcs
-            .get(sym)
-            .cloned()
-            .ok_or(Error::SymbolNotFound(
-                String::from_utf8_lossy(sym).into_owned(),
-            ))
+    fn get_export_func(&self, sym: &[u8]) -> Result<FunctionHandle, Error> {
+        let ptr = *self.export_funcs.get(sym).ok_or(Error::SymbolNotFound(
+            String::from_utf8_lossy(sym).into_owned(),
+        ))?;
+
+        Ok(self.function_handle_from_ptr(ptr))
     }
 
-    fn get_func_from_idx(
-        &self,
-        table_id: u32,
-        func_id: u32,
-    ) -> Result<*const extern "C" fn(), Error> {
-        self.func_table
+    fn get_func_from_idx(&self, table_id: u32, func_id: u32) -> Result<FunctionHandle, Error> {
+        let ptr = self
+            .func_table
             .get(&(table_id, func_id))
             .cloned()
-            .ok_or(Error::FuncNotFound(table_id, func_id))
+            .ok_or(Error::FuncNotFound(table_id, func_id))?;
+
+        Ok(self.function_handle_from_ptr(ptr))
     }
 
-    fn get_start_func(&self) -> Result<Option<*const extern "C" fn()>, Error> {
-        Ok(self.start_func.map(|start| start as *const extern "C" fn()))
+    fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error> {
+        Ok(self
+            .start_func
+            .map(|start| self.function_handle_from_ptr(start as *const extern "C" fn())))
     }
 
     fn function_manifest(&self) -> &[FunctionSpec] {
@@ -282,8 +284,8 @@ impl ModuleInternal for MockModule {
         Ok(None)
     }
 
-    fn get_signature(&self, fn_id: u32) -> Result<&Signature, Error> {
-        self.module_data.get_signature(fn_id).ok_or(lucet_incorrect_module!("Signature lookup failed for function index {}. This is very likely a bug in module data contents.", fn_id))
+    fn get_signature(&self, fn_id: u32) -> &Signature {
+        self.module_data.get_signature(fn_id)
     }
 }
 

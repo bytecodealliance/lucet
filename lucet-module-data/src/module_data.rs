@@ -65,14 +65,21 @@ impl<'a> ModuleData<'a> {
     // uses function index as an index into a table of function elements.
     //
     // This is an index of all functions in the module.
-    pub fn get_signature(&self, fn_id: u32) -> Option<&Signature> {
-        self.function_info.get(fn_id as usize).map(|func| {
-            self.signatures().get(func.signature.as_u32() as usize).expect("functions have a signature")
-        })
+    pub fn get_signature(&self, fn_id: u32) -> &Signature {
+        let sig_idx = self.function_info[fn_id as usize].signature;
+        &self.signatures[sig_idx.as_u32() as usize]
     }
 
-    pub fn get_name(&self, fn_id: u32) -> Option<&str> {
-        self.function_info.get(fn_id as usize).and_then(|func| func.name)
+    pub fn function_id_by_name(&self, name: &[u8]) -> Option<u32> {
+        self.function_info
+            .iter()
+            .enumerate()
+            .find(|(_, fn_meta)| { fn_meta.sym == Some(name) })
+            .map(|(i, _)| i as u32)
+    }
+
+    pub fn sym_for(&self, fn_id: u32) -> Option<&[u8]> {
+        self.function_info.get(fn_id as usize).and_then(|func| func.sym)
     }
 
     pub fn signatures(&self) -> &[Signature] {

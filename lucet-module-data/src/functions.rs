@@ -1,4 +1,5 @@
 use crate::traps::{TrapManifest, TrapSite};
+use crate::types::Signature;
 use cranelift_codegen::entity::entity_impl;
 use serde::{Deserialize, Serialize};
 
@@ -21,21 +22,39 @@ entity_impl!(UniqueSignatureIndex);
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FunctionMetadata<'a> {
     pub signature: UniqueSignatureIndex,
-    pub name: Option<&'a str>,
+    #[serde(borrow)]
+    pub sym: Option<&'a [u8]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OwnedFunctionMetadata {
     pub signature: UniqueSignatureIndex,
-    pub name: Option<String>,
+    pub sym: Option<Vec<u8>>,
 }
 
 impl OwnedFunctionMetadata {
     pub fn to_ref<'a>(&'a self) -> FunctionMetadata<'a> {
         FunctionMetadata {
             signature: self.signature.clone(),
-            name: self.name.as_ref().map(|s| &**s).clone(),
+            sym: self.sym.as_ref().map(|s| s.as_slice()).clone(),
         }
+    }
+}
+
+pub struct FunctionHandle<'module> {
+    func: &'module FunctionSpec,
+    sig: &'module Signature,
+}
+
+impl <'a> FunctionHandle<'a> {
+    pub fn addr(&self) -> u64 {
+        self.func.addr()
+    }
+    pub fn as_ptr(&self) -> *const extern "C" fn() {
+        self.addr() as *const extern "C" fn()
+    }
+    pub fn sig(&self) -> &'a Signature {
+        self.sig
     }
 }
 
@@ -59,6 +78,9 @@ pub struct FunctionSpec {
 impl FunctionSpec {
     pub fn new(code_addr: u64, code_len: u32, traps_addr: u64, traps_len: u64) -> Self {
         FunctionSpec { code_addr, code_len, traps_addr, traps_len }
+    }
+    pub fn addr(&self) -> u64 {
+        self.code_addr
     }
     pub fn code_len(&self) -> u32 {
         self.code_len

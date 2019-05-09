@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use libloading::{Library, Symbol};
-use lucet_module_data::{FunctionSpec, ModuleData, Signature};
+use lucet_module_data::{FunctionHandle, FunctionSpec, ModuleData, Signature};
 use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
@@ -165,23 +165,17 @@ impl ModuleInternal for DlModule {
         Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize) })
     }
 
-    fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error> {
+    fn get_export_func(&self, sym: &[u8]) -> Result<FunctionHandle, Error> {
         let mut guest_sym: Vec<u8> = b"guest_func_".to_vec();
         guest_sym.extend_from_slice(sym);
-        match unsafe { self.lib.get::<*const extern "C" fn()>(&guest_sym) } {
-            Err(ref e) if is_undefined_symbol(e) => Err(Error::SymbolNotFound(
-                String::from_utf8_lossy(sym).into_owned(),
-            )),
-            Err(e) => Err(Error::DlError(e)),
-            Ok(f) => Ok(*f),
-        }
+
+        self.module_data
+            .function_id_by_name(&guest_sym)
+            .ok_or_else(|| Error::SymbolNotFound(String::from_utf8_lossy(sym).into_owned()))
+            .map(|id| self.get_function_handle(id))
     }
 
-    fn get_func_from_idx(
-        &self,
-        table_id: u32,
-        func_id: u32,
-    ) -> Result<*const extern "C" fn(), Error> {
+    fn get_func_from_idx(&self, table_id: u32, func_id: u32) -> Result<FunctionHandle, Error> {
         if table_id != 0 {
             return Err(Error::FuncNotFound(table_id, func_id));
         }
@@ -190,10 +184,13 @@ impl ModuleInternal for DlModule {
             .get(func_id as usize)
             .map(|element| unsafe { std::mem::transmute(element.rf) })
             .ok_or(Error::FuncNotFound(table_id, func_id))?;
-        Ok(&func as *const extern "C" fn())
+
+        let func_ptr = &func as *const extern "C" fn();
+
+        Ok(self.function_handle_from_ptr(func_ptr))
     }
 
-    fn get_start_func(&self) -> Result<Option<*const extern "C" fn()>, Error> {
+    fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error> {
         // `guest_start` is a pointer to the function the module designates as the start function,
         // since we can't have multiple symbols pointing to the same function and guest code might
         // call it in the normal course of execution
@@ -204,7 +201,7 @@ impl ModuleInternal for DlModule {
             if start_func.is_null() {
                 lucet_incorrect_module!("`guest_start` is defined but null");
             }
-            Ok(Some(unsafe { **start_func }))
+            Ok(Some(self.function_handle_from_ptr(unsafe { **start_func })))
         } else {
             Ok(None)
         }
@@ -236,8 +233,8 @@ impl ModuleInternal for DlModule {
         }
     }
 
-    fn get_signature(&self, fn_id: u32) -> Result<&Signature, Error> {
-        self.module_data.get_signature(fn_id).ok_or(lucet_incorrect_module!("Signature lookup failed for function index {}. This is very likely a bug in module data contents.", fn_id))
+    fn get_signature(&self, fn_id: u32) -> &Signature {
+        self.module_data.get_signature(fn_id)
     }
 }
 

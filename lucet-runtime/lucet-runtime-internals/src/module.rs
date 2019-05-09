@@ -5,7 +5,8 @@ mod sparse_page_data;
 pub use crate::module::dl::DlModule;
 pub use crate::module::mock::{MockExportBuilder, MockModuleBuilder};
 pub use lucet_module_data::{
-    FunctionSpec, Global, GlobalSpec, HeapSpec, Signature, TrapCode, TrapManifest, ValueType,
+    FunctionHandle, FunctionSpec, Global, GlobalSpec, HeapSpec, Signature, TrapCode, TrapManifest,
+    ValueType,
 };
 
 use crate::alloc::Limits;
@@ -55,21 +56,38 @@ pub trait ModuleInternal: Send + Sync {
     /// Get the table elements from the module.
     fn table_elements(&self) -> Result<&[TableElement], Error>;
 
-    fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error>;
+    fn get_export_func(&self, sym: &[u8]) -> Result<FunctionHandle, Error>;
 
-    fn get_func_from_idx(
-        &self,
-        table_id: u32,
-        func_id: u32,
-    ) -> Result<*const extern "C" fn(), Error>;
+    fn get_func_from_idx(&self, table_id: u32, func_id: u32) -> Result<FunctionHandle, Error>;
 
-    fn get_start_func(&self) -> Result<Option<*const extern "C" fn()>, Error>;
+    fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error>;
 
     fn function_manifest(&self) -> &[FunctionSpec];
 
     fn addr_details(&self, addr: *const c_void) -> Result<Option<AddrDetails>, Error>;
 
-    fn get_signature(&self, fn_id: u32) -> Result<&Signature, Error>;
+    fn get_signature(&self, fn_id: u32) -> &Signature;
+
+    fn function_handle_from_ptr(&self, ptr: *const extern "C" fn()) -> FunctionHandle {
+        let (fn_id, fn_spec) = self
+            .function_manifest()
+            .iter()
+            .enumerate()
+            .find(|(_, fn_spec)| fn_spec.addr() == ptr as u64)
+            .expect("valid function pointer");
+
+        FunctionHandle {
+            func: fn_spec,
+            sig: self.get_signature(fn_id as u32),
+        }
+    }
+
+    fn get_function_handle(&self, fn_id: u32) -> FunctionHandle {
+        FunctionHandle {
+            func: &self.function_manifest()[fn_id as usize],
+            sig: self.get_signature(fn_id),
+        }
+    }
 
     /// Look up an instruction pointer in the trap manifest.
     ///

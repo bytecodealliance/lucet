@@ -15,7 +15,7 @@ pub use crate::error::Error;
 pub use crate::globals::{Global, GlobalDef, GlobalSpec};
 pub use crate::linear_memory::{HeapSpec, SparseData, LinearMemorySpec};
 pub use crate::module_data::ModuleData;
-pub use crate::functions::{FunctionMetadata, FunctionSpec, UniqueSignatureIndex};
+pub use crate::functions::{FunctionHandle, FunctionMetadata, FunctionSpec, UniqueSignatureIndex};
 pub use crate::traps::{TrapManifest, TrapSite, TrapCode};
 pub use crate::types::{Signature, ValueType};
 

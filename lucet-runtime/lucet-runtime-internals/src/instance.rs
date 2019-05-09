@@ -14,7 +14,7 @@ use crate::sysdeps::UContext;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
-use lucet_module_data::TrapCode;
+use lucet_module_data::{FunctionHandle, TrapCode};
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
@@ -551,21 +551,18 @@ impl Instance {
     }
 
     /// Run a function in guest context at the given entrypoint.
-    fn run_func(
-        &mut self,
-        func: *const extern "C" fn(),
-        args: &[Val],
-    ) -> Result<UntypedRetVal, Error> {
+    fn run_func(&mut self, func: FunctionHandle, args: &[Val]) -> Result<UntypedRetVal, Error> {
         lucet_ensure!(
             self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal()),
             "instance must be ready or non-fatally faulted"
         );
-        if func.is_null() {
+        if func.as_ptr().is_null() {
             return Err(Error::InvalidArgument(
                 "entrypoint function cannot be null; this is probably a malformed module",
             ));
         }
 
+        /*
         let fn_id: u32 = self
             .module
             .function_manifest()
@@ -578,17 +575,17 @@ impl Instance {
             ))?;
 
         let sig = self.module.get_signature(fn_id)?;
-
+        */
         // in typechecking these values, we can only really check that arguments are correct.
         // in the future we might want to make return value use more type safe as well.
 
-        if sig.params.len() != args.len() {
+        if func.sig().params.len() != args.len() {
             return Err(Error::InvalidArgument(
                 "entrypoint function signature mismatch (number of arguments is incorrect)",
             ));
         }
 
-        for (param_ty, arg) in sig.params.iter().zip(args.iter()) {
+        for (param_ty, arg) in func.sig().params.iter().zip(args.iter()) {
             if param_ty != &arg.value_type() {
                 return Err(Error::InvalidArgument(
                     "entrypoint function signature mismatch",
@@ -596,7 +593,7 @@ impl Instance {
             }
         }
 
-        self.entrypoint = func;
+        self.entrypoint = func.as_ptr();
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
@@ -606,7 +603,7 @@ impl Instance {
                 unsafe { self.alloc.stack_u64_mut() },
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
-                func,
+                func.as_ptr(),
                 &args_with_vmctx,
             )
         })?;
