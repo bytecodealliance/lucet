@@ -10,8 +10,7 @@ mod prelude;
 mod r#struct;
 
 use self::cache::{Cache, CachedStructMemberEntry, CachedTypeEntry};
-pub(crate) use self::catom::*;
-use crate::backend::*;
+pub(crate) use self::catom::CAtom;
 use crate::error::IDLError;
 use crate::generator::Generator;
 use crate::module::Module;
@@ -35,7 +34,6 @@ struct CTypeInfo<'t> {
 /// Generator for the C backend
 pub struct CGenerator {
     pub target: Target,
-    pub backend_config: BackendConfig,
     pub cache: Cache,
     pub w: PrettyWriter,
 }
@@ -93,10 +91,9 @@ impl Generator for CGenerator {
 }
 
 impl CGenerator {
-    pub fn new(target: Target, backend_config: BackendConfig, w: Box<dyn Write>) -> Self {
+    pub fn new(target: Target, w: Box<dyn Write>) -> Self {
         Self {
             target,
-            backend_config,
             cache: Cache::default(),
             w: PrettyWriter::new(w),
         }

@@ -19,8 +19,3 @@ impl<T: AsRef<str>> From<T> for Backend {
         }
     }
 }
-
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
-pub struct BackendConfig {
-    pub zero_native_pointers: bool,
-}

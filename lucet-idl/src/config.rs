@@ -1,4 +1,4 @@
-use super::backend::{Backend, BackendConfig};
+use super::backend::Backend;
 use super::target::Target;
 use crate::c::CGenerator;
 use crate::generator::Generator;
@@ -9,7 +9,6 @@ use std::io::Write;
 pub struct Config {
     pub target: Target,
     pub backend: Backend,
-    pub backend_config: BackendConfig,
 }
 
 impl Config {
@@ -19,20 +18,13 @@ impl Config {
         if zero_native_pointers {
             target = Target::Generic;
         }
-        let backend_config = BackendConfig {
-            zero_native_pointers,
-        };
-        Self {
-            target,
-            backend,
-            backend_config,
-        }
+        Self { target, backend }
     }
 
     pub fn generator(&self, w: Box<dyn Write>) -> Box<dyn Generator> {
         match self.backend {
-            Backend::C => Box::new(CGenerator::new(self.target, self.backend_config, w)),
-            Backend::Rust => Box::new(RustGenerator::new(self.target, self.backend_config, w)),
+            Backend::C => Box::new(CGenerator::new(self.target, w)),
+            Backend::Rust => Box::new(RustGenerator::new(self.target, w)),
         }
     }
 }

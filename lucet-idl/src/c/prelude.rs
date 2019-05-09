@@ -1,10 +1,6 @@
 use super::*;
 
-pub fn generate(
-    pretty_writer: &mut PrettyWriter,
-    target: Target,
-    backend_config: BackendConfig,
-) -> Result<(), IDLError> {
+pub fn generate(pretty_writer: &mut PrettyWriter, target: Target) -> Result<(), IDLError> {
     let prelude = r"
 #include <assert.h>
 #include <inttypes.h>
@@ -17,19 +13,6 @@ pub fn generate(
         pretty_writer.write_line(line.as_ref())?;
     }
     pretty_writer.eob()?;
-
-    if backend_config.zero_native_pointers {
-        pretty_writer.write_line(
-            r"#define ZERO_NATIVE_POINTERS // Avoid serializing native pointers".as_ref(),
-        )?;
-    } else if !(target.is_reference_alignment_compatible()
-        && target.uses_reference_target_endianness())
-    {
-        pretty_writer.write_line(
-            r"// #define ZERO_NATIVE_POINTERS // Define to avoid serializing native pointers"
-                .as_ref(),
-        )?;
-    }
 
     let prelude = r"
 #ifndef ___REFERENCE_COMPATIBLE_ALIGNMENT

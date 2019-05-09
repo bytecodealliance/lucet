@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::backend::BackendConfig;
 use crate::error::IDLError;
 use crate::generator::Generator;
 use crate::module::Module;
@@ -28,16 +27,14 @@ struct CTypeInfo<'t> {
 /// Generator for the C backend
 pub struct RustGenerator {
     pub target: Target,
-    pub backend_config: BackendConfig,
     pub defined: HashMap<Ident, String>,
     pub w: PrettyWriter,
 }
 
 impl RustGenerator {
-    pub fn new(target: Target, backend_config: BackendConfig, w: Box<dyn Write>) -> Self {
+    pub fn new(target: Target, w: Box<dyn Write>) -> Self {
         Self {
             target,
-            backend_config,
             defined: HashMap::new(),
             w: PrettyWriter::new(w),
         }
