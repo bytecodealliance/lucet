@@ -1,0 +1,11 @@
+[package]
+name = "lucet-idl-test"
+version = "0.1.0"
+authors = ["Pat Hickey <phickey@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+lucet-idl = { path = "../" }
+lucet-wasi-sdk = { path = "../../lucet-wasi-sdk" }
+lucetc = { path = "../../lucetc" }
+lucet-runtime = { path = "../../lucet-runtime" }

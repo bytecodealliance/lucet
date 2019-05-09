@@ -4,6 +4,7 @@
 members = [
   "lucet-analyze",
   "lucet-idl",
+  "lucet-idl/lucet-idl-test",
   "lucet-module-data",
   "lucet-runtime",
   "lucet-runtime/lucet-runtime-internals",

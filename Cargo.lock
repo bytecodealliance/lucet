@@ -769,6 +769,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lucet-idl-test"
+version = "0.1.0"
+dependencies = [
+ "lucet-idl 0.1.0",
+ "lucet-runtime 0.1.0",
+ "lucet-wasi-sdk 0.1.0",
+ "lucetc 0.1.0",
+]
+
+[[package]]
 name = "lucet-module-data"
 version = "0.1.0"
 dependencies = [
