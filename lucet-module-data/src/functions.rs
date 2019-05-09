@@ -1,5 +1,4 @@
 use crate::traps::{TrapManifest, TrapSite};
-use crate::types::Signature;
 use cranelift_codegen::entity::entity_impl;
 use serde::{Deserialize, Serialize};
 
@@ -41,21 +40,9 @@ impl OwnedFunctionMetadata {
     }
 }
 
-pub struct FunctionHandle<'module> {
-    func: &'module FunctionSpec,
-    sig: &'module Signature,
-}
-
-impl <'a> FunctionHandle<'a> {
-    pub fn addr(&self) -> u64 {
-        self.func.addr()
-    }
-    pub fn as_ptr(&self) -> *const extern "C" fn() {
-        self.addr() as *const extern "C" fn()
-    }
-    pub fn sig(&self) -> &'a Signature {
-        self.sig
-    }
+pub struct FunctionHandle {
+    pub ptr: *const extern "C" fn(),
+    pub id: u32
 }
 
 // The layout of this struct is very tightly coupled to lucetc's `write_function_manifest`!

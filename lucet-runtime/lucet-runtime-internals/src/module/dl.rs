@@ -172,7 +172,10 @@ impl ModuleInternal for DlModule {
         self.module_data
             .function_id_by_name(&guest_sym)
             .ok_or_else(|| Error::SymbolNotFound(String::from_utf8_lossy(sym).into_owned()))
-            .map(|id| self.get_function_handle(id))
+            .map(|id| {
+                let ptr = self.function_manifest()[id as usize].addr() as *const extern "C" fn();
+                FunctionHandle { ptr, id }
+            })
     }
 
     fn get_func_from_idx(&self, table_id: u32, func_id: u32) -> Result<FunctionHandle, Error> {
@@ -180,14 +183,12 @@ impl ModuleInternal for DlModule {
             return Err(Error::FuncNotFound(table_id, func_id));
         }
         let table = self.table_elements()?;
-        let func: extern "C" fn() = table
+        let func: *const extern "C" fn() = table
             .get(func_id as usize)
-            .map(|element| unsafe { std::mem::transmute(element.rf) })
+            .map(|element| unsafe { element.rf as *const extern "C" fn() })
             .ok_or(Error::FuncNotFound(table_id, func_id))?;
 
-        let func_ptr = &func as *const extern "C" fn();
-
-        Ok(self.function_handle_from_ptr(func_ptr))
+        Ok(self.function_handle_from_ptr(func))
     }
 
     fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error> {

@@ -69,24 +69,15 @@ pub trait ModuleInternal: Send + Sync {
     fn get_signature(&self, fn_id: u32) -> &Signature;
 
     fn function_handle_from_ptr(&self, ptr: *const extern "C" fn()) -> FunctionHandle {
-        let (fn_id, fn_spec) = self
+        let id = self
             .function_manifest()
             .iter()
             .enumerate()
-            .find(|(_, fn_spec)| fn_spec.addr() == ptr as u64)
+            .find(|(id, fn_spec)| fn_spec.addr() == ptr as u64)
+            .map(|(fn_id, _)| fn_id as u32)
             .expect("valid function pointer");
 
-        FunctionHandle {
-            func: fn_spec,
-            sig: self.get_signature(fn_id as u32),
-        }
-    }
-
-    fn get_function_handle(&self, fn_id: u32) -> FunctionHandle {
-        FunctionHandle {
-            func: &self.function_manifest()[fn_id as usize],
-            sig: self.get_signature(fn_id),
-        }
+        FunctionHandle { ptr, id }
     }
 
     /// Look up an instruction pointer in the trap manifest.

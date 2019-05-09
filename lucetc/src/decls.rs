@@ -383,7 +383,7 @@ impl<'a> ModuleDecls<'a> {
 
             functions.push(FunctionMetadata {
                 signature: decl.signature_index,
-                name: Some(name.symbol()), // TODO: what about functions without names? currently internal functions are named like `guest_func_N`.
+                sym: Some(name.symbol().as_bytes()), // TODO: what about functions without names? currently internal functions are named like `guest_func_N`.
             });
         }
 

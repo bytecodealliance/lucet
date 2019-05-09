@@ -836,7 +836,7 @@ macro_rules! entrypoint_tests {
                 let func = vmctx
                     .get_func_from_idx(0, cb_idx)
                     .expect("can get function by index");
-                let func = func as *const extern "C" fn(*mut lucet_vmctx, u64) -> u64;
+                let func: *const extern "C" fn(*mut lucet_vmctx, u64) -> u64 = unsafe { std::mem::transmute(&func.ptr) };
                 (*func)(vmctx.as_raw(), x) + 1
             }
         }

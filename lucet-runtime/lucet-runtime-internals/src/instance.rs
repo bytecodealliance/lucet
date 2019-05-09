@@ -556,36 +556,24 @@ impl Instance {
             self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal()),
             "instance must be ready or non-fatally faulted"
         );
-        if func.as_ptr().is_null() {
+        if func.ptr.is_null() {
             return Err(Error::InvalidArgument(
                 "entrypoint function cannot be null; this is probably a malformed module",
             ));
         }
 
-        /*
-        let fn_id: u32 = self
-            .module
-            .function_manifest()
-            .iter()
-            .enumerate()
-            .find(|(_, fn_spec)| fn_spec.relative_addr(func as u64) == Some(0))
-            .map(|(fn_id, _)| fn_id as u32)
-            .ok_or(Error::InvalidArgument(
-                "entrypoint function must be the start of a function declared in this module",
-            ))?;
+        let sig = self.module.get_signature(func.id);
 
-        let sig = self.module.get_signature(fn_id)?;
-        */
         // in typechecking these values, we can only really check that arguments are correct.
         // in the future we might want to make return value use more type safe as well.
 
-        if func.sig().params.len() != args.len() {
+        if sig.params.len() != args.len() {
             return Err(Error::InvalidArgument(
                 "entrypoint function signature mismatch (number of arguments is incorrect)",
             ));
         }
 
-        for (param_ty, arg) in func.sig().params.iter().zip(args.iter()) {
+        for (param_ty, arg) in sig.params.iter().zip(args.iter()) {
             if param_ty != &arg.value_type() {
                 return Err(Error::InvalidArgument(
                     "entrypoint function signature mismatch",
@@ -593,7 +581,7 @@ impl Instance {
             }
         }
 
-        self.entrypoint = func.as_ptr();
+        self.entrypoint = func.ptr;
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
@@ -603,7 +591,7 @@ impl Instance {
                 unsafe { self.alloc.stack_u64_mut() },
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
-                func.as_ptr(),
+                func.ptr,
                 &args_with_vmctx,
             )
         })?;
