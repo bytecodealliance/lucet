@@ -593,6 +593,7 @@ impl Instance {
                 unsafe { self.alloc.stack_u64_mut() },
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
+                &self.kill_state.ctx_switch_done,
                 func,
                 &args_with_vmctx,
             )
@@ -940,7 +941,7 @@ fn strsignal_wrapper(sig: libc::c_int) -> CString {
 ///
 ///n
 struct KillState {
-    signal_safe_flag: AtomicBool,
+    ctx_switch_done: AtomicBool,
     should_terminate: AtomicBool,
     thread_id: Mutex<Option<pthread_t>>,
 }

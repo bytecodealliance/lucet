@@ -65,11 +65,14 @@ _lucet_context_bootstrap:
 .align 16
 lucet_context_backstop:
 _lucet_context_backstop:
-    mov -16(%rbp), %rdi  /* parent context to arg 1 */
-    mov -8(%rbp), %rsi  /* own context to arg 2 */
+    mov -24(%rbp), %rdi  /* parent context to arg 1 */
+    mov -16(%rbp), %rsi  /* own context to arg 2 */
     mov %rax, (8*8 + 8*16 + 8*0)(%rdi) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
     mov %rdx, (8*8 + 8*16 + 8*1)(%rdi)
     movdqu %xmm0, (8*8 + 8*16 + 8*2)(%rdi) /* floating-point return value */
+    mov -8(%rbp), %rdx  /* safety flag pointer to arg 3 (rdx is still in use until this point) */
+    movb $0, (%rdx) /* flip the context switch safety flag back off */
+        
 #ifdef __ELF__
     jmp lucet_context_swap@PLT
 #else

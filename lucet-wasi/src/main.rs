@@ -200,11 +200,7 @@ fn run(config: Config) {
             let kill_switch = inst.kill_switch();
             thread::spawn(move || {
                 thread::sleep(timeout);
-                if kill_switch.terminate() {
-                    println!("Timed out!");
-                } else {
-                    println!("Failed to time out?!");
-                }
+                kill_switch.terminate();
             });
         }
 

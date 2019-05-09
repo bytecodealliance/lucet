@@ -11,6 +11,7 @@ use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::mem;
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use xfailure::xbail;
 
 /// Callee-saved general-purpose registers in the AMD64 ABI.
@@ -194,11 +195,12 @@ impl ContextHandle {
     pub fn create_and_init(
         stack: &mut [u64],
         parent: &mut ContextHandle,
+        flag: &AtomicBool,
         fptr: *const extern "C" fn(),
         args: &[Val],
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
-        Context::init(stack, parent, &mut child, fptr, args)?;
+        Context::init(stack, parent, &mut child, flag, fptr, args)?;
         Ok(child)
     }
 }
@@ -286,6 +288,7 @@ impl Context {
         stack: &mut [u64],
         parent: &mut Context,
         child: &mut Context,
+        flag: &AtomicBool,
         fptr: *const extern "C" fn(),
         args: &[Val],
     ) -> Result<(), Error> {
@@ -325,7 +328,7 @@ impl Context {
         let stack_start = 3 // the bootstrap ret addr, then guest func ret addr, then the backstop ret addr
         + spilled_args.len() // then any args to guest func that don't fit in registers
         + spilled_args.len() % 2 // padding to keep the stack 16-byte aligned when we spill an odd number of spilled arguments
-        + 4; // then the backstop args and terminator
+        + 5; // then the backstop args and terminator
 
         // stack-saved arguments start 3 below the top of the stack
         // (TODO: a diagram would be great here)
@@ -353,8 +356,9 @@ impl Context {
         // its frame - first the context we are switching *out of* (which is also the one we are
         // creating right now) and the ctx we switch back into. Note *parent might not be a valid
         // ctx now, but it should be when this ctx is started.
-        stack[sp - 4] = child as *mut Context as u64;
-        stack[sp - 3] = parent as *mut Context as u64;
+        stack[sp - 5] = child as *mut Context as u64;
+        stack[sp - 4] = parent as *mut Context as u64;
+        stack[sp - 3] = flag as *const AtomicBool as u64;
         // Terminate the call chain.
         stack[sp - 2] = 0;
         stack[sp - 1] = 0;
@@ -449,7 +453,6 @@ impl Context {
         lucet_context_swap(
             from as *mut Context,
             to as *const Context,
-            flag as *const AtomicBool,
         );
     }
 
@@ -631,7 +634,7 @@ extern "C" {
     fn lucet_context_backstop();
 
     /// Saves the current context and performs the context switch. Implemented in assembly.
-    fn lucet_context_swap(from: *mut Context, to: *const Context, flag: *const AtomicBool);
+    fn lucet_context_swap(from: *mut Context, to: *const Context);
 
     /// Performs the context switch; implemented in assembly.
     ///

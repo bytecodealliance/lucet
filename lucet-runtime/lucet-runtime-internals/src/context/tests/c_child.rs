@@ -51,9 +51,11 @@ macro_rules! test_body {
 macro_rules! init_and_swap {
     ( $stack:ident, $fn:ident, [ $( $args:expr ),* ] ) => {
         unsafe {
+            let flag = AtomicBool::new(false);
             let child = Box::into_raw(Box::new(ContextHandle::create_and_init(
                 &mut *$stack,
                 parent_regs.as_mut().unwrap(),
+                &flag,
                 $fn as *const extern "C" fn(),
                 &[$( $args ),*],
             ).unwrap()));
