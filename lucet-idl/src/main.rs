@@ -18,10 +18,7 @@ impl ExeConfig {
             .version("1.0")
             .about("lucet_idl code generator")
             .arg(
-                Arg::with_name("input_file")
-                    .short("i")
-                    .long("input")
-                    .takes_value(true)
+                Arg::with_name("input")
                     .required(true)
                     .help("Path to the input file"),
             )
@@ -54,7 +51,7 @@ impl ExeConfig {
             .get_matches();
         let input_path = PathBuf::from(
             matches
-                .value_of("input_file")
+                .value_of("input")
                 .ok_or(IDLError::UsageError("Input file required"))?,
         );
         let config = Config::parse(
