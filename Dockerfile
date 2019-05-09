@@ -27,12 +27,14 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
 # rebuilds.
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
-RUN curl -sS -L -O https://static.rust-lang.org/dist/rust-1.35.0-x86_64-unknown-linux-gnu.tar.gz \
-	&& tar xzf rust-1.35.0-x86_64-unknown-linux-gnu.tar.gz \
-	&& cd rust-1.35.0-x86_64-unknown-linux-gnu \
-	&& ./install.sh \
-	&& cd .. \
-	&& rm -rf rust-1.35.0-x86_64-unknown-linux-gnu rust-1.35.0-x86_64-unknown-linux-gnu.tar.gz
+RUN curl https://sh.rustup.rs -sSf | \
+    sh -s -- --default-toolchain 1.35.0 -y && \
+        /root/.cargo/bin/rustup update nightly
+ENV PATH=/root/.cargo/bin:$PATH
+
+RUN rustup target add wasm32-unknown-wasi \
+    --toolchain nightly
+
 ENV PATH=/usr/local/bin:$PATH
 RUN cargo install --root /usr/local cargo-audit cargo-watch rsign2
 
