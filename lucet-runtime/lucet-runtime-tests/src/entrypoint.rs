@@ -121,39 +121,55 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"add_2", add_2 as *const extern "C" fn())
-                .with_sig(lucet_signature!((I64, I64) -> I64)),
+            MockExportBuilder::new(b"add_2", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&add_2)
+            })
+            .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_10", add_10 as *const extern "C" fn())
-                .with_sig(lucet_signature!(
+            MockExportBuilder::new(b"add_10", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&add_10)
+            })
+            .with_sig(lucet_signature!(
                     (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"mul_2", mul_2 as *const extern "C" fn())
-                .with_sig(lucet_signature!((I64, I64) -> I64)),
+            MockExportBuilder::new(b"mul_2", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&mul_2)
+            })
+            .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f32_2", add_f32_2 as *const extern "C" fn())
-                .with_sig(lucet_signature!((F32, F32) -> F32)),
+            MockExportBuilder::new(b"add_f32_2", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&add_f32_2)
+            })
+            .with_sig(lucet_signature!((F32, F32) -> F32)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f64_2", add_f64_2 as *const extern "C" fn())
-                .with_sig(lucet_signature!((F64, F64) -> F64)),
+            MockExportBuilder::new(b"add_f64_2", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&add_f64_2)
+            })
+            .with_sig(lucet_signature!((F64, F64) -> F64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f32_10", add_f32_10 as *const extern "C" fn())
-                .with_sig(lucet_signature!(
+            MockExportBuilder::new(b"add_f32_10", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&add_f32_10)
+            })
+            .with_sig(lucet_signature!(
                     (F32, F32, F32, F32, F32, F32, F32, F32, F32, F32) -> F32)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f64_10", add_f64_10 as *const extern "C" fn())
-                .with_sig(lucet_signature!(
+            MockExportBuilder::new(b"add_f64_10", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&add_f64_10)
+            })
+            .with_sig(lucet_signature!(
                     (F64, F64, F64, F64, F64, F64, F64, F64, F64, F64) -> F64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_mixed_20", add_mixed_20 as *const extern "C" fn())
-                .with_sig(lucet_signature!(
+            MockExportBuilder::new(b"add_mixed_20", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&add_mixed_20)
+            })
+            .with_sig(lucet_signature!(
                     (
                         F64, I32, F32, F64, I32, F32,
                         F64, I32, F32, F64, I32, F32,
@@ -827,25 +843,36 @@ macro_rules! entrypoint_tests {
         }
 
         lucet_hostcalls! {
-            #[no_mangle]
-            pub unsafe extern "C" fn callback_hostcall(
-                &mut vmctx,
-                cb_idx: u32,
-                x: u64,
-            ) -> u64 {
-                let func = vmctx
-                    .get_func_from_idx(0, cb_idx)
-                    .expect("can get function by index");
-                let func: *const extern "C" fn(*mut lucet_vmctx, u64) -> u64 = unsafe { std::mem::transmute(&func.ptr) };
-                (*func)(vmctx.as_raw(), x) + 1
-            }
-        }
+                    #[no_mangle]
+                    pub unsafe extern "C" fn callback_hostcall(
+                        &mut vmctx,
+                        cb_idx: u32,
+                        x: u64,
+                    ) -> u64 {
+                        let func = vmctx
+                            .get_func_from_idx(0, cb_idx)
+                            .expect("can get function by index");
+                        println!("Func from index: {:016x}", func.ptr as u64);
+        //                let func: extern "C" fn(*mut lucet_vmctx, u64) -> u64 = unsafe { std::mem::transmute(func.ptr) };
+                        let func = std::mem::transmute::<
+                            extern "C" fn(),
+                            extern "C" fn(*mut lucet_vmctx, u64) -> u64
+                        >(func.ptr);
+                        (func)(vmctx.as_raw(), x) + 1
+                    }
+                }
 
         #[test]
         fn entrypoint_callback() {
             let module =
                 test_module_c("entrypoint", "callback.c").expect("module builds and loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+
+            use lucet_runtime_internals::module::ModuleInternal;
+            println!(
+                "function manifest: {:016x}",
+                Arc::clone(&module).function_manifest().as_ptr() as u64
+            );
 
             let mut inst = region
                 .new_instance(module)

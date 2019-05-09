@@ -598,7 +598,9 @@ macro_rules! alloc_tests {
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
-                    heap_touching_child as *const extern "C" fn(),
+                    unsafe {
+                        *std::mem::transmute::<_, *const extern "C" fn()>(&heap_touching_child)
+                    },
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
@@ -640,7 +642,9 @@ macro_rules! alloc_tests {
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
-                    stack_pattern_child as *const extern "C" fn(),
+                    unsafe {
+                        *std::mem::transmute::<_, *const extern "C" fn()>(&stack_pattern_child)
+                    },
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");

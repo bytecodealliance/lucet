@@ -217,7 +217,9 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(b"f", f as *const extern "C" fn()))
+                .with_export_func(MockExportBuilder::new(b"f", unsafe {
+                    *std::mem::transmute::<_, *const extern "C" fn()>(&f)
+                }))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -246,7 +248,9 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(b"f", f as *const extern "C" fn()))
+                .with_export_func(MockExportBuilder::new(b"f", unsafe {
+                    *std::mem::transmute::<_, *const extern "C" fn()>(&f)
+                }))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -275,7 +279,9 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(b"f", f as *const extern "C" fn()))
+                .with_export_func(MockExportBuilder::new(b"f", unsafe {
+                    *std::mem::transmute::<_, *const extern "C" fn()>(&f)
+                }))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");

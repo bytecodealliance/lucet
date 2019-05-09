@@ -173,7 +173,7 @@ impl ModuleInternal for DlModule {
             .function_id_by_name(&guest_sym)
             .ok_or_else(|| Error::SymbolNotFound(String::from_utf8_lossy(sym).into_owned()))
             .map(|id| {
-                let ptr = self.function_manifest()[id as usize].addr() as *const extern "C" fn();
+                let ptr = self.function_manifest()[id as usize].ptr();
                 FunctionHandle { ptr, id }
             })
     }
@@ -183,9 +183,12 @@ impl ModuleInternal for DlModule {
             return Err(Error::FuncNotFound(table_id, func_id));
         }
         let table = self.table_elements()?;
-        let func: *const extern "C" fn() = table
+        let func: extern "C" fn() = table
             .get(func_id as usize)
-            .map(|element| unsafe { element.rf as *const extern "C" fn() })
+            .map(|element| unsafe {
+                println!("element.rf is {:016x}", element.rf);
+                std::mem::transmute::<u64, extern "C" fn()>(element.rf)
+            })
             .ok_or(Error::FuncNotFound(table_id, func_id))?;
 
         Ok(self.function_handle_from_ptr(func))
@@ -195,10 +198,7 @@ impl ModuleInternal for DlModule {
         // `guest_start` is a pointer to the function the module designates as the start function,
         // since we can't have multiple symbols pointing to the same function and guest code might
         // call it in the normal course of execution
-        if let Ok(start_func) = unsafe {
-            self.lib
-                .get::<*const *const extern "C" fn()>(b"guest_start")
-        } {
+        if let Ok(start_func) = unsafe { self.lib.get::<*const extern "C" fn()>(b"guest_start") } {
             if start_func.is_null() {
                 lucet_incorrect_module!("`guest_start` is defined but null");
             }

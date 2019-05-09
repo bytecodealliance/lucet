@@ -68,12 +68,12 @@ pub trait ModuleInternal: Send + Sync {
 
     fn get_signature(&self, fn_id: u32) -> &Signature;
 
-    fn function_handle_from_ptr(&self, ptr: *const extern "C" fn()) -> FunctionHandle {
+    fn function_handle_from_ptr(&self, ptr: extern "C" fn()) -> FunctionHandle {
         let id = self
             .function_manifest()
             .iter()
             .enumerate()
-            .find(|(id, fn_spec)| fn_spec.addr() == ptr as u64)
+            .find(|(id, fn_spec)| fn_spec.ptr() == ptr)
             .map(|(fn_id, _)| fn_id as u32)
             .expect("valid function pointer");
 

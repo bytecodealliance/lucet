@@ -215,7 +215,7 @@ pub struct Instance {
     >,
 
     /// Pointer to the function used as the entrypoint (for use in backtraces)
-    entrypoint: *const extern "C" fn(),
+    entrypoint: Option<extern "C" fn()>,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -517,7 +517,7 @@ impl Instance {
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
             signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
-            entrypoint: ptr::null(),
+            entrypoint: None,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
@@ -556,7 +556,7 @@ impl Instance {
             self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal()),
             "instance must be ready or non-fatally faulted"
         );
-        if func.ptr.is_null() {
+        if unsafe { std::mem::transmute::<extern "C" fn(), u64>(func.ptr) } == 0 {
             return Err(Error::InvalidArgument(
                 "entrypoint function cannot be null; this is probably a malformed module",
             ));
@@ -581,7 +581,7 @@ impl Instance {
             }
         }
 
-        self.entrypoint = func.ptr;
+        self.entrypoint = Some(func.ptr);
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);

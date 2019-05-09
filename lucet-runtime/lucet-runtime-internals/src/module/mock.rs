@@ -16,8 +16,8 @@ pub struct MockModuleBuilder {
     sparse_page_data: Vec<Option<Vec<u8>>>,
     globals: BTreeMap<usize, OwnedGlobalSpec>,
     table_elements: BTreeMap<usize, TableElement>,
-    export_funcs: HashMap<Vec<u8>, *const extern "C" fn()>,
-    func_table: HashMap<(u32, u32), *const extern "C" fn()>,
+    export_funcs: HashMap<Vec<u8>, extern "C" fn()>,
+    func_table: HashMap<(u32, u32), extern "C" fn()>,
     start_func: Option<extern "C" fn()>,
     function_manifest: Vec<FunctionSpec>,
     function_info: Vec<OwnedFunctionMetadata>,
@@ -134,12 +134,7 @@ impl MockModuleBuilder {
         self
     }
 
-    pub fn with_table_func(
-        mut self,
-        table_idx: u32,
-        func_idx: u32,
-        func: *const extern "C" fn(),
-    ) -> Self {
+    pub fn with_table_func(mut self, table_idx: u32, func_idx: u32, func: extern "C" fn()) -> Self {
         self.func_table.insert((table_idx, func_idx), func);
         self
     }
@@ -214,8 +209,8 @@ pub struct MockModule {
     serialized_module_data: Vec<u8>,
     module_data: ModuleData<'static>,
     pub table_elements: Vec<TableElement>,
-    pub export_funcs: HashMap<Vec<u8>, *const extern "C" fn()>,
-    pub func_table: HashMap<(u32, u32), *const extern "C" fn()>,
+    pub export_funcs: HashMap<Vec<u8>, extern "C" fn()>,
+    pub func_table: HashMap<(u32, u32), extern "C" fn()>,
     pub start_func: Option<extern "C" fn()>,
     pub function_manifest: Vec<FunctionSpec>,
 }
@@ -271,7 +266,7 @@ impl ModuleInternal for MockModule {
     fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error> {
         Ok(self
             .start_func
-            .map(|start| self.function_handle_from_ptr(start as *const extern "C" fn())))
+            .map(|start| self.function_handle_from_ptr(start)))
     }
 
     fn function_manifest(&self) -> &[FunctionSpec] {
@@ -291,14 +286,14 @@ impl ModuleInternal for MockModule {
 
 pub struct MockExportBuilder {
     sym: &'static [u8],
-    func: *const extern "C" fn(),
+    func: extern "C" fn(),
     func_len: Option<usize>,
     traps: Option<&'static [TrapSite]>,
     sig: Signature,
 }
 
 impl MockExportBuilder {
-    pub fn new(name: &'static [u8], func: *const extern "C" fn()) -> MockExportBuilder {
+    pub fn new(name: &'static [u8], func: extern "C" fn()) -> MockExportBuilder {
         MockExportBuilder {
             sym: name,
             func: func,
@@ -309,11 +304,6 @@ impl MockExportBuilder {
                 ret_ty: None,
             },
         }
-    }
-
-    pub fn with_func(mut self, f: *const extern "C" fn()) -> MockExportBuilder {
-        self.func = f;
-        self
     }
 
     pub fn with_func_len(mut self, len: usize) -> MockExportBuilder {
@@ -334,7 +324,7 @@ impl MockExportBuilder {
     pub fn sym(&self) -> &'static [u8] {
         self.sym
     }
-    pub fn func(&self) -> *const extern "C" fn() {
+    pub fn func(&self) -> extern "C" fn() {
         self.func
     }
     pub fn func_len(&self) -> usize {

@@ -27,7 +27,9 @@ pub fn null_mock() -> Arc<dyn Module> {
     extern "C" fn f(_vmctx: *mut lucet_vmctx) {}
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(b"f", f as *const extern "C" fn()))
+        .with_export_func(MockExportBuilder::new(b"f",
+                                                 unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&f) })
+        )
         .build()
 }
 
@@ -50,7 +52,9 @@ pub fn large_dense_heap_mock(heap_kb: usize) -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"f", f as *const extern "C" fn())
+            MockExportBuilder::new(b"f",
+                                   unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&f) }
+            )
         )
         .with_initial_heap(heap.as_slice())
         .with_heap_spec(heap_spec)
@@ -83,7 +87,9 @@ pub fn large_sparse_heap_mock(heap_kb: usize, stride: usize) -> Arc<dyn Module> 
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"f", f as *const extern "C" fn())
+            MockExportBuilder::new(b"f",
+                                   unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&f) }
+            )
         )
         .with_initial_heap(heap.as_slice())
         .with_heap_spec(heap_spec)
@@ -106,7 +112,9 @@ pub fn fib_mock() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"f", f as *const extern "C" fn())
+            MockExportBuilder::new(b"f",
+                                   unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&f) }
+            )
         )
         .build()
 }
@@ -185,7 +193,9 @@ pub fn many_args_mock() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"f", f as *const extern "C" fn())
+            MockExportBuilder::new(b"f",
+                                   unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&f) }
+            )
         )
         .build()
 }
@@ -262,10 +272,14 @@ pub fn hostcalls_mock() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"wrapped", wrapped as *const extern "C" fn())
+            MockExportBuilder::new(b"wrapped",
+                                   unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&wrapped) }
+            )
         )
         .with_export_func(
-            MockExportBuilder::new(b"raw", raw as *const extern "C" fn())
+            MockExportBuilder::new(b"raw",
+                                   unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&raw) }
+            )
         )
         .build()
 }

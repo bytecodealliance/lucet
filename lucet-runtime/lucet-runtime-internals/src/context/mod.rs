@@ -193,7 +193,7 @@ impl ContextHandle {
     pub fn create_and_init(
         stack: &mut [u64],
         parent: &mut ContextHandle,
-        fptr: *const extern "C" fn(),
+        fptr: extern "C" fn(),
         args: &[Val],
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
@@ -251,7 +251,7 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     entrypoint as *const extern "C" fn(),
+    ///     entrypoint,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
     /// assert!(res.is_ok());
@@ -276,7 +276,7 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     entrypoint as *const extern "C" fn(),
+    ///     entrypoint,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
     /// assert!(res.is_ok());
@@ -285,7 +285,7 @@ impl Context {
         stack: &mut [u64],
         parent: &mut Context,
         child: &mut Context,
-        fptr: *const extern "C" fn(),
+        fptr: extern "C" fn(),
         args: &[Val],
     ) -> Result<(), Error> {
         if !stack_is_aligned(stack) {
@@ -343,7 +343,7 @@ impl Context {
         stack[sp + 0 - stack_start] = lucet_context_bootstrap as u64;
 
         // The bootstrap function returns into the guest function, fptr
-        stack[sp + 1 - stack_start] = fptr as u64;
+        stack[sp + 1 - stack_start] = unsafe { std::mem::transmute::<extern "C" fn(), u64>(fptr) };
 
         // the guest function returns into lucet_context_backstop.
         stack[sp + 2 - stack_start] = lucet_context_backstop as u64;

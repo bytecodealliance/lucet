@@ -54,7 +54,7 @@ macro_rules! init_and_swap {
             let child = Box::into_raw(Box::new(ContextHandle::create_and_init(
                 &mut *$stack,
                 parent_regs.as_mut().unwrap(),
-                $fn as *const extern "C" fn(),
+                unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&$fn) },
                 &[$( $args ),*],
             ).unwrap()));
 

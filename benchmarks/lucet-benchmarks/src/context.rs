@@ -13,7 +13,7 @@ fn context_init(c: &mut Criterion) {
             ContextHandle::create_and_init(
                 &mut *stack,
                 &mut parent,
-                f as *const extern "C" fn(),
+                unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&f) },
                 &[],
             )
             .unwrap();
@@ -33,7 +33,7 @@ fn context_swap_return(c: &mut Criterion) {
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
                     &mut parent,
-                    f as *const extern "C" fn(),
+                    unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&f) },
                     &[],
                 )
                 .unwrap();
@@ -60,7 +60,7 @@ fn context_init_swap_return(c: &mut Criterion) {
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
                     &mut parent,
-                    f as *const extern "C" fn(),
+                    unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&f) },
                     &[],
                 )
                 .unwrap();
@@ -353,7 +353,7 @@ fn context_init_swap_return_many_args(c: &mut Criterion) {
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
                     &mut parent,
-                    f as *const extern "C" fn(),
+                    unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&f) },
                     &args,
                 )
                 .unwrap();

@@ -84,15 +84,18 @@ macro_rules! globals_tests {
                 .with_global(0, -1)
                 .with_global(1, 420)
                 .with_export_func(
-                    MockExportBuilder::new(b"get_global0", get_global0 as *const extern "C" fn())
+                    MockExportBuilder::new(b"get_global0",
+                                           unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&get_global0) })
                         .with_sig(lucet_signature!(() -> I64))
                 )
                 .with_export_func(
-                    MockExportBuilder::new(b"set_global0", set_global0 as *const extern "C" fn())
+                    MockExportBuilder::new(b"set_global0",
+                                           unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&set_global0) })
                         .with_sig(lucet_signature!((I64) -> ()))
                 )
                 .with_export_func(
-                    MockExportBuilder::new(b"get_global1", get_global1 as *const extern "C" fn())
+                    MockExportBuilder::new(b"get_global1",
+                                           unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&get_global1) })
                         .with_sig(lucet_signature!(() -> I64))
                 )
                 .build()

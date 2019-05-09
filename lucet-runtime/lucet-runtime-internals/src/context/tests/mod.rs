@@ -35,7 +35,7 @@ fn init_rejects_unaligned() {
     let res = ContextHandle::create_and_init(
         &mut stack_unaligned,
         &mut parent,
-        dummy as *const extern "C" fn(),
+        unsafe { *std::mem::transmute::<_, *const extern "C" fn()>(&dummy) },
         &[],
     );
 

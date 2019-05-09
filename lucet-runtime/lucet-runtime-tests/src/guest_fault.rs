@@ -84,39 +84,35 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
     }];
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(
-            b"onetwothree",
-            onetwothree as *const extern "C" fn(),
-        ))
+        .with_export_func(MockExportBuilder::new(b"onetwothree", unsafe {
+            *std::mem::transmute::<_, *const extern "C" fn()>(&onetwothree)
+        }))
         .with_export_func(
-            MockExportBuilder::new(
-                b"illegal_instr",
-                guest_func_illegal_instr as *const extern "C" fn(),
-            )
+            MockExportBuilder::new(b"illegal_instr", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&guest_func_illegal_instr)
+            })
             .with_func_len(11)
             .with_traps(ILLEGAL_INSTR_TRAPS),
         )
         .with_export_func(
-            MockExportBuilder::new(b"oob", guest_func_oob as *const extern "C" fn())
-                .with_func_len(41)
-                .with_traps(OOB_TRAPS),
+            MockExportBuilder::new(b"oob", unsafe {
+                *std::mem::transmute::<_, *const extern "C" fn()>(&guest_func_oob)
+            })
+            .with_func_len(41)
+            .with_traps(OOB_TRAPS),
         )
-        .with_export_func(MockExportBuilder::new(
-            b"hostcall_main",
-            hostcall_main as *const extern "C" fn(),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            b"infinite_loop",
-            infinite_loop as *const extern "C" fn(),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            b"fatal",
-            fatal as *const extern "C" fn(),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            b"recoverable_fatal",
-            recoverable_fatal as *const extern "C" fn(),
-        ))
+        .with_export_func(MockExportBuilder::new(b"hostcall_main", unsafe {
+            *std::mem::transmute::<_, *const extern "C" fn()>(&hostcall_main)
+        }))
+        .with_export_func(MockExportBuilder::new(b"infinite_loop", unsafe {
+            *std::mem::transmute::<_, *const extern "C" fn()>(&infinite_loop)
+        }))
+        .with_export_func(MockExportBuilder::new(b"fatal", unsafe {
+            *std::mem::transmute::<_, *const extern "C" fn()>(&fatal)
+        }))
+        .with_export_func(MockExportBuilder::new(b"recoverable_fatal", unsafe {
+            *std::mem::transmute::<_, *const extern "C" fn()>(&recoverable_fatal)
+        }))
         .build()
 }
 
@@ -545,10 +541,9 @@ macro_rules! guest_fault_tests {
                 // therefore testing that the host signal gets re-raised.
                 let child = std::thread::spawn(|| {
                     let module = MockModuleBuilder::new()
-                        .with_export_func(MockExportBuilder::new(
-                            b"sleepy_guest",
-                            sleepy_guest as *const extern "C" fn(),
-                        ))
+                        .with_export_func(MockExportBuilder::new(b"sleepy_guest", unsafe {
+                            *std::mem::transmute::<_, *const extern "C" fn()>(&sleepy_guest)
+                        }))
                         .build();
                     let region =
                         TestRegion::create(1, &Limits::default()).expect("region can be created");

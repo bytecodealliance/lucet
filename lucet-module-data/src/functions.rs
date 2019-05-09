@@ -41,7 +41,7 @@ impl OwnedFunctionMetadata {
 }
 
 pub struct FunctionHandle {
-    pub ptr: *const extern "C" fn(),
+    pub ptr: extern "C" fn(),
     pub id: u32
 }
 
@@ -66,8 +66,10 @@ impl FunctionSpec {
     pub fn new(code_addr: u64, code_len: u32, traps_addr: u64, traps_len: u64) -> Self {
         FunctionSpec { code_addr, code_len, traps_addr, traps_len }
     }
-    pub fn addr(&self) -> u64 {
-        self.code_addr
+    pub fn ptr(&self) -> extern "C" fn() {
+        unsafe {
+            std::mem::transmute::<u64, extern "C" fn()>(self.code_addr)
+        }
     }
     pub fn code_len(&self) -> u32 {
         self.code_len
