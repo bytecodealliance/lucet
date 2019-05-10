@@ -1,5 +1,5 @@
-use crate::helpers::MockModuleBuilder;
-use lucet_module_data::{FunctionSpec, TrapCode, TrapSite};
+use crate::helpers::{MockExportBuilder, MockModuleBuilder};
+use lucet_module_data::{FunctionPointer, TrapCode, TrapSite};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
@@ -83,36 +83,40 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         code: TrapCode::HeapOutOfBounds,
     }];
 
-    let function_manifest = &[
-        FunctionSpec::new(
-            guest_func_illegal_instr as *const extern "C" fn() as u64,
-            11,
-            ILLEGAL_INSTR_TRAPS.as_ptr() as u64,
-            ILLEGAL_INSTR_TRAPS.len() as u64,
-        ),
-        FunctionSpec::new(
-            guest_func_oob as *const extern "C" fn() as u64,
-            41,
-            OOB_TRAPS.as_ptr() as u64,
-            OOB_TRAPS.len() as u64,
-        ),
-    ];
-
     MockModuleBuilder::new()
-        .with_export_func(b"onetwothree", onetwothree as *const extern "C" fn())
+        .with_export_func(MockExportBuilder::new(
+            b"onetwothree",
+            FunctionPointer::from_usize(onetwothree as usize),
+        ))
         .with_export_func(
-            b"illegal_instr",
-            guest_func_illegal_instr as *const extern "C" fn(),
+            MockExportBuilder::new(
+                b"illegal_instr",
+                FunctionPointer::from_usize(guest_func_illegal_instr as usize),
+            )
+            .with_func_len(11)
+            .with_traps(ILLEGAL_INSTR_TRAPS),
         )
-        .with_export_func(b"oob", guest_func_oob as *const extern "C" fn())
-        .with_export_func(b"hostcall_main", hostcall_main as *const extern "C" fn())
-        .with_export_func(b"infinite_loop", infinite_loop as *const extern "C" fn())
-        .with_export_func(b"fatal", fatal as *const extern "C" fn())
         .with_export_func(
+            MockExportBuilder::new(b"oob", FunctionPointer::from_usize(guest_func_oob as usize))
+                .with_func_len(41)
+                .with_traps(OOB_TRAPS),
+        )
+        .with_export_func(MockExportBuilder::new(
+            b"hostcall_main",
+            FunctionPointer::from_usize(hostcall_main as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            b"infinite_loop",
+            FunctionPointer::from_usize(infinite_loop as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            b"fatal",
+            FunctionPointer::from_usize(fatal as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
             b"recoverable_fatal",
-            recoverable_fatal as *const extern "C" fn(),
-        )
-        .with_function_manifest(function_manifest)
+            FunctionPointer::from_usize(recoverable_fatal as usize),
+        ))
         .build()
 }
 
@@ -121,6 +125,7 @@ macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, siginfo_t, SIGSEGV};
+        use lucet_module_data::FunctionPointer;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
@@ -134,7 +139,7 @@ macro_rules! guest_fault_tests {
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::guest_fault::mock_traps_module;
-        use $crate::helpers::{test_ex, test_nonex, MockModuleBuilder};
+        use $crate::helpers::{test_ex, test_nonex, MockExportBuilder, MockModuleBuilder};
 
         lazy_static! {
             static ref RECOVERABLE_PTR_LOCK: Mutex<()> = Mutex::new(());
@@ -540,7 +545,10 @@ macro_rules! guest_fault_tests {
                 // therefore testing that the host signal gets re-raised.
                 let child = std::thread::spawn(|| {
                     let module = MockModuleBuilder::new()
-                        .with_export_func(b"sleepy_guest", sleepy_guest as *const extern "C" fn())
+                        .with_export_func(MockExportBuilder::new(
+                            b"sleepy_guest",
+                            FunctionPointer::from_usize(sleepy_guest as usize),
+                        ))
                         .build();
                     let region =
                         TestRegion::create(1, &Limits::default()).expect("region can be created");

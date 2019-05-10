@@ -3,6 +3,7 @@ macro_rules! host_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::c_void;
+        use lucet_module_data::FunctionPointer;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, Limits, Region,
@@ -11,7 +12,7 @@ macro_rules! host_tests {
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
-        use $crate::helpers::MockModuleBuilder;
+        use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
         #[test]
         fn load_module() {
             let _module = test_module_c("host", "trivial.c").expect("build and load module");
@@ -118,7 +119,8 @@ macro_rules! host_tests {
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
-            inst.run(b"main", &[]).expect("instance runs");
+            inst.run(b"main", &[0u32.into(), 0i32.into()])
+                .expect("instance runs");
         }
 
         #[test]
@@ -132,7 +134,8 @@ macro_rules! host_tests {
                 .build()
                 .expect("instance can be created");
 
-            inst.run(b"main", &[]).expect("instance runs");
+            inst.run(b"main", &[0u32.into(), 0i32.into()])
+                .expect("instance runs");
 
             assert!(*inst.get_embed_ctx::<bool>().unwrap().unwrap());
         }
@@ -145,7 +148,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"main", &[]) {
+            match inst.run(b"main", &[0u32.into(), 0i32.into()]) {
                 Err(Error::RuntimeTerminated(term)) => {
                     assert_eq!(
                         *term
@@ -169,7 +172,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"main", &[]) {
+            match inst.run(b"main", &[0u32.into(), 0u32.into()]) {
                 Err(Error::RuntimeTerminated(term)) => {
                     assert_eq!(
                         *term
@@ -194,7 +197,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"trigger_div_error", &[0u64.into()]) {
+            match inst.run(b"trigger_div_error", &[0u32.into()]) {
                 Err(Error::RuntimeFault(details)) => {
                     assert_eq!(details.trapcode, Some(TrapCode::IntegerDivByZero));
                 }
@@ -215,7 +218,10 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(b"f", f as *const extern "C" fn())
+                .with_export_func(MockExportBuilder::new(
+                    b"f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -244,7 +250,10 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(b"f", f as *const extern "C" fn())
+                .with_export_func(MockExportBuilder::new(
+                    b"f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -273,7 +282,10 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(b"f", f as *const extern "C" fn())
+                .with_export_func(MockExportBuilder::new(
+                    b"f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");

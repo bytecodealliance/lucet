@@ -1,6 +1,7 @@
 mod c_child;
 mod rust_child;
 use crate::context::{Context, ContextHandle, Error};
+use lucet_module_data::FunctionPointer;
 use memoffset::offset_of;
 use std::slice;
 
@@ -35,7 +36,7 @@ fn init_rejects_unaligned() {
     let res = ContextHandle::create_and_init(
         &mut stack_unaligned,
         &mut parent,
-        dummy as *const extern "C" fn(),
+        FunctionPointer::from_usize(dummy as usize),
         &[],
     );
 

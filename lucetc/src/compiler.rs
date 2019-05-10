@@ -108,7 +108,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
-    pub fn module_data(&self) -> ModuleData {
+    pub fn module_data(&self) -> Result<ModuleData, LucetcError> {
         self.decls.get_module_data()
     }
 
@@ -139,13 +139,16 @@ impl<'a> Compiler<'a> {
         let function_manifest: Vec<(String, FunctionSpec)> = self
             .clif_module
             .declared_functions()
-            .filter_map(|f| {
-                f.compiled.as_ref().map(|compiled| {
-                    (
-                        f.decl.name.to_owned(), // this copy is only necessary because `clif_module` is moved in `finish, below`
-                        FunctionSpec::new(0, compiled.code_length(), 0, 0),
-                    )
-                })
+            .map(|f| {
+                (
+                    f.decl.name.to_owned(), // this copy is only necessary because `clif_module` is moved in `finish, below`
+                    FunctionSpec::new(
+                        0,
+                        f.compiled.as_ref().map(|c| c.code_length()).unwrap_or(0),
+                        0,
+                        0,
+                    ),
+                )
             })
             .collect();
 
@@ -195,7 +198,7 @@ fn write_module_data<B: ClifBackend>(
     use cranelift_module::{DataContext, Linkage};
 
     let module_data_serialized: Vec<u8> = decls
-        .get_module_data()
+        .get_module_data()?
         .serialize()
         .context(LucetcErrorKind::ModuleData)?;
     {

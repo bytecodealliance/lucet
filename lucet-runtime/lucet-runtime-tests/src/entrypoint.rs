@@ -1,5 +1,6 @@
 use crate::build::test_module_wasm;
-use crate::helpers::MockModuleBuilder;
+use crate::helpers::{MockExportBuilder, MockModuleBuilder};
+use lucet_module_data::{lucet_signature, FunctionPointer};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
@@ -119,14 +120,62 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
     }
 
     MockModuleBuilder::new()
-        .with_export_func(b"add_2", add_2 as *const extern "C" fn())
-        .with_export_func(b"add_10", add_10 as *const extern "C" fn())
-        .with_export_func(b"mul_2", mul_2 as *const extern "C" fn())
-        .with_export_func(b"add_f32_2", add_f32_2 as *const extern "C" fn())
-        .with_export_func(b"add_f64_2", add_f64_2 as *const extern "C" fn())
-        .with_export_func(b"add_f32_10", add_f32_10 as *const extern "C" fn())
-        .with_export_func(b"add_f64_10", add_f64_10 as *const extern "C" fn())
-        .with_export_func(b"add_mixed_20", add_mixed_20 as *const extern "C" fn())
+        .with_export_func(
+            MockExportBuilder::new(b"add_2", FunctionPointer::from_usize(add_2 as usize))
+                .with_sig(lucet_signature!((I64, I64) -> I64)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(b"add_10", FunctionPointer::from_usize(add_10 as usize))
+                .with_sig(lucet_signature!(
+                    (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(b"mul_2", FunctionPointer::from_usize(mul_2 as usize))
+                .with_sig(lucet_signature!((I64, I64) -> I64)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(
+                b"add_f32_2",
+                FunctionPointer::from_usize(add_f32_2 as usize),
+            )
+            .with_sig(lucet_signature!((F32, F32) -> F32)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(
+                b"add_f64_2",
+                FunctionPointer::from_usize(add_f64_2 as usize),
+            )
+            .with_sig(lucet_signature!((F64, F64) -> F64)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(
+                b"add_f32_10",
+                FunctionPointer::from_usize(add_f32_10 as usize),
+            )
+            .with_sig(lucet_signature!(
+                    (F32, F32, F32, F32, F32, F32, F32, F32, F32, F32) -> F32)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(
+                b"add_f64_10",
+                FunctionPointer::from_usize(add_f64_10 as usize),
+            )
+            .with_sig(lucet_signature!(
+                    (F64, F64, F64, F64, F64, F64, F64, F64, F64, F64) -> F64)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(
+                b"add_mixed_20",
+                FunctionPointer::from_usize(add_mixed_20 as usize),
+            )
+            .with_sig(lucet_signature!(
+                    (
+                        F64, I32, F32, F64, I32, F32,
+                        F64, I32, F32, F64, I32, F32,
+                        F64, I32, F32, F64, I64, F32,
+                        F64, I64
+                    ) -> F64)),
+        )
         .build()
 }
 
@@ -468,6 +517,80 @@ macro_rules! entrypoint_tests {
             );
         }
 
+        #[test]
+        fn mock_typecheck_entrypoint_wrong_args() {
+            typecheck_entrypoint_wrong_args(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_typecheck_entrypoint_wrong_args() {
+            typecheck_entrypoint_wrong_args(wat_calculator_module())
+        }
+
+        fn typecheck_entrypoint_wrong_args(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(b"add_2", &[123.0f64.into(), 456.0f64.into()]) {
+                Err(Error::InvalidArgument(err)) => {
+                    assert_eq!(err, "entrypoint function signature mismatch")
+                }
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
+        #[test]
+        fn mock_typecheck_entrypoint_too_few_args() {
+            typecheck_entrypoint_too_few_args(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_typecheck_entrypoint_too_few_args() {
+            typecheck_entrypoint_too_few_args(wat_calculator_module())
+        }
+
+        fn typecheck_entrypoint_too_few_args(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(b"add_2", &[123u64.into()]) {
+                Err(Error::InvalidArgument(err)) => assert_eq!(
+                    err,
+                    "entrypoint function signature mismatch (number of arguments is incorrect)"
+                ),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
+        #[test]
+        fn mock_typecheck_entrypoint_too_many_args() {
+            typecheck_entrypoint_too_many_args(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_typecheck_entrypoint_too_many_args() {
+            typecheck_entrypoint_too_many_args(wat_calculator_module())
+        }
+
+        fn typecheck_entrypoint_too_many_args(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(b"add_2", &[123u64.into(), 456u64.into(), 789u64.into()]) {
+                Err(Error::InvalidArgument(err)) => assert_eq!(
+                    err,
+                    "entrypoint function signature mismatch (number of arguments is incorrect)"
+                ),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
         use $crate::build::test_module_c;
         const TEST_REGION_INIT_VAL: libc::c_int = 123;
         const TEST_REGION_SIZE: libc::size_t = 4;
@@ -728,8 +851,11 @@ macro_rules! entrypoint_tests {
                 let func = vmctx
                     .get_func_from_idx(0, cb_idx)
                     .expect("can get function by index");
-                let func = func as *const extern "C" fn(*mut lucet_vmctx, u64) -> u64;
-                (*func)(vmctx.as_raw(), x) + 1
+                let func = std::mem::transmute::<
+                    usize,
+                    extern "C" fn(*mut lucet_vmctx, u64) -> u64
+                >(func.ptr.as_usize());
+                (func)(vmctx.as_raw(), x) + 1
             }
         }
 

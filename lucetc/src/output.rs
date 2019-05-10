@@ -66,13 +66,17 @@ impl ObjectFile {
 
         // Now that we have trap information, we can fix up FunctionSpec entries to have
         // correct `trap_length` values
-        let mut function_map: HashMap<String, FunctionSpec> = HashMap::new();
-        for (name, fn_spec) in function_manifest.into_iter() {
-            function_map.insert(name, fn_spec);
+        let mut function_map: HashMap<String, u32> = HashMap::new();
+        for (i, (name, _)) in function_manifest.iter().enumerate() {
+            function_map.insert(name.clone(), i as u32);
         }
 
         for sink in trap_manifest.sinks.iter() {
-            if let Some(ref mut fn_spec) = function_map.get_mut(&sink.name) {
+            if let Some(idx) = function_map.get(&sink.name) {
+                let (_, fn_spec) = &mut function_manifest
+                    .get_mut(*idx as usize)
+                    .expect("index is valid");
+
                 std::mem::replace::<FunctionSpec>(
                     fn_spec,
                     FunctionSpec::new(0, fn_spec.code_len(), 0, sink.sites.len() as u64),
@@ -82,8 +86,6 @@ impl ObjectFile {
                     .context(LucetcErrorKind::TranslatingModule)?;
             }
         }
-
-        let function_manifest: Vec<(String, FunctionSpec)> = function_map.into_iter().collect();
 
         write_trap_tables(trap_manifest, &mut product.artifact)?;
         write_function_manifest(function_manifest.as_slice(), &mut product.artifact)?;

@@ -27,8 +27,7 @@ macro_rules! strcmp_tests {
                 .expect("s2 is a valid CString")
                 .into_bytes_with_nul();
 
-            let res_size = std::mem::size_of::<uint64_t>();
-            assert!(res_size + s1.len() + s2.len() < WASM_PAGE_SIZE as usize);
+            assert!(s1.len() + s2.len() < WASM_PAGE_SIZE as usize);
 
             let module = test_module_c("strcmp", "guest.c").expect("compile module");
             let region = TestRegion::create(10, &Limits::default()).expect("region can be created");
@@ -39,8 +38,7 @@ macro_rules! strcmp_tests {
             let newpage_start = inst.grow_memory(1).expect("grow_memory succeeds");
             let heap = inst.heap_mut();
 
-            let res_ptr = (newpage_start * WASM_PAGE_SIZE) as usize;
-            let s1_ptr = res_ptr + res_size;
+            let s1_ptr = (newpage_start * WASM_PAGE_SIZE) as usize;
             let s2_ptr = s1_ptr + s1.len();
             heap[s1_ptr..s2_ptr].copy_from_slice(&s1);
             heap[s2_ptr..s2_ptr + s2.len()].copy_from_slice(&s2);
@@ -48,11 +46,7 @@ macro_rules! strcmp_tests {
             let res = c_int::from(
                 inst.run(
                     b"run_strcmp",
-                    &[
-                        Val::GuestPtr(s1_ptr as u32),
-                        Val::GuestPtr(s2_ptr as u32),
-                        Val::GuestPtr(res_ptr as u32),
-                    ],
+                    &[Val::GuestPtr(s1_ptr as u32), Val::GuestPtr(s2_ptr as u32)],
                 )
                 .expect("instance runs"),
             );

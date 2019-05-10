@@ -3,6 +3,7 @@
 use crate::context::{Context, ContextHandle};
 use crate::val::{Val, __m128_as_f32, __m128_as_f64};
 use lazy_static::lazy_static;
+use lucet_module_data::FunctionPointer;
 use std::cell::RefCell;
 use std::fmt::Write;
 use std::os::raw::{c_int, c_void};
@@ -50,7 +51,7 @@ macro_rules! init_and_swap {
             let child = ContextHandle::create_and_init(
                 &mut *$stack,
                 PARENT.as_mut().unwrap(),
-                $fn as *const extern "C" fn(),
+                FunctionPointer::from_usize($fn as usize),
                 &[$( $args ),*],
             ).unwrap();
             CHILD = Some(child);

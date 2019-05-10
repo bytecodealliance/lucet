@@ -13,12 +13,14 @@ fn write_relocated_slice(
     to: &str,
     len: u64,
 ) -> Result<(), Error> {
-    obj.link(Link {
-        from, // the data at `from` + `at` (eg. manifest_sym)
-        to,   // is a reference to `to`    (eg. fn_name)
-        at: buf.position(),
-    })
-    .context(format!("linking {} into function manifest", to))?;
+    if len > 0 {
+        obj.link(Link {
+            from, // the data at `from` + `at` (eg. manifest_sym)
+            to,   // is a reference to `to`    (eg. fn_name)
+            at: buf.position(),
+        })
+        .context(format!("linking {} into function manifest", to))?;
+    }
 
     buf.write_u64::<LittleEndian>(0).unwrap();
     buf.write_u64::<LittleEndian>(len).unwrap();

@@ -5,7 +5,7 @@ use crate::module::ModuleInfo;
 pub use crate::module::{Exportable, TableElems};
 use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
-use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap};
+use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
@@ -15,17 +15,11 @@ use cranelift_wasm::{
 };
 use failure::{format_err, Error, ResultExt};
 use lucet_module_data::{
-    owned::OwnedLinearMemorySpec, Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec,
-    ModuleData,
+    owned::OwnedLinearMemorySpec, FunctionMetadata, Global as GlobalVariant, GlobalDef, GlobalSpec,
+    HeapSpec, ModuleData, Signature as LucetSignature, UniqueSignatureIndex,
 };
 use std::collections::HashMap;
-
-/// UniqueSignatureIndex names a signature after collapsing duplicate signatures to a single
-/// identifier, whereas SignatureIndex is directly what the original module specifies, and may
-/// specify duplicates of types that are structurally equal.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct UniqueSignatureIndex(u32);
-entity_impl!(UniqueSignatureIndex);
+use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub struct FunctionDecl<'a> {
@@ -368,12 +362,47 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    pub fn get_module_data(&self) -> ModuleData {
+    pub fn get_module_data(&self) -> Result<ModuleData, LucetcError> {
         let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
             Some(spec.to_ref())
         } else {
             None
         };
-        ModuleData::new(linear_memory, self.globals_spec.clone())
+
+        let mut functions: Vec<FunctionMetadata> = Vec::new();
+        for fn_index in self.function_names.keys() {
+            let decl = self.get_func(fn_index).unwrap();
+
+            // can't use `decl.name` for `FunctionMetadata::name` as `decl` is dropped in the next
+            // iteration of this loop.
+            let name = self
+                .function_names
+                .get(fn_index)
+                .ok_or_else(|| format_err!("func index out of bounds: {:?}", fn_index))
+                .unwrap();
+
+            functions.push(FunctionMetadata {
+                signature: decl.signature_index,
+                sym: Some(name.symbol().as_bytes()), // TODO: what about functions without names? currently internal functions are named like `guest_func_N`.
+            });
+        }
+
+        let signatures = self
+            .info
+            .signatures
+            .values()
+            .map(|sig| {
+                LucetSignature::try_from(sig)
+                    .map_err(|e| format_err!("error converting cranelift sig to wasm sig: {:?}", e))
+                    .context(LucetcErrorKind::TranslatingModule)
+            })
+            .collect::<Result<Vec<LucetSignature>, failure::Context<LucetcErrorKind>>>()?;
+
+        Ok(ModuleData::new(
+            linear_memory,
+            self.globals_spec.clone(),
+            functions,
+            signatures,
+        ))
     }
 }

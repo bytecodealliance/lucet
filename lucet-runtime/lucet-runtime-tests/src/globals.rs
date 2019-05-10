@@ -1,12 +1,13 @@
 #[macro_export]
 macro_rules! globals_tests {
     ( $TestRegion:path ) => {
+        use lucet_module_data::{lucet_signature, FunctionPointer};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{Error, Limits, Module, Region};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_wasm;
-        use $crate::helpers::MockModuleBuilder;
+        use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
 
         #[test]
         fn defined_globals() {
@@ -82,9 +83,18 @@ macro_rules! globals_tests {
             MockModuleBuilder::new()
                 .with_global(0, -1)
                 .with_global(1, 420)
-                .with_export_func(b"get_global0", get_global0 as *const extern "C" fn())
-                .with_export_func(b"set_global0", set_global0 as *const extern "C" fn())
-                .with_export_func(b"get_global1", get_global1 as *const extern "C" fn())
+                .with_export_func(
+                    MockExportBuilder::new(b"get_global0", FunctionPointer::from_usize(get_global0 as usize))
+                        .with_sig(lucet_signature!(() -> I64))
+                )
+                .with_export_func(
+                    MockExportBuilder::new(b"set_global0", FunctionPointer::from_usize(set_global0 as usize))
+                        .with_sig(lucet_signature!((I64) -> ()))
+                )
+                .with_export_func(
+                    MockExportBuilder::new(b"get_global1", FunctionPointer::from_usize(get_global1 as usize))
+                        .with_sig(lucet_signature!(() -> I64))
+                )
                 .build()
         }
 

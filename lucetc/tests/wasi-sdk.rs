@@ -57,7 +57,7 @@ mod programs {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile empty");
-        let mdata = c.module_data();
+        let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());
         // clang creates 3 globals, all internal:
         assert_eq!(mdata.globals_spec().len(), 3);
@@ -87,7 +87,7 @@ mod programs {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a");
-        let _mdata = c.module_data();
+        let _mdata = c.module_data().unwrap();
 
         /* FIXME: module data doesn't contain the information to check these properties:
         assert_eq!(p.import_functions().len(), 0, "import functions");
@@ -104,7 +104,7 @@ mod programs {
         let b = b_only_test_bindings();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile b");
-        let _mdata = c.module_data();
+        let _mdata = c.module_data().unwrap();
         /* FIXME: module data doesn't contain the information to check these properties:
         assert_eq!(p.import_functions().len(), 1, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
@@ -119,7 +119,7 @@ mod programs {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a & b");
-        let _mdata = c.module_data();
+        let _mdata = c.module_data().unwrap();
         /* FIXME: module data doesn't contain the information to check these properties:
         assert_eq!(p.import_functions().len(), 0, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
