@@ -24,7 +24,8 @@ pub use crate::module::Module;
 pub use crate::package::Package;
 pub use crate::target::Target;
 pub use crate::types::{
-    Attr, DataType, DataTypeRef, FuncDecl, FuncRet, Ident, Location, Name, Named, NamedMember,
+    AtomType, Attr, DataType, DataTypeRef, FuncDecl, FuncRet, Ident, Location, Name, Named,
+    NamedMember,
 };
 
 use crate::parser::Parser;

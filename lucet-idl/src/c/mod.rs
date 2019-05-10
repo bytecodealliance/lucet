@@ -92,10 +92,12 @@ impl Generator for CGenerator {
 
 impl CGenerator {
     pub fn new(target: Target, w: Box<dyn Write>) -> Self {
+        let mut w = PrettyWriter::new(w);
+        prelude::generate(&mut w, target.clone()).expect("write prelude");
         Self {
             target,
             cache: Cache::default(),
-            w: PrettyWriter::new(w),
+            w,
         }
     }
     /// Traverse a `DataTypeRef` chain, and return information

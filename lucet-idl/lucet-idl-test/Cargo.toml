@@ -4,8 +4,17 @@ version = "0.1.0"
 authors = ["Pat Hickey <phickey@fastly.com>"]
 edition = "2018"
 
+[lib]
+crate-type=["rlib"]
+
+[[bin]]
+name = "lucet-idl-test"
+path = "src/main.rs"
+
 [dependencies]
 lucet-idl = { path = "../" }
 lucet-wasi-sdk = { path = "../../lucet-wasi-sdk" }
 lucetc = { path = "../../lucetc" }
 lucet-runtime = { path = "../../lucet-runtime" }
+proptest = "0.9.3"
+tempfile = "3.0"
