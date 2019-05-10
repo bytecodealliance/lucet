@@ -852,9 +852,9 @@ macro_rules! entrypoint_tests {
                     .get_func_from_idx(0, cb_idx)
                     .expect("can get function by index");
                 let func = std::mem::transmute::<
-                    u64,
+                    usize,
                     extern "C" fn(*mut lucet_vmctx, u64) -> u64
-                >(func.ptr.as_usize() as u64);
+                >(func.ptr.as_usize());
                 (func)(vmctx.as_raw(), x) + 1
             }
         }

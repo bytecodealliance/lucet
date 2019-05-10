@@ -249,8 +249,11 @@ impl Vmctx {
     ///         operand2: u32,
     ///     ) -> u32 {
     ///         if let Ok(binop) = vmctx.get_func_from_idx(binop_table_idx, binop_func_idx) {
-    ///             let typed_binop = binop.as_ptr() as *const extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32;
-    ///             unsafe { (*typed_binop)(vmctx.as_raw(), operand1, operand2) }
+    ///             let typed_binop = std::mem::transmute::<
+    ///                 usize,
+    ///                 extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32
+    ///             >(binop.ptr.as_usize());
+    ///             unsafe { (typed_binop)(vmctx.as_raw(), operand1, operand2) }
     ///         } else {
     ///             lucet_hostcall_terminate!("invalid function index")
     ///         }

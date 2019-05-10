@@ -73,7 +73,7 @@ pub trait ModuleInternal: Send + Sync {
             .function_manifest()
             .iter()
             .enumerate()
-            .find(|(id, fn_spec)| fn_spec.ptr() == ptr)
+            .find(|(_, fn_spec)| fn_spec.ptr() == ptr)
             .map(|(fn_id, _)| fn_id as u32)
             .expect("valid function pointer");
 

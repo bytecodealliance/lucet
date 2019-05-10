@@ -279,7 +279,7 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     FunctionPointer::From_usize(entrypoint as usize),
+    ///     FunctionPointer::from_usize(entrypoint as usize),
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
     /// assert!(res.is_ok());

@@ -13,8 +13,7 @@ impl UContextPtr {
     #[inline]
     pub fn get_ip(self) -> *const c_void {
         let mcontext = &unsafe { *(self.0) }.uc_mcontext;
-        let reg: libc::greg_t = mcontext.gregs[REG_RIP as usize];
-        reg as *const _
+        mcontext.gregs[REG_RIP as usize] as *const _
     }
 }
 
