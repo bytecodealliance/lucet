@@ -185,10 +185,7 @@ impl ModuleInternal for DlModule {
         let table = self.table_elements()?;
         let func: extern "C" fn() = table
             .get(func_id as usize)
-            .map(|element| unsafe {
-                println!("element.rf is {:016x}", element.rf);
-                std::mem::transmute::<u64, extern "C" fn()>(element.rf)
-            })
+            .map(|element| unsafe { std::mem::transmute::<u64, extern "C" fn()>(element.rf) })
             .ok_or(Error::FuncNotFound(table_id, func_id))?;
 
         Ok(self.function_handle_from_ptr(func))

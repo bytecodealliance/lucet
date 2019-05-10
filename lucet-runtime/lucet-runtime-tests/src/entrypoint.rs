@@ -843,36 +843,28 @@ macro_rules! entrypoint_tests {
         }
 
         lucet_hostcalls! {
-                    #[no_mangle]
-                    pub unsafe extern "C" fn callback_hostcall(
-                        &mut vmctx,
-                        cb_idx: u32,
-                        x: u64,
-                    ) -> u64 {
-                        let func = vmctx
-                            .get_func_from_idx(0, cb_idx)
-                            .expect("can get function by index");
-                        println!("Func from index: {:016x}", func.ptr as u64);
-        //                let func: extern "C" fn(*mut lucet_vmctx, u64) -> u64 = unsafe { std::mem::transmute(func.ptr) };
-                        let func = std::mem::transmute::<
-                            extern "C" fn(),
-                            extern "C" fn(*mut lucet_vmctx, u64) -> u64
-                        >(func.ptr);
-                        (func)(vmctx.as_raw(), x) + 1
-                    }
-                }
+            #[no_mangle]
+            pub unsafe extern "C" fn callback_hostcall(
+                &mut vmctx,
+                cb_idx: u32,
+                x: u64,
+            ) -> u64 {
+                let func = vmctx
+                    .get_func_from_idx(0, cb_idx)
+                    .expect("can get function by index");
+                let func = std::mem::transmute::<
+                    extern "C" fn(),
+                    extern "C" fn(*mut lucet_vmctx, u64) -> u64
+                >(func.ptr);
+                (func)(vmctx.as_raw(), x) + 1
+            }
+        }
 
         #[test]
         fn entrypoint_callback() {
             let module =
                 test_module_c("entrypoint", "callback.c").expect("module builds and loads");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-
-            use lucet_runtime_internals::module::ModuleInternal;
-            println!(
-                "function manifest: {:016x}",
-                Arc::clone(&module).function_manifest().as_ptr() as u64
-            );
 
             let mut inst = region
                 .new_instance(module)

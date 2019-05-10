@@ -125,13 +125,6 @@ impl MockModuleBuilder {
             signature: sig_idx,
             sym: Some(export.sym().to_vec()),
         });
-        println!(
-            "Function with name {} has signature {:?} with idx {}",
-            String::from_utf8(export.sym().to_vec()).unwrap(),
-            export.sig(),
-            sig_idx.as_u32()
-        );
-        println!("  oh and it's at {:016x}", export.func() as u64);
         self.function_manifest.push(FunctionSpec::new(
             export.func() as u64,
             export.func_len() as u32,
