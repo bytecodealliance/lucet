@@ -431,6 +431,7 @@ impl Context {
     /// parent context.
     ///
     /// ```no_run
+    /// # use lucet_module_data::FunctionPointer;
     /// # use lucet_runtime_internals::context::Context;
     /// # extern "C" fn entrypoint() {}
     /// # let mut stack = vec![0u64; 1024].into_boxed_slice();
