@@ -343,7 +343,7 @@ impl Context {
         stack[sp + 0 - stack_start] = lucet_context_bootstrap as u64;
 
         // The bootstrap function returns into the guest function, fptr
-        stack[sp + 1 - stack_start] = unsafe { std::mem::transmute::<extern "C" fn(), u64>(fptr) };
+        stack[sp + 1 - stack_start] = fptr as u64;
 
         // the guest function returns into lucet_context_backstop.
         stack[sp + 2 - stack_start] = lucet_context_backstop as u64;

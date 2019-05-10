@@ -599,7 +599,7 @@ macro_rules! alloc_tests {
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
                     unsafe {
-                        *std::mem::transmute::<_, *const extern "C" fn()>(&heap_touching_child)
+                        std::mem::transmute::<_, extern "C" fn()>(heap_touching_child as u64)
                     },
                     &[Val::CPtr(heap_ptr)],
                 )
@@ -643,7 +643,7 @@ macro_rules! alloc_tests {
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
                     unsafe {
-                        *std::mem::transmute::<_, *const extern "C" fn()>(&stack_pattern_child)
+                        std::mem::transmute::<_, extern "C" fn()>(stack_pattern_child as u64)
                     },
                     &[Val::CPtr(heap_ptr)],
                 )

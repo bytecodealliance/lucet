@@ -122,52 +122,52 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
     MockModuleBuilder::new()
         .with_export_func(
             MockExportBuilder::new(b"add_2", unsafe {
-                *std::mem::transmute::<_, *const extern "C" fn()>(&add_2)
+                std::mem::transmute::<_, extern "C" fn()>(add_2 as u64)
             })
             .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
             MockExportBuilder::new(b"add_10", unsafe {
-                *std::mem::transmute::<_, *const extern "C" fn()>(&add_10)
+                std::mem::transmute::<_, extern "C" fn()>(add_10 as u64)
             })
             .with_sig(lucet_signature!(
                     (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64)),
         )
         .with_export_func(
             MockExportBuilder::new(b"mul_2", unsafe {
-                *std::mem::transmute::<_, *const extern "C" fn()>(&mul_2)
+                std::mem::transmute::<_, extern "C" fn()>(mul_2 as u64)
             })
             .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
             MockExportBuilder::new(b"add_f32_2", unsafe {
-                *std::mem::transmute::<_, *const extern "C" fn()>(&add_f32_2)
+                std::mem::transmute::<_, extern "C" fn()>(add_f32_2 as u64)
             })
             .with_sig(lucet_signature!((F32, F32) -> F32)),
         )
         .with_export_func(
             MockExportBuilder::new(b"add_f64_2", unsafe {
-                *std::mem::transmute::<_, *const extern "C" fn()>(&add_f64_2)
+                std::mem::transmute::<_, extern "C" fn()>(add_f64_2 as u64)
             })
             .with_sig(lucet_signature!((F64, F64) -> F64)),
         )
         .with_export_func(
             MockExportBuilder::new(b"add_f32_10", unsafe {
-                *std::mem::transmute::<_, *const extern "C" fn()>(&add_f32_10)
+                std::mem::transmute::<_, extern "C" fn()>(add_f32_10 as u64)
             })
             .with_sig(lucet_signature!(
                     (F32, F32, F32, F32, F32, F32, F32, F32, F32, F32) -> F32)),
         )
         .with_export_func(
             MockExportBuilder::new(b"add_f64_10", unsafe {
-                *std::mem::transmute::<_, *const extern "C" fn()>(&add_f64_10)
+                std::mem::transmute::<_, extern "C" fn()>(add_f64_10 as u64)
             })
             .with_sig(lucet_signature!(
                     (F64, F64, F64, F64, F64, F64, F64, F64, F64, F64) -> F64)),
         )
         .with_export_func(
             MockExportBuilder::new(b"add_mixed_20", unsafe {
-                *std::mem::transmute::<_, *const extern "C" fn()>(&add_mixed_20)
+                std::mem::transmute::<_, extern "C" fn()>(add_mixed_20 as u64)
             })
             .with_sig(lucet_signature!(
                     (

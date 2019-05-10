@@ -218,7 +218,7 @@ macro_rules! host_tests {
 
             let module = MockModuleBuilder::new()
                 .with_export_func(MockExportBuilder::new(b"f", unsafe {
-                    *std::mem::transmute::<_, *const extern "C" fn()>(&f)
+                    std::mem::transmute::<_, extern "C" fn()>(f as u64)
                 }))
                 .build();
 
@@ -249,7 +249,7 @@ macro_rules! host_tests {
 
             let module = MockModuleBuilder::new()
                 .with_export_func(MockExportBuilder::new(b"f", unsafe {
-                    *std::mem::transmute::<_, *const extern "C" fn()>(&f)
+                    std::mem::transmute::<_, extern "C" fn()>(f as u64)
                 }))
                 .build();
 
@@ -280,7 +280,7 @@ macro_rules! host_tests {
 
             let module = MockModuleBuilder::new()
                 .with_export_func(MockExportBuilder::new(b"f", unsafe {
-                    *std::mem::transmute::<_, *const extern "C" fn()>(&f)
+                    std::mem::transmute::<_, extern "C" fn()>(f as u64)
                 }))
                 .build();
 
