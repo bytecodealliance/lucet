@@ -440,7 +440,7 @@ impl Context {
     ///     &mut stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     entrypoint as *const extern "C" fn(),
+    ///     FunctionPointer::from_usize(entrypoint as usize),
     ///     &[],
     /// ).unwrap();
     ///
