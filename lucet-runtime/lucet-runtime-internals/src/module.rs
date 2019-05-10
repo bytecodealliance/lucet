@@ -5,8 +5,8 @@ mod sparse_page_data;
 pub use crate::module::dl::DlModule;
 pub use crate::module::mock::{MockExportBuilder, MockModuleBuilder};
 pub use lucet_module_data::{
-    FunctionHandle, FunctionSpec, Global, GlobalSpec, HeapSpec, Signature, TrapCode, TrapManifest,
-    ValueType,
+    FunctionHandle, FunctionPointer, FunctionSpec, Global, GlobalSpec, HeapSpec, Signature,
+    TrapCode, TrapManifest, ValueType,
 };
 
 use crate::alloc::Limits;
@@ -68,7 +68,7 @@ pub trait ModuleInternal: Send + Sync {
 
     fn get_signature(&self, fn_id: u32) -> &Signature;
 
-    fn function_handle_from_ptr(&self, ptr: extern "C" fn()) -> FunctionHandle {
+    fn function_handle_from_ptr(&self, ptr: FunctionPointer) -> FunctionHandle {
         let id = self
             .function_manifest()
             .iter()

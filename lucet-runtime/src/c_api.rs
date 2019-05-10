@@ -420,9 +420,10 @@ lucet_hostcalls! {
         vmctx.instance()
             .module()
             .get_func_from_idx(table_idx, func_idx)
+            // I think this was also in error!
             // the Rust API actually returns a pointer to a function pointer, so we want to dereference
             // one layer of that to make it nicer in C
-            .map(|fptr| *(fptr.ptr as *const *const c_void))
+            .map(|fptr| fptr.ptr.as_usize() as *const c_void)
             .unwrap_or(std::ptr::null())
     }
 

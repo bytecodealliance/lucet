@@ -2,6 +2,7 @@
 macro_rules! alloc_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
+        use lucet_module_data::FunctionPointer;
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
@@ -598,9 +599,7 @@ macro_rules! alloc_tests {
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
-                    unsafe {
-                        std::mem::transmute::<_, extern "C" fn()>(heap_touching_child as u64)
-                    },
+                    FunctionPointer::from_usize(heap_touching_child as usize),
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
@@ -642,9 +641,7 @@ macro_rules! alloc_tests {
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
-                    unsafe {
-                        std::mem::transmute::<_, extern "C" fn()>(stack_pattern_child as u64)
-                    },
+                    FunctionPointer::from_usize(stack_pattern_child as usize),
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");

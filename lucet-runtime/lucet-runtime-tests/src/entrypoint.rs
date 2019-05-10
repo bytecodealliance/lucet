@@ -1,6 +1,6 @@
 use crate::build::test_module_wasm;
 use crate::helpers::{MockExportBuilder, MockModuleBuilder};
-use lucet_module_data::lucet_signature;
+use lucet_module_data::{lucet_signature, FunctionPointer};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
@@ -121,54 +121,53 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"add_2", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(add_2 as u64)
-            })
-            .with_sig(lucet_signature!((I64, I64) -> I64)),
+            MockExportBuilder::new(b"add_2", FunctionPointer::from_usize(add_2 as usize))
+                .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_10", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(add_10 as u64)
-            })
-            .with_sig(lucet_signature!(
+            MockExportBuilder::new(b"add_10", FunctionPointer::from_usize(add_10 as usize))
+                .with_sig(lucet_signature!(
                     (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"mul_2", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(mul_2 as u64)
-            })
-            .with_sig(lucet_signature!((I64, I64) -> I64)),
+            MockExportBuilder::new(b"mul_2", FunctionPointer::from_usize(mul_2 as usize))
+                .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f32_2", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(add_f32_2 as u64)
-            })
+            MockExportBuilder::new(
+                b"add_f32_2",
+                FunctionPointer::from_usize(add_f32_2 as usize),
+            )
             .with_sig(lucet_signature!((F32, F32) -> F32)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f64_2", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(add_f64_2 as u64)
-            })
+            MockExportBuilder::new(
+                b"add_f64_2",
+                FunctionPointer::from_usize(add_f64_2 as usize),
+            )
             .with_sig(lucet_signature!((F64, F64) -> F64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f32_10", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(add_f32_10 as u64)
-            })
+            MockExportBuilder::new(
+                b"add_f32_10",
+                FunctionPointer::from_usize(add_f32_10 as usize),
+            )
             .with_sig(lucet_signature!(
                     (F32, F32, F32, F32, F32, F32, F32, F32, F32, F32) -> F32)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_f64_10", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(add_f64_10 as u64)
-            })
+            MockExportBuilder::new(
+                b"add_f64_10",
+                FunctionPointer::from_usize(add_f64_10 as usize),
+            )
             .with_sig(lucet_signature!(
                     (F64, F64, F64, F64, F64, F64, F64, F64, F64, F64) -> F64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_mixed_20", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(add_mixed_20 as u64)
-            })
+            MockExportBuilder::new(
+                b"add_mixed_20",
+                FunctionPointer::from_usize(add_mixed_20 as usize),
+            )
             .with_sig(lucet_signature!(
                     (
                         F64, I32, F32, F64, I32, F32,
@@ -853,9 +852,9 @@ macro_rules! entrypoint_tests {
                     .get_func_from_idx(0, cb_idx)
                     .expect("can get function by index");
                 let func = std::mem::transmute::<
-                    extern "C" fn(),
+                    u64,
                     extern "C" fn(*mut lucet_vmctx, u64) -> u64
-                >(func.ptr);
+                >(func.ptr.as_usize() as u64);
                 (func)(vmctx.as_raw(), x) + 1
             }
         }

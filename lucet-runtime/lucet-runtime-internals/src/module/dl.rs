@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use libloading::{Library, Symbol};
-use lucet_module_data::{FunctionHandle, FunctionSpec, ModuleData, Signature};
+use lucet_module_data::{FunctionHandle, FunctionPointer, FunctionSpec, ModuleData, Signature};
 use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
@@ -183,9 +183,9 @@ impl ModuleInternal for DlModule {
             return Err(Error::FuncNotFound(table_id, func_id));
         }
         let table = self.table_elements()?;
-        let func: extern "C" fn() = table
+        let func: FunctionPointer = table
             .get(func_id as usize)
-            .map(|element| unsafe { std::mem::transmute::<u64, extern "C" fn()>(element.rf) })
+            .map(|element| FunctionPointer::from_usize(element.rf as usize))
             .ok_or(Error::FuncNotFound(table_id, func_id))?;
 
         Ok(self.function_handle_from_ptr(func))
@@ -199,7 +199,9 @@ impl ModuleInternal for DlModule {
             if start_func.is_null() {
                 lucet_incorrect_module!("`guest_start` is defined but null");
             }
-            Ok(Some(self.function_handle_from_ptr(unsafe { **start_func })))
+            Ok(Some(self.function_handle_from_ptr(
+                FunctionPointer::from_usize(unsafe { **start_func } as usize),
+            )))
         } else {
             Ok(None)
         }

@@ -11,6 +11,22 @@ use std::slice::from_raw_parts;
 pub struct UniqueSignatureIndex(u32);
 entity_impl!(UniqueSignatureIndex);
 
+/// FunctionPointer serves entirely as a safer way to work with function pointers than as raw u64
+/// or usize values. It also avoids the need to write them as `fn` types, which cannot be freely
+/// cast from one to another with `as`. If you need to call a `FunctionPointer`, use `as_usize()`
+/// and transmute the resulting usize to a `fn` type with appropriate signature.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Serialize, Deserialize)]
+pub struct FunctionPointer(usize);
+
+impl FunctionPointer {
+    pub fn from_usize(ptr: usize) -> FunctionPointer {
+        FunctionPointer(ptr)
+    }
+    pub fn as_usize(&self) -> usize {
+        self.0
+    }
+}
+
 /// Information about the corresponding function.
 ///
 /// This is split from but closely related to a [`FunctionSpec`]. The distinction is largely for
@@ -41,7 +57,7 @@ impl OwnedFunctionMetadata {
 }
 
 pub struct FunctionHandle {
-    pub ptr: extern "C" fn(),
+    pub ptr: FunctionPointer,
     pub id: u32
 }
 
@@ -66,10 +82,8 @@ impl FunctionSpec {
     pub fn new(code_addr: u64, code_len: u32, traps_addr: u64, traps_len: u64) -> Self {
         FunctionSpec { code_addr, code_len, traps_addr, traps_len }
     }
-    pub fn ptr(&self) -> extern "C" fn() {
-        unsafe {
-            std::mem::transmute::<u64, extern "C" fn()>(self.code_addr)
-        }
+    pub fn ptr(&self) -> FunctionPointer {
+        FunctionPointer::from_usize(self.code_addr as usize)
     }
     pub fn code_len(&self) -> u32 {
         self.code_len

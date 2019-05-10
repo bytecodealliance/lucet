@@ -597,6 +597,7 @@ name = "lucet-benchmarks"
 version = "0.1.0"
 dependencies = [
  "criterion 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lucet-module-data 0.1.0",
  "lucet-runtime 0.1.0",
  "lucet-runtime-internals 0.1.0",
  "lucet-runtime-tests 0.1.0",

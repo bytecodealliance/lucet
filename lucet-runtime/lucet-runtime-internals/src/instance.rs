@@ -14,7 +14,7 @@ use crate::sysdeps::UContext;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
-use lucet_module_data::{FunctionHandle, TrapCode};
+use lucet_module_data::{FunctionHandle, FunctionPointer, TrapCode};
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
@@ -215,7 +215,7 @@ pub struct Instance {
     >,
 
     /// Pointer to the function used as the entrypoint (for use in backtraces)
-    entrypoint: Option<extern "C" fn()>,
+    entrypoint: Option<FunctionPointer>,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -556,7 +556,7 @@ impl Instance {
             self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal()),
             "instance must be ready or non-fatally faulted"
         );
-        if unsafe { std::mem::transmute::<extern "C" fn(), u64>(func.ptr) } == 0 {
+        if func.ptr.as_usize() == 0 {
             return Err(Error::InvalidArgument(
                 "entrypoint function cannot be null; this is probably a malformed module",
             ));

@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! globals_tests {
     ( $TestRegion:path ) => {
-        use lucet_module_data::lucet_signature;
+        use lucet_module_data::{lucet_signature, FunctionPointer};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{Error, Limits, Module, Region};
         use std::sync::Arc;
@@ -84,18 +84,15 @@ macro_rules! globals_tests {
                 .with_global(0, -1)
                 .with_global(1, 420)
                 .with_export_func(
-                    MockExportBuilder::new(b"get_global0",
-                                           unsafe { std::mem::transmute::<_, extern "C" fn()>(get_global0 as u64) })
+                    MockExportBuilder::new(b"get_global0", FunctionPointer::from_usize(get_global0 as usize))
                         .with_sig(lucet_signature!(() -> I64))
                 )
                 .with_export_func(
-                    MockExportBuilder::new(b"set_global0",
-                                           unsafe { std::mem::transmute::<_, extern "C" fn()>(set_global0 as u64) })
+                    MockExportBuilder::new(b"set_global0", FunctionPointer::from_usize(set_global0 as usize))
                         .with_sig(lucet_signature!((I64) -> ()))
                 )
                 .with_export_func(
-                    MockExportBuilder::new(b"get_global1",
-                                           unsafe { std::mem::transmute::<_, extern "C" fn()>(get_global1 as u64) })
+                    MockExportBuilder::new(b"get_global1", FunctionPointer::from_usize(get_global1 as usize))
                         .with_sig(lucet_signature!(() -> I64))
                 )
                 .build()

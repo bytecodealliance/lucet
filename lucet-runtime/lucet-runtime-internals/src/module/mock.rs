@@ -5,7 +5,8 @@ use lucet_module_data::owned::{
     OwnedFunctionMetadata, OwnedGlobalSpec, OwnedLinearMemorySpec, OwnedModuleData, OwnedSparseData,
 };
 use lucet_module_data::{
-    FunctionHandle, FunctionSpec, ModuleData, Signature, TrapSite, UniqueSignatureIndex,
+    FunctionHandle, FunctionPointer, FunctionSpec, ModuleData, Signature, TrapSite,
+    UniqueSignatureIndex,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
@@ -16,9 +17,9 @@ pub struct MockModuleBuilder {
     sparse_page_data: Vec<Option<Vec<u8>>>,
     globals: BTreeMap<usize, OwnedGlobalSpec>,
     table_elements: BTreeMap<usize, TableElement>,
-    export_funcs: HashMap<Vec<u8>, extern "C" fn()>,
-    func_table: HashMap<(u32, u32), extern "C" fn()>,
-    start_func: Option<extern "C" fn()>,
+    export_funcs: HashMap<Vec<u8>, FunctionPointer>,
+    func_table: HashMap<(u32, u32), FunctionPointer>,
+    start_func: Option<FunctionPointer>,
     function_manifest: Vec<FunctionSpec>,
     function_info: Vec<OwnedFunctionMetadata>,
     signatures: Vec<Signature>,
@@ -126,7 +127,7 @@ impl MockModuleBuilder {
             sym: Some(export.sym().to_vec()),
         });
         self.function_manifest.push(FunctionSpec::new(
-            export.func() as u64,
+            export.func().as_usize() as u64,
             export.func_len() as u32,
             export.traps().as_ptr() as u64,
             export.traps().len() as u64,
@@ -134,12 +135,12 @@ impl MockModuleBuilder {
         self
     }
 
-    pub fn with_table_func(mut self, table_idx: u32, func_idx: u32, func: extern "C" fn()) -> Self {
+    pub fn with_table_func(mut self, table_idx: u32, func_idx: u32, func: FunctionPointer) -> Self {
         self.func_table.insert((table_idx, func_idx), func);
         self
     }
 
-    pub fn with_start_func(mut self, func: extern "C" fn()) -> Self {
+    pub fn with_start_func(mut self, func: FunctionPointer) -> Self {
         self.start_func = Some(func);
         self
     }
@@ -209,9 +210,9 @@ pub struct MockModule {
     serialized_module_data: Vec<u8>,
     module_data: ModuleData<'static>,
     pub table_elements: Vec<TableElement>,
-    pub export_funcs: HashMap<Vec<u8>, extern "C" fn()>,
-    pub func_table: HashMap<(u32, u32), extern "C" fn()>,
-    pub start_func: Option<extern "C" fn()>,
+    pub export_funcs: HashMap<Vec<u8>, FunctionPointer>,
+    pub func_table: HashMap<(u32, u32), FunctionPointer>,
+    pub start_func: Option<FunctionPointer>,
     pub function_manifest: Vec<FunctionSpec>,
 }
 
@@ -286,14 +287,14 @@ impl ModuleInternal for MockModule {
 
 pub struct MockExportBuilder {
     sym: &'static [u8],
-    func: extern "C" fn(),
+    func: FunctionPointer,
     func_len: Option<usize>,
     traps: Option<&'static [TrapSite]>,
     sig: Signature,
 }
 
 impl MockExportBuilder {
-    pub fn new(name: &'static [u8], func: extern "C" fn()) -> MockExportBuilder {
+    pub fn new(name: &'static [u8], func: FunctionPointer) -> MockExportBuilder {
         MockExportBuilder {
             sym: name,
             func: func,
@@ -324,7 +325,7 @@ impl MockExportBuilder {
     pub fn sym(&self) -> &'static [u8] {
         self.sym
     }
-    pub fn func(&self) -> extern "C" fn() {
+    pub fn func(&self) -> FunctionPointer {
         self.func
     }
     pub fn func_len(&self) -> usize {

@@ -1,5 +1,5 @@
 use crate::helpers::{MockExportBuilder, MockModuleBuilder};
-use lucet_module_data::{TrapCode, TrapSite};
+use lucet_module_data::{FunctionPointer, TrapCode, TrapSite};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
@@ -84,35 +84,39 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
     }];
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(b"onetwothree", unsafe {
-            std::mem::transmute::<_, extern "C" fn()>(onetwothree as u64)
-        }))
+        .with_export_func(MockExportBuilder::new(
+            b"onetwothree",
+            FunctionPointer::from_usize(onetwothree as usize),
+        ))
         .with_export_func(
-            MockExportBuilder::new(b"illegal_instr", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(guest_func_illegal_instr as u64)
-            })
+            MockExportBuilder::new(
+                b"illegal_instr",
+                FunctionPointer::from_usize(guest_func_illegal_instr as usize),
+            )
             .with_func_len(11)
             .with_traps(ILLEGAL_INSTR_TRAPS),
         )
         .with_export_func(
-            MockExportBuilder::new(b"oob", unsafe {
-                std::mem::transmute::<_, extern "C" fn()>(guest_func_oob as u64)
-            })
-            .with_func_len(41)
-            .with_traps(OOB_TRAPS),
+            MockExportBuilder::new(b"oob", FunctionPointer::from_usize(guest_func_oob as usize))
+                .with_func_len(41)
+                .with_traps(OOB_TRAPS),
         )
-        .with_export_func(MockExportBuilder::new(b"hostcall_main", unsafe {
-            std::mem::transmute::<_, extern "C" fn()>(hostcall_main as u64)
-        }))
-        .with_export_func(MockExportBuilder::new(b"infinite_loop", unsafe {
-            std::mem::transmute::<_, extern "C" fn()>(infinite_loop as u64)
-        }))
-        .with_export_func(MockExportBuilder::new(b"fatal", unsafe {
-            std::mem::transmute::<_, extern "C" fn()>(fatal as u64)
-        }))
-        .with_export_func(MockExportBuilder::new(b"recoverable_fatal", unsafe {
-            std::mem::transmute::<_, extern "C" fn()>(recoverable_fatal as u64)
-        }))
+        .with_export_func(MockExportBuilder::new(
+            b"hostcall_main",
+            FunctionPointer::from_usize(hostcall_main as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            b"infinite_loop",
+            FunctionPointer::from_usize(infinite_loop as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            b"fatal",
+            FunctionPointer::from_usize(fatal as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            b"recoverable_fatal",
+            FunctionPointer::from_usize(recoverable_fatal as usize),
+        ))
         .build()
 }
 
@@ -121,7 +125,7 @@ macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, siginfo_t, SIGSEGV};
-        use lucet_module_data::Signature;
+        use lucet_module_data::FunctionPointer;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
@@ -541,9 +545,10 @@ macro_rules! guest_fault_tests {
                 // therefore testing that the host signal gets re-raised.
                 let child = std::thread::spawn(|| {
                     let module = MockModuleBuilder::new()
-                        .with_export_func(MockExportBuilder::new(b"sleepy_guest", unsafe {
-                            std::mem::transmute::<_, extern "C" fn()>(sleepy_guest as u64)
-                        }))
+                        .with_export_func(MockExportBuilder::new(
+                            b"sleepy_guest",
+                            FunctionPointer::from_usize(sleepy_guest as usize),
+                        ))
                         .build();
                     let region =
                         TestRegion::create(1, &Limits::default()).expect("region can be created");

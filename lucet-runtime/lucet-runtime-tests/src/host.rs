@@ -3,6 +3,7 @@ macro_rules! host_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::c_void;
+        use lucet_module_data::FunctionPointer;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, Limits, Region,
@@ -217,9 +218,10 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(b"f", unsafe {
-                    std::mem::transmute::<_, extern "C" fn()>(f as u64)
-                }))
+                .with_export_func(MockExportBuilder::new(
+                    b"f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -248,9 +250,10 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(b"f", unsafe {
-                    std::mem::transmute::<_, extern "C" fn()>(f as u64)
-                }))
+                .with_export_func(MockExportBuilder::new(
+                    b"f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -279,9 +282,10 @@ macro_rules! host_tests {
             }
 
             let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(b"f", unsafe {
-                    std::mem::transmute::<_, extern "C" fn()>(f as u64)
-                }))
+                .with_export_func(MockExportBuilder::new(
+                    b"f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
                 .build();
 
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
