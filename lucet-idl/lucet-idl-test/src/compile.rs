@@ -27,8 +27,16 @@ pub fn rust_codegen(package: &Package) {
         .arg("-o")
         .arg(tempdir.path().join("example"))
         .status()
-        .expect("run rustcc");
+        .expect("run rustc");
+
+    if !cmd_rustc.success() {
+        Command::new("cat")
+            .arg(gen_file.clone())
+            .status()
+            .expect("debug output");
+    }
     assert!(cmd_rustc.success(), "failure to compile generated code");
+
     /*
         let cmd_run = Command::new(tempdir.path().join("example"))
             .status()
@@ -60,6 +68,13 @@ pub fn c_codegen(package: &Package) {
         .arg(tempdir.path().join("example.o"))
         .status()
         .expect("run cc");
+
+    if !cmd_cc.success() {
+        Command::new("cat")
+            .arg(tempdir.path().join("example.c"))
+            .status()
+            .expect("debug output");
+    }
     assert!(cmd_cc.success(), "failure to compile generated code");
 
     /*
