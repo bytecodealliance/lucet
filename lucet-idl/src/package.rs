@@ -90,8 +90,7 @@ impl Package {
 mod test {
     use super::*;
     use crate::parser::Parser;
-    use crate::types::{AtomType, DataType, DataTypeRef};
-
+    use crate::types::{AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant};
     fn pkg_(syntax: &str) -> Result<Package, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
@@ -212,8 +211,10 @@ mod test {
                     funcs: HashMap::new(),
                     data_types: vec![(
                         Ident(0),
-                        DataType::Alias {
-                            to: DataTypeRef::Atom(AtomType::U8),
+                        DataType {
+                            variant: DataTypeVariant::Alias(AliasDataType {
+                                to: DataTypeRef::Atom(AtomType::U8)
+                            }),
                             attrs: Vec::new()
                         }
                     )]

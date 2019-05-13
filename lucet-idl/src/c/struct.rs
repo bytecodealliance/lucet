@@ -5,23 +5,15 @@ pub fn generate(
     gen: &mut CGenerator,
     module: &Module,
     data_type_entry: &Named<DataType>,
+    struct_: &StructDataType,
 ) -> Result<(), IDLError> {
-    let (named_members, _attrs) = if let DataType::Struct {
-        members: named_members,
-        attrs,
-    } = &data_type_entry.entity
-    {
-        (named_members, attrs)
-    } else {
-        unreachable!()
-    };
     gen.w
         .write_line(format!("struct {} {{", data_type_entry.name.name).as_bytes())?;
     let mut w_block = gen.w.new_block();
     let mut offset: usize = 0;
     let mut first_member_align = 0;
     let mut members_offsets = vec![];
-    for named_member in named_members {
+    for named_member in struct_.members.iter() {
         let type_info = gen.type_info(module, &named_member.type_);
         let type_align = type_info.type_align;
         let type_size = type_info.type_size;
@@ -70,7 +62,7 @@ pub fn generate(
     // Add assertions to check that the target platform matches the expected alignment
     // Also add a macro definition for the structure size
     // Skip the first member, as it will always be at the beginning of the structure
-    for (i, named_member) in named_members.iter().enumerate().skip(1) {
+    for (i, named_member) in struct_.members.iter().enumerate().skip(1) {
         gen.w.write_line(
             format!(
                 "_Static_assert(offsetof(struct {}, {}) == {}, \"unexpected offset\");",

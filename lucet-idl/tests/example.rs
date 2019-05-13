@@ -14,7 +14,6 @@ fn compile_and_run_c() {
 
     let config = lucet_idl::Config {
         backend: lucet_idl::Backend::C,
-        backend_config: lucet_idl::BackendConfig::default(),
         target: lucet_idl::Target::Generic,
     };
 
@@ -54,7 +53,6 @@ fn compile_and_run_rust() {
 
     let config = lucet_idl::Config {
         backend: lucet_idl::Backend::Rust,
-        backend_config: lucet_idl::BackendConfig::default(),
         target: lucet_idl::Target::Generic,
     };
 

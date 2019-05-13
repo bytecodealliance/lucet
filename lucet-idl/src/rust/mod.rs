@@ -7,7 +7,9 @@ use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
 use crate::types::AtomType;
-use crate::types::{DataType, DataTypeRef, FuncDecl, Ident, Named};
+use crate::types::{
+    AliasDataType, DataType, DataTypeRef, EnumDataType, FuncDecl, Ident, Named, StructDataType,
+};
 use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
 use std::io::Write;
@@ -88,16 +90,10 @@ impl Generator for RustGenerator {
         &mut self,
         module: &Module,
         data_type_entry: &Named<DataType>,
+        alias: &AliasDataType,
     ) -> Result<(), IDLError> {
-        let (pointee, _attrs) =
-            if let DataType::Alias { to: pointee, attrs } = &data_type_entry.entity {
-                (pointee, attrs)
-            } else {
-                unreachable!()
-            };
-
         let typename = self.define_name(data_type_entry);
-        let pointee_name = self.get_defined_typename(pointee);
+        let pointee_name = self.get_defined_typename(&alias.to);
 
         self.w
             .writeln(format!("pub type {} = {};", typename, pointee_name))?
@@ -109,17 +105,8 @@ impl Generator for RustGenerator {
         &mut self,
         module: &Module,
         data_type_entry: &Named<DataType>,
+        struct_: &StructDataType,
     ) -> Result<(), IDLError> {
-        let (named_members, _attrs) = if let DataType::Struct {
-            members: named_members,
-            attrs,
-        } = &data_type_entry.entity
-        {
-            (named_members, attrs)
-        } else {
-            unreachable!()
-        };
-
         let typename = data_type_entry.name.name.to_camel_case();
         self.defined.insert(data_type_entry.id, typename.clone());
 
@@ -128,7 +115,7 @@ impl Generator for RustGenerator {
             .writeln(format!("pub struct {} {{", typename))?;
 
         let mut w = self.w.new_block();
-        for m in named_members {
+        for m in struct_.members.iter() {
             w.writeln(format!(
                 "{}: {},",
                 m.name.to_snake_case(),
@@ -146,17 +133,8 @@ impl Generator for RustGenerator {
         &mut self,
         module: &Module,
         data_type_entry: &Named<DataType>,
+        enum_: &EnumDataType,
     ) -> Result<(), IDLError> {
-        let (named_members, _attrs) = if let DataType::Enum {
-            members: named_members,
-            attrs,
-        } = &data_type_entry.entity
-        {
-            (named_members, attrs)
-        } else {
-            unreachable!()
-        };
-
         let typename = data_type_entry.name.name.to_camel_case();
         self.defined.insert(data_type_entry.id, typename.clone());
 
@@ -166,7 +144,7 @@ impl Generator for RustGenerator {
             .writeln(format!("pub enum {} {{", typename))?;
 
         let mut w = self.w.new_block();
-        for m in named_members {
+        for m in enum_.members.iter() {
             w.writeln(format!("{},", m.name.to_camel_case()))?;
         }
 

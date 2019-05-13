@@ -1,7 +1,8 @@
 use crate::error::ValidationError;
 use crate::parser::{SyntaxDecl, SyntaxRef};
 use crate::types::{
-    Attr, DataType, DataTypeRef, FuncDecl, FuncRet, Ident, Location, Name, Named, NamedMember,
+    AliasDataType, Attr, DataType, DataTypeRef, DataTypeVariant, EnumDataType, EnumMember, FuncArg,
+    FuncDecl, FuncRet, Ident, Location, Name, Named, StructDataType, StructMember,
 };
 use std::collections::HashMap;
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -69,8 +70,8 @@ impl Module {
         }
     }
 
-    fn define_data_type(&mut self, id: Ident, dt: DataType) {
-        if let Some(prev_def) = self.data_types.insert(id, dt) {
+    fn define_data_type(&mut self, id: Ident, variant: DataTypeVariant, attrs: Vec<Attr>) {
+        if let Some(prev_def) = self.data_types.insert(id, DataType { variant, attrs }) {
             panic!("id {} already defined: {:?}", id, prev_def)
         }
     }
@@ -110,7 +111,7 @@ impl Module {
                     // defined types:
                     let type_ = self.get_ref(&mem.type_)?;
                     // build the struct with this as the member:
-                    dtype_members.push(NamedMember {
+                    dtype_members.push(StructMember {
                         type_,
                         name: mem.name.clone(),
                         attrs: mem.attrs.clone(),
@@ -118,10 +119,10 @@ impl Module {
                 }
                 self.define_data_type(
                     id,
-                    DataType::Struct {
+                    DataTypeVariant::Struct(StructDataType {
                         members: dtype_members,
-                        attrs: attrs.clone(),
-                    },
+                    }),
+                    attrs.clone(),
                 )
             }
             SyntaxDecl::Enum {
@@ -148,28 +149,25 @@ impl Module {
                         })?
                     }
                     // build the struct with this as the member:
-                    dtype_members.push(NamedMember {
-                        type_: (),
+                    dtype_members.push(EnumMember {
                         name: var.name.clone(),
                         attrs: var.attrs.clone(),
                     })
                 }
                 self.define_data_type(
                     id,
-                    DataType::Enum {
+                    DataTypeVariant::Enum(EnumDataType {
                         members: dtype_members,
-                        attrs: attrs.clone(),
-                    },
+                    }),
+                    attrs.clone(),
                 )
             }
             SyntaxDecl::Alias { what, attrs, .. } => {
                 let to = self.get_ref(what)?;
                 self.define_data_type(
                     id,
-                    DataType::Alias {
-                        to,
-                        attrs: attrs.clone(),
-                    },
+                    DataTypeVariant::Alias(AliasDataType { to }),
+                    attrs.clone(),
                 );
             }
             SyntaxDecl::Function {
@@ -193,13 +191,13 @@ impl Module {
                         } else {
                             arg_names.insert(arg_syntax.name.clone(), arg_syntax.location.clone());
                         }
-                        Ok(NamedMember {
+                        Ok(FuncArg {
                             name: arg_syntax.name.clone(),
                             type_,
                             attrs: arg_syntax.attrs.clone(),
                         })
                     })
-                    .collect::<Result<Vec<NamedMember<DataTypeRef>>, _>>()?;
+                    .collect::<Result<Vec<FuncArg>, _>>()?;
 
                 let rets = rets
                     .iter()
@@ -241,20 +239,25 @@ impl Module {
             Err(())?
         }
         visited[id.0] = true;
-        match self.data_types.get(&id).expect("data_type is defined") {
-            DataType::Struct { members, .. } => {
-                for mem in members {
+        match self
+            .data_types
+            .get(&id)
+            .expect("data_type is defined")
+            .variant
+        {
+            DataTypeVariant::Struct(ref s) => {
+                for mem in s.members.iter() {
                     if let DataTypeRef::Defined(id) = mem.type_ {
                         self.dfs_walk(id, visited, ordered)?
                     }
                 }
             }
-            DataType::Alias { to, .. } => {
-                if let DataTypeRef::Defined(id) = to {
-                    self.dfs_walk(*id, visited, ordered)?
+            DataTypeVariant::Alias(ref a) => {
+                if let DataTypeRef::Defined(id) = a.to {
+                    self.dfs_walk(id, visited, ordered)?
                 }
             }
-            DataType::Enum { .. } => {}
+            DataTypeVariant::Enum(_) => {}
         }
         if let Some(ordered) = ordered.as_mut() {
             if !ordered.contains(&id) {
@@ -382,8 +385,8 @@ mod tests {
     fn struct_two_atoms() {
         {
             let d = mod_("struct foo { a: i32, b: f32 }").unwrap();
-            let members = match &d.data_types[&Ident(0)] {
-                DataType::Struct { members, .. } => members,
+            let members = match &d.data_types[&Ident(0)].variant {
+                DataTypeVariant::Struct(s) => &s.members,
                 _ => panic!("Unexpected type"),
             };
             assert_eq!(members[0].name, "a");
@@ -476,8 +479,8 @@ mod tests {
 
         {
             let d = mod_("enum foo { a, b }").unwrap();
-            let members = match &d.data_types[&Ident(0)] {
-                DataType::Enum { members, .. } => members,
+            let members = match &d.data_types[&Ident(0)].variant {
+                DataTypeVariant::Enum(e) => &e.members,
                 _ => panic!("Unexpected type"),
             };
             assert_eq!(members[0].name, "a");
@@ -592,7 +595,7 @@ mod tests {
                 funcs: vec![(
                     Ident(0),
                     FuncDecl {
-                        args: vec![NamedMember {
+                        args: vec![FuncArg {
                             type_: DataTypeRef::Atom(AtomType::U8),
                             name: "a".to_owned(),
                             attrs: Vec::new(),
@@ -667,9 +670,11 @@ mod tests {
                 .collect::<HashMap<_, _>>(),
                 data_types: vec![(
                     Ident(1),
-                    DataType::Alias {
-                        to: DataTypeRef::Atom(AtomType::U8),
-                        attrs: Vec::new()
+                    DataType {
+                        variant: DataTypeVariant::Alias(AliasDataType {
+                            to: DataTypeRef::Atom(AtomType::U8),
+                        }),
+                        attrs: Vec::new(),
                     }
                 )]
                 .into_iter()

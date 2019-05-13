@@ -54,31 +54,56 @@ pub enum DataTypeRef {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct NamedMember<R> {
-    pub type_: R,
+pub struct StructMember {
+    pub type_: DataTypeRef,
     pub name: String,
     pub attrs: Vec<Attr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataType {
-    Struct {
-        members: Vec<NamedMember<DataTypeRef>>,
-        attrs: Vec<Attr>,
-    },
-    Enum {
-        members: Vec<NamedMember<()>>,
-        attrs: Vec<Attr>,
-    },
-    Alias {
-        to: DataTypeRef,
-        attrs: Vec<Attr>,
-    },
+pub struct StructDataType {
+    pub members: Vec<StructMember>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct EnumMember {
+    pub name: String,
+    pub attrs: Vec<Attr>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct EnumDataType {
+    pub members: Vec<EnumMember>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct AliasDataType {
+    pub to: DataTypeRef,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DataTypeVariant {
+    Struct(StructDataType),
+    Enum(EnumDataType),
+    Alias(AliasDataType),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct DataType {
+    pub variant: DataTypeVariant,
+    pub attrs: Vec<Attr>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct FuncArg {
+    pub type_: DataTypeRef,
+    pub name: String,
+    pub attrs: Vec<Attr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FuncDecl {
-    pub args: Vec<NamedMember<DataTypeRef>>,
+    pub args: Vec<FuncArg>,
     pub rets: Vec<FuncRet>,
     pub attrs: Vec<Attr>,
 }

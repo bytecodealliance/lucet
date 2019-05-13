@@ -6,13 +6,9 @@ pub fn generate(
     gen: &mut CGenerator,
     module: &Module,
     data_type_entry: &Named<DataType>,
+    alias: &AliasDataType,
 ) -> Result<(), IDLError> {
-    let (type_, _attrs) = if let DataType::Alias { to: type_, attrs } = &data_type_entry.entity {
-        (type_, attrs)
-    } else {
-        unreachable!()
-    };
-    let type_info = gen.type_info(module, type_);
+    let type_info = gen.type_info(module, &alias.to);
     gen.w.indent()?;
     gen.w
         .write(format!("typedef {}", type_info.type_name).as_bytes())?;

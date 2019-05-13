@@ -16,7 +16,10 @@ use crate::generator::Generator;
 use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
 use crate::target::Target;
-use crate::types::{DataType, DataTypeRef, FuncDecl, Named};
+use crate::types::{
+    AliasDataType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl, Named,
+    StructDataType,
+};
 use std::io::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -59,16 +62,18 @@ impl Generator for CGenerator {
         &mut self,
         module: &Module,
         data_type_entry: &Named<DataType>,
+        alias: &AliasDataType,
     ) -> Result<(), IDLError> {
-        alias::generate(self, module, data_type_entry)
+        alias::generate(self, module, data_type_entry, alias)
     }
 
     fn gen_struct(
         &mut self,
         module: &Module,
         data_type_entry: &Named<DataType>,
+        struct_: &StructDataType,
     ) -> Result<(), IDLError> {
-        r#struct::generate(self, module, data_type_entry)
+        r#struct::generate(self, module, data_type_entry, struct_)
     }
 
     // Enums generate both a specific typedef, and a traditional C-style enum
@@ -77,8 +82,9 @@ impl Generator for CGenerator {
         &mut self,
         module: &Module,
         data_type_entry: &Named<DataType>,
+        enum_: &EnumDataType,
     ) -> Result<(), IDLError> {
-        r#enum::generate(self, module, data_type_entry)
+        r#enum::generate(self, module, data_type_entry, enum_)
     }
 
     fn gen_function(
@@ -122,12 +128,12 @@ impl CGenerator {
                     let data_type_entry = module
                         .get_datatype(*data_type_id)
                         .expect("defined datatype");
-                    match data_type_entry.entity {
-                        DataType::Struct { .. } => {
+                    match data_type_entry.entity.variant {
+                        DataTypeVariant::Struct { .. } => {
                             type_name = type_name
                                 .or_else(|| Some(format!("struct {}", data_type_entry.name.name)))
                         }
-                        DataType::Enum { .. } => {
+                        DataTypeVariant::Enum { .. } => {
                             type_name = type_name.or_else(|| {
                                 Some(format!(
                                     "{} /* (enum ___{}) */",
@@ -135,10 +141,10 @@ impl CGenerator {
                                 ))
                             })
                         }
-                        DataType::Alias { to, .. } => {
+                        DataTypeVariant::Alias(ref a) => {
                             type_name =
                                 type_name.or_else(|| Some(data_type_entry.name.name.to_string()));
-                            type_ = &to;
+                            type_ = &a.to;
                             continue;
                         }
                     };
@@ -161,11 +167,10 @@ impl CGenerator {
             DataTypeRef::Defined(inner_type) => inner_type,
         };
         let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
-        let inner_data_type = inner_data_type_entry.entity;
-        match inner_data_type {
-            DataType::Struct { .. } => false,
-            DataType::Enum { .. } => true,
-            DataType::Alias { to, .. } => self.is_type_eventually_an_atom_or_enum(module, to),
+        match inner_data_type_entry.entity.variant {
+            DataTypeVariant::Struct { .. } => false,
+            DataTypeVariant::Enum { .. } => true,
+            DataTypeVariant::Alias(ref a) => self.is_type_eventually_an_atom_or_enum(module, &a.to),
         }
     }
 
@@ -176,9 +181,8 @@ impl CGenerator {
             DataTypeRef::Defined(inner_type) => inner_type,
         };
         let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
-        let inner_data_type = inner_data_type_entry.entity;
-        if let DataType::Alias { to, .. } = inner_data_type {
-            self.unalias(module, to)
+        if let DataTypeVariant::Alias(ref a) = inner_data_type_entry.entity.variant {
+            self.unalias(module, &a.to)
         } else {
             type_
         }

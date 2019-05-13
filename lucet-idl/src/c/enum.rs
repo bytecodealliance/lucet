@@ -6,17 +6,8 @@ pub fn generate(
     gen: &mut CGenerator,
     _module: &Module,
     data_type_entry: &Named<DataType>,
+    enum_: &EnumDataType,
 ) -> Result<(), IDLError> {
-    let (named_members, _attrs) = if let DataType::Enum {
-        members: named_members,
-        attrs,
-    } = &data_type_entry.entity
-    {
-        (named_members, attrs)
-    } else {
-        unreachable!()
-    };
-
     let enum_native_type = CAtom::enum_();
     let (type_align, type_size, type_name) = (
         enum_native_type.native_type_align,
@@ -29,14 +20,14 @@ pub fn generate(
             "typedef {} {}; // enum, should be in the [0...{}] range",
             type_name,
             data_type_entry.name.name,
-            named_members.len() - 1
+            enum_.members.len() - 1
         )
         .as_bytes(),
     )?;
     gen.w
         .write_line(format!("enum ___{} {{", data_type_entry.name.name).as_bytes())?;
     let mut pretty_writer_i1 = gen.w.new_block();
-    for (i, named_member) in named_members.iter().enumerate() {
+    for (i, named_member) in enum_.members.iter().enumerate() {
         pretty_writer_i1.write_line(
             format!(
                 "{}, // {}",
