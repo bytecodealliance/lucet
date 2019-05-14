@@ -4,6 +4,44 @@ use serde::{Deserialize, Serialize};
 
 use std::slice::from_raw_parts;
 
+/// FunctionIndex is an identifier for a function, imported, exported, or external. The space of
+/// FunctionIndex is shared for all of these, so `FunctionIndex(N)` may identify exported function
+/// #2, `FunctionIndex(N + 1)` may identify an internal function, and `FunctionIndex(N + 2)` may
+/// identify an imported function.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct FunctionIndex(u32);
+
+impl FunctionIndex {
+    pub fn from_u32(idx: u32) -> FunctionIndex {
+        FunctionIndex(idx)
+    }
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+}
+
+/// ImportFunction specifically ties a FunctionIndex to some imported function information together
+/// with a module that function should be found in.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct ImportFunction<'a> {
+    pub fn_idx: FunctionIndex,
+    pub module: &'a str
+}
+
+pub struct OwnedImportFunction {
+    pub fn_idx: FunctionIndex,
+    pub module: String
+}
+
+impl OwnedImportFunction {
+    pub fn to_ref<'a>(&'a self) -> ImportFunction<'a> {
+        ImportFunction {
+            fn_idx: self.fn_idx.clone(),
+            module: self.module.as_str()
+        }
+    }
+}
+
 /// UniqueSignatureIndex names a signature after collapsing duplicate signatures to a single
 /// identifier, whereas SignatureIndex is directly what the original module specifies, and may
 /// specify duplicates of types that are structurally equal.
@@ -58,7 +96,7 @@ impl OwnedFunctionMetadata {
 
 pub struct FunctionHandle {
     pub ptr: FunctionPointer,
-    pub id: u32
+    pub id: FunctionIndex
 }
 
 // The layout of this struct is very tightly coupled to lucetc's `write_function_manifest`!

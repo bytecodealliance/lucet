@@ -15,7 +15,7 @@ pub use crate::error::Error;
 pub use crate::globals::{Global, GlobalDef, GlobalSpec};
 pub use crate::linear_memory::{HeapSpec, SparseData, LinearMemorySpec};
 pub use crate::module_data::ModuleData;
-pub use crate::functions::{FunctionHandle, FunctionMetadata, FunctionPointer, FunctionSpec, UniqueSignatureIndex};
+pub use crate::functions::{FunctionHandle, FunctionIndex, FunctionMetadata, FunctionPointer, FunctionSpec, ImportFunction, UniqueSignatureIndex};
 pub use crate::traps::{TrapManifest, TrapSite, TrapCode};
 pub use crate::types::{Signature, ValueType};
 
@@ -24,5 +24,5 @@ pub mod owned {
     pub use crate::globals::OwnedGlobalSpec;
     pub use crate::linear_memory::{OwnedSparseData, OwnedLinearMemorySpec};
     pub use crate::module_data::OwnedModuleData;
-    pub use crate::functions::OwnedFunctionMetadata;
+    pub use crate::functions::{OwnedFunctionMetadata, OwnedImportFunction};
 }

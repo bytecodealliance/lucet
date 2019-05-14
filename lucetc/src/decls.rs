@@ -15,8 +15,9 @@ use cranelift_wasm::{
 };
 use failure::{format_err, Error, ResultExt};
 use lucet_module_data::{
-    owned::OwnedLinearMemorySpec, FunctionMetadata, Global as GlobalVariant, GlobalDef, GlobalSpec,
-    HeapSpec, ModuleData, Signature as LucetSignature, UniqueSignatureIndex,
+    owned::OwnedLinearMemorySpec, FunctionIndex as LucetFunctionIndex, FunctionMetadata,
+    Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec, ImportFunction, ModuleData,
+    Signature as LucetSignature, UniqueSignatureIndex,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -61,6 +62,8 @@ pub struct ModuleDecls<'a> {
     info: ModuleInfo<'a>,
     runtime: Runtime,
     function_names: PrimaryMap<FuncIndex, Name>,
+    imports: Vec<ImportFunction<'a>>,
+    exports: Vec<LucetFunctionIndex>,
     table_names: PrimaryMap<TableIndex, (Name, Name)>,
     runtime_names: HashMap<RuntimeFunc, Name>,
     globals_spec: Vec<GlobalSpec<'a>>,
@@ -75,7 +78,7 @@ impl<'a> ModuleDecls<'a> {
         runtime: Runtime,
         heap_settings: HeapSettings,
     ) -> Result<Self, LucetcError> {
-        let function_names = Self::declare_funcs(&info, clif_module, bindings)?;
+        let (function_names, imports, exports) = Self::declare_funcs(&info, clif_module, bindings)?;
         let table_names = Self::declare_tables(&info, clif_module)?;
         let runtime_names = Self::declare_runtime(&runtime, clif_module)?;
         let globals_spec = Self::declare_globals_spec(&info)?;
@@ -83,6 +86,8 @@ impl<'a> ModuleDecls<'a> {
         Ok(Self {
             info,
             function_names,
+            imports,
+            exports,
             table_names,
             runtime_names,
             runtime,
@@ -97,8 +102,18 @@ impl<'a> ModuleDecls<'a> {
         info: &ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
         bindings: &Bindings,
-    ) -> Result<PrimaryMap<FuncIndex, Name>, LucetcError> {
+    ) -> Result<
+        (
+            PrimaryMap<FuncIndex, Name>,
+            Vec<ImportFunction<'a>>,
+            Vec<LucetFunctionIndex>,
+        ),
+        LucetcError,
+    > {
         let mut function_names = PrimaryMap::new();
+        let mut exports: Vec<LucetFunctionIndex> = Vec::new();
+        let mut imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
+
         for ix in 0..info.functions.len() {
             let func_index = FuncIndex::new(ix);
             let exportable_sigix = info.functions.get(func_index).unwrap();
@@ -112,6 +127,10 @@ impl<'a> ModuleDecls<'a> {
                 let funcid = clif_module
                     .declare_function(&import_symbol, Linkage::Import, signature)
                     .context(LucetcErrorKind::TranslatingModule)?;
+                imports.push(ImportFunction {
+                    fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
+                    module: import_mod,
+                });
                 Name::new_func(import_symbol, funcid)
             } else {
                 if exportable_sigix.export_names.is_empty() {
@@ -125,12 +144,13 @@ impl<'a> ModuleDecls<'a> {
                     let funcid = clif_module
                         .declare_function(&export_symbol, Linkage::Export, signature)
                         .context(LucetcErrorKind::TranslatingModule)?;
+                    exports.push(LucetFunctionIndex::from_u32(function_names.len() as u32));
                     Name::new_func(export_symbol, funcid)
                 }
             };
             function_names.push(name);
         }
-        Ok(function_names)
+        Ok((function_names, imports, exports))
     }
 
     fn declare_tables<B: ClifBackend>(
@@ -402,6 +422,8 @@ impl<'a> ModuleDecls<'a> {
             linear_memory,
             self.globals_spec.clone(),
             functions,
+            self.imports.clone(),
+            self.exports.clone(),
             signatures,
         ))
     }

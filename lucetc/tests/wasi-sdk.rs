@@ -71,10 +71,11 @@ mod programs {
             0
         );
 
+        assert_eq!(mdata.import_functions().len(), 0, "import functions");
+        assert_eq!(mdata.export_functions().len(), 0, "export functions");
+
         /* FIXME: module data doesn't contain the information to check these properties:
-        assert_eq!(p.import_functions().len(), 0, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
-        assert_eq!(num_export_functions(&p), 0, "export functions");
         */
 
         let _obj = c.object_file().expect("generate code from empty");
@@ -87,12 +88,13 @@ mod programs {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a");
-        let _mdata = c.module_data().unwrap();
+        let mdata = c.module_data().unwrap();
+
+        assert_eq!(mdata.import_functions().len(), 0, "import functions");
+        assert_eq!(mdata.export_functions().len(), 1, "export functions");
 
         /* FIXME: module data doesn't contain the information to check these properties:
-        assert_eq!(p.import_functions().len(), 0, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
-        assert_eq!(num_export_functions(&p), 1, "export functions");
         */
 
         let _obj = c.object_file().expect("generate code from a");
@@ -104,11 +106,12 @@ mod programs {
         let b = b_only_test_bindings();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile b");
-        let _mdata = c.module_data().unwrap();
+        let mdata = c.module_data().unwrap();
+        assert_eq!(mdata.import_functions().len(), 1, "import functions");
+        assert_eq!(mdata.export_functions().len(), 1, "export functions");
+
         /* FIXME: module data doesn't contain the information to check these properties:
-        assert_eq!(p.import_functions().len(), 1, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
-        assert_eq!(num_export_functions(&p), 1, "export functions");
         */
         let _obj = c.object_file().expect("generate code from b");
     }
@@ -119,11 +122,12 @@ mod programs {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a & b");
-        let _mdata = c.module_data().unwrap();
+        let mdata = c.module_data().unwrap();
+        assert_eq!(mdata.import_functions().len(), 0, "import functions");
+        assert_eq!(mdata.export_functions().len(), 2, "export functions");
+
         /* FIXME: module data doesn't contain the information to check these properties:
-        assert_eq!(p.import_functions().len(), 0, "import functions");
         assert_eq!(num_import_globals(&p), 0, "import globals");
-        assert_eq!(num_export_functions(&p), 2, "export functions");
         */
         let _obj = c.object_file().expect("generate code from a & b");
     }

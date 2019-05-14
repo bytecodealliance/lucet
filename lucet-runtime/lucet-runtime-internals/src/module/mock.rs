@@ -2,10 +2,11 @@ use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use lucet_module_data::owned::{
-    OwnedFunctionMetadata, OwnedGlobalSpec, OwnedLinearMemorySpec, OwnedModuleData, OwnedSparseData,
+    OwnedFunctionMetadata, OwnedGlobalSpec, OwnedImportFunction, OwnedLinearMemorySpec,
+    OwnedModuleData, OwnedSparseData,
 };
 use lucet_module_data::{
-    FunctionHandle, FunctionPointer, FunctionSpec, ModuleData, Signature, TrapSite,
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, Signature, TrapSite,
     UniqueSignatureIndex,
 };
 use std::collections::{BTreeMap, HashMap};
@@ -22,6 +23,8 @@ pub struct MockModuleBuilder {
     start_func: Option<FunctionPointer>,
     function_manifest: Vec<FunctionSpec>,
     function_info: Vec<OwnedFunctionMetadata>,
+    imports: Vec<OwnedImportFunction>,
+    exports: Vec<FunctionIndex>,
     signatures: Vec<Signature>,
 }
 
@@ -126,6 +129,8 @@ impl MockModuleBuilder {
             signature: sig_idx,
             sym: Some(export.sym().to_vec()),
         });
+        self.exports
+            .push(FunctionIndex::from_u32(self.function_manifest.len() as u32));
         self.function_manifest.push(FunctionSpec::new(
             export.func().as_usize() as u64,
             export.func_len() as u32,
@@ -183,6 +188,8 @@ impl MockModuleBuilder {
             }),
             globals_spec,
             self.function_info.clone(),
+            self.imports,
+            self.exports,
             self.signatures,
         );
         let serialized_module_data = owned_module_data
@@ -280,7 +287,7 @@ impl ModuleInternal for MockModule {
         Ok(None)
     }
 
-    fn get_signature(&self, fn_id: u32) -> &Signature {
+    fn get_signature(&self, fn_id: FunctionIndex) -> &Signature {
         self.module_data.get_signature(fn_id)
     }
 }
