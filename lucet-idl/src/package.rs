@@ -115,6 +115,7 @@ mod test {
                     names: Vec::new(),
                     attrs: Vec::new(),
                     data_types: HashMap::new(),
+                    data_type_ordering: Vec::new(),
                     funcs: HashMap::new(),
                 }
             )]
@@ -158,6 +159,7 @@ mod test {
                         names: Vec::new(),
                         attrs: Vec::new(),
                         data_types: HashMap::new(),
+                        data_type_ordering: Vec::new(),
                         funcs: HashMap::new(),
                     }
                 ),
@@ -167,6 +169,7 @@ mod test {
                         names: Vec::new(),
                         attrs: Vec::new(),
                         data_types: HashMap::new(),
+                        data_type_ordering: Vec::new(),
                         funcs: HashMap::new(),
                     }
                 ),
@@ -176,6 +179,7 @@ mod test {
                         names: Vec::new(),
                         attrs: Vec::new(),
                         data_types: HashMap::new(),
+                        data_type_ordering: Vec::new(),
                         funcs: HashMap::new(),
                     }
                 )
@@ -220,6 +224,7 @@ mod test {
                     )]
                     .into_iter()
                     .collect::<HashMap<Ident, DataType>>(),
+                    data_type_ordering: vec![Ident(0)],
                 }
             )]
             .into_iter()

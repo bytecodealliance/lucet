@@ -1,15 +1,20 @@
+mod builder;
+
 use crate::error::ValidationError;
 use crate::parser::{SyntaxDecl, SyntaxRef};
 use crate::types::{
     AliasDataType, Attr, DataType, DataTypeRef, DataTypeVariant, EnumDataType, EnumMember, FuncArg,
     FuncDecl, FuncRet, Ident, Location, Name, Named, StructDataType, StructMember,
 };
+use builder::DataTypeModuleBuilder;
 use std::collections::HashMap;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Module {
     pub names: Vec<Name>,
     pub attrs: Vec<Attr>,
     pub data_types: HashMap<Ident, DataType>,
+    pub data_type_ordering: Vec<Ident>,
     pub funcs: HashMap<Ident, FuncDecl>,
 }
 
@@ -19,6 +24,7 @@ impl Module {
             names: Vec::new(),
             attrs: attrs.to_vec(),
             data_types: HashMap::new(),
+            data_type_ordering: Vec::new(),
             funcs: HashMap::new(),
         }
     }
@@ -70,19 +76,13 @@ impl Module {
         }
     }
 
-    fn define_data_type(&mut self, id: Ident, variant: DataTypeVariant, attrs: Vec<Attr>) {
-        if let Some(prev_def) = self.data_types.insert(id, DataType { variant, attrs }) {
-            panic!("id {} already defined: {:?}", id, prev_def)
-        }
-    }
-
-    fn define_function(&mut self, id: Ident, decl: FuncDecl) {
-        if let Some(prev_def) = self.funcs.insert(id, decl) {
-            panic!("id {} already defined: {:?}", id, prev_def)
-        }
-    }
-
-    fn define_decl(&mut self, id: Ident, decl: &SyntaxDecl) -> Result<(), ValidationError> {
+    fn decl_to_ir(
+        &self,
+        id: Ident,
+        decl: &SyntaxDecl,
+        data_types_ir: &mut DataTypeModuleBuilder,
+        funcs_ir: &mut HashMap<Ident, FuncDecl>,
+    ) -> Result<(), ValidationError> {
         match decl {
             SyntaxDecl::Struct {
                 name,
@@ -117,13 +117,15 @@ impl Module {
                         attrs: mem.attrs.clone(),
                     })
                 }
-                self.define_data_type(
+
+                data_types_ir.define(
                     id,
                     DataTypeVariant::Struct(StructDataType {
                         members: dtype_members,
                     }),
                     attrs.clone(),
-                )
+                    location.clone(),
+                );
             }
             SyntaxDecl::Enum {
                 name,
@@ -154,20 +156,27 @@ impl Module {
                         attrs: var.attrs.clone(),
                     })
                 }
-                self.define_data_type(
+                data_types_ir.define(
                     id,
                     DataTypeVariant::Enum(EnumDataType {
                         members: dtype_members,
                     }),
                     attrs.clone(),
-                )
+                    location.clone(),
+                );
             }
-            SyntaxDecl::Alias { what, attrs, .. } => {
+            SyntaxDecl::Alias {
+                what,
+                attrs,
+                location,
+                ..
+            } => {
                 let to = self.get_ref(what)?;
-                self.define_data_type(
+                data_types_ir.define(
                     id,
                     DataTypeVariant::Alias(AliasDataType { to }),
                     attrs.clone(),
+                    location.clone(),
                 );
             }
             SyntaxDecl::Function {
@@ -215,71 +224,19 @@ impl Module {
                         location: location.clone(),
                     })?
                 }
-                self.define_function(
-                    id,
-                    FuncDecl {
-                        args,
-                        rets,
-                        attrs: attrs.clone(),
-                    },
-                );
+
+                let decl = FuncDecl {
+                    args,
+                    rets,
+                    attrs: attrs.clone(),
+                };
+                if let Some(prev_def) = funcs_ir.insert(id, decl) {
+                    panic!("id {} already defined: {:?}", id, prev_def)
+                }
             }
             SyntaxDecl::Module { .. } => unreachable!(), // Should be excluded by from_declarations constructor
         }
         Ok(())
-    }
-
-    fn dfs_walk(
-        &self,
-        id: Ident,
-        visited: &mut [bool],
-        ordered: &mut Option<&mut Vec<Ident>>,
-    ) -> Result<(), ()> {
-        if visited[id.0] {
-            Err(())?
-        }
-        visited[id.0] = true;
-        match self
-            .data_types
-            .get(&id)
-            .expect("data_type is defined")
-            .variant
-        {
-            DataTypeVariant::Struct(ref s) => {
-                for mem in s.members.iter() {
-                    if let DataTypeRef::Defined(id) = mem.type_ {
-                        self.dfs_walk(id, visited, ordered)?
-                    }
-                }
-            }
-            DataTypeVariant::Alias(ref a) => {
-                if let DataTypeRef::Defined(id) = a.to {
-                    self.dfs_walk(id, visited, ordered)?
-                }
-            }
-            DataTypeVariant::Enum(_) => {}
-        }
-        if let Some(ordered) = ordered.as_mut() {
-            if !ordered.contains(&id) {
-                ordered.push(id)
-            }
-        }
-        visited[id.0] = false;
-        Ok(())
-    }
-
-    fn dfs_find_cycle(&self, id: Ident) -> Result<(), ()> {
-        let mut visited = Vec::new();
-        visited.resize(self.names.len(), false);
-        self.dfs_walk(id, &mut visited, &mut None)
-    }
-
-    fn ensure_finite_datatype(&self, id: Ident, decl: &SyntaxDecl) -> Result<(), ValidationError> {
-        self.dfs_find_cycle(id)
-            .map_err(|_| ValidationError::Infinite {
-                name: decl.name().to_owned(),
-                location: *decl.location(),
-            })
     }
 
     pub fn from_declarations(
@@ -298,15 +255,17 @@ impl Module {
             }
         }
 
+        let mut data_types_ir = DataTypeModuleBuilder::new();
+        let mut funcs_ir = HashMap::new();
         for (decl, id) in decls.iter().zip(&idents) {
-            mod_.define_decl(id.clone(), decl)?
+            mod_.decl_to_ir(id.clone(), decl, &mut data_types_ir, &mut funcs_ir)?
         }
 
-        for (decl, id) in decls.iter().zip(idents) {
-            if decl.is_datatype() {
-                mod_.ensure_finite_datatype(id, decl)?
-            }
-        }
+        let (data_types, ordering) = data_types_ir.validate_datatypes(&mod_.names)?;
+        mod_.data_types = data_types;
+        mod_.data_type_ordering = ordering;
+
+        mod_.funcs = funcs_ir;
 
         Ok(mod_)
     }
@@ -338,22 +297,10 @@ impl Module {
             None
         }
     }
-
-    fn ordered_datatype_idents(&self) -> Vec<Ident> {
-        let mut visited = Vec::new();
-        visited.resize(self.names.len(), false);
-        let mut ordered = Vec::with_capacity(visited.capacity());
-        for id in self.data_types.keys() {
-            let _ = self.dfs_walk(*id, &mut visited, &mut Some(&mut ordered));
-        }
-        ordered
-    }
-
     pub fn datatypes(&self) -> impl Iterator<Item = Named<DataType>> {
-        let idents = self.ordered_datatype_idents();
-        idents
-            .into_iter()
-            .map(move |i| self.get_datatype(i).unwrap())
+        self.data_type_ordering
+            .iter()
+            .map(move |i| self.get_datatype(*i).unwrap())
     }
 
     pub fn func_decls(&self) -> impl Iterator<Item = Named<FuncDecl>> {
@@ -579,6 +526,7 @@ mod tests {
                 .into_iter()
                 .collect::<HashMap<_, _>>(),
                 data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
                 attrs: Vec::new(),
             }
         );
@@ -607,6 +555,7 @@ mod tests {
                 .into_iter()
                 .collect::<HashMap<_, _>>(),
                 data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
                 attrs: Vec::new(),
             }
         );
@@ -635,6 +584,7 @@ mod tests {
                 .into_iter()
                 .collect::<HashMap<_, _>>(),
                 data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
                 attrs: Vec::new(),
             }
         );
@@ -679,6 +629,7 @@ mod tests {
                 )]
                 .into_iter()
                 .collect::<HashMap<_, _>>(),
+                data_type_ordering: vec![Ident(1)],
                 attrs: Vec::new(),
             }
         );
