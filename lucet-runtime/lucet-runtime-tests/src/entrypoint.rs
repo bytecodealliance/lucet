@@ -585,6 +585,31 @@ macro_rules! entrypoint_tests {
             }
         }
 
+        #[test]
+        fn mock_imported_entrypoint() {
+            imported_entrypoint(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_imported_entrypoint() {
+            imported_entrypoint(wat_calculator_module())
+        }
+
+        fn imported_entrypoint(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(
+                "add_4_reexport",
+                &[123u64.into(), 456u64.into(), 789u64.into(), 432u64.into()],
+            ) {
+                Ok(res) => assert_eq!(u64::from(res), 1800),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
         use $crate::build::test_module_c;
         const TEST_REGION_INIT_VAL: libc::c_int = 123;
         const TEST_REGION_SIZE: libc::size_t = 4;
@@ -833,6 +858,19 @@ macro_rules! entrypoint_tests {
             // Run the body routine
             inst.run("ctype_body", &[Val::GuestPtr(ctxstar)])
                 .expect("instance runs");
+        }
+
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn add_4_hostcall(
+                &mut vmctx,
+                a: u64,
+                b: u64,
+                c: u64,
+                d: u64,
+            ) -> u64 {
+                a + b + c + d
+            }
         }
 
         lucet_hostcalls! {
