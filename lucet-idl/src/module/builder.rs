@@ -78,6 +78,7 @@ impl DataTypeModuleBuilder {
         }
         visited[id.0] = true;
         let dt = self.data_types.get(&id).expect("data type IR is defined");
+
         match &dt.variant {
             VariantIR::Struct(ref s) => {
                 // First, iterate down the member to ensure this is finite, and fill in type
@@ -95,12 +96,7 @@ impl DataTypeModuleBuilder {
                         let repr_size = datatype_repr_size(&mem.type_, finalized_types)
                             .expect("datatype is defined by prior dfs_walk");
 
-                        if let Some(prev_elem) = members.last() {
-                            let prev_elem_size = prev_elem.repr_size;
-                            let padding = (prev_elem_size - 1)
-                                - ((offset + (prev_elem_size - 1)) % prev_elem_size);
-                            offset += padding;
-                        }
+                        offset = align_to(offset, repr_size);
 
                         members.push(StructMember {
                             type_: mem.type_.clone(),
@@ -115,15 +111,14 @@ impl DataTypeModuleBuilder {
                     // Struct will be aligned to the size of the first element. Structs always have
                     // at least one element.
                     let first_elem_size = members[0].repr_size;
-                    let end_padding = (first_elem_size - 1)
-                        - ((offset + (first_elem_size - 1)) % first_elem_size);
+                    let repr_size = align_to(offset, first_elem_size);
 
                     finalized_types.insert(
                         id,
                         DataType {
                             variant: DataTypeVariant::Struct(StructDataType { members }),
                             attrs: dt.attrs.clone(),
-                            repr_size: offset + end_padding,
+                            repr_size,
                         },
                     );
                 }
@@ -200,8 +195,40 @@ fn datatype_repr_size(
     datatype_ref: &DataTypeRef,
     finalized_types: &HashMap<Ident, DataType>,
 ) -> Option<usize> {
-    Some(match datatype_ref {
+    let r = match datatype_ref {
         DataTypeRef::Atom(a) => a.repr_size(),
         DataTypeRef::Defined(ref member_ident) => finalized_types.get(member_ident)?.repr_size,
-    })
+    };
+    assert!(r > 0);
+    Some(r)
+}
+fn align_to(offs: usize, alignment: usize) -> usize {
+    offs + alignment - 1 - ((offs + alignment - 1) % alignment)
+}
+
+#[cfg(test)]
+mod align_test {
+    use super::align_to;
+    #[test]
+    fn align_test() {
+        assert_eq!(0, align_to(0, 1));
+        assert_eq!(0, align_to(0, 2));
+        assert_eq!(0, align_to(0, 4));
+        assert_eq!(0, align_to(0, 8));
+
+        assert_eq!(1, align_to(1, 1));
+        assert_eq!(2, align_to(1, 2));
+        assert_eq!(4, align_to(1, 4));
+        assert_eq!(8, align_to(1, 8));
+
+        assert_eq!(2, align_to(2, 1));
+        assert_eq!(2, align_to(2, 2));
+        assert_eq!(4, align_to(2, 4));
+        assert_eq!(8, align_to(2, 8));
+
+        assert_eq!(5, align_to(5, 1));
+        assert_eq!(6, align_to(5, 2));
+        assert_eq!(8, align_to(5, 4));
+        assert_eq!(8, align_to(5, 8));
+    }
 }

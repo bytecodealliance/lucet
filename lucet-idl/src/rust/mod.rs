@@ -42,9 +42,9 @@ impl RustGenerator {
         }
     }
 
-    fn define_name(&mut self, data_type_entry: &Named<DataType>) -> String {
-        let typename = data_type_entry.name.name.to_camel_case();
-        self.defined.insert(data_type_entry.id, typename.clone());
+    fn define_name(&mut self, dt: &Named<DataType>) -> String {
+        let typename = dt.name.name.to_camel_case();
+        self.defined.insert(dt.id, typename.clone());
         typename
     }
 
@@ -74,41 +74,44 @@ impl RustGenerator {
 }
 
 impl Generator for RustGenerator {
-    fn gen_type_header(
-        &mut self,
-        _module: &Module,
-        data_type_entry: &Named<DataType>,
-    ) -> Result<(), IDLError> {
-        self.w.eob()?.writeln(format!(
-            "/// {}: {:?}",
-            data_type_entry.name.name, data_type_entry
-        ))?;
+    fn gen_type_header(&mut self, _module: &Module, dt: &Named<DataType>) -> Result<(), IDLError> {
+        self.w
+            .eob()?
+            .writeln(format!("/// {}: {:?}", dt.name.name, dt))?;
         Ok(())
     }
 
     fn gen_alias(
         &mut self,
         module: &Module,
-        data_type_entry: &Named<DataType>,
+        dt: &Named<DataType>,
         alias: &AliasDataType,
     ) -> Result<(), IDLError> {
-        let typename = self.define_name(data_type_entry);
+        let typename = self.define_name(dt);
         let pointee_name = self.get_defined_typename(&alias.to);
 
         self.w
             .writeln(format!("pub type {} = {};", typename, pointee_name))?
             .eob()?;
+
+        gen_testcase(&mut self.w, &dt.name.name.to_snake_case(), |w| {
+            w.writeln(format!(
+                "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
+                dt.entity.repr_size, typename
+            ))?;
+            Ok(())
+        })?;
+
         Ok(())
     }
 
     fn gen_struct(
         &mut self,
         module: &Module,
-        data_type_entry: &Named<DataType>,
+        dt: &Named<DataType>,
         struct_: &StructDataType,
     ) -> Result<(), IDLError> {
-        let typename = data_type_entry.name.name.to_camel_case();
-        self.defined.insert(data_type_entry.id, typename.clone());
+        let typename = self.define_name(dt);
 
         self.w
             .writeln("#[repr(C)]")?
@@ -124,6 +127,22 @@ impl Generator for RustGenerator {
         }
 
         self.w.writeln("}")?.eob()?;
+
+        gen_testcase(&mut self.w, &dt.name.name.to_snake_case(), |w| {
+            w.writeln(format!(
+                "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
+                dt.entity.repr_size, typename
+            ))?;
+
+            for m in struct_.members.iter() {
+                w.writeln(format!(
+                    "assert_eq!({}, offset_of!(super::{}, {}));",
+                    m.offset, typename, m.name,
+                ))?;
+            }
+            Ok(())
+        })?;
+
         Ok(())
     }
 
@@ -132,11 +151,10 @@ impl Generator for RustGenerator {
     fn gen_enum(
         &mut self,
         module: &Module,
-        data_type_entry: &Named<DataType>,
+        dt: &Named<DataType>,
         enum_: &EnumDataType,
     ) -> Result<(), IDLError> {
-        let typename = data_type_entry.name.name.to_camel_case();
-        self.defined.insert(data_type_entry.id, typename.clone());
+        let typename = self.define_name(dt);
 
         self.w
             .writeln("#[repr(C)]")?
@@ -149,6 +167,15 @@ impl Generator for RustGenerator {
         }
 
         self.w.writeln("}")?.eob()?;
+
+        gen_testcase(&mut self.w, &dt.name.name.to_snake_case(), |w| {
+            w.writeln(format!(
+                "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
+                dt.entity.repr_size, typename
+            ))?;
+            Ok(())
+        })?;
+
         Ok(())
     }
 
@@ -180,6 +207,7 @@ impl Generator for RustGenerator {
 
         self.w
             .writeln("#[no_mangle]")?
+            .writeln("#[allow(unused_variables)]")?
             .writeln(format!("pub fn {}({}) -> {} {{", name, args, rets))?;
 
         let mut w = self.w.new_block();
@@ -189,4 +217,24 @@ impl Generator for RustGenerator {
 
         Ok(())
     }
+}
+
+fn gen_testcase<F>(w: &mut PrettyWriter, name: &str, f: F) -> Result<(), IDLError>
+where
+    F: FnOnce(&mut PrettyWriter) -> Result<(), IDLError>,
+{
+    w.writeln("#[cfg(test)]")?;
+    w.writeln(format!("mod {} {{", name))?;
+    let mut ww = w.new_block();
+    ww.writeln("#[allow(unused_imports)]")?;
+    ww.writeln("use ::memoffset::offset_of;")?;
+    ww.writeln("#[test]")?;
+    ww.writeln("fn test() {")?;
+    let mut www = ww.new_block();
+    f(&mut www)?;
+    ww.writeln("}")?;
+    ww.eob()?;
+    w.writeln("}")?;
+    w.eob()?;
+    Ok(())
 }

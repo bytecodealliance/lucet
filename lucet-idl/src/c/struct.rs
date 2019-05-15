@@ -1,5 +1,4 @@
 use super::*;
-use std::cmp;
 
 pub fn generate(
     gen: &mut CGenerator,
@@ -11,7 +10,6 @@ pub fn generate(
     gen.w
         .write_line(format!("struct {} {{", dtname).as_bytes())?;
     let mut w_block = gen.w.new_block();
-    let mut offset: usize = 0;
     for member in struct_.members.iter() {
         w_block.indent()?;
         w_block.write(gen.type_name(module, &member.type_).as_bytes())?;
@@ -19,13 +17,9 @@ pub fn generate(
         w_block.write(member.name.as_bytes())?;
         w_block.write(b";")?;
         w_block.eol()?;
-
-        offset += member.repr_size;
     }
     gen.w.write_line(b"};")?;
     gen.w.eob()?;
-
-    let struct_size = offset;
 
     // Add assertions to check that the target platform matches the expected alignment
     // Also add a macro definition for the structure size
@@ -39,10 +33,12 @@ pub fn generate(
             .as_bytes(),
         )?;
     }
+
+    let struct_size = dt.entity.repr_size;
     gen.w.write_line(
         format!(
             "_Static_assert(sizeof(struct {}) == {}, \"unexpected structure size\");",
-            dtname, struct_size
+            dtname, struct_size,
         )
         .as_bytes(),
     )?;

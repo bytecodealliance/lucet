@@ -1,5 +1,5 @@
 use lucet_idl;
-use std::fs::File;
+use std::fs::{create_dir, File};
 use std::io::prelude::*;
 use std::process::Command;
 use tempfile::TempDir;
@@ -58,7 +58,26 @@ fn compile_and_run_rust() {
 
     let tempdir = TempDir::new().expect("create tempdir");
 
-    let gen_file = tempdir.path().join("out.rs");
+    create_dir(tempdir.path().join("src")).expect("create src");
+    let gen_file = tempdir.path().join("src").join("lib.rs");
+
+    let mut cargo_toml =
+        File::create(tempdir.path().join("Cargo.toml")).expect("create cargo.toml");
+    cargo_toml
+        .write_all(
+            "
+[package]
+name = \"test\"
+version = \"0.1.0\"
+edition = \"2018\"
+[lib]
+crate-type=[\"rlib\"]
+[dependencies]
+memoffset=\"*\""
+                .as_bytes(),
+        )
+        .unwrap();
+    drop(cargo_toml);
 
     lucet_idl::run(
         &config,
@@ -67,18 +86,10 @@ fn compile_and_run_rust() {
     )
     .expect("run lucet_idl");
 
-    let cmd_rustc = Command::new("rustc")
-        .arg(gen_file.clone())
-        .arg("--test")
-        .arg("--allow=dead_code")
-        .arg("-o")
-        .arg(tempdir.path().join("example"))
+    let cmd_rustc = Command::new("cargo")
+        .arg("test")
+        .current_dir(tempdir.path())
         .status()
         .expect("run rustcc");
     assert!(cmd_rustc.success(), "failure to compile generated code");
-
-    let cmd_run = Command::new(tempdir.path().join("example"))
-        .status()
-        .expect("run generated code");
-    assert!(cmd_run.success(), "failure to run generated code");
 }
