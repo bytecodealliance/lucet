@@ -1,5 +1,5 @@
 use lucet_idl::{codegen, Backend, Config, Package, Target};
-use std::fs::{create_dir, File};
+use std::fs::File;
 use std::io::Write;
 use std::process::Command;
 use tempfile::TempDir;
@@ -12,26 +12,8 @@ pub fn rust_codegen(package: &Package) {
 
     let tempdir = TempDir::new().expect("create tempdir");
 
-    create_dir(tempdir.path().join("src")).expect("create src");
     let gen_file = tempdir.path().join("src").join("lib.rs");
 
-    let mut cargo_toml =
-        File::create(tempdir.path().join("Cargo.toml")).expect("create cargo.toml");
-    cargo_toml
-        .write_all(
-            "
-[package]
-name = \"test\"
-version = \"0.1.0\"
-edition = \"2018\"
-[lib]
-crate-type=[\"rlib\"]
-[dependencies]
-memoffset=\"*\""
-                .as_bytes(),
-        )
-        .unwrap();
-    drop(cargo_toml);
     codegen(
         package,
         &config,
@@ -39,11 +21,15 @@ memoffset=\"*\""
     )
     .expect("lucet_idl codegen");
 
-    let cmd_rustc = Command::new("cargo")
-        .arg("test")
-        .current_dir(tempdir.path())
+    let cmd_rustc = Command::new("rustc")
+        .arg(gen_file.clone())
+        .arg("--test")
+        .arg("--allow=dead_code")
+        .arg("-o")
+        .arg(tempdir.path().join("example"))
         .status()
-        .expect("run cargo test");
+        .expect("run rustc");
+    assert!(cmd_rustc.success(), "failure to compile generated code");
 
     if !cmd_rustc.success() {
         Command::new("cat")

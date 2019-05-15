@@ -136,7 +136,7 @@ impl Generator for RustGenerator {
 
             for m in struct_.members.iter() {
                 w.writeln(format!(
-                    "assert_eq!({}, offset_of!(super::{}, {}));",
+                    "assert_eq!({}, {{ let base = ::std::ptr::null::<super::{}>(); unsafe {{ (&(*base).{}) as *const _ as usize }} }});",
                     m.offset, typename, m.name,
                 ))?;
             }
@@ -226,8 +226,6 @@ where
     w.writeln("#[cfg(test)]")?;
     w.writeln(format!("mod {} {{", name))?;
     let mut ww = w.new_block();
-    ww.writeln("#[allow(unused_imports)]")?;
-    ww.writeln("use ::memoffset::offset_of;")?;
     ww.writeln("#[test]")?;
     ww.writeln("fn test() {")?;
     let mut www = ww.new_block();
