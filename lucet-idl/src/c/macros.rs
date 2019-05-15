@@ -42,10 +42,7 @@ pub fn macro_for_data_type_ref(
     data_type_ref: &DataTypeRef,
 ) -> String {
     match data_type_ref {
-        DataTypeRef::Atom(atom_type) => {
-            let native_type_size = CAtom::from(*atom_type).native_type_size;
-            format!("{}", native_type_size)
-        }
+        DataTypeRef::Atom(atom_type) => format!("{}", atom_type.repr_size()),
         DataTypeRef::Defined(data_type_id) => {
             let data_type_entry = module
                 .get_datatype(*data_type_id)
