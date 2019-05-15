@@ -119,40 +119,45 @@ impl<'a> ModuleDecls<'a> {
             let exportable_sigix = info.functions.get(func_index).unwrap();
             let inner_sig_index = info.signature_mapping.get(exportable_sigix.entity).unwrap();
             let signature = info.signatures.get(*inner_sig_index).unwrap();
-            let name = if let Some((import_mod, import_field)) = info.imported_funcs.get(func_index)
-            {
-                let import_symbol = bindings
-                    .translate(import_mod, import_field)
-                    .context(LucetcErrorKind::TranslatingModule)?;
-                let funcid = clif_module
-                    .declare_function(&import_symbol, Linkage::Import, signature)
-                    .context(LucetcErrorKind::TranslatingModule)?;
-                imports.push(ImportFunction {
+
+            let exported_name = if !exportable_sigix.export_names.is_empty() {
+                exports.push(ExportFunction {
                     fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
-                    module: import_mod,
-                    name: import_field,
+                    names: exportable_sigix.export_names.clone(),
                 });
-                Name::new_func(import_symbol, funcid)
+
+                Some((
+                    format!("guest_func_{}", exportable_sigix.export_names[0]),
+                    Linkage::Export,
+                ))
             } else {
-                if exportable_sigix.export_names.is_empty() {
-                    let def_symbol = format!("guest_func_{}", ix);
-                    let funcid = clif_module
-                        .declare_function(&def_symbol, Linkage::Local, signature)
-                        .context(LucetcErrorKind::TranslatingModule)?;
-                    Name::new_func(def_symbol, funcid)
-                } else {
-                    let export_symbol = format!("guest_func_{}", exportable_sigix.export_names[0]);
-                    let funcid = clif_module
-                        .declare_function(&export_symbol, Linkage::Export, signature)
-                        .context(LucetcErrorKind::TranslatingModule)?;
-                    exports.push(ExportFunction {
-                        fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
-                        names: exportable_sigix.export_names.clone(),
-                    });
-                    Name::new_func(export_symbol, funcid)
-                }
+                None
             };
-            function_names.push(name);
+
+            let imported_name =
+                if let Some((import_mod, import_field)) = info.imported_funcs.get(func_index) {
+                    imports.push(ImportFunction {
+                        fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
+                        module: import_mod,
+                        name: import_field,
+                    });
+                    let import_symbol = bindings
+                        .translate(import_mod, import_field)
+                        .context(LucetcErrorKind::TranslatingModule)?;
+                    Some((import_symbol, Linkage::Import))
+                } else {
+                    None
+                };
+
+            let (decl_sym, decl_linkage) = imported_name
+                .or(exported_name)
+                .unwrap_or_else(|| (format!("guest_func_{}", ix), Linkage::Local));
+
+            let funcid = clif_module
+                .declare_function(&decl_sym, decl_linkage, signature)
+                .context(LucetcErrorKind::TranslatingModule)?;
+
+            function_names.push(Name::new_func(decl_sym, funcid));
         }
         Ok((function_names, imports, exports))
     }
