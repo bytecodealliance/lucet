@@ -91,27 +91,26 @@ impl DataTypeModuleBuilder {
                 // If finalized type information has not yet been computed, we can now compute it:
                 if !finalized_types.contains_key(&id) {
                     let mut offset = 0;
+                    let mut struct_align = 1;
                     let mut members: Vec<StructMember> = Vec::new();
                     for mem in s.members.iter() {
-                        let repr_size = datatype_repr_size(&mem.type_, finalized_types)
-                            .expect("datatype is defined by prior dfs_walk");
+                        let (repr_size, align) =
+                            datatype_repr_size_align(&mem.type_, finalized_types)
+                                .expect("datatype is defined by prior dfs_walk");
 
-                        offset = align_to(offset, repr_size);
+                        offset = align_to(offset, align);
+                        struct_align = ::std::cmp::max(struct_align, align);
 
                         members.push(StructMember {
                             type_: mem.type_.clone(),
                             name: mem.name.clone(),
                             attrs: mem.attrs.clone(),
-                            repr_size,
                             offset,
                         });
                         offset += repr_size;
                     }
 
-                    // Struct will be aligned to the size of the first element. Structs always have
-                    // at least one element.
-                    let first_elem_size = members[0].repr_size;
-                    let repr_size = align_to(offset, first_elem_size);
+                    let repr_size = align_to(offset, struct_align);
 
                     finalized_types.insert(
                         id,
@@ -119,6 +118,7 @@ impl DataTypeModuleBuilder {
                             variant: DataTypeVariant::Struct(StructDataType { members }),
                             attrs: dt.attrs.clone(),
                             repr_size,
+                            align: struct_align,
                         },
                     );
                 }
@@ -128,7 +128,7 @@ impl DataTypeModuleBuilder {
                     self.dfs_walk(pointee_id, visited, ordered, finalized_types)?;
                 };
                 if !finalized_types.contains_key(&id) {
-                    let repr_size = datatype_repr_size(&a.to, finalized_types)
+                    let (repr_size, align) = datatype_repr_size_align(&a.to, finalized_types)
                         .expect("datatype is defined by prior dfs_walk");
                     finalized_types.insert(
                         id,
@@ -136,6 +136,7 @@ impl DataTypeModuleBuilder {
                             variant: DataTypeVariant::Alias(AliasDataType { to: a.to.clone() }),
                             attrs: dt.attrs.clone(),
                             repr_size,
+                            align,
                         },
                     );
                 }
@@ -145,6 +146,7 @@ impl DataTypeModuleBuilder {
                 if !finalized_types.contains_key(&id) {
                     // x86_64 ABI says enum is 32 bits wide
                     let repr_size = AtomType::U32.repr_size();
+                    let align = repr_size;
                     finalized_types.insert(
                         id,
                         DataType {
@@ -153,6 +155,7 @@ impl DataTypeModuleBuilder {
                             }),
                             attrs: dt.attrs.clone(),
                             repr_size,
+                            align,
                         },
                     );
                 }
@@ -191,16 +194,23 @@ impl DataTypeModuleBuilder {
     }
 }
 
-fn datatype_repr_size(
+fn datatype_repr_size_align(
     datatype_ref: &DataTypeRef,
     finalized_types: &HashMap<Ident, DataType>,
-) -> Option<usize> {
-    let r = match datatype_ref {
-        DataTypeRef::Atom(a) => a.repr_size(),
-        DataTypeRef::Defined(ref member_ident) => finalized_types.get(member_ident)?.repr_size,
+) -> Option<(usize, usize)> {
+    let (size, align) = match datatype_ref {
+        DataTypeRef::Atom(a) => {
+            let s = a.repr_size();
+            (s, s)
+        }
+        DataTypeRef::Defined(ref member_ident) => {
+            let t = finalized_types.get(member_ident)?;
+            (t.repr_size, t.align)
+        }
     };
-    assert!(r > 0);
-    Some(r)
+    assert!(size > 0);
+    assert!(align > 0);
+    Some((size, align))
 }
 fn align_to(offs: usize, alignment: usize) -> usize {
     offs + alignment - 1 - ((offs + alignment - 1) % alignment)

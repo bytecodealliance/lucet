@@ -11,7 +11,7 @@ pub fn rust_codegen(package: &Package) {
 
     let tempdir = TempDir::new().expect("create tempdir");
 
-    let gen_file = tempdir.path().join("src").join("lib.rs");
+    let gen_file = tempdir.path().join("lib.rs");
 
     codegen(
         package,

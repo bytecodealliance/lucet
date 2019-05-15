@@ -1,12 +1,12 @@
-mod builder;
-
+use crate::data_layout::{
+    AliasIR, DataTypeModuleBuilder, EnumIR, StructIR, StructMemberIR, VariantIR,
+};
 use crate::error::ValidationError;
 use crate::parser::{SyntaxDecl, SyntaxRef};
 use crate::types::{
     Attr, DataType, DataTypeRef, EnumMember, FuncArg, FuncDecl, FuncRet, Ident, Location, Name,
     Named,
 };
-use builder::{AliasIR, DataTypeModuleBuilder, EnumIR, StructIR, StructMemberIR, VariantIR};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -341,20 +341,19 @@ mod tests {
                                 name: "a".to_owned(),
                                 type_: DataTypeRef::Atom(AtomType::I32),
                                 attrs: Vec::new(),
-                                repr_size: 4,
                                 offset: 0,
                             },
                             StructMember {
                                 name: "b".to_owned(),
                                 type_: DataTypeRef::Atom(AtomType::F32),
                                 attrs: Vec::new(),
-                                repr_size: 4,
                                 offset: 4,
                             },
                         ]
                     }),
                     attrs: Vec::new(),
                     repr_size: 8,
+                    align: 4,
                 }
             );
         }
@@ -637,6 +636,7 @@ mod tests {
                         }),
                         attrs: Vec::new(),
                         repr_size: 1,
+                        align: 1,
                     }
                 )]
                 .into_iter()

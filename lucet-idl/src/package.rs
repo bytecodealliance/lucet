@@ -221,6 +221,7 @@ mod test {
                             }),
                             attrs: Vec::new(),
                             repr_size: 1,
+                            align: 1,
                         }
                     )]
                     .into_iter()

@@ -70,7 +70,6 @@ pub struct StructMember {
     pub type_: DataTypeRef,
     pub name: String,
     pub attrs: Vec<Attr>,
-    pub repr_size: usize,
     pub offset: usize,
 }
 
@@ -107,6 +106,7 @@ pub struct DataType {
     pub variant: DataTypeVariant,
     pub attrs: Vec<Attr>,
     pub repr_size: usize,
+    pub align: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
