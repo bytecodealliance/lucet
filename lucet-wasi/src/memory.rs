@@ -424,7 +424,7 @@ pub fn dec_u32(x: u32) -> u32 {
 }
 
 pub fn enc_u32(x: u32) -> u32 {
-    x
+    x.to_le()
 }
 
 pub fn dec_usize(size: wasm32::size_t) -> usize {
