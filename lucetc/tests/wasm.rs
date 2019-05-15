@@ -46,7 +46,7 @@ mod module_data {
 
         assert_eq!(mdata.import_functions().len(), 0);
         assert_eq!(mdata.function_info().len(), 1);
-        assert_eq!(mdata.export_functions()[0].names, vec!["guest_func_main"]);
+        assert_eq!(mdata.export_functions()[0].names, vec!["main"]);
     }
 
     #[test]
@@ -60,7 +60,7 @@ mod module_data {
 
         assert_eq!(mdata.import_functions().len(), 0);
         assert_eq!(mdata.function_info().len(), 1);
-        assert_eq!(mdata.export_functions()[0].names, vec!["guest_func_main"]);
+        assert_eq!(mdata.export_functions()[0].names, vec!["main"]);
     }
     #[test]
     fn icall_import() {
@@ -77,10 +77,7 @@ mod module_data {
         assert_eq!(mdata.import_functions()[0].module, "env");
         assert_eq!(mdata.import_functions()[0].name, "icalltarget");
         assert_eq!(mdata.function_info().len(), 5);
-        assert_eq!(
-            mdata.export_functions()[0].names,
-            vec!["guest_func_launchpad"]
-        );
+        assert_eq!(mdata.export_functions()[0].names, vec!["launchpad"]);
         assert_eq!(mdata.globals_spec().len(), 0);
 
         /*  TODO can't express these with module data
