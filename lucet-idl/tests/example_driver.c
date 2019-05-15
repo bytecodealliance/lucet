@@ -4,7 +4,7 @@
 
 int main (int argc, char *argv[]) {
 
-    color c1 = COLOR_RED;
+    enum color c1 = COLOR_RED;
     colour c2 = COLOR_BLUE;
     col c3 = COLOR_GREEN;
 

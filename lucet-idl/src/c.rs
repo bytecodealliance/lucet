@@ -35,11 +35,11 @@ impl Generator for CGenerator {
         dt: &Named<DataType>,
         alias: &AliasDataType,
     ) -> Result<(), IDLError> {
-        let dtname = &dt.name.name;
+        let dtname = self.type_name(dt);
         self.w.indent()?;
         self.w.writeln(format!(
             "typedef {} {};",
-            self.type_name(module, &alias.to),
+            self.type_ref_name(module, &alias.to),
             dtname
         ))?;
         self.w.eob()?;
@@ -60,16 +60,15 @@ impl Generator for CGenerator {
         dt: &Named<DataType>,
         struct_: &StructDataType,
     ) -> Result<(), IDLError> {
-        let dtname = &dt.name.name;
-        self.w.writeln(format!("struct {} {{", dtname))?;
+        let dtname = self.type_name(dt);
+        self.w.writeln(format!("{} {{", dtname))?;
         let mut w_block = self.w.new_block();
         for member in struct_.members.iter() {
-            w_block.indent()?;
-            w_block.write(self.type_name(module, &member.type_).as_bytes())?;
-            w_block.space()?;
-            w_block.write(member.name.as_bytes())?;
-            w_block.write(b";")?;
-            w_block.eol()?;
+            w_block.writeln(format!(
+                "{} {};",
+                self.type_ref_name(module, &member.type_),
+                member.name
+            ))?;
         }
         self.w.writeln("};")?;
         self.w.eob()?;
@@ -79,14 +78,14 @@ impl Generator for CGenerator {
         // Skip the first member, as it will always be at the beginning of the structure
         for (i, member) in struct_.members.iter().enumerate().skip(1) {
             self.w.writeln(format!(
-                "_Static_assert(offsetof(struct {}, {}) == {}, \"unexpected offset\");",
+                "_Static_assert(offsetof({}, {}) == {}, \"unexpected offset\");",
                 dtname, member.name, member.offset
             ))?;
         }
 
         let struct_size = dt.entity.repr_size;
         self.w.writeln(format!(
-            "_Static_assert(sizeof(struct {}) == {}, \"unexpected structure size\");",
+            "_Static_assert(sizeof({}) == {}, \"unexpected structure size\");",
             dtname, struct_size,
         ))?;
         self.w.eob()?;
@@ -102,14 +101,9 @@ impl Generator for CGenerator {
         dt: &Named<DataType>,
         enum_: &EnumDataType,
     ) -> Result<(), IDLError> {
+        let dtname = self.type_name(dt);
         let type_size = dt.entity.repr_size;
-        self.w.writeln(format!(
-            "typedef {} {}; // enum, should be in the [0...{}] range",
-            atom_type_name(&AtomType::U32),
-            dt.name.name,
-            enum_.members.len() - 1
-        ))?;
-        self.w.writeln(format!("enum ___{} {{", dt.name.name))?;
+        self.w.writeln(format!("{} {{", dtname))?;
         let mut pretty_writer_i1 = self.w.new_block();
         for (i, named_member) in enum_.members.iter().enumerate() {
             pretty_writer_i1.writeln(format!(
@@ -122,7 +116,7 @@ impl Generator for CGenerator {
         self.w.eob()?;
         self.w.writeln(format!(
             "_Static_assert(sizeof({}) == {}, \"unexpected enumeration size\");",
-            dt.name.name, type_size
+            dtname, type_size
         ))?;
         self.w.eob()?;
         Ok(())
@@ -181,15 +175,20 @@ impl CGenerator {
         }
     }
 
-    pub fn type_name<'t>(&self, module: &'t Module, type_: &'t DataTypeRef) -> &'t str {
+    fn type_name(&self, dt: &Named<DataType>) -> String {
+        match dt.entity.variant {
+            DataTypeVariant::Struct(_) => format!("struct {}", dt.name.name),
+            DataTypeVariant::Enum(_) => format!("enum {}", dt.name.name),
+            DataTypeVariant::Alias(_) => format!("{}", dt.name.name),
+        }
+    }
+
+    fn type_ref_name(&self, module: &Module, type_: &DataTypeRef) -> String {
         match type_ {
-            DataTypeRef::Atom(a) => atom_type_name(a),
+            DataTypeRef::Atom(a) => atom_type_name(a).to_owned(),
             DataTypeRef::Defined(id) => {
-                &module
-                    .get_datatype(*id)
-                    .expect("alias has valid pointee")
-                    .name
-                    .name
+                let dt = &module.get_datatype(*id).expect("type_name of valid ref");
+                self.type_name(dt)
             }
         }
     }

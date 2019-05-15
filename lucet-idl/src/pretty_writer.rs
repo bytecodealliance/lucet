@@ -57,12 +57,6 @@ impl PrettyWriter {
         Ok(self)
     }
 
-    /// Output a space
-    pub fn space(&mut self) -> Result<&mut Self, IDLError> {
-        self._write_all(b" ")?;
-        Ok(self)
-    }
-
     /// Output an end of line
     pub fn eol(&mut self) -> Result<&mut Self, IDLError> {
         self._write_all(b"\n")?;
