@@ -56,7 +56,7 @@ pub trait ModuleInternal: Send + Sync {
     /// Get the table elements from the module.
     fn table_elements(&self) -> Result<&[TableElement], Error>;
 
-    fn get_export_func(&self, sym: &[u8]) -> Result<FunctionHandle, Error>;
+    fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error>;
 
     fn get_func_from_idx(&self, table_id: u32, func_id: u32) -> Result<FunctionHandle, Error>;
 

@@ -167,13 +167,10 @@ impl ModuleInternal for DlModule {
         Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize) })
     }
 
-    fn get_export_func(&self, sym: &[u8]) -> Result<FunctionHandle, Error> {
-        let mut guest_sym: Vec<u8> = b"guest_func_".to_vec();
-        guest_sym.extend_from_slice(sym);
-
+    fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error> {
         self.module_data
-            .function_id_by_name(&guest_sym)
-            .ok_or_else(|| Error::SymbolNotFound(String::from_utf8_lossy(sym).into_owned()))
+            .get_export_func_id(sym)
+            .ok_or_else(|| Error::SymbolNotFound(sym.to_string()))
             .map(|id| {
                 let ptr = self.function_manifest()[id.as_u32() as usize].ptr();
                 FunctionHandle { ptr, id }

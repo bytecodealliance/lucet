@@ -1,5 +1,5 @@
 use crate::{
-    functions::{FunctionIndex, FunctionMetadata, ImportFunction, OwnedFunctionMetadata},
+    functions::{ExportFunction, FunctionIndex, FunctionMetadata, ImportFunction, OwnedFunctionMetadata},
     globals::GlobalSpec,
     linear_memory::{HeapSpec, LinearMemorySpec, SparseData},
     types::Signature,
@@ -25,7 +25,8 @@ pub struct ModuleData<'a> {
     function_info: Vec<FunctionMetadata<'a>>,
     #[serde(borrow)]
     import_functions: Vec<ImportFunction<'a>>,
-    export_functions: Vec<FunctionIndex>,
+    #[serde(borrow)]
+    export_functions: Vec<ExportFunction<'a>>,
     signatures: Vec<Signature>,
 }
 
@@ -35,7 +36,7 @@ impl<'a> ModuleData<'a> {
         globals_spec: Vec<GlobalSpec<'a>>,
         function_info: Vec<FunctionMetadata<'a>>,
         import_functions: Vec<ImportFunction<'a>>,
-        export_functions: Vec<FunctionIndex>,
+        export_functions: Vec<ExportFunction<'a>>,
         signatures: Vec<Signature>,
     ) -> Self {
         Self {
@@ -76,7 +77,7 @@ impl<'a> ModuleData<'a> {
         &self.import_functions
     }
 
-    pub fn export_functions(&self) -> &[FunctionIndex] {
+    pub fn export_functions(&self) -> &[ExportFunction] {
         &self.export_functions
     }
 
@@ -89,16 +90,11 @@ impl<'a> ModuleData<'a> {
         &self.signatures[sig_idx.as_u32() as usize]
     }
 
-    pub fn function_id_by_name(&self, name: &[u8]) -> Option<FunctionIndex> {
-        self.function_info
+    pub fn get_export_func_id(&self, name: &str) -> Option<FunctionIndex> {
+        self.export_functions
             .iter()
-            .enumerate()
-            .find(|(_, fn_meta)| { fn_meta.sym == Some(name) })
-            .map(|(i, _)| FunctionIndex::from_u32(i as u32))
-    }
-
-    pub fn sym_for(&self, fn_id: FunctionIndex) -> Option<&[u8]> {
-        self.function_info[fn_id.as_u32() as usize].sym
+            .find(|export| export.names.contains(&name))
+            .map(|export| export.fn_idx)
     }
 
     pub fn signatures(&self) -> &[Signature] {
@@ -119,7 +115,7 @@ impl<'a> ModuleData<'a> {
 use crate::{
     globals::OwnedGlobalSpec,
     linear_memory::{OwnedLinearMemorySpec, OwnedSparseData},
-    functions::OwnedImportFunction,
+    functions::{OwnedExportFunction, OwnedImportFunction},
 };
 
 /// The metadata (and some data) for a Lucet module.
@@ -132,7 +128,7 @@ pub struct OwnedModuleData {
     globals_spec: Vec<OwnedGlobalSpec>,
     function_info: Vec<OwnedFunctionMetadata>,
     imports: Vec<OwnedImportFunction>,
-    exports: Vec<FunctionIndex>,
+    exports: Vec<OwnedExportFunction>,
     signatures: Vec<Signature>,
 }
 
@@ -142,7 +138,7 @@ impl OwnedModuleData {
         globals_spec: Vec<OwnedGlobalSpec>,
         function_info: Vec<OwnedFunctionMetadata>,
         imports: Vec<OwnedImportFunction>,
-        exports: Vec<FunctionIndex>,
+        exports: Vec<OwnedExportFunction>,
         signatures: Vec<Signature>,
     ) -> Self {
         Self {
@@ -167,7 +163,7 @@ impl OwnedModuleData {
             self.globals_spec.iter().map(|gs| gs.to_ref()).collect(),
             self.function_info.iter().map(|info| info.to_ref()).collect(),
             self.imports.iter().map(|imp| imp.to_ref()).collect(),
-            self.exports.clone(),
+            self.exports.iter().map(|exp| exp.to_ref()).collect(),
             self.signatures.clone(),
         )
     }

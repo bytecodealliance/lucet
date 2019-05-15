@@ -28,7 +28,7 @@ pub fn null_mock() -> Arc<dyn Module> {
     extern "C" fn f(_vmctx: *mut lucet_vmctx) {}
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(b"f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
         .build()
 }
 
@@ -50,7 +50,7 @@ pub fn large_dense_heap_mock(heap_kb: usize) -> Arc<dyn Module> {
     });
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(b"f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
         .with_initial_heap(heap.as_slice())
         .with_heap_spec(heap_spec)
         .build()
@@ -81,7 +81,7 @@ pub fn large_sparse_heap_mock(heap_kb: usize, stride: usize) -> Arc<dyn Module> 
         });
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(b"f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
         .with_initial_heap(heap.as_slice())
         .with_heap_spec(heap_spec)
         .build()
@@ -102,7 +102,7 @@ pub fn fib_mock() -> Arc<dyn Module> {
     }
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(b"f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
         .build()
 }
 
@@ -179,7 +179,7 @@ pub fn many_args_mock() -> Arc<dyn Module> {
     }
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(b"f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
         .build()
 }
 
@@ -255,8 +255,8 @@ pub fn hostcalls_mock() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"wrapped", FunctionPointer::from_usize(wrapped as usize)))
+            MockExportBuilder::new("wrapped", FunctionPointer::from_usize(wrapped as usize)))
         .with_export_func(
-            MockExportBuilder::new(b"raw", FunctionPointer::from_usize(raw as usize)))
+            MockExportBuilder::new("raw", FunctionPointer::from_usize(raw as usize)))
         .build()
 }

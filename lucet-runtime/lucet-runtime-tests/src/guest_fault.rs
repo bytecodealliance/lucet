@@ -85,36 +85,36 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(MockExportBuilder::new(
-            b"onetwothree",
+            "onetwothree",
             FunctionPointer::from_usize(onetwothree as usize),
         ))
         .with_export_func(
             MockExportBuilder::new(
-                b"illegal_instr",
+                "illegal_instr",
                 FunctionPointer::from_usize(guest_func_illegal_instr as usize),
             )
             .with_func_len(11)
             .with_traps(ILLEGAL_INSTR_TRAPS),
         )
         .with_export_func(
-            MockExportBuilder::new(b"oob", FunctionPointer::from_usize(guest_func_oob as usize))
+            MockExportBuilder::new("oob", FunctionPointer::from_usize(guest_func_oob as usize))
                 .with_func_len(41)
                 .with_traps(OOB_TRAPS),
         )
         .with_export_func(MockExportBuilder::new(
-            b"hostcall_main",
+            "hostcall_main",
             FunctionPointer::from_usize(hostcall_main as usize),
         ))
         .with_export_func(MockExportBuilder::new(
-            b"infinite_loop",
+            "infinite_loop",
             FunctionPointer::from_usize(infinite_loop as usize),
         ))
         .with_export_func(MockExportBuilder::new(
-            b"fatal",
+            "fatal",
             FunctionPointer::from_usize(fatal as usize),
         ))
         .with_export_func(MockExportBuilder::new(
-            b"recoverable_fatal",
+            "recoverable_fatal",
             FunctionPointer::from_usize(recoverable_fatal as usize),
         ))
         .build()
@@ -546,7 +546,7 @@ macro_rules! guest_fault_tests {
                 let child = std::thread::spawn(|| {
                     let module = MockModuleBuilder::new()
                         .with_export_func(MockExportBuilder::new(
-                            b"sleepy_guest",
+                            "sleepy_guest",
                             FunctionPointer::from_usize(sleepy_guest as usize),
                         ))
                         .build();

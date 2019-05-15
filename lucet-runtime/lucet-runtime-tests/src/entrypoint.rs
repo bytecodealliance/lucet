@@ -121,35 +121,29 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
 
     MockModuleBuilder::new()
         .with_export_func(
-            MockExportBuilder::new(b"add_2", FunctionPointer::from_usize(add_2 as usize))
+            MockExportBuilder::new("add_2", FunctionPointer::from_usize(add_2 as usize))
                 .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"add_10", FunctionPointer::from_usize(add_10 as usize))
+            MockExportBuilder::new("add_10", FunctionPointer::from_usize(add_10 as usize))
                 .with_sig(lucet_signature!(
                     (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(b"mul_2", FunctionPointer::from_usize(mul_2 as usize))
+            MockExportBuilder::new("mul_2", FunctionPointer::from_usize(mul_2 as usize))
                 .with_sig(lucet_signature!((I64, I64) -> I64)),
         )
         .with_export_func(
-            MockExportBuilder::new(
-                b"add_f32_2",
-                FunctionPointer::from_usize(add_f32_2 as usize),
-            )
-            .with_sig(lucet_signature!((F32, F32) -> F32)),
+            MockExportBuilder::new("add_f32_2", FunctionPointer::from_usize(add_f32_2 as usize))
+                .with_sig(lucet_signature!((F32, F32) -> F32)),
+        )
+        .with_export_func(
+            MockExportBuilder::new("add_f64_2", FunctionPointer::from_usize(add_f64_2 as usize))
+                .with_sig(lucet_signature!((F64, F64) -> F64)),
         )
         .with_export_func(
             MockExportBuilder::new(
-                b"add_f64_2",
-                FunctionPointer::from_usize(add_f64_2 as usize),
-            )
-            .with_sig(lucet_signature!((F64, F64) -> F64)),
-        )
-        .with_export_func(
-            MockExportBuilder::new(
-                b"add_f32_10",
+                "add_f32_10",
                 FunctionPointer::from_usize(add_f32_10 as usize),
             )
             .with_sig(lucet_signature!(
@@ -157,7 +151,7 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
         )
         .with_export_func(
             MockExportBuilder::new(
-                b"add_f64_10",
+                "add_f64_10",
                 FunctionPointer::from_usize(add_f64_10 as usize),
             )
             .with_sig(lucet_signature!(
@@ -165,7 +159,7 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
         )
         .with_export_func(
             MockExportBuilder::new(
-                b"add_mixed_20",
+                "add_mixed_20",
                 FunctionPointer::from_usize(add_mixed_20 as usize),
             )
             .with_sig(lucet_signature!(

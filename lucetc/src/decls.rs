@@ -15,9 +15,9 @@ use cranelift_wasm::{
 };
 use failure::{format_err, Error, ResultExt};
 use lucet_module_data::{
-    owned::OwnedLinearMemorySpec, FunctionIndex as LucetFunctionIndex, FunctionMetadata,
-    Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec, ImportFunction, ModuleData,
-    Signature as LucetSignature, UniqueSignatureIndex,
+    owned::OwnedLinearMemorySpec, ExportFunction, FunctionIndex as LucetFunctionIndex,
+    FunctionMetadata, Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec, ImportFunction,
+    ModuleData, Signature as LucetSignature, UniqueSignatureIndex,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -63,7 +63,7 @@ pub struct ModuleDecls<'a> {
     runtime: Runtime,
     function_names: PrimaryMap<FuncIndex, Name>,
     imports: Vec<ImportFunction<'a>>,
-    exports: Vec<LucetFunctionIndex>,
+    exports: Vec<ExportFunction<'a>>,
     table_names: PrimaryMap<TableIndex, (Name, Name)>,
     runtime_names: HashMap<RuntimeFunc, Name>,
     globals_spec: Vec<GlobalSpec<'a>>,
@@ -106,12 +106,12 @@ impl<'a> ModuleDecls<'a> {
         (
             PrimaryMap<FuncIndex, Name>,
             Vec<ImportFunction<'a>>,
-            Vec<LucetFunctionIndex>,
+            Vec<ExportFunction<'a>>,
         ),
         LucetcError,
     > {
         let mut function_names = PrimaryMap::new();
-        let mut exports: Vec<LucetFunctionIndex> = Vec::new();
+        let mut exports: Vec<ExportFunction<'a>> = Vec::new();
         let mut imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
 
         for ix in 0..info.functions.len() {
@@ -130,6 +130,7 @@ impl<'a> ModuleDecls<'a> {
                 imports.push(ImportFunction {
                     fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
                     module: import_mod,
+                    name: import_field,
                 });
                 Name::new_func(import_symbol, funcid)
             } else {
@@ -144,7 +145,10 @@ impl<'a> ModuleDecls<'a> {
                     let funcid = clif_module
                         .declare_function(&export_symbol, Linkage::Export, signature)
                         .context(LucetcErrorKind::TranslatingModule)?;
-                    exports.push(LucetFunctionIndex::from_u32(function_names.len() as u32));
+                    exports.push(ExportFunction {
+                        fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
+                        names: exportable_sigix.export_names.clone(),
+                    });
                     Name::new_func(export_symbol, funcid)
                 }
             };
@@ -403,7 +407,10 @@ impl<'a> ModuleDecls<'a> {
 
             functions.push(FunctionMetadata {
                 signature: decl.signature_index,
-                sym: Some(name.symbol().as_bytes()), // TODO: what about functions without names? currently internal functions are named like `guest_func_N`.
+                // TODO: this is a best-effort attempt to figure out a useful name.
+                // in the future, we should use names from the module names section
+                // and maybe use export names as a fallback.
+                name: Some(name.symbol()),
             });
         }
 

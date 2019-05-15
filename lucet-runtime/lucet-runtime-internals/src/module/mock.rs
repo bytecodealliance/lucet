@@ -2,12 +2,12 @@ use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use lucet_module_data::owned::{
-    OwnedFunctionMetadata, OwnedGlobalSpec, OwnedImportFunction, OwnedLinearMemorySpec,
-    OwnedModuleData, OwnedSparseData,
+    OwnedExportFunction, OwnedFunctionMetadata, OwnedGlobalSpec, OwnedImportFunction,
+    OwnedLinearMemorySpec, OwnedModuleData, OwnedSparseData,
 };
 use lucet_module_data::{
-    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, Signature, TrapSite,
-    UniqueSignatureIndex,
+    ExportFunction, FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData,
+    Signature, TrapSite, UniqueSignatureIndex,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
@@ -18,13 +18,13 @@ pub struct MockModuleBuilder {
     sparse_page_data: Vec<Option<Vec<u8>>>,
     globals: BTreeMap<usize, OwnedGlobalSpec>,
     table_elements: BTreeMap<usize, TableElement>,
-    export_funcs: HashMap<Vec<u8>, FunctionPointer>,
+    export_funcs: HashMap<&'static str, FunctionPointer>,
     func_table: HashMap<(u32, u32), FunctionPointer>,
     start_func: Option<FunctionPointer>,
     function_manifest: Vec<FunctionSpec>,
     function_info: Vec<OwnedFunctionMetadata>,
     imports: Vec<OwnedImportFunction>,
-    exports: Vec<FunctionIndex>,
+    exports: Vec<OwnedExportFunction>,
     signatures: Vec<Signature>,
 }
 
@@ -122,15 +122,16 @@ impl MockModuleBuilder {
     }
 
     pub fn with_export_func(mut self, export: MockExportBuilder) -> Self {
-        self.export_funcs
-            .insert(export.sym().to_vec(), export.func());
+        self.export_funcs.insert(export.sym(), export.func());
         let sig_idx = self.record_sig(export.sig());
         self.function_info.push(OwnedFunctionMetadata {
             signature: sig_idx,
-            sym: Some(export.sym().to_vec()),
+            name: Some(export.sym().to_string()),
         });
-        self.exports
-            .push(FunctionIndex::from_u32(self.function_manifest.len() as u32));
+        self.exports.push(OwnedExportFunction {
+            fn_idx: FunctionIndex::from_u32(self.function_manifest.len() as u32),
+            names: vec![export.sym().to_string()],
+        });
         self.function_manifest.push(FunctionSpec::new(
             export.func().as_usize() as u64,
             export.func_len() as u32,
@@ -217,7 +218,7 @@ pub struct MockModule {
     serialized_module_data: Vec<u8>,
     module_data: ModuleData<'static>,
     pub table_elements: Vec<TableElement>,
-    pub export_funcs: HashMap<Vec<u8>, FunctionPointer>,
+    pub export_funcs: HashMap<&'static str, FunctionPointer>,
     pub func_table: HashMap<(u32, u32), FunctionPointer>,
     pub start_func: Option<FunctionPointer>,
     pub function_manifest: Vec<FunctionSpec>,
@@ -253,10 +254,11 @@ impl ModuleInternal for MockModule {
         Ok(&self.table_elements)
     }
 
-    fn get_export_func(&self, sym: &[u8]) -> Result<FunctionHandle, Error> {
-        let ptr = *self.export_funcs.get(sym).ok_or(Error::SymbolNotFound(
-            String::from_utf8_lossy(sym).into_owned(),
-        ))?;
+    fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error> {
+        let ptr = *self
+            .export_funcs
+            .get(sym)
+            .ok_or(Error::SymbolNotFound(sym.to_string()))?;
 
         Ok(self.function_handle_from_ptr(ptr))
     }
@@ -293,7 +295,7 @@ impl ModuleInternal for MockModule {
 }
 
 pub struct MockExportBuilder {
-    sym: &'static [u8],
+    sym: &'static str,
     func: FunctionPointer,
     func_len: Option<usize>,
     traps: Option<&'static [TrapSite]>,
@@ -301,7 +303,7 @@ pub struct MockExportBuilder {
 }
 
 impl MockExportBuilder {
-    pub fn new(name: &'static [u8], func: FunctionPointer) -> MockExportBuilder {
+    pub fn new(name: &'static str, func: FunctionPointer) -> MockExportBuilder {
         MockExportBuilder {
             sym: name,
             func: func,
@@ -329,7 +331,7 @@ impl MockExportBuilder {
         self
     }
 
-    pub fn sym(&self) -> &'static [u8] {
+    pub fn sym(&self) -> &'static str {
         self.sym
     }
     pub fn func(&self) -> FunctionPointer {

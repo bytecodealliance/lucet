@@ -219,7 +219,7 @@ macro_rules! host_tests {
 
             let module = MockModuleBuilder::new()
                 .with_export_func(MockExportBuilder::new(
-                    b"f",
+                    "f",
                     FunctionPointer::from_usize(f as usize),
                 ))
                 .build();
@@ -251,7 +251,7 @@ macro_rules! host_tests {
 
             let module = MockModuleBuilder::new()
                 .with_export_func(MockExportBuilder::new(
-                    b"f",
+                    "f",
                     FunctionPointer::from_usize(f as usize),
                 ))
                 .build();
@@ -283,7 +283,7 @@ macro_rules! host_tests {
 
             let module = MockModuleBuilder::new()
                 .with_export_func(MockExportBuilder::new(
-                    b"f",
+                    "f",
                     FunctionPointer::from_usize(f as usize),
                 ))
                 .build();

@@ -46,7 +46,7 @@ mod module_data {
 
         assert_eq!(mdata.import_functions().len(), 0);
         assert_eq!(mdata.function_info().len(), 1);
-        assert_eq!(mdata.function_info()[0].sym, Some(&b"guest_func_main"[..]));
+        assert_eq!(mdata.export_functions()[0].names, vec!["guest_func_main"]);
     }
 
     #[test]
@@ -60,7 +60,7 @@ mod module_data {
 
         assert_eq!(mdata.import_functions().len(), 0);
         assert_eq!(mdata.function_info().len(), 1);
-        assert_eq!(mdata.function_info()[0].sym, Some(&b"guest_func_main"[..]));
+        assert_eq!(mdata.export_functions()[0].names, vec!["guest_func_main"]);
     }
     #[test]
     fn icall_import() {
@@ -75,14 +75,11 @@ mod module_data {
 
         assert_eq!(mdata.import_functions().len(), 1);
         assert_eq!(mdata.import_functions()[0].module, "env");
-        assert_eq!(
-            mdata.sym_for(mdata.import_functions()[0].fn_idx),
-            Some(&b"icalltarget"[..])
-        );
+        assert_eq!(mdata.import_functions()[0].name, "icalltarget");
         assert_eq!(mdata.function_info().len(), 5);
         assert_eq!(
-            mdata.function_info()[1].sym,
-            Some(&b"guest_func_launchpad"[..])
+            mdata.export_functions()[0].names,
+            vec!["guest_func_launchpad"]
         );
         assert_eq!(mdata.globals_spec().len(), 0);
 

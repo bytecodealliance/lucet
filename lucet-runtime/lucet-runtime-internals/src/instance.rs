@@ -311,7 +311,14 @@ impl Instance {
     /// For the moment, we do not mark this as `unsafe` in the Rust type system, but that may change
     /// in the future.
     pub fn run(&mut self, entrypoint: &[u8], args: &[Val]) -> Result<UntypedRetVal, Error> {
-        let func = self.module.get_export_func(entrypoint)?;
+        let func = self
+            .module
+            .get_export_func(std::str::from_utf8(entrypoint).map_err(|_| {
+                // This could make for ambiguous errors in an unlikely scenario:
+                // if a symbol "foo" exists, but an entrypoint like "f\x00oo" is provided
+                // where "from_utf8_lossy" ends up providing a string for a symbol that exists
+                Error::SymbolNotFound(String::from_utf8_lossy(entrypoint).to_string())
+            })?)?;
         self.run_func(func, &args)
     }
 

@@ -20,24 +20,50 @@ impl FunctionIndex {
     }
 }
 
-/// ImportFunction specifically ties a FunctionIndex to some imported function information together
-/// with a module that function should be found in.
+/// ImportFunction describes an internal function - its internal function index and the name/module
+/// pair that function should be found in.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct ImportFunction<'a> {
     pub fn_idx: FunctionIndex,
-    pub module: &'a str
+    pub module: &'a str,
+    pub name: &'a str
+}
+
+/// ExportFunction describes an exported function - its internal function index and a name that
+/// function has been exported under.
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct ExportFunction<'a> {
+    pub fn_idx: FunctionIndex,
+    #[serde(borrow)]
+    pub names: Vec<&'a str>
+}
+
+pub struct OwnedExportFunction {
+    pub fn_idx: FunctionIndex,
+    pub names: Vec<String>
+}
+
+impl OwnedExportFunction {
+    pub fn to_ref<'a>(&'a self) -> ExportFunction<'a> {
+        ExportFunction {
+            fn_idx: self.fn_idx.clone(),
+            names: self.names.iter().map(|x| x.as_str()).collect()
+        }
+    }
 }
 
 pub struct OwnedImportFunction {
     pub fn_idx: FunctionIndex,
-    pub module: String
+    pub module: String,
+    pub name: String
 }
 
 impl OwnedImportFunction {
     pub fn to_ref<'a>(&'a self) -> ImportFunction<'a> {
         ImportFunction {
             fn_idx: self.fn_idx.clone(),
-            module: self.module.as_str()
+            module: self.module.as_str(),
+            name: self.name.as_str(),
         }
     }
 }
@@ -75,21 +101,26 @@ impl FunctionPointer {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FunctionMetadata<'a> {
     pub signature: UniqueSignatureIndex,
+    /// the "name" field is some human-friendly name, not necessarily the same as used to reach
+    /// this function (through an export, for example), and may not even indicate that a function
+    /// is exported at all.
+    /// TODO: at some point when possible, this field ought to be set from the names section of a
+    /// wasm module. At the moment that information is lost at parse time.
     #[serde(borrow)]
-    pub sym: Option<&'a [u8]>,
+    pub name: Option<&'a str>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OwnedFunctionMetadata {
     pub signature: UniqueSignatureIndex,
-    pub sym: Option<Vec<u8>>,
+    pub name: Option<String>,
 }
 
 impl OwnedFunctionMetadata {
-    pub fn to_ref<'a>(&'a self) -> FunctionMetadata<'a> {
+    pub fn to_ref(&self) -> FunctionMetadata {
         FunctionMetadata {
             signature: self.signature.clone(),
-            sym: self.sym.as_ref().map(|s| s.as_slice()).clone(),
+            name: self.name.as_ref().map(|n| n.as_str()),
         }
     }
 }
