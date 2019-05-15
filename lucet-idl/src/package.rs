@@ -219,7 +219,8 @@ mod test {
                             variant: DataTypeVariant::Alias(AliasDataType {
                                 to: DataTypeRef::Atom(AtomType::U8)
                             }),
-                            attrs: Vec::new()
+                            attrs: Vec::new(),
+                            repr_size: 1,
                         }
                     )]
                     .into_iter()

@@ -58,6 +58,8 @@ pub struct StructMember {
     pub type_: DataTypeRef,
     pub name: String,
     pub attrs: Vec<Attr>,
+    pub repr_size: usize,
+    pub offset: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -92,6 +94,7 @@ pub enum DataTypeVariant {
 pub struct DataType {
     pub variant: DataTypeVariant,
     pub attrs: Vec<Attr>,
+    pub repr_size: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

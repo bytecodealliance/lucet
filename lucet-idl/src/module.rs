@@ -3,10 +3,10 @@ mod builder;
 use crate::error::ValidationError;
 use crate::parser::{SyntaxDecl, SyntaxRef};
 use crate::types::{
-    AliasDataType, Attr, DataType, DataTypeRef, DataTypeVariant, EnumDataType, EnumMember, FuncArg,
-    FuncDecl, FuncRet, Ident, Location, Name, Named, StructDataType, StructMember,
+    Attr, DataType, DataTypeRef, EnumMember, FuncArg, FuncDecl, FuncRet, Ident, Location, Name,
+    Named,
 };
-use builder::DataTypeModuleBuilder;
+use builder::{AliasIR, DataTypeModuleBuilder, EnumIR, StructIR, StructMemberIR, VariantIR};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -111,7 +111,7 @@ impl Module {
                     // defined types:
                     let type_ = self.get_ref(&mem.type_)?;
                     // build the struct with this as the member:
-                    dtype_members.push(StructMember {
+                    dtype_members.push(StructMemberIR {
                         type_,
                         name: mem.name.clone(),
                         attrs: mem.attrs.clone(),
@@ -120,7 +120,7 @@ impl Module {
 
                 data_types_ir.define(
                     id,
-                    DataTypeVariant::Struct(StructDataType {
+                    VariantIR::Struct(StructIR {
                         members: dtype_members,
                     }),
                     attrs.clone(),
@@ -158,7 +158,7 @@ impl Module {
                 }
                 data_types_ir.define(
                     id,
-                    DataTypeVariant::Enum(EnumDataType {
+                    VariantIR::Enum(EnumIR {
                         members: dtype_members,
                     }),
                     attrs.clone(),
@@ -174,7 +174,7 @@ impl Module {
                 let to = self.get_ref(what)?;
                 data_types_ir.define(
                     id,
-                    DataTypeVariant::Alias(AliasDataType { to }),
+                    VariantIR::Alias(AliasIR { to }),
                     attrs.clone(),
                     location.clone(),
                 );
@@ -314,7 +314,7 @@ impl Module {
 mod tests {
     use super::*;
     use crate::parser::Parser;
-    use crate::types::AtomType;
+    use crate::types::{AliasDataType, AtomType, DataTypeVariant, StructDataType, StructMember};
 
     fn mod_(syntax: &str) -> Result<Module, ValidationError> {
         let mut parser = Parser::new(syntax);
@@ -332,20 +332,31 @@ mod tests {
     fn struct_two_atoms() {
         {
             let d = mod_("struct foo { a: i32, b: f32 }").unwrap();
-            let members = match &d.data_types[&Ident(0)].variant {
-                DataTypeVariant::Struct(s) => &s.members,
-                _ => panic!("Unexpected type"),
-            };
-            assert_eq!(members[0].name, "a");
-            assert_eq!(members[1].name, "b");
-            match &members[0].type_ {
-                DataTypeRef::Atom(AtomType::I32) => (),
-                _ => panic!("Unexpected type"),
-            };
-            match &members[1].type_ {
-                DataTypeRef::Atom(AtomType::F32) => (),
-                _ => panic!("Unexpected type"),
-            };
+            assert_eq!(
+                d.data_types[&Ident(0)],
+                DataType {
+                    variant: DataTypeVariant::Struct(StructDataType {
+                        members: vec![
+                            StructMember {
+                                name: "a".to_owned(),
+                                type_: DataTypeRef::Atom(AtomType::I32),
+                                attrs: Vec::new(),
+                                repr_size: 4,
+                                offset: 0,
+                            },
+                            StructMember {
+                                name: "b".to_owned(),
+                                type_: DataTypeRef::Atom(AtomType::F32),
+                                attrs: Vec::new(),
+                                repr_size: 4,
+                                offset: 4,
+                            },
+                        ]
+                    }),
+                    attrs: Vec::new(),
+                    repr_size: 8,
+                }
+            );
         }
     }
 
@@ -625,6 +636,7 @@ mod tests {
                             to: DataTypeRef::Atom(AtomType::U8),
                         }),
                         attrs: Vec::new(),
+                        repr_size: 1,
                     }
                 )]
                 .into_iter()
