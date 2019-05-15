@@ -96,7 +96,7 @@ macro_rules! stack_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            inst.run(b"localpalooza", &[recursion_depth.into()])
+            inst.run("localpalooza", &[recursion_depth.into()])
         }
 
         fn expect_ok(module: Arc<DlModule>, recursion_depth: i32) {

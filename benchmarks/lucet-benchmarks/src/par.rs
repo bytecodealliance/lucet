@@ -89,7 +89,7 @@ fn par_run<R: RegionCreate + 'static>(
             .unwrap()
             .install(|| {
                 handles.par_iter_mut().for_each(|handle| {
-                    handle.run(b"f", &[]).unwrap();
+                    handle.run("f", &[]).unwrap();
                 })
             })
     }

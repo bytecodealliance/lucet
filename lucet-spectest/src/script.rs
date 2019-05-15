@@ -159,7 +159,7 @@ impl ScriptEnv {
         args: Vec<Val>,
     ) -> Result<UntypedRetVal, ScriptError> {
         let (_, ref mut inst) = self.instance_named_mut(name)?;
-        inst.run(field.as_bytes(), &args)
+        inst.run(field, &args)
             .map_err(|e| ScriptError::RuntimeError(e))
     }
 

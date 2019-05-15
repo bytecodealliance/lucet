@@ -165,9 +165,15 @@ pub unsafe extern "C" fn lucet_instance_run(
             .map(|v| v.into())
             .collect()
     };
+    let entrypoint = match CStr::from_ptr(entrypoint).to_str() {
+        Ok(entrypoint_str) => entrypoint_str,
+        Err(_) => {
+            return lucet_error::SymbolNotFound;
+        }
+    };
+
     with_instance_ptr!(inst, {
-        let entrypoint = CStr::from_ptr(entrypoint);
-        inst.run(entrypoint.to_bytes(), args.as_slice())
+        inst.run(entrypoint, args.as_slice())
             .map(|_| lucet_error::Ok)
             .unwrap_or_else(|e| {
                 eprintln!("{}", e);

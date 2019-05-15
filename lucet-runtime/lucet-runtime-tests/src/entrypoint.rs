@@ -210,7 +210,7 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"add_2", &[123u64.into(), 456u64.into()])
+                .run("add_2", &[123u64.into(), 456u64.into()])
                 .expect("instance runs");
 
             assert_eq!(u64::from(retval), 123u64 + 456);
@@ -240,7 +240,7 @@ macro_rules! entrypoint_tests {
             // order is correct.
             let retval = inst
                 .run(
-                    b"add_10",
+                    "add_10",
                     &[
                         1u64.into(),
                         2u64.into(),
@@ -276,7 +276,7 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"mul_2", &[123u64.into(), 456u64.into()])
+                .run("mul_2", &[123u64.into(), 456u64.into()])
                 .expect("instance runs");
 
             assert_eq!(u64::from(retval), 123 * 456);
@@ -294,13 +294,13 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"add_2", &[111u64.into(), 222u64.into()])
+                .run("add_2", &[111u64.into(), 222u64.into()])
                 .expect("instance runs");
 
             assert_eq!(u64::from(retval), 111 + 222);
 
             let retval = inst
-                .run(b"mul_2", &[333u64.into(), 444u64.into()])
+                .run("mul_2", &[333u64.into(), 444u64.into()])
                 .expect("instance runs");
 
             assert_eq!(u64::from(retval), 333 * 444);
@@ -322,7 +322,7 @@ macro_rules! entrypoint_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"invalid", &[123u64.into(), 456u64.into()]) {
+            match inst.run("invalid", &[123u64.into(), 456u64.into()]) {
                 Err(Error::SymbolNotFound(sym)) => assert_eq!(sym, "invalid"),
                 res => panic!("unexpected result: {:?}", res),
             }
@@ -344,7 +344,7 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"add_f32_2", &[(-6.9f32).into(), 4.2f32.into()])
+                .run("add_f32_2", &[(-6.9f32).into(), 4.2f32.into()])
                 .expect("instance runs");
 
             assert_eq!(f32::from(retval), -6.9 + 4.2);
@@ -365,7 +365,7 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"add_f64_2", &[(-6.9f64).into(), 4.2f64.into()])
+                .run("add_f64_2", &[(-6.9f64).into(), 4.2f64.into()])
                 .expect("instance runs");
 
             assert_eq!(f64::from(retval), -6.9 + 4.2);
@@ -387,7 +387,7 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run(
-                    b"add_f32_10",
+                    "add_f32_10",
                     &[
                         0.1f32.into(),
                         0.2f32.into(),
@@ -425,7 +425,7 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run(
-                    b"add_f64_10",
+                    "add_f64_10",
                     &[
                         0.1f64.into(),
                         0.2f64.into(),
@@ -460,7 +460,7 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run(
-                    b"add_mixed_20",
+                    "add_mixed_20",
                     &[
                         (-1.1f64).into(),
                         1u8.into(),
@@ -527,7 +527,7 @@ macro_rules! entrypoint_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"add_2", &[123.0f64.into(), 456.0f64.into()]) {
+            match inst.run("add_2", &[123.0f64.into(), 456.0f64.into()]) {
                 Err(Error::InvalidArgument(err)) => {
                     assert_eq!(err, "entrypoint function signature mismatch")
                 }
@@ -551,7 +551,7 @@ macro_rules! entrypoint_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"add_2", &[123u64.into()]) {
+            match inst.run("add_2", &[123u64.into()]) {
                 Err(Error::InvalidArgument(err)) => assert_eq!(
                     err,
                     "entrypoint function signature mismatch (number of arguments is incorrect)"
@@ -576,7 +576,7 @@ macro_rules! entrypoint_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"add_2", &[123u64.into(), 456u64.into(), 789u64.into()]) {
+            match inst.run("add_2", &[123u64.into(), 456u64.into(), 789u64.into()]) {
                 Err(Error::InvalidArgument(err)) => assert_eq!(
                     err,
                     "entrypoint function signature mismatch (number of arguments is incorrect)"
@@ -611,7 +611,7 @@ macro_rules! entrypoint_tests {
             // This function will call `malloc` for the given size, then `memset` the entire region to the
             // init_as argument. The pointer to the allocated region gets stored in loc_outval.
             inst.run(
-                b"create_and_memset",
+                "create_and_memset",
                 &[
                     // int init_as
                     TEST_REGION_INIT_VAL.into(),
@@ -662,7 +662,7 @@ macro_rules! entrypoint_tests {
 
             // Create a region and initialize it, just like above
             inst.run(
-                b"create_and_memset",
+                "create_and_memset",
                 &[
                     // int init_as
                     TEST_REGION_INIT_VAL.into(),
@@ -692,7 +692,7 @@ macro_rules! entrypoint_tests {
             }
 
             // Then increment the first location in the region
-            inst.run(b"increment_ptr", &[Val::GuestPtr(loc_region_1)])
+            inst.run("increment_ptr", &[Val::GuestPtr(loc_region_1)])
                 .expect("instance runs");
 
             let heap = inst.heap();
@@ -737,7 +737,7 @@ macro_rules! entrypoint_tests {
 
             // same as above
             inst.run(
-                b"create_and_memset",
+                "create_and_memset",
                 &[
                     // int init_as
                     TEST_REGION_INIT_VAL.into(),
@@ -757,7 +757,7 @@ macro_rules! entrypoint_tests {
 
             // Create a second region
             inst.run(
-                b"create_and_memset",
+                "create_and_memset",
                 &[
                     // int init_as
                     TEST_REGION2_INIT_VAL.into(),
@@ -815,7 +815,7 @@ macro_rules! entrypoint_tests {
 
             // Run the setup routine
             inst.run(
-                b"ctype_setup",
+                "ctype_setup",
                 &[
                     std::ptr::null::<c_void>().into(),
                     Val::GuestPtr(loc_ctxstar),
@@ -831,7 +831,7 @@ macro_rules! entrypoint_tests {
             assert!(ctxstar > 0);
 
             // Run the body routine
-            inst.run(b"ctype_body", &[Val::GuestPtr(ctxstar)])
+            inst.run("ctype_body", &[Val::GuestPtr(ctxstar)])
                 .expect("instance runs");
         }
 
@@ -864,7 +864,7 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"callback_entrypoint", &[0u64.into()])
+                .run("callback_entrypoint", &[0u64.into()])
                 .expect("instance runs");
             assert_eq!(u64::from(retval), 3);
         }

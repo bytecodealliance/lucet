@@ -6,8 +6,8 @@ use lucet_module_data::owned::{
     OwnedLinearMemorySpec, OwnedModuleData, OwnedSparseData,
 };
 use lucet_module_data::{
-    ExportFunction, FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData,
-    Signature, TrapSite, UniqueSignatureIndex,
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, Signature, TrapSite,
+    UniqueSignatureIndex,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;

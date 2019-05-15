@@ -188,7 +188,7 @@ fn run(config: Config) {
             .build()
             .expect("instance can be created");
 
-        match inst.run(config.entrypoint.as_bytes(), &[]) {
+        match inst.run(config.entrypoint, &[]) {
             // normal termination implies 0 exit code
             Ok(_) => 0,
             Err(lucet_runtime::Error::RuntimeTerminated(

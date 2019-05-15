@@ -201,7 +201,7 @@ fn drop_instance_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) 
 /// switching overhead.
 fn run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
-        inst.run(b"f", &[]).unwrap();
+        inst.run("f", &[]).unwrap();
     }
 
     let module = null_mock();
@@ -222,7 +222,7 @@ fn run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
 /// cost of the Lucet runtime.
 fn run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
-        inst.run(b"f", &[]).unwrap();
+        inst.run("f", &[]).unwrap();
     }
 
     let module = fib_mock();
@@ -240,7 +240,7 @@ fn run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
 /// Run a trivial WASI program.
 fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
-        inst.run(b"_start", &[]).unwrap();
+        inst.run("_start", &[]).unwrap();
     }
 
     let workdir = TempDir::new().expect("create working directory");
@@ -281,7 +281,7 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
 fn run_many_args<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
         inst.run(
-            b"f",
+            "f",
             &[
                 0xAFu8.into(),
                 0xAFu16.into(),
@@ -368,7 +368,7 @@ fn run_many_args<R: RegionCreate + 'static>(c: &mut Criterion) {
 
 fn run_hostcall_wrapped<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
-        inst.run(b"wrapped", &[]).unwrap();
+        inst.run("wrapped", &[]).unwrap();
     }
 
     let module = hostcalls_mock();
@@ -388,7 +388,7 @@ fn run_hostcall_wrapped<R: RegionCreate + 'static>(c: &mut Criterion) {
 
 fn run_hostcall_raw<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
-        inst.run(b"raw", &[]).unwrap();
+        inst.run("raw", &[]).unwrap();
     }
 
     let module = hostcalls_mock();

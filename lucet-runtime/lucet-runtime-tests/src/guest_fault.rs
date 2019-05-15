@@ -194,7 +194,7 @@ macro_rules! guest_fault_tests {
         }
 
         fn run_onetwothree(inst: &mut Instance) {
-            let retval = inst.run(b"onetwothree", &[]).expect("instance runs");
+            let retval = inst.run("onetwothree", &[]).expect("instance runs");
             assert_eq!(libc::c_int::from(retval), 123);
         }
 
@@ -208,7 +208,7 @@ macro_rules! guest_fault_tests {
                     .new_instance(module)
                     .expect("instance can be created");
 
-                match inst.run(b"illegal_instr", &[]) {
+                match inst.run("illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
                         assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
                     }
@@ -232,7 +232,7 @@ macro_rules! guest_fault_tests {
                     .new_instance(module)
                     .expect("instance can be created");
 
-                match inst.run(b"oob", &[]) {
+                match inst.run("oob", &[]) {
                     Err(Error::RuntimeFault(details)) => {
                         assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
                     }
@@ -256,7 +256,7 @@ macro_rules! guest_fault_tests {
                     .new_instance(module)
                     .expect("instance can be created");
 
-                match inst.run(b"hostcall_main", &[]) {
+                match inst.run("hostcall_main", &[]) {
                     Err(Error::RuntimeTerminated(term)) => {
                         assert_eq!(
                             *term
@@ -317,7 +317,7 @@ macro_rules! guest_fault_tests {
                 // returns. This will initially cause a segfault. The signal handler will recover
                 // from the segfault, map the page to read/write, and then return to the child
                 // code. The child code will then succeed, and the instance will exit successfully.
-                inst.run(b"recoverable_fatal", &[]).expect("instance runs");
+                inst.run("recoverable_fatal", &[]).expect("instance runs");
 
                 unsafe { recoverable_ptr_teardown() };
                 drop(lock);
@@ -362,7 +362,7 @@ macro_rules! guest_fault_tests {
                         // returns. This will initially cause a segfault. The signal handler will recover
                         // from the segfault, map the page to read/write, and then return to the child
                         // code. The child code will then succeed, and the instance will exit successfully.
-                        match inst.run(b"recoverable_fatal", &[]) {
+                        match inst.run("recoverable_fatal", &[]) {
                             Err(Error::RuntimeTerminated(_)) => (),
                             res => panic!("unexpected result: {:?}", res),
                         }
@@ -417,7 +417,7 @@ macro_rules! guest_fault_tests {
                 );
                 unsafe { sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds") };
 
-                match inst.run(b"illegal_instr", &[]) {
+                match inst.run("illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
                         assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
                     }
@@ -486,7 +486,7 @@ macro_rules! guest_fault_tests {
                         nix::unistd::alarm::set(1);
 
                         // run guest code that loops forever
-                        inst.run(b"infinite_loop", &[]).expect("instance runs");
+                        inst.run("infinite_loop", &[]).expect("instance runs");
                         // show that we never get here
                         std::process::exit(1);
                     }
@@ -556,7 +556,7 @@ macro_rules! guest_fault_tests {
                         .new_instance(module)
                         .expect("instance can be created");
 
-                    inst.run(b"sleepy_guest", &[]).expect("instance runs");
+                    inst.run("sleepy_guest", &[]).expect("instance runs");
                 });
 
                 // now trigger a segfault in the middle of running the guest
@@ -606,7 +606,7 @@ macro_rules! guest_fault_tests {
                                 .new_instance(module)
                                 .expect("instance can be created");
 
-                            inst.run(b"infinite_loop", &[]).expect("instance runs");
+                            inst.run("infinite_loop", &[]).expect("instance runs");
                             unreachable!()
                         });
 
@@ -646,7 +646,7 @@ macro_rules! guest_fault_tests {
                         // Child code should run code that will make an OOB beyond the guard page. This will
                         // cause the entire process to abort before returning from `run`
                         inst.set_fatal_handler(handler);
-                        inst.run(b"fatal", &[]).expect("instance runs");
+                        inst.run("fatal", &[]).expect("instance runs");
                         // Show that we never get here:
                         std::process::exit(1);
                     }
@@ -681,7 +681,7 @@ macro_rules! guest_fault_tests {
                         // Child code should run code that will make an OOB beyond the guard page. This will
                         // cause the entire process to abort before returning from `run`
                         inst.set_fatal_handler(fatal_handler_exit);
-                        inst.run(b"fatal", &[]).expect("instance runs");
+                        inst.run("fatal", &[]).expect("instance runs");
                         // Show that we never get here:
                         std::process::exit(1);
                     }

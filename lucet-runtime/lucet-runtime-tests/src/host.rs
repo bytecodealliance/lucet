@@ -119,7 +119,7 @@ macro_rules! host_tests {
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
-            inst.run(b"main", &[0u32.into(), 0i32.into()])
+            inst.run("main", &[0u32.into(), 0i32.into()])
                 .expect("instance runs");
         }
 
@@ -134,7 +134,7 @@ macro_rules! host_tests {
                 .build()
                 .expect("instance can be created");
 
-            inst.run(b"main", &[0u32.into(), 0i32.into()])
+            inst.run("main", &[0u32.into(), 0i32.into()])
                 .expect("instance runs");
 
             assert!(*inst.get_embed_ctx::<bool>().unwrap().unwrap());
@@ -148,7 +148,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"main", &[0u32.into(), 0i32.into()]) {
+            match inst.run("main", &[0u32.into(), 0i32.into()]) {
                 Err(Error::RuntimeTerminated(term)) => {
                     assert_eq!(
                         *term
@@ -172,7 +172,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"main", &[0u32.into(), 0u32.into()]) {
+            match inst.run("main", &[0u32.into(), 0u32.into()]) {
                 Err(Error::RuntimeTerminated(term)) => {
                     assert_eq!(
                         *term
@@ -197,7 +197,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"trigger_div_error", &[0u32.into()]) {
+            match inst.run("trigger_div_error", &[0u32.into()]) {
                 Err(Error::RuntimeFault(details)) => {
                     assert_eq!(details.trapcode, Some(TrapCode::IntegerDivByZero));
                 }
@@ -229,7 +229,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"f", &[]) {
+            match inst.run("f", &[]) {
                 Err(Error::RuntimeTerminated(details)) => {
                     assert_eq!(details, TerminationDetails::BorrowError("heap_mut"));
                 }
@@ -261,7 +261,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"f", &[]) {
+            match inst.run("f", &[]) {
                 Err(Error::RuntimeTerminated(details)) => {
                     assert_eq!(details, TerminationDetails::CtxNotFound);
                 }
@@ -293,7 +293,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            let retval = inst.run(b"f", &[]).expect("instance runs");
+            let retval = inst.run("f", &[]).expect("instance runs");
             assert_eq!(bool::from(retval), true);
         }
     };

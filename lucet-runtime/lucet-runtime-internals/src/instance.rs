@@ -286,11 +286,11 @@ impl Instance {
     /// # use lucet_runtime_internals::instance::InstanceHandle;
     /// # let instance: InstanceHandle = unimplemented!();
     /// // regular execution yields `Ok(UntypedRetVal)`
-    /// let retval = instance.run(b"factorial", &[5u64.into()]).unwrap();
+    /// let retval = instance.run("factorial", &[5u64.into()]).unwrap();
     /// assert_eq!(u64::from(retval), 120u64);
     ///
     /// // runtime faults yield `Err(Error)`
-    /// let result = instance.run(b"faulting_function", &[]);
+    /// let result = instance.run("faulting_function", &[]);
     /// assert!(result.is_err());
     /// ```
     ///
@@ -310,15 +310,8 @@ impl Instance {
     ///
     /// For the moment, we do not mark this as `unsafe` in the Rust type system, but that may change
     /// in the future.
-    pub fn run(&mut self, entrypoint: &[u8], args: &[Val]) -> Result<UntypedRetVal, Error> {
-        let func = self
-            .module
-            .get_export_func(std::str::from_utf8(entrypoint).map_err(|_| {
-                // This could make for ambiguous errors in an unlikely scenario:
-                // if a symbol "foo" exists, but an entrypoint like "f\x00oo" is provided
-                // where "from_utf8_lossy" ends up providing a string for a symbol that exists
-                Error::SymbolNotFound(String::from_utf8_lossy(entrypoint).to_string())
-            })?)?;
+    pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<UntypedRetVal, Error> {
+        let func = self.module.get_export_func(entrypoint)?;
         self.run_func(func, &args)
     }
 

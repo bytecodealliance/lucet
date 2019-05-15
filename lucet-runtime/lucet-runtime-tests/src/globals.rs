@@ -18,7 +18,7 @@ macro_rules! globals_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            inst.run(b"main", &[]).expect("instance runs");
+            inst.run("main", &[]).expect("instance runs");
 
             // Now the globals should be:
             // $x = 3
@@ -32,7 +32,7 @@ macro_rules! globals_tests {
             let heap_u32 = unsafe { inst.heap_u32() };
             assert_eq!(heap_u32[0..=2], [4, 5, 6]);
 
-            inst.run(b"main", &[]).expect("instance runs");
+            inst.run("main", &[]).expect("instance runs");
 
             // now heap should be:
             // [0] = 3
@@ -121,7 +121,7 @@ macro_rules! globals_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            let retval = inst.run(b"get_global0", &[]).expect("instance runs");
+            let retval = inst.run("get_global0", &[]).expect("instance runs");
             assert_eq!(i64::from(retval), -1);
         }
 
@@ -133,10 +133,10 @@ macro_rules! globals_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            let retval = inst.run(b"get_global0", &[]).expect("instance runs");
+            let retval = inst.run("get_global0", &[]).expect("instance runs");
             assert_eq!(i64::from(retval), -1);
 
-            let retval = inst.run(b"get_global1", &[]).expect("instance runs");
+            let retval = inst.run("get_global1", &[]).expect("instance runs");
             assert_eq!(i64::from(retval), 420);
         }
 
@@ -148,10 +148,10 @@ macro_rules! globals_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            inst.run(b"set_global0", &[666i64.into()])
+            inst.run("set_global0", &[666i64.into()])
                 .expect("instance runs");
 
-            let retval = inst.run(b"get_global0", &[]).expect("instance runs");
+            let retval = inst.run("get_global0", &[]).expect("instance runs");
             assert_eq!(i64::from(retval), 666);
         }
     };
