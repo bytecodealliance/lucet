@@ -6,13 +6,11 @@ use proptest::test_runner::TestRunner;
 
 fn main() {
     let mut runner = TestRunner::default();
-    let dts = prop::collection::vec(DatatypeSyntax::strat(), 0..20)
-        .new_tree(&mut runner)
-        .unwrap()
-        .current();
-    let spec = Spec::from_decls(dts);
+    let spec = Spec::strat(10).new_tree(&mut runner).unwrap().current();
     let rendered = spec.render_idl();
     println!("{}", rendered);
 
-    let _pkg = parse_package(&rendered).expect("parse generated package");
+    let pkg = parse_package(&rendered).expect("parse generated package");
+
+    let _wasm = lucet_idl_test::compile::rust_wasm_codegen(&pkg);
 }

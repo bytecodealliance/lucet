@@ -1,9 +1,10 @@
 use lucet_idl::{codegen, Backend, Config, Package, Target};
 use std::fs::File;
+use std::io::Read;
 use std::process::Command;
 use tempfile::TempDir;
 
-pub fn rust_codegen(package: &Package) {
+pub fn rust_test(package: &Package) {
     let config = Config {
         backend: Backend::Rust,
         target: Target::Generic,
@@ -21,6 +22,7 @@ pub fn rust_codegen(package: &Package) {
     .expect("lucet_idl codegen");
 
     let cmd_rustc = Command::new("rustc")
+        .arg("+stable")
         .arg(gen_file.clone())
         .arg("--test")
         .arg("--allow=dead_code")
@@ -28,7 +30,6 @@ pub fn rust_codegen(package: &Package) {
         .arg(tempdir.path().join("example"))
         .status()
         .expect("run rustc");
-    assert!(cmd_rustc.success(), "failure to compile generated code");
 
     if !cmd_rustc.success() {
         Command::new("cat")
@@ -37,6 +38,48 @@ pub fn rust_codegen(package: &Package) {
             .expect("debug output");
     }
     assert!(cmd_rustc.success(), "failure to compile generated code");
+}
+
+pub fn rust_wasm_codegen(package: &Package) -> Vec<u8> {
+    let config = Config {
+        backend: Backend::Rust,
+        target: Target::Generic,
+    };
+
+    let tempdir = TempDir::new().expect("create tempdir");
+
+    let gen_file = tempdir.path().join("lib.rs");
+    let wasm_file = tempdir.path().join("example.wasm");
+
+    codegen(
+        package,
+        &config,
+        Box::new(File::create(gen_file.clone()).expect("create file")),
+    )
+    .expect("lucet_idl codegen");
+
+    let cmd_rustc = Command::new("rustc")
+        .arg("+nightly")
+        .arg(gen_file.clone())
+        .arg("--target=wasm32-unknown-wasi")
+        .arg("-o")
+        .arg(wasm_file.clone())
+        .status()
+        .expect("run rustc");
+
+    if !cmd_rustc.success() {
+        Command::new("cat")
+            .arg(gen_file.clone())
+            .status()
+            .expect("debug output");
+    }
+
+    assert!(cmd_rustc.success(), "failure to compile generated code");
+
+    let mut wasm = File::open(wasm_file).expect("open wasm file");
+    let mut buf = Vec::new();
+    wasm.read_to_end(&mut buf).expect("read wasm file");
+    buf
 }
 
 pub fn c_codegen(package: &Package) {

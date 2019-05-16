@@ -199,27 +199,84 @@ impl DatatypeSyntax {
 }
 
 #[derive(Debug, Clone)]
+pub struct FunctionSyntax {
+    args: Vec<DatatypeRef>,
+    ret: Option<DatatypeRef>,
+}
+
+impl FunctionSyntax {
+    pub fn strat(max_args: usize) -> impl Strategy<Value = Self> {
+        (
+            prop::collection::vec(DatatypeRef::strat(), 0..max_args),
+            prop::option::of(DatatypeRef::strat()),
+        )
+            .prop_map(|(args, ret)| FunctionSyntax { args, ret })
+    }
+
+    pub fn normalize(&self, highest_definition: usize) -> Self {
+        let args = self
+            .args
+            .iter()
+            .map(|a| a.normalize(highest_definition))
+            .collect();
+        let ret = self.ret.clone().map(|a| a.normalize(highest_definition));
+        Self { args, ret }
+    }
+
+    pub fn render_idl(&self, name: usize) -> String {
+        let mut args = String::new();
+        for (ix, a) in self.args.iter().enumerate() {
+            args += &format!("a_{}: {}, ", ix, a.render_idl());
+        }
+        let mut ret = String::new();
+        if let Some(ref r) = self.ret {
+            ret += &format!("-> {}", r.render_idl());
+        }
+        format!("fn f_{}({}){};", name, args, ret)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Spec {
-    pub decls: Vec<DatatypeSyntax>,
+    pub datatype_decls: Vec<DatatypeSyntax>,
+    pub function_decls: Vec<FunctionSyntax>,
 }
 
 impl Spec {
     pub fn strat(max_size: usize) -> impl Strategy<Value = Self> {
-        prop::collection::vec(DatatypeSyntax::strat(), 1..max_size).prop_map(Self::from_decls)
+        (
+            prop::collection::vec(DatatypeSyntax::strat(), 1..max_size),
+            prop::collection::vec(FunctionSyntax::strat(max_size), 1..max_size),
+        )
+            .prop_map(|(ds, fs)| Self::from_decls(ds, fs))
     }
 
-    pub fn from_decls(decls: Vec<DatatypeSyntax>) -> Self {
-        let decls = decls
+    pub fn from_decls(
+        datatype_decls: Vec<DatatypeSyntax>,
+        function_decls: Vec<FunctionSyntax>,
+    ) -> Self {
+        let datatype_decls: Vec<DatatypeSyntax> = datatype_decls
             .iter()
             .enumerate()
             .map(|(ix, decl)| decl.normalize(ix))
             .collect();
-        Spec { decls }
+        let num_datatypes = datatype_decls.len();
+        let function_decls = function_decls
+            .iter()
+            .map(|decl| decl.normalize(num_datatypes))
+            .collect();
+        Spec {
+            datatype_decls,
+            function_decls,
+        }
     }
 
     pub fn render_idl(&self) -> String {
         let mut s = String::new();
-        for (ix, d) in self.decls.iter().enumerate() {
+        for (ix, d) in self.datatype_decls.iter().enumerate() {
+            s += &format!("    {}\n", d.render_idl(ix));
+        }
+        for (ix, d) in self.function_decls.iter().enumerate() {
             s += &format!("    {}\n", d.render_idl(ix));
         }
         format!("mod spec {{\n{}\n}}", s)
