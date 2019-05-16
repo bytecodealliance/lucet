@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
 #include <stdio.h>
@@ -84,6 +85,7 @@ int main(void)
 
     res = mkdir("/sandbox/test", 0755);
     assert(res == -1);
+    assert(errno == EEXIST);
 
     res = rmdir("/sandbox/test");
     assert(res == 0);
