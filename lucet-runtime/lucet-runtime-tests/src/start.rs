@@ -15,7 +15,7 @@ macro_rules! start_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            inst.run(b"main", &[]).expect("instance runs");
+            inst.run("main", &[]).expect("instance runs");
 
             // Now the globals should be:
             // $flossie = 17
@@ -35,7 +35,7 @@ macro_rules! start_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            inst.run(b"main", &[]).expect("instance runs");
+            inst.run("main", &[]).expect("instance runs");
 
             // Now the globals should be:
             // $flossie = 17
@@ -55,7 +55,7 @@ macro_rules! start_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            inst.run(b"main", &[]).expect("instance runs");
+            inst.run("main", &[]).expect("instance runs");
 
             // Now the globals should be:
             // $flossie = 17

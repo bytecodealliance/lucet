@@ -53,7 +53,7 @@
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
 //! let mut inst = region.new_instance(module).unwrap();
 //!
-//! let retval = inst.run(b"factorial", &[5u64.into()]).unwrap();
+//! let retval = inst.run("factorial", &[5u64.into()]).unwrap();
 //! assert_eq!(u64::from(retval), 120u64);
 //! ```
 //!
@@ -95,7 +95,7 @@
 //!     .build()
 //!     .unwrap();
 //!
-//! inst.run(b"call_foo", &[]).unwrap();
+//! inst.run("call_foo", &[]).unwrap();
 //!
 //! let context_after = inst.get_embed_ctx::<MyContext>().unwrap().unwrap();
 //! assert_eq!(context_after.x, 42);
@@ -124,7 +124,7 @@
 //!     .build()
 //!     .unwrap();
 //!
-//! inst.run(b"main", &[]).unwrap();
+//! inst.run("main", &[]).unwrap();
 //!
 //! // clean up embedder context
 //! drop(inst);
@@ -171,7 +171,7 @@
 //! // install the handler
 //! inst.set_signal_handler(signal_handler_count);
 //!
-//! match inst.run(b"raise_a_signal", &[]) {
+//! match inst.run("raise_a_signal", &[]) {
 //!     Err(Error::RuntimeFault(_)) => {
 //!         println!("I've now handled {} signals!", SIGNAL_COUNT.load(Ordering::SeqCst));
 //!     }

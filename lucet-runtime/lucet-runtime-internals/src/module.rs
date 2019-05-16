@@ -5,8 +5,8 @@ mod sparse_page_data;
 pub use crate::module::dl::DlModule;
 pub use crate::module::mock::{MockExportBuilder, MockModuleBuilder};
 pub use lucet_module_data::{
-    FunctionHandle, FunctionPointer, FunctionSpec, Global, GlobalSpec, HeapSpec, Signature,
-    TrapCode, TrapManifest, ValueType,
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Global, GlobalSpec, HeapSpec,
+    Signature, TrapCode, TrapManifest, ValueType,
 };
 
 use crate::alloc::Limits;
@@ -56,7 +56,7 @@ pub trait ModuleInternal: Send + Sync {
     /// Get the table elements from the module.
     fn table_elements(&self) -> Result<&[TableElement], Error>;
 
-    fn get_export_func(&self, sym: &[u8]) -> Result<FunctionHandle, Error>;
+    fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error>;
 
     fn get_func_from_idx(&self, table_id: u32, func_id: u32) -> Result<FunctionHandle, Error>;
 
@@ -66,7 +66,7 @@ pub trait ModuleInternal: Send + Sync {
 
     fn addr_details(&self, addr: *const c_void) -> Result<Option<AddrDetails>, Error>;
 
-    fn get_signature(&self, fn_id: u32) -> &Signature;
+    fn get_signature(&self, fn_id: FunctionIndex) -> &Signature;
 
     fn function_handle_from_ptr(&self, ptr: FunctionPointer) -> FunctionHandle {
         let id = self
@@ -74,7 +74,7 @@ pub trait ModuleInternal: Send + Sync {
             .iter()
             .enumerate()
             .find(|(_, fn_spec)| fn_spec.ptr() == ptr)
-            .map(|(fn_id, _)| fn_id as u32)
+            .map(|(fn_id, _)| FunctionIndex::from_u32(fn_id as u32))
             .expect("valid function pointer");
 
         FunctionHandle { ptr, id }

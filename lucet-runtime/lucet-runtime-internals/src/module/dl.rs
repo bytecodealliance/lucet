@@ -2,7 +2,9 @@ use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use libloading::{Library, Symbol};
-use lucet_module_data::{FunctionHandle, FunctionPointer, FunctionSpec, ModuleData, Signature};
+use lucet_module_data::{
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, Signature,
+};
 use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
@@ -165,15 +167,12 @@ impl ModuleInternal for DlModule {
         Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize) })
     }
 
-    fn get_export_func(&self, sym: &[u8]) -> Result<FunctionHandle, Error> {
-        let mut guest_sym: Vec<u8> = b"guest_func_".to_vec();
-        guest_sym.extend_from_slice(sym);
-
+    fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error> {
         self.module_data
-            .function_id_by_name(&guest_sym)
-            .ok_or_else(|| Error::SymbolNotFound(String::from_utf8_lossy(sym).into_owned()))
+            .get_export_func_id(sym)
+            .ok_or_else(|| Error::SymbolNotFound(sym.to_string()))
             .map(|id| {
-                let ptr = self.function_manifest()[id as usize].ptr();
+                let ptr = self.function_manifest()[id.as_u32() as usize].ptr();
                 FunctionHandle { ptr, id }
             })
     }
@@ -233,7 +232,7 @@ impl ModuleInternal for DlModule {
         }
     }
 
-    fn get_signature(&self, fn_id: u32) -> &Signature {
+    fn get_signature(&self, fn_id: FunctionIndex) -> &Signature {
         self.module_data.get_signature(fn_id)
     }
 }

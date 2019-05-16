@@ -15,8 +15,9 @@ use cranelift_wasm::{
 };
 use failure::{format_err, Error, ResultExt};
 use lucet_module_data::{
-    owned::OwnedLinearMemorySpec, FunctionMetadata, Global as GlobalVariant, GlobalDef, GlobalSpec,
-    HeapSpec, ModuleData, Signature as LucetSignature, UniqueSignatureIndex,
+    owned::OwnedLinearMemorySpec, ExportFunction, FunctionIndex as LucetFunctionIndex,
+    FunctionMetadata, Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec, ImportFunction,
+    ModuleData, Signature as LucetSignature, UniqueSignatureIndex,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -61,6 +62,8 @@ pub struct ModuleDecls<'a> {
     info: ModuleInfo<'a>,
     runtime: Runtime,
     function_names: PrimaryMap<FuncIndex, Name>,
+    imports: Vec<ImportFunction<'a>>,
+    exports: Vec<ExportFunction<'a>>,
     table_names: PrimaryMap<TableIndex, (Name, Name)>,
     runtime_names: HashMap<RuntimeFunc, Name>,
     globals_spec: Vec<GlobalSpec<'a>>,
@@ -75,7 +78,7 @@ impl<'a> ModuleDecls<'a> {
         runtime: Runtime,
         heap_settings: HeapSettings,
     ) -> Result<Self, LucetcError> {
-        let function_names = Self::declare_funcs(&info, clif_module, bindings)?;
+        let (function_names, imports, exports) = Self::declare_funcs(&info, clif_module, bindings)?;
         let table_names = Self::declare_tables(&info, clif_module)?;
         let runtime_names = Self::declare_runtime(&runtime, clif_module)?;
         let globals_spec = Self::declare_globals_spec(&info)?;
@@ -83,6 +86,8 @@ impl<'a> ModuleDecls<'a> {
         Ok(Self {
             info,
             function_names,
+            imports,
+            exports,
             table_names,
             runtime_names,
             runtime,
@@ -97,40 +102,64 @@ impl<'a> ModuleDecls<'a> {
         info: &ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
         bindings: &Bindings,
-    ) -> Result<PrimaryMap<FuncIndex, Name>, LucetcError> {
+    ) -> Result<
+        (
+            PrimaryMap<FuncIndex, Name>,
+            Vec<ImportFunction<'a>>,
+            Vec<ExportFunction<'a>>,
+        ),
+        LucetcError,
+    > {
         let mut function_names = PrimaryMap::new();
+        let mut exports: Vec<ExportFunction<'a>> = Vec::new();
+        let mut imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
+
         for ix in 0..info.functions.len() {
             let func_index = FuncIndex::new(ix);
             let exportable_sigix = info.functions.get(func_index).unwrap();
             let inner_sig_index = info.signature_mapping.get(exportable_sigix.entity).unwrap();
             let signature = info.signatures.get(*inner_sig_index).unwrap();
-            let name = if let Some((import_mod, import_field)) = info.imported_funcs.get(func_index)
-            {
-                let import_symbol = bindings
-                    .translate(import_mod, import_field)
-                    .context(LucetcErrorKind::TranslatingModule)?;
-                let funcid = clif_module
-                    .declare_function(&import_symbol, Linkage::Import, signature)
-                    .context(LucetcErrorKind::TranslatingModule)?;
-                Name::new_func(import_symbol, funcid)
+
+            let exported_name = if !exportable_sigix.export_names.is_empty() {
+                exports.push(ExportFunction {
+                    fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
+                    names: exportable_sigix.export_names.clone(),
+                });
+
+                Some((
+                    format!("guest_func_{}", exportable_sigix.export_names[0]),
+                    Linkage::Export,
+                ))
             } else {
-                if exportable_sigix.export_names.is_empty() {
-                    let def_symbol = format!("guest_func_{}", ix);
-                    let funcid = clif_module
-                        .declare_function(&def_symbol, Linkage::Local, signature)
-                        .context(LucetcErrorKind::TranslatingModule)?;
-                    Name::new_func(def_symbol, funcid)
-                } else {
-                    let export_symbol = format!("guest_func_{}", exportable_sigix.export_names[0]);
-                    let funcid = clif_module
-                        .declare_function(&export_symbol, Linkage::Export, signature)
-                        .context(LucetcErrorKind::TranslatingModule)?;
-                    Name::new_func(export_symbol, funcid)
-                }
+                None
             };
-            function_names.push(name);
+
+            let imported_name =
+                if let Some((import_mod, import_field)) = info.imported_funcs.get(func_index) {
+                    imports.push(ImportFunction {
+                        fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
+                        module: import_mod,
+                        name: import_field,
+                    });
+                    let import_symbol = bindings
+                        .translate(import_mod, import_field)
+                        .context(LucetcErrorKind::TranslatingModule)?;
+                    Some((import_symbol, Linkage::Import))
+                } else {
+                    None
+                };
+
+            let (decl_sym, decl_linkage) = imported_name
+                .or(exported_name)
+                .unwrap_or_else(|| (format!("guest_func_{}", ix), Linkage::Local));
+
+            let funcid = clif_module
+                .declare_function(&decl_sym, decl_linkage, signature)
+                .context(LucetcErrorKind::TranslatingModule)?;
+
+            function_names.push(Name::new_func(decl_sym, funcid));
         }
-        Ok(function_names)
+        Ok((function_names, imports, exports))
     }
 
     fn declare_tables<B: ClifBackend>(
@@ -383,7 +412,10 @@ impl<'a> ModuleDecls<'a> {
 
             functions.push(FunctionMetadata {
                 signature: decl.signature_index,
-                sym: Some(name.symbol().as_bytes()), // TODO: what about functions without names? currently internal functions are named like `guest_func_N`.
+                // TODO: this is a best-effort attempt to figure out a useful name.
+                // in the future, we should use names from the module names section
+                // and maybe use export names as a fallback.
+                name: Some(name.symbol()),
             });
         }
 
@@ -402,6 +434,8 @@ impl<'a> ModuleDecls<'a> {
             linear_memory,
             self.globals_spec.clone(),
             functions,
+            self.imports.clone(),
+            self.exports.clone(),
             signatures,
         ))
     }

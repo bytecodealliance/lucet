@@ -41,16 +41,12 @@ mod module_data {
         let b = super::test_bindings();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling fibonacci");
-        assert_eq!(c.module_data().unwrap().globals_spec().len(), 0);
+        let mdata = c.module_data().unwrap();
+        assert_eq!(mdata.globals_spec().len(), 0);
 
-        /* TODO can't express these with module data
-        assert_eq!(p.import_functions().len(), 0);
-        assert_eq!(p.defined_functions().len(), 1);
-        assert_eq!(
-            p.defined_functions().get(0).unwrap().symbol(),
-            "guest_func_main"
-        );
-        */
+        assert_eq!(mdata.import_functions().len(), 0);
+        assert_eq!(mdata.function_info().len(), 1);
+        assert_eq!(mdata.export_functions()[0].names, vec!["main"]);
     }
 
     #[test]
@@ -59,16 +55,12 @@ mod module_data {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling arith");
-        assert_eq!(c.module_data().unwrap().globals_spec().len(), 0);
+        let mdata = c.module_data().unwrap();
+        assert_eq!(mdata.globals_spec().len(), 0);
 
-        /* TODO can't express these with module data
-        assert_eq!(p.import_functions().len(), 0);
-        assert_eq!(p.defined_functions().len(), 1);
-        assert_eq!(
-            p.defined_functions().get(0).unwrap().symbol(),
-            "guest_func_main"
-        );
-        */
+        assert_eq!(mdata.import_functions().len(), 0);
+        assert_eq!(mdata.function_info().len(), 1);
+        assert_eq!(mdata.export_functions()[0].names, vec!["main"]);
     }
     #[test]
     fn icall_import() {
@@ -79,18 +71,16 @@ mod module_data {
         .unwrap();
         let h = HeapSettings::default();
         let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile icall");
-        let _module_data = c.module_data().unwrap();
+        let mdata = c.module_data().unwrap();
+
+        assert_eq!(mdata.import_functions().len(), 1);
+        assert_eq!(mdata.import_functions()[0].module, "env");
+        assert_eq!(mdata.import_functions()[0].name, "icalltarget");
+        assert_eq!(mdata.function_info().len(), 5);
+        assert_eq!(mdata.export_functions()[0].names, vec!["launchpad"]);
+        assert_eq!(mdata.globals_spec().len(), 0);
 
         /*  TODO can't express these with module data
-        assert_eq!(p.import_functions().len(), 1);
-        assert_eq!(p.import_functions()[0].module(), "env");
-        assert_eq!(p.import_functions()[0].field(), "icalltarget");
-        assert_eq!(p.globals().len(), 0);
-        assert_eq!(p.defined_functions().len(), 4);
-        assert_eq!(
-            p.defined_functions().get(0).unwrap().symbol(),
-            "guest_func_launchpad"
-        );
         assert_eq!(
             p.get_table(0).unwrap().elements().get(0),
             Some(&TableElem::FunctionIx(2))

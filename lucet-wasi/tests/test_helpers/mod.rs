@@ -65,7 +65,7 @@ pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, E
         .with_embed_ctx(ctx)
         .build()?;
 
-    match inst.run(b"_start", &[]) {
+    match inst.run("_start", &[]) {
         // normal termination implies 0 exit code
         Ok(_) => Ok(0),
         Err(lucet_runtime::Error::RuntimeTerminated(

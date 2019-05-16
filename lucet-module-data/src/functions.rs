@@ -4,6 +4,70 @@ use serde::{Deserialize, Serialize};
 
 use std::slice::from_raw_parts;
 
+/// FunctionIndex is an identifier for a function, imported, exported, or external. The space of
+/// FunctionIndex is shared for all of these, so `FunctionIndex(N)` may identify exported function
+/// #2, `FunctionIndex(N + 1)` may identify an internal function, and `FunctionIndex(N + 2)` may
+/// identify an imported function.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct FunctionIndex(u32);
+
+impl FunctionIndex {
+    pub fn from_u32(idx: u32) -> FunctionIndex {
+        FunctionIndex(idx)
+    }
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+}
+
+/// ImportFunction describes an internal function - its internal function index and the name/module
+/// pair that function should be found in.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct ImportFunction<'a> {
+    pub fn_idx: FunctionIndex,
+    pub module: &'a str,
+    pub name: &'a str
+}
+
+/// ExportFunction describes an exported function - its internal function index and a name that
+/// function has been exported under.
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub struct ExportFunction<'a> {
+    pub fn_idx: FunctionIndex,
+    #[serde(borrow)]
+    pub names: Vec<&'a str>
+}
+
+pub struct OwnedExportFunction {
+    pub fn_idx: FunctionIndex,
+    pub names: Vec<String>
+}
+
+impl OwnedExportFunction {
+    pub fn to_ref<'a>(&'a self) -> ExportFunction<'a> {
+        ExportFunction {
+            fn_idx: self.fn_idx.clone(),
+            names: self.names.iter().map(|x| x.as_str()).collect()
+        }
+    }
+}
+
+pub struct OwnedImportFunction {
+    pub fn_idx: FunctionIndex,
+    pub module: String,
+    pub name: String
+}
+
+impl OwnedImportFunction {
+    pub fn to_ref<'a>(&'a self) -> ImportFunction<'a> {
+        ImportFunction {
+            fn_idx: self.fn_idx.clone(),
+            module: self.module.as_str(),
+            name: self.name.as_str(),
+        }
+    }
+}
+
 /// UniqueSignatureIndex names a signature after collapsing duplicate signatures to a single
 /// identifier, whereas SignatureIndex is directly what the original module specifies, and may
 /// specify duplicates of types that are structurally equal.
@@ -37,28 +101,33 @@ impl FunctionPointer {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FunctionMetadata<'a> {
     pub signature: UniqueSignatureIndex,
+    /// the "name" field is some human-friendly name, not necessarily the same as used to reach
+    /// this function (through an export, for example), and may not even indicate that a function
+    /// is exported at all.
+    /// TODO: at some point when possible, this field ought to be set from the names section of a
+    /// wasm module. At the moment that information is lost at parse time.
     #[serde(borrow)]
-    pub sym: Option<&'a [u8]>,
+    pub name: Option<&'a str>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OwnedFunctionMetadata {
     pub signature: UniqueSignatureIndex,
-    pub sym: Option<Vec<u8>>,
+    pub name: Option<String>,
 }
 
 impl OwnedFunctionMetadata {
-    pub fn to_ref<'a>(&'a self) -> FunctionMetadata<'a> {
+    pub fn to_ref(&self) -> FunctionMetadata {
         FunctionMetadata {
             signature: self.signature.clone(),
-            sym: self.sym.as_ref().map(|s| s.as_slice()).clone(),
+            name: self.name.as_ref().map(|n| n.as_str()),
         }
     }
 }
 
 pub struct FunctionHandle {
     pub ptr: FunctionPointer,
-    pub id: u32
+    pub id: FunctionIndex
 }
 
 // The layout of this struct is very tightly coupled to lucetc's `write_function_manifest`!

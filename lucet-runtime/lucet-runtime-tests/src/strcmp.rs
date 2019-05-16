@@ -45,7 +45,7 @@ macro_rules! strcmp_tests {
 
             let res = c_int::from(
                 inst.run(
-                    b"run_strcmp",
+                    "run_strcmp",
                     &[Val::GuestPtr(s1_ptr as u32), Val::GuestPtr(s2_ptr as u32)],
                 )
                 .expect("instance runs"),
@@ -84,7 +84,7 @@ macro_rules! strcmp_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"wasm_fault", &[]) {
+            match inst.run("wasm_fault", &[]) {
                 Err(Error::RuntimeFault { .. }) => (),
                 res => panic!("unexpected result: {:?}", res),
             }
