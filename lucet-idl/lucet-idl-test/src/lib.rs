@@ -16,7 +16,7 @@ mod tests {
             compile::rust_codegen(&pkg);
         }
 
-        #[test]
+        //#[test]
         fn generate_and_c(spec in Spec::strat(20)) {
             let rendered = spec.render_idl();
             let pkg = parse_package(&rendered).unwrap();
