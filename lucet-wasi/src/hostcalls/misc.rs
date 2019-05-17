@@ -11,8 +11,8 @@ use lucet_runtime::vmctx::Vmctx;
 
 use nix::convert_ioctl_res;
 use nix::libc::{self, c_int};
+use std::cmp;
 use std::time::SystemTime;
-use std::{cmp, slice};
 
 // define the `fionread()` function, equivalent to `ioctl(fd, FIONREAD, *bytes)`
 nix::ioctl_read_bad!(fionread, nix::libc::FIONREAD, c_int);
@@ -262,25 +262,19 @@ pub fn wasi_random_get(
 ) -> wasm32::__wasi_errno_t {
     use rand::{thread_rng, RngCore};
 
-    let buf_len = dec_usize(buf_len);
-    let buf_ptr = match unsafe { dec_ptr(vmctx, buf_ptr, buf_len) } {
-        Ok(ptr) => ptr,
+    let buf = match dec_slice_of_mut::<u8>(vmctx, buf_ptr, buf_len) {
+        Ok(buf) => buf,
         Err(e) => return enc_errno(e),
     };
-
-    let buf = unsafe { std::slice::from_raw_parts_mut(buf_ptr, buf_len) };
-
     thread_rng().fill_bytes(buf);
 
     return wasm32::__WASI_ESUCCESS;
 }
 
-fn __wasi_poll_oneoff_handle_timeout_event(
-    vmctx: &mut Vmctx,
+fn _wasi_poll_oneoff_handle_timeout_event(
     output_slice: &mut [wasm32::__wasi_event_t],
-    nevents: wasm32::uintptr_t,
     timeout: Option<ClockEventData>,
-) -> wasm32::__wasi_errno_t {
+) -> wasm32::size_t {
     if let Some(ClockEventData { userdata, .. }) = timeout {
         let output_event = host::__wasi_event_t {
             userdata,
@@ -294,24 +288,17 @@ fn __wasi_poll_oneoff_handle_timeout_event(
             },
         };
         output_slice[0] = enc_event(output_event);
-        if let Err(e) = unsafe { enc_pointee(vmctx, nevents, 1) } {
-            return enc_errno(e);
-        }
+        1
     } else {
         // shouldn't happen
-        if let Err(e) = unsafe { enc_pointee(vmctx, nevents, 0) } {
-            return enc_errno(e);
-        }
+        0
     }
-    wasm32::__WASI_ESUCCESS
 }
 
-fn __wasi_poll_oneoff_handle_fd_event<'t>(
-    vmctx: &mut Vmctx,
+fn _wasi_poll_oneoff_handle_fd_event<'t>(
     output_slice: &mut [wasm32::__wasi_event_t],
-    nevents: wasm32::uintptr_t,
     events: impl Iterator<Item = (&'t FdEventData, &'t nix::poll::PollFd)>,
-) -> wasm32::__wasi_errno_t {
+) -> wasm32::size_t {
     let mut output_slice_cur = output_slice.iter_mut();
     let mut revents_count = 0;
     for (fd_event, poll_fd) in events {
@@ -383,10 +370,7 @@ fn __wasi_poll_oneoff_handle_fd_event<'t>(
         *output_slice_cur.next().unwrap() = enc_event(output_event);
         revents_count += 1;
     }
-    if let Err(e) = unsafe { enc_pointee(vmctx, nevents, revents_count) } {
-        return enc_errno(e);
-    }
-    wasm32::__WASI_ESUCCESS
+    revents_count
 }
 
 pub fn wasi_poll_oneoff(
@@ -399,15 +383,13 @@ pub fn wasi_poll_oneoff(
     if nsubscriptions as u64 > wasm32::__wasi_filesize_t::max_value() {
         return wasm32::__WASI_EINVAL;
     }
-    unsafe { enc_pointee(vmctx, nevents, 0) }.unwrap();
-    let input_slice_ =
-        unsafe { dec_slice_of::<wasm32::__wasi_subscription_t>(vmctx, input, nsubscriptions) }
-            .unwrap();
-    let input_slice = unsafe { slice::from_raw_parts(input_slice_.0, input_slice_.1) };
+    enc_pointee(vmctx, nevents, 0).unwrap();
 
-    let output_slice_ =
-        unsafe { dec_slice_of::<wasm32::__wasi_event_t>(vmctx, output, nsubscriptions) }.unwrap();
-    let output_slice = unsafe { slice::from_raw_parts_mut(output_slice_.0, output_slice_.1) };
+    let input_slice =
+        dec_slice_of::<wasm32::__wasi_subscription_t>(vmctx, input, nsubscriptions).unwrap();
+
+    let output_slice =
+        dec_slice_of_mut::<wasm32::__wasi_event_t>(vmctx, output, nsubscriptions).unwrap();
 
     let input: Vec<_> = input_slice.iter().map(|x| dec_subscription(x)).collect();
 
@@ -471,9 +453,14 @@ pub fn wasi_poll_oneoff(
             Ok(ready) => break ready as usize,
         }
     };
-    if ready == 0 {
-        return __wasi_poll_oneoff_handle_timeout_event(vmctx, output_slice, nevents, timeout);
+    let events_count = if ready == 0 {
+        _wasi_poll_oneoff_handle_timeout_event(output_slice, timeout)
+    } else {
+        let events = fd_events.iter().zip(poll_fds.iter()).take(ready);
+        _wasi_poll_oneoff_handle_fd_event(output_slice, events)
+    };
+    if let Err(e) = enc_pointee(vmctx, nevents, events_count) {
+        return enc_errno(e);
     }
-    let events = fd_events.iter().zip(poll_fds.iter()).take(ready);
-    __wasi_poll_oneoff_handle_fd_event(vmctx, output_slice, nevents, events)
+    wasm32::__WASI_ESUCCESS
 }
