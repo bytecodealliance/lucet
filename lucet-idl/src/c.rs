@@ -2,8 +2,8 @@
 #![allow(unused_variables)]
 
 use crate::error::IDLError;
-use crate::generator::Generator;
 use crate::module::Module;
+use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
 use crate::types::{
     AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl, Named,
@@ -16,7 +16,38 @@ pub struct CGenerator {
     pub w: PrettyWriter,
 }
 
-impl Generator for CGenerator {
+impl CGenerator {
+    pub fn new(w: Box<dyn Write>) -> Self {
+        let mut w = PrettyWriter::new(w);
+        let prelude = r"
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>";
+        for line in prelude.lines() {
+            w.write_line(line.as_ref()).unwrap();
+        }
+        w.eob().unwrap();
+        Self { w }
+    }
+
+    pub fn generate_guest(&mut self, package: &Package) -> Result<(), IDLError> {
+        for (_ident, module) in package.modules.iter() {
+            for ref dt in module.datatypes() {
+                self.gen_type_header(module, dt)?;
+                match &dt.entity.variant {
+                    DataTypeVariant::Struct(s) => self.gen_struct(module, dt, s)?,
+                    DataTypeVariant::Alias(a) => self.gen_alias(module, dt, a)?,
+                    DataTypeVariant::Enum(e) => self.gen_enum(module, dt, e)?,
+                }
+            }
+            for fdecl in module.func_decls() {
+                self.gen_function(module, &fdecl)?;
+            }
+        }
+        Ok(())
+    }
+
     fn gen_type_header(&mut self, _module: &Module, dt: &Named<DataType>) -> Result<(), IDLError> {
         self.w
             .eob()?
@@ -125,22 +156,6 @@ impl Generator for CGenerator {
     ) -> Result<(), IDLError> {
         // UNIMPLEMENTED!!
         Ok(())
-    }
-}
-
-impl CGenerator {
-    pub fn new(w: Box<dyn Write>) -> Self {
-        let mut w = PrettyWriter::new(w);
-        let prelude = r"
-#include <assert.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stddef.h>";
-        for line in prelude.lines() {
-            w.write_line(line.as_ref()).unwrap();
-        }
-        w.eob().unwrap();
-        Self { w }
     }
 
     // Return `true` if the type is an atom, an emum, or an alias to one of these

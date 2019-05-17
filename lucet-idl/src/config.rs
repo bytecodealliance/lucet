@@ -1,9 +1,4 @@
-use crate::backend::Backend;
-use crate::c::CGenerator;
 use crate::error::IDLError;
-use crate::generator::Generator;
-use crate::rust::RustGenerator;
-use std::io::Write;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -16,12 +11,22 @@ impl Config {
             .ok_or_else(|| IDLError::UsageError(format!("Invalid backend: {}", backend_opt)))?;
         Ok(Self { backend })
     }
+}
 
-    pub fn generator(&self, w: Box<dyn Write>) -> Box<dyn Generator> {
-        match self.backend {
-            Backend::CGuest => Box::new(CGenerator::new(w)),
-            Backend::RustGuest => Box::new(RustGenerator::new(w)),
-            Backend::RustHost => unimplemented!(),
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Backend {
+    CGuest,
+    RustGuest,
+    RustHost,
+}
+
+impl Backend {
+    pub fn from_str<T: AsRef<str>>(s: T) -> Option<Self> {
+        match s.as_ref() {
+            "c_guest" => Some(Backend::CGuest),
+            "rust_guest" => Some(Backend::RustGuest),
+            "rust_host" => Some(Backend::RustHost),
+            _ => None,
         }
     }
 }

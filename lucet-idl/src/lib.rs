@@ -3,12 +3,10 @@
 #[macro_use]
 extern crate failure;
 
-mod backend;
 mod c;
 mod config;
 mod data_layout;
 mod error;
-mod generator;
 mod lexer;
 mod module;
 mod package;
@@ -17,8 +15,7 @@ mod pretty_writer;
 mod rust;
 mod types;
 
-pub use crate::backend::Backend;
-pub use crate::config::Config;
+pub use crate::config::{Backend, Config};
 pub use crate::error::IDLError;
 pub use crate::module::Module;
 pub use crate::package::Package;
@@ -26,7 +23,9 @@ pub use crate::types::{
     AtomType, Attr, DataType, DataTypeRef, FuncDecl, FuncRet, Ident, Location, Name, Named,
 };
 
+use crate::c::CGenerator;
 use crate::parser::Parser;
+use crate::rust::RustGenerator;
 use std::io::Write;
 
 pub fn parse_package(input: &str) -> Result<Package, IDLError> {
@@ -37,16 +36,12 @@ pub fn parse_package(input: &str) -> Result<Package, IDLError> {
 }
 
 pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Result<(), IDLError> {
-    let mut generator = config.generator(output);
-
-    for (_ident, mod_) in package.modules.iter() {
-        for dt in mod_.datatypes() {
-            generator.gen_datatype(mod_, &dt)?;
-        }
-        for fdecl in mod_.func_decls() {
-            generator.gen_function(mod_, &fdecl)?;
-        }
+    match config.backend {
+        Backend::CGuest => CGenerator::new(output).generate_guest(package)?,
+        Backend::RustGuest => RustGenerator::new(output).generate_guest(package)?,
+        Backend::RustHost => RustGenerator::new(output).generate_host(package)?,
     }
+
     Ok(())
 }
 

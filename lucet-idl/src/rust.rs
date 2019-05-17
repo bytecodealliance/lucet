@@ -2,12 +2,13 @@
 #![allow(unused_variables)]
 
 use crate::error::IDLError;
-use crate::generator::Generator;
 use crate::module::Module;
+use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
 use crate::types::AtomType;
 use crate::types::{
-    AliasDataType, DataType, DataTypeRef, EnumDataType, FuncDecl, Ident, Named, StructDataType,
+    AliasDataType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl, Ident, Named,
+    StructDataType,
 };
 use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
@@ -25,6 +26,38 @@ impl RustGenerator {
             defined: HashMap::new(),
             w: PrettyWriter::new(w),
         }
+    }
+
+    pub fn generate_guest(&mut self, package: &Package) -> Result<(), IDLError> {
+        for (_ident, module) in package.modules.iter() {
+            self.generate_datatypes(module)?;
+            for fdecl in module.func_decls() {
+                self.guest_function_import(module, &fdecl)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn generate_host(&mut self, package: &Package) -> Result<(), IDLError> {
+        for (_ident, module) in package.modules.iter() {
+            self.generate_datatypes(module)?;
+            for fdecl in module.func_decls() {
+                unimplemented!(); // FIXME
+            }
+        }
+        Ok(())
+    }
+
+    fn generate_datatypes(&mut self, module: &Module) -> Result<(), IDLError> {
+        for ref dt in module.datatypes() {
+            self.gen_type_header(module, dt)?;
+            match &dt.entity.variant {
+                DataTypeVariant::Struct(s) => self.gen_struct(module, dt, s)?,
+                DataTypeVariant::Alias(a) => self.gen_alias(module, dt, a)?,
+                DataTypeVariant::Enum(e) => self.gen_enum(module, dt, e)?,
+            }
+        }
+        Ok(())
     }
 
     fn define_name(&mut self, dt: &Named<DataType>) -> String {
@@ -56,9 +89,7 @@ impl RustGenerator {
             F64 => "f64",
         }
     }
-}
 
-impl Generator for RustGenerator {
     fn gen_type_header(&mut self, _module: &Module, dt: &Named<DataType>) -> Result<(), IDLError> {
         self.w
             .eob()?
@@ -164,7 +195,7 @@ impl Generator for RustGenerator {
         Ok(())
     }
 
-    fn gen_function(
+    fn guest_function_import(
         &mut self,
         module: &Module,
         func_decl_entry: &Named<FuncDecl>,
@@ -192,7 +223,7 @@ impl Generator for RustGenerator {
 
         self.w
             .writeln("#[no_mangle]")?
-            .writeln(format!("extern \"C\" fn {}({}) -> {};", name, args, rets))?;
+            .writeln(format!("extern \"C\" fn {}({}) -> {} ;", name, args, rets))?;
 
         Ok(())
     }

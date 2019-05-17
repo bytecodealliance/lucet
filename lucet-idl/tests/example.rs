@@ -43,7 +43,7 @@ fn compile_and_run_c() {
 }
 
 #[test]
-fn compile_and_run_rust() {
+fn compile_and_run_rust_guest() {
     let mut source = String::new();
     File::open("tests/example.idl")
         .expect("open example.idl")
@@ -51,7 +51,7 @@ fn compile_and_run_rust() {
         .expect("read example.idl");
 
     let config = lucet_idl::Config {
-        backend: lucet_idl::Backend::RustHost,
+        backend: lucet_idl::Backend::RustGuest,
     };
 
     let tempdir = TempDir::new().expect("create tempdir");
