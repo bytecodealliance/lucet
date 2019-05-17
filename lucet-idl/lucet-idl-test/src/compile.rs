@@ -6,8 +6,7 @@ use tempfile::TempDir;
 
 pub fn rust_test(package: &Package) {
     let config = Config {
-        backend: Backend::Rust,
-        target: Target::Generic,
+        backend: Backend::RustHost,
     };
 
     let tempdir = TempDir::new().expect("create tempdir");
@@ -42,8 +41,7 @@ pub fn rust_test(package: &Package) {
 
 pub fn rust_wasm_codegen(package: &Package) -> Vec<u8> {
     let config = Config {
-        backend: Backend::Rust,
-        target: Target::Generic,
+        backend: Backend::RustGuest,
     };
 
     let tempdir = TempDir::new().expect("create tempdir");

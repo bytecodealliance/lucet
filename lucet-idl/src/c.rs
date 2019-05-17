@@ -5,7 +5,6 @@ use crate::error::IDLError;
 use crate::generator::Generator;
 use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
-use crate::target::Target;
 use crate::types::{
     AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl, Named,
     StructDataType,
@@ -14,7 +13,6 @@ use std::io::prelude::*;
 
 /// Generator for the C backend
 pub struct CGenerator {
-    pub target: Target,
     pub w: PrettyWriter,
 }
 
@@ -73,8 +71,6 @@ impl Generator for CGenerator {
         self.w.writeln("};")?;
         self.w.eob()?;
 
-        // Add assertions to check that the target platform matches the expected alignment
-        // Also add a macro definition for the structure size
         // Skip the first member, as it will always be at the beginning of the structure
         for (i, member) in struct_.members.iter().enumerate().skip(1) {
             self.w.writeln(format!(
@@ -133,7 +129,7 @@ impl Generator for CGenerator {
 }
 
 impl CGenerator {
-    pub fn new(target: Target, w: Box<dyn Write>) -> Self {
+    pub fn new(w: Box<dyn Write>) -> Self {
         let mut w = PrettyWriter::new(w);
         let prelude = r"
 #include <assert.h>
@@ -144,7 +140,7 @@ impl CGenerator {
             w.write_line(line.as_ref()).unwrap();
         }
         w.eob().unwrap();
-        Self { target, w }
+        Self { w }
     }
 
     // Return `true` if the type is an atom, an emum, or an alias to one of these

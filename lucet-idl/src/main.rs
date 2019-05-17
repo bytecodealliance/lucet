@@ -5,7 +5,7 @@ use std::io;
 use std::io::prelude::*;
 use std::path::PathBuf;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct ExeConfig {
     pub input_path: PathBuf,
     pub output_path: Option<PathBuf>,
@@ -15,7 +15,7 @@ pub struct ExeConfig {
 impl ExeConfig {
     pub fn parse() -> Result<Self, IDLError> {
         let matches = App::new("lucet-idl")
-            .version("1.0")
+            .version("0.1.0")
             .about("lucet_idl code generator")
             .arg(
                 Arg::with_name("input")
@@ -23,45 +23,32 @@ impl ExeConfig {
                     .help("Path to the input file"),
             )
             .arg(
-                Arg::with_name("target")
-                    .short("t")
-                    .long("target")
-                    .default_value("Generic")
-                    .takes_value(true)
-                    .required(false)
-                    .help("Target, one of: x86, x86_64, x86_64_32, generic"),
-            )
-            .arg(
                 Arg::with_name("backend")
                     .short("b")
                     .long("backend")
-                    .default_value("c")
+                    .default_value("c_guest")
                     .takes_value(true)
                     .required(false)
-                    .help("Backend, one of: c, rust"),
+                    .help("Backend, one of: c_guest, rust_guest, rust_host"),
             )
             .arg(
-                Arg::with_name("zero-native-pointers")
-                    .short("z")
-                    .long("zero-native-pointers")
-                    .takes_value(false)
+                Arg::with_name("output")
+                    .short("o")
+                    .takes_value(true)
                     .required(false)
-                    .help("Do not serialize native pointers"),
+                    .help("output path"),
             )
             .get_matches();
         let input_path = PathBuf::from(
             matches
                 .value_of("input")
-                .ok_or(IDLError::UsageError("Input file required"))?,
+                .ok_or(IDLError::UsageError("Input file required".to_owned()))?,
         );
-        let config = Config::parse(
-            matches.value_of("target").unwrap(),
-            matches.value_of("backend").unwrap(),
-            matches.is_present("zero-native-pointers"),
-        );
+        let output_path = matches.value_of("output").map(PathBuf::from);
+        let config = Config::parse(matches.value_of("backend").unwrap())?;
         Ok(ExeConfig {
             input_path,
-            output_path: None,
+            output_path,
             config,
         })
     }
@@ -71,7 +58,12 @@ fn doit() -> Result<(), IDLError> {
     let mut source = String::new();
     File::open(&exe_config.input_path)?.read_to_string(&mut source)?;
 
-    run(&exe_config.config, &source, Box::new(io::stdout()))?;
+    let output: Box<dyn Write> = match exe_config.output_path {
+        Some(ref p) => Box::new(File::create(p)?),
+        None => Box::new(io::stdout()),
+    };
+
+    run(&exe_config.config, &source, output)?;
 
     Ok(())
 }

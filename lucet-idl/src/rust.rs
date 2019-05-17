@@ -5,7 +5,6 @@ use crate::error::IDLError;
 use crate::generator::Generator;
 use crate::module::Module;
 use crate::pretty_writer::PrettyWriter;
-use crate::target::Target;
 use crate::types::AtomType;
 use crate::types::{
     AliasDataType, DataType, DataTypeRef, EnumDataType, FuncDecl, Ident, Named, StructDataType,
@@ -14,29 +13,15 @@ use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
 use std::io::Write;
 
-#[derive(Clone, Debug)]
-struct CTypeInfo<'t> {
-    /// The native type name
-    type_name: String,
-    /// Alignment rules for that type
-    type_align: usize,
-    /// The native type size
-    type_size: usize,
-    /// The leaf type node
-    leaf_data_type_ref: &'t DataTypeRef,
-}
-
-/// Generator for the C backend
+/// Generator for the Rust backend
 pub struct RustGenerator {
-    pub target: Target,
     pub defined: HashMap<Ident, String>,
     pub w: PrettyWriter,
 }
 
 impl RustGenerator {
-    pub fn new(target: Target, w: Box<dyn Write>) -> Self {
+    pub fn new(w: Box<dyn Write>) -> Self {
         Self {
-            target,
             defined: HashMap::new(),
             w: PrettyWriter::new(w),
         }
@@ -207,13 +192,7 @@ impl Generator for RustGenerator {
 
         self.w
             .writeln("#[no_mangle]")?
-            .writeln("#[allow(unused_variables)]")?
-            .writeln(format!("pub fn {}({}) -> {} {{", name, args, rets))?;
-
-        let mut w = self.w.new_block();
-        w.writeln("unimplemented!()")?;
-
-        self.w.writeln("}")?.eob()?;
+            .writeln(format!("extern \"C\" fn {}({}) -> {};", name, args, rets))?;
 
         Ok(())
     }

@@ -13,8 +13,7 @@ fn compile_and_run_c() {
         .expect("read example.idl");
 
     let config = lucet_idl::Config {
-        backend: lucet_idl::Backend::C,
-        target: lucet_idl::Target::Generic,
+        backend: lucet_idl::Backend::CGuest,
     };
 
     let tempdir = TempDir::new().expect("create tempdir");
@@ -52,8 +51,7 @@ fn compile_and_run_rust() {
         .expect("read example.idl");
 
     let config = lucet_idl::Config {
-        backend: lucet_idl::Backend::Rust,
-        target: lucet_idl::Target::Generic,
+        backend: lucet_idl::Backend::RustHost,
     };
 
     let tempdir = TempDir::new().expect("create tempdir");

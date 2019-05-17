@@ -1,21 +1,17 @@
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Backend {
-    C,
-    Rust,
+    CGuest,
+    RustGuest,
+    RustHost,
 }
 
-impl Default for Backend {
-    fn default() -> Self {
-        Backend::C
-    }
-}
-
-impl<T: AsRef<str>> From<T> for Backend {
-    fn from(s: T) -> Self {
+impl Backend {
+    pub fn from_str<T: AsRef<str>>(s: T) -> Option<Self> {
         match s.as_ref() {
-            "c" => Backend::C,
-            "rust" => Backend::Rust,
-            _ => Backend::default(),
+            "c_guest" => Some(Backend::CGuest),
+            "rust_guest" => Some(Backend::RustGuest),
+            "rust_host" => Some(Backend::RustHost),
+            _ => None,
         }
     }
 }

@@ -10,7 +10,7 @@ pub enum IDLError {
     #[fail(display = "Internal error: {}", _0)]
     InternalError(&'static str),
     #[fail(display = "Incorrect usage: {}", _0)]
-    UsageError(&'static str),
+    UsageError(String),
     #[fail(display = "{}", _0)]
     ParseError(#[cause] parser::ParseError),
     #[fail(display = "{}", _0)]
