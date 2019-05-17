@@ -161,6 +161,27 @@ pub unsafe fn dec_ciovec_slice(
     slice.iter().map(|iov| dec_ciovec(vmctx, iov)).collect()
 }
 
+pub unsafe fn dec_iovec(
+    vmctx: &Vmctx,
+    iovec: &wasm32::__wasi_iovec_t,
+) -> Result<host::__wasi_iovec_t, host::__wasi_errno_t> {
+    let len = dec_usize(iovec.buf_len);
+    Ok(host::__wasi_iovec_t {
+        buf: dec_ptr(vmctx, iovec.buf, len)? as *mut host::void,
+        buf_len: len,
+    })
+}
+
+pub unsafe fn dec_iovec_slice(
+    vmctx: &Vmctx,
+    ptr: wasm32::uintptr_t,
+    len: wasm32::size_t,
+) -> Result<Vec<host::__wasi_iovec_t>, host::__wasi_errno_t> {
+    let slice = dec_slice_of::<wasm32::__wasi_iovec_t>(vmctx, ptr, len)?;
+    let slice = slice::from_raw_parts(slice.0, slice.1);
+    slice.iter().map(|iov| dec_iovec(vmctx, iov)).collect()
+}
+
 dec_enc_scalar!(
     __wasi_clockid_t,
     dec_clockid,
@@ -357,7 +378,7 @@ pub unsafe fn dec_prestat_byref(
 pub fn enc_prestat(
     prestat: host::__wasi_prestat_t,
 ) -> Result<wasm32::__wasi_prestat_t, host::__wasi_errno_t> {
-    match prestat.pr_type as u32 {
+    match u32::from(prestat.pr_type) {
         host::__WASI_PREOPENTYPE_DIR => {
             let u = wasm32::__wasi_prestat_t___wasi_prestat_u {
                 dir: wasm32::__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t {
@@ -389,6 +410,7 @@ dec_enc_scalar!(
     enc_rights,
     enc_rights_byref
 );
+
 dec_enc_scalar!(
     __wasi_timestamp_t,
     dec_timestamp,
@@ -396,6 +418,14 @@ dec_enc_scalar!(
     enc_timestamp,
     enc_timestamp_byref
 );
+
+pub fn dec_u32(x: u32) -> u32 {
+    u32::from_le(x)
+}
+
+pub fn enc_u32(x: u32) -> u32 {
+    x.to_le()
+}
 
 pub fn dec_usize(size: wasm32::size_t) -> usize {
     cast::usize(u32::from_le(size))
@@ -496,4 +526,58 @@ pub fn enc_event(event: host::__wasi_event_t) -> wasm32::__wasi_event_t {
         },
         __bindgen_padding_0: 0,
     }
+}
+
+dec_enc_scalar!(
+    __wasi_advice_t,
+    dec_advice,
+    dec_advice_byref,
+    enc_advice,
+    enc_advice_byref
+);
+
+dec_enc_scalar!(
+    __wasi_fstflags_t,
+    dec_fstflags,
+    dec_fstflags_byref,
+    enc_fstflags,
+    enc_fstflags_byref
+);
+
+dec_enc_scalar!(
+    __wasi_dircookie_t,
+    dec_dircookie,
+    dec_dircookie_byref,
+    enc_dircookie,
+    enc_dircookie_byref
+);
+
+#[cfg(target_os = "linux")]
+pub fn dirent_from_host(
+    host_entry: &nix::libc::dirent,
+) -> Result<wasm32::__wasi_dirent_t, host::__wasi_errno_t> {
+    let mut entry = unsafe { std::mem::zeroed::<wasm32::__wasi_dirent_t>() };
+    let d_namlen = unsafe { std::ffi::CStr::from_ptr(host_entry.d_name.as_ptr()) }
+        .to_bytes()
+        .len();
+    if d_namlen > u32::max_value() as usize {
+        return Err(host::__WASI_EIO as host::__wasi_errno_t);
+    }
+    entry.d_ino = enc_inode(host_entry.d_ino);
+    entry.d_next = enc_dircookie(host_entry.d_off as u64);
+    entry.d_namlen = enc_u32(d_namlen as u32);
+    entry.d_type = enc_filetype(host_entry.d_type);
+    Ok(entry)
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn dirent_from_host(
+    host_entry: &nix::libc::dirent,
+) -> Result<wasm32::__wasi_dirent_t, host::__wasi_errno_t> {
+    let mut entry = unsafe { std::mem::zeroed::<wasm32::__wasi_dirent_t>() };
+    entry.d_ino = enc_inode(host_entry.d_ino);
+    entry.d_next = enc_dircookie(host_entry.d_seekoff);
+    entry.d_namlen = enc_u32(u32::from(host_entry.d_namlen));
+    entry.d_type = enc_filetype(host_entry.d_type);
+    Ok(entry)
 }
