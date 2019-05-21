@@ -65,7 +65,6 @@ impl CGenerator {
         alias: &AliasDataType,
     ) -> Result<(), IDLError> {
         let dtname = self.type_name(dt);
-        self.w.indent()?;
         self.w.writeln(format!(
             "typedef {} {};",
             self.type_ref_name(module, &alias.to),

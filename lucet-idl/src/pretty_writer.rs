@@ -36,6 +36,11 @@ impl PrettyWriter {
         }
     }
 
+    pub fn indent(&mut self) -> &mut Self {
+        self.indent += 1;
+        self
+    }
+
     fn _write_all(&mut self, buf: &[u8]) -> Result<(), IDLError> {
         self.writer.borrow_mut().write_all(buf).map_err(Into::into)
     }
@@ -47,7 +52,7 @@ impl PrettyWriter {
     }
 
     /// Output an indentation string
-    pub fn indent(&mut self) -> Result<&mut Self, IDLError> {
+    fn write_indent(&mut self) -> Result<&mut Self, IDLError> {
         let indent_bytes = &self.indent_bytes.clone();
         {
             for _ in 0..self.indent {
@@ -65,6 +70,9 @@ impl PrettyWriter {
 
     /// Output a block separator
     pub fn eob(&mut self) -> Result<&mut Self, IDLError> {
+        if self.indent > 0 {
+            self.indent -= 1;
+        }
         self.eol()
     }
 
@@ -76,7 +84,7 @@ impl PrettyWriter {
 
     /// Indent, write raw data and terminate with an end of line
     pub fn write_line(&mut self, buf: &[u8]) -> Result<&mut Self, IDLError> {
-        self.indent()?.write(buf)?.eol()
+        self.write_indent()?.write(buf)?.eol()
     }
 
     /// Indent, write raw data and terminate with an end of line

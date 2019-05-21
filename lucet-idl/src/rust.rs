@@ -31,9 +31,13 @@ impl RustGenerator {
     pub fn generate_guest(&mut self, package: &Package) -> Result<(), IDLError> {
         for (_ident, module) in package.modules.iter() {
             self.generate_datatypes(module)?;
+            self.w.writeln("extern \"C\" {")?;
+            self.w.indent();
             for fdecl in module.func_decls() {
                 self.guest_function_import(module, &fdecl)?;
             }
+            self.w.eob()?;
+            self.w.writeln("}")?;
         }
         Ok(())
     }
@@ -50,7 +54,6 @@ impl RustGenerator {
 
     fn generate_datatypes(&mut self, module: &Module) -> Result<(), IDLError> {
         for ref dt in module.datatypes() {
-            self.gen_type_header(module, dt)?;
             match &dt.entity.variant {
                 DataTypeVariant::Struct(s) => self.gen_struct(module, dt, s)?,
                 DataTypeVariant::Alias(a) => self.gen_alias(module, dt, a)?,
@@ -88,13 +91,6 @@ impl RustGenerator {
             F32 => "f32",
             F64 => "f64",
         }
-    }
-
-    fn gen_type_header(&mut self, _module: &Module, dt: &Named<DataType>) -> Result<(), IDLError> {
-        self.w
-            .eob()?
-            .writeln(format!("/// {}: {:?}", dt.name.name, dt))?;
-        Ok(())
     }
 
     fn gen_alias(
@@ -200,9 +196,6 @@ impl RustGenerator {
         module: &Module,
         func_decl_entry: &Named<FuncDecl>,
     ) -> Result<(), IDLError> {
-        self.w
-            .write_line(format!("// {:?}", func_decl_entry).as_bytes())?;
-
         let name = func_decl_entry.name.name.to_snake_case();
         let mut args = String::new();
         for a in func_decl_entry.entity.args.iter() {
@@ -223,7 +216,7 @@ impl RustGenerator {
 
         self.w
             .writeln("#[no_mangle]")?
-            .writeln(format!("extern \"C\" fn {}({}) -> {} ;", name, args, rets))?;
+            .writeln(format!("fn {}({}) -> {};", name, args, rets))?;
 
         Ok(())
     }
