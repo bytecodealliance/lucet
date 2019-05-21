@@ -1,6 +1,6 @@
-use lucet_idl::{codegen, Backend, Config, Package, Target};
+use lucet_idl::{codegen, Backend, Config, Package};
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -46,32 +46,43 @@ pub fn rust_wasm_codegen(package: &Package) -> Vec<u8> {
 
     let tempdir = TempDir::new().expect("create tempdir");
 
-    let gen_file = tempdir.path().join("lib.rs");
+    let idl_file = tempdir.path().join("idl.rs");
+    let main_file = tempdir.path().join("main.rs");
     let wasm_file = tempdir.path().join("example.wasm");
+
+    let mut main = File::create(main_file.clone()).expect("create main");
+    main.write_all(
+        b"#[allow(unused)]
+mod idl;
+
+fn main() {
+    println!(\"hello, world\");
+}
+",
+    )
+    .expect("write contents of main");
 
     codegen(
         package,
         &config,
-        Box::new(File::create(gen_file.clone()).expect("create file")),
+        Box::new(File::create(idl_file.clone()).expect("create file")),
     )
     .expect("lucet_idl codegen");
 
     let cmd_rustc = Command::new("rustc")
         .arg("+nightly")
-        .arg(gen_file.clone())
-        .arg("--target=wasm32-unknown-wasi")
+        .arg(main_file.clone())
+        .arg("--target=wasm32-wasi")
         .arg("-o")
         .arg(wasm_file.clone())
         .status()
         .expect("run rustc");
-
     if !cmd_rustc.success() {
         Command::new("cat")
-            .arg(gen_file.clone())
+            .arg(idl_file.clone())
             .status()
             .expect("debug output");
     }
-
     assert!(cmd_rustc.success(), "failure to compile generated code");
 
     let mut wasm = File::open(wasm_file).expect("open wasm file");
@@ -82,8 +93,7 @@ pub fn rust_wasm_codegen(package: &Package) -> Vec<u8> {
 
 pub fn c_codegen(package: &Package) {
     let config = lucet_idl::Config {
-        backend: lucet_idl::Backend::C,
-        target: lucet_idl::Target::Generic,
+        backend: lucet_idl::Backend::CGuest,
     };
 
     let tempdir = TempDir::new().expect("create tempdir");
