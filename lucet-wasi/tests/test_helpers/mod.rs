@@ -1,9 +1,9 @@
 use failure::{bail, Error};
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::host::__wasi_exitcode_t;
-use lucet_wasi::{WasiCtx, WasiCtxBuilder};
+use lucet_wasi::{self, WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
-use lucetc::{Bindings, Lucetc, LucetcOpts};
+use lucetc::{Lucetc, LucetcOpts};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
@@ -66,9 +66,7 @@ pub fn wasi_load<P: AsRef<Path>>(
     workdir: &TempDir,
     wasm_file: P,
 ) -> Result<Arc<dyn Module>, Error> {
-    let bindings = Bindings::from_file(Path::new(LUCET_WASI_ROOT).join("bindings.json"))?;
-
-    let native_build = Lucetc::new(wasm_file).with_bindings(bindings);
+    let native_build = Lucetc::new(wasm_file).with_bindings(lucet_wasi::bindings());
 
     let so_file = workdir.path().join("out.so");
 
