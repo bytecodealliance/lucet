@@ -63,14 +63,13 @@ fn main() {
             .arg("+nightly")
             .arg(main_path)
             .arg("--target=wasm32-wasi")
-            .arg("--test")
             .arg("-o")
             .arg(wasm_file.clone())
             .status()
             .expect("run rustc");
         info!("done!");
         if !cmd_rustc.success() {
-            Err(format_err!(""))?
+            Err(format_err!("rustc error building guest"))?
         }
         Ok(wasm_file)
     }
@@ -104,17 +103,37 @@ fn main() {
 
         info!("creating main.rs for rust host...");
         let mut main_file = File::create(dir.join("main.rs"))?;
-        main_file.write_all(
-            b"
-#[allow(unused)]
-mod idl;
-
-fn main() {
-    println!(\"hello, world\");
-}",
-        )?;
+        main_file.write_all(include_bytes!("../resources/rust_host/src/main.rs"))?;
 
         info!("done!");
         unimplemented!()
+    }
+}
+
+pub struct WasiHostBuild {
+    tempdir: TempDir,
+}
+
+impl WasiHostBuild {
+    pub fn new() -> Result<Self, Error> {
+        info!("starting wasi host build...");
+
+        let tempdir = TempDir::new().expect("create tempdir for WasiHostBuild");
+
+        let resource_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join("rust_host");
+        let run_cargo = Command::new("cargo")
+            .arg("build")
+            .current_dir(resource_dir)
+            .status()
+            .expect("run cargo build");
+        if !run_cargo.success() {
+            Err(format_err!("cargo died building host project"))?
+        }
+
+        info!("done!");
+
+        Ok(WasiHostBuild { tempdir })
     }
 }
