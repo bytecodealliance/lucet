@@ -1,16 +1,27 @@
+use env_logger;
+use log::{debug, info};
 use lucet_idl::parse_package;
 use lucet_idl_test::syntax::Spec;
+use lucet_idl_test::wasi::WasiProject;
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::TestRunner;
 
 fn main() {
+    env_logger::init();
+
     let mut runner = TestRunner::default();
     let spec = Spec::strat(10).new_tree(&mut runner).unwrap().current();
     let rendered = spec.render_idl();
-    //println!("{}", rendered);
+    info!("generated spec:\n{}", rendered);
 
     let pkg = parse_package(&rendered).expect("parse generated package");
 
-    let _wasm = lucet_idl_test::compile::rust_wasm_codegen(&pkg);
+    debug!("parsed package: {:?}", pkg);
+    let wasi_project = WasiProject::new(pkg);
+
+    let _rust_guest = wasi_project
+        .codegen_rust_guest()
+        .expect("compile rust guest");
+    let _rust_host = wasi_project.compile_rust_host().expect("compile rust host");
 }

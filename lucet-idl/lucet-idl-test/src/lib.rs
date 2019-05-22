@@ -1,5 +1,6 @@
 pub mod compile;
 pub mod syntax;
+pub mod wasi;
 
 #[cfg(test)]
 mod tests {

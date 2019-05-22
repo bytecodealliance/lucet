@@ -790,9 +790,12 @@ dependencies = [
 name = "lucet-idl-test"
 version = "0.1.0"
 dependencies = [
+ "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-idl 0.1.0",
  "lucet-runtime 0.1.0",
- "lucet-wasi-sdk 0.1.0",
+ "lucet-wasi 0.1.0",
  "lucetc 0.1.0",
  "proptest 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
