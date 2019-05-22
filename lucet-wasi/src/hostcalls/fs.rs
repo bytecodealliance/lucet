@@ -766,8 +766,8 @@ pub fn wasi_fd_fdstat_set_rights(
     fs_rights_inheriting: wasm32::__wasi_rights_t,
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
-    let fe = match ctx.fds.get(&host_fd) {
+    let mut ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let fe = match ctx.fds.get_mut(&host_fd) {
         Some(fe) => fe,
         None => return wasm32::__WASI_EBADF,
     };
@@ -776,6 +776,8 @@ pub fn wasi_fd_fdstat_set_rights(
     {
         return wasm32::__WASI_ENOTCAPABLE;
     }
+    fe.rights_base = fs_rights_base;
+    fe.rights_inheriting = fs_rights_inheriting;
     wasm32::__WASI_ESUCCESS
 }
 
