@@ -347,7 +347,7 @@ pub fn wasi_path_open(
         & ((host::__WASI_RIGHT_FD_DATASYNC
             | host::__WASI_RIGHT_FD_WRITE
             | host::__WASI_RIGHT_FD_ALLOCATE
-            | host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE) as host::__wasi_rights_t)
+            | host::__WASI_RIGHT_FD_FILESTAT_SET_SIZE) as host::__wasi_rights_t)
         != 0;
 
     let mut nix_all_oflags = if read && write {
@@ -372,7 +372,7 @@ pub fn wasi_path_open(
         needed_base |= host::__WASI_RIGHT_PATH_CREATE_FILE as host::__wasi_rights_t;
     }
     if nix_all_oflags.contains(OFlag::O_TRUNC) {
-        needed_inheriting |= host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE as host::__wasi_rights_t;
+        needed_base |= host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE as host::__wasi_rights_t;
     }
 
     // convert file descriptor flags
