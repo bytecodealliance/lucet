@@ -44,7 +44,7 @@ pub fn wasi_fd_fdstat_get(
         Err(e) => return enc_errno(e),
     };
 
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let errno = if let Some(fe) = ctx.fds.get(&host_fd) {
         host_fdstat.fs_filetype = fe.fd_object.ty;
         host_fdstat.fs_rights_base = fe.rights_base;
@@ -78,8 +78,7 @@ pub fn wasi_fd_fdstat_set_flags(
     let host_fdflags = dec_fdflags(fdflags);
     let nix_flags = host::nix_from_fdflags(host_fdflags);
 
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
-
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     if let Some(fe) = ctx.fds.get(&host_fd) {
         match nix::fcntl::fcntl(fe.fd_object.rawfd, nix::fcntl::F_SETFL(nix_flags)) {
             Ok(_) => wasm32::__WASI_ESUCCESS,
@@ -95,7 +94,7 @@ pub fn wasi_fd_tell(
     fd: wasm32::__wasi_fd_t,
     offset: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let fd = dec_fd(fd);
 
     let host_offset = {
@@ -125,7 +124,7 @@ pub fn wasi_fd_seek(
     whence: wasm32::__wasi_whence_t,
     newoffset: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let fd = dec_fd(fd);
     let offset = dec_filedelta(offset);
     let whence = dec_whence(whence);
@@ -488,7 +487,7 @@ pub fn wasi_fd_filestat_get(
     use nix::sys::stat::fstat;
 
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
 
     let rights = host::__WASI_RIGHT_FD_FILESTAT_GET;
     match ctx.get_fd_entry(host_fd, rights.into(), 0) {
@@ -613,7 +612,7 @@ pub fn wasi_fd_allocate(
     len: wasm32::__wasi_filesize_t,
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_ALLOCATE;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -667,7 +666,7 @@ pub fn wasi_fd_advise(
     advice: wasm32::__wasi_advice_t,
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_ADVISE;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -720,7 +719,7 @@ pub fn wasi_fd_advise(
 
 pub fn wasi_fd_datasync(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_DATASYNC;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -746,7 +745,7 @@ pub fn wasi_fd_datasync(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::_
 
 pub fn wasi_fd_sync(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_SYNC;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -789,7 +788,7 @@ pub fn wasi_fd_filestat_set_size(
     use nix::unistd::ftruncate;
 
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_FILESTAT_SET_SIZE;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -815,7 +814,7 @@ pub fn wasi_fd_filestat_set_times(
     use nix::sys::time::{TimeSpec, TimeValLike};
 
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_FILESTAT_SET_TIMES;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -950,7 +949,7 @@ pub fn wasi_fd_pread(
         Ok(iovs) => iovs,
         Err(e) => return enc_errno(e),
     };
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_READ;
     let fe = match ctx.get_fd_entry(fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -1000,7 +999,7 @@ pub fn wasi_fd_pwrite(
         Ok(iovs) => iovs,
         Err(e) => return enc_errno(e),
     };
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_READ;
     let fe = match ctx.get_fd_entry(fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -1043,7 +1042,7 @@ pub fn wasi_fd_readdir(
         Err(e) => return enc_errno(e),
     };
     let fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_READDIR;
     let fe = match ctx.get_fd_entry(fd, rights.into(), 0) {
         Ok(fe) => fe,
