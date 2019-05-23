@@ -189,19 +189,19 @@ used to manage the container.
 
 #### Setting up the environment
 
-0) The Lucet repository uses git submodules. Make sure they are checked out
+1) The Lucet repository uses git submodules. Make sure they are checked out
    by running `git submodule init && git submodule update`.
 
-1) Install and run the `docker` service. We do not support `podman` at this
+2) Install and run the `docker` service. We do not support `podman` at this
    time. On MacOS, [Docker for
    Mac](https://docs.docker.com/docker-for-mac/install/) is an option.
 
-2) Once Docker is running, in a terminal, and at the root of the cloned
+3) Once Docker is running, in a terminal, and at the root of the cloned
    repository, run: `source devenv_setenv.sh`. (This command requires the
    current shell to be `zsh`, `ksh` or `bash`). After a couple minutes, the
    Docker image is built and a new container is run.
 
-3) Check that new commands are now available:
+4) Check that new commands are now available:
 
 ```sh
 lucetc --help
@@ -274,11 +274,133 @@ lucet-wasi hello.so
   environment.
 * `./devenv_start.sh` and `./devenv_stop.sh` start and stop the container.
 
+### Compiling the toolchain without Docker
+
+Support for WebAssembly was introduced in LLVM 8, released in March 2019.
+
+As a result, Lucet can be compiled with an existing LLVM installation, provided
+that it is up to date.
+
+We successfully compiled it on macOS, Arch Linux and Ubuntu 19.04 using standard
+system packages.
+
+#### Compilation on Ubuntu 19.04
+
+On recent Ubuntu versions, the `cmake`, `clang` and `lld` packages must be
+installed:
+
+```sh
+apt install curl ca-certificates clang lld
+
+update-alternatives --install /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-8 100
+```
+
+In order to compile applications to WebAssembly, builtins need to be installed
+as well:
+
+```sh
+curl -sL https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-5/libclang_rt.builtins-wasm32-wasi-5.0.tar.gz | \
+sudo tar x -zf - -C /usr/lib/llvm-8/lib/clang/8.0.0
+```
+
+Install the latest stable version of the Rust compiler:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+```
+
+Fetch, compile and install the WASI sysroot:
+
+```sh
+git clone --recursive https://github.com/CraneStation/wasi-sysroot
+
+cd wasi-sysroot
+
+sudo make WASM_CC=clang-8 WASM_NM=llvm-nm-8 WASM_AR=llvm-ar-8 \
+  INSTALL_DIR=/opt/wasi-sysroot install
+
+cd - && sudo rm -fr wasi-sysroot
+```
+
+Enter the Lucet git repository clone, and fetch/update the submodules:
+
+```sh
+cd lucet
+
+git submodule update --init
+```
+
+Set relevant environment variables:
+
+```sh
+export WASI_SYSROOT=/opt/wasi-sysroot
+export CLANG_ROOT=/usr/lib/llvm-8/lib/clang/8.0.0
+export CLANG=clang-8
+```
+
+Finally, compile the toolchain:
+
+```sh
+cargo build --release
+```
+
+### Compilation on macOS
+
+Install `llvm`, `rust` and `cmake` using [Homebrew](https://brew.sh):
+
+```sh
+brew install llvm rust cmake
+```
+
+In order to compile applications to WebAssembly, builtins need to be installed
+as well:
+
+```sh
+curl -sL https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-5/libclang_rt.builtins-wasm32-wasi-5.0.tar.gz | \
+sudo tar x -zf - -C /usr/local/opt/llvm/lib/clang/8*
+```
+
+Fetch, compile and install the WASI sysroot:
+
+```sh
+git clone --recursive https://github.com/CraneStation/wasi-sysroot
+
+cd wasi-sysroot
+
+sudo env PATH=/usr/local/opt/llvm/bin:$PATH \
+  make INSTALL_DIR=/opt/wasi-sysroot install
+
+cd - && sudo rm -fr wasi-sysroot
+```
+
+Enter the Lucet git repository clone, and fetch/update the submodules:
+
+```sh
+cd lucet
+
+git submodule update --init
+```
+
+Set relevant environment variables:
+
+```sh
+export WASI_SYSROOT=/opt/wasi-sysroot
+export CLANG_ROOT="$(echo /usr/local/opt/llvm/lib/clang/8*)"
+export CLANG=/usr/local/opt/llvm/bin/clang
+```
+
+Finally, compile the toolchain:
+
+```sh
+cargo build --release
+```
+
 ## Security
 
 The lucet project aims to provide support for secure execution of untrusted code. Security is achieved through a combination of lucet-supplied security controls and user-supplied security controls. See [SECURITY.md](SECURITY.md) for more information on the lucet security model.
 
-###  Reporting Security Issues
+### Reporting Security Issues
 
 The Lucet project team welcomes security reports and is committed to providing
 prompt attention to security issues. Security issues should be reported
