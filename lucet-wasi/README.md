@@ -2,10 +2,6 @@
 
 Experimental WASI embedding for the Lucet runtime.
 
-If you have questions or suggestions, the authors of `lucet-wasi` and others
-in the WASI community can be found in the [WebAssembly Discord
-room](https://discord.gg/PtuCxYc).
-
 ## Examples
 
 Example WASI programs are in the [`examples`](examples) directory.
