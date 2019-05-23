@@ -583,6 +583,15 @@ version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -792,6 +801,7 @@ version = "0.1.0"
 dependencies = [
  "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fs2 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-idl 0.1.0",
  "lucet-runtime 0.1.0",
@@ -799,6 +809,18 @@ dependencies = [
  "lucetc 0.1.0",
  "proptest 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "lucet-idl-test-rust-host"
+version = "0.1.0"
+dependencies = [
+ "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lucet-idl 0.1.0",
+ "lucet-runtime 0.1.0",
+ "lucet-wasi 0.1.0",
 ]
 
 [[package]]
@@ -1988,6 +2010,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum fake-simd 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 "checksum flate2 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)" = "246b6f24d8e616b0c176a8143486ddc8bb0bac2f30f0a0d3efbcf1e0d47cb7e5"
 "checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
+"checksum fs2 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
 "checksum fuchsia-cprng 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 "checksum gcc 0.3.55 (registry+https://github.com/rust-lang/crates.io-index)" = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
 "checksum generic-array 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3c0f28c2f5bfb5960175af447a2da7c18900693738343dc896ffbcabd9839592"

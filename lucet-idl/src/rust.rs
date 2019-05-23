@@ -46,7 +46,7 @@ impl RustGenerator {
         for (_ident, module) in package.modules.iter() {
             self.generate_datatypes(module)?;
             for fdecl in module.func_decls() {
-                unimplemented!(); // FIXME
+                self.w.writeln(format!("// UNIMPLEMENTED: {:?}", fdecl))?;
             }
         }
         Ok(())
