@@ -10,7 +10,7 @@ Example WASI programs are in the [`examples`](examples) directory.
 
 We support the entire [WASI API](https://github.com/CraneStation/wasmtime/blob/master/docs/WASI-api.md),
 with the exception of socket-related syscalls. These will be added when
-network access is standardised.
+network access is standardized.
 
 ## Thread safety
 
