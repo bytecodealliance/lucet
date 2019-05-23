@@ -44,7 +44,7 @@ pub fn wasi_fd_fdstat_get(
         Err(e) => return enc_errno(e),
     };
 
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let errno = if let Some(fe) = ctx.fds.get(&host_fd) {
         host_fdstat.fs_filetype = fe.fd_object.ty;
         host_fdstat.fs_rights_base = fe.rights_base;
@@ -78,8 +78,7 @@ pub fn wasi_fd_fdstat_set_flags(
     let host_fdflags = dec_fdflags(fdflags);
     let nix_flags = host::nix_from_fdflags(host_fdflags);
 
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
-
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     if let Some(fe) = ctx.fds.get(&host_fd) {
         match nix::fcntl::fcntl(fe.fd_object.rawfd, nix::fcntl::F_SETFL(nix_flags)) {
             Ok(_) => wasm32::__WASI_ESUCCESS,
@@ -95,7 +94,7 @@ pub fn wasi_fd_tell(
     fd: wasm32::__wasi_fd_t,
     offset: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let fd = dec_fd(fd);
 
     let host_offset = {
@@ -125,7 +124,7 @@ pub fn wasi_fd_seek(
     whence: wasm32::__wasi_whence_t,
     newoffset: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let fd = dec_fd(fd);
     let offset = dec_filedelta(offset);
     let whence = dec_whence(whence);
@@ -347,7 +346,7 @@ pub fn wasi_path_open(
         & ((host::__WASI_RIGHT_FD_DATASYNC
             | host::__WASI_RIGHT_FD_WRITE
             | host::__WASI_RIGHT_FD_ALLOCATE
-            | host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE) as host::__wasi_rights_t)
+            | host::__WASI_RIGHT_FD_FILESTAT_SET_SIZE) as host::__wasi_rights_t)
         != 0;
 
     let mut nix_all_oflags = if read && write {
@@ -372,7 +371,7 @@ pub fn wasi_path_open(
         needed_base |= host::__WASI_RIGHT_PATH_CREATE_FILE as host::__wasi_rights_t;
     }
     if nix_all_oflags.contains(OFlag::O_TRUNC) {
-        needed_inheriting |= host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE as host::__wasi_rights_t;
+        needed_base |= host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE as host::__wasi_rights_t;
     }
 
     // convert file descriptor flags
@@ -406,11 +405,14 @@ pub fn wasi_path_open(
         Err(e) => return enc_errno(e),
     };
 
+    // Call openat. Use mode 0o666 so that we follow whatever the user's
+    // umask is, but don't set the executable flag, because it isn't yet
+    // meaningful for WASI programs to create executable files.
     let new_fd = match openat(
         dir,
         path.as_os_str(),
         nix_all_oflags,
-        Mode::from_bits_truncate(0o777),
+        Mode::from_bits_truncate(0o666),
     ) {
         Ok(fd) => fd,
         Err(e) => {
@@ -426,6 +428,23 @@ pub fn wasi_path_open(
                     } else {
                         return wasm32::__WASI_ENXIO;
                     }
+                }
+                // Linux returns ENOTDIR instead of ELOOP when using O_NOFOLLOW|O_DIRECTORY
+                // on a symlink.
+                Some(Errno::ENOTDIR)
+                    if !(nix_all_oflags & (OFlag::O_NOFOLLOW | OFlag::O_DIRECTORY)).is_empty() =>
+                {
+                    if let Ok(stat) = fstatat(dir, path.as_os_str(), AtFlags::AT_SYMLINK_NOFOLLOW) {
+                        if SFlag::from_bits_truncate(stat.st_mode).contains(SFlag::S_IFLNK) {
+                            return wasm32::__WASI_ELOOP;
+                        }
+                    }
+                    return wasm32::__WASI_ENOTDIR;
+                }
+                // FreeBSD returns EMLINK instead of ELOOP when using O_NOFOLLOW on
+                // a symlink.
+                Some(Errno::EMLINK) if !(nix_all_oflags & OFlag::O_NOFOLLOW).is_empty() => {
+                    return wasm32::__WASI_ELOOP;
                 }
                 Some(e) => return wasm32::errno_from_nix(e),
                 None => return wasm32::__WASI_ENOSYS,
@@ -468,7 +487,7 @@ pub fn wasi_fd_filestat_get(
     use nix::sys::stat::fstat;
 
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
 
     let rights = host::__WASI_RIGHT_FD_FILESTAT_GET;
     match ctx.get_fd_entry(host_fd, rights.into(), 0) {
@@ -593,7 +612,7 @@ pub fn wasi_fd_allocate(
     len: wasm32::__wasi_filesize_t,
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_ALLOCATE;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -647,7 +666,7 @@ pub fn wasi_fd_advise(
     advice: wasm32::__wasi_advice_t,
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_ADVISE;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -700,7 +719,7 @@ pub fn wasi_fd_advise(
 
 pub fn wasi_fd_datasync(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_DATASYNC;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -726,7 +745,7 @@ pub fn wasi_fd_datasync(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::_
 
 pub fn wasi_fd_sync(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_SYNC;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -746,8 +765,8 @@ pub fn wasi_fd_fdstat_set_rights(
     fs_rights_inheriting: wasm32::__wasi_rights_t,
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
-    let fe = match ctx.fds.get(&host_fd) {
+    let mut ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let fe = match ctx.fds.get_mut(&host_fd) {
         Some(fe) => fe,
         None => return wasm32::__WASI_EBADF,
     };
@@ -756,6 +775,8 @@ pub fn wasi_fd_fdstat_set_rights(
     {
         return wasm32::__WASI_ENOTCAPABLE;
     }
+    fe.rights_base = fs_rights_base;
+    fe.rights_inheriting = fs_rights_inheriting;
     wasm32::__WASI_ESUCCESS
 }
 
@@ -767,7 +788,7 @@ pub fn wasi_fd_filestat_set_size(
     use nix::unistd::ftruncate;
 
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_FILESTAT_SET_SIZE;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -793,7 +814,7 @@ pub fn wasi_fd_filestat_set_times(
     use nix::sys::time::{TimeSpec, TimeValLike};
 
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_FILESTAT_SET_TIMES;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -928,7 +949,7 @@ pub fn wasi_fd_pread(
         Ok(iovs) => iovs,
         Err(e) => return enc_errno(e),
     };
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_READ;
     let fe = match ctx.get_fd_entry(fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -978,7 +999,7 @@ pub fn wasi_fd_pwrite(
         Ok(iovs) => iovs,
         Err(e) => return enc_errno(e),
     };
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_READ;
     let fe = match ctx.get_fd_entry(fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -1021,7 +1042,7 @@ pub fn wasi_fd_readdir(
         Err(e) => return enc_errno(e),
     };
     let fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_READDIR;
     let fe = match ctx.get_fd_entry(fd, rights.into(), 0) {
         Ok(fe) => fe,
