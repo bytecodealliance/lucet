@@ -1,8 +1,7 @@
 use env_logger;
 use log::{debug, info};
 use lucet_idl::parse_package;
-use lucet_idl_test::syntax::Spec;
-use lucet_idl_test::wasi::WasiProject;
+use lucet_idl_test::{CGuestApp, HostApp, RustGuestApp, Spec};
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::TestRunner;
@@ -18,13 +17,14 @@ fn main() {
     let pkg = parse_package(&rendered).expect("parse generated package");
 
     debug!("parsed package: {:?}", pkg);
-    let wasi_project = WasiProject::new(pkg);
 
-    let rust_guest = wasi_project
-        .codegen_rust_guest()
-        .expect("compile rust guest");
+    let mut rust_guest_app = RustGuestApp::new().expect("create rust guest app");
+    let rust_guest_so = rust_guest_app.build(&pkg).expect("compile rust guest app");
 
-    let rust_host = wasi_project.create_rust_host().expect("compile rust host");
+    let mut c_guest_app = CGuestApp::new().expect("create c guest app");
+    let c_guest_so = c_guest_app.build(&pkg).expect("compile c guest app");
 
-    rust_host.run(&rust_guest).expect("run host application");
+    let mut host_app = HostApp::new(&pkg).expect("create host app");
+    host_app.run(&rust_guest_so).expect("run rust_guest_so");
+    host_app.run(&c_guest_so).expect("run c_guest_so");
 }
