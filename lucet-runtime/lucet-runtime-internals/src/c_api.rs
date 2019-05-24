@@ -99,14 +99,17 @@ impl From<Error> for lucet_error {
     }
 }
 
+#[repr(C)]
 pub struct lucet_instance {
     _unused: [u8; 0],
 }
 
+#[repr(C)]
 pub struct lucet_region {
     _unused: [u8; 0],
 }
 
+#[repr(C)]
 pub struct lucet_dl_module {
     _unused: [u8; 0],
 }
