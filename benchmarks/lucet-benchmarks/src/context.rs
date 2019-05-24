@@ -1,5 +1,4 @@
 use criterion::Criterion;
-use lucet_module_data::FunctionPointer;
 use lucet_runtime_internals::context::{Context, ContextHandle};
 
 /// Time the initialization of a context.
@@ -14,7 +13,7 @@ fn context_init(c: &mut Criterion) {
             ContextHandle::create_and_init(
                 &mut *stack,
                 &mut parent,
-                FunctionPointer::from_usize(f as usize),
+                f as usize,
                 &[],
             )
             .unwrap();
@@ -34,7 +33,7 @@ fn context_swap_return(c: &mut Criterion) {
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
                     &mut parent,
-                    FunctionPointer::from_usize(f as usize),
+                    f as usize,
                     &[],
                 )
                 .unwrap();
@@ -61,7 +60,7 @@ fn context_init_swap_return(c: &mut Criterion) {
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
                     &mut parent,
-                    FunctionPointer::from_usize(f as usize),
+                    f as usize,
                     &[],
                 )
                 .unwrap();
@@ -354,7 +353,7 @@ fn context_init_swap_return_many_args(c: &mut Criterion) {
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
                     &mut parent,
-                    FunctionPointer::from_usize(f as usize),
+                    f as usize,
                     &args,
                 )
                 .unwrap();
