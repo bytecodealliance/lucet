@@ -80,6 +80,7 @@ pub unsafe extern "C" fn lucet_region_new_instance_with_wasi_ctx(
             .with_embed_ctx(wasi_ctx.build())
             .build()
             .map(|i| {
+                dbg!(i.heap().len());
                 inst_out.write(instance_handle_to_raw(i) as _);
                 lucet_error::Ok
             })

@@ -141,7 +141,7 @@ impl DerefMut for InstanceHandle {
 
 impl Drop for InstanceHandle {
     fn drop(&mut self) {
-        if self.needs_inst_drop {
+        if dbg!(self.needs_inst_drop) {
             unsafe {
                 let inst = self.inst.as_mut();
 
@@ -669,7 +669,7 @@ impl Instance {
 
     fn run_start(&mut self) -> Result<(), Error> {
         if let Some(start) = self.module.get_start_func()? {
-            self.run_func(start, &[])?;
+            dbg!(self.run_func(start, &[])?);
         }
         Ok(())
     }

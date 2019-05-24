@@ -100,6 +100,8 @@ impl<'a> InstanceBuilder<'a> {
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     pub fn build(self) -> Result<InstanceHandle, Error> {
-        self.region.new_instance_with(self.module, self.embed_ctx)
+        let inst = self.region.new_instance_with(self.module, self.embed_ctx)?;
+        dbg!(inst.heap().len());
+        Ok(inst)
     }
 }

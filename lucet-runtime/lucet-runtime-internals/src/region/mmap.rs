@@ -167,7 +167,7 @@ impl RegionInternal for MmapRegion {
                 )?
             };
         }
-        alloc.heap_accessible_size = initial_size;
+        alloc.heap_accessible_size = dbg!(initial_size);
         alloc.heap_inaccessible_size = alloc.slot().limits.heap_address_space_size - initial_size;
 
         // Initialize the heap using the module sparse page data. There cannot be more pages in the

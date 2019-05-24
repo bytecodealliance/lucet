@@ -106,7 +106,7 @@ pub struct Alloc {
 
 impl Drop for Alloc {
     fn drop(&mut self) {
-        // eprintln!("Alloc::drop()");
+        eprintln!("Alloc::drop()");
         self.region.clone().drop_alloc(self);
     }
 }
@@ -133,7 +133,8 @@ impl Alloc {
 
         let host_page_size = host_page_size() as u32;
 
-        if self.heap_accessible_size as u32 % host_page_size != 0 {
+        dbg!(self.heap_accessible_size);
+        if dbg!(self.heap_accessible_size as u32) % dbg!(host_page_size) != 0 {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
 
@@ -191,6 +192,7 @@ impl Alloc {
             .expand_heap(slot, newly_accessible as u32, expand_pagealigned)?;
 
         self.heap_accessible_size += expand_pagealigned as usize;
+        dbg!(self.heap_accessible_size);
         self.heap_inaccessible_size -= expand_pagealigned as usize;
 
         Ok(newly_accessible as u32)

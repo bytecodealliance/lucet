@@ -281,7 +281,7 @@ pub unsafe extern "C" fn lucet_instance_grow_heap(
                 }
                 lucet_error::Ok
             }
-            Err(e) => e.into(),
+            Err(e) => dbg!(e).into(),
         }
     })
 }
