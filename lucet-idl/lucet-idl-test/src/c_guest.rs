@@ -71,4 +71,8 @@ int main(int argc, char* argv[]) {
         lucetc.shared_object_file(&so_file)?;
         Ok(so_file)
     }
+
+    pub fn into_workspace(self) -> Workspace {
+        self.work
+    }
 }
