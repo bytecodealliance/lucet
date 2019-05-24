@@ -18,8 +18,15 @@ num-derive = "0.2"
 byteorder = "1.2"
 failure = "0.1"
 lazy_static = "1.1"
+lucetc = { path = "../lucetc" }
 lucet-runtime-tests = { path = "lucet-runtime-tests" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 nix = "0.13"
+tempfile = "3.0"
+
+[build-dependencies]
+# only used for tests
+cc = "1.0"
 
 [lib]
 name = "lucet_runtime"

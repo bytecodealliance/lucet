@@ -5,7 +5,6 @@ mod tests;
 
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 use failure::Fail;
-use lucet_module_data::FunctionPointer;
 use nix;
 use nix::sys::signal;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
@@ -194,7 +193,7 @@ impl ContextHandle {
     pub fn create_and_init(
         stack: &mut [u64],
         parent: &mut ContextHandle,
-        fptr: FunctionPointer,
+        fptr: usize,
         args: &[Val],
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
@@ -240,7 +239,6 @@ impl Context {
     /// ```
     ///
     /// ```no_run
-    /// # use lucet_module_data::FunctionPointer;
     /// # use lucet_runtime_internals::context::Context;
     /// # use lucet_runtime_internals::val::Val;
     /// extern "C" { fn entrypoint(x: u64, y: f32); }
@@ -253,7 +251,7 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     FunctionPointer::from_usize(entrypoint as usize),
+    ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
     /// assert!(res.is_ok());
@@ -266,7 +264,6 @@ impl Context {
     /// with C calling conventions.
     ///
     /// ```no_run
-    /// # use lucet_module_data::FunctionPointer;
     /// # use lucet_runtime_internals::context::{Context, ContextHandle};
     /// # use lucet_runtime_internals::val::Val;
     /// extern "C" fn entrypoint(x: u64, y: f32) { }
@@ -279,7 +276,7 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     FunctionPointer::from_usize(entrypoint as usize),
+    ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
     /// assert!(res.is_ok());
@@ -288,7 +285,7 @@ impl Context {
         stack: &mut [u64],
         parent: &mut Context,
         child: &mut Context,
-        fptr: FunctionPointer,
+        fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
         if !stack_is_aligned(stack) {
@@ -346,7 +343,7 @@ impl Context {
         stack[sp + 0 - stack_start] = lucet_context_bootstrap as u64;
 
         // The bootstrap function returns into the guest function, fptr
-        stack[sp + 1 - stack_start] = fptr.as_usize() as u64;
+        stack[sp + 1 - stack_start] = fptr as u64;
 
         // the guest function returns into lucet_context_backstop.
         stack[sp + 2 - stack_start] = lucet_context_backstop as u64;
@@ -431,7 +428,6 @@ impl Context {
     /// parent context.
     ///
     /// ```no_run
-    /// # use lucet_module_data::FunctionPointer;
     /// # use lucet_runtime_internals::context::Context;
     /// # extern "C" fn entrypoint() {}
     /// # let mut stack = vec![0u64; 1024].into_boxed_slice();
@@ -441,7 +437,7 @@ impl Context {
     ///     &mut stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     FunctionPointer::from_usize(entrypoint as usize),
+    ///     entrypoint as usize,
     ///     &[],
     /// ).unwrap();
     ///

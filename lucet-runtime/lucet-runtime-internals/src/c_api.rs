@@ -205,10 +205,9 @@ unsafe impl Sync for CTerminationDetails {}
 pub mod lucet_state {
     use crate::c_api::{lucet_val, CTerminationDetails};
     use crate::instance::{State, TerminationDetails};
-    use crate::module::AddrDetails;
+    use crate::module::{AddrDetails, TrapCode};
     use crate::sysdeps::UContext;
     use libc::{c_char, c_void};
-    use lucet_module_data::TrapCode;
     use num_derive::FromPrimitive;
     use std::ffi::CString;
     use std::ptr;

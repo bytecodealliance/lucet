@@ -200,7 +200,7 @@
 
 pub mod c_api;
 
-pub use lucet_module_data::TrapCode;
+pub use lucet_module_data::{FunctionPointer, TrapCode};
 pub use lucet_runtime_internals::alloc::Limits;
 pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::{

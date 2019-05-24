@@ -8,13 +8,12 @@ use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::siginfo_ext::SiginfoExt;
-use crate::module::{self, Global, Module};
+use crate::module::{self, FunctionHandle, FunctionPointer, Global, Module, TrapCode};
 use crate::region::RegionInternal;
 use crate::sysdeps::UContext;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
-use lucet_module_data::{FunctionHandle, FunctionPointer, TrapCode};
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
@@ -591,7 +590,7 @@ impl Instance {
                 unsafe { self.alloc.stack_u64_mut() },
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
-                func.ptr,
+                func.ptr.as_usize(),
                 &args_with_vmctx,
             )
         })?;

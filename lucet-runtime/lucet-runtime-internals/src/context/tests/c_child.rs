@@ -8,7 +8,6 @@
 use crate::context::{Context, ContextHandle};
 use crate::val::Val;
 use lazy_static::lazy_static;
-use lucet_module_data::FunctionPointer;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_void};
 use std::sync::Mutex;
@@ -55,7 +54,7 @@ macro_rules! init_and_swap {
             let child = Box::into_raw(Box::new(ContextHandle::create_and_init(
                 &mut *$stack,
                 parent_regs.as_mut().unwrap(),
-                FunctionPointer::from_usize($fn as usize),
+                $fn as usize,
                 &[$( $args ),*],
             ).unwrap()));
 

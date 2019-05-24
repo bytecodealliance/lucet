@@ -3,11 +3,10 @@ macro_rules! host_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::c_void;
-        use lucet_module_data::FunctionPointer;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, Limits, Region,
-            TerminationDetails, TrapCode,
+            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FunctionPointer, Limits,
+            Region, TerminationDetails, TrapCode,
         };
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;

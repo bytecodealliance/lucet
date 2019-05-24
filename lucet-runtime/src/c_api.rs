@@ -451,3 +451,37 @@ lucet_hostcalls! {
             .unwrap_or(std::ptr::null_mut())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::lucet_dl_module;
+    use crate::DlModule;
+    use lucet_wasi_sdk::{LinkOpt, LinkOpts, Lucetc};
+    use std::sync::Arc;
+    use tempfile::TempDir;
+
+    extern "C" {
+        fn lucet_runtime_test_expand_heap(module: *mut lucet_dl_module) -> bool;
+    }
+
+    #[test]
+    fn expand_heap() {
+        let workdir = TempDir::new().expect("create working directory");
+
+        let native_build = Lucetc::new(&["tests/guests/null.c"])
+            .with_link_opt(LinkOpt::NoDefaultEntryPoint)
+            .with_link_opt(LinkOpt::AllowUndefinedAll);
+
+        let so_file = workdir.path().join("null.so");
+
+        native_build.build(so_file.clone()).unwrap();
+
+        let dlmodule = DlModule::load(so_file).unwrap();
+
+        unsafe {
+            assert!(lucet_runtime_test_expand_heap(
+                Arc::into_raw(dlmodule) as *mut lucet_dl_module
+            ));
+        }
+    }
+}

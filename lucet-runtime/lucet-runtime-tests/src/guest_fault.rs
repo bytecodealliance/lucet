@@ -125,11 +125,10 @@ macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, siginfo_t, SIGSEGV};
-        use lucet_module_data::FunctionPointer;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
-            Limits, Region, SignalBehavior, TrapCode,
+            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails,
+            FunctionPointer, Instance, Limits, Region, SignalBehavior, TrapCode,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
