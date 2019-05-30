@@ -110,7 +110,7 @@ impl<'a> ArtifactSummary<'a> {
         for header in &self.elf.program_headers {
             if header.p_type == elf::program_header::PT_LOAD {
                 // Bounds check the entry
-                if addr >= header.p_vaddr && (addr + size) < (header.p_vaddr + header.p_memsz) {
+                if addr >= header.p_vaddr && (addr + size) <= (header.p_vaddr + header.p_memsz) {
                     let start = (addr - header.p_vaddr + header.p_offset) as usize;
                     let end = start + size as usize;
 
