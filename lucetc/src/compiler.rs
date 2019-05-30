@@ -23,23 +23,23 @@ use lucet_module_data::{FunctionSpec, ModuleData};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
-    Default,
-    Best,
-    Fastest,
+    None,
+    Standard,
+    Fast,
 }
 
 impl Default for OptLevel {
     fn default() -> OptLevel {
-        OptLevel::Default
+        OptLevel::Standard
     }
 }
 
 impl OptLevel {
     pub fn to_flag(&self) -> &str {
         match self {
-            OptLevel::Default => "default",
-            OptLevel::Best => "best",
-            OptLevel::Fastest => "fastest",
+            OptLevel::None => "fast",
+            OptLevel::Standard => "default",
+            OptLevel::Fast => "best",
         }
     }
 }

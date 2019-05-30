@@ -94,10 +94,10 @@ impl Options {
         };
 
         let opt_level = match m.value_of("opt_level") {
-            None => OptLevel::Default,
-            Some("default") => OptLevel::Default,
-            Some("best") => OptLevel::Best,
-            Some("fastest") => OptLevel::Fastest,
+            None => OptLevel::default(),
+            Some("0") => OptLevel::None,
+            Some("1") => OptLevel::Standard,
+            Some("2") => OptLevel::Fast,
             Some(_) => panic!("unknown value for opt-level"),
         };
 
@@ -195,8 +195,8 @@ impl Options {
                 Arg::with_name("opt_level")
                     .long("--opt-level")
                     .takes_value(true)
-                    .possible_values(&["default", "fastest", "best"])
-                    .help("optimization level (default: 'default')"),
+                    .possible_values(&["0", "1", "2"])
+                    .help("optimization level (default: '1')"),
             )
             .get_matches();
 

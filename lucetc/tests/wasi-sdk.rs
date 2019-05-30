@@ -56,7 +56,7 @@ mod programs {
         let m = module_from_c(&["empty"], &[]).expect("build module for empty");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile empty");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile empty");
         let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());
         // clang creates 3 globals, all internal:
@@ -87,7 +87,7 @@ mod programs {
 
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile a");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
@@ -105,7 +105,7 @@ mod programs {
         let m = module_from_c(&["b"], &["b"]).expect("build module for b");
         let b = b_only_test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile b");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile b");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 1, "import functions");
         assert_eq!(mdata.export_functions().len(), 1, "export functions");
@@ -121,7 +121,7 @@ mod programs {
         let m = module_from_c(&["a", "b"], &["a", "b"]).expect("build module for a & b");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile a & b");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile a & b");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
         assert_eq!(mdata.export_functions().len(), 2, "export functions");
