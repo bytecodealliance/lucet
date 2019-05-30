@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use cranelift_codegen::ir;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ValueType {
@@ -8,6 +9,17 @@ pub enum ValueType {
     I64,
     F32,
     F64,
+}
+
+impl Display for ValueType {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            ValueType::I32 => write!(f, "I32"),
+            ValueType::I64 => write!(f, "I64"),
+            ValueType::F32 => write!(f, "F32"),
+            ValueType::F64 => write!(f, "F64"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -59,6 +71,24 @@ pub struct Signature {
     pub params: Vec<ValueType>,
     // In the future, wasm may permit this to be a Vec of ValueType
     pub ret_ty: Option<ValueType>,
+}
+
+impl Display for Signature {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "(")?;
+        for (i, p) in self.params.iter().enumerate() {
+            if i == 0 {
+                write!(f, "{}", p)?;
+            } else {
+                write!(f, ", {}", p)?;
+            }
+        }
+        write!(f, ") -> ")?;
+        match self.ret_ty {
+            Some(ty) => write!(f, "{}", ty),
+            None => write!(f, "()")
+        }
+    }
 }
 
 #[macro_export]
