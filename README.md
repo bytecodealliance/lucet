@@ -239,12 +239,12 @@ int main(void)
 Time to compile to WebAssembly! The development environment includes a version
 of the Clang toolchain that is built to generate WebAssembly by default. The
 related commands are accessible from your current shell, and are prefixed by
-`wasm32-unknown-wasi-`.
+`wasm32-wasi-`.
 
 For example, to create a WebAssembly module `hello.wasm` from `hello.c`:
 
 ```sh
-wasm32-unknown-wasi-clang -Ofast -o hello.wasm hello.c
+wasm32-wasi-clang -Ofast -o hello.wasm hello.c
 ```
 
 The next step is to use Lucet to build native `x86_64` code from that
