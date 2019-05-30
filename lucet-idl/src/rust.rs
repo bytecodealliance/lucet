@@ -44,10 +44,15 @@ impl RustGenerator {
 
     pub fn generate_host(&mut self, package: &Package) -> Result<(), IDLError> {
         for (_ident, module) in package.modules.iter() {
+            self.w.writeln("use lucet_runtime::lucet_hostcalls;")?;
             self.generate_datatypes(module)?;
+            self.w.writeln("lucet_hostcalls! {")?;
+            self.w.indent();
             for fdecl in module.func_decls() {
-                self.w.writeln(format!("// UNIMPLEMENTED: {:?}", fdecl))?;
+                self.host_function_definition(module, &fdecl)?;
             }
+            self.w.eob()?;
+            self.w.writeln("}")?;
         }
         Ok(())
     }
@@ -217,6 +222,43 @@ impl RustGenerator {
         self.w
             .writeln("#[no_mangle]")?
             .writeln(format!("fn {}({}) -> {};", name, args, rets))?;
+
+        Ok(())
+    }
+
+    fn host_function_definition(
+        &mut self,
+        module: &Module,
+        func_decl_entry: &Named<FuncDecl>,
+    ) -> Result<(), IDLError> {
+        let name = func_decl_entry.name.name.to_snake_case();
+        let mut args = format!("&mut vmctx,");
+        for a in func_decl_entry.entity.args.iter() {
+            args += &format!(
+                "{}: {},",
+                a.name.to_snake_case(),
+                self.get_defined_typename(&a.type_)
+            );
+        }
+
+        let func_rets = &func_decl_entry.entity.rets;
+        let rets = if func_rets.len() == 0 {
+            "()".to_owned()
+        } else {
+            assert_eq!(func_rets.len(), 1);
+            self.get_defined_typename(&func_rets[0].type_).to_owned()
+        };
+
+        self.w.writeln("#[no_mangle]")?.writeln(format!(
+            "pub unsafe extern \"C\" fn {}({}) -> {} {{",
+            name, args, rets
+        ))?;
+
+        self.w.indent();
+        self.w.writeln("unimplemented!()")?;
+        self.w.eob()?;
+
+        self.w.writeln("}")?;
 
         Ok(())
     }
