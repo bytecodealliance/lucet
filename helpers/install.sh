@@ -25,7 +25,7 @@ LUCET_BUNDLE_DOC_DIR=${LUCET_BUNDLE_DOC_DIR:-"${LUCET_DOC_DIR}/lucet"}
 WASI_PREFIX=${WASI_PREFIX:-${WASI_SDK:-"/opt/wasi-sdk"}}
 WASI_BIN=${WASI_BIN:-"${WASI_PREFIX}/bin"}
 WASI_SYSROOT=${WASI_SYSROOT:-"${WASI_PREFIX}/share/sysroot"}
-WASI_TARGET=${WASI_TARGET:-"wasm32-unknown-wasi"}
+WASI_TARGET=${WASI_TARGET:-"wasm32-wasi"}
 WASI_BIN_PREFIX=${WASI_BIN_PREFIX:-"$WASI_TARGET"}
 
 BINS="lucet-analyze lucet-wasi lucetc sightglass spec-test wasmonkey"
