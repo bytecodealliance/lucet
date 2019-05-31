@@ -41,7 +41,7 @@ pub(crate) const STACK_PROBE_BINARY: &'static [u8] = &[
 ];
 
 pub fn declare_metadata<'a>(info: &mut ModuleInfo<'a>) -> Result<(), Error> {
-    let runtime_sigidx = SignatureIndex::from_u32(info.signatures.len() as u32);
+    let runtime_sigidx = SignatureIndex::from_u32(info.signature_mapping.len() as u32);
     info.declare_signature(Signature {
         params: vec![],
         returns: vec![AbiParam::new(types::I32)],

@@ -4,6 +4,7 @@ use crate::heap::HeapSettings;
 use crate::module::ModuleInfo;
 pub use crate::module::{Exportable, TableElems};
 use crate::name::Name;
+use crate::pointer::NATIVE_POINTER;
 use crate::runtime::{Runtime, RuntimeFunc};
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
@@ -44,8 +45,25 @@ impl<'a> FunctionDecl<'a> {
 /// Function provided by lucet-runtime to be called from generated code, e.g. memory size & grow
 /// functions.
 pub struct RuntimeDecl<'a> {
-    pub signature: &'a ir::Signature,
+    signature: &'a ir::Signature,
     pub name: Name,
+}
+
+impl<'a> RuntimeDecl<'a> {
+    pub fn internal_signature(&self) -> &'a ir::Signature {
+        self.signature
+    }
+
+    pub fn native_signature(&self) -> ir::Signature {
+        let mut native_sig = self.signature.clone();
+
+        native_sig.params.insert(
+            0,
+            ir::AbiParam::special(NATIVE_POINTER, ir::ArgumentPurpose::VMContext),
+        );
+
+        native_sig
+    }
 }
 
 #[derive(Debug)]
@@ -195,7 +213,7 @@ impl<'a> ModuleDecls<'a> {
     ) -> Result<HashMap<RuntimeFunc, Name>, LucetcError> {
         let mut runtime_names: HashMap<RuntimeFunc, Name> = HashMap::new();
         for (func, (symbol, signature)) in runtime.functions.iter() {
-            let runtime_sigidx = SignatureIndex::from_u32(info.signatures.len() as u32);
+            let runtime_sigidx = SignatureIndex::from_u32(info.signature_mapping.len() as u32);
             // Declare runtime fuction signatures so they exist just in case no other function
             // happens to have the same ones
             info.declare_signature(signature.clone());
