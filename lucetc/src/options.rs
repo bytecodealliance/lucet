@@ -97,7 +97,7 @@ impl Options {
             None => OptLevel::default(),
             Some("0") => OptLevel::None,
             Some("1") => OptLevel::Standard,
-            Some("2") => OptLevel::Fast,
+            Some("2") | Some("fast") => OptLevel::Fast,
             Some(_) => panic!("unknown value for opt-level"),
         };
 
@@ -195,7 +195,7 @@ impl Options {
                 Arg::with_name("opt_level")
                     .long("--opt-level")
                     .takes_value(true)
-                    .possible_values(&["0", "1", "2"])
+                    .possible_values(&["0", "1", "2", "fast"])
                     .help("optimization level (default: '1')"),
             )
             .get_matches();
