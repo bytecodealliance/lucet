@@ -27,16 +27,16 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
 # rebuilds.
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
-RUN curl -sS -L -O https://static.rust-lang.org/dist/rust-1.34.2-x86_64-unknown-linux-gnu.tar.gz \
-	&& tar xzf rust-1.34.2-x86_64-unknown-linux-gnu.tar.gz \
-	&& cd rust-1.34.2-x86_64-unknown-linux-gnu \
+RUN curl -sS -L -O https://static.rust-lang.org/dist/rust-1.35.0-x86_64-unknown-linux-gnu.tar.gz \
+	&& tar xzf rust-1.35.0-x86_64-unknown-linux-gnu.tar.gz \
+	&& cd rust-1.35.0-x86_64-unknown-linux-gnu \
 	&& ./install.sh \
 	&& cd .. \
-	&& rm -rf rust-1.34.2-x86_64-unknown-linux-gnu rust-1.34.2-x86_64-unknown-linux-gnu.tar.gz
+	&& rm -rf rust-1.35.0-x86_64-unknown-linux-gnu rust-1.35.0-x86_64-unknown-linux-gnu.tar.gz
 ENV PATH=/usr/local/bin:$PATH
 RUN cargo install --root /usr/local cargo-audit cargo-watch
 
-RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-4/wasi-sdk_4.0_amd64.deb \
- && dpkg -i wasi-sdk_4.0_amd64.deb && rm -f wasi-sdk_4.0_amd64.deb
+RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-5/wasi-sdk_5.0_amd64.deb \
+	&& dpkg -i wasi-sdk_5.0_amd64.deb && rm -f wasi-sdk_5.0_amd64.deb
 
 ENV WASI_SDK=/opt/wasi-sdk

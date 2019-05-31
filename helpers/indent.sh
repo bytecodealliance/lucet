@@ -10,8 +10,8 @@ cleanup () {
 }
 trap cleanup 1 2 3 6 9 15
 
-if ! $(rustfmt --version | grep -q "rustfmt 1.0.3-stable"); then
-	echo "indent requires rustfmt 1.0.3-stable"
+if ! $(rustfmt --version | grep -q "rustfmt 1.2.0-stable"); then
+	echo "indent requires rustfmt 1.2.0-stable"
 	exit 1;
 fi
 
