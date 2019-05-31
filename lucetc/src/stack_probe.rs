@@ -8,10 +8,15 @@
 //! adding custom entries for it into the trap table, so that stack overflows in the probe will be
 //! treated like any other guest trap.
 
+use crate::module::ModuleInfo;
 use cranelift_codegen::binemit::TrapSink;
 use cranelift_codegen::ir;
+use cranelift_codegen::ir::{types, AbiParam, Signature};
+use cranelift_codegen::isa::CallConv;
 use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
 use cranelift_faerie::FaerieProduct;
+use cranelift_wasm::ModuleEnvironment;
+use cranelift_wasm::SignatureIndex;
 use faerie::Decl;
 use failure::Error;
 
@@ -34,6 +39,17 @@ pub(crate) const STACK_PROBE_BINARY: &'static [u8] = &[
     0x81, 0xeb, 0x00, 0x10, 0x00, 0x00, 0x49, 0x81, 0xfb, 0x00, 0x10, 0x00, 0x00, 0x77, 0xe4, 0x4c,
     0x29, 0xdc, 0x48, 0x85, 0x64, 0x24, 0x08, 0x48, 0x01, 0xc4, 0xc3,
 ];
+
+pub fn declare_metadata<'a>(info: &mut ModuleInfo<'a>) -> Result<(), Error> {
+    let runtime_sigidx = SignatureIndex::from_u32(info.signatures.len() as u32);
+    info.declare_signature(Signature {
+        params: vec![],
+        returns: vec![AbiParam::new(types::I32)],
+        call_conv: CallConv::SystemV, // the stack probe function is very specific to x86_64, and possibly tos SystemV ABI platforms?
+    });
+    info.declare_func_type(runtime_sigidx);
+    Ok(())
+}
 
 pub fn declare_and_define(product: &mut FaerieProduct) -> Result<(), Error> {
     product.artifact.declare_with(

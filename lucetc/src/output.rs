@@ -47,19 +47,6 @@ impl ObjectFile {
     ) -> Result<Self, Error> {
         stack_probe::declare_and_define(&mut product)?;
 
-        // stack_probe::declare_and_define adds a new function into `product`, but
-        // function_manifest was already constructed from all defined functions.
-        // So, we have to add a new entry to `function_manifest` for the stack probe
-        function_manifest.push((
-            stack_probe::STACK_PROBE_SYM.to_string(),
-            FunctionSpec::new(
-                0, // there is no real address for the function until written to an object file
-                stack_probe::STACK_PROBE_BINARY.len() as u32,
-                0,
-                0, // fix up this FunctionSpec with trap info like any other
-            ),
-        ));
-
         let trap_manifest = &product
             .trap_manifest
             .expect("trap manifest will be present");

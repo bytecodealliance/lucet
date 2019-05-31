@@ -59,9 +59,9 @@ pub struct TableDecl<'a> {
 }
 
 pub struct ModuleDecls<'a> {
-    info: ModuleInfo<'a>,
+    pub info: ModuleInfo<'a>,
     runtime: Runtime,
-    function_names: PrimaryMap<FuncIndex, Name>,
+    pub function_names: PrimaryMap<FuncIndex, Name>,
     imports: Vec<ImportFunction<'a>>,
     exports: Vec<ExportFunction<'a>>,
     table_names: PrimaryMap<TableIndex, (Name, Name)>,
@@ -72,15 +72,17 @@ pub struct ModuleDecls<'a> {
 
 impl<'a> ModuleDecls<'a> {
     pub fn new<B: ClifBackend>(
-        info: ModuleInfo<'a>,
+        mut info: ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
         bindings: &Bindings,
         runtime: Runtime,
         heap_settings: HeapSettings,
     ) -> Result<Self, LucetcError> {
-        let (function_names, imports, exports) = Self::declare_funcs(&info, clif_module, bindings)?;
+        let (mut function_names, imports, exports) =
+            Self::declare_funcs(&info, clif_module, bindings)?;
         let table_names = Self::declare_tables(&info, clif_module)?;
-        let runtime_names = Self::declare_runtime(&runtime, clif_module)?;
+        let runtime_names =
+            Self::declare_runtime(&mut info, &mut function_names, &runtime, clif_module)?;
         let globals_spec = Self::declare_globals_spec(&info)?;
         let linear_memory_spec = Self::declare_linear_memory_spec(&info, heap_settings)?;
         Ok(Self {
@@ -186,15 +188,27 @@ impl<'a> ModuleDecls<'a> {
     }
 
     fn declare_runtime<B: ClifBackend>(
+        info: &mut ModuleInfo<'a>,
+        function_names: &mut PrimaryMap<FuncIndex, Name>,
         runtime: &Runtime,
         clif_module: &mut ClifModule<B>,
     ) -> Result<HashMap<RuntimeFunc, Name>, LucetcError> {
         let mut runtime_names: HashMap<RuntimeFunc, Name> = HashMap::new();
         for (func, (symbol, signature)) in runtime.functions.iter() {
+            let runtime_sigidx = SignatureIndex::from_u32(info.signatures.len() as u32);
+            // Declare runtime fuction signatures so they exist just in case no other function
+            // happens to have the same ones
+            info.declare_signature(signature.clone());
+            info.declare_func_type(runtime_sigidx);
+
+            let inner_sig_index = info.signature_mapping.get(runtime_sigidx).unwrap();
+            let declared_signature = info.signatures.get(*inner_sig_index).unwrap();
             let funcid = clif_module
-                .declare_function(&symbol, Linkage::Import, signature)
+                .declare_function(&symbol, Linkage::Import, declared_signature)
                 .context(LucetcErrorKind::TranslatingModule)?;
             let name = Name::new_func(symbol.clone(), funcid);
+
+            function_names.push(name.clone());
 
             runtime_names.insert(*func, name);
         }
