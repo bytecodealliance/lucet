@@ -42,4 +42,5 @@ assets = [
     ["LICENSE", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
     ["LICENSE.wasmtime", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
     ["LICENSE.cloudabi-utils", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
+    ["bindings.json", "/opt/fst-lucet-wasi/share/", "644"],
 ]
