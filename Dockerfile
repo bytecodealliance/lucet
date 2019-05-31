@@ -1,7 +1,7 @@
 FROM ubuntu:xenial
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
+	&& apt-get install -y --no-install-recommends \
 	build-essential \
 	curl \
 	git \
@@ -13,13 +13,13 @@ RUN apt-get update \
 	ca-certificates \
 	software-properties-common \
 	libssl-dev \
-    pkg-config \
-    csmith \
-    libcsmith-dev \
-    creduce \
-    gcc-multilib \
-    clang-6.0 \
- && rm -rf /var/lib/apt/lists/*
+	pkg-config \
+	csmith \
+	libcsmith-dev \
+	creduce \
+	gcc-multilib \
+	clang-6.0 \
+	&& rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
 
