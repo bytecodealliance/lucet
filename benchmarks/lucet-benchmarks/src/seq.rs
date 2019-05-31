@@ -29,7 +29,7 @@ fn hello_load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criter
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file, OptLevel::Best);
+    compile_hello(&so_file, OptLevel::Fast);
 
     c.bench_function(
         &format!("hello_load_mkregion_and_instantiate ({})", R::TYPE_NAME),
@@ -57,7 +57,7 @@ fn hello_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file, OptLevel::Best);
+    compile_hello(&so_file, OptLevel::Fast);
 
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
@@ -125,7 +125,7 @@ fn hello_drop_instance<R: RegionCreate + 'static>(c: &mut Criterion) {
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file, OptLevel::Best);
+    compile_hello(&so_file, OptLevel::Fast);
 
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
@@ -246,7 +246,7 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file, OptLevel::Best);
+    compile_hello(&so_file, OptLevel::Fast);
 
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
