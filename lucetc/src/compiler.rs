@@ -132,40 +132,7 @@ impl<'a> Compiler<'a> {
                 .context(LucetcErrorKind::FunctionDefinition)?;
         }
 
-        use cranelift_entity::EntityRef;
-        stack_probe::declare_metadata(&mut self.decls.info).unwrap();
-        let stack_probe_id = self
-            .clif_module
-            .declare_function(
-                stack_probe::STACK_PROBE_SYM,
-                cranelift_module::Linkage::Local,
-                self.decls
-                    .info
-                    .signatures
-                    .get(
-                        *self
-                            .decls
-                            .info
-                            .signature_mapping
-                            .get(
-                                self.decls
-                                    .info
-                                    .functions
-                                    .get(cranelift_wasm::FuncIndex::new(
-                                        self.decls.info.functions.len() - 1,
-                                    ))
-                                    .unwrap()
-                                    .entity,
-                            )
-                            .unwrap(),
-                    )
-                    .unwrap(),
-            )
-            .unwrap();
-        self.decls.function_names.push(crate::name::Name::new_func(
-            stack_probe::STACK_PROBE_SYM.to_string(),
-            stack_probe_id,
-        ));
+        stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
 
         write_module_data(&mut self.clif_module, &self.decls)?;
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
