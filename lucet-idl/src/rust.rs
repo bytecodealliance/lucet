@@ -250,8 +250,13 @@ impl RustGenerator {
         };
 
         self.w.writeln("#[no_mangle]")?.writeln(format!(
-            "pub unsafe extern \"C\" fn {}({}) -> {} {{",
-            name, args, rets
+            "// Wasm func {}::{}
+pub unsafe extern \"C\" fn {}({}) -> {} {{",
+            module.module_name,
+            func_decl_entry.entity.field_name,
+            func_decl_entry.entity.binding_name,
+            args,
+            rets
         ))?;
 
         self.w.indent();

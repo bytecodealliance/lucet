@@ -1,4 +1,3 @@
-* idl package generates a lucetc::Bindings, binding info accessible in modules / func AST
 * idl-test generates arbitrary values for a given type
 * describe ABI of functions:
     * annotations to arguments saying whether they are in, out, or inout

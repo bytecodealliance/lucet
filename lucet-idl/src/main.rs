@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::path::PathBuf;
+use std::process;
 
 #[derive(Clone, Debug)]
 pub struct ExeConfig {
@@ -69,5 +70,8 @@ fn doit() -> Result<(), IDLError> {
 }
 
 fn main() {
-    doit().unwrap();
+    if let Err(e) = doit() {
+        eprintln!("{}", e);
+        process::exit(1);
+    }
 }

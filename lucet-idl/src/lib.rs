@@ -26,6 +26,7 @@ pub use crate::types::{
 use crate::c::CGenerator;
 use crate::parser::Parser;
 use crate::rust::RustGenerator;
+use lucetc::Bindings;
 use std::io::Write;
 
 pub fn parse_package(input: &str) -> Result<Package, IDLError> {
@@ -40,12 +41,20 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
         Backend::CGuest => CGenerator::new(output).generate_guest(package)?,
         Backend::RustGuest => RustGenerator::new(output).generate_guest(package)?,
         Backend::RustHost => RustGenerator::new(output).generate_host(package)?,
+        Backend::Bindings => generate_bindings(&package.bindings(), output)?,
     }
-
     Ok(())
 }
 
 pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
     let pkg = parse_package(input)?;
     codegen(&pkg, config, output)
+}
+
+fn generate_bindings(bindings: &Bindings, mut output: Box<dyn Write>) -> Result<(), IDLError> {
+    let bindings_json = bindings
+        .to_string()
+        .map_err(|_| IDLError::InternalError("bindings generation"))?;
+    output.write_all(bindings_json.as_bytes())?;
+    Ok(())
 }

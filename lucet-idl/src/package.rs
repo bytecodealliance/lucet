@@ -2,6 +2,8 @@ use crate::error::ValidationError;
 use crate::module::Module;
 use crate::parser::SyntaxDecl;
 use crate::types::{Ident, Location, Name};
+use heck::SnakeCase;
+use lucetc::Bindings;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -75,14 +77,29 @@ impl Package {
 
         for (decl, id) in decls.iter().zip(&idents) {
             match decl {
-                SyntaxDecl::Module { decls, attrs, .. } => {
-                    pkg.define_module(*id, Module::from_declarations(decls, attrs)?);
+                SyntaxDecl::Module {
+                    decls, attrs, name, ..
+                } => {
+                    let binding_prefix = "__".to_owned() + &name.to_snake_case();
+                    pkg.define_module(
+                        *id,
+                        Module::from_declarations(decls, attrs, name.clone(), binding_prefix)?,
+                    );
                 }
                 _ => unreachable!(),
             }
         }
 
         Ok(pkg)
+    }
+
+    pub fn bindings(&self) -> Bindings {
+        let b: HashMap<String, HashMap<String, String>> = self
+            .modules
+            .iter()
+            .map(|(_, m)| (m.module_name.clone(), m.func_bindings()))
+            .collect();
+        Bindings::new(b)
     }
 }
 

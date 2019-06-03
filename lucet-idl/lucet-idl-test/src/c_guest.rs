@@ -65,8 +65,9 @@ int main(int argc, char* argv[]) {
         self.generate_idl_h(package)?;
         self.generate_main_c()?;
         self.wasi_clang()?;
-        let lucetc =
-            Lucetc::new(self.work.output_path("out.wasm")).with_bindings(lucet_wasi::bindings());
+        let mut bindings = lucet_wasi::bindings();
+        bindings.extend(&package.bindings())?;
+        let lucetc = Lucetc::new(self.work.output_path("out.wasm")).with_bindings(bindings);
         let so_file = self.work.output_path("out.so");
         lucetc.shared_object_file(&so_file)?;
         Ok(so_file)

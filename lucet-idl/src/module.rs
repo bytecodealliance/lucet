@@ -7,6 +7,7 @@ use crate::types::{
     Attr, DataType, DataTypeRef, EnumMember, FuncArg, FuncDecl, FuncRet, Ident, Location, Name,
     Named,
 };
+use heck::SnakeCase;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -16,16 +17,20 @@ pub struct Module {
     pub data_types: HashMap<Ident, DataType>,
     pub data_type_ordering: Vec<Ident>,
     pub funcs: HashMap<Ident, FuncDecl>,
+    pub module_name: String,
+    pub binding_prefix: String,
 }
 
 impl Module {
-    fn new(attrs: &[Attr]) -> Self {
+    fn new(attrs: &[Attr], module_name: String, binding_prefix: String) -> Self {
         Self {
             names: Vec::new(),
             attrs: attrs.to_vec(),
             data_types: HashMap::new(),
             data_type_ordering: Vec::new(),
             funcs: HashMap::new(),
+            module_name,
+            binding_prefix,
         }
     }
 
@@ -180,6 +185,7 @@ impl Module {
                 );
             }
             SyntaxDecl::Function {
+                name,
                 args,
                 rets,
                 attrs,
@@ -225,10 +231,13 @@ impl Module {
                     })?
                 }
 
+                let binding_name = self.binding_prefix.clone() + "_" + &name.to_snake_case();
                 let decl = FuncDecl {
                     args,
                     rets,
                     attrs: attrs.clone(),
+                    field_name: name.clone(),
+                    binding_name,
                 };
                 if let Some(prev_def) = funcs_ir.insert(id, decl) {
                     panic!("id {} already defined: {:?}", id, prev_def)
@@ -242,8 +251,10 @@ impl Module {
     pub fn from_declarations(
         decls: &[SyntaxDecl],
         attrs: &[Attr],
+        module_name: String,
+        binding_prefix: String,
     ) -> Result<Module, ValidationError> {
-        let mut mod_ = Self::new(attrs);
+        let mut mod_ = Self::new(attrs, module_name, binding_prefix);
         let mut idents: Vec<Ident> = Vec::new();
         for decl in decls {
             match decl {
@@ -307,6 +318,12 @@ impl Module {
         self.funcs
             .iter()
             .map(move |(i, _)| self.get_func_decl(*i).unwrap())
+    }
+
+    pub fn func_bindings(&self) -> HashMap<String, String> {
+        self.func_decls()
+            .map(|d| (d.entity.field_name.clone(), d.entity.binding_name.clone()))
+            .collect()
     }
 }
 

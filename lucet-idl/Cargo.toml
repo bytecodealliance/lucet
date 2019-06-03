@@ -19,6 +19,7 @@ clap = "2"
 failure = "0.1"
 xfailure = "0.1"
 heck = "0.3"
+lucetc = { path = "../lucetc" }
 
 [dev-dependencies]
 tempfile = "3.0"

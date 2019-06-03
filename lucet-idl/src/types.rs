@@ -118,6 +118,8 @@ pub struct FuncArg {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FuncDecl {
+    pub field_name: String,
+    pub binding_name: String,
     pub args: Vec<FuncArg>,
     pub rets: Vec<FuncRet>,
     pub attrs: Vec<Attr>,
