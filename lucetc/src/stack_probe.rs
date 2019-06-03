@@ -44,7 +44,6 @@ pub fn declare_metadata<'a, B: ClifBackend>(
     decls: &mut ModuleDecls<'a>,
     clif_module: &mut ClifModule<B>,
 ) -> Result<FuncIndex, Error> {
-    // TODO: clean
     Ok(decls
         .declare_new_function(
             clif_module,
@@ -53,7 +52,7 @@ pub fn declare_metadata<'a, B: ClifBackend>(
             Signature {
                 params: vec![],
                 returns: vec![AbiParam::new(types::I32)],
-                call_conv: CallConv::SystemV, // the stack probe function is very specific to x86_64, and possibly tos SystemV ABI platforms?
+                call_conv: CallConv::SystemV, // the stack probe function is very specific to x86_64, and possibly to SystemV ABI platforms?
             },
         )
         .unwrap())
