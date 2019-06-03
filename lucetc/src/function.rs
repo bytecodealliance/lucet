@@ -67,7 +67,7 @@ impl<'a> FuncInfo<'a> {
                     .module_decls
                     .get_runtime(runtime_func)
                     .expect("runtime function not available");
-                let signature = func.import_signature(decl.native_signature());
+                let signature = func.import_signature(decl.signature().to_owned());
                 let fref = func.import_function(ir::ExtFuncData {
                     name: decl.name.into(),
                     signature,

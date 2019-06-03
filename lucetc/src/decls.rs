@@ -4,7 +4,6 @@ use crate::heap::HeapSettings;
 use crate::module::ModuleInfo;
 pub use crate::module::{Exportable, TableElems};
 use crate::name::Name;
-use crate::pointer::NATIVE_POINTER;
 use crate::runtime::{Runtime, RuntimeFunc};
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
@@ -50,19 +49,8 @@ pub struct RuntimeDecl<'a> {
 }
 
 impl<'a> RuntimeDecl<'a> {
-    pub fn internal_signature(&self) -> &'a ir::Signature {
+    pub fn signature(&self) -> &'a ir::Signature {
         self.signature
-    }
-
-    pub fn native_signature(&self) -> ir::Signature {
-        let mut native_sig = self.signature.clone();
-
-        native_sig.params.insert(
-            0,
-            ir::AbiParam::special(NATIVE_POINTER, ir::ArgumentPurpose::VMContext),
-        );
-
-        native_sig
     }
 }
 
