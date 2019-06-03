@@ -132,6 +132,8 @@ impl<'a> Compiler<'a> {
                 .context(LucetcErrorKind::FunctionDefinition)?;
         }
 
+        stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
+
         write_module_data(&mut self.clif_module, &self.decls)?;
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
         write_table_data(&mut self.clif_module, &self.decls)?;

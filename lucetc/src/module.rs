@@ -99,6 +99,28 @@ impl<'a> ModuleInfo<'a> {
             data_initializers: HashMap::new(),
         }
     }
+
+    pub fn signature_for_function(&self, func_index: FuncIndex) -> &ir::Signature {
+        // FuncIndex are valid (or the caller has very bad data)
+        let sigidx = self.functions.get(func_index).unwrap().entity;
+
+        self.signature_by_id(sigidx)
+    }
+
+    pub fn signature_by_id(&self, sig_idx: SignatureIndex) -> &ir::Signature {
+        // All signatures map to some unique signature index
+        let unique_sig_idx = self.signature_mapping.get(sig_idx).unwrap();
+        // Unique signature indices are valid (or we're in some deeply bad state)
+        self.signatures.get(*unique_sig_idx).unwrap()
+    }
+
+    pub fn declare_func_with_sig(&mut self, sig: ir::Signature) -> (FuncIndex, SignatureIndex) {
+        let new_sigidx = SignatureIndex::from_u32(self.signature_mapping.len() as u32);
+        self.declare_signature(sig);
+        let new_funcidx = FuncIndex::from_u32(self.functions.len() as u32);
+        self.declare_func_type(new_sigidx);
+        (new_funcidx, new_sigidx)
+    }
 }
 
 impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
