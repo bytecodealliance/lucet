@@ -155,11 +155,26 @@ impl<'a> ModuleDecls<'a> {
                 }
             };
 
-            let (decl_sym, decl_linkage) = import_name_for(func_index, decls, bindings)?
-                .or_else(|| export_name_for(func_index, decls))
-                .unwrap_or_else(|| (format!("guest_func_{}", ix), Linkage::Local));
+            let mut declared = false;
 
-            decls.declare_function(clif_module, decl_sym, decl_linkage, func_index)?;
+            if let Some((decl_sym, decl_linkage)) = import_name_for(func_index, decls, bindings)? {
+                decls.declare_function(clif_module, decl_sym, decl_linkage, func_index)?;
+                declared = true;
+            }
+
+            if let Some((decl_sym, decl_linkage)) = export_name_for(func_index, decls) {
+                decls.declare_function(clif_module, decl_sym, decl_linkage, func_index)?;
+                declared = true;
+            }
+
+            if !declared {
+                decls.declare_function(
+                    clif_module,
+                    format!("guest_func_{}", ix),
+                    Linkage::Local,
+                    func_index,
+                )?;
+            }
         }
         Ok(())
     }
@@ -177,7 +192,9 @@ impl<'a> ModuleDecls<'a> {
     ) -> Result<FuncIndex, LucetcError> {
         let (new_funcidx, _) = self.info.declare_func_with_sig(signature);
 
-        self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)
+        self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)?;
+
+        Ok(new_funcidx)
     }
 
     /// The internal side of fixing up a new function declaration. This is also the work that must
@@ -188,7 +205,14 @@ impl<'a> ModuleDecls<'a> {
         decl_sym: String,
         decl_linkage: Linkage,
         func_ix: FuncIndex,
-    ) -> Result<FuncIndex, LucetcError> {
+    ) -> Result<(), LucetcError> {
+        // This function declaration may be a subsequent additional declaration for a function
+        // we've already been told about. In that case, func_ix will already be a valid index for a
+        // function name, and we should not try to declare it again.
+        //
+        // Regardless of the function being known internally, we must forward the additional
+        // declaration to `clif_module` so functions with multiple forms of linkage (import +
+        // export, exported twice, ...) are correctly declared in the resultant artifact.
         let funcid = clif_module
             .declare_function(
                 &decl_sym,
@@ -196,8 +220,19 @@ impl<'a> ModuleDecls<'a> {
                 self.info.signature_for_function(func_ix),
             )
             .context(LucetcErrorKind::TranslatingModule)?;
-        self.function_names.push(Name::new_func(decl_sym, funcid));
-        Ok(FuncIndex::new(self.function_names.len() - 1))
+
+        if func_ix.as_u32() as usize >= self.function_names.len() {
+            // func_ix is new, so we need to add the name
+            //
+            // if func_ix is new, it should be an index for the Name we're about to add. So, it
+            // should be the same as the current value for `self.function_names.len()`.
+            //
+            // If this fails, we're declaring functions out of order. oops!
+            debug_assert!(func_ix.as_u32() as usize == self.function_names.len());
+
+            self.function_names.push(Name::new_func(decl_sym, funcid));
+        }
+        Ok(())
     }
 
     fn declare_tables<B: ClifBackend>(
