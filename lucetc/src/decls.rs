@@ -285,7 +285,7 @@ impl<'a> ModuleDecls<'a> {
                     def: GlobalDef::new(init_val),
                 }
             };
-            globals.push(GlobalSpec::new(g_variant, None));
+            globals.push(GlobalSpec::new(g_variant, g_decl.export_names.clone()));
         }
         Ok(globals)
     }

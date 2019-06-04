@@ -9,36 +9,39 @@ use serde::{Deserialize, Serialize};
 pub struct GlobalSpec<'a> {
     #[serde(borrow)]
     global: Global<'a>,
-    export: Option<&'a str>,
+    export_names: Vec<&'a str>,
 }
 
 impl<'a> GlobalSpec<'a> {
-    pub fn new(global: Global<'a>, export: Option<&'a str>) -> Self {
-        Self { global, export }
+    pub fn new(global: Global<'a>, export_names: Vec<&'a str>) -> Self {
+        Self { global, export_names }
     }
 
-    /// Create a new global definition with an initial value and an optional export name.
-    pub fn new_def(init_val: i64, export: Option<&'a str>) -> Self {
+    /// Create a new global definition with an initial value and export names.
+    pub fn new_def(init_val: i64, export_names: Vec<&'a str>) -> Self {
         Self::new(
             Global::Def {
                 def: GlobalDef::new(init_val),
             },
-            export,
+            export_names,
         )
     }
 
-    /// Create a new global import definition with a module and field name, and an optional export
-    /// name.
-    pub fn new_import(module: &'a str, field: &'a str, export: Option<&'a str>) -> Self {
-        Self::new(Global::Import { module, field }, export)
+    /// Create a new global import definition with a module and field name, and export names.
+    pub fn new_import(module: &'a str, field: &'a str, export_names: Vec<&'a str>) -> Self {
+        Self::new(Global::Import { module, field }, export_names)
     }
 
     pub fn global(&self) -> &Global {
         &self.global
     }
 
-    pub fn export(&self) -> Option<&str> {
-        self.export
+    pub fn export_names(&self) -> &[&str] {
+        &self.export_names
+    }
+
+    pub fn is_internal(&self) -> bool {
+        self.export_names.len() == 0
     }
 }
 
@@ -83,38 +86,33 @@ impl GlobalDef {
 /// This type is useful when directly building up a value to be serialized.
 pub struct OwnedGlobalSpec {
     global: OwnedGlobal,
-    export: Option<String>,
+    export_names: Vec<String>,
 }
 
 impl OwnedGlobalSpec {
-    pub fn new(global: OwnedGlobal, export: Option<String>) -> Self {
-        Self { global, export }
+    pub fn new(global: OwnedGlobal, export_names: Vec<String>) -> Self {
+        Self { global, export_names }
     }
 
-    /// Create a new global definition with an initial value and an optional export name.
-    pub fn new_def(init_val: i64, export: Option<String>) -> Self {
+    /// Create a new global definition with an initial value and export names.
+    pub fn new_def(init_val: i64, export_names: Vec<String>) -> Self {
         Self::new(
             OwnedGlobal::Def {
                 def: GlobalDef::new(init_val),
             },
-            export,
+            export_names,
         )
     }
 
-    /// Create a new global import definition with a module and field name, and an optional export
-    /// name.
-    pub fn new_import(module: String, field: String, export: Option<String>) -> Self {
-        Self::new(OwnedGlobal::Import { module, field }, export)
+    /// Create a new global import definition with a module and field name, and export names.
+    pub fn new_import(module: String, field: String, export_names: Vec<String>) -> Self {
+        Self::new(OwnedGlobal::Import { module, field }, export_names)
     }
 
     /// Create a [`GlobalSpec`](../struct.GlobalSpec.html) backed by the values in this
     /// `OwnedGlobalSpec`.
     pub fn to_ref<'a>(&'a self) -> GlobalSpec<'a> {
-        let export = match &self.export {
-            Some(e) => Some(e.as_str()),
-            None => None,
-        };
-        GlobalSpec::new(self.global.to_ref(), export)
+        GlobalSpec::new(self.global.to_ref(), self.export_names.iter().map(|x| x.as_str()).collect())
     }
 }
 

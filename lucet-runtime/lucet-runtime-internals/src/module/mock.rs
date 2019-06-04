@@ -64,14 +64,14 @@ impl MockModuleBuilder {
 
     pub fn with_global(mut self, idx: u32, init_val: i64) -> Self {
         self.globals
-            .insert(idx as usize, OwnedGlobalSpec::new_def(init_val, None));
+            .insert(idx as usize, OwnedGlobalSpec::new_def(init_val, vec![]));
         self
     }
 
     pub fn with_exported_global(mut self, idx: u32, init_val: i64, export_name: &str) -> Self {
         self.globals.insert(
             idx as usize,
-            OwnedGlobalSpec::new_def(init_val, Some(export_name.to_string())),
+            OwnedGlobalSpec::new_def(init_val, vec![export_name.to_string()]),
         );
         self
     }
@@ -79,7 +79,7 @@ impl MockModuleBuilder {
     pub fn with_import(mut self, idx: u32, import_module: &str, import_field: &str) -> Self {
         self.globals.insert(
             idx as usize,
-            OwnedGlobalSpec::new_import(import_module.to_string(), import_field.to_string(), None),
+            OwnedGlobalSpec::new_import(import_module.to_string(), import_field.to_string(), vec![]),
         );
         self
     }
@@ -96,7 +96,7 @@ impl MockModuleBuilder {
             OwnedGlobalSpec::new_import(
                 import_module.to_string(),
                 import_field.to_string(),
-                Some(export_name.to_string()),
+                vec![export_name.to_string()],
             ),
         );
         self
