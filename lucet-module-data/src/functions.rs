@@ -141,7 +141,7 @@ pub struct FunctionHandle {
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct FunctionSpec {
-    code_addr: u64,
+    pub code_addr: u64,
     code_len: u32,
     traps_addr: u64,
     traps_len: u64

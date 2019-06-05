@@ -71,24 +71,24 @@ impl DlModule {
             std::ptr::null()
         };
 
-        let function_manifest = unsafe {
+        let function_manifest: &mut [FunctionSpec] = unsafe {
             let manifest_len_ptr = lib.get::<*const u32>(b"lucet_function_manifest_len");
-            let manifest_ptr = lib.get::<*const FunctionSpec>(b"lucet_function_manifest");
+            let manifest_ptr = lib.get::<*mut FunctionSpec>(b"lucet_function_manifest");
 
             match (manifest_ptr, manifest_len_ptr) {
                 (Ok(ptr), Ok(len_ptr)) => {
                     let manifest_len = len_ptr.as_ref().ok_or(lucet_incorrect_module!(
                         "`lucet_function_manifest_len` is defined but null"
                     ))?;
-                    let manifest = ptr.as_ref().ok_or(lucet_incorrect_module!(
+                    let manifest: *mut FunctionSpec = *ptr; /*.ok_or(lucet_incorrect_module!(
                         "`lucet_function_manifest` is defined but null"
-                    ))?;
+                    ))?;*/
 
-                    from_raw_parts(manifest, *manifest_len as usize)
+                    std::slice::from_raw_parts_mut(manifest, *manifest_len as usize)
                 }
                 (Err(ptr_err), Err(len_err)) => {
                     if is_undefined_symbol(&ptr_err) && is_undefined_symbol(&len_err) {
-                        &[]
+                        &mut []
                     } else {
                         // This is an unfortunate situation. Both attempts to look up symbols
                         // failed, but at least one is not due to an undefined symbol.
@@ -116,6 +116,36 @@ impl DlModule {
                 }
             }
         };
+
+        // resolve imports (oh no ...)
+        unsafe {
+            use nix::sys::mman::ProtFlags;
+            use libloading::os::unix;
+
+            // Yoinked from region/mmap.rs for now
+            unsafe fn mprotect(addr: *mut c_void, length: libc::size_t, prot: ProtFlags) -> nix::Result<()> {
+                nix::errno::Errno::result(libc::mprotect(addr, length, prot.bits())).map(drop)
+            }
+
+            let runtime = unix::Library::this();
+
+            let manifest_page_offset = function_manifest.as_ptr() as u64 % 4096;
+            let manifest_page_ptr = (function_manifest.as_ptr() as u64 - manifest_page_offset) as *mut c_void;
+            let manifest_len = (manifest_page_offset + (function_manifest.len() * std::mem::size_of::<FunctionSpec>()) as u64) as usize;
+            mprotect(manifest_page_ptr, manifest_len,
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)?;
+
+            for import in module_data.import_functions() {
+                let ptr = runtime.get::<*const usize>(import.name.as_bytes()).map_err(Error::DlError)?;
+                let fn_addr = ptr.as_ref().unwrap() as *const usize as u64;
+                function_manifest.get_mut(import.fn_idx.as_u32() as usize).unwrap().code_addr = fn_addr;
+            }
+
+            // Module data ends up in the same page as code, potentially, so this gets +x so as to
+            // permit those functions to execute. this should be fixed, though..
+            mprotect(manifest_page_ptr, manifest_len,
+                ProtFlags::PROT_READ | ProtFlags::PROT_EXEC)?;
+        }
 
         Ok(Arc::new(DlModule {
             lib,
