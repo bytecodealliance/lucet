@@ -2,6 +2,7 @@ mod c_guest;
 mod host;
 mod rust_guest;
 pub mod syntax;
+pub mod values;
 mod workspace;
 
 pub use c_guest::CGuestApp;
