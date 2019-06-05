@@ -1,6 +1,29 @@
 use lucetc::Bindings;
 use serde_json::json;
 
+use lucet_runtime::lucet_hostcalls;
+
+lucet_hostcalls! {
+    #[no_mangle]
+    pub unsafe extern "C" fn print(&mut _vmctx,) -> () {
+        println!("hello, world!");
+    }
+}
+
+lucet_hostcalls! {
+    #[no_mangle]
+    pub unsafe extern "C" fn print_i32(&mut _vmctx, x: i32,) -> () {
+        println!("{}", x);
+    }
+}
+
+lucet_hostcalls! {
+    #[no_mangle]
+    pub unsafe extern "C" fn print_f32(&mut _vmctx, x: i32,) -> () {
+        println!("{}", x);
+    }
+}
+
 pub fn spec_test_bindings() -> Bindings {
     let imports: serde_json::Value = json!({
         "test": {
