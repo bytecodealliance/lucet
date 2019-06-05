@@ -1,13 +1,14 @@
 use clap::{App, Arg};
 use env_logger;
 use log::{debug, info};
-use lucet_idl::parse_package;
+use lucet_idl::{parse_package, Package};
 use lucet_idl_test::{CGuestApp, HostApp, RustGuestApp, Spec, Workspace};
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::TestRunner;
 use std::fs::read_to_string;
 use std::path::PathBuf;
+use std::process;
 
 fn main() {
     env_logger::init();
@@ -27,6 +28,11 @@ fn main() {
     let pkg = parse_package(&input_idl).expect("parse generated package");
 
     debug!("parsed package: {:?}", pkg);
+
+    if exe_config.generate_values {
+        generate_values(&pkg);
+        process::exit(0);
+    }
 
     // Workspace deleted when dropped - need to keep it alive for app to be run
     let mut guest_apps: Vec<(PathBuf, Workspace)> = Vec::new();
@@ -60,6 +66,7 @@ struct ExeConfig {
     pub build_rust_guest: bool,
     pub build_c_guest: bool,
     pub run_guests: bool,
+    pub generate_values: bool,
 }
 
 impl ExeConfig {
@@ -100,6 +107,13 @@ impl ExeConfig {
                     .long("no-run")
                     .help(""),
             )
+            .arg(
+                Arg::with_name("generate_values")
+                    .required(false)
+                    .takes_value(false)
+                    .long("generate-values")
+                    .help(""),
+            )
             .get_matches();
 
         ExeConfig {
@@ -108,6 +122,23 @@ impl ExeConfig {
             build_c_guest: !matches.is_present("no_c_guest"),
             build_rust_guest: !matches.is_present("no_rust_guest"),
             run_guests: !matches.is_present("no_run") || !matches.is_present("no_host"),
+            generate_values: matches.is_present("generate_values"),
+        }
+    }
+}
+
+fn generate_values(package: &Package) {
+    use lucet_idl_test::values::*;
+
+    for (_, m) in package.modules.iter() {
+        for dt in m.datatypes() {
+            let dt_generator = m.datatype_strat(&dt.datatype_ref());
+            let mut runner = TestRunner::default();
+            let value = dt_generator
+                .new_tree(&mut runner)
+                .expect("create valuetree")
+                .current();
+            println!("type: {:?}\nvalue: {:?}", dt, value);
         }
     }
 }

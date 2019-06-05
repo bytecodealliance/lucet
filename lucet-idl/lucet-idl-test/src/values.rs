@@ -1,6 +1,6 @@
 use lucet_idl::{
-    AliasDataType, AtomType, DataTypeRef, DataTypeVariant, EnumDataType, Module, StructDataType,
-    StructMember,
+    AliasDataType, AtomType, DataTypeRef, DataTypeVariant, EnumDataType, Module, Named,
+    StructDataType, StructMember,
 };
 use proptest::{self, prelude::*};
 
@@ -39,20 +39,44 @@ impl AtomVal {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnumVal {
+    pub enum_name: String,
     pub member_name: String,
 }
 
 impl EnumVal {
-    pub fn strat(enum_datatype: &EnumDataType) -> impl Strategy<Value = Self> {
-        proptest::sample::select(enum_datatype.members.clone()).prop_map(|mem| EnumVal {
-            member_name: mem.name,
+    pub fn strat(enum_datatype: &Named<EnumDataType>) -> impl Strategy<Value = Self> {
+        let name = enum_datatype.name.name.clone();
+        proptest::sample::select(enum_datatype.entity.members.clone()).prop_map(move |mem| {
+            EnumVal {
+                enum_name: name.clone(),
+                member_name: mem.name,
+            }
         })
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructVal {
+    pub struct_name: String,
     pub members: Vec<StructMemberVal>,
+}
+
+impl StructVal {
+    pub fn strat(struct_dt: &Named<StructDataType>, module: &Module) -> BoxedStrategy<Self> {
+        let name = struct_dt.name.name.clone();
+        let member_strats: Vec<BoxedStrategy<StructMemberVal>> = struct_dt
+            .entity
+            .members
+            .iter()
+            .map(|m| StructMemberVal::strat(m, module))
+            .collect();
+        member_strats
+            .prop_map(move |members| StructVal {
+                struct_name: name.clone(),
+                members,
+            })
+            .boxed()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -63,10 +87,11 @@ pub struct StructMemberVal {
 
 impl StructMemberVal {
     pub fn strat(struct_member: &StructMember, module: &Module) -> BoxedStrategy<Self> {
+        let name = struct_member.name.clone();
         module
             .datatype_strat(&struct_member.type_)
-            .prop_map(|value| StructMemberVal {
-                name: struct_member.name.clone(),
+            .prop_map(move |value| StructMemberVal {
+                name: name.clone(),
                 value: Box::new(value),
             })
             .boxed()
@@ -74,7 +99,23 @@ impl StructMemberVal {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct AliasVal {}
+pub struct AliasVal {
+    pub name: String,
+    pub value: Box<DataTypeVal>,
+}
+
+impl AliasVal {
+    pub fn strat(alias_dt: &Named<AliasDataType>, module: &Module) -> BoxedStrategy<Self> {
+        let name = alias_dt.name.name.clone();
+        module
+            .datatype_strat(&alias_dt.entity.to)
+            .prop_map(move |value| AliasVal {
+                name: name.clone(),
+                value: Box::new(value),
+            })
+            .boxed()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DataTypeVal {
@@ -84,7 +125,7 @@ pub enum DataTypeVal {
     Atom(AtomVal),
 }
 
-trait ModuleExt {
+pub trait ModuleExt {
     fn datatype_strat(&self, dtref: &DataTypeRef) -> BoxedStrategy<DataTypeVal>;
 }
 
@@ -94,9 +135,19 @@ impl ModuleExt for Module {
             DataTypeRef::Defined(ident) => {
                 let dt = self.get_datatype(*ident).expect("ref to defined datatype");
                 match dt.entity.variant {
-                    DataTypeVariant::Struct(struct_dt) => unimplemented!(),
-                    DataTypeVariant::Enum(enum_dt) => unimplemented!(),
-                    DataTypeVariant::Alias(alias_dt) => unimplemented!(),
+                    DataTypeVariant::Struct(ref struct_dt) => {
+                        StructVal::strat(&dt.using_name(struct_dt), self)
+                            .prop_map(DataTypeVal::Struct)
+                            .boxed()
+                    }
+                    DataTypeVariant::Enum(ref enum_dt) => EnumVal::strat(&dt.using_name(enum_dt))
+                        .prop_map(DataTypeVal::Enum)
+                        .boxed(),
+                    DataTypeVariant::Alias(ref alias_dt) => {
+                        AliasVal::strat(&dt.using_name(alias_dt), self)
+                            .prop_map(DataTypeVal::Alias)
+                            .boxed()
+                    }
                 }
             }
             DataTypeRef::Atom(a) => AtomVal::strat(&a).prop_map(DataTypeVal::Atom).boxed(),

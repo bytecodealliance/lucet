@@ -1,4 +1,6 @@
 * idl-test generates arbitrary values for a given type
+    * generate rust literals
+    * generate C literals
 * describe ABI of functions:
     * annotations to arguments saying whether they are in, out, or inout
     * non-atomic arguments need to be passed by reference, cannot be return values

@@ -151,3 +151,19 @@ pub struct Named<'t, E> {
     pub name: &'t Name,
     pub entity: &'t E,
 }
+
+impl<'a, T> Named<'a, T> {
+    pub fn using_name<U>(&self, other: &'a U) -> Named<'a, U> {
+        Named {
+            id: self.id,
+            name: self.name,
+            entity: other,
+        }
+    }
+}
+
+impl<'a> Named<'a, DataType> {
+    pub fn datatype_ref(&self) -> DataTypeRef {
+        DataTypeRef::Defined(self.id)
+    }
+}
