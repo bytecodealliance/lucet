@@ -73,22 +73,22 @@ impl DlModule {
 
         let function_manifest = unsafe {
             let manifest_len_ptr = lib.get::<*const u32>(b"lucet_function_manifest_len");
-            let manifest_ptr = lib.get::<*const FunctionSpec>(b"lucet_function_manifest");
+            let manifest_ptr = lib.get::<*mut FunctionSpec>(b"lucet_function_manifest");
 
             match (manifest_ptr, manifest_len_ptr) {
                 (Ok(ptr), Ok(len_ptr)) => {
                     let manifest_len = len_ptr.as_ref().ok_or(lucet_incorrect_module!(
                         "`lucet_function_manifest_len` is defined but null"
                     ))?;
-                    let manifest = ptr.as_ref().ok_or(lucet_incorrect_module!(
-                        "`lucet_function_manifest` is defined but null"
-                    ))?;
+                    let manifest = ptr.as_mut().ok_or(
+                        lucet_incorrect_module!("`lucet_function_manifest` is defined but null"),
+                    )?;
 
-                    from_raw_parts(manifest, *manifest_len as usize)
+                    std::slice::from_raw_parts_mut(manifest, *manifest_len as usize)
                 }
                 (Err(ptr_err), Err(len_err)) => {
                     if is_undefined_symbol(&ptr_err) && is_undefined_symbol(&len_err) {
-                        &[]
+                        &mut []
                     } else {
                         // This is an unfortunate situation. Both attempts to look up symbols
                         // failed, but at least one is not due to an undefined symbol.
@@ -116,6 +116,82 @@ impl DlModule {
                 }
             }
         };
+
+        // Fix up entries in function manifest for imported functions to have correct addresses
+        unsafe {
+            use libloading::os::unix;
+            use nix::sys::mman::ProtFlags;
+
+            // Yoinked from region/mmap.rs for now
+            unsafe fn mprotect(
+                addr: *mut c_void,
+                length: libc::size_t,
+                prot: ProtFlags,
+            ) -> nix::Result<()> {
+                nix::errno::Errno::result(libc::mprotect(addr, length, prot.bits())).map(drop)
+            }
+
+            let runtime = unix::Library::this();
+
+            let manifest_page_offset = function_manifest.as_ptr() as u64 % 4096;
+            let manifest_page_ptr =
+                (function_manifest.as_ptr() as u64 - manifest_page_offset) as *mut c_void;
+
+            // Because the function manifest may not be page-aligned, the manifest may actually
+            // start far past 0, with pages laid out like something like:
+            //
+            // 0                X                   Y
+            // | data data data | function manifest |
+            //
+            // where Y-X == manifest length as bytes, but X can be anywhere in the PAGE_SIZE bytes
+            // after 0. Since mprotect will start at 0 from whatever address, we must actually
+            // adjust protections for the whole span [0..Y). We do this by specifying that region
+            // as the length to mprotect.
+            let manifest_region_len = (manifest_page_offset
+                + (function_manifest.len() * std::mem::size_of::<FunctionSpec>()) as u64)
+                as usize;
+
+            mprotect(
+                manifest_page_ptr,
+                manifest_region_len,
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+            )?;
+
+            for import in module_data.import_functions() {
+                let ptr = runtime
+                    .get::<extern "C" fn()>(import.name.as_bytes())
+                    .map_err(Error::DlError)?;
+
+                let existing_entry = function_manifest
+                    .get_mut(import.fn_idx.as_u32() as usize)
+                    .unwrap();
+
+                // TODO: if this import is ever resolved from another WASM module, we can
+                // read trap and code length information from that module. In fact, this might even
+                // be rewritable as a replace by a clone of the exported FunctionSpec that satisfies
+                // this import!
+                let new_entry = FunctionSpec::new(
+                    *ptr as u64,
+                    existing_entry.code_len(),
+                    existing_entry
+                        .traps()
+                        .map(|manifest| manifest.traps.as_ptr() as u64)
+                        .unwrap_or(0),
+                    existing_entry.traps_len(),
+                );
+
+                std::mem::replace(existing_entry, new_entry);
+            }
+
+            // The function manifest may end up in the same page as code, for now, so this gets +x to
+            // permit those functions to execute. This should be should be fixed so .rodata can be
+            // kept -x.
+            mprotect(
+                manifest_page_ptr,
+                manifest_region_len,
+                ProtFlags::PROT_READ | ProtFlags::PROT_EXEC,
+            )?;
+        }
 
         Ok(Arc::new(DlModule {
             lib,
