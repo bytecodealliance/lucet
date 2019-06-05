@@ -202,7 +202,17 @@ impl ModuleInternal for DlModule {
                 FunctionPointer::from_usize(unsafe { **start_func } as usize),
             )))
         } else {
-            Ok(None)
+            let start_sym = b"guest_func__start";
+            if let Ok(start_func) = unsafe { self.lib.get::<*const extern "C" fn()>(start_sym) } {
+            if start_func.is_null() {
+                lucet_incorrect_module!("`guest_start` is defined but null");
+            }
+            Ok(Some(self.function_handle_from_ptr(
+                FunctionPointer::from_usize(*start_func as usize),
+            )))
+            } else {
+                Ok(None)
+            }
         }
     }
 

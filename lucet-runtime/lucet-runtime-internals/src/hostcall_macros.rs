@@ -81,7 +81,9 @@ macro_rules! lucet_hostcall_terminate {
         lucet_hostcall_terminate!("lucet_hostcall_terminate")
     };
     ( $payload:expr ) => {
-        panic!($crate::instance::TerminationDetails::provide($payload))
+        use std::process;
+
+        process::exit($payload as i32);
     };
     ( $payload:expr, ) => {
         lucet_hostcall_terminate!($payload)

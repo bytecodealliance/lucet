@@ -435,7 +435,7 @@ lucet_hostcalls! {
         &mut _vmctx,
         details: *mut c_void,
     ) -> () {
-        lucet_hostcall_terminate!(CTerminationDetails { details});
+        lucet_hostcall_terminate!(details as i32);
     }
 
     #[no_mangle]
