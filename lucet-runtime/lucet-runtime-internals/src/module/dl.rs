@@ -81,8 +81,8 @@ impl DlModule {
                         "`lucet_function_manifest_len` is defined but null"
                     ))?;
                     let manifest: *mut FunctionSpec = *ptr; /*.ok_or(lucet_incorrect_module!(
-                        "`lucet_function_manifest` is defined but null"
-                    ))?;*/
+                                                                "`lucet_function_manifest` is defined but null"
+                                                            ))?;*/
 
                     std::slice::from_raw_parts_mut(manifest, *manifest_len as usize)
                 }
@@ -119,32 +119,50 @@ impl DlModule {
 
         // resolve imports (oh no ...)
         unsafe {
-            use nix::sys::mman::ProtFlags;
             use libloading::os::unix;
+            use nix::sys::mman::ProtFlags;
 
             // Yoinked from region/mmap.rs for now
-            unsafe fn mprotect(addr: *mut c_void, length: libc::size_t, prot: ProtFlags) -> nix::Result<()> {
+            unsafe fn mprotect(
+                addr: *mut c_void,
+                length: libc::size_t,
+                prot: ProtFlags,
+            ) -> nix::Result<()> {
                 nix::errno::Errno::result(libc::mprotect(addr, length, prot.bits())).map(drop)
             }
 
             let runtime = unix::Library::this();
 
             let manifest_page_offset = function_manifest.as_ptr() as u64 % 4096;
-            let manifest_page_ptr = (function_manifest.as_ptr() as u64 - manifest_page_offset) as *mut c_void;
-            let manifest_len = (manifest_page_offset + (function_manifest.len() * std::mem::size_of::<FunctionSpec>()) as u64) as usize;
-            mprotect(manifest_page_ptr, manifest_len,
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)?;
+            let manifest_page_ptr =
+                (function_manifest.as_ptr() as u64 - manifest_page_offset) as *mut c_void;
+            let manifest_len = (manifest_page_offset
+                + (function_manifest.len() * std::mem::size_of::<FunctionSpec>()) as u64)
+                as usize;
+            mprotect(
+                manifest_page_ptr,
+                manifest_len,
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+            )?;
 
             for import in module_data.import_functions() {
-                let ptr = runtime.get::<*const usize>(import.name.as_bytes()).map_err(Error::DlError)?;
+                let ptr = runtime
+                    .get::<*const usize>(import.name.as_bytes())
+                    .map_err(Error::DlError)?;
                 let fn_addr = ptr.as_ref().unwrap() as *const usize as u64;
-                function_manifest.get_mut(import.fn_idx.as_u32() as usize).unwrap().code_addr = fn_addr;
+                function_manifest
+                    .get_mut(import.fn_idx.as_u32() as usize)
+                    .unwrap()
+                    .code_addr = fn_addr;
             }
 
             // Module data ends up in the same page as code, potentially, so this gets +x so as to
             // permit those functions to execute. this should be fixed, though..
-            mprotect(manifest_page_ptr, manifest_len,
-                ProtFlags::PROT_READ | ProtFlags::PROT_EXEC)?;
+            mprotect(
+                manifest_page_ptr,
+                manifest_len,
+                ProtFlags::PROT_READ | ProtFlags::PROT_EXEC,
+            )?;
         }
 
         Ok(Arc::new(DlModule {

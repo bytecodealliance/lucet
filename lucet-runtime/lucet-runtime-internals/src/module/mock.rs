@@ -79,7 +79,11 @@ impl MockModuleBuilder {
     pub fn with_import(mut self, idx: u32, import_module: &str, import_field: &str) -> Self {
         self.globals.insert(
             idx as usize,
-            OwnedGlobalSpec::new_import(import_module.to_string(), import_field.to_string(), vec![]),
+            OwnedGlobalSpec::new_import(
+                import_module.to_string(),
+                import_field.to_string(),
+                vec![],
+            ),
         );
         self
     }
