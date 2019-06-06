@@ -302,25 +302,42 @@ impl<'a> ModuleDecls<'a> {
         for ix in 0..info.globals.len() {
             let ix = GlobalIndex::new(ix);
             let g_decl = info.globals.get(ix).unwrap();
-            let g_import = info.imported_globals.get(ix);
-            let g_variant = if let Some((module, field)) = g_import {
-                GlobalVariant::Import { module, field }
-            } else {
-                let init_val = match g_decl.entity.initializer {
-                    // Need to fix global spec in ModuleData and the runtime to support more:
-                    GlobalInit::I32Const(i) => i as i64,
-                    GlobalInit::I64Const(i) => i,
-                    _ => Err(format_err!(
-                        "non-integer global initializer: {:?}",
-                        g_decl.entity
-                    ))
-                    .context(LucetcErrorKind::Unsupported)?,
-                };
-                GlobalVariant::Def {
-                    def: GlobalDef::new(init_val),
+
+            let global = match g_decl.entity.initializer {
+                GlobalInit::I32Const(i) => Ok(GlobalVariant::Def(GlobalDef::I32(i))),
+                GlobalInit::I64Const(i) => Ok(GlobalVariant::Def(GlobalDef::I64(i))),
+                GlobalInit::F32Const(f) => {
+                    Ok(GlobalVariant::Def(GlobalDef::F32(f32::from_bits(f))))
                 }
-            };
-            globals.push(GlobalSpec::new(g_variant, g_decl.export_names.clone()));
+                GlobalInit::F64Const(f) => {
+                    Ok(GlobalVariant::Def(GlobalDef::F64(f64::from_bits(f))))
+                }
+                GlobalInit::GetGlobal(ref_ix) => {
+                    let ref_decl = info.globals.get(ref_ix).unwrap();
+                    if let GlobalInit::Import = ref_decl.entity.initializer {
+                        if let Some((module, field)) = info.imported_globals.get(ref_ix) {
+                            Ok(GlobalVariant::Import { module, field })
+                        } else {
+                            Err(format_err!("inconsistent state: global {} is declared as an import but has no entry in imported_globals", ref_ix.as_u32()))
+                            .context(LucetcErrorKind::TranslatingModule)
+                        }
+                    } else {
+                        // This WASM restriction may be loosened in the future:
+                        Err(format_err!("invalid global declarations: global {} is initialized by referencing another global value, but the referenced global is not an import", ix.as_u32()))
+                        .context(LucetcErrorKind::TranslatingModule)
+                    }
+                }
+                GlobalInit::Import => {
+                    if let Some((module, field)) = info.imported_globals.get(ix) {
+                        Ok(GlobalVariant::Import { module, field })
+                    } else {
+                        Err(format_err!("inconsistent state: global {} is declared as an import but has no entry in imported_globals", ix.as_u32()))
+                        .context(LucetcErrorKind::TranslatingModule)
+                    }
+                }
+            }?;
+
+            globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));
         }
         Ok(globals)
     }
