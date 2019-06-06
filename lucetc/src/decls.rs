@@ -117,7 +117,7 @@ impl<'a> ModuleDecls<'a> {
             fn export_name_for<'a>(
                 func_ix: FuncIndex,
                 decls: &mut ModuleDecls<'a>,
-            ) -> Option<(String, Linkage)> {
+            ) -> Option<String> {
                 let export = decls.info.functions.get(func_ix).unwrap();
 
                 if !export.export_names.is_empty() {
@@ -126,10 +126,7 @@ impl<'a> ModuleDecls<'a> {
                         names: export.export_names.clone(),
                     });
 
-                    Some((
-                        format!("guest_func_{}", export.export_names[0]),
-                        Linkage::Export,
-                    ))
+                    Some(format!("guest_func_{}", export.export_names[0]))
                 } else {
                     None
                 }
@@ -139,7 +136,7 @@ impl<'a> ModuleDecls<'a> {
                 func_ix: FuncIndex,
                 decls: &mut ModuleDecls<'a>,
                 bindings: &Bindings,
-            ) -> Result<Option<(String, Linkage)>, failure::Context<LucetcErrorKind>> {
+            ) -> Result<Option<String>, failure::Context<LucetcErrorKind>> {
                 if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
                     decls.imports.push(ImportFunction {
                         fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
@@ -149,31 +146,39 @@ impl<'a> ModuleDecls<'a> {
                     let import_symbol = bindings
                         .translate(import_mod, import_field)
                         .context(LucetcErrorKind::TranslatingModule)?;
-                    Ok(Some((import_symbol, Linkage::Import)))
+                    Ok(Some(import_symbol))
                 } else {
                     Ok(None)
                 }
             };
 
-            let mut declared = false;
+            let import_info = import_name_for(func_index, decls, bindings)?;
+            let export_info = export_name_for(func_index, decls);
 
-            if let Some((decl_sym, decl_linkage)) = import_name_for(func_index, decls, bindings)? {
-                decls.declare_function(clif_module, decl_sym, decl_linkage, func_index)?;
-                declared = true;
-            }
+            match (import_info, export_info) {
+                (Some(import_sym), _) => {
+                    // if a function is only an import, declare the corresponding artifact import.
+                    // if a function is an export and import, it will not have a real function body
+                    // in this program, and we must not declare it with Linkage::Export (there will
+                    // never be a define to satisfy the symbol!)
 
-            if let Some((decl_sym, decl_linkage)) = export_name_for(func_index, decls) {
-                decls.declare_function(clif_module, decl_sym, decl_linkage, func_index)?;
-                declared = true;
-            }
-
-            if !declared {
-                decls.declare_function(
-                    clif_module,
-                    format!("guest_func_{}", ix),
-                    Linkage::Local,
-                    func_index,
-                )?;
+                    decls.declare_function(clif_module, import_sym, Linkage::Import, func_index)?;
+                }
+                (None, Some(export_sym)) => {
+                    // This is a function that is only exported, so there will be a body in this
+                    // artifact. We can declare the export.
+                    decls.declare_function(clif_module, export_sym, Linkage::Export, func_index)?;
+                }
+                (None, None) => {
+                    // No import or export for this function. It's local, and we have to make up a
+                    // name.
+                    decls.declare_function(
+                        clif_module,
+                        format!("guest_func_{}", ix),
+                        Linkage::Local,
+                        func_index,
+                    )?;
+                }
             }
         }
         Ok(())
