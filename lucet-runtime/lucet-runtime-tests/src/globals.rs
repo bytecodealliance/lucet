@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! globals_tests {
     ( $TestRegion:path ) => {
-        use lucet_module_data::{lucet_signature, FunctionPointer};
+        use lucet_module_data::{lucet_signature, FunctionPointer, GlobalValue};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{Error, Limits, Module, Region};
         use std::sync::Arc;
@@ -62,22 +62,22 @@ macro_rules! globals_tests {
 
         fn mock_globals_module() -> Arc<dyn Module> {
             extern "C" {
-                fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut i64;
+                fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut GlobalValue;
             }
 
             unsafe extern "C" fn get_global0(vmctx: *mut lucet_vmctx) -> i64 {
                 let globals = std::slice::from_raw_parts(lucet_vmctx_get_globals(vmctx), 2);
-                globals[0]
+                globals[0].i_64
             }
 
             unsafe extern "C" fn set_global0(vmctx: *mut lucet_vmctx, val: i64) {
                 let globals = std::slice::from_raw_parts_mut(lucet_vmctx_get_globals(vmctx), 2);
-                globals[0] = val;
+                globals[0].i_64 = val;
             }
 
             unsafe extern "C" fn get_global1(vmctx: *mut lucet_vmctx) -> i64 {
                 let globals = std::slice::from_raw_parts(lucet_vmctx_get_globals(vmctx), 2);
-                globals[1]
+                globals[1].i_64
             }
 
             MockModuleBuilder::new()
@@ -109,8 +109,8 @@ macro_rules! globals_tests {
             let inst = region
                 .new_instance(module)
                 .expect("instance can be created");
-            assert_eq!(inst.globals()[0], -1);
-            assert_eq!(inst.globals()[1], 420);
+            assert_eq!(unsafe { inst.globals()[0].i_64 }, -1);
+            assert_eq!(unsafe { inst.globals()[1].i_64 }, 420);
         }
 
         #[test]

@@ -12,7 +12,7 @@ mod traps;
 mod types;
 
 pub use crate::error::Error;
-pub use crate::globals::{Global, GlobalDef, GlobalSpec};
+pub use crate::globals::{Global, GlobalDef, GlobalSpec, GlobalValue};
 pub use crate::linear_memory::{HeapSpec, SparseData, LinearMemorySpec};
 pub use crate::module_data::ModuleData;
 pub use crate::functions::{ExportFunction, FunctionHandle, FunctionIndex, FunctionMetadata, FunctionPointer, FunctionSpec, ImportFunction, UniqueSignatureIndex};
