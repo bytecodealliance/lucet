@@ -82,8 +82,8 @@ macro_rules! lucet_hostcall_terminate {
     };
     ( $payload:expr ) => {
         use std::process;
-
-        process::exit($payload as i32);
+        println!("\nexit = {}", $payload);
+        process::exit(0);
     };
     ( $payload:expr, ) => {
         lucet_hostcall_terminate!($payload)
