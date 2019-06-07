@@ -14,6 +14,16 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
         arg0 + arg1
     }
 
+    extern "C" fn add_4_hostcall(
+        _vmctx: *mut lucet_vmctx,
+        arg0: u64,
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+    ) -> u64 {
+        arg0 + arg1 + arg2 + arg3
+    }
+
     extern "C" fn add_10(
         _vmctx: *mut lucet_vmctx,
         arg0: u64,
@@ -123,6 +133,11 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
         .with_export_func(
             MockExportBuilder::new("add_2", FunctionPointer::from_usize(add_2 as usize))
                 .with_sig(lucet_signature!((I64, I64) -> I64)),
+        )
+        .with_exported_import_func(
+            "add_4_reexport",
+            FunctionPointer::from_usize(add_4_hostcall as usize),
+            lucet_signature!((I64, I64, I64, I64) -> I64),
         )
         .with_export_func(
             MockExportBuilder::new("add_10", FunctionPointer::from_usize(add_10 as usize))
