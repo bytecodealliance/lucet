@@ -80,9 +80,9 @@ impl DlModule {
                     let manifest_len = len_ptr.as_ref().ok_or(lucet_incorrect_module!(
                         "`lucet_function_manifest_len` is defined but null"
                     ))?;
-                    let manifest: *mut FunctionSpec = *ptr; /*.ok_or(lucet_incorrect_module!(
-                                                                "`lucet_function_manifest` is defined but null"
-                                                            ))?;*/
+                    let manifest: *mut FunctionSpec = ptr.as_mut().ok_or(
+                        lucet_incorrect_module!("`lucet_function_manifest` is defined but null"),
+                    )?;
 
                     std::slice::from_raw_parts_mut(manifest, *manifest_len as usize)
                 }
@@ -117,7 +117,7 @@ impl DlModule {
             }
         };
 
-        // resolve imports (oh no ...)
+        // Fix up entries in function manifest for imported functions to have correct addresses
         unsafe {
             use libloading::os::unix;
             use nix::sys::mman::ProtFlags;
@@ -136,31 +136,59 @@ impl DlModule {
             let manifest_page_offset = function_manifest.as_ptr() as u64 % 4096;
             let manifest_page_ptr =
                 (function_manifest.as_ptr() as u64 - manifest_page_offset) as *mut c_void;
-            let manifest_len = (manifest_page_offset
+
+            // Because the function manifest may not be page-aligned, the manifest may actually
+            // start far past 0, with pages laid out like something like:
+            //
+            // 0                X                   Y
+            // | data data data | function manifest |
+            //
+            // where Y-X == manifest length as bytes, but X can be anywhere in the PAGE_SIZE bytes
+            // after 0. Since mprotect will start at 0 from whatever address, we must actually
+            // adjust protections for the whole span [0..Y). We do this by specifying that region
+            // as the length to mprotect.
+            let manifest_region_len = (manifest_page_offset
                 + (function_manifest.len() * std::mem::size_of::<FunctionSpec>()) as u64)
                 as usize;
+
             mprotect(
                 manifest_page_ptr,
-                manifest_len,
+                manifest_region_len,
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
             )?;
 
             for import in module_data.import_functions() {
                 let ptr = runtime
-                    .get::<*const usize>(import.name.as_bytes())
+                    .get::<extern "C" fn()>(import.name.as_bytes())
                     .map_err(Error::DlError)?;
-                let fn_addr = ptr.as_ref().unwrap() as *const usize as u64;
-                function_manifest
+
+                let existing_entry = function_manifest
                     .get_mut(import.fn_idx.as_u32() as usize)
-                    .unwrap()
-                    .code_addr = fn_addr;
+                    .unwrap();
+
+                // TODO: if this import is ever resolved from another WASM module, we can
+                // read trap and code length information from that module. In fact, this might even
+                // be rewritable as a swap with a clone of the exported FunctionSpec that satisfies
+                // this import!
+                let new_entry = FunctionSpec::new(
+                    *ptr as u64,
+                    existing_entry.code_len(),
+                    existing_entry
+                        .traps()
+                        .map(|manifest| manifest.traps.as_ptr() as u64)
+                        .unwrap_or(0),
+                    existing_entry.traps_len(),
+                );
+
+                std::mem::replace(existing_entry, new_entry);
             }
 
-            // Module data ends up in the same page as code, potentially, so this gets +x so as to
-            // permit those functions to execute. this should be fixed, though..
+            // The function manifest may end up in the same page as code, for now, so this gets +x to
+            // permit those functions to execute. This should be should be fixed so .rodata can be
+            // kept -x.
             mprotect(
                 manifest_page_ptr,
-                manifest_len,
+                manifest_region_len,
                 ProtFlags::PROT_READ | ProtFlags::PROT_EXEC,
             )?;
         }
