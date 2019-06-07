@@ -141,6 +141,31 @@ impl MockModuleBuilder {
         self
     }
 
+    pub fn with_exported_import_func(
+        mut self,
+        export_name: &'static str,
+        import_fn_ptr: FunctionPointer,
+        sig: Signature,
+    ) -> Self {
+        self.export_funcs.insert(export_name, import_fn_ptr);
+        let sig_idx = self.record_sig(sig);
+        self.function_info.push(OwnedFunctionMetadata {
+            signature: sig_idx,
+            name: Some(export_name.to_string()),
+        });
+        self.exports.push(OwnedExportFunction {
+            fn_idx: FunctionIndex::from_u32(self.function_manifest.len() as u32),
+            names: vec![export_name.to_string()],
+        });
+        self.function_manifest.push(FunctionSpec::new(
+            import_fn_ptr.as_usize() as u64,
+            0u32,
+            0u64,
+            0u64,
+        ));
+        self
+    }
+
     pub fn with_table_func(mut self, table_idx: u32, func_idx: u32, func: FunctionPointer) -> Self {
         self.func_table.insert((table_idx, func_idx), func);
         self
