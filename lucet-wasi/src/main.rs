@@ -22,13 +22,14 @@ fn main() {
     // of the runtime:
     lucet_runtime::lucet_internal_ensure_linked();
     hostcalls::ensure_linked();
+    const START: &'static str = "_start";
 
     let matches = app_from_crate!()
         .arg(
             Arg::with_name("entrypoint")
                 .long("entrypoint")
                 .takes_value(true)
-                .default_value("_start")
+                .default_value(START)
                 .help("Entrypoint to run within the WASI module"),
         )
         .arg(
@@ -183,7 +184,7 @@ fn run(config: Config) {
             ctx = ctx.preopened_dir(dir, guest_path);
         }
         let mut inst = region
-            .new_instance_builder(module as Arc<dyn Module>)
+            .new_instance_builder(module as Arc<dyn Module>, config.entrypoint)
             .with_embed_ctx(ctx.build().expect("WASI ctx can be created"))
             .build()
             .expect("instance can be created");

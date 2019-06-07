@@ -60,7 +60,7 @@ pub trait ModuleInternal: Send + Sync {
 
     fn get_func_from_idx(&self, table_id: u32, func_id: u32) -> Result<FunctionHandle, Error>;
 
-    fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error>;
+    fn get_start_func(&self, entrypoint: &str) -> Result<Option<FunctionHandle>, Error>;
 
     fn function_manifest(&self) -> &[FunctionSpec];
 

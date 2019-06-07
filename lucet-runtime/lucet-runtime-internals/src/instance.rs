@@ -77,6 +77,7 @@ pub fn new_instance_handle(
     module: Arc<dyn Module>,
     alloc: Alloc,
     embed_ctx: CtxMap,
+    entrypoint: &str,
 ) -> Result<InstanceHandle, Error> {
     let inst = NonNull::new(instance)
         .ok_or(lucet_format_err!("instance pointer is null; this is a bug"))?;
@@ -104,7 +105,7 @@ pub fn new_instance_handle(
 
     handle.needs_inst_drop = true;
 
-    handle.reset()?;
+    handle.reset(entrypoint)?;
 
     Ok(handle)
 }
@@ -344,7 +345,7 @@ impl Instance {
     ///
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
-    pub fn reset(&mut self) -> Result<(), Error> {
+    pub fn reset(&mut self, entrypoint: &str) -> Result<(), Error> {
         self.alloc.reset_heap(self.module.as_ref())?;
         let globals = unsafe { self.alloc.globals_mut() };
         let mod_globals = self.module.globals();
@@ -364,7 +365,7 @@ impl Instance {
             retval: UntypedRetVal::default(),
         };
 
-        self.run_start()?;
+        self.run_start(entrypoint)?;
 
         Ok(())
     }
@@ -669,8 +670,8 @@ impl Instance {
         }
     }
 
-    fn run_start(&mut self) -> Result<(), Error> {
-        if let Some(start) = self.module.get_start_func()? {
+    fn run_start(&mut self, entrypoint: &str) -> Result<(), Error> {
+        if let Some(start) = self.module.get_start_func(entrypoint)? {
             self.run_func(start, &[])?;
         }
         Ok(())
