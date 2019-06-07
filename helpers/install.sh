@@ -64,9 +64,9 @@ devenv_setenv_file="$(mktemp)"
 cat >"$devenv_setenv_file" <<EOT
 #! /bin/sh
 
-export PATH="${LUCET_BIN_DIR}:${PATH}"
-export LD_LIBRARY_PATH="${LUCET_LIB_DIR}:${LD_LIBRARY_PATH}"
-export DYLD_LIBRARY_PATH="${LUCET_LIB_DIR}:${DYLD_LIBRARY_PATH}"
+export PATH="${LUCET_BIN_DIR}:\${PATH}"
+export LD_LIBRARY_PATH="${LUCET_LIB_DIR}:\${LD_LIBRARY_PATH}"
+export DYLD_LIBRARY_PATH="${LUCET_LIB_DIR}:\${DYLD_LIBRARY_PATH}"
 
 if [ \$# -gt 0 ]; then
     exec "\$@"
