@@ -56,6 +56,21 @@ mod module_data {
     }
 
     #[test]
+    fn multiple_import() {
+        let m = load_wat_module("multiple_import");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling multiple_import");
+        let mdata = c.module_data().unwrap();
+        assert_eq!(mdata.globals_spec().len(), 0);
+
+        assert_eq!(mdata.import_functions().len(), 4);
+        assert_eq!(mdata.export_functions().len(), 1);
+        assert_eq!(mdata.function_info().len(), 6);
+        assert_eq!(mdata.export_functions()[0].names, vec!["exported_inc"]);
+    }
+
+    #[test]
     fn fibonacci() {
         let m = load_wat_module("fibonacci");
         let b = super::test_bindings();
