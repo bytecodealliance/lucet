@@ -1,3 +1,4 @@
+use crate::alloc;
 use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
@@ -133,7 +134,8 @@ impl DlModule {
 
             let runtime = unix::Library::this();
 
-            let manifest_page_offset = function_manifest.as_ptr() as u64 % 4096;
+            let manifest_page_offset =
+                function_manifest.as_ptr() as u64 % alloc::host_page_size() as u64;
             let manifest_page_ptr =
                 (function_manifest.as_ptr() as u64 - manifest_page_offset) as *mut c_void;
 
