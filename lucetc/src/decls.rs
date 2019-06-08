@@ -79,7 +79,7 @@ impl<'a> ModuleDecls<'a> {
     pub fn new<B: ClifBackend>(
         info: ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
-        bindings: &Bindings,
+        bindings: &'a Bindings,
         runtime: Runtime,
         heap_settings: HeapSettings,
     ) -> Result<Self, LucetcError> {
@@ -109,7 +109,7 @@ impl<'a> ModuleDecls<'a> {
     fn declare_funcs<B: ClifBackend>(
         decls: &mut ModuleDecls<'a>,
         clif_module: &mut ClifModule<B>,
-        bindings: &Bindings,
+        bindings: &'a Bindings,
     ) -> Result<(), LucetcError> {
         for ix in 0..decls.info.functions.len() {
             let func_index = FuncIndex::new(ix);
@@ -135,18 +135,19 @@ impl<'a> ModuleDecls<'a> {
             fn import_name_for<'a>(
                 func_ix: FuncIndex,
                 decls: &mut ModuleDecls<'a>,
-                bindings: &Bindings,
+                bindings: &'a Bindings,
             ) -> Result<Option<String>, failure::Context<LucetcErrorKind>> {
                 if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
+                    let import_symbol = bindings
+                        .translate(import_mod, import_field)
+                        .context(LucetcErrorKind::TranslatingModule)?;
                     decls.imports.push(ImportFunction {
                         fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                         module: import_mod,
                         name: import_field,
+                        mapped_to: Some(import_symbol),
                     });
-                    let import_symbol = bindings
-                        .translate(import_mod, import_field)
-                        .context(LucetcErrorKind::TranslatingModule)?;
-                    Ok(Some(import_symbol))
+                    Ok(Some(import_symbol.to_string()))
                 } else {
                     Ok(None)
                 }

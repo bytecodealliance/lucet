@@ -21,12 +21,13 @@ impl FunctionIndex {
 }
 
 /// ImportFunction describes an internal function - its internal function index and the name/module
-/// pair that function should be found in.
+/// pair that function should be found in, as well as the name of a hostcall it maps to.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct ImportFunction<'a> {
     pub fn_idx: FunctionIndex,
     pub module: &'a str,
-    pub name: &'a str
+    pub name: &'a str,
+    pub mapped_to: Option<&'a str>,
 }
 
 /// ExportFunction describes an exported function - its internal function index and a name that
@@ -55,7 +56,8 @@ impl OwnedExportFunction {
 pub struct OwnedImportFunction {
     pub fn_idx: FunctionIndex,
     pub module: String,
-    pub name: String
+    pub name: String,
+    pub mapped_to: Option<String>,
 }
 
 impl OwnedImportFunction {
@@ -64,6 +66,7 @@ impl OwnedImportFunction {
             fn_idx: self.fn_idx.clone(),
             module: self.module.as_str(),
             name: self.name.as_str(),
+            mapped_to: self.mapped_to.as_ref().map(|x| x.as_str()),
         }
     }
 }

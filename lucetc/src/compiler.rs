@@ -54,7 +54,7 @@ impl<'a> Compiler<'a> {
     pub fn new(
         wasm_binary: &'a [u8],
         opt_level: OptLevel,
-        bindings: &Bindings,
+        bindings: &'a Bindings,
         heap_settings: HeapSettings,
     ) -> Result<Self, LucetcError> {
         let isa = Self::target_isa(opt_level);

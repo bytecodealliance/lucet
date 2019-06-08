@@ -103,10 +103,10 @@ impl Bindings {
         Ok(())
     }
 
-    pub fn translate(&self, module: &str, symbol: &str) -> Result<String, Error> {
+    pub fn translate(&self, module: &str, symbol: &str) -> Result<&str, Error> {
         match self.bindings.get(module) {
             Some(m) => match m.get(symbol) {
-                Some(s) => Ok(s.clone()),
+                Some(s) => Ok(s),
                 None => Err(format_err!("Unknown symbol `{}::{}`", module, symbol)),
             },
             None => Err(format_err!(

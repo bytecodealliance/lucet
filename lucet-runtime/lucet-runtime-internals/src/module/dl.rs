@@ -160,8 +160,19 @@ impl DlModule {
             )?;
 
             for import in module_data.import_functions() {
+                let host_sym = match import.mapped_to {
+                    Some(sym) => sym,
+                    None => {
+                        return Err(lucet_incorrect_module!(
+                            "unbound symbol cannot be resolved: {}/{}",
+                            import.module,
+                            import.name
+                        ));
+                    }
+                };
+
                 let ptr = runtime
-                    .get::<extern "C" fn()>(import.name.as_bytes())
+                    .get::<extern "C" fn()>(host_sym.as_bytes())
                     .map_err(Error::DlError)?;
 
                 let existing_entry = function_manifest
