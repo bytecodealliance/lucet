@@ -80,9 +80,9 @@ impl DlModule {
                     let manifest_len = len_ptr.as_ref().ok_or(lucet_incorrect_module!(
                         "`lucet_function_manifest_len` is defined but null"
                     ))?;
-                    let manifest = ptr.as_mut().ok_or(
-                        lucet_incorrect_module!("`lucet_function_manifest` is defined but null"),
-                    )?;
+                    let manifest = ptr.as_mut().ok_or(lucet_incorrect_module!(
+                        "`lucet_function_manifest` is defined but null"
+                    ))?;
 
                     std::slice::from_raw_parts_mut(manifest, *manifest_len as usize)
                 }
