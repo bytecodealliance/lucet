@@ -20,9 +20,7 @@ LUCET_SHARE_DIR=${LUCET_SHARE_DIR:-"${LUCET_PREFIX}/share"}
 LUCET_EXAMPLES_DIR=${LUCET_EXAMPLES_DIR:-"${LUCET_SHARE_DIR}/examples"}
 LUCET_DOC_DIR=${LUCET_DOC_DIR:-"${LUCET_SHARE_DIR}/doc"}
 LUCET_BUNDLE_DOC_DIR=${LUCET_BUNDLE_DOC_DIR:-"${LUCET_DOC_DIR}/lucet"}
-WASI_PREFIX=${WASI_PREFIX:-${WASI_SDK:-"/opt/wasi-sdk"}}
-WASI_BIN=${WASI_BIN:-"${WASI_PREFIX}/bin"}
-WASI_SYSROOT=${WASI_SYSROOT:-"${WASI_PREFIX}/share/sysroot"}
+WASI_SDK_PREFIX=${WASI_SDK_PREFIX:-${WASI_SDK:-"/opt/wasi-sdk"}}
 WASI_TARGET=${WASI_TARGET:-"wasm32-wasi"}
 WASI_BIN_PREFIX=${WASI_BIN_PREFIX:-"$WASI_TARGET"}
 
@@ -45,6 +43,91 @@ if test -t 0; then
     echo
     sleep 10
 fi
+
+if ! install -d "$LUCET_PREFIX" 2>/dev/null; then
+    SUDO=""
+    if command -v doas >/dev/null; then
+        SUDO="doas"
+    elif command -v sudo >/dev/null; then
+        SUDO="sudo"
+    else
+        echo "[${LUCET_PREFIX}] doesn't exist and cannot be created" >&2
+        exit 1
+    fi
+    echo "[${LUCET_PREFIX}] doesn't exist and the $SUDO command is required to create it"
+    if ! "$SUDO" install -o "$(id -u)" -d "$LUCET_PREFIX"; then
+        echo "[${LUCET_PREFIX}] doesn't exist and cannot be created even with additional privileges" >&2
+        exit 1
+    fi
+fi
+
+# Find a WASI sysroot
+for wasi_sysroot in $WASI_SYSROOT ${WASI_SDK_PREFIX}/share/sysroot /opt/wasi-sysroot; do
+    if [ -e "${wasi_sysroot}/include/wasi/core.h" ]; then
+        WASI_SYSROOT="$wasi_sysroot"
+    fi
+done
+if [ -z "$WASI_SYSROOT" ]; then
+    echo "The WASI sysroot was not found." >&2
+    echo "You may have to define a WASI_SYSROOT environment variable set to its base directory."
+    exit 1
+fi
+echo "* WASI sysroot: [$WASI_SYSROOT]"
+
+# Find:
+# - A clang/llvm installation able to compile to WebAssmbly/WASI
+# - The base path to this installation
+# - The optional suffix added to clang (e.g. clang-8)
+# - The optional suffix added to LLVM tools (e.g. ar-8) that differs from the clang one on some Linux distributions
+
+TMP_OBJ=$(mktemp)
+for llvm_bin_path_candidate in "$LLVM_BIN" "${WASI_SDK_PREFIX}/bin" /usr/local/opt/llvm/bin $(echo "$PATH" | sed s/:/\ /g); do
+    [ -d "$llvm_bin_path_candidate" ] || continue
+    clang_candidate=$(find "$llvm_bin_path_candidate" -maxdepth 1 \( -type f -o -type l \) \( -name "clang" -o -name "clang-[0-9]*" \) -print |
+        sort | while read -r clang_candidate; do
+            echo "int main(void){return 0;}" | "$clang_candidate" --target=wasm32-wasi -o "$TMP_OBJ" -c -x c - 2>/dev/null || continue
+            echo "$clang_candidate"
+            break
+        done)
+    [ -z "$clang_candidate" ] && continue
+    llvm_bin=$(dirname "$clang_candidate")
+    clang_candidate_bn=$(basename "$clang_candidate")
+    case "$clang_candidate_bn" in
+    clang) clang_bin_suffix="none" ;;
+    clang-[0-9]*) clang_bin_suffix=$(echo "$clang_candidate_bn" | sed "s/^clang//") ;;
+    *) continue ;;
+    esac
+    CLANG_BIN_SUFFIX="$clang_bin_suffix"
+    LLVM_BIN="$llvm_bin"
+    if [ -z "$CLANG_BIN_SUFFIX" ] || [ -z "$LLVM_BIN" ]; then
+        continue
+    fi
+    if [ "$CLANG_BIN_SUFFIX" = "none" ]; then
+        CLANG_BIN_SUFFIX=""
+    fi
+    break
+done
+rm -f "$TMP_OBJ"
+
+if [ -z "$LLVM_BIN" ]; then
+    echo "No clang/LLVM installation able to compile to WebAssembly/WASI was found." >&2
+    echo "The builtins might be missing -- See the Lucet documentation." >&2
+    exit 1
+fi
+echo "* LLVM installation directory: [$LLVM_BIN]"
+echo "* Suitable clang executable: [clang${CLANG_BIN_SUFFIX}]"
+
+LLVM_BIN_SUFFIX="$CLANG_BIN_SUFFIX"
+if ! command -v "${LLVM_BIN}/llvm-ar${LLVM_BIN_SUFFIX}" >/dev/null; then
+    LLVM_BIN_SUFFIX=""
+    if ! command -v "${LLVM_BIN}/llvm-ar${LLVM_BIN_SUFFIX}" >/dev/null; then
+        echo "LLVM not found" >&2
+        exit 1
+    fi
+    echo test
+fi
+echo "* LLVM tools suffix: [${LLVM_BIN_SUFFIX}] (ex: [llvm-ar${LLVM_BIN_SUFFIX}])"
+echo
 
 install -d -v "$LUCET_BIN_DIR" || exit 1
 for bin in $BINS; do
@@ -97,18 +180,18 @@ for file in clang clang++; do
     cat >"$wrapper_file" <<EOT
 #! /bin/sh
 
-exec "${WASI_BIN}/${file}" --target="$WASI_TARGET" --sysroot="$WASI_SYSROOT" "\$@"
+exec "${LLVM_BIN}/${file}${CLANG_BIN_SUFFIX}" --target="$WASI_TARGET" --sysroot="$WASI_SYSROOT" "\$@"
 EOT
     install -p -v "$wrapper_file" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-${file}"
     rm -f "$wrapper_file"
 done
 
 for file in ar dwarfdump nm ranlib size; do
-    ln -sfv "${WASI_BIN}/llvm-${file}" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-${file}"
+    ln -sfv "${LLVM_BIN}/llvm-${file}${LLVM_BIN_SUFFIX}" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-${file}"
 done
 
 for file in ld; do
-    ln -sfv "${WASI_BIN}/wasm-${file}" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-${file}"
+    ln -sfv "${LLVM_BIN}/wasm-${file}${LLVM_BIN_SUFFIX}" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-${file}"
 done
 
 ln -svf "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-clang" "${LUCET_BIN_DIR}/${WASI_BIN_PREFIX}-gcc"
@@ -132,7 +215,7 @@ rm -f "$wrapper_file"
 if test -t 0; then
     echo
     echo "Lucet has been installed in [${LUCET_PREFIX}]"
-    if [ "$(basename $SHELL)" == "fish" ]; then
+    if [ "$(basename $SHELL)" = "fish" ]; then
         echo "Add ${LUCET_BIN_DIR} to your shell's search paths."
     else
         echo "Type 'source ${LUCET_BIN_DIR}/devenv_setenv.sh' to add the Lucet paths to your environment."
