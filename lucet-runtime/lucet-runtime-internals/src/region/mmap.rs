@@ -16,7 +16,6 @@ pub struct MmapRegion {
     capacity: usize,
     freelist: Mutex<Vec<Slot>>,
     limits: Limits,
-//    entrypoint: &'static str,
 }
 
 impl Region for MmapRegion {}
@@ -238,13 +237,11 @@ impl MmapRegion {
             "signal stack size is a multiple of host page size"
         );
         limits.validate()?;
-        //const START: &'static str = "_start";
 
         let region = Arc::new(MmapRegion {
             capacity: instance_capacity,
             freelist: Mutex::new(Vec::with_capacity(instance_capacity)),
             limits: limits.clone(),
-            //entrypoint: START,
         });
         {
             let mut freelist = region.freelist.lock().unwrap();
