@@ -16,10 +16,7 @@ fi
 echo "Building lucet-dev:latest"
 docker build -t lucet-dev:latest .
 
-if [ -n "$DEVENV_NO_INSTALL" ]; then
-        docker tag lucet-dev:latest lucet:latest
-        exit
-fi
+docker tag lucet-dev:latest lucet:latest
 
 if docker image inspect lucet:latest > /dev/null; then
         if [ -z "$DEVENV_FORCE_REBUILD" ]; then
@@ -35,7 +32,11 @@ docker run --name=lucet-dev --detach --mount type=bind,src="$(cd $(dirname ${0})
         lucet-dev:latest /bin/sleep 99999999 > /dev/null
 
 echo "Building and installing optimized files in [$HOST_LUCET_MOUNT_POINT]"
-docker exec -t -w "$HOST_LUCET_MOUNT_POINT" lucet-dev make install
+if [ -z "$UNOPTIMIZED_BUILD" ]; then
+        docker exec -t -w "$HOST_LUCET_MOUNT_POINT" lucet-dev make install
+else
+        docker exec -t -w "$HOST_LUCET_MOUNT_POINT" lucet-dev make install-dev
+fi
 
 echo "Cleaning"
 docker exec -t -w "$HOST_LUCET_MOUNT_POINT" lucet-dev make clean

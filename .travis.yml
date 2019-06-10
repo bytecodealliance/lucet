@@ -1,14 +1,16 @@
 dist: xenial
 
 env:
-    - DEVENV_NO_INSTALL=1
+    - UNOPTIMIZED_BUILD=true
 
 services:
     - docker
 
 script:
     - ./devenv_run.sh make indent-check test audit
+    - ./devenv_stop.sh
     - git diff --exit-code
+    - ./devenv_build_toolchain_only.sh
 
 notifications:
     email: false
