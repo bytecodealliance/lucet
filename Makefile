@@ -16,6 +16,10 @@ build:
 install: build
 	@helpers/install.sh
 
+.PHONY: install-dev
+install-dev: build-dev
+	@helpers/install.sh --unoptimized
+
 .PHONY: test
 test: indent-check
 	cargo test --no-fail-fast \

@@ -9,9 +9,15 @@ if [ ! -x "${LUCET_SRC_PREFIX}/helpers/install.sh" ]; then
     exit 1
 fi
 
+if [ "$1" = "--unoptimized" ]; then
+    LUCET_BUILD_TYPE="debug"
+else
+    LUCET_BUILD_TYPE="release"
+fi
+
 LUCET_PREFIX=${LUCET_PREFIX:-"/opt/lucet"}
 LUCET_SRC_PREFIX=${LUCET_SRC_PREFIX:-"/lucet"}
-LUCET_SRC_RELEASE_DIR=${LUCET_SRC_RELEASE_DIR:-"${LUCET_SRC_PREFIX}/target/release"}
+LUCET_SRC_RELEASE_DIR=${LUCET_SRC_RELEASE_DIR:-"${LUCET_SRC_PREFIX}/target/${LUCET_BUILD_TYPE}"}
 LUCET_BIN_DIR=${LUCET_BIN_DIR:-"${LUCET_PREFIX}/bin"}
 LUCET_LIB_DIR=${LUCET_LIB_DIR:-"${LUCET_PREFIX}/lib"}
 LUCET_LIBEXEC_DIR=${LUCET_LIBEXEC_DIR:-"${LUCET_PREFIX}/libexec"}
