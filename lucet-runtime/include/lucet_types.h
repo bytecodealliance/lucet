@@ -22,6 +22,7 @@ enum lucet_error {
     lucet_error_region_full,
     lucet_error_module,
     lucet_error_limits_exceeded,
+    lucet_error_no_linear_memory,
     lucet_error_symbol_not_found,
     lucet_error_func_not_found,
     lucet_error_runtime_fault,
