@@ -16,7 +16,7 @@ use crate::sysdeps::UContext;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
-use lucet_module_data::{FunctionHandle, FunctionPointer, TrapCode};
+use lucet_module_data::{FunctionHandle, FunctionPointer, GlobalValue, TrapCode};
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
@@ -357,7 +357,7 @@ impl Instance {
                         i
                     )));
                 }
-                Global::Def { def } => def.init_val(),
+                Global::Def(def) => def.init_val(),
             };
         }
 
@@ -407,12 +407,12 @@ impl Instance {
     }
 
     /// Return the WebAssembly globals as a slice of `i64`s.
-    pub fn globals(&self) -> &[i64] {
+    pub fn globals(&self) -> &[GlobalValue] {
         unsafe { self.alloc.globals() }
     }
 
     /// Return the WebAssembly globals as a mutable slice of `i64`s.
-    pub fn globals_mut(&mut self) -> &mut [i64] {
+    pub fn globals_mut(&mut self) -> &mut [GlobalValue] {
         unsafe { self.alloc.globals_mut() }
     }
 

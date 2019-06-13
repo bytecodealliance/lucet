@@ -456,6 +456,19 @@ fn summarize_module_data<'a, 'b: 'a>(
     }
 
     println!("");
+    println!("Globals:");
+    if module_data.globals_spec().len() > 0 {
+        for global_spec in module_data.globals_spec().iter() {
+            println!("  {:?}", global_spec.global());
+            for name in global_spec.export_names() {
+                println!("    Exported as: {}", name);
+            }
+        }
+    } else {
+        println!("  None");
+    }
+
+    println!("");
     println!("Exported Functions/Symbols:");
     let mut exported_symbols = summary.exported_functions.clone();
     for export in module_data.export_functions() {

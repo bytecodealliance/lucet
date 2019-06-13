@@ -36,6 +36,22 @@ mod module_data {
     use std::path::PathBuf;
 
     #[test]
+    fn globals_export() {
+        let m = load_wat_module("globals_export");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling globals_export");
+        let mdata = c.module_data().unwrap();
+
+        assert_eq!(mdata.globals_spec().len(), 1);
+        assert_eq!(mdata.globals_spec()[0].export_names(), &["start", "dupe"]);
+
+        assert_eq!(mdata.import_functions().len(), 0);
+        assert_eq!(mdata.export_functions().len(), 0);
+        assert_eq!(mdata.function_info().len(), 2);
+    }
+
+    #[test]
     fn fibonacci() {
         let m = load_wat_module("fibonacci");
         let b = super::test_bindings();

@@ -59,17 +59,11 @@ mod programs {
         let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile empty");
         let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());
-        // clang creates 3 globals, all internal:
+        // clang creates 3 globals:
         assert_eq!(mdata.globals_spec().len(), 3);
-        assert_eq!(
-            mdata
-                .globals_spec()
-                .iter()
-                .filter(|g| g.export().is_some())
-                .collect::<Vec<_>>()
-                .len(),
-            0
-        );
+        assert!(mdata.globals_spec()[0].is_internal());
+        assert_eq!(mdata.globals_spec()[1].export_names(), &["__heap_base"]);
+        assert_eq!(mdata.globals_spec()[2].export_names(), &["__data_end"]);
 
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
         assert_eq!(mdata.export_functions().len(), 0, "export functions");
