@@ -183,22 +183,12 @@ fn run(config: Config) {
         for (dir, guest_path) in config.preopen_dirs {
             ctx = ctx.preopened_dir(dir, guest_path);
         }
-        let mut inst = region
+        region
             .new_instance_builder(module as Arc<dyn Module>, config.entrypoint)
             .with_embed_ctx(ctx.build().expect("WASI ctx can be created"))
             .build()
             .expect("instance can be created");
-
-        match inst.run(config.entrypoint, &[]) {
-            // normal termination implies 0 exit code
-            Ok(_) => 0,
-            Err(lucet_runtime::Error::RuntimeTerminated(
-                lucet_runtime::TerminationDetails::Provided(any),
-            )) => *any
-                .downcast_ref::<lucet_wasi::host::__wasi_exitcode_t>()
-                .expect("termination yields an exitcode"),
-            Err(e) => panic!("lucet-wasi runtime error: {}", e),
-        }
+        0
     };
     std::process::exit(exitcode as i32);
 }
