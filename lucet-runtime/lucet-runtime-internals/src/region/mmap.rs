@@ -25,6 +25,7 @@ impl RegionInternal for MmapRegion {
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
+        entrypoint: &str,
     ) -> Result<InstanceHandle, Error> {
         let slot = self
             .freelist
@@ -74,7 +75,7 @@ impl RegionInternal for MmapRegion {
             region,
         };
 
-        let inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
+        let inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx, entrypoint)?;
 
         Ok(inst)
     }

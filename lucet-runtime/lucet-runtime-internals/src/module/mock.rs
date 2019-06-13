@@ -273,7 +273,7 @@ impl ModuleInternal for MockModule {
         Ok(self.function_handle_from_ptr(ptr))
     }
 
-    fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error> {
+    fn get_start_func(&self, _entrypoint: &str) -> Result<Option<FunctionHandle>, Error> {
         Ok(self
             .start_func
             .map(|start| self.function_handle_from_ptr(start)))

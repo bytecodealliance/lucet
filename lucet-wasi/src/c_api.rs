@@ -75,8 +75,9 @@ pub unsafe extern "C" fn lucet_region_new_instance_with_wasi_ctx(
     assert_nonnull!(inst_out);
     with_ffi_arcs!([region: dyn Region, module: DlModule], {
         let wasi_ctx = *Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
+        const START: &'static str = "_start";
         region
-            .new_instance_builder(module.clone() as Arc<dyn Module>)
+            .new_instance_builder(module.clone() as Arc<dyn Module>, START)
             .with_embed_ctx(wasi_ctx.build())
             .build()
             .map(|i| {

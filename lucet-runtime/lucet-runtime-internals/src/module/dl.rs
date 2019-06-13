@@ -190,7 +190,7 @@ impl ModuleInternal for DlModule {
         Ok(self.function_handle_from_ptr(func))
     }
 
-    fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error> {
+    fn get_start_func(&self, entrypoint: &str) -> Result<Option<FunctionHandle>, Error> {
         // `guest_start` is a pointer to the function the module designates as the start function,
         // since we can't have multiple symbols pointing to the same function and guest code might
         // call it in the normal course of execution
@@ -202,10 +202,11 @@ impl ModuleInternal for DlModule {
                 FunctionPointer::from_usize(unsafe { **start_func } as usize),
             )))
         } else {
-            let start_sym = b"guest_func__start";
+            let ss = [b"guest_func_" , entrypoint.as_bytes()].concat();
+            let start_sym: &[u8] = &ss;
             if let Ok(start_func) = unsafe { self.lib.get::<*const extern "C" fn()>(start_sym) } {
             if start_func.is_null() {
-                lucet_incorrect_module!("`guest_func__start` is defined but null");
+                lucet_incorrect_module!("{}", format!("{:?} is defined but null", ss));
             }
             Ok(Some(self.function_handle_from_ptr(
                 FunctionPointer::from_usize(*start_func as usize),

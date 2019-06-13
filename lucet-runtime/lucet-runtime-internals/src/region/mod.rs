@@ -25,12 +25,13 @@ pub trait Region: RegionInternal {
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     fn new_instance(&self, module: Arc<dyn Module>) -> Result<InstanceHandle, Error> {
-        self.new_instance_builder(module).build()
+        const START: &'static str = "_start";
+        self.new_instance_builder(module, START).build()
     }
 
     /// Return an [`InstanceBuilder`](struct.InstanceBuilder.html) for the given module.
-    fn new_instance_builder<'a>(&'a self, module: Arc<dyn Module>) -> InstanceBuilder<'a> {
-        InstanceBuilder::new(self.as_dyn_internal(), module)
+    fn new_instance_builder<'a>(&'a self, module: Arc<dyn Module>, entrypoint: &'a str) -> InstanceBuilder<'a> {
+        InstanceBuilder::new(self.as_dyn_internal(), module, entrypoint)
     }
 }
 
@@ -40,6 +41,7 @@ pub trait RegionInternal: Send + Sync {
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
+        entrypoint: &str,
     ) -> Result<InstanceHandle, Error>;
 
     /// Unmaps the heap, stack, and globals of an `Alloc`, while retaining the virtual address
@@ -73,14 +75,16 @@ pub struct InstanceBuilder<'a> {
     region: &'a dyn RegionInternal,
     module: Arc<dyn Module>,
     embed_ctx: CtxMap,
+    entrypoint: &'a str,
 }
 
 impl<'a> InstanceBuilder<'a> {
-    fn new(region: &'a dyn RegionInternal, module: Arc<dyn Module>) -> Self {
+    fn new(region: &'a dyn RegionInternal, module: Arc<dyn Module>, entrypoint: &'a str) -> Self {
         InstanceBuilder {
             region,
             module,
             embed_ctx: CtxMap::new(),
+            entrypoint,
         }
     }
 
@@ -100,6 +104,6 @@ impl<'a> InstanceBuilder<'a> {
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     pub fn build(self) -> Result<InstanceHandle, Error> {
-        self.region.new_instance_with(self.module, self.embed_ctx)
+        self.region.new_instance_with(self.module, self.embed_ctx, self.entrypoint)
     }
 }

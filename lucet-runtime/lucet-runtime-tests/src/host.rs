@@ -127,9 +127,9 @@ macro_rules! host_tests {
         fn run_hello() {
             let module = test_module_c("host", "hello.c").expect("build and load module");
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-
+            const START: &'static str = "_start";
             let mut inst = region
-                .new_instance_builder(module)
+                .new_instance_builder(module, START)
                 .with_embed_ctx(false)
                 .build()
                 .expect("instance can be created");
