@@ -44,7 +44,7 @@ struct FdEventData {
 }
 
 pub fn wasi_proc_exit(_vmctx: &mut Vmctx, rval: wasm32::__wasi_exitcode_t) -> ! {
-    lucet_hostcall_terminate!(rval as i32);
+    lucet_hostcall_terminate!(dec_exitcode(rval));
 }
 
 pub fn wasi_args_get(
