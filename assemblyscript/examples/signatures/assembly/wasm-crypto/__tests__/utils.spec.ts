@@ -37,11 +37,11 @@ describe("bin2hex", (): void => {
 describe("hex2bin", (): void => {
   it("shoud decode from hex", (): void => {
     let hex = "00050a0f14191e23282d32373c41464b50555a5f64696e7378";
-    let bin = hex2bin(hex)!;
+    let bin = hex2bin(hex);
     let ref = new Uint8Array(25);
     for (let i = 0; i < 25; i++) {
       ref[i] = i * 5;
     }
-    expect<bool>(equals(ref, bin)).toBeTruthy();
+    expect<bool>(equals(ref, bin!)).toBeTruthy();
   })
 })

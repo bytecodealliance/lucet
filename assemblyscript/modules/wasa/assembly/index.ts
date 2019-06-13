@@ -1,5 +1,9 @@
-import { IO, Console, Random, Date, Process, EnvironEntry, Environ, CommandLine, Filesystem } from "./wasa";
+import {
+  WASAError, Descriptor,
+  Console, Random, Date, Process, EnvironEntry, Environ, CommandLine, FileSystem, FileStat
+} from "./wasa";
 
 export {
-  IO, Console, Random, Date, Process, EnvironEntry, Environ, CommandLine, Filesystem
-}
+  WASAError, Descriptor,
+  Console, Random, Date, Process, EnvironEntry, Environ, CommandLine, FileSystem, FileStat
+};

@@ -1,11 +1,8 @@
-import 'allocator/arena';
-export { memory };
-
 import {
     SIGN_RANDBYTES, SIGN_SEEDBYTES, SIGN_KEYPAIRBYTES, SIGN_BYTES, SIGN_PUBLICKEYBYTES,
     signKeypairFromSeed, signPublicKey, sign, signVerify, bin2hex, hex2bin
 } from "./wasm-crypto/crypto";
-import { Console, Random, CommandLine, Process, Filesystem, IO, Environ }
+import { Console, Random, CommandLine, Process, FileSystem, Environ }
     from "../../../modules/wasa/assembly/wasa";
 
 /**
@@ -16,17 +13,17 @@ function createKeypair(keypair_file: string): void {
     Console.log("Creating a new keypair...");
     let seed = Random.randomBytes(SIGN_SEEDBYTES);
     let keypair = signKeypairFromSeed(seed);
-    let fd = Filesystem.openForWrite(keypair_file);
+    let fd = FileSystem.open(keypair_file, "w");
     if (fd === null) {
         Console.error("Unable to create the keypair file");
         Process.exit(1);
     }
-    let keypair_array: Array<u8> = [];
+    let keypair_array = new Array<u8>(keypair.length);
     for (let i = 0; i < keypair.length; i++) {
-        keypair_array[i] = unchecked(keypair[i]);
+        keypair_array[i] = keypair[i];
     }
-    IO.write(fd!, keypair_array);
-    IO.close(fd!);
+    fd!.write(keypair_array);
+    fd!.close();
     Console.log("Key pair created and saved into [" + keypair_file + "]");
     let pk_hex = bin2hex(signPublicKey(keypair));
     Console.log("Public key: [" + pk_hex + "]");
@@ -38,37 +35,37 @@ function createKeypair(keypair_file: string): void {
  * @param keypair_file file containing a key pair
  */
 function createSignature(file: string, keypair_file: string): void {
-    let fd = Filesystem.openForRead(keypair_file);
+    let fd = FileSystem.open(keypair_file, "r");
     if (fd === null) {
         Console.error("Unable to read the keypair file");
         Process.exit(1);
     }
-    let keypair_ = IO.readAll(fd!);
-    IO.close(fd!);
-    if (keypair_ === null || keypair_!.length !== SIGN_KEYPAIRBYTES) {
+    let keypair_ = fd!.readAll();
+    fd!.close();
+    if (keypair_ === null || keypair_.length !== SIGN_KEYPAIRBYTES) {
         Console.error("Invalid keypair file content");
         Process.exit(1);
     }
     let keypair = new Uint8Array(SIGN_KEYPAIRBYTES);
     for (let i = 0; i < SIGN_KEYPAIRBYTES; i++) {
-        keypair[i] = unchecked(keypair_![i]);
+        keypair[i] = keypair_![i];
     }
-    fd = Filesystem.openForRead(file);
+    fd = FileSystem.open(file, "r");
     if (fd === null) {
         Console.error("Unable to open the file to sign");
         Process.exit(1);
     }
-    let data_ = IO.readAll(fd!);
+    let data_ = fd!.readAll();
     if (data_ === null) {
         Console.error("Error while reading the file to sign");
         Process.exit(1);
     }
-    IO.close(fd!);
+    fd!.close();
     let data = data_!;
     let data_len = data.length;
     let data_u8 = new Uint8Array(data.length);
     for (let i = 0; i < data_len; i++) {
-        data_u8[i] = unchecked(data[i]);
+        data_u8[i] = data[i];
     }
     let z = Random.randomBytes(SIGN_RANDBYTES);
     let signature = sign(data_u8, keypair, z);
@@ -84,31 +81,31 @@ function createSignature(file: string, keypair_file: string): void {
  */
 function verifySignature(file: string, publickey_hex: string, signature_hex: string): void {
     let publickey = hex2bin(publickey_hex);
-    if (publickey === null || publickey!.length !== SIGN_PUBLICKEYBYTES) {
+    if (publickey === null || publickey.length !== SIGN_PUBLICKEYBYTES) {
         Console.error("Invalid public key");
         Process.exit(1);
     }
     let signature = hex2bin(signature_hex);
-    if (signature === null || signature!.length !== SIGN_BYTES) {
+    if (signature === null || signature.length !== SIGN_BYTES) {
         Console.error("Invalid signature");
         Process.exit(1);
     }
-    let fd = Filesystem.openForRead(file);
+    let fd = FileSystem.open(file, "r");
     if (fd === null) {
         Console.error("Unable to open the file to sign");
         Process.exit(1);
     }
-    let data_ = IO.readAll(fd!);
+    let data_ = fd!.readAll();
     if (data_ === null) {
         Console.error("Error while reading the file to sign");
         Process.exit(1);
     }
-    IO.close(fd!);
+    fd!.close();
     let data = data_!;
     let data_len = data.length;
     let data_u8 = new Uint8Array(data.length);
     for (let i = 0; i < data_len; i++) {
-        data_u8[i] = unchecked(data[i]);
+        data_u8[i] = data[i];
     }
     if (signVerify(signature!, data_u8, publickey!) === false) {
         Console.error("The signature didn't verify");
@@ -151,9 +148,9 @@ export function main(): void {
         keypair_file = "keypair.bin";
     }
     if (command == "keypair") {
-        createKeypair(keypair_file);
+        createKeypair(keypair_file!);
     } else if (command == "sign" && args.length == 3) {
-        createSignature(args[2], keypair_file);
+        createSignature(args[2], keypair_file!);
     } else if (command == "verify" && args.length == 5) {
         verifySignature(args[2], args[3], args[4]);
     } else {
