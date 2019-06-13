@@ -1,20 +1,16 @@
 use failure::Error;
 use lucet_runtime_internals::module::DlModule;
 use lucetc::Lucetc;
-use std::fs::File;
-use std::io::prelude::*;
 use std::sync::Arc;
 use tempfile::TempDir;
+use wabt::wat2wasm;
 
 pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, Error> {
+    let wasm_program = wat2wasm(generate_test_wat(num_locals)).expect("test wat is valid");
+
+    let native_build = Lucetc::from_bytes(wasm_program);
+
     let workdir = TempDir::new().expect("create working directory");
-
-    let wasm_path = workdir.path().join("out.wasm");
-
-    let mut wasm_file = File::create(&wasm_path)?;
-    wasm_file.write_all(generate_test_wat(num_locals).as_bytes())?;
-
-    let native_build = Lucetc::new(wasm_path);
 
     let so_file = workdir.path().join("out.so");
 

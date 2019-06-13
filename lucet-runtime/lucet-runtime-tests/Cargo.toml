@@ -17,7 +17,7 @@ lucet-module-data = { path = "../../lucet-module-data" }
 lucet-runtime-internals = { path = "../lucet-runtime-internals" }
 lucet-wasi-sdk = { path = "../../lucet-wasi-sdk" }
 lucetc = { path = "../../lucetc" }
-
+wabt = "0.7"
 
 [build-dependencies]
 cc = "1.0"

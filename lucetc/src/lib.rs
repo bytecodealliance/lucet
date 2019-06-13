@@ -31,8 +31,13 @@ use std::env;
 use std::path::{Path, PathBuf};
 use tempfile;
 
+enum LucetcInput {
+    Bytes(Vec<u8>),
+    Path(PathBuf),
+}
+
 pub struct Lucetc {
-    input: PathBuf,
+    input: LucetcInput,
     bindings: Vec<Bindings>,
     opt_level: OptLevel,
     heap: HeapSettings,
@@ -150,7 +155,17 @@ impl Lucetc {
     pub fn new<P: AsRef<Path>>(input: P) -> Self {
         let input = input.as_ref();
         Self {
-            input: input.to_owned(),
+            input: LucetcInput::Path(input.to_owned()),
+            bindings: vec![],
+            opt_level: OptLevel::default(),
+            heap: HeapSettings::default(),
+            builtins_paths: vec![],
+        }
+    }
+
+    pub fn from_bytes<B: AsRef<[u8]>>(bytes: B) -> Self {
+        Self {
+            input: LucetcInput::Bytes(bytes.as_ref().to_owned()),
             bindings: vec![],
             opt_level: OptLevel::default(),
             heap: HeapSettings::default(),
@@ -162,7 +177,10 @@ impl Lucetc {
         use parity_wasm::elements::{deserialize_buffer, serialize};
 
         let mut builtins_bindings = vec![];
-        let mut module_binary = read_module(&self.input)?;
+        let mut module_binary = match &self.input {
+            LucetcInput::Bytes(bytes) => bytes.clone(),
+            LucetcInput::Path(path) => read_module(&path)?,
+        };
 
         if !self.builtins_paths.is_empty() {
             let mut module = deserialize_buffer(&module_binary)?;
