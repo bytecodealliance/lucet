@@ -25,8 +25,7 @@ pub trait Region: RegionInternal {
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     fn new_instance(&self, module: Arc<dyn Module>) -> Result<InstanceHandle, Error> {
-        const START: &'static str = "_start";
-        self.new_instance_builder(module, START).build()
+        self.new_instance_builder(module, "_start").build()
     }
 
     /// Return an [`InstanceBuilder`](struct.InstanceBuilder.html) for the given module.

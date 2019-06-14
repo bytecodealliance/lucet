@@ -216,8 +216,7 @@ macro_rules! guest_fault_tests {
                 }
 
                 // after a fault, can reset and run a normal function
-                const START: &'static str = "_start";
-                inst.reset(START).expect("instance resets");
+                inst.reset("_start").expect("instance resets");
 
                 run_onetwothree(&mut inst);
             })
@@ -241,8 +240,7 @@ macro_rules! guest_fault_tests {
                 }
 
                 // after a fault, can reset and run a normal function
-                const START: &'static str = "_start";
-                inst.reset(START).expect("instance resets");
+                inst.reset("_start").expect("instance resets");
 
                 run_onetwothree(&mut inst);
             });
@@ -273,8 +271,7 @@ macro_rules! guest_fault_tests {
                 }
 
                 // after a fault, can reset and run a normal function
-                const START: &'static str = "_start";
-                inst.reset(START).expect("instance resets");
+                inst.reset("_start").expect("instance resets");
 
                 run_onetwothree(&mut inst);
             });

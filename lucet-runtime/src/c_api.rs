@@ -104,10 +104,9 @@ pub unsafe extern "C" fn lucet_region_new_instance_with_ctx(
     inst_out: *mut *mut lucet_instance,
 ) -> lucet_error {
     assert_nonnull!(inst_out);
-    const START: &'static str = "_start";
     with_ffi_arcs!([region: dyn Region, module: DlModule], {
         region
-            .new_instance_builder(module.clone() as Arc<dyn Module>, START)
+            .new_instance_builder(module.clone() as Arc<dyn Module>, "_start")
             .with_embed_ctx(embed_ctx)
             .build()
             .map(|i| {
@@ -238,8 +237,7 @@ pub unsafe extern "C" fn lucet_state_release(state: *mut lucet_state::lucet_stat
 #[no_mangle]
 pub unsafe extern "C" fn lucet_instance_reset(inst: *mut lucet_instance) -> lucet_error {
     with_instance_ptr!(inst, {
-        const START: &'static str = "_start";
-        inst.reset(START)
+        inst.reset("_start")
             .map(|_| lucet_error::Ok)
             .unwrap_or_else(|e| e.into())
     })

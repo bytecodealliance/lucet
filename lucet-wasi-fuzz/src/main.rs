@@ -376,13 +376,12 @@ fn run<P: AsRef<Path>>(
 ) -> Result<__wasi_exitcode_t, Error> {
     let region = MmapRegion::create(1, &Limits::default())?;
     let module = wasi_test(tmpdir, path)?;
-    const START: &'static str = "_start";
     let mut inst = region
-        .new_instance_builder(module, START)
+        .new_instance_builder(module, "_start")
         .with_embed_ctx(ctx)
         .build()?;
 
-    match inst.run(START, &[]) {
+    match inst.run("_start", &[]) {
         // normal termination implies 0 exit code
         Ok(_) => Ok(0),
         Err(lucet_runtime::Error::RuntimeTerminated(

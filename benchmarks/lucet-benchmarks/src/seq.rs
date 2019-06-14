@@ -240,8 +240,7 @@ fn run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
 /// Run a trivial WASI program.
 fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
-        const START: &'static str = "_start";
-        inst.run(START, &[]).unwrap();
+        inst.run("_start", &[]).unwrap();
     }
 
     let workdir = TempDir::new().expect("create working directory");
@@ -251,7 +250,6 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
 
     let module = DlModule::load(&so_file).unwrap();
     let region = R::create(1, &Limits::default()).unwrap();
-    const START: &'static str = "_start";
 
     c.bench_function(&format!("run_hello ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
@@ -263,7 +261,7 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
                     .build()
                     .unwrap();
                 region
-                    .new_instance_builder(module.clone(),START)
+                    .new_instance_builder(module.clone(),"_start")
                     .with_embed_ctx(ctx)
                     .build()
                     .unwrap()

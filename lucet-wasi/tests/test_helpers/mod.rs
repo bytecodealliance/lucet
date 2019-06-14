@@ -59,13 +59,12 @@ pub fn wasi_test<P: AsRef<Path>>(c_file: P) -> Result<Arc<dyn Module>, Error> {
 pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, Error> {
     let region = MmapRegion::create(1, &Limits::default())?;
     let module = test_module_wasi(path)?;
-    const START: &'static str = "_start";
     let mut inst = region
-        .new_instance_builder(module, START)
+        .new_instance_builder(module, "_start")
         .with_embed_ctx(ctx)
         .build()?;
 
-    match inst.run(START, &[]) {
+    match inst.run("_start", &[]) {
         // normal termination implies 0 exit code
         Ok(_) => Ok(0),
         Err(lucet_runtime::Error::RuntimeTerminated(

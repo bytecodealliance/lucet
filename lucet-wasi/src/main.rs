@@ -22,14 +22,13 @@ fn main() {
     // of the runtime:
     lucet_runtime::lucet_internal_ensure_linked();
     hostcalls::ensure_linked();
-    const START: &'static str = "_start";
 
     let matches = app_from_crate!()
         .arg(
             Arg::with_name("entrypoint")
                 .long("entrypoint")
                 .takes_value(true)
-                .default_value(START)
+                .default_value("_start")
                 .help("Entrypoint to run within the WASI module"),
         )
         .arg(
