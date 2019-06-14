@@ -181,7 +181,7 @@ impl Lucetc {
         let mut builtins_bindings = vec![];
         let mut module_binary = match &self.input {
             LucetcInput::Bytes(bytes) => bytes.clone(),
-            LucetcInput::Path(path) => read_module(path)?
+            LucetcInput::Path(path) => read_module(&path)?,
         };
 
         if !self.builtins_paths.is_empty() {
