@@ -17,6 +17,7 @@ mod stack_probe;
 mod table;
 mod traps;
 
+use crate::load::read_bytes;
 pub use crate::{
     bindings::Bindings,
     compiler::Compiler,
@@ -26,7 +27,6 @@ pub use crate::{
     load::read_module,
     patch::patch_module,
 };
-use crate::load::read_bytes;
 use failure::{format_err, Error, ResultExt};
 use std::env;
 use std::path::{Path, PathBuf};
