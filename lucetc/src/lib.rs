@@ -26,6 +26,7 @@ pub use crate::{
     load::read_module,
     patch::patch_module,
 };
+use crate::load::read_bytes;
 use failure::{format_err, Error, ResultExt};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -163,14 +164,15 @@ impl Lucetc {
         }
     }
 
-    pub fn from_bytes<B: AsRef<[u8]>>(bytes: B) -> Self {
-        Self {
-            input: LucetcInput::Bytes(bytes.as_ref().to_owned()),
+    pub fn try_from_bytes<B: AsRef<[u8]>>(bytes: B) -> Result<Self, Error> {
+        let input = read_bytes(bytes.as_ref().to_vec())?;
+        Ok(Self {
+            input: LucetcInput::Bytes(input),
             bindings: vec![],
             opt_level: OptLevel::default(),
             heap: HeapSettings::default(),
             builtins_paths: vec![],
-        }
+        })
     }
 
     fn build(&self) -> Result<(Vec<u8>, Bindings), Error> {
@@ -179,7 +181,7 @@ impl Lucetc {
         let mut builtins_bindings = vec![];
         let mut module_binary = match &self.input {
             LucetcInput::Bytes(bytes) => bytes.clone(),
-            LucetcInput::Path(path) => read_module(&path)?,
+            LucetcInput::Path(path) => read_module(path)?
         };
 
         if !self.builtins_paths.is_empty() {

@@ -3,12 +3,9 @@ use lucet_runtime_internals::module::DlModule;
 use lucetc::Lucetc;
 use std::sync::Arc;
 use tempfile::TempDir;
-use wabt::wat2wasm;
 
 pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, Error> {
-    let wasm_program = wat2wasm(generate_test_wat(num_locals)).expect("test wat is valid");
-
-    let native_build = Lucetc::from_bytes(wasm_program);
+    let native_build = Lucetc::try_from_bytes(generate_test_wat(num_locals))?;
 
     let workdir = TempDir::new().expect("create working directory");
 
