@@ -1191,6 +1191,7 @@ pub fn wasi_path_readlink(
     bufused: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
     use nix::fcntl::readlinkat;
+    use std::cmp;
 
     match enc_usize_byref(vmctx, bufused, 0) {
         Ok(_) => {}
@@ -1206,15 +1207,20 @@ pub fn wasi_path_readlink(
         Ok((dir, path)) => (dir, path),
         Err(e) => return enc_errno(e),
     };
-    let mut buf = match dec_slice_of_mut::<u8>(vmctx, buf_ptr, buf_len) {
-        Ok(buf) => buf,
-        Err(e) => return enc_errno(e),
+    let dummy_buf = &mut [0u8];
+    let mut buf = if buf_len > 0 {
+        match dec_slice_of_mut::<u8>(vmctx, buf_ptr, buf_len) {
+            Ok(buf) => buf,
+            Err(e) => return enc_errno(e),
+        }
+    } else {
+        dummy_buf
     };
     let target_path = match readlinkat(dir, path.as_os_str(), &mut buf) {
         Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
         Ok(target_path) => target_path,
     };
-    let host_bufused = target_path.len();
+    let host_bufused = cmp::min(buf_len as usize, target_path.len());
     match enc_usize_byref(vmctx, bufused, host_bufused) {
         Ok(_) => {}
         Err(e) => return enc_errno(e),
