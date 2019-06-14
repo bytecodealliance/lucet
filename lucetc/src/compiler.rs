@@ -37,7 +37,7 @@ impl Default for OptLevel {
 impl OptLevel {
     pub fn to_flag(&self) -> &str {
         match self {
-            OptLevel::None => "fast",
+            OptLevel::None => "fastest",
             OptLevel::Standard => "default",
             OptLevel::Fast => "best",
         }
