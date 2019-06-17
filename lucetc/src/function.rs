@@ -203,7 +203,13 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     }
 
     fn make_direct_func(&mut self, func: &mut ir::Function, index: FuncIndex) -> ir::FuncRef {
-        let func_decl = self.module_decls.get_func(index).unwrap();
+        let unique_index = *self
+            .module_decls
+            .info
+            .function_mapping
+            .get(index)
+            .expect("function indices are valid");
+        let func_decl = self.module_decls.get_func(unique_index).unwrap();
         let signature = func.import_signature(func_decl.signature.clone());
         let colocated = !func_decl.imported();
         func.import_function(ir::ExtFuncData {

@@ -1,8 +1,8 @@
 use crate::bindings::Bindings;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::heap::HeapSettings;
-use crate::module::ModuleInfo;
 pub use crate::module::{Exportable, TableElems};
+use crate::module::{ModuleInfo, UniqueFuncIndex};
 use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
@@ -10,8 +10,8 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex,
-    Table, TableIndex,
+    Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
+    TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
 use lucet_module_data::{
@@ -65,12 +65,12 @@ pub struct TableDecl<'a> {
 }
 
 pub struct ModuleDecls<'a> {
-    info: ModuleInfo<'a>,
-    function_names: PrimaryMap<FuncIndex, Name>,
+    pub info: ModuleInfo<'a>,
+    function_names: PrimaryMap<UniqueFuncIndex, Name>,
     imports: Vec<ImportFunction<'a>>,
     exports: Vec<ExportFunction<'a>>,
     table_names: PrimaryMap<TableIndex, (Name, Name)>,
-    runtime_names: HashMap<RuntimeFunc, FuncIndex>,
+    runtime_names: HashMap<RuntimeFunc, UniqueFuncIndex>,
     globals_spec: Vec<GlobalSpec<'a>>,
     linear_memory_spec: Option<OwnedLinearMemorySpec>,
 }
@@ -112,10 +112,10 @@ impl<'a> ModuleDecls<'a> {
         bindings: &Bindings,
     ) -> Result<(), LucetcError> {
         for ix in 0..decls.info.functions.len() {
-            let func_index = FuncIndex::new(ix);
+            let func_index = UniqueFuncIndex::new(ix);
 
             fn export_name_for<'a>(
-                func_ix: FuncIndex,
+                func_ix: UniqueFuncIndex,
                 decls: &mut ModuleDecls<'a>,
             ) -> Option<(String, Linkage)> {
                 let export = decls.info.functions.get(func_ix).unwrap();
@@ -136,7 +136,7 @@ impl<'a> ModuleDecls<'a> {
             };
 
             fn import_name_for<'a>(
-                func_ix: FuncIndex,
+                func_ix: UniqueFuncIndex,
                 decls: &mut ModuleDecls<'a>,
                 bindings: &Bindings,
             ) -> Result<Option<(String, Linkage)>, failure::Context<LucetcErrorKind>> {
@@ -174,7 +174,7 @@ impl<'a> ModuleDecls<'a> {
         decl_sym: String,
         decl_linkage: Linkage,
         signature: ir::Signature,
-    ) -> Result<FuncIndex, LucetcError> {
+    ) -> Result<UniqueFuncIndex, LucetcError> {
         let (new_funcidx, _) = self.info.declare_func_with_sig(signature);
 
         self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)
@@ -187,8 +187,8 @@ impl<'a> ModuleDecls<'a> {
         clif_module: &mut ClifModule<B>,
         decl_sym: String,
         decl_linkage: Linkage,
-        func_ix: FuncIndex,
-    ) -> Result<FuncIndex, LucetcError> {
+        func_ix: UniqueFuncIndex,
+    ) -> Result<UniqueFuncIndex, LucetcError> {
         let funcid = clif_module
             .declare_function(
                 &decl_sym,
@@ -197,7 +197,7 @@ impl<'a> ModuleDecls<'a> {
             )
             .context(LucetcErrorKind::TranslatingModule)?;
         self.function_names.push(Name::new_func(decl_sym, funcid));
-        Ok(FuncIndex::new(self.function_names.len() - 1))
+        Ok(UniqueFuncIndex::new(self.function_names.len() - 1))
     }
 
     fn declare_tables<B: ClifBackend>(
@@ -360,7 +360,7 @@ impl<'a> ModuleDecls<'a> {
         )
     }
 
-    pub fn get_func(&self, func_index: FuncIndex) -> Result<FunctionDecl, Error> {
+    pub fn get_func(&self, func_index: UniqueFuncIndex) -> Result<FunctionDecl, Error> {
         let name = self
             .function_names
             .get(func_index)
@@ -378,7 +378,7 @@ impl<'a> ModuleDecls<'a> {
         })
     }
 
-    pub fn get_start_func(&self) -> Option<FuncIndex> {
+    pub fn get_start_func(&self) -> Option<UniqueFuncIndex> {
         self.info.start_func.clone()
     }
 
