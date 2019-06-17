@@ -82,9 +82,10 @@ impl<'a> ModuleDecls<'a> {
         bindings: &Bindings,
         runtime: Runtime,
         heap_settings: HeapSettings,
+        writable_tables: bool,
     ) -> Result<Self, LucetcError> {
         let imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
-        let table_names = Self::declare_tables(&info, clif_module)?;
+        let table_names = Self::declare_tables(&info, clif_module, writable_tables)?;
         let globals_spec = Self::build_globals_spec(&info)?;
         let linear_memory_spec = Self::build_linear_memory_spec(&info, heap_settings)?;
         let mut decls = Self {
@@ -203,12 +204,13 @@ impl<'a> ModuleDecls<'a> {
     fn declare_tables<B: ClifBackend>(
         info: &ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
+        writable_tables : bool,
     ) -> Result<PrimaryMap<TableIndex, (Name, Name)>, LucetcError> {
         let mut table_names = PrimaryMap::new();
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id = clif_module
-                .declare_data(&def_symbol, Linkage::Export, false)
+                .declare_data(&def_symbol, Linkage::Export, writable_tables)
                 .context(LucetcErrorKind::TranslatingModule)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 

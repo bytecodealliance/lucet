@@ -9,7 +9,7 @@ use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
 use std::slice;
-use std::slice::from_raw_parts;
+use std::slice::{from_raw_parts, from_raw_parts_mut};
 use std::sync::Arc;
 
 /// A Lucet module backed by a dynamically-loaded shared object.
@@ -165,6 +165,24 @@ impl ModuleInternal for DlModule {
             lucet_incorrect_module!("table segment too long: {}", len);
         }
         Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize) })
+    }
+
+    fn table_elements_mut(&self) -> Result<&mut [TableElement], Error> {
+        let p_table_segment: Symbol<*mut TableElement> = unsafe {
+            self.lib.get(b"guest_table_0").map_err(|e| {
+                lucet_incorrect_module!("error loading required symbol `guest_table_0`: {}", e)
+            })?
+        };
+        let p_table_segment_len: Symbol<*const usize> = unsafe {
+            self.lib.get(b"guest_table_0_len").map_err(|e| {
+                lucet_incorrect_module!("error loading required symbol `guest_table_0_len`: {}", e)
+            })?
+        };
+        let len = unsafe { **p_table_segment_len };
+        if len > std::u32::MAX as usize {
+            lucet_incorrect_module!("table segment too long: {}", len);
+        }
+        Ok(unsafe { from_raw_parts_mut(*p_table_segment, **p_table_segment_len as usize) })
     }
 
     fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error> {

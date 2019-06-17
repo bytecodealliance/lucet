@@ -258,6 +258,10 @@ impl ModuleInternal for MockModule {
         Ok(&self.table_elements)
     }
 
+    fn table_elements_mut(&self) -> Result<&mut [TableElement], Error> {
+        Err(Error::Unsupported("Mutable elements not implemented".to_string()))
+    }
+
     fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error> {
         let ptr = *self
             .export_funcs

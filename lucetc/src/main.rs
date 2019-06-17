@@ -67,6 +67,8 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.guard_size(guard_size);
     }
 
+    c.writable_tables(opts.writable_tables);
+
     match opts.codegen {
         CodegenOutput::Obj => c.object_file(&opts.output)?,
         CodegenOutput::SharedObj => c.shared_object_file(&opts.output)?,

@@ -20,6 +20,21 @@ pub struct TableElement {
     rf: u64,
 }
 
+impl TableElement {
+    pub fn set_element(&mut self, new_ty: u64, new_rf: u64) {
+        self.ty = new_ty;
+        self.rf = new_rf;
+    }
+
+    pub fn ty(&self) -> u64 {
+        self.ty
+    }
+
+    pub fn rf(&self) -> u64 {
+        self.rf
+    }
+}
+
 /// Details about a program address.
 ///
 /// It is possible to determine whether an address lies within the module code if the module is
@@ -55,6 +70,8 @@ pub trait ModuleInternal: Send + Sync {
 
     /// Get the table elements from the module.
     fn table_elements(&self) -> Result<&[TableElement], Error>;
+
+    fn table_elements_mut(&self) -> Result<&mut [TableElement], Error>;
 
     fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error>;
 

@@ -41,6 +41,7 @@ pub struct Options {
     pub reserved_size: Option<u64>,
     pub guard_size: Option<u64>,
     pub opt_level: OptLevel,
+    pub writable_tables : bool,
 }
 
 impl Options {
@@ -101,6 +102,8 @@ impl Options {
             Some(_) => panic!("unknown value for opt-level"),
         };
 
+        let writable_tables = m.is_present("writable_tables");
+
         Ok(Options {
             output,
             input,
@@ -112,6 +115,7 @@ impl Options {
             reserved_size,
             guard_size,
             opt_level,
+            writable_tables
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -197,6 +201,12 @@ impl Options {
                     .takes_value(true)
                     .possible_values(&["0", "1", "2", "fast"])
                     .help("optimization level (default: '1')"),
+            )
+            .arg(
+                Arg::with_name("writable_tables")
+                    .long("--writable-tables")
+                    .takes_value(false)
+                    .help("make the function indirection tables writable"),
             )
             .get_matches();
 

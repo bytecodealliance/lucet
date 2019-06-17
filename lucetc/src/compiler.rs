@@ -56,6 +56,7 @@ impl<'a> Compiler<'a> {
         opt_level: OptLevel,
         bindings: &Bindings,
         heap_settings: HeapSettings,
+        writable_tables: bool,
     ) -> Result<Self, LucetcError> {
         let isa = Self::target_isa(opt_level);
 
@@ -99,6 +100,7 @@ impl<'a> Compiler<'a> {
             bindings,
             runtime,
             heap_settings,
+            writable_tables,
         )?;
 
         Ok(Self {

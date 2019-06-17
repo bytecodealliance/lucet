@@ -43,6 +43,7 @@ pub struct Lucetc {
     opt_level: OptLevel,
     heap: HeapSettings,
     builtins_paths: Vec<PathBuf>,
+    writable_tables: bool
 }
 
 pub trait AsLucetc {
@@ -82,6 +83,9 @@ pub trait LucetcOpts {
 
     fn guard_size(&mut self, guard_size: u64);
     fn with_guard_size(self, guard_size: u64) -> Self;
+
+    fn writable_tables(&mut self, writable_tables: bool);
+    fn with_writable_tables(self, writable_tables: bool) -> Self;
 }
 
 impl<T: AsLucetc> LucetcOpts for T {
@@ -150,6 +154,15 @@ impl<T: AsLucetc> LucetcOpts for T {
         self.guard_size(guard_size);
         self
     }
+
+    fn writable_tables(&mut self, writable_tables: bool) {
+        self.as_lucetc().writable_tables = writable_tables;
+    }
+
+    fn with_writable_tables(mut self, writable_tables: bool) -> Self {
+        self.writable_tables(writable_tables);
+        self
+    }
 }
 
 impl Lucetc {
@@ -161,6 +174,7 @@ impl Lucetc {
             opt_level: OptLevel::default(),
             heap: HeapSettings::default(),
             builtins_paths: vec![],
+            writable_tables : false
         }
     }
 
@@ -172,6 +186,7 @@ impl Lucetc {
             opt_level: OptLevel::default(),
             heap: HeapSettings::default(),
             builtins_paths: vec![],
+            writable_tables: false
         })
     }
 
@@ -211,6 +226,7 @@ impl Lucetc {
             self.opt_level,
             &bindings,
             self.heap.clone(),
+            self.writable_tables,
         )?;
         let obj = compiler.object_file()?;
 
@@ -226,6 +242,7 @@ impl Lucetc {
             self.opt_level,
             &bindings,
             self.heap.clone(),
+            self.writable_tables,
         )?;
 
         compiler
