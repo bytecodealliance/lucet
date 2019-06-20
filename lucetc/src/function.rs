@@ -7,7 +7,7 @@ use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
     FuncEnvironment, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex, SignatureIndex,
-    TableIndex, WasmResult,
+    TableIndex, WasmResult, WasmError,
 };
 use std::collections::HashMap;
 
@@ -84,23 +84,23 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         self.module_decls.target_config()
     }
 
-    fn make_global(&mut self, func: &mut ir::Function, index: GlobalIndex) -> GlobalVariable {
+    fn make_global(&mut self, func: &mut ir::Function, index: GlobalIndex) -> Result<GlobalVariable, WasmError> {
         let global_base = self.get_global_base(func);
         let global = self.module_decls.get_global(index).expect("valid global");
         let index = index.as_u32() as i32;
         let offset = (index * NATIVE_POINTER_SIZE as i32).into();
-        GlobalVariable::Memory {
+        Ok(GlobalVariable::Memory {
             gv: global_base,
             offset,
             ty: global.entity.ty,
-        }
+        })
     }
 
-    fn make_heap(&mut self, func: &mut ir::Function, index: MemoryIndex) -> ir::Heap {
+    fn make_heap(&mut self, func: &mut ir::Function, index: MemoryIndex) -> Result<ir::Heap, WasmError> {
         assert_eq!(index, MemoryIndex::new(0), "only memory 0 is supported");
         let heap_spec = self.module_decls.get_heap().expect("valid heap");
         let vmctx = self.get_vmctx(func);
-        func.create_heap(ir::HeapData {
+        Ok(func.create_heap(ir::HeapData {
             base: vmctx,
             min_size: heap_spec.initial_size.into(),
             offset_guard_size: heap_spec.guard_size.into(),
@@ -108,10 +108,10 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
                 bound: heap_spec.reserved_size.into(),
             },
             index_type: ir::types::I32,
-        })
+        }))
     }
 
-    fn make_table(&mut self, func: &mut ir::Function, index: TableIndex) -> ir::Table {
+    fn make_table(&mut self, func: &mut ir::Function, index: TableIndex) -> Result<ir::Table, WasmError> {
         let index_type = ir::types::I64;
         let table_decl = self.module_decls.get_table(index).expect("valid table");
         let base_gv = func.create_global_value(ir::GlobalValueData::Symbol {
@@ -132,13 +132,13 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         });
         let element_size = ((NATIVE_POINTER_SIZE * 2) as u64).into();
         let min_size = (table_decl.table.minimum as u64).into();
-        func.create_table(ir::TableData {
+        Ok(func.create_table(ir::TableData {
             base_gv,
             bound_gv,
             element_size,
             index_type,
             min_size,
-        })
+        }))
     }
 
     fn translate_call_indirect(
@@ -197,20 +197,20 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         Ok(pos.ins().call_indirect(sig_ref, table_entry_fptr, &args))
     }
 
-    fn make_indirect_sig(&mut self, func: &mut ir::Function, index: SignatureIndex) -> ir::SigRef {
+    fn make_indirect_sig(&mut self, func: &mut ir::Function, index: SignatureIndex) -> Result<ir::SigRef, WasmError> {
         let sig = self.module_decls.get_signature(index).unwrap().clone();
-        func.import_signature(sig)
+        Ok(func.import_signature(sig))
     }
 
-    fn make_direct_func(&mut self, func: &mut ir::Function, index: FuncIndex) -> ir::FuncRef {
+    fn make_direct_func(&mut self, func: &mut ir::Function, index: FuncIndex) -> Result<ir::FuncRef, WasmError> {
         let func_decl = self.module_decls.get_func(index).unwrap();
         let signature = func.import_signature(func_decl.signature.clone());
         let colocated = !func_decl.imported();
-        func.import_function(ir::ExtFuncData {
+        Ok(func.import_function(ir::ExtFuncData {
             name: func_decl.name.into(),
             signature,
             colocated,
-        })
+        }))
     }
 
     fn translate_call(
