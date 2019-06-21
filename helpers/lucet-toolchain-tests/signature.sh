@@ -10,6 +10,7 @@ fi
 
 if ! command -v rsign >/dev/null; then
     cargo install rsign2
+    export PATH="${HOME}/.cargo/bin:${PATH}"
 fi
 
 echo "Creating a key pair to sign the WebAssembly code"
