@@ -388,7 +388,7 @@ lucet_hostcalls! {
     /// Get the number of WebAssembly pages currently in the heap.
     pub unsafe extern "C" fn lucet_vmctx_current_memory(
         &mut vmctx,
-    ) -> libc::uint32_t {
+    ) -> u32 {
         vmctx.instance().alloc().heap_len() as u32 / WASM_PAGE_SIZE
     }
 
@@ -398,10 +398,10 @@ lucet_hostcalls! {
     /// On success, returns the number of pages that existed before the call. On failure, returns `-1`.
     pub unsafe extern "C" fn lucet_vmctx_grow_memory(
         &mut vmctx,
-        additional_pages: libc::uint32_t,
-    ) -> libc::int32_t {
+        additional_pages: u32,
+    ) -> i32 {
         if let Ok(old_pages) = vmctx.instance_mut().grow_memory(additional_pages) {
-            old_pages as libc::int32_t
+            old_pages as i32
         } else {
             -1
         }
