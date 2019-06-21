@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 pub mod c_api;
 pub mod ctx;
 pub mod fdentry;

@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 use lucet_module_data::{Error, FunctionSpec, ModuleData, TrapManifest, TrapSite};
 
 use byteorder::{LittleEndian, ReadBytesExt};

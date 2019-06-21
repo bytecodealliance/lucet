@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 use failure::{Error, Fail};
 use std::env;
 use std::io::Write;

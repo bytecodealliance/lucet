@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 mod bindings;
 mod compiler;
 mod decls;
