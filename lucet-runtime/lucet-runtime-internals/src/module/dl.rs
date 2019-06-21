@@ -33,12 +33,16 @@ unsafe impl Sync for DlModule {}
 impl DlModule {
     /// Create a module, loading code from a shared object on the filesystem.
     pub fn load<P: AsRef<Path>>(so_path: P) -> Result<Arc<Self>, Error> {
-        Self::load_and_verify(so_path, None)
+        Self::load_and_maybe_verify(so_path, None)
     }
 
     /// Create a module, loading code from a shared object on the filesystem
     /// and verifying it using a public key if one has been supplied.
-    pub fn load_and_verify<P: AsRef<Path>>(
+    pub fn load_and_verify<P: AsRef<Path>>(so_path: P, pk: PublicKey) -> Result<Arc<Self>, Error> {
+        Self::load_and_maybe_verify(so_path, Some(pk))
+    }
+
+    fn load_and_maybe_verify<P: AsRef<Path>>(
         so_path: P,
         pk: Option<PublicKey>,
     ) -> Result<Arc<Self>, Error> {

@@ -187,8 +187,12 @@ fn run(config: Config<'_>) {
             }
             (true, None) => panic!("signature verification requires a public key"),
         };
-        let module =
-            DlModule::load_and_verify(&config.lucet_module, pk).expect("module can be loaded");
+        let module = if let Some(pk) = pk {
+            DlModule::load_and_verify(&config.lucet_module, pk)
+                .expect("signed module can be loaded")
+        } else {
+            DlModule::load(&config.lucet_module).expect("module can be loaded")
+        };
         let min_globals_size = module.globals().len() * std::mem::size_of::<u64>();
         let globals_size = ((min_globals_size + 4096 - 1) / 4096) * 4096;
 
