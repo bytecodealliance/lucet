@@ -14,15 +14,15 @@ pub struct GlobalSpec<'a> {
 
 impl<'a> GlobalSpec<'a> {
     pub fn new(global: Global<'a>, export_names: Vec<&'a str>) -> Self {
-        Self { global, export_names }
+        Self {
+            global,
+            export_names,
+        }
     }
 
     /// Create a new global definition with an initial value and export names.
     pub fn new_def(init_val: i64, export_names: Vec<&'a str>) -> Self {
-        Self::new(
-            Global::Def(GlobalDef::I64(init_val)),
-            export_names,
-        )
+        Self::new(Global::Def(GlobalDef::I64(init_val)), export_names)
     }
 
     /// Create a new global import definition with a module and field name, and export names.
@@ -61,7 +61,7 @@ pub enum GlobalDef {
     I32(i32),
     I64(i64),
     F32(f32),
-    F64(f64)
+    F64(f64),
 }
 
 impl GlobalDef {
@@ -87,7 +87,7 @@ impl std::fmt::Debug for GlobalValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Because GlobalValue is a union of primitives, there won't be anything wrong,
         // representation-wise, with printing the underlying data as an i64, f64, or
-        // another primitive. This still may incur UB by doing something like trying to 
+        // another primitive. This still may incur UB by doing something like trying to
         // read data from an uninitialized memory, if the union is initialized with a
         // 32-bit value, and then read as a 64-bit value (as this code is about to do).
         //
@@ -116,15 +116,15 @@ pub struct OwnedGlobalSpec {
 
 impl OwnedGlobalSpec {
     pub fn new(global: OwnedGlobal, export_names: Vec<String>) -> Self {
-        Self { global, export_names }
+        Self {
+            global,
+            export_names,
+        }
     }
 
     /// Create a new global definition with an initial value and export names.
     pub fn new_def(init_val: i64, export_names: Vec<String>) -> Self {
-        Self::new(
-            OwnedGlobal::Def(GlobalDef::I64(init_val)),
-            export_names,
-        )
+        Self::new(OwnedGlobal::Def(GlobalDef::I64(init_val)), export_names)
     }
 
     /// Create a new global import definition with a module and field name, and export names.
@@ -135,7 +135,10 @@ impl OwnedGlobalSpec {
     /// Create a [`GlobalSpec`](../struct.GlobalSpec.html) backed by the values in this
     /// `OwnedGlobalSpec`.
     pub fn to_ref<'a>(&'a self) -> GlobalSpec<'a> {
-        GlobalSpec::new(self.global.to_ref(), self.export_names.iter().map(|x| x.as_str()).collect())
+        GlobalSpec::new(
+            self.global.to_ref(),
+            self.export_names.iter().map(|x| x.as_str()).collect(),
+        )
     }
 }
 

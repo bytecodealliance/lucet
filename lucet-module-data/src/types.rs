@@ -1,6 +1,6 @@
-use std::convert::TryFrom;
 use cranelift_codegen::ir;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -25,7 +25,7 @@ impl Display for ValueType {
 #[derive(Debug)]
 pub enum ValueError {
     Unrepresentable,
-    InvalidVMContext
+    InvalidVMContext,
 }
 
 impl TryFrom<&ir::AbiParam> for ValueType {
@@ -37,7 +37,7 @@ impl TryFrom<&ir::AbiParam> for ValueType {
                 value_type: cranelift_ty,
                 purpose: ir::ArgumentPurpose::Normal,
                 extension: ir::ArgumentExtension::None,
-                location: ir::ArgumentLoc::Unassigned
+                location: ir::ArgumentLoc::Unassigned,
             } => {
                 let size = cranelift_ty.bits();
 
@@ -56,8 +56,8 @@ impl TryFrom<&ir::AbiParam> for ValueType {
                 } else {
                     Err(ValueError::Unrepresentable)
                 }
-            },
-            _ => Err(ValueError::Unrepresentable)
+            }
+            _ => Err(ValueError::Unrepresentable),
         }
     }
 }
@@ -86,7 +86,7 @@ impl Display for Signature {
         write!(f, ") -> ")?;
         match self.ret_ty {
             Some(ty) => write!(f, "{}", ty),
-            None => write!(f, "()")
+            None => write!(f, "()"),
         }
     }
 }
@@ -116,7 +116,7 @@ macro_rules! lucet_signature {
 #[derive(Debug)]
 pub enum SignatureError {
     BadElement(ir::AbiParam, ValueError),
-    BadSignature
+    BadSignature,
 }
 
 impl TryFrom<&ir::Signature> for Signature {
@@ -135,16 +135,22 @@ impl TryFrom<&ir::Signature> for Signature {
                     value_type: value,
                     purpose: ir::ArgumentPurpose::VMContext,
                     extension: ir::ArgumentExtension::None,
-                    location: ir::ArgumentLoc::Unassigned
+                    location: ir::ArgumentLoc::Unassigned,
                 } => {
                     if value.is_int() && value.bits() == 64 {
                         // this is VMContext, so we can move on.
                     } else {
-                        return Err(SignatureError::BadElement(param.to_owned(), ValueError::InvalidVMContext));
+                        return Err(SignatureError::BadElement(
+                            param.to_owned(),
+                            ValueError::InvalidVMContext,
+                        ));
                     }
-                },
+                }
                 _ => {
-                    return Err(SignatureError::BadElement(param.to_owned(), ValueError::InvalidVMContext));
+                    return Err(SignatureError::BadElement(
+                        param.to_owned(),
+                        ValueError::InvalidVMContext,
+                    ));
                 }
             }
         } else {
@@ -165,7 +171,7 @@ impl TryFrom<&ir::Signature> for Signature {
                     .map_err(|e| SignatureError::BadElement(ret_ty.clone(), e))?;
 
                 Some(value_ty)
-            },
+            }
             _ => {
                 return Err(SignatureError::BadSignature);
             }

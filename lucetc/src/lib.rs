@@ -14,6 +14,7 @@ mod output;
 mod patch;
 mod pointer;
 mod runtime;
+pub mod signature;
 mod sparsedata;
 mod stack_probe;
 mod table;
@@ -30,6 +31,7 @@ pub use crate::{
     patch::patch_module,
 };
 use failure::{format_err, Error, ResultExt};
+use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};
 use tempfile;
@@ -45,6 +47,10 @@ pub struct Lucetc {
     opt_level: OptLevel,
     heap: HeapSettings,
     builtins_paths: Vec<PathBuf>,
+    sk: Option<SecretKey>,
+    pk: Option<PublicKey>,
+    sign: bool,
+    verify: bool,
 }
 
 pub trait AsLucetc {
@@ -84,6 +90,15 @@ pub trait LucetcOpts {
 
     fn guard_size(&mut self, guard_size: u64);
     fn with_guard_size(self, guard_size: u64) -> Self;
+
+    fn pk(&mut self, pk: PublicKey);
+    fn with_pk(self, pk: PublicKey) -> Self;
+    fn sk(&mut self, sk: SecretKey);
+    fn with_sk(self, sk: SecretKey) -> Self;
+    fn verify(&mut self);
+    fn with_verify(self) -> Self;
+    fn sign(&mut self);
+    fn with_sign(self) -> Self;
 }
 
 impl<T: AsLucetc> LucetcOpts for T {
@@ -152,6 +167,42 @@ impl<T: AsLucetc> LucetcOpts for T {
         self.guard_size(guard_size);
         self
     }
+
+    fn pk(&mut self, pk: PublicKey) {
+        self.as_lucetc().pk = Some(pk);
+    }
+
+    fn with_pk(mut self, pk: PublicKey) -> Self {
+        self.pk(pk);
+        self
+    }
+
+    fn sk(&mut self, sk: SecretKey) {
+        self.as_lucetc().sk = Some(sk);
+    }
+
+    fn with_sk(mut self, sk: SecretKey) -> Self {
+        self.sk(sk);
+        self
+    }
+
+    fn verify(&mut self) {
+        self.as_lucetc().verify = true;
+    }
+
+    fn with_verify(mut self) -> Self {
+        self.verify();
+        self
+    }
+
+    fn sign(&mut self) {
+        self.as_lucetc().sign = true;
+    }
+
+    fn with_sign(mut self) -> Self {
+        self.sign();
+        self
+    }
 }
 
 impl Lucetc {
@@ -163,6 +214,10 @@ impl Lucetc {
             opt_level: OptLevel::default(),
             heap: HeapSettings::default(),
             builtins_paths: vec![],
+            pk: None,
+            sk: None,
+            sign: false,
+            verify: false,
         }
     }
 
@@ -174,6 +229,10 @@ impl Lucetc {
             opt_level: OptLevel::default(),
             heap: HeapSettings::default(),
             builtins_paths: vec![],
+            pk: None,
+            sk: None,
+            sign: false,
+            verify: false,
         })
     }
 
@@ -183,7 +242,7 @@ impl Lucetc {
         let mut builtins_bindings = vec![];
         let mut module_binary = match &self.input {
             LucetcInput::Bytes(bytes) => bytes.clone(),
-            LucetcInput::Path(path) => read_module(&path)?,
+            LucetcInput::Path(path) => read_module(&path, &self.pk, self.verify)?,
         };
 
         if !self.builtins_paths.is_empty() {
@@ -242,7 +301,13 @@ impl Lucetc {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
-        link_so(objpath, output)?;
+        link_so(objpath, &output)?;
+        if self.sign {
+            let sk = self.sk.as_ref().ok_or(
+                format_err!("signing requires a secret key").context(LucetcErrorKind::Signature),
+            )?;
+            signature::sign(&output, sk)?;
+        }
         Ok(())
     }
 }
