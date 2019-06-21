@@ -110,7 +110,7 @@ impl RawModuleAndData {
     // address as well as the section offset.
 
     // Elf
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(target_family = "unix", not(target_os = "macos")))]
     fn symbol_data(
         obj_bin: &[u8],
         symbol_name: &str,
