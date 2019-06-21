@@ -19,7 +19,7 @@ impl CtxMap {
         self.map.contains_key(&TypeId::of::<T>())
     }
 
-    pub fn try_get<T: Any>(&self) -> Option<Result<Ref<T>, BorrowError>> {
+    pub fn try_get<T: Any>(&self) -> Option<Result<Ref<'_, T>, BorrowError>> {
         self.map.get(&TypeId::of::<T>()).map(|x| {
             x.try_borrow().map(|r| {
                 Ref::map(r, |b| {
@@ -30,7 +30,7 @@ impl CtxMap {
         })
     }
 
-    pub fn try_get_mut<T: Any>(&mut self) -> Option<Result<RefMut<T>, BorrowMutError>> {
+    pub fn try_get_mut<T: Any>(&mut self) -> Option<Result<RefMut<'_, T>, BorrowMutError>> {
         self.map.get_mut(&TypeId::of::<T>()).map(|x| {
             x.try_borrow_mut().map(|r| {
                 RefMut::map(r, |b| {

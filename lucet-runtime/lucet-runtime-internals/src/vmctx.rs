@@ -96,7 +96,7 @@ impl Vmctx {
     ///
     /// If the heap is already mutably borrowed by `heap_mut()`, the instance will
     /// terminate with `TerminationDetails::BorrowError`.
-    pub fn heap(&self) -> Ref<[u8]> {
+    pub fn heap(&self) -> Ref<'_, [u8]> {
         unsafe {
             self.reconstitute_heap_view_if_needed();
         }
@@ -111,7 +111,7 @@ impl Vmctx {
     ///
     /// If the heap is already borrowed by `heap()` or `heap_mut()`, the instance will terminate
     /// with `TerminationDetails::BorrowError`.
-    pub fn heap_mut(&self) -> RefMut<[u8]> {
+    pub fn heap_mut(&self) -> RefMut<'_, [u8]> {
         unsafe {
             self.reconstitute_heap_view_if_needed();
         }
@@ -162,7 +162,7 @@ impl Vmctx {
     ///
     /// If the context is already mutably borrowed by `get_embed_ctx_mut`, the instance will
     /// terminate with `TerminationDetails::BorrowError`.
-    pub fn get_embed_ctx<T: Any>(&self) -> Ref<T> {
+    pub fn get_embed_ctx<T: Any>(&self) -> Ref<'_, T> {
         match self.instance().embed_ctx.try_get::<T>() {
             Some(Ok(t)) => t,
             Some(Err(_)) => panic!(TerminationDetails::BorrowError("get_embed_ctx")),
@@ -177,7 +177,7 @@ impl Vmctx {
     ///
     /// If the context is already borrowed by some other use of `get_embed_ctx` or
     /// `get_embed_ctx_mut`, the instance will terminate with `TerminationDetails::BorrowError`.
-    pub fn get_embed_ctx_mut<T: Any>(&self) -> RefMut<T> {
+    pub fn get_embed_ctx_mut<T: Any>(&self) -> RefMut<'_, T> {
         match unsafe { self.instance_mut().embed_ctx.try_get_mut::<T>() } {
             Some(Ok(t)) => t,
             Some(Err(_)) => panic!(TerminationDetails::BorrowError("get_embed_ctx_mut")),
@@ -205,7 +205,7 @@ impl Vmctx {
     ///
     /// If the globals are already mutably borrowed by `globals_mut()`, the instance will terminate
     /// with `TerminationDetails::BorrowError`.
-    pub fn globals(&self) -> Ref<[GlobalValue]> {
+    pub fn globals(&self) -> Ref<'_, [GlobalValue]> {
         let r = self
             .globals_view
             .try_borrow()
@@ -217,7 +217,7 @@ impl Vmctx {
     ///
     /// If the globals are already borrowed by `globals()` or `globals_mut()`, the instance will
     /// terminate with `TerminationDetails::BorrowError`.
-    pub fn globals_mut(&self) -> RefMut<[GlobalValue]> {
+    pub fn globals_mut(&self) -> RefMut<'_, [GlobalValue]> {
         let r = self
             .globals_view
             .try_borrow_mut()

@@ -133,7 +133,7 @@ impl ModuleInternal for DlModule {
         self.module_data.heap_spec()
     }
 
-    fn globals(&self) -> &[GlobalSpec] {
+    fn globals(&self) -> &[GlobalSpec<'_>] {
         self.module_data.globals_spec()
     }
 
@@ -150,12 +150,12 @@ impl ModuleInternal for DlModule {
     }
 
     fn table_elements(&self) -> Result<&[TableElement], Error> {
-        let p_table_segment: Symbol<*const TableElement> = unsafe {
+        let p_table_segment: Symbol<'_, *const TableElement> = unsafe {
             self.lib.get(b"guest_table_0").map_err(|e| {
                 lucet_incorrect_module!("error loading required symbol `guest_table_0`: {}", e)
             })?
         };
-        let p_table_segment_len: Symbol<*const usize> = unsafe {
+        let p_table_segment_len: Symbol<'_, *const usize> = unsafe {
             self.lib.get(b"guest_table_0_len").map_err(|e| {
                 lucet_incorrect_module!("error loading required symbol `guest_table_0_len`: {}", e)
             })?

@@ -425,12 +425,12 @@ impl Instance {
     }
 
     /// Get a reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx<T: Any>(&self) -> Option<Result<Ref<T>, BorrowError>> {
+    pub fn get_embed_ctx<T: Any>(&self) -> Option<Result<Ref<'_, T>, BorrowError>> {
         self.embed_ctx.try_get::<T>()
     }
 
     /// Get a mutable reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<Result<RefMut<T>, BorrowMutError>> {
+    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<Result<RefMut<'_, T>, BorrowMutError>> {
         self.embed_ctx.try_get_mut::<T>()
     }
 
@@ -727,7 +727,7 @@ pub struct FaultDetails {
 }
 
 impl std::fmt::Display for FaultDetails {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.fatal {
             write!(f, "fault FATAL ")?;
         } else {
@@ -818,7 +818,7 @@ impl PartialEq for TerminationDetails {
 }
 
 impl std::fmt::Debug for TerminationDetails {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "TerminationDetails::")?;
         match self {
             TerminationDetails::Signal => write!(f, "Signal"),
@@ -833,7 +833,7 @@ unsafe impl Send for TerminationDetails {}
 unsafe impl Sync for TerminationDetails {}
 
 impl std::fmt::Display for State {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             State::Ready { .. } => write!(f, "ready"),
             State::Running => write!(f, "running"),

@@ -238,7 +238,7 @@ impl ModuleInternal for MockModule {
         self.module_data.heap_spec()
     }
 
-    fn globals(&self) -> &[GlobalSpec] {
+    fn globals(&self) -> &[GlobalSpec<'_>] {
         self.module_data.globals_spec()
     }
 

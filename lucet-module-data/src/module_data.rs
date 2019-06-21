@@ -73,11 +73,11 @@ impl<'a> ModuleData<'a> {
         &self.function_info
     }
 
-    pub fn import_functions(&self) -> &[ImportFunction] {
+    pub fn import_functions(&self) -> &[ImportFunction<'_>] {
         &self.import_functions
     }
 
-    pub fn export_functions(&self) -> &[ExportFunction] {
+    pub fn export_functions(&self) -> &[ExportFunction<'_>] {
         &self.export_functions
     }
 

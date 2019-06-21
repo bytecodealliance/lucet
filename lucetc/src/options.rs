@@ -44,7 +44,7 @@ pub struct Options {
 }
 
 impl Options {
-    pub fn from_args(m: &ArgMatches) -> Result<Self, Error> {
+    pub fn from_args(m: &ArgMatches<'_>) -> Result<Self, Error> {
         let input: Vec<PathBuf> = m
             .values_of("input")
             .unwrap_or_default()
