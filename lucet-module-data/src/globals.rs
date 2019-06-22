@@ -30,7 +30,7 @@ impl<'a> GlobalSpec<'a> {
         Self::new(Global::Import { module, field }, export_names)
     }
 
-    pub fn global(&self) -> &Global {
+    pub fn global(&self) -> &Global<'_> {
         &self.global
     }
 
@@ -84,7 +84,7 @@ pub union GlobalValue {
 }
 
 impl std::fmt::Debug for GlobalValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Because GlobalValue is a union of primitives, there won't be anything wrong,
         // representation-wise, with printing the underlying data as an i64, f64, or
         // another primitive. This still may incur UB by doing something like trying to 

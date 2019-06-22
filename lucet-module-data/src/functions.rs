@@ -117,7 +117,7 @@ pub struct OwnedFunctionMetadata {
 }
 
 impl OwnedFunctionMetadata {
-    pub fn to_ref(&self) -> FunctionMetadata {
+    pub fn to_ref(&self) -> FunctionMetadata<'_> {
         FunctionMetadata {
             signature: self.signature.clone(),
             name: self.name.as_ref().map(|n| n.as_str()),
@@ -175,7 +175,7 @@ impl FunctionSpec {
 
         None
     }
-    pub fn traps(&self) -> Option<TrapManifest> {
+    pub fn traps(&self) -> Option<TrapManifest<'_>> {
         let traps_ptr = self.traps_addr as *const TrapSite;
         if !traps_ptr.is_null() {
             let traps_slice =

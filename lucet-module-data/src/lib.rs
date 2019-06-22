@@ -3,6 +3,8 @@
 //! These types are used both in `lucetc` and `lucet-runtime`, with values serialized in
 //! [`bincode`](https://github.com/TyOverby/bincode) format to the compiled Lucet modules.
 
+#![deny(bare_trait_objects)]
+
 mod error;
 mod functions;
 mod globals;

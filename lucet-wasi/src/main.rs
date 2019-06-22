@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 #[macro_use]
 extern crate clap;
 
@@ -154,7 +156,7 @@ fn main() {
     run(config)
 }
 
-fn run(config: Config) {
+fn run(config: Config<'_>) {
     lucet_wasi::hostcalls::ensure_linked();
     let exitcode = {
         // doing all of this in a block makes sure everything gets dropped before exiting

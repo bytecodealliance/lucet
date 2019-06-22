@@ -12,7 +12,7 @@ pub enum ValueType {
 }
 
 impl Display for ValueType {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ValueType::I32 => write!(f, "I32"),
             ValueType::I64 => write!(f, "I64"),
@@ -74,7 +74,7 @@ pub struct Signature {
 }
 
 impl Display for Signature {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "(")?;
         for (i, p) in self.params.iter().enumerate() {
             if i == 0 {

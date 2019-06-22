@@ -47,7 +47,7 @@ pub struct TrapManifest<'a> {
 }
 
 impl <'a> TrapManifest<'a> {
-    pub fn new(traps: &'a [TrapSite]) -> TrapManifest {
+    pub fn new(traps: &'a [TrapSite]) -> TrapManifest<'_> {
         TrapManifest { traps }
     }
     pub fn lookup_addr(&self, addr: u32) -> Option<TrapCode> {

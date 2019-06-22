@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 use lucet_module_data::{Error, FunctionSpec, ModuleData, TrapManifest, TrapSite};
 
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -43,7 +45,7 @@ struct DataSegment {
 }
 
 impl<'a> ArtifactSummary<'a> {
-    fn new(buffer: &'a Vec<u8>, elf: &'a elf::Elf) -> Self {
+    fn new(buffer: &'a Vec<u8>, elf: &'a elf::Elf<'_>) -> Self {
         Self {
             buffer: buffer,
             elf: elf,
@@ -286,7 +288,7 @@ fn parse_trap_manifest<'a>(
     if let Some(faulty_trap_manifest) = f.traps() {
         let trap_ptr = faulty_trap_manifest.traps.as_ptr();
         let traps_count = faulty_trap_manifest.traps.len();
-        let traps_byte_count = traps_count * std::mem::size_of::<TrapManifest>();
+        let traps_byte_count = traps_count * std::mem::size_of::<TrapManifest<'_>>();
         if let Some(traps_byte_slice) =
             summary.read_memory(trap_ptr as u64, traps_byte_count as u64)
         {
@@ -530,7 +532,7 @@ fn summarize_module_data<'a, 'b: 'a>(
     }
 }
 
-fn print_summary(summary: ArtifactSummary) {
+fn print_summary(summary: ArtifactSummary<'_>) {
     println!("Required Symbols:");
     println!(
         "  {:30}: {}",
