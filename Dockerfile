@@ -32,11 +32,10 @@ RUN curl https://sh.rustup.rs -sSf | \
         /root/.cargo/bin/rustup update nightly
 ENV PATH=/root/.cargo/bin:$PATH
 
-RUN rustup target add wasm32-unknown-wasi \
-    --toolchain nightly
+RUN rustup component add rustfmt --toolchain 1.35.0-x86_64-unknown-linux-gnu
+RUN rustup target add wasm32-unknown-wasi
 
-ENV PATH=/usr/local/bin:$PATH
-RUN cargo install --root /usr/local cargo-audit cargo-watch rsign2
+RUN cargo install cargo-audit cargo-watch rsign2
 
 RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-5/wasi-sdk_5.0_amd64.deb \
 	&& dpkg -i wasi-sdk_5.0_amd64.deb && rm -f wasi-sdk_5.0_amd64.deb

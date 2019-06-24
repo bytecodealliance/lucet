@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 . "$(dirname ${BASH_SOURCE:-$0})/config.inc"
 
