@@ -147,7 +147,7 @@ pub fn enc_slice_of<T>(
 
     // get the pointer into guest memory, and copy the bytes
     let ptr = dec_ptr(vmctx, ptr, len_bytes)? as *mut libc::c_void;
-    unsafe { libc::memcpy(ptr, slice.as_ptr() as *const libc::c_void, len_bytes) };
+    unsafe { std::ptr::copy_nonoverlapping(slice.as_ptr() as *const libc::c_void, ptr, len_bytes) };
 
     Ok(())
 }
