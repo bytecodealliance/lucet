@@ -7,7 +7,7 @@ use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
     FuncEnvironment, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex, SignatureIndex,
-    TableIndex, WasmResult, WasmError,
+    TableIndex, WasmError, WasmResult,
 };
 use std::collections::HashMap;
 
@@ -84,7 +84,11 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         self.module_decls.target_config()
     }
 
-    fn make_global(&mut self, func: &mut ir::Function, index: GlobalIndex) -> Result<GlobalVariable, WasmError> {
+    fn make_global(
+        &mut self,
+        func: &mut ir::Function,
+        index: GlobalIndex,
+    ) -> Result<GlobalVariable, WasmError> {
         let global_base = self.get_global_base(func);
         let global = self.module_decls.get_global(index).expect("valid global");
         let index = index.as_u32() as i32;
@@ -96,7 +100,11 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         })
     }
 
-    fn make_heap(&mut self, func: &mut ir::Function, index: MemoryIndex) -> Result<ir::Heap, WasmError> {
+    fn make_heap(
+        &mut self,
+        func: &mut ir::Function,
+        index: MemoryIndex,
+    ) -> Result<ir::Heap, WasmError> {
         assert_eq!(index, MemoryIndex::new(0), "only memory 0 is supported");
         let heap_spec = self.module_decls.get_heap().expect("valid heap");
         let vmctx = self.get_vmctx(func);
@@ -111,7 +119,11 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         }))
     }
 
-    fn make_table(&mut self, func: &mut ir::Function, index: TableIndex) -> Result<ir::Table, WasmError> {
+    fn make_table(
+        &mut self,
+        func: &mut ir::Function,
+        index: TableIndex,
+    ) -> Result<ir::Table, WasmError> {
         let index_type = ir::types::I64;
         let table_decl = self.module_decls.get_table(index).expect("valid table");
         let base_gv = func.create_global_value(ir::GlobalValueData::Symbol {
@@ -197,12 +209,20 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         Ok(pos.ins().call_indirect(sig_ref, table_entry_fptr, &args))
     }
 
-    fn make_indirect_sig(&mut self, func: &mut ir::Function, index: SignatureIndex) -> Result<ir::SigRef, WasmError> {
+    fn make_indirect_sig(
+        &mut self,
+        func: &mut ir::Function,
+        index: SignatureIndex,
+    ) -> Result<ir::SigRef, WasmError> {
         let sig = self.module_decls.get_signature(index).unwrap().clone();
         Ok(func.import_signature(sig))
     }
 
-    fn make_direct_func(&mut self, func: &mut ir::Function, index: FuncIndex) -> Result<ir::FuncRef, WasmError> {
+    fn make_direct_func(
+        &mut self,
+        func: &mut ir::Function,
+        index: FuncIndex,
+    ) -> Result<ir::FuncRef, WasmError> {
         let func_decl = self.module_decls.get_func(index).unwrap();
         let signature = func.import_signature(func_decl.signature.clone());
         let colocated = !func_decl.imported();
