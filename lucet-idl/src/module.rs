@@ -336,7 +336,7 @@ mod tests {
     fn mod_(syntax: &str) -> Result<Module, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
-        Module::from_declarations(&decls, &[])
+        Module::from_declarations(&decls, &[], String::new(), String::new())
     }
 
     #[test]
@@ -548,6 +548,8 @@ mod tests {
                         args: Vec::new(),
                         rets: Vec::new(),
                         attrs: Vec::new(),
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
                     }
                 )]
                 .into_iter()
@@ -555,6 +557,8 @@ mod tests {
                 data_types: HashMap::new(),
                 data_type_ordering: Vec::new(),
                 attrs: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
             }
         );
     }
@@ -577,6 +581,8 @@ mod tests {
                         }],
                         rets: Vec::new(),
                         attrs: Vec::new(),
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
                     }
                 )]
                 .into_iter()
@@ -584,6 +590,8 @@ mod tests {
                 data_types: HashMap::new(),
                 data_type_ordering: Vec::new(),
                 attrs: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
             }
         );
     }
@@ -606,6 +614,8 @@ mod tests {
                             attrs: Vec::new(),
                         }],
                         attrs: Vec::new(),
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
                     }
                 )]
                 .into_iter()
@@ -613,6 +623,8 @@ mod tests {
                 data_types: HashMap::new(),
                 data_type_ordering: Vec::new(),
                 attrs: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
             }
         );
     }
@@ -641,6 +653,8 @@ mod tests {
                             attrs: Vec::new(),
                         }],
                         attrs: Vec::new(),
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
                     }
                 )]
                 .into_iter()
@@ -660,6 +674,8 @@ mod tests {
                 .collect::<HashMap<_, _>>(),
                 data_type_ordering: vec![Ident(1)],
                 attrs: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
             }
         );
     }

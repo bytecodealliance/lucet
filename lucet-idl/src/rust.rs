@@ -74,11 +74,12 @@ impl RustGenerator {
         typename
     }
 
-    fn get_defined_typename(&self, data_type_ref: &DataTypeRef) -> &str {
+    fn get_defined_typename(&self, data_type_ref: &DataTypeRef) -> String {
         match data_type_ref {
             DataTypeRef::Defined(id) => self.defined.get(id).expect("definition exists"),
             DataTypeRef::Atom(a) => Self::atom_name(a),
         }
+        .to_owned()
     }
 
     fn atom_name(atom_type: &AtomType) -> &'static str {
@@ -111,7 +112,7 @@ impl RustGenerator {
             .writeln(format!("pub type {} = {};", typename, pointee_name))?
             .eob()?;
 
-        gen_testcase(&mut self.w, &dt.name.name.to_snake_case(), |w| {
+        gen_testcase(&mut self.w, &dt.name.name.to_snake_case(), move |w| {
             w.writeln(format!(
                 "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
                 dt.entity.repr_size, typename

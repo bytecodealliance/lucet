@@ -134,6 +134,8 @@ mod test {
                     data_types: HashMap::new(),
                     data_type_ordering: Vec::new(),
                     funcs: HashMap::new(),
+                    module_name: "empty".to_owned(),
+                    binding_prefix: "__empty".to_owned(),
                 }
             )]
             .into_iter()
@@ -178,6 +180,8 @@ mod test {
                         data_types: HashMap::new(),
                         data_type_ordering: Vec::new(),
                         funcs: HashMap::new(),
+                        module_name: "empty1".to_owned(),
+                        binding_prefix: "__empty1".to_owned(),
                     }
                 ),
                 (
@@ -188,6 +192,8 @@ mod test {
                         data_types: HashMap::new(),
                         data_type_ordering: Vec::new(),
                         funcs: HashMap::new(),
+                        module_name: "empty2".to_owned(),
+                        binding_prefix: "__empty2".to_owned(),
                     }
                 ),
                 (
@@ -198,6 +204,8 @@ mod test {
                         data_types: HashMap::new(),
                         data_type_ordering: Vec::new(),
                         funcs: HashMap::new(),
+                        module_name: "empty3".to_owned(),
+                        binding_prefix: "__empty3".to_owned(),
                     }
                 )
             ]
@@ -244,6 +252,8 @@ mod test {
                     .into_iter()
                     .collect::<HashMap<Ident, DataType>>(),
                     data_type_ordering: vec![Ident(0)],
+                    module_name: "foo".to_owned(),
+                    binding_prefix: "__foo".to_owned(),
                 }
             )]
             .into_iter()
