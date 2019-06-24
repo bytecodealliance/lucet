@@ -51,6 +51,7 @@ enum Config {
 
 fn main() {
     lucet_runtime::lucet_internal_ensure_linked();
+    lucet_wasi::hostcalls::ensure_linked();
 
     match Config::from_args() {
         Config::Fuzz { num_tests } => run_many(num_tests),
