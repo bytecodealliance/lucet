@@ -10,8 +10,8 @@ use cranelift_wasm::{
 use lucet_module_data::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
 
-/// UniqueFuncIndex names a function after merging duplicate function declarations to a signle
-/// identifier, whereas FuncIndex is maintained by Cranelift and may have multiple indices refering
+/// UniqueFuncIndex names a function after merging duplicate function declarations to a single
+/// identifier, whereas FuncIndex is maintained by Cranelift and may have multiple indices referring
 /// to a single function in the resulting artifact.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct UniqueFuncIndex(u32);
