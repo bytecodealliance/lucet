@@ -1025,7 +1025,7 @@ pub fn wasi_fd_readdir(
     cookie: wasm32::__wasi_dircookie_t,
     bufused: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
-    use libc::{dirent, fdopendir, memcpy, readdir_r, seekdir};
+    use libc::{dirent, fdopendir, readdir_r, seekdir};
 
     match enc_usize_byref(vmctx, bufused, 0) {
         Ok(_) => {}
@@ -1081,9 +1081,9 @@ pub fn wasi_fd_readdir(
         host_buf_offset += std::mem::size_of_val(&entry);
         let name_ptr = unsafe { *host_entry }.d_name.as_ptr();
         unsafe {
-            memcpy(
-                host_buf_ptr.offset(host_buf_offset as isize) as *mut _,
+            std::ptr::copy_nonoverlapping(
                 name_ptr as *const _,
+                host_buf_ptr.offset(host_buf_offset as isize) as *mut _,
                 name_len,
             )
         };
