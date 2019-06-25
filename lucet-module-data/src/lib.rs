@@ -22,7 +22,7 @@ pub use crate::functions::{
 pub use crate::globals::{Global, GlobalDef, GlobalSpec, GlobalValue};
 pub use crate::linear_memory::{HeapSpec, LinearMemorySpec, SparseData};
 pub use crate::module_data::ModuleData;
-pub use crate::signature::{ModuleSignature, PublicKey, RawModuleAndData};
+pub use crate::signature::{ModuleSignature, PublicKey};
 pub use crate::traps::{TrapCode, TrapManifest, TrapSite};
 pub use crate::types::{Signature, ValueType};
 

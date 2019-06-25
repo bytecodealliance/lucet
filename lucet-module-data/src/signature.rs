@@ -1,7 +1,7 @@
 use crate::error::Error::{self, IOError, ModuleSignatureError};
 use crate::ModuleData;
 use byteorder::{ByteOrder, LittleEndian};
-pub use minisign::PublicKey;
+pub use minisign::{PublicKey, SecretKey};
 use minisign::{SignatureBones, SignatureBox};
 use object::*;
 use std::fs::{File, OpenOptions};
@@ -36,6 +36,28 @@ impl ModuleSignature {
         )
         .map_err(|e| ModuleSignatureError(e))
     }
+
+    pub fn sign<P: AsRef<Path>>(path: P, sk: &SecretKey) -> Result<(), Error> {
+        let raw_module_and_data = RawModuleAndData::from_file(&path).map_err(|e| IOError(e))?;
+        let signature_box = minisign::sign(
+            None,
+            sk,
+            Cursor::new(&raw_module_and_data.obj_bin),
+            true,
+            None,
+            None,
+        )
+        .map_err(|e| ModuleSignatureError(e))?;
+        let signature_bones: SignatureBones = signature_box.into();
+        let patched_module_data_bin = ModuleData::patch_module_signature(
+            raw_module_and_data.module_data_bin(),
+            &signature_bones.to_bytes(),
+        )?;
+        raw_module_and_data
+            .write_patched_module_data(&path, &patched_module_data_bin)
+            .map_err(|e| IOError(e))?;
+        Ok(())
+    }
 }
 
 struct SymbolData {
@@ -43,7 +65,7 @@ struct SymbolData {
     len: usize,
 }
 
-pub struct RawModuleAndData {
+struct RawModuleAndData {
     pub obj_bin: Vec<u8>,
     pub module_data_offset: usize,
     pub module_data_len: usize,

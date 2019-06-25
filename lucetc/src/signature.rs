@@ -1,5 +1,5 @@
 use failure::*;
-use lucet_module_data::{ModuleData, RawModuleAndData};
+use lucet_module_data::ModuleSignature;
 pub use minisign::{KeyPair, PublicKey, SecretKey, SignatureBones, SignatureBox};
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
@@ -20,11 +20,12 @@ fn raw_key_path<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
 pub fn sk_from_file<P: AsRef<Path>>(sk_path: P) -> Result<SecretKey, Error> {
     match raw_key_path(sk_path.as_ref()) {
         None => SecretKey::from_file(sk_path, None)
-            .map_err(|_| format_err!("Unable to read the secret key")),
+            .map_err(|e| format_err!("Unable to read the secret key: {}", e)),
         Some(sk_path) => {
             let mut sk_bin: Vec<u8> = Vec::new();
             File::open(sk_path)?.read_to_end(&mut sk_bin)?;
-            SecretKey::from_bytes(&sk_bin).map_err(|_| format_err!("Unable to read the secret key"))
+            SecretKey::from_bytes(&sk_bin)
+                .map_err(|e| format_err!("Unable to read the secret key: {}", e))
         }
     }
 }
@@ -40,7 +41,7 @@ fn signature_path<P: AsRef<Path>>(path: P) -> Result<PathBuf, Error> {
 pub fn signature_box_for_module_path<P: AsRef<Path>>(path: P) -> Result<SignatureBox, Error> {
     let signature_path = signature_path(path)?;
     SignatureBox::from_file(&signature_path)
-        .map_err(|_| format_err!("Unable to load the signature file"))
+        .map_err(|e| format_err!("Unable to load the signature file: {}", e))
 }
 
 pub fn keygen<P: AsRef<Path>, Q: AsRef<Path>>(pk_path: P, sk_path: Q) -> Result<KeyPair, Error> {
@@ -49,11 +50,11 @@ pub fn keygen<P: AsRef<Path>, Q: AsRef<Path>>(pk_path: P, sk_path: Q) -> Result<
             let pk_writer = File::create(pk_path)?;
             let sk_writer = File::create(sk_path)?;
             KeyPair::generate_and_write_encrypted_keypair(pk_writer, sk_writer, None, None)
-                .map_err(|_| format_err!("Unable to generate the key pair"))
+                .map_err(|e| format_err!("Unable to generate the key pair: {}", e))
         }
         Some(sk_path_raw) => {
             let kp = KeyPair::generate_unencrypted_keypair()
-                .map_err(|_| format_err!("Unable to generate the key pair"))?;
+                .map_err(|e| format_err!("Unable to generate the key pair: {}", e))?;
             let mut pk_writer = File::create(pk_path)?;
             let mut sk_writer = File::create(sk_path_raw)?;
             pk_writer.write_all(&kp.pk.to_box()?.to_bytes())?;
@@ -63,26 +64,16 @@ pub fn keygen<P: AsRef<Path>, Q: AsRef<Path>>(pk_path: P, sk_path: Q) -> Result<
     }
 }
 
-pub fn verify(buf: &[u8], signature_box: &SignatureBox, pk: &PublicKey) -> Result<(), Error> {
-    minisign::verify(pk, signature_box, Cursor::new(buf), false, false)
-        .map_err(|_| format_err!("Unable to verify the signature"))
+// Verify the source code (WASM / WAT)
+pub fn verify_source_code(
+    buf: &[u8],
+    signature_box: &SignatureBox,
+    pk: &PublicKey,
+) -> Result<(), Error> {
+    minisign::verify(pk, signature_box, Cursor::new(buf), false, false).map_err(|e| e.into())
 }
 
-pub fn sign<P: AsRef<Path>>(path: P, sk: &SecretKey) -> Result<(), Error> {
-    let raw_module_and_data = RawModuleAndData::from_file(&path)?;
-    let signature_box = minisign::sign(
-        None,
-        sk,
-        Cursor::new(&raw_module_and_data.obj_bin),
-        true,
-        None,
-        None,
-    )?;
-    let signature_bones: SignatureBones = signature_box.into();
-    let patched_module_data_bin = ModuleData::patch_module_signature(
-        raw_module_and_data.module_data_bin(),
-        &signature_bones.to_bytes(),
-    )?;
-    raw_module_and_data.write_patched_module_data(&path, &patched_module_data_bin)?;
-    Ok(())
+// Sign the compiled code
+pub fn sign_module<P: AsRef<Path>>(path: P, sk: &SecretKey) -> Result<(), Error> {
+    ModuleSignature::sign(path, sk).map_err(|e| e.into())
 }

@@ -306,7 +306,7 @@ impl Lucetc {
             let sk = self.sk.as_ref().ok_or(
                 format_err!("signing requires a secret key").context(LucetcErrorKind::Signature),
             )?;
-            signature::sign(&output, sk)?;
+            signature::sign_module(&output, sk)?;
         }
         Ok(())
     }

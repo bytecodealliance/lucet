@@ -18,7 +18,7 @@ pub fn read_module<P: AsRef<Path>>(
     };
     let contents = read_to_u8s(path)?;
     if let Some(signature_box) = signature_box {
-        signature::verify(
+        signature::verify_source_code(
             &contents,
             &signature_box,
             pk.as_ref()
