@@ -1,3 +1,5 @@
+# Lucet version 0.1.0
+
 [workspace]
 members = [
   "lucet-analyze",
