@@ -34,7 +34,7 @@ RUN curl -sS -L -O https://static.rust-lang.org/dist/rust-1.35.0-x86_64-unknown-
 	&& cd .. \
 	&& rm -rf rust-1.35.0-x86_64-unknown-linux-gnu rust-1.35.0-x86_64-unknown-linux-gnu.tar.gz
 ENV PATH=/usr/local/bin:$PATH
-RUN cargo install --root /usr/local cargo-audit cargo-watch
+RUN cargo install --root /usr/local cargo-audit cargo-watch rsign2
 
 RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-5/wasi-sdk_5.0_amd64.deb \
 	&& dpkg -i wasi-sdk_5.0_amd64.deb && rm -f wasi-sdk_5.0_amd64.deb

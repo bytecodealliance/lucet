@@ -63,6 +63,8 @@ pub enum LucetcErrorKind {
     MemorySpecs,
     #[fail(display = "Output")]
     Output,
+    #[fail(display = "Signature")]
+    Signature,
     #[fail(display = "Unsupported")]
     Unsupported,
 }

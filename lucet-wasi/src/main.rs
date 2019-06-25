@@ -5,10 +5,11 @@ extern crate clap;
 
 use clap::Arg;
 use human_size::{Byte, Size};
-use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, Region};
+use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region};
 use lucet_runtime_internals::module::ModuleInternal;
 use lucet_wasi::{hostcalls, WasiCtxBuilder};
 use std::fs::File;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 struct Config<'a> {
@@ -17,6 +18,8 @@ struct Config<'a> {
     entrypoint: &'a str,
     preopen_dirs: Vec<(File, &'a str)>,
     limits: Limits,
+    verify: bool,
+    pk_path: Option<PathBuf>,
 }
 
 fn main() {
@@ -88,6 +91,18 @@ fn main() {
                 .multiple(true)
                 .help("Arguments to the WASI `main` function"),
         )
+        .arg(
+            Arg::with_name("verify")
+                .long("--signature-verify")
+                .takes_value(false)
+                .help("Verify the signature of the source file")
+        )
+        .arg(
+            Arg::with_name("pk_path")
+                .long("--signature-pk")
+                .takes_value(true)
+                .help("Path to the public key to verify the source code signature")
+        )
         .get_matches();
 
     let entrypoint = matches.value_of("entrypoint").unwrap();
@@ -145,12 +160,17 @@ fn main() {
         .map(|vals| vals.collect())
         .unwrap_or(vec![]);
 
+    let verify = matches.is_present("verify");
+    let pk_path = matches.value_of("pk_path").map(PathBuf::from);
+
     let config = Config {
         lucet_module,
         guest_args,
         entrypoint,
         preopen_dirs,
         limits,
+        verify,
+        pk_path,
     };
 
     run(config)
@@ -160,7 +180,19 @@ fn run(config: Config<'_>) {
     lucet_wasi::hostcalls::ensure_linked();
     let exitcode = {
         // doing all of this in a block makes sure everything gets dropped before exiting
-        let module = DlModule::load(&config.lucet_module).expect("module can be loaded");
+        let pk = match (config.verify, config.pk_path) {
+            (false, _) => None,
+            (true, Some(pk_path)) => {
+                Some(PublicKey::from_file(pk_path).expect("public key can be loaded"))
+            }
+            (true, None) => panic!("signature verification requires a public key"),
+        };
+        let module = if let Some(pk) = pk {
+            DlModule::load_and_verify(&config.lucet_module, pk)
+                .expect("signed module can be loaded")
+        } else {
+            DlModule::load(&config.lucet_module).expect("module can be loaded")
+        };
         let min_globals_size = module.globals().len() * std::mem::size_of::<u64>();
         let globals_size = ((min_globals_size + 4096 - 1) / 4096) * 4096;
 

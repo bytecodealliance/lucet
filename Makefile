@@ -33,6 +33,7 @@ test: indent-check
             -p lucet-benchmarks
     # run a single seed through the fuzzer to stave off bitrot
 	cargo run -p lucet-wasi-fuzz -- test-seed 410757864950
+	helpers/lucet-toolchain-tests/signature.sh
 
 .PHONY: fuzz
 fuzz:
