@@ -9,6 +9,7 @@
 //! treated like any other guest trap.
 
 use crate::decls::ModuleDecls;
+use crate::module::UniqueFuncIndex;
 use cranelift_codegen::binemit::TrapSink;
 use cranelift_codegen::ir;
 use cranelift_codegen::ir::{types, AbiParam, Signature};
@@ -16,7 +17,6 @@ use cranelift_codegen::isa::CallConv;
 use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
 use cranelift_faerie::FaerieProduct;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
-use cranelift_wasm::FuncIndex;
 use faerie::Decl;
 use failure::Error;
 
@@ -43,7 +43,7 @@ pub(crate) const STACK_PROBE_BINARY: &'static [u8] = &[
 pub fn declare_metadata<'a, B: ClifBackend>(
     decls: &mut ModuleDecls<'a>,
     clif_module: &mut ClifModule<B>,
-) -> Result<FuncIndex, Error> {
+) -> Result<UniqueFuncIndex, Error> {
     Ok(decls
         .declare_new_function(
             clif_module,

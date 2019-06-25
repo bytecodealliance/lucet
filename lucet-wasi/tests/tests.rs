@@ -7,6 +7,16 @@ use std::path::Path;
 use tempfile::TempDir;
 
 #[test]
+fn double_import() {
+    let ctx = WasiCtxBuilder::new();
+
+    let (exitcode, stdout) = run_with_stdout("duplicate_import.wat", ctx).unwrap();
+
+    assert_eq!(stdout, "duplicate import works!\n");
+    assert_eq!(exitcode, 0);
+}
+
+#[test]
 fn hello() {
     let ctx = WasiCtxBuilder::new().args(&["hello"]);
 

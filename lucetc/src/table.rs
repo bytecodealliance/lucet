@@ -1,16 +1,17 @@
 use crate::decls::{ModuleDecls, TableDecl};
 use crate::error::{LucetcError, LucetcErrorKind};
+use crate::module::UniqueFuncIndex;
 use crate::pointer::NATIVE_POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
-use cranelift_wasm::{FuncIndex, TableElementType, TableIndex};
+use cranelift_wasm::{TableElementType, TableIndex};
 use failure::{format_err, ResultExt};
 use std::io::Cursor;
 
 #[derive(Debug, Clone)]
 enum Elem {
-    Func(FuncIndex),
+    Func(UniqueFuncIndex),
     Empty,
 }
 
