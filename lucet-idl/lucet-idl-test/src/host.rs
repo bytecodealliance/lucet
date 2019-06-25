@@ -8,9 +8,11 @@ use tempfile::TempDir;
 
 pub struct HostApp {
     root: PathBuf,
-    lockfile: File,
     tempdir: TempDir,
     backups: Vec<(PathBuf, PathBuf)>,
+    // lockfile is never used in methods, it just needs to have the same lifetime as the app, it
+    // gets unlocked when HostApp drops
+    _lockfile: File,
 }
 
 impl HostApp {
@@ -31,7 +33,7 @@ impl HostApp {
 
         let mut hostapp = HostApp {
             root,
-            lockfile,
+            _lockfile: lockfile,
             tempdir: TempDir::new()?,
             backups: Vec::new(),
         };
@@ -97,6 +99,5 @@ impl Drop for HostApp {
         for (backup, orig) in self.backups.iter() {
             fs::rename(backup, orig).expect("restore backup")
         }
-        self.lockfile.unlock().expect("unlock");
     }
 }
