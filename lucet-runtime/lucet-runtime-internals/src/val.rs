@@ -176,6 +176,21 @@ impl UntypedRetVal {
     }
 }
 
+impl From<RegVal> for UntypedRetVal {
+    fn from(reg: RegVal) -> UntypedRetVal {
+        match reg {
+            RegVal::GpReg(r) => UntypedRetVal::new(r, unsafe { _mm_setzero_ps() }),
+            RegVal::FpReg(r) => UntypedRetVal::new(0, r),
+        }
+    }
+}
+
+impl<T: Into<Val>> From<T> for UntypedRetVal {
+    fn from(v: T) -> UntypedRetVal {
+        val_to_reg(&v.into()).into()
+    }
+}
+
 macro_rules! impl_from_fp {
     ( $ty:ty, $f:ident, $as:ident ) => {
         impl From<UntypedRetVal> for $ty {
