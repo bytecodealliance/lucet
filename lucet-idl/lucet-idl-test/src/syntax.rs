@@ -53,7 +53,7 @@ impl DatatypeRef {
         any::<usize>().prop_map(DatatypeRef)
     }
 
-    pub fn normalize(&self, highest_definition: usize) -> Self {
+    pub fn normalize(self, highest_definition: usize) -> Self {
         assert!(highest_definition != 0);
         DatatypeRef(self.0 % highest_definition)
     }
@@ -70,7 +70,7 @@ pub enum DatatypeName {
 }
 
 impl DatatypeName {
-    pub fn normalize(&self, highest_definition: usize) -> Self {
+    pub fn normalize(self, highest_definition: usize) -> Self {
         match self {
             DatatypeName::Defined(def) => {
                 if highest_definition == 0 {
@@ -128,10 +128,10 @@ impl StructSyntax {
             .prop_map(|members| StructSyntax { members })
     }
 
-    pub fn normalize(&self, highest_definition: usize) -> Self {
+    pub fn normalize(self, highest_definition: usize) -> Self {
         let members = self
             .members
-            .iter()
+            .into_iter()
             .map(|m| m.normalize(highest_definition))
             .collect();
         Self { members }
@@ -155,7 +155,7 @@ impl AliasSyntax {
     pub fn strat() -> impl Strategy<Value = Self> {
         DatatypeName::strat().prop_map(|target| AliasSyntax { target })
     }
-    pub fn normalize(&self, highest_definition: usize) -> Self {
+    pub fn normalize(self, highest_definition: usize) -> Self {
         Self {
             target: self.target.normalize(highest_definition),
         }
@@ -181,7 +181,7 @@ impl DatatypeSyntax {
         ]
     }
 
-    pub fn normalize(&self, highest_definition: usize) -> Self {
+    pub fn normalize(self, highest_definition: usize) -> Self {
         match self {
             DatatypeSyntax::Enum(e) => DatatypeSyntax::Enum(e.clone()),
             DatatypeSyntax::Struct(s) => DatatypeSyntax::Struct(s.normalize(highest_definition)),
@@ -213,10 +213,10 @@ impl FunctionSyntax {
             .prop_map(|(args, ret)| FunctionSyntax { args, ret })
     }
 
-    pub fn normalize(&self, highest_definition: usize) -> Self {
+    pub fn normalize(self, highest_definition: usize) -> Self {
         let args = self
             .args
-            .iter()
+            .into_iter()
             .map(|a| a.normalize(highest_definition))
             .collect();
         let ret = self.ret.clone().map(|a| a.normalize(highest_definition));
@@ -256,13 +256,13 @@ impl Spec {
         function_decls: Vec<FunctionSyntax>,
     ) -> Self {
         let datatype_decls: Vec<DatatypeSyntax> = datatype_decls
-            .iter()
+            .into_iter()
             .enumerate()
             .map(|(ix, decl)| decl.normalize(ix))
             .collect();
         let num_datatypes = datatype_decls.len();
         let function_decls = function_decls
-            .iter()
+            .into_iter()
             .map(|decl| decl.normalize(num_datatypes))
             .collect();
         Spec {
