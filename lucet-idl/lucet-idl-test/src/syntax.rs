@@ -74,6 +74,7 @@ impl DatatypeName {
         match self {
             DatatypeName::Defined(def) => {
                 if highest_definition == 0 {
+                    // No defined type to normalize to - instead use an atom type.
                     DatatypeName::Atom(AtomType::I64)
                 } else {
                     DatatypeName::Defined(def.normalize(highest_definition))
@@ -105,6 +106,7 @@ pub struct EnumSyntax {
 
 impl EnumSyntax {
     pub fn strat() -> impl Strategy<Value = Self> {
+        // up to 20 variants for now. probably want to allow more in the future?
         (1..20usize).prop_map(|variants| EnumSyntax { variants })
     }
 
