@@ -2,6 +2,7 @@ use crate::workspace::Workspace;
 use failure::{format_err, Error};
 use lucet_idl::{self, Backend, Config, Package};
 use lucet_wasi;
+use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
 use std::fs::File;
 use std::io::Write;
@@ -43,28 +44,15 @@ int main(int argc, char* argv[]) {
         )?;
         Ok(())
     }
-    fn wasi_clang(&mut self) -> Result<(), Error> {
-        let wasi_sdk =
-            PathBuf::from(std::env::var("WASI_SDK").unwrap_or_else(|_| "/opt/wasi-sdk".to_owned()));
-        let cmd_cc = Command::new(wasi_sdk.join("bin").join("clang"))
-            .arg("--std=c99")
-            .arg(self.work.source_path("main.c"))
-            .arg("-I")
-            .arg(self.work.source_path(""))
-            .arg("-o")
-            .arg(self.work.output_path("out.wasm"))
-            .status()?;
-
-        if !cmd_cc.success() {
-            Err(format_err!("clang error building guest"))?
-        }
-        Ok(())
-    }
 
     pub fn build(&mut self, package: &Package) -> Result<PathBuf, Error> {
         self.generate_idl_h(package)?;
         self.generate_main_c()?;
-        self.wasi_clang()?;
+
+        Link::new(&[self.work.source_path("main.c")])
+            .with_include(self.work.source_path(""))
+            .link(&self.work.output_path("out.wasm"))?;
+
         let mut bindings = lucet_wasi::bindings();
         bindings.extend(&package.bindings())?;
         let lucetc = Lucetc::new(self.work.output_path("out.wasm")).with_bindings(bindings);
