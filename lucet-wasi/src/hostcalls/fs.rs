@@ -60,12 +60,8 @@ pub fn wasi_fd_fdstat_get(
     } else {
         wasm32::__WASI_EBADF
     };
-
-    unsafe {
-        enc_fdstat_byref(vmctx, fdstat_ptr, host_fdstat)
-            .expect("can write back into the pointer we read from");
-    }
-
+    enc_fdstat_byref(vmctx, fdstat_ptr, host_fdstat)
+        .expect("can write back into the pointer we read from");
     errno
 }
 
@@ -109,12 +105,9 @@ pub fn wasi_fd_tell(
             Err(e) => return enc_errno(e),
         }
     };
-
-    unsafe {
-        enc_filesize_byref(vmctx, offset, host_offset as u64)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_filesize_byref(vmctx, offset, host_offset as u64)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_seek(
@@ -151,12 +144,9 @@ pub fn wasi_fd_seek(
             Err(e) => return enc_errno(e),
         }
     };
-
-    unsafe {
-        enc_filesize_byref(vmctx, newoffset, host_newoffset as u64)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_filesize_byref(vmctx, newoffset, host_newoffset as u64)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_prestat_get(
@@ -174,23 +164,20 @@ pub fn wasi_fd_prestat_get(
                 if fe.fd_object.ty != host::__WASI_FILETYPE_DIRECTORY as host::__wasi_filetype_t {
                     return wasm32::__WASI_ENOTDIR;
                 }
-                unsafe {
-                    enc_prestat_byref(
-                        vmctx,
-                        prestat_ptr,
-                        host::__wasi_prestat_t {
-                            pr_type: host::__WASI_PREOPENTYPE_DIR as host::__wasi_preopentype_t,
-                            u: host::__wasi_prestat_t___wasi_prestat_u {
-                                dir:
-                                    host::__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t {
-                                        pr_name_len: po_path.as_os_str().as_bytes().len(),
-                                    },
+                enc_prestat_byref(
+                    vmctx,
+                    prestat_ptr,
+                    host::__wasi_prestat_t {
+                        pr_type: host::__WASI_PREOPENTYPE_DIR as host::__wasi_preopentype_t,
+                        u: host::__wasi_prestat_t___wasi_prestat_u {
+                            dir: host::__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t {
+                                pr_name_len: po_path.as_os_str().as_bytes().len(),
                             },
                         },
-                    )
-                    .map(|_| wasm32::__WASI_ESUCCESS)
-                    .unwrap_or_else(|e| e)
-                }
+                    },
+                )
+                .map(|_| wasm32::__WASI_ESUCCESS)
+                .unwrap_or_else(|e| e)
             } else {
                 wasm32::__WASI_ENOTSUP
             }
@@ -218,11 +205,9 @@ pub fn wasi_fd_prestat_dir_name(
                 if path_bytes.len() > dec_usize(path_len) {
                     return wasm32::__WASI_ENAMETOOLONG;
                 }
-                unsafe {
-                    enc_slice_of(vmctx, path_bytes, path_ptr)
-                        .map(|_| wasm32::__WASI_ESUCCESS)
-                        .unwrap_or_else(|e| e)
-                }
+                enc_slice_of(vmctx, path_bytes, path_ptr)
+                    .map(|_| wasm32::__WASI_ESUCCESS)
+                    .unwrap_or_else(|e| e)
             } else {
                 wasm32::__WASI_ENOTSUP
             }
@@ -268,12 +253,9 @@ pub fn wasi_fd_read(
         let mut fe = ctx.fds.remove(&fd).expect("file entry is still there");
         fe.fd_object.needs_close = false;
     }
-
-    unsafe {
-        enc_usize_byref(vmctx, nread, host_nread)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, nread, host_nread)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_write(
@@ -307,12 +289,9 @@ pub fn wasi_fd_write(
         Ok(len) => len,
         Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
     };
-
-    unsafe {
-        enc_usize_byref(vmctx, nwritten, host_nwritten)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, nwritten, host_nwritten)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_path_open(
@@ -459,6 +438,9 @@ pub fn wasi_path_open(
             nix::unistd::close(new_fd).unwrap_or_else(|e| {
                 dbg!(e);
             });
+            if let Err(e) = enc_fd_byref(vmctx, fd_out_ptr, wasm32::__wasi_fd_t::max_value()) {
+                return enc_errno(e);
+            }
             return enc_errno(e);
         }
         Ok((_ty, max_base, max_inheriting)) => {
@@ -471,12 +453,9 @@ pub fn wasi_path_open(
             }
         }
     };
-
-    unsafe {
-        enc_fd_byref(vmctx, fd_out_ptr, guest_fd)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_fd_byref(vmctx, fd_out_ptr, guest_fd)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_filestat_get(
@@ -495,10 +474,8 @@ pub fn wasi_fd_filestat_get(
             Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
             Ok(filestat) => {
                 let host_filestat = host::filestat_from_nix(filestat);
-                unsafe {
-                    enc_filestat_byref(vmctx, filestat_ptr, host_filestat)
-                        .expect("can write into the pointer");
-                }
+                enc_filestat_byref(vmctx, filestat_ptr, host_filestat)
+                    .expect("can write into the pointer");
             }
         },
         Err(e) => return enc_errno(e),
@@ -536,10 +513,8 @@ pub fn wasi_path_filestat_get(
         Err(e) => wasm32::errno_from_nix(e.as_errno().unwrap()),
         Ok(filestat) => {
             let host_filestat = host::filestat_from_nix(filestat);
-            unsafe {
-                enc_filestat_byref(vmctx, filestat_ptr, host_filestat)
-                    .expect("can write into the pointer");
-            }
+            enc_filestat_byref(vmctx, filestat_ptr, host_filestat)
+                .expect("can write into the pointer");
             wasm32::__WASI_ESUCCESS
         }
     }
@@ -601,7 +576,26 @@ pub fn wasi_path_unlink_file(
     // nix doesn't expose unlinkat() yet
     match unsafe { unlinkat(dir, path_cstr.as_ptr(), 0) } {
         0 => wasm32::__WASI_ESUCCESS,
-        _ => wasm32::errno_from_nix(errno::Errno::last()),
+        _ => {
+            let mut e = errno::Errno::last();
+            // Non-Linux implementations may return EPERM when attempting to remove a
+            // directory without `REMOVEDIR`. For WASI, adjust this to `EISDIR`.
+            #[cfg(not(linux))]
+            {
+                use nix::fcntl::AtFlags;
+                use nix::sys::stat::{fstatat, SFlag};
+                if e == errno::Errno::EPERM {
+                    if let Ok(stat) = fstatat(dir, path.as_os_str(), AtFlags::AT_SYMLINK_NOFOLLOW) {
+                        if SFlag::from_bits_truncate(stat.st_mode).contains(SFlag::S_IFDIR) {
+                            e = errno::Errno::EISDIR;
+                        }
+                    } else {
+                        e = errno::Errno::last();
+                    }
+                }
+            }
+            wasm32::errno_from_nix(e)
+        }
     }
 }
 
@@ -977,11 +971,9 @@ pub fn wasi_fd_pread(
         buf_offset += vec_len;
         left -= vec_len;
     }
-    unsafe {
-        enc_usize_byref(vmctx, nread, host_nread)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, nread, host_nread)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_pwrite(
@@ -1020,11 +1012,9 @@ pub fn wasi_fd_pwrite(
         Ok(len) => len,
         Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
     };
-    unsafe {
-        enc_usize_byref(vmctx, nwritten, host_nwritten)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, nwritten, host_nwritten)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_readdir(
@@ -1035,7 +1025,7 @@ pub fn wasi_fd_readdir(
     cookie: wasm32::__wasi_dircookie_t,
     bufused: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
-    use libc::{dirent, fdopendir, memcpy, readdir_r, seekdir};
+    use libc::{dirent, fdopendir, readdir_r, seekdir};
 
     match enc_usize_byref(vmctx, bufused, 0) {
         Ok(_) => {}
@@ -1091,9 +1081,9 @@ pub fn wasi_fd_readdir(
         host_buf_offset += std::mem::size_of_val(&entry);
         let name_ptr = unsafe { *host_entry }.d_name.as_ptr();
         unsafe {
-            memcpy(
-                host_buf_ptr.offset(host_buf_offset as isize) as *mut _,
+            std::ptr::copy_nonoverlapping(
                 name_ptr as *const _,
+                host_buf_ptr.offset(host_buf_offset as isize) as *mut _,
                 name_len,
             )
         };
@@ -1101,11 +1091,9 @@ pub fn wasi_fd_readdir(
         left -= required_space;
     }
     let host_bufused = host_buf_len - left;
-    unsafe {
-        enc_usize_byref(vmctx, bufused, host_bufused)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, bufused, host_bufused)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_renumber(
@@ -1203,6 +1191,7 @@ pub fn wasi_path_readlink(
     bufused: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
     use nix::fcntl::readlinkat;
+    use std::cmp;
 
     match enc_usize_byref(vmctx, bufused, 0) {
         Ok(_) => {}
@@ -1218,15 +1207,20 @@ pub fn wasi_path_readlink(
         Ok((dir, path)) => (dir, path),
         Err(e) => return enc_errno(e),
     };
-    let mut buf = match dec_slice_of_mut::<u8>(vmctx, buf_ptr, buf_len) {
-        Ok(buf) => buf,
-        Err(e) => return enc_errno(e),
+    let dummy_buf = &mut [0u8];
+    let mut buf = if buf_len > 0 {
+        match dec_slice_of_mut::<u8>(vmctx, buf_ptr, buf_len) {
+            Ok(buf) => buf,
+            Err(e) => return enc_errno(e),
+        }
+    } else {
+        dummy_buf
     };
     let target_path = match readlinkat(dir, path.as_os_str(), &mut buf) {
         Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
         Ok(target_path) => target_path,
     };
-    let host_bufused = target_path.len();
+    let host_bufused = cmp::min(buf_len as usize, target_path.len());
     match enc_usize_byref(vmctx, bufused, host_bufused) {
         Ok(_) => {}
         Err(e) => return enc_errno(e),

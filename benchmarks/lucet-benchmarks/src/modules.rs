@@ -1,4 +1,4 @@
-use lucet_module_data::FunctionPointer;
+use lucet_module_data::{lucet_signature, FunctionPointer};
 use lucet_runtime::lucet_hostcalls;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder, Module};
@@ -28,7 +28,10 @@ pub fn null_mock() -> Arc<dyn Module> {
     extern "C" fn f(_vmctx: *mut lucet_vmctx) {}
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(MockExportBuilder::new(
+            "f",
+            FunctionPointer::from_usize(f as usize),
+        ))
         .build()
 }
 
@@ -50,7 +53,10 @@ pub fn large_dense_heap_mock(heap_kb: usize) -> Arc<dyn Module> {
     });
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(MockExportBuilder::new(
+            "f",
+            FunctionPointer::from_usize(f as usize),
+        ))
         .with_initial_heap(heap.as_slice())
         .with_heap_spec(heap_spec)
         .build()
@@ -81,7 +87,10 @@ pub fn large_sparse_heap_mock(heap_kb: usize, stride: usize) -> Arc<dyn Module> 
         });
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(MockExportBuilder::new(
+            "f",
+            FunctionPointer::from_usize(f as usize),
+        ))
         .with_initial_heap(heap.as_slice())
         .with_heap_spec(heap_spec)
         .build()
@@ -102,7 +111,10 @@ pub fn fib_mock() -> Arc<dyn Module> {
     }
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(MockExportBuilder::new(
+            "f",
+            FunctionPointer::from_usize(f as usize),
+        ))
         .build()
 }
 
@@ -179,7 +191,25 @@ pub fn many_args_mock() -> Arc<dyn Module> {
     }
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)))
+        .with_export_func(
+            MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)).with_sig(
+                lucet_signature!(
+                    (
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64
+                    ) -> ()
+                ),
+            ),
+        )
         .build()
 }
 
@@ -254,9 +284,13 @@ pub fn hostcalls_mock() -> Arc<dyn Module> {
     }
 
     MockModuleBuilder::new()
-        .with_export_func(
-            MockExportBuilder::new("wrapped", FunctionPointer::from_usize(wrapped as usize)))
-        .with_export_func(
-            MockExportBuilder::new("raw", FunctionPointer::from_usize(raw as usize)))
+        .with_export_func(MockExportBuilder::new(
+            "wrapped",
+            FunctionPointer::from_usize(wrapped as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            "raw",
+            FunctionPointer::from_usize(raw as usize),
+        ))
         .build()
 }

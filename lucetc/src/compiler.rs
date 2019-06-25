@@ -37,7 +37,7 @@ impl Default for OptLevel {
 impl OptLevel {
     pub fn to_flag(&self) -> &str {
         match self {
-            OptLevel::None => "fast",
+            OptLevel::None => "fastest",
             OptLevel::Standard => "default",
             OptLevel::Fast => "best",
         }
@@ -109,7 +109,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
-    pub fn module_data(&self) -> Result<ModuleData, LucetcError> {
+    pub fn module_data(&self) -> Result<ModuleData<'_>, LucetcError> {
         self.decls.get_module_data()
     }
 
@@ -195,7 +195,7 @@ impl<'a> Compiler<'a> {
 
 fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls,
+    decls: &ModuleDecls<'_>,
 ) -> Result<(), LucetcError> {
     use byteorder::{LittleEndian, WriteBytesExt};
     use cranelift_module::{DataContext, Linkage};
@@ -236,7 +236,7 @@ fn write_module_data<B: ClifBackend>(
 
 fn write_startfunc_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls,
+    decls: &ModuleDecls<'_>,
 ) -> Result<(), LucetcError> {
     use cranelift_module::{DataContext, Linkage};
 

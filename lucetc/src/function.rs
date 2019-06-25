@@ -155,7 +155,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn translate_call_indirect(
         &mut self,
-        mut pos: FuncCursor,
+        mut pos: FuncCursor<'_>,
         _table_index: TableIndex,
         table: ir::Table,
         sig_index: SignatureIndex,
@@ -221,9 +221,15 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn make_direct_func(
         &mut self,
         func: &mut ir::Function,
-        index: FuncIndex,
+        index: FuncIndex
     ) -> Result<ir::FuncRef, WasmError> {
-        let func_decl = self.module_decls.get_func(index).unwrap();
+        let unique_index = *self
+            .module_decls
+            .info
+            .function_mapping
+            .get(index)
+            .expect("function indices are valid");
+        let func_decl = self.module_decls.get_func(unique_index).unwrap();
         let signature = func.import_signature(func_decl.signature.clone());
         let colocated = !func_decl.imported();
         Ok(func.import_function(ir::ExtFuncData {
@@ -235,7 +241,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn translate_call(
         &mut self,
-        mut pos: FuncCursor,
+        mut pos: FuncCursor<'_>,
         _callee_index: FuncIndex,
         callee: ir::FuncRef,
         call_args: &[ir::Value],
@@ -271,7 +277,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn translate_memory_size(
         &mut self,
-        mut pos: FuncCursor,
+        mut pos: FuncCursor<'_>,
         index: MemoryIndex,
         _heap: ir::Heap,
     ) -> WasmResult<ir::Value> {

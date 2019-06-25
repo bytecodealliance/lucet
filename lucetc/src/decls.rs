@@ -1,8 +1,8 @@
 use crate::bindings::Bindings;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::heap::HeapSettings;
-use crate::module::ModuleInfo;
 pub use crate::module::{Exportable, TableElems};
+use crate::module::{ModuleInfo, UniqueFuncIndex};
 use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
@@ -10,8 +10,8 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex,
-    Table, TableIndex,
+    Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
+    TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
 use lucet_module_data::{
@@ -65,12 +65,12 @@ pub struct TableDecl<'a> {
 }
 
 pub struct ModuleDecls<'a> {
-    info: ModuleInfo<'a>,
-    function_names: PrimaryMap<FuncIndex, Name>,
+    pub info: ModuleInfo<'a>,
+    function_names: PrimaryMap<UniqueFuncIndex, Name>,
     imports: Vec<ImportFunction<'a>>,
     exports: Vec<ExportFunction<'a>>,
     table_names: PrimaryMap<TableIndex, (Name, Name)>,
-    runtime_names: HashMap<RuntimeFunc, FuncIndex>,
+    runtime_names: HashMap<RuntimeFunc, UniqueFuncIndex>,
     globals_spec: Vec<GlobalSpec<'a>>,
     linear_memory_spec: Option<OwnedLinearMemorySpec>,
 }
@@ -112,10 +112,10 @@ impl<'a> ModuleDecls<'a> {
         bindings: &Bindings,
     ) -> Result<(), LucetcError> {
         for ix in 0..decls.info.functions.len() {
-            let func_index = FuncIndex::new(ix);
+            let func_index = UniqueFuncIndex::new(ix);
 
             fn export_name_for<'a>(
-                func_ix: FuncIndex,
+                func_ix: UniqueFuncIndex,
                 decls: &mut ModuleDecls<'a>,
             ) -> Option<(String, Linkage)> {
                 let export = decls.info.functions.get(func_ix).unwrap();
@@ -136,7 +136,7 @@ impl<'a> ModuleDecls<'a> {
             };
 
             fn import_name_for<'a>(
-                func_ix: FuncIndex,
+                func_ix: UniqueFuncIndex,
                 decls: &mut ModuleDecls<'a>,
                 bindings: &Bindings,
             ) -> Result<Option<(String, Linkage)>, failure::Context<LucetcErrorKind>> {
@@ -174,7 +174,7 @@ impl<'a> ModuleDecls<'a> {
         decl_sym: String,
         decl_linkage: Linkage,
         signature: ir::Signature,
-    ) -> Result<FuncIndex, LucetcError> {
+    ) -> Result<UniqueFuncIndex, LucetcError> {
         let (new_funcidx, _) = self.info.declare_func_with_sig(signature);
 
         self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)
@@ -187,8 +187,8 @@ impl<'a> ModuleDecls<'a> {
         clif_module: &mut ClifModule<B>,
         decl_sym: String,
         decl_linkage: Linkage,
-        func_ix: FuncIndex,
-    ) -> Result<FuncIndex, LucetcError> {
+        func_ix: UniqueFuncIndex,
+    ) -> Result<UniqueFuncIndex, LucetcError> {
         let funcid = clif_module
             .declare_function(
                 &decl_sym,
@@ -197,7 +197,7 @@ impl<'a> ModuleDecls<'a> {
             )
             .context(LucetcErrorKind::TranslatingModule)?;
         self.function_names.push(Name::new_func(decl_sym, funcid));
-        Ok(FuncIndex::new(self.function_names.len() - 1))
+        Ok(UniqueFuncIndex::new(self.function_names.len() - 1))
     }
 
     fn declare_tables<B: ClifBackend>(
@@ -351,7 +351,7 @@ impl<'a> ModuleDecls<'a> {
         self.info.target_config()
     }
 
-    pub fn function_bodies(&self) -> impl Iterator<Item = (FunctionDecl, &(&'a [u8], usize))> {
+    pub fn function_bodies(&self) -> impl Iterator<Item = (FunctionDecl<'_>, &(&'a [u8], usize))> {
         Box::new(
             self.info
                 .function_bodies
@@ -360,7 +360,7 @@ impl<'a> ModuleDecls<'a> {
         )
     }
 
-    pub fn get_func(&self, func_index: FuncIndex) -> Result<FunctionDecl, Error> {
+    pub fn get_func(&self, func_index: UniqueFuncIndex) -> Result<FunctionDecl<'_>, Error> {
         let name = self
             .function_names
             .get(func_index)
@@ -378,11 +378,11 @@ impl<'a> ModuleDecls<'a> {
         })
     }
 
-    pub fn get_start_func(&self) -> Option<FuncIndex> {
+    pub fn get_start_func(&self) -> Option<UniqueFuncIndex> {
         self.info.start_func.clone()
     }
 
-    pub fn get_runtime(&self, runtime_func: RuntimeFunc) -> Result<RuntimeDecl, Error> {
+    pub fn get_runtime(&self, runtime_func: RuntimeFunc) -> Result<RuntimeDecl<'_>, Error> {
         let func_id = *self.runtime_names.get(&runtime_func).unwrap();
         let name = self.function_names.get(func_id).unwrap();
         Ok(RuntimeDecl {
@@ -391,7 +391,7 @@ impl<'a> ModuleDecls<'a> {
         })
     }
 
-    pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl, Error> {
+    pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl<'_>, Error> {
         let (contents_name, len_name) = self
             .table_names
             .get(table_index)
@@ -429,7 +429,7 @@ impl<'a> ModuleDecls<'a> {
             .ok_or_else(|| format_err!("signature out of bounds: {:?}", signature_index))
     }
 
-    pub fn get_global(&self, global_index: GlobalIndex) -> Result<&Exportable<Global>, Error> {
+    pub fn get_global(&self, global_index: GlobalIndex) -> Result<&Exportable<'_, Global>, Error> {
         self.info
             .globals
             .get(global_index)
@@ -444,14 +444,14 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    pub fn get_module_data(&self) -> Result<ModuleData, LucetcError> {
+    pub fn get_module_data(&self) -> Result<ModuleData<'_>, LucetcError> {
         let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
             Some(spec.to_ref())
         } else {
             None
         };
 
-        let mut functions: Vec<FunctionMetadata> = Vec::new();
+        let mut functions: Vec<FunctionMetadata<'_>> = Vec::new();
         for fn_index in self.function_names.keys() {
             let decl = self.get_func(fn_index).unwrap();
 

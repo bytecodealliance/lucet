@@ -61,7 +61,7 @@ pub fn wasi_args_get(
         let arg_bytes = arg.as_bytes_with_nul();
         let arg_ptr = argv_buf + argv_buf_offset;
 
-        if let Err(e) = unsafe { enc_slice_of(vmctx, arg_bytes, arg_ptr) } {
+        if let Err(e) = enc_slice_of(vmctx, arg_bytes, arg_ptr) {
             return enc_errno(e);
         }
 
@@ -76,12 +76,9 @@ pub fn wasi_args_get(
             return wasm32::__WASI_EOVERFLOW;
         }
     }
-
-    unsafe {
-        enc_slice_of(vmctx, argv.as_slice(), argv_ptr)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_slice_of(vmctx, argv.as_slice(), argv_ptr)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_args_sizes_get(
@@ -97,14 +94,11 @@ pub fn wasi_args_sizes_get(
         .iter()
         .map(|arg| arg.as_bytes_with_nul().len())
         .sum();
-
-    unsafe {
-        if let Err(e) = enc_usize_byref(vmctx, argc_ptr, argc) {
-            return enc_errno(e);
-        }
-        if let Err(e) = enc_usize_byref(vmctx, argv_buf_size_ptr, argv_size) {
-            return enc_errno(e);
-        }
+    if let Err(e) = enc_usize_byref(vmctx, argc_ptr, argc) {
+        return enc_errno(e);
+    }
+    if let Err(e) = enc_usize_byref(vmctx, argv_buf_size_ptr, argv_size) {
+        return enc_errno(e);
     }
     wasm32::__WASI_ESUCCESS
 }
@@ -146,11 +140,9 @@ pub fn wasi_clock_res_get(
             if resolution == 0 {
                 wasm32::__WASI_EINVAL
             } else {
-                unsafe {
-                    enc_timestamp_byref(vmctx, resolution_ptr, resolution)
-                        .map(|_| wasm32::__WASI_ESUCCESS)
-                        .unwrap_or_else(|e| e)
-                }
+                enc_timestamp_byref(vmctx, resolution_ptr, resolution)
+                    .map(|_| wasm32::__WASI_ESUCCESS)
+                    .unwrap_or_else(|e| e)
             }
         })
         .unwrap_or(wasm32::__WASI_EOVERFLOW)
@@ -185,7 +177,7 @@ pub fn wasi_clock_time_get(
     (timespec.tv_sec as host::__wasi_timestamp_t)
         .checked_mul(1_000_000_000)
         .and_then(|sec_ns| sec_ns.checked_add(timespec.tv_nsec as host::__wasi_timestamp_t))
-        .map(|time| unsafe {
+        .map(|time| {
             enc_timestamp_byref(vmctx, time_ptr, time)
                 .map(|_| wasm32::__WASI_ESUCCESS)
                 .unwrap_or_else(|e| e)
@@ -207,7 +199,7 @@ pub fn wasi_environ_get(
         let env_bytes = pair.as_bytes_with_nul();
         let env_ptr = environ_buf + environ_buf_offset;
 
-        if let Err(e) = unsafe { enc_slice_of(vmctx, env_bytes, env_ptr) } {
+        if let Err(e) = enc_slice_of(vmctx, env_bytes, env_ptr) {
             return enc_errno(e);
         }
 
@@ -222,12 +214,9 @@ pub fn wasi_environ_get(
             return wasm32::__WASI_EOVERFLOW;
         }
     }
-
-    unsafe {
-        enc_slice_of(vmctx, environ.as_slice(), environ_ptr)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_slice_of(vmctx, environ.as_slice(), environ_ptr)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_environ_sizes_get(
@@ -241,13 +230,11 @@ pub fn wasi_environ_sizes_get(
     if let Some(environ_size) = ctx.env.iter().try_fold(0, |acc: u32, pair| {
         acc.checked_add(pair.as_bytes_with_nul().len() as u32)
     }) {
-        unsafe {
-            if let Err(e) = enc_usize_byref(vmctx, environ_count_ptr, environ_count) {
-                return enc_errno(e);
-            }
-            if let Err(e) = enc_usize_byref(vmctx, environ_size_ptr, environ_size as usize) {
-                return enc_errno(e);
-            }
+        if let Err(e) = enc_usize_byref(vmctx, environ_count_ptr, environ_count) {
+            return enc_errno(e);
+        }
+        if let Err(e) = enc_usize_byref(vmctx, environ_size_ptr, environ_size as usize) {
+            return enc_errno(e);
         }
         wasm32::__WASI_ESUCCESS
     } else {

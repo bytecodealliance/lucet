@@ -31,18 +31,38 @@ pub fn guest_file<P: AsRef<Path>>(path: P) -> PathBuf {
     p
 }
 
-pub fn wasi_test<P: AsRef<Path>>(c_file: P) -> Result<Arc<dyn Module>, Error> {
+pub fn wasi_test<P: AsRef<Path>>(file: P) -> Result<Arc<dyn Module>, Error> {
     let workdir = TempDir::new().expect("create working directory");
 
-    let wasm_build = Link::new(&[c_file])
-        .with_cflag("-Wall")
-        .with_cflag("-Werror")
-        .with_print_output(true);
+    let wasm_path = match file.as_ref().extension().and_then(|x| x.to_str()) {
+        Some("c") => {
+            // some tests are .c, and must be compiled/linked to .wasm we can run
+            let wasm_build = Link::new(&[file])
+                .with_cflag("-Wall")
+                .with_cflag("-Werror")
+                .with_print_output(true);
 
-    let wasm_file = workdir.path().join("out.wasm");
+            let wasm_file = workdir.path().join("out.wasm");
+            wasm_build.link(wasm_file.clone())?;
 
-    wasm_build.link(wasm_file.clone())?;
+            wasm_file
+        },
+        Some("wasm") | Some("wat") => {
+            // others are just wasm we can run directly
+            file.as_ref().to_owned()
+        }
+        Some(ext) => {
+            panic!("unknown test file extension: .{}", ext);
+        }
+        None => {
+            panic!("unknown test file, has no extension");
+        }
+    };
 
+    wasi_load(&workdir, wasm_path)
+}
+
+pub fn wasi_load<P: AsRef<Path>>(workdir: &TempDir, wasm_file: P) -> Result<Arc<dyn Module>, Error> {
     let bindings = Bindings::from_file(Path::new(LUCET_WASI_ROOT).join("bindings.json"))?;
 
     let native_build = Lucetc::new(wasm_file).with_bindings(bindings);

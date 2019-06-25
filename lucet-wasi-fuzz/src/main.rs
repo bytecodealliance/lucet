@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 use failure::{bail, ensure, format_err, Error};
 use libc::c_ulong;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};

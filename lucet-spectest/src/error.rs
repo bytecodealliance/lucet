@@ -27,7 +27,7 @@ impl SpecTestError {
 }
 
 impl Fail for SpecTestError {
-    fn cause(&self) -> Option<&Fail> {
+    fn cause(&self) -> Option<&dyn Fail> {
         self.inner.cause()
     }
     fn backtrace(&self) -> Option<&Backtrace> {
@@ -36,7 +36,7 @@ impl Fail for SpecTestError {
 }
 
 impl Display for SpecTestError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Display::fmt(&self.inner, f)
     }
 }
