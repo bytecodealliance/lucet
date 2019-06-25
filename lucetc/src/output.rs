@@ -19,7 +19,7 @@ pub struct CraneliftFuncs {
 }
 
 impl CraneliftFuncs {
-    pub fn new(funcs: HashMap<Name, ir::Function>, isa: Box<isa::TargetIsa>) -> Self {
+    pub fn new(funcs: HashMap<Name, ir::Function>, isa: Box<dyn isa::TargetIsa>) -> Self {
         Self { funcs, isa }
     }
     /// This outputs a .clif file

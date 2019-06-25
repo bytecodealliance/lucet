@@ -143,7 +143,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn translate_call_indirect(
         &mut self,
-        mut pos: FuncCursor,
+        mut pos: FuncCursor<'_>,
         _table_index: TableIndex,
         table: ir::Table,
         sig_index: SignatureIndex,
@@ -221,7 +221,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn translate_call(
         &mut self,
-        mut pos: FuncCursor,
+        mut pos: FuncCursor<'_>,
         _callee_index: FuncIndex,
         callee: ir::FuncRef,
         call_args: &[ir::Value],
@@ -257,7 +257,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn translate_memory_size(
         &mut self,
-        mut pos: FuncCursor,
+        mut pos: FuncCursor<'_>,
         index: MemoryIndex,
         _heap: ir::Heap,
     ) -> WasmResult<ir::Value> {

@@ -227,9 +227,9 @@ pub fn filestat_from_nix(filestat: nix::sys::stat::FileStat) -> __wasi_filestat_
         st_ino: filestat.st_ino as __wasi_inode_t,
         st_nlink: filestat.st_nlink as __wasi_linkcount_t,
         st_size: filestat.st_size as __wasi_filesize_t,
-        st_atim: filestat.st_atime as __wasi_timestamp_t,
-        st_ctim: filestat.st_ctime as __wasi_timestamp_t,
-        st_mtim: filestat.st_mtime as __wasi_timestamp_t,
+        st_atim: filestat.st_atime as __wasi_timestamp_t * 1_000_000_000,
+        st_ctim: filestat.st_ctime as __wasi_timestamp_t * 1_000_000_000,
+        st_mtim: filestat.st_mtime as __wasi_timestamp_t * 1_000_000_000,
         st_filetype: filetype_from_nix(filetype),
     }
 }

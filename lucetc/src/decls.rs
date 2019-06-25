@@ -351,7 +351,7 @@ impl<'a> ModuleDecls<'a> {
         self.info.target_config()
     }
 
-    pub fn function_bodies(&self) -> impl Iterator<Item = (FunctionDecl, &(&'a [u8], usize))> {
+    pub fn function_bodies(&self) -> impl Iterator<Item = (FunctionDecl<'_>, &(&'a [u8], usize))> {
         Box::new(
             self.info
                 .function_bodies
@@ -360,7 +360,7 @@ impl<'a> ModuleDecls<'a> {
         )
     }
 
-    pub fn get_func(&self, func_index: UniqueFuncIndex) -> Result<FunctionDecl, Error> {
+    pub fn get_func(&self, func_index: UniqueFuncIndex) -> Result<FunctionDecl<'_>, Error> {
         let name = self
             .function_names
             .get(func_index)
@@ -382,7 +382,7 @@ impl<'a> ModuleDecls<'a> {
         self.info.start_func.clone()
     }
 
-    pub fn get_runtime(&self, runtime_func: RuntimeFunc) -> Result<RuntimeDecl, Error> {
+    pub fn get_runtime(&self, runtime_func: RuntimeFunc) -> Result<RuntimeDecl<'_>, Error> {
         let func_id = *self.runtime_names.get(&runtime_func).unwrap();
         let name = self.function_names.get(func_id).unwrap();
         Ok(RuntimeDecl {
@@ -391,7 +391,7 @@ impl<'a> ModuleDecls<'a> {
         })
     }
 
-    pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl, Error> {
+    pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl<'_>, Error> {
         let (contents_name, len_name) = self
             .table_names
             .get(table_index)
@@ -429,7 +429,7 @@ impl<'a> ModuleDecls<'a> {
             .ok_or_else(|| format_err!("signature out of bounds: {:?}", signature_index))
     }
 
-    pub fn get_global(&self, global_index: GlobalIndex) -> Result<&Exportable<Global>, Error> {
+    pub fn get_global(&self, global_index: GlobalIndex) -> Result<&Exportable<'_, Global>, Error> {
         self.info
             .globals
             .get(global_index)
@@ -444,14 +444,14 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    pub fn get_module_data(&self) -> Result<ModuleData, LucetcError> {
+    pub fn get_module_data(&self) -> Result<ModuleData<'_>, LucetcError> {
         let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
             Some(spec.to_ref())
         } else {
             None
         };
 
-        let mut functions: Vec<FunctionMetadata> = Vec::new();
+        let mut functions: Vec<FunctionMetadata<'_>> = Vec::new();
         for fn_index in self.function_names.keys() {
             let decl = self.get_func(fn_index).unwrap();
 

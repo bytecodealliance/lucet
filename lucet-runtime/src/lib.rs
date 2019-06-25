@@ -198,6 +198,8 @@
 //! that, for example, a `SIGSEGV` on a non-Lucet thread of a host program will still likely abort
 //! the entire process.
 
+#![deny(bare_trait_objects)]
+
 pub mod c_api;
 
 pub use lucet_module_data::TrapCode;

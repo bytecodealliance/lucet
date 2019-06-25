@@ -27,7 +27,7 @@ impl LucetcError {
 }
 
 impl Fail for LucetcError {
-    fn cause(&self) -> Option<&Fail> {
+    fn cause(&self) -> Option<&dyn Fail> {
         self.inner.cause()
     }
     fn backtrace(&self) -> Option<&Backtrace> {
@@ -36,7 +36,7 @@ impl Fail for LucetcError {
 }
 
 impl Display for LucetcError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Display::fmt(&self.inner, f)
     }
 }

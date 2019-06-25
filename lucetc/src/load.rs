@@ -1,3 +1,4 @@
+use crate::error::LucetcErrorKind;
 use failure::*;
 use std::fs::File;
 use std::io::Read;
@@ -6,10 +7,16 @@ use wabt::wat2wasm;
 
 pub fn read_module<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, Error> {
     let contents = read_to_u8s(path)?;
-    let converted = if wasm_preamble(&contents) {
-        contents
+    read_bytes(contents)
+}
+
+pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
+    let converted = if wasm_preamble(&bytes) {
+        bytes
     } else {
-        wat2wasm(contents)?
+        wat2wasm(bytes).map_err(|_| {
+            format_err!("Input is neither valid WASM nor WAT").context(LucetcErrorKind::Input)
+        })?
     };
     Ok(converted)
 }
