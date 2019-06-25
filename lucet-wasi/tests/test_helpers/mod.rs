@@ -46,7 +46,7 @@ pub fn wasi_test<P: AsRef<Path>>(file: P) -> Result<Arc<dyn Module>, Error> {
             wasm_build.link(wasm_file.clone())?;
 
             wasm_file
-        },
+        }
         Some("wasm") | Some("wat") => {
             // others are just wasm we can run directly
             file.as_ref().to_owned()
@@ -62,7 +62,10 @@ pub fn wasi_test<P: AsRef<Path>>(file: P) -> Result<Arc<dyn Module>, Error> {
     wasi_load(&workdir, wasm_path)
 }
 
-pub fn wasi_load<P: AsRef<Path>>(workdir: &TempDir, wasm_file: P) -> Result<Arc<dyn Module>, Error> {
+pub fn wasi_load<P: AsRef<Path>>(
+    workdir: &TempDir,
+    wasm_file: P,
+) -> Result<Arc<dyn Module>, Error> {
     let bindings = Bindings::from_file(Path::new(LUCET_WASI_ROOT).join("bindings.json"))?;
 
     let native_build = Lucetc::new(wasm_file).with_bindings(bindings);
