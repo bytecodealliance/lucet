@@ -221,7 +221,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn make_direct_func(
         &mut self,
         func: &mut ir::Function,
-        index: FuncIndex
+        index: FuncIndex,
     ) -> Result<ir::FuncRef, WasmError> {
         let unique_index = *self
             .module_decls
