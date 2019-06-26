@@ -23,7 +23,7 @@ cranelift-frontend = { path = "../cranelift/cranelift-frontend" }
 cranelift-module = { path = "../cranelift/cranelift-module" }
 cranelift-faerie = { path = "../cranelift/cranelift-faerie" }
 cranelift-wasm = { path = "../cranelift/cranelift-wasm" }
-target-lexicon = "0.3"
+target-lexicon = "0.4.0"
 lucet-module-data = { path = "../lucet-module-data" }
 wasmparser = "0.23"
 clap="2.32"

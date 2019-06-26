@@ -5,6 +5,7 @@ use failure::{Error, ResultExt};
 use lucet_module_data::FunctionSpec;
 use std::io::Cursor;
 use std::mem::size_of;
+use target_lexicon::BinaryFormat;
 
 fn write_relocated_slice(
     obj: &mut Artifact,
@@ -22,17 +23,34 @@ fn write_relocated_slice(
         })
         .context(format!("linking {} into function manifest", to))?;
     } else if imported {
+        let absolute_reloc =
+            match obj.target.binary_format {
+                BinaryFormat::Elf => {
+                    faerie::artifact::Reloc::Raw {
+                        reloc: 1, // this is an ELF R_X86_64_64
+                        addend: 0,
+                    }
+                }
+                BinaryFormat::Macho => {
+                    faerie::artifact::Reloc::Raw {
+                        reloc: 0, // this is a MachO X86_64_RELOC_UNSIGNED
+                        addend: 0,
+                    }
+                }
+                _ => {
+                    panic!("Unsupported target format!")
+                }
+            };
+
         obj.link_with(
             Link {
                 from,
                 to,
                 at: buf.position(),
             },
-            faerie::artifact::Reloc::Raw {
-                reloc: 1,
-                addend: 0,
-            },
-        )?;
+            absolute_reloc
+        )
+        .context(format!("linking {} into function manifest", to))?;
     }
 
     buf.write_u64::<LittleEndian>(0).unwrap();
@@ -85,6 +103,7 @@ pub fn write_function_manifest(
             &manifest_sym,
             fn_name,
             fn_spec.code_len() as u64,
+            // Functions are only 0 bytes if they are imported
             if fn_spec.code_len() as u64 == 0 {
                 true
             } else {
@@ -98,6 +117,7 @@ pub fn write_function_manifest(
             &manifest_sym,
             &trap_sym_for_func(fn_name),
             fn_spec.traps_len() as u64,
+            // we don't import trap tables from another module
             false,
         )?;
     }
