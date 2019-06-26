@@ -15,17 +15,10 @@ pub enum Token<'a> {
     Comma,    // ,
     Hash,     // #
     Equals,   // =
-    Keyword(Keyword),
+    Arrow,    // ->
     Atom(AtomType),
     Word(&'a str),
     Quote(&'a str), // Found between balanced "". No escaping.
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Keyword {
-    Struct, // 'struct'
-    Enum,   // 'enum'
-    Type,   // 'type'
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -143,9 +136,7 @@ impl<'a> Lexer<'a> {
         let text = &self.source[begin..self.pos];
         token(
             match text {
-                "struct" => Token::Keyword(Keyword::Struct),
-                "enum" => Token::Keyword(Keyword::Enum),
-                "type" => Token::Keyword(Keyword::Type),
+                "bool" => Token::Atom(AtomType::Bool),
                 "i8" => Token::Atom(AtomType::I8),
                 "i16" => Token::Atom(AtomType::I16),
                 "i32" => Token::Atom(AtomType::I32),
@@ -224,6 +215,16 @@ impl<'a> Lexer<'a> {
                     ',' => self.scan_char(Token::Comma),
                     '#' => self.scan_char(Token::Hash),
                     '=' => self.scan_char(Token::Equals),
+                    '-' => {
+                        if self.looking_at("->") {
+                            self.next_ch(); // Consume -
+                            self.next_ch(); // Consume >
+                            token(Token::Arrow, loc)
+                        } else {
+                            self.next_ch();
+                            error(LexError::InvalidChar('/'), loc)
+                        }
+                    }
                     '/' => {
                         if self.looking_at("//") {
                             self.rest_of_line();
@@ -287,15 +288,6 @@ mod tests {
         assert_eq!(lex.next(), token(Token::Atom(AtomType::U64), 2, 11));
         assert_eq!(lex.next(), token(Token::Atom(AtomType::F32), 3, 0));
         assert_eq!(lex.next(), token(Token::Atom(AtomType::F64), 3, 4));
-        assert_eq!(lex.next(), None);
-    }
-
-    #[test]
-    fn keywords() {
-        let mut lex = Lexer::new("struct\n\nenum type");
-        assert_eq!(lex.next(), token(Token::Keyword(Keyword::Struct), 1, 0));
-        assert_eq!(lex.next(), token(Token::Keyword(Keyword::Enum), 3, 0));
-        assert_eq!(lex.next(), token(Token::Keyword(Keyword::Type), 3, 5));
         assert_eq!(lex.next(), None);
     }
 

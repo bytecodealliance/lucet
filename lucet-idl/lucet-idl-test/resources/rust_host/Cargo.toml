@@ -1,0 +1,17 @@
+[package]
+name = "lucet-idl-test-rust-host"
+version = "0.1.0"
+authors = ["Pat Hickey <phickey@fastly.com>"]
+edition = "2018"
+
+[[bin]]
+name = "lucet-idl-test-rust-host"
+path = "src/main.rs"
+
+[dependencies]
+lucet-idl = { path = "../../../" }
+lucet-runtime = { path = "../../../../lucet-runtime" }
+lucet-wasi = { path = "../../../../lucet-wasi" }
+failure = "0.1"
+log = "0.4"
+env_logger = "0.6"

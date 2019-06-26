@@ -1,45 +1,47 @@
-use super::backend::{Backend, BackendConfig};
-use super::target::Target;
-use crate::c::CGenerator;
-use crate::generator::Generator;
-use crate::rust::RustGenerator;
-use std::io::Write;
+use crate::error::IDLError;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Config {
-    pub target: Target,
     pub backend: Backend,
-    pub backend_config: BackendConfig,
 }
 
 impl Config {
-    pub fn parse(target_opt: &str, backend_opt: &str, zero_native_pointers: bool) -> Self {
-        let mut target = Target::from(target_opt);
-        let backend = Backend::from(backend_opt);
-        if zero_native_pointers {
-            target = Target::Generic;
-        }
-        let backend_config = BackendConfig {
-            zero_native_pointers,
-        };
-        Self {
-            target,
-            backend,
-            backend_config,
+    pub fn parse(backend_opt: &str) -> Result<Self, IDLError> {
+        let backend = Backend::from_str(backend_opt).ok_or_else(|| {
+            IDLError::UsageError(format!(
+                "Invalid backend: {}\nValid options are: {:?}",
+                backend_opt,
+                Backend::options()
+            ))
+        })?;
+        Ok(Self { backend })
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Backend {
+    CGuest,
+    RustGuest,
+    RustHost,
+    Bindings,
+}
+
+impl Backend {
+    pub fn from_str<T: AsRef<str>>(s: T) -> Option<Self> {
+        match s.as_ref() {
+            "c_guest" => Some(Backend::CGuest),
+            "rust_guest" => Some(Backend::RustGuest),
+            "rust_host" => Some(Backend::RustHost),
+            "bindings" => Some(Backend::Bindings),
+            _ => None,
         }
     }
-
-    pub fn generator<W: Write>(&self) -> Box<dyn Generator<W>> {
-        match self.backend {
-            Backend::C => Box::new(CGenerator {
-                target: self.target,
-                backend_config: self.backend_config,
-            }),
-
-            Backend::Rust => Box::new(RustGenerator {
-                target: self.target,
-                backend_config: self.backend_config,
-            }),
-        }
+    pub fn options() -> Vec<String> {
+        vec![
+            "c_guest".to_owned(),
+            "rust_guest".to_owned(),
+            "rust_host".to_owned(),
+            "bindings".to_owned(),
+        ]
     }
 }

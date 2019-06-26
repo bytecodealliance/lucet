@@ -1,134 +1,36 @@
-use super::parser::{SyntaxDecl, SyntaxRef};
-use super::types::{AtomType, Attr, Location};
+use crate::data_layout::{
+    AliasIR, DataTypeModuleBuilder, EnumIR, StructIR, StructMemberIR, VariantIR,
+};
+use crate::error::ValidationError;
+use crate::parser::{SyntaxDecl, SyntaxRef};
+use crate::types::{
+    Attr, DataType, DataTypeRef, EnumMember, FuncArg, FuncDecl, FuncRet, Ident, Location, Name,
+    Named,
+};
+use heck::SnakeCase;
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct DataTypeId(pub usize);
-
-impl fmt::Display for DataTypeId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataTypeRef {
-    Defined(DataTypeId),
-    Atom(AtomType),
-    Ptr(Box<DataTypeRef>),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct NamedMember<R> {
-    pub type_: R,
-    pub name: String,
-    pub attrs: Vec<Attr>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataType {
-    Struct {
-        members: Vec<NamedMember<DataTypeRef>>,
-        attrs: Vec<Attr>,
-    },
-    Enum {
-        members: Vec<NamedMember<()>>,
-        attrs: Vec<Attr>,
-    },
-    Alias {
-        to: DataTypeRef,
-        attrs: Vec<Attr>,
-    },
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Name {
-    pub name: String,
-    pub location: Location,
-}
-
-impl fmt::Display for Name {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Module {
     pub names: Vec<Name>,
-    pub data_types: HashMap<usize, DataType>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ValidationError {
-    NameAlreadyExists {
-        name: String,
-        at_location: Location,
-        previous_location: Location,
-    },
-    NameNotFound {
-        name: String,
-        use_location: Location,
-    },
-    Empty {
-        name: String,
-        location: Location,
-    },
-    Infinite {
-        name: String,
-        location: Location,
-    },
-}
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ValidationError::NameAlreadyExists {
-                name,
-                at_location,
-                previous_location,
-            } => write!(
-                f,
-                "Redefinition of name {} at line {} - previous definition was at line {}",
-                name, at_location.line, previous_location.line
-            ),
-            ValidationError::NameNotFound { name, use_location } => {
-                write!(f, "Name {} not found at line {}", name, use_location.line)
-            }
-            ValidationError::Empty { name, location } => {
-                write!(f, "Empty definition for {} at line {}", name, location.line)
-            }
-            ValidationError::Infinite { name, location } => write!(
-                f,
-                "Circular reference for {} at line {}",
-                name, location.line
-            ),
-        }
-    }
-}
-
-/// A convenient structure holding a data type, its name and
-/// its internal IDL representation
-#[derive(Debug, Clone)]
-pub struct DataTypeEntry<'t> {
-    pub id: DataTypeId,
-    pub name: &'t Name,
-    pub data_type: &'t DataType,
-}
-
-impl Error for ValidationError {
-    fn description(&self) -> &str {
-        "Validation error"
-    }
+    pub attrs: Vec<Attr>,
+    pub data_types: HashMap<Ident, DataType>,
+    pub data_type_ordering: Vec<Ident>,
+    pub funcs: HashMap<Ident, FuncDecl>,
+    pub module_name: String,
+    pub binding_prefix: String,
 }
 
 impl Module {
-    fn new() -> Self {
+    fn new(attrs: &[Attr], module_name: String, binding_prefix: String) -> Self {
         Self {
             names: Vec::new(),
+            attrs: attrs.to_vec(),
             data_types: HashMap::new(),
+            data_type_ordering: Vec::new(),
+            funcs: HashMap::new(),
+            module_name,
+            binding_prefix,
         }
     }
 
@@ -136,7 +38,7 @@ impl Module {
         &mut self,
         name: &str,
         location: &Location,
-    ) -> Result<DataTypeId, ValidationError> {
+    ) -> Result<Ident, ValidationError> {
         if let Some(existing) = self.id_for_name(&name) {
             let prev = self
                 .names
@@ -153,14 +55,14 @@ impl Module {
                 name: name.to_owned(),
                 location: *location,
             });
-            Ok(DataTypeId(id))
+            Ok(Ident(id))
         }
     }
 
-    fn id_for_name(&self, name: &str) -> Option<DataTypeId> {
+    fn id_for_name(&self, name: &str) -> Option<Ident> {
         for (id, n) in self.names.iter().enumerate() {
             if n.name == name {
-                return Some(DataTypeId(id));
+                return Some(Ident(id));
             }
         }
         None
@@ -169,7 +71,6 @@ impl Module {
     fn get_ref(&self, syntax_ref: &SyntaxRef) -> Result<DataTypeRef, ValidationError> {
         match syntax_ref {
             SyntaxRef::Atom { atom, .. } => Ok(DataTypeRef::Atom(*atom)),
-            SyntaxRef::Ptr { to, .. } => Ok(DataTypeRef::Ptr(Box::new(self.get_ref(&to)?))),
             SyntaxRef::Name { name, location } => match self.id_for_name(name) {
                 Some(id) => Ok(DataTypeRef::Defined(id)),
                 None => Err(ValidationError::NameNotFound {
@@ -180,13 +81,13 @@ impl Module {
         }
     }
 
-    fn define_data_type(&mut self, id: DataTypeId, dt: DataType) {
-        if let Some(prev_def) = self.data_types.insert(id.0, dt) {
-            panic!("id {} already defined: {:?}", id, prev_def)
-        }
-    }
-
-    fn define_decl(&mut self, id: DataTypeId, decl: &SyntaxDecl) -> Result<(), ValidationError> {
+    fn decl_to_ir(
+        &self,
+        id: Ident,
+        decl: &SyntaxDecl,
+        data_types_ir: &mut DataTypeModuleBuilder,
+        funcs_ir: &mut HashMap<Ident, FuncDecl>,
+    ) -> Result<(), ValidationError> {
         match decl {
             SyntaxDecl::Struct {
                 name,
@@ -215,19 +116,21 @@ impl Module {
                     // defined types:
                     let type_ = self.get_ref(&mem.type_)?;
                     // build the struct with this as the member:
-                    dtype_members.push(NamedMember {
+                    dtype_members.push(StructMemberIR {
                         type_,
                         name: mem.name.clone(),
                         attrs: mem.attrs.clone(),
                     })
                 }
-                self.define_data_type(
+
+                data_types_ir.define(
                     id,
-                    DataType::Struct {
+                    VariantIR::Struct(StructIR {
                         members: dtype_members,
-                        attrs: attrs.clone(),
-                    },
-                )
+                    }),
+                    attrs.clone(),
+                    location.clone(),
+                );
             }
             SyntaxDecl::Enum {
                 name,
@@ -253,186 +156,274 @@ impl Module {
                         })?
                     }
                     // build the struct with this as the member:
-                    dtype_members.push(NamedMember {
-                        type_: (),
+                    dtype_members.push(EnumMember {
                         name: var.name.clone(),
                         attrs: var.attrs.clone(),
                     })
                 }
-                self.define_data_type(
+                data_types_ir.define(
                     id,
-                    DataType::Enum {
+                    VariantIR::Enum(EnumIR {
                         members: dtype_members,
-                        attrs: attrs.clone(),
-                    },
-                )
-            }
-            SyntaxDecl::Alias { what, attrs, .. } => {
-                let to = self.get_ref(what)?;
-                self.define_data_type(
-                    id,
-                    DataType::Alias {
-                        to,
-                        attrs: attrs.clone(),
-                    },
+                    }),
+                    attrs.clone(),
+                    location.clone(),
                 );
             }
+            SyntaxDecl::Alias {
+                what,
+                attrs,
+                location,
+                ..
+            } => {
+                let to = self.get_ref(what)?;
+                data_types_ir.define(
+                    id,
+                    VariantIR::Alias(AliasIR { to }),
+                    attrs.clone(),
+                    location.clone(),
+                );
+            }
+            SyntaxDecl::Function {
+                name,
+                args,
+                rets,
+                attrs,
+                location,
+                ..
+            } => {
+                let mut arg_names: HashMap<String, Location> = HashMap::new();
+                let args = args
+                    .iter()
+                    .map(|arg_syntax| {
+                        let type_ = self.get_ref(&arg_syntax.type_)?;
+                        if let Some(previous_location) = arg_names.get(&arg_syntax.name) {
+                            Err(ValidationError::NameAlreadyExists {
+                                name: arg_syntax.name.clone(),
+                                at_location: arg_syntax.location,
+                                previous_location: previous_location.clone(),
+                            })?;
+                        } else {
+                            arg_names.insert(arg_syntax.name.clone(), arg_syntax.location.clone());
+                        }
+                        Ok(FuncArg {
+                            name: arg_syntax.name.clone(),
+                            type_,
+                            attrs: arg_syntax.attrs.clone(),
+                        })
+                    })
+                    .collect::<Result<Vec<FuncArg>, _>>()?;
+
+                let rets = rets
+                    .iter()
+                    .map(|ret_syntax| {
+                        let type_ = self.get_ref(&ret_syntax.type_)?;
+                        Ok(FuncRet {
+                            type_,
+                            attrs: ret_syntax.attrs.clone(),
+                        })
+                    })
+                    .collect::<Result<Vec<FuncRet>, _>>()?;
+                if rets.len() > 1 {
+                    Err(ValidationError::Syntax {
+                        expected: "at most one return value",
+                        location: location.clone(),
+                    })?
+                }
+
+                let binding_name = self.binding_prefix.clone() + "_" + &name.to_snake_case();
+                let decl = FuncDecl {
+                    args,
+                    rets,
+                    attrs: attrs.clone(),
+                    field_name: name.clone(),
+                    binding_name,
+                };
+                if let Some(prev_def) = funcs_ir.insert(id, decl) {
+                    panic!("id {} already defined: {:?}", id, prev_def)
+                }
+            }
+            SyntaxDecl::Module { .. } => unreachable!(), // Should be excluded by from_declarations constructor
         }
         Ok(())
     }
 
-    fn dfs_walk(
-        &self,
-        id: DataTypeId,
-        visited: &mut [bool],
-        ordered: &mut Option<&mut Vec<DataTypeId>>,
-    ) -> Result<(), ()> {
-        if visited[id.0] {
-            Err(())?
-        }
-        visited[id.0] = true;
-        match self.data_types.get(&id.0).expect("data_type is defined") {
-            DataType::Struct { members, .. } => {
-                for mem in members {
-                    if let DataTypeRef::Defined(id) = mem.type_ {
-                        self.dfs_walk(id, visited, ordered)?
-                    }
-                }
-            }
-            DataType::Alias { to, .. } => {
-                if let DataTypeRef::Defined(id) = to {
-                    self.dfs_walk(*id, visited, ordered)?
-                }
-            }
-            DataType::Enum { .. } => {}
-        }
-        if let Some(ordered) = ordered.as_mut() {
-            if !ordered.contains(&id) {
-                ordered.push(id)
-            }
-        }
-        visited[id.0] = false;
-        Ok(())
-    }
-
-    pub fn ordered_dependencies(&self) -> Result<Vec<DataTypeId>, ()> {
-        let mut visited = Vec::new();
-        visited.resize(self.names.len(), false);
-        let mut ordered = Vec::with_capacity(visited.capacity());
-        for id in self.data_types.keys() {
-            let _ = self.dfs_walk(DataTypeId(*id), &mut visited, &mut Some(&mut ordered));
-        }
-        Ok(ordered)
-    }
-
-    fn dfs_find_cycle(&self, id: DataTypeId) -> Result<(), ()> {
-        let mut visited = Vec::new();
-        visited.resize(self.names.len(), false);
-        self.dfs_walk(id, &mut visited, &mut None)
-    }
-
-    fn ensure_finite(&self, id: DataTypeId, decl: &SyntaxDecl) -> Result<(), ValidationError> {
-        self.dfs_find_cycle(id)
-            .map_err(|_| ValidationError::Infinite {
-                name: decl.name().to_owned(),
-                location: *decl.location(),
-            })
-    }
-
-    pub fn from_declarations(decls: &[SyntaxDecl]) -> Result<Module, ValidationError> {
-        let mut desc = Self::new();
-        let mut idents: Vec<DataTypeId> = Vec::new();
+    pub fn from_declarations(
+        decls: &[SyntaxDecl],
+        attrs: &[Attr],
+        module_name: String,
+        binding_prefix: String,
+    ) -> Result<Module, ValidationError> {
+        let mut mod_ = Self::new(attrs, module_name, binding_prefix);
+        let mut idents: Vec<Ident> = Vec::new();
         for decl in decls {
-            idents.push(desc.introduce_name(decl.name(), decl.location())?)
+            match decl {
+                SyntaxDecl::Module { .. } => Err(ValidationError::Syntax {
+                    expected: "type or function declaration",
+                    location: *decl.location(),
+                })?,
+                _ => idents.push(mod_.introduce_name(decl.name(), decl.location())?),
+            }
         }
 
+        let mut data_types_ir = DataTypeModuleBuilder::new();
+        let mut funcs_ir = HashMap::new();
         for (decl, id) in decls.iter().zip(&idents) {
-            desc.define_decl(id.clone(), decl)?
+            mod_.decl_to_ir(id.clone(), decl, &mut data_types_ir, &mut funcs_ir)?
         }
 
-        for (decl, id) in decls.iter().zip(idents) {
-            desc.ensure_finite(id, decl)?
-        }
+        let (data_types, ordering) = data_types_ir.validate_datatypes(&mod_.names)?;
+        mod_.data_types = data_types;
+        mod_.data_type_ordering = ordering;
 
-        Ok(desc)
+        mod_.funcs = funcs_ir;
+
+        Ok(mod_)
     }
 
     /// Retrieve information about a data type given its identifier
-    pub fn get_datatype(&self, id: DataTypeId) -> DataTypeEntry<'_> {
+    pub fn get_datatype(&self, id: Ident) -> Option<Named<DataType>> {
         let name = &self.names[id.0];
-        let data_type = &self.data_types[&id.0];
-        DataTypeEntry {
-            id,
-            name,
-            data_type,
+        if let Some(data_type) = &self.data_types.get(&id) {
+            Some(Named {
+                id,
+                name,
+                entity: data_type,
+            })
+        } else {
+            None
         }
+    }
+
+    /// Retrieve information about a function declaration  given its identifier
+    pub fn get_func_decl(&self, id: Ident) -> Option<Named<FuncDecl>> {
+        let name = &self.names[id.0];
+        if let Some(func_decl) = &self.funcs.get(&id) {
+            Some(Named {
+                id,
+                name,
+                entity: func_decl,
+            })
+        } else {
+            None
+        }
+    }
+    pub fn datatypes(&self) -> impl Iterator<Item = Named<DataType>> {
+        self.data_type_ordering
+            .iter()
+            .map(move |i| self.get_datatype(*i).unwrap())
+    }
+
+    pub fn func_decls(&self) -> impl Iterator<Item = Named<FuncDecl>> {
+        self.funcs
+            .iter()
+            .map(move |(i, _)| self.get_func_decl(*i).unwrap())
+    }
+
+    pub fn func_bindings(&self) -> HashMap<String, String> {
+        self.func_decls()
+            .map(|d| (d.entity.field_name.clone(), d.entity.binding_name.clone()))
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::parser::Parser;
     use super::*;
+    use crate::parser::Parser;
+    use crate::types::{AliasDataType, AtomType, DataTypeVariant, StructDataType, StructMember};
 
-    fn module(syntax: &str) -> Result<Module, ValidationError> {
+    fn mod_(syntax: &str) -> Result<Module, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
-        Module::from_declarations(&decls)
+        Module::from_declarations(&decls, &[], String::new(), String::new())
     }
 
     #[test]
-    fn structs() {
-        assert!(module("struct foo { a: i32}").is_ok());
-        assert!(module("struct foo { a: i32, b: f32 }").is_ok());
+    fn structs_basic() {
+        assert!(mod_("struct foo { a: i32}").is_ok());
+        assert!(mod_("struct foo { a: i32, b: f32 }").is_ok());
+    }
 
+    #[test]
+    fn struct_two_atoms() {
         {
-            let d = module("struct foo { a: i32, b: f32 }").unwrap();
-            let members = match &d.data_types[&0] {
-                DataType::Struct { members, .. } => members,
-                _ => panic!("Unexpected type"),
-            };
-            assert_eq!(members[0].name, "a");
-            assert_eq!(members[1].name, "b");
-            match &members[0].type_ {
-                DataTypeRef::Atom(AtomType::I32) => (),
-                _ => panic!("Unexpected type"),
-            };
-            match &members[1].type_ {
-                DataTypeRef::Atom(AtomType::F32) => (),
-                _ => panic!("Unexpected type"),
-            };
+            let d = mod_("struct foo { a: i32, b: f32 }").unwrap();
+            assert_eq!(
+                d.data_types[&Ident(0)],
+                DataType {
+                    variant: DataTypeVariant::Struct(StructDataType {
+                        members: vec![
+                            StructMember {
+                                name: "a".to_owned(),
+                                type_: DataTypeRef::Atom(AtomType::I32),
+                                attrs: Vec::new(),
+                                offset: 0,
+                            },
+                            StructMember {
+                                name: "b".to_owned(),
+                                type_: DataTypeRef::Atom(AtomType::F32),
+                                attrs: Vec::new(),
+                                offset: 4,
+                            },
+                        ]
+                    }),
+                    attrs: Vec::new(),
+                    repr_size: 8,
+                    align: 4,
+                }
+            );
         }
+    }
 
+    #[test]
+    fn struct_prev_definition() {
         // Refer to a struct defined previously:
-        assert!(module("struct foo { a: i32, b: f64 } struct bar { a: foo }").is_ok());
+        assert!(mod_("struct foo { a: i32, b: f64 } struct bar { a: foo }").is_ok());
+    }
+
+    #[test]
+    fn struct_next_definition() {
         // Refer to a struct defined afterwards:
-        assert!(module("struct foo { a: i32, b: bar} struct bar { a: i32 }").is_ok());
+        assert!(mod_("struct foo { a: i32, b: bar} struct bar { a: i32 }").is_ok());
+    }
 
+    #[test]
+    fn struct_self_referential() {
         // Refer to itself
-        assert!(module("struct list { next: *list, thing: i32 }").is_ok());
+        assert!(mod_("struct list { next: list, thing: i32 }").is_err());
+    }
 
+    #[test]
+    fn struct_empty() {
         // No members
         assert_eq!(
-            module("struct foo {}").err().unwrap(),
+            mod_("struct foo {}").err().unwrap(),
             ValidationError::Empty {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
             }
         );
+    }
 
+    #[test]
+    fn struct_duplicate_member() {
         // Duplicate member in struct
         assert_eq!(
-            module("struct foo { \na: i32, \na: f64}").err().unwrap(),
+            mod_("struct foo { \na: i32, \na: f64}").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "a".to_owned(),
                 at_location: Location { line: 3, column: 0 },
                 previous_location: Location { line: 2, column: 0 },
             }
         );
+    }
 
+    #[test]
+    fn struct_duplicate_definition() {
         // Duplicate definition of struct
         assert_eq!(
-            module("struct foo { a: i32 }\nstruct foo { a: i32 } ")
+            mod_("struct foo { a: i32 }\nstruct foo { a: i32 } ")
                 .err()
                 .unwrap(),
             ValidationError::NameAlreadyExists {
@@ -441,10 +432,13 @@ mod tests {
                 previous_location: Location { line: 1, column: 0 },
             }
         );
+    }
 
+    #[test]
+    fn struct_undeclared_member() {
         // Refer to type that is not declared
         assert_eq!(
-            module("struct foo { \nb: bar }").err().unwrap(),
+            mod_("struct foo { \nb: bar }").err().unwrap(),
             ValidationError::NameNotFound {
                 name: "bar".to_owned(),
                 use_location: Location { line: 2, column: 3 },
@@ -454,13 +448,13 @@ mod tests {
 
     #[test]
     fn enums() {
-        assert!(module("enum foo { a }").is_ok());
-        assert!(module("enum foo { a, b }").is_ok());
+        assert!(mod_("enum foo { a }").is_ok());
+        assert!(mod_("enum foo { a, b }").is_ok());
 
         {
-            let d = module("enum foo { a, b }").unwrap();
-            let members = match &d.data_types[&0] {
-                DataType::Enum { members, .. } => members,
+            let d = mod_("enum foo { a, b }").unwrap();
+            let members = match &d.data_types[&Ident(0)].variant {
+                DataTypeVariant::Enum(e) => &e.members,
                 _ => panic!("Unexpected type"),
             };
             assert_eq!(members[0].name, "a");
@@ -469,7 +463,7 @@ mod tests {
 
         // No members
         assert_eq!(
-            module("enum foo {}").err().unwrap(),
+            mod_("enum foo {}").err().unwrap(),
             ValidationError::Empty {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
@@ -478,7 +472,7 @@ mod tests {
 
         // Duplicate member in enum
         assert_eq!(
-            module("enum foo { \na,\na }").err().unwrap(),
+            mod_("enum foo { \na,\na }").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "a".to_owned(),
                 at_location: Location { line: 3, column: 0 },
@@ -488,7 +482,7 @@ mod tests {
 
         // Duplicate definition of enum
         assert_eq!(
-            module("enum foo { a }\nenum foo { a } ").err().unwrap(),
+            mod_("enum foo { a }\nenum foo { a } ").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "foo".to_owned(),
                 at_location: Location { line: 2, column: 0 },
@@ -499,19 +493,19 @@ mod tests {
 
     #[test]
     fn aliases() {
-        assert!(module("type foo = i32").is_ok());
-        assert!(module("type foo = *f64").is_ok());
-        assert!(module("type foo = ************f64").is_ok());
+        assert!(mod_("type foo = i32;").is_ok());
+        assert!(mod_("type foo = f64;").is_ok());
+        assert!(mod_("type foo = u8;").is_ok());
 
-        assert!(module("type foo = *bar\nenum bar { a }").is_ok());
+        assert!(mod_("type foo = bar;\nenum bar { a }").is_ok());
 
-        assert!(module("type link = *list\nstruct list { next: link, thing: i32 }").is_ok());
+        assert!(mod_("type link = u32;\nstruct list { next: link, thing: i32 }").is_ok());
     }
 
     #[test]
     fn infinite() {
         assert_eq!(
-            module("type foo = bar\ntype bar = foo").err().unwrap(),
+            mod_("type foo = bar;\ntype bar = foo;").err().unwrap(),
             ValidationError::Infinite {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
@@ -519,7 +513,7 @@ mod tests {
         );
 
         assert_eq!(
-            module("type foo = bar\nstruct bar { a: foo }")
+            mod_("type foo = bar;\nstruct bar { a: foo }")
                 .err()
                 .unwrap(),
             ValidationError::Infinite {
@@ -529,12 +523,216 @@ mod tests {
         );
 
         assert_eq!(
-            module("type foo = bar\nstruct bar { a: baz }\nstruct baz { c: i32, e: foo }")
+            mod_("type foo = bar;\nstruct bar { a: baz }\nstruct baz { c: i32, e: foo }")
                 .err()
                 .unwrap(),
             ValidationError::Infinite {
                 name: "foo".to_owned(),
                 location: Location { line: 1, column: 0 },
+            }
+        );
+    }
+
+    #[test]
+    fn func_trivial() {
+        assert_eq!(
+            mod_("fn trivial();").ok().unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        args: Vec::new(),
+                        rets: Vec::new(),
+                        attrs: Vec::new(),
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
+                attrs: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
+            }
+        );
+    }
+    #[test]
+    fn func_one_arg() {
+        assert_eq!(
+            mod_("fn trivial(a: u8);").ok().unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        args: vec![FuncArg {
+                            type_: DataTypeRef::Atom(AtomType::U8),
+                            name: "a".to_owned(),
+                            attrs: Vec::new(),
+                        }],
+                        rets: Vec::new(),
+                        attrs: Vec::new(),
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
+                attrs: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_ret() {
+        assert_eq!(
+            mod_("fn trivial() -> u8;").ok().unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        args: Vec::new(),
+                        rets: vec![FuncRet {
+                            type_: DataTypeRef::Atom(AtomType::U8),
+                            attrs: Vec::new(),
+                        }],
+                        attrs: Vec::new(),
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
+                attrs: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_ret_defined_type() {
+        assert_eq!(
+            mod_("fn trivial() -> foo;\ntype foo = u8;").ok().unwrap(),
+            Module {
+                names: vec![
+                    Name {
+                        name: "trivial".to_owned(),
+                        location: Location { line: 1, column: 0 }
+                    },
+                    Name {
+                        name: "foo".to_owned(),
+                        location: Location { line: 2, column: 0 }
+                    }
+                ],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        args: Vec::new(),
+                        rets: vec![FuncRet {
+                            type_: DataTypeRef::Defined(Ident(1)),
+                            attrs: Vec::new(),
+                        }],
+                        attrs: Vec::new(),
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: vec![(
+                    Ident(1),
+                    DataType {
+                        variant: DataTypeVariant::Alias(AliasDataType {
+                            to: DataTypeRef::Atom(AtomType::U8),
+                        }),
+                        attrs: Vec::new(),
+                        repr_size: 1,
+                        align: 1,
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_type_ordering: vec![Ident(1)],
+                attrs: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn func_unknown_arg_type() {
+        assert_eq!(
+            mod_("fn trivial(a: foo);").err().unwrap(),
+            ValidationError::NameNotFound {
+                name: "foo".to_owned(),
+                use_location: Location {
+                    line: 1,
+                    column: 14
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn func_unknown_ret_type() {
+        assert_eq!(
+            mod_("fn trivial(a: u8) -> foo;").err().unwrap(),
+            ValidationError::NameNotFound {
+                name: "foo".to_owned(),
+                use_location: Location {
+                    line: 1,
+                    column: 21
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn func_multiple_returns() {
+        assert_eq!(
+            mod_("fn trivial(a: u8) -> bool, bool;").err().unwrap(),
+            ValidationError::Syntax {
+                expected: "at most one return value",
+                location: Location { line: 1, column: 0 },
+            }
+        );
+    }
+
+    #[test]
+    fn func_duplicate_arg() {
+        assert_eq!(
+            mod_("fn trivial(a: u8, a: u8);").err().unwrap(),
+            ValidationError::NameAlreadyExists {
+                name: "a".to_owned(),
+                at_location: Location {
+                    line: 1,
+                    column: 18
+                },
+                previous_location: Location {
+                    line: 1,
+                    column: 11
+                },
             }
         );
     }
