@@ -224,7 +224,7 @@ struct SignalState {
     saved_sigfpe: SigAction,
     saved_sigill: SigAction,
     saved_sigsegv: SigAction,
-    saved_panic_hook: Option<Arc<Box<dyn Fn(&panic::PanicInfo) + Sync + Send + 'static>>>,
+    saved_panic_hook: Option<Arc<Box<dyn Fn(&panic::PanicInfo<'_>) + Sync + Send + 'static>>>,
 }
 
 // raw pointers in the saved types
@@ -260,7 +260,7 @@ unsafe fn setup_guest_signal_state(ostate: &mut Option<SignalState>) {
     });
 }
 
-fn setup_guest_panic_hook() -> Arc<Box<dyn Fn(&panic::PanicInfo) + Sync + Send + 'static>> {
+fn setup_guest_panic_hook() -> Arc<Box<dyn Fn(&panic::PanicInfo<'_>) + Sync + Send + 'static>> {
     let saved_panic_hook = Arc::new(panic::take_hook());
     let closure_saved_panic_hook = saved_panic_hook.clone();
     std::panic::set_hook(Box::new(move |panic_info| {

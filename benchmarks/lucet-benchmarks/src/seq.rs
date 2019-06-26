@@ -7,7 +7,8 @@ use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-const DENSE_HEAP_SIZES_KB: &'static [usize] = &[0, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2 * 1024, 4 * 1024];
+const DENSE_HEAP_SIZES_KB: &'static [usize] =
+    &[0, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2 * 1024, 4 * 1024];
 
 const SPARSE_HEAP_SIZES_KB: &'static [usize] = &[0, 256, 512, 1024, 2 * 1024, 4 * 1024];
 

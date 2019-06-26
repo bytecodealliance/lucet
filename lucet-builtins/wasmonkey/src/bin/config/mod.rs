@@ -64,12 +64,16 @@ impl Config {
                     .help("Use the original name as a key in the builtins map"),
             )
             .get_matches();
-        let input_path = PathBuf::from(matches
-            .value_of("input_file")
-            .ok_or(WError::UsageError("Input file required"))?);
-        let output_path = PathBuf::from(matches
-            .value_of("output_file")
-            .ok_or(WError::UsageError("Output file required"))?);
+        let input_path = PathBuf::from(
+            matches
+                .value_of("input_file")
+                .ok_or(WError::UsageError("Input file required"))?,
+        );
+        let output_path = PathBuf::from(
+            matches
+                .value_of("output_file")
+                .ok_or(WError::UsageError("Output file required"))?,
+        );
         let builtins_path = matches.value_of("builtins_file").map(PathBuf::from);
         let builtins_map_path = matches.value_of("builtins_map_file").map(PathBuf::from);
         let builtins_map_original_names = matches.is_present("builtins_map_original_names");

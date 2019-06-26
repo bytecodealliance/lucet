@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 pub mod error;
 pub mod script;
 

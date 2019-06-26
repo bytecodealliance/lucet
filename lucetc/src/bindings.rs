@@ -4,35 +4,6 @@ use std::collections::{hash_map::Entry, HashMap};
 use std::fs;
 use std::path::Path;
 
-fn parse_modules(
-    m: &Map<String, Value>,
-) -> Result<HashMap<String, HashMap<String, String>>, Error> {
-    let mut res = HashMap::new();
-    for (modulename, values) in m {
-        match values.as_object() {
-            Some(methods) => {
-                let methodmap = parse_methods(methods)?;
-                res.insert(modulename.to_owned(), methodmap);
-            }
-            None => Err(format_err!(""))?,
-        }
-    }
-    Ok(res)
-}
-
-fn parse_methods(m: &Map<String, Value>) -> Result<HashMap<String, String>, Error> {
-    let mut res = HashMap::new();
-    for (method, i) in m {
-        match i.as_str() {
-            Some(importbinding) => {
-                res.insert(method.to_owned(), importbinding.to_owned());
-            }
-            None => Err(format_err!(""))?,
-        }
-    }
-    Ok(res)
-}
-
 #[derive(Debug, Clone)]
 pub struct Bindings {
     bindings: HashMap<String, HashMap<String, String>>,
@@ -54,11 +25,10 @@ impl Bindings {
     }
 
     pub fn from_json(v: &Value) -> Result<Bindings, Error> {
-        let bindings = match v.as_object() {
-            Some(modules) => parse_modules(modules)?,
+        match v.as_object() {
+            Some(modules) => Self::parse_modules_json_obj(modules),
             None => Err(format_err!("top level json expected to be object"))?,
-        };
-        Ok(Self::new(bindings))
+        }
     }
 
     pub fn from_str(s: &str) -> Result<Bindings, Error> {
@@ -72,7 +42,6 @@ impl Bindings {
     }
 
     pub fn extend(&mut self, other: &Bindings) -> Result<(), Error> {
-        //self.bindings.extend(other.bindings);
         for (modname, othermodbindings) in other.bindings.iter() {
             match self.bindings.entry(modname.clone()) {
                 Entry::Occupied(mut e) => {
@@ -115,6 +84,61 @@ impl Bindings {
                 symbol
             )),
         }
+    }
+
+    fn parse_modules_json_obj(m: &Map<String, Value>) -> Result<Self, Error> {
+        let mut res = HashMap::new();
+        for (modulename, values) in m {
+            match values.as_object() {
+                Some(methods) => {
+                    let methodmap = Self::parse_methods_json_obj(methods)?;
+                    res.insert(modulename.to_owned(), methodmap);
+                }
+                None => Err(format_err!(""))?,
+            }
+        }
+        Ok(Self::new(res))
+    }
+
+    fn parse_methods_json_obj(m: &Map<String, Value>) -> Result<HashMap<String, String>, Error> {
+        let mut res = HashMap::new();
+        for (method, i) in m {
+            match i.as_str() {
+                Some(importbinding) => {
+                    res.insert(method.to_owned(), importbinding.to_owned());
+                }
+                None => Err(format_err!(""))?,
+            }
+        }
+        Ok(res)
+    }
+
+    pub fn to_string(&self) -> Result<String, Error> {
+        let s = serde_json::to_string(&self.to_json())?;
+        Ok(s)
+    }
+
+    pub fn to_json(&self) -> Value {
+        Value::from(self.serialize_modules_json_obj())
+    }
+
+    fn serialize_modules_json_obj(&self) -> Map<String, Value> {
+        let mut m = Map::new();
+        for (modulename, values) in self.bindings.iter() {
+            m.insert(
+                modulename.to_owned(),
+                Value::from(Self::serialize_methods_json_obj(values)),
+            );
+        }
+        m
+    }
+
+    fn serialize_methods_json_obj(methods: &HashMap<String, String>) -> Map<String, Value> {
+        let mut m = Map::new();
+        for (methodname, symbol) in methods.iter() {
+            m.insert(methodname.to_owned(), Value::from(symbol.to_owned()));
+        }
+        m
     }
 }
 

@@ -1,20 +1,21 @@
 use crate::decls::{ModuleDecls, TableDecl};
 use crate::error::{LucetcError, LucetcErrorKind};
+use crate::module::UniqueFuncIndex;
 use crate::pointer::NATIVE_POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
-use cranelift_wasm::{FuncIndex, TableElementType, TableIndex};
+use cranelift_wasm::{TableElementType, TableIndex};
 use failure::{format_err, ResultExt};
 use std::io::Cursor;
 
 #[derive(Debug, Clone)]
 enum Elem {
-    Func(FuncIndex),
+    Func(UniqueFuncIndex),
     Empty,
 }
 
-fn table_elements(decl: &TableDecl) -> Result<Vec<Elem>, LucetcError> {
+fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, LucetcError> {
     match decl.table.ty {
         TableElementType::Func => Ok(()),
         _ => Err(format_err!("table with non-function elements: {:?}", decl))
@@ -45,7 +46,7 @@ fn table_elements(decl: &TableDecl) -> Result<Vec<Elem>, LucetcError> {
 
 pub fn write_table_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls,
+    decls: &ModuleDecls<'_>,
 ) -> Result<(), LucetcError> {
     if let Ok(table_decl) = decls.get_table(TableIndex::new(0)) {
         // Indirect calls are performed by looking up the callee function and type in a table that

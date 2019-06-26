@@ -19,7 +19,7 @@ pub struct CraneliftFuncs {
 }
 
 impl CraneliftFuncs {
-    pub fn new(funcs: HashMap<Name, ir::Function>, isa: Box<isa::TargetIsa>) -> Self {
+    pub fn new(funcs: HashMap<Name, ir::Function>, isa: Box<dyn isa::TargetIsa>) -> Self {
         Self { funcs, isa }
     }
     /// This outputs a .clif file
@@ -28,7 +28,7 @@ impl CraneliftFuncs {
         let mut buffer = String::new();
         for (n, func) in self.funcs.iter() {
             buffer.push_str(&format!("; {}\n", n.symbol()));
-            write_function(&mut buffer, func, Some(self.isa.as_ref()))
+            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into())
                 .context(format_err!("writing func {:?}", n))?
         }
         let mut file = File::create(path)?;

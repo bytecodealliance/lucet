@@ -3,7 +3,8 @@ use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, T
 use libc::c_void;
 use libloading::{Library, Symbol};
 use lucet_module_data::{
-    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, Signature,
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, ModuleSignature,
+    PublicKey, Signature,
 };
 use std::ffi::CStr;
 use std::mem;
@@ -32,6 +33,19 @@ unsafe impl Sync for DlModule {}
 impl DlModule {
     /// Create a module, loading code from a shared object on the filesystem.
     pub fn load<P: AsRef<Path>>(so_path: P) -> Result<Arc<Self>, Error> {
+        Self::load_and_maybe_verify(so_path, None)
+    }
+
+    /// Create a module, loading code from a shared object on the filesystem
+    /// and verifying it using a public key if one has been supplied.
+    pub fn load_and_verify<P: AsRef<Path>>(so_path: P, pk: PublicKey) -> Result<Arc<Self>, Error> {
+        Self::load_and_maybe_verify(so_path, Some(pk))
+    }
+
+    fn load_and_maybe_verify<P: AsRef<Path>>(
+        so_path: P,
+        pk: Option<PublicKey>,
+    ) -> Result<Arc<Self>, Error> {
         // Load the dynamic library. The undefined symbols corresponding to the lucet_syscall_
         // functions will be provided by the current executable.  We trust our wasm->dylib compiler
         // to make sure these function calls are the way the dylib can touch memory outside of its
@@ -64,6 +78,12 @@ impl DlModule {
         let module_data_slice: &'static [u8] =
             unsafe { slice::from_raw_parts(*module_data_ptr, *module_data_len) };
         let module_data = ModuleData::deserialize(module_data_slice)?;
+
+        // If a public key has been provided, verify the module signature
+        // The TOCTOU issue is unavoidable without reimplenting `dlopen(3)`
+        if let Some(pk) = pk {
+            ModuleSignature::verify(so_path, &pk, &module_data)?;
+        }
 
         let fbase = if let Some(dli) = dladdr(*module_data_ptr as *const c_void) {
             dli.dli_fbase
@@ -133,7 +153,7 @@ impl ModuleInternal for DlModule {
         self.module_data.heap_spec()
     }
 
-    fn globals(&self) -> &[GlobalSpec] {
+    fn globals(&self) -> &[GlobalSpec<'_>] {
         self.module_data.globals_spec()
     }
 
@@ -150,12 +170,12 @@ impl ModuleInternal for DlModule {
     }
 
     fn table_elements(&self) -> Result<&[TableElement], Error> {
-        let p_table_segment: Symbol<*const TableElement> = unsafe {
+        let p_table_segment: Symbol<'_, *const TableElement> = unsafe {
             self.lib.get(b"guest_table_0").map_err(|e| {
                 lucet_incorrect_module!("error loading required symbol `guest_table_0`: {}", e)
             })?
         };
-        let p_table_segment_len: Symbol<*const usize> = unsafe {
+        let p_table_segment_len: Symbol<'_, *const usize> = unsafe {
             self.lib.get(b"guest_table_0_len").map_err(|e| {
                 lucet_incorrect_module!("error loading required symbol `guest_table_0_len`: {}", e)
             })?

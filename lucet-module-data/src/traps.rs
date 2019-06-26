@@ -35,7 +35,7 @@ impl TrapCode {
 #[derive(Clone, Debug)]
 pub struct TrapSite {
     pub offset: u32,
-    pub code: TrapCode
+    pub code: TrapCode,
 }
 
 /// A collection of trap sites, typically obtained from a
@@ -43,17 +43,16 @@ pub struct TrapSite {
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct TrapManifest<'a> {
-    pub traps: &'a [TrapSite]
+    pub traps: &'a [TrapSite],
 }
 
-impl <'a> TrapManifest<'a> {
-    pub fn new(traps: &'a [TrapSite]) -> TrapManifest {
+impl<'a> TrapManifest<'a> {
+    pub fn new(traps: &'a [TrapSite]) -> TrapManifest<'_> {
         TrapManifest { traps }
     }
     pub fn lookup_addr(&self, addr: u32) -> Option<TrapCode> {
         // predicate to find the trapsite for the addr via binary search
-        let f =
-            |ts: &TrapSite| ts.offset.cmp(&addr);
+        let f = |ts: &TrapSite| ts.offset.cmp(&addr);
 
         if let Ok(i) = self.traps.binary_search_by(f) {
             Some(self.traps[i].code)

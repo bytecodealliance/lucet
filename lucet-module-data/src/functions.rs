@@ -26,7 +26,7 @@ impl FunctionIndex {
 pub struct ImportFunction<'a> {
     pub fn_idx: FunctionIndex,
     pub module: &'a str,
-    pub name: &'a str
+    pub name: &'a str,
 }
 
 /// ExportFunction describes an exported function - its internal function index and a name that
@@ -35,19 +35,19 @@ pub struct ImportFunction<'a> {
 pub struct ExportFunction<'a> {
     pub fn_idx: FunctionIndex,
     #[serde(borrow)]
-    pub names: Vec<&'a str>
+    pub names: Vec<&'a str>,
 }
 
 pub struct OwnedExportFunction {
     pub fn_idx: FunctionIndex,
-    pub names: Vec<String>
+    pub names: Vec<String>,
 }
 
 impl OwnedExportFunction {
     pub fn to_ref<'a>(&'a self) -> ExportFunction<'a> {
         ExportFunction {
             fn_idx: self.fn_idx.clone(),
-            names: self.names.iter().map(|x| x.as_str()).collect()
+            names: self.names.iter().map(|x| x.as_str()).collect(),
         }
     }
 }
@@ -55,7 +55,7 @@ impl OwnedExportFunction {
 pub struct OwnedImportFunction {
     pub fn_idx: FunctionIndex,
     pub module: String,
-    pub name: String
+    pub name: String,
 }
 
 impl OwnedImportFunction {
@@ -117,7 +117,7 @@ pub struct OwnedFunctionMetadata {
 }
 
 impl OwnedFunctionMetadata {
-    pub fn to_ref(&self) -> FunctionMetadata {
+    pub fn to_ref(&self) -> FunctionMetadata<'_> {
         FunctionMetadata {
             signature: self.signature.clone(),
             name: self.name.as_ref().map(|n| n.as_str()),
@@ -127,7 +127,7 @@ impl OwnedFunctionMetadata {
 
 pub struct FunctionHandle {
     pub ptr: FunctionPointer,
-    pub id: FunctionIndex
+    pub id: FunctionIndex,
 }
 
 // The layout of this struct is very tightly coupled to lucetc's `write_function_manifest`!
@@ -144,12 +144,17 @@ pub struct FunctionSpec {
     code_addr: u64,
     code_len: u32,
     traps_addr: u64,
-    traps_len: u64
+    traps_len: u64,
 }
 
 impl FunctionSpec {
     pub fn new(code_addr: u64, code_len: u32, traps_addr: u64, traps_len: u64) -> Self {
-        FunctionSpec { code_addr, code_len, traps_addr, traps_len }
+        FunctionSpec {
+            code_addr,
+            code_len,
+            traps_addr,
+            traps_len,
+        }
     }
     pub fn ptr(&self) -> FunctionPointer {
         FunctionPointer::from_usize(self.code_addr as usize)
@@ -175,13 +180,10 @@ impl FunctionSpec {
 
         None
     }
-    pub fn traps(&self) -> Option<TrapManifest> {
+    pub fn traps(&self) -> Option<TrapManifest<'_>> {
         let traps_ptr = self.traps_addr as *const TrapSite;
         if !traps_ptr.is_null() {
-            let traps_slice =
-                unsafe {
-                    from_raw_parts(traps_ptr, self.traps_len as usize)
-                };
+            let traps_slice = unsafe { from_raw_parts(traps_ptr, self.traps_len as usize) };
             Some(TrapManifest::new(traps_slice))
         } else {
             None

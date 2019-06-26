@@ -70,6 +70,21 @@ mod module_data {
         assert_eq!(mdata.export_functions()[0].names, vec!["exported_inc"]);
     }
 
+    fn globals_export() {
+        let m = load_wat_module("globals_export");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling globals_export");
+        let mdata = c.module_data().unwrap();
+
+        assert_eq!(mdata.globals_spec().len(), 1);
+        assert_eq!(mdata.globals_spec()[0].export_names(), &["start", "dupe"]);
+
+        assert_eq!(mdata.import_functions().len(), 0);
+        assert_eq!(mdata.export_functions().len(), 0);
+        assert_eq!(mdata.function_info().len(), 2);
+    }
+
     #[test]
     fn fibonacci() {
         let m = load_wat_module("fibonacci");
@@ -97,6 +112,32 @@ mod module_data {
         assert_eq!(mdata.function_info().len(), 3);
         assert_eq!(mdata.export_functions()[0].names, vec!["main"]);
     }
+
+    #[test]
+    fn duplicate_imports() {
+        let m = load_wat_module("duplicate_imports");
+        let b = Bindings::from_file(&PathBuf::from(
+            "tests/bindings/duplicate_imports_bindings.json",
+        ))
+        .unwrap();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile duplicate_imports");
+        let mdata = c.module_data().unwrap();
+
+        assert_eq!(mdata.import_functions().len(), 2);
+        assert_eq!(mdata.import_functions()[0].module, "env");
+        assert_eq!(mdata.import_functions()[0].name, "read");
+        assert_eq!(mdata.import_functions()[1].module, "env");
+        assert_eq!(mdata.import_functions()[1].name, "write");
+        assert_eq!(mdata.function_info().len(), 5);
+        assert_eq!(mdata.function_info()[0].name, Some("host_read"));
+        assert_eq!(mdata.function_info()[1].name, Some("host_write"));
+        assert_eq!(mdata.function_info()[2].name, Some("guest_func__start"));
+        assert_eq!(mdata.export_functions().len(), 1);
+        assert_eq!(mdata.export_functions()[0].names, ["_start"]);
+        assert_eq!(mdata.globals_spec().len(), 0);
+    }
+
     #[test]
     fn icall_import() {
         let m = load_wat_module("icall_import");

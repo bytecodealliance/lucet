@@ -13,11 +13,11 @@ human-size = "0.4"
 libc = "0.2"
 lucet-runtime = { path = "../lucet-runtime" }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals" }
+lucetc = { path = "../lucetc" }
 nix = "0.13"
 rand = "0.6"
 
 [dev-dependencies]
-lucetc = { path = "../lucetc" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 tempfile = "3.0"
 

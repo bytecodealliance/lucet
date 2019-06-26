@@ -37,7 +37,7 @@ impl Default for OptLevel {
 impl OptLevel {
     pub fn to_flag(&self) -> &str {
         match self {
-            OptLevel::None => "fast",
+            OptLevel::None => "fastest",
             OptLevel::Standard => "default",
             OptLevel::Fast => "best",
         }
@@ -72,6 +72,7 @@ impl<'a> Compiler<'a> {
         }
 
         translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
+            WasmError::User(_) => e.context(LucetcErrorKind::Input),
             WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation), // This will trigger once cranelift-wasm upgrades to a validating wasm parser.
             WasmError::Unsupported { .. } => e.context(LucetcErrorKind::Unsupported),
             WasmError::ImplLimitExceeded { .. } => e.context(LucetcErrorKind::TranslatingModule),
@@ -79,7 +80,7 @@ impl<'a> Compiler<'a> {
 
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
-            _ => (FaerieBuilder::default_libcall_names())(libcall),
+            _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
         let mut clif_module: ClifModule<FaerieBackend> = ClifModule::new(
@@ -108,7 +109,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
-    pub fn module_data(&self) -> Result<ModuleData, LucetcError> {
+    pub fn module_data(&self) -> Result<ModuleData<'_>, LucetcError> {
         self.decls.get_module_data()
     }
 
@@ -194,7 +195,7 @@ impl<'a> Compiler<'a> {
 
 fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls,
+    decls: &ModuleDecls<'_>,
 ) -> Result<(), LucetcError> {
     use byteorder::{LittleEndian, WriteBytesExt};
     use cranelift_module::{DataContext, Linkage};
@@ -212,7 +213,7 @@ fn write_module_data<B: ClifBackend>(
         data_len_ctx.define(serialized_len.into_boxed_slice());
 
         let data_len_decl = clif_module
-            .declare_data("lucet_module_data_len", Linkage::Export, false)
+            .declare_data("lucet_module_data_len", Linkage::Export, false, None)
             .context(LucetcErrorKind::ModuleData)?;
         clif_module
             .define_data(data_len_decl, &data_len_ctx)
@@ -224,7 +225,7 @@ fn write_module_data<B: ClifBackend>(
         module_data_ctx.define(module_data_serialized.into_boxed_slice());
 
         let module_data_decl = clif_module
-            .declare_data("lucet_module_data", Linkage::Export, true)
+            .declare_data("lucet_module_data", Linkage::Export, true, None)
             .context(LucetcErrorKind::ModuleData)?;
         clif_module
             .define_data(module_data_decl, &module_data_ctx)
@@ -235,7 +236,7 @@ fn write_module_data<B: ClifBackend>(
 
 fn write_startfunc_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls,
+    decls: &ModuleDecls<'_>,
 ) -> Result<(), LucetcError> {
     use cranelift_module::{DataContext, Linkage};
 
@@ -243,7 +244,7 @@ fn write_startfunc_data<B: ClifBackend>(
 
     if let Some(func_ix) = decls.get_start_func() {
         let name = clif_module
-            .declare_data("guest_start", Linkage::Export, false)
+            .declare_data("guest_start", Linkage::Export, false, None)
             .context(error_kind.clone())?;
         let mut ctx = DataContext::new();
         ctx.define_zeroinit(8);

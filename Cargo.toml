@@ -1,7 +1,11 @@
+# Lucet version 0.1.0
+
 [workspace]
 members = [
   "lucet-analyze",
   "lucet-idl",
+  "lucet-idl/lucet-idl-test",
+  "lucet-idl/lucet-idl-test/resources/rust_host",
   "lucet-module-data",
   "lucet-runtime",
   "lucet-runtime/lucet-runtime-internals",
