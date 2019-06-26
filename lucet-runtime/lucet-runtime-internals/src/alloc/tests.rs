@@ -7,7 +7,7 @@ macro_rules! alloc_tests {
         use $crate::alloc::Limits;
         use $crate::context::{Context, ContextHandle};
         use $crate::instance::InstanceInternal;
-        use $crate::module::{HeapSpec, MockModuleBuilder};
+        use $crate::module::{GlobalValue, HeapSpec, MockModuleBuilder};
         use $crate::region::Region;
         use $crate::val::Val;
 
@@ -348,15 +348,22 @@ macro_rules! alloc_tests {
                 assert_eq!(stack[LIMITS_STACK_SIZE - 1], 0xFF);
 
                 let globals = unsafe { inst.alloc_mut().globals_mut() };
-                assert_eq!(globals.len(), LIMITS_GLOBALS_SIZE / 8);
+                assert_eq!(
+                    globals.len(),
+                    LIMITS_GLOBALS_SIZE / std::mem::size_of::<GlobalValue>()
+                );
 
-                assert_eq!(globals[0], 0);
-                globals[0] = 0xFF;
-                assert_eq!(globals[0], 0xFF);
+                unsafe {
+                    assert_eq!(globals[0].i_64, 0);
+                    globals[0].i_64 = 0xFF;
+                    assert_eq!(globals[0].i_64, 0xFF);
+                }
 
-                assert_eq!(globals[globals.len() - 1], 0);
-                globals[globals.len() - 1] = 0xFF;
-                assert_eq!(globals[globals.len() - 1], 0xFF);
+                unsafe {
+                    assert_eq!(globals[globals.len() - 1].i_64, 0);
+                    globals[globals.len() - 1].i_64 = 0xFF;
+                    assert_eq!(globals[globals.len() - 1].i_64, 0xFF);
+                }
 
                 let sigstack = unsafe { inst.alloc_mut().sigstack_mut() };
                 assert_eq!(sigstack.len(), libc::SIGSTKSZ);

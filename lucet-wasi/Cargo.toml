@@ -10,7 +10,7 @@ cast = "0.2"
 clap = "2.23"
 failure = "0.1"
 human-size = "0.4"
-libc = "0.2"
+libc = "=0.2.54"
 lucet-runtime = { path = "../lucet-runtime" }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals" }
 nix = "0.13"

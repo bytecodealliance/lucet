@@ -165,7 +165,7 @@ pub struct UntypedRetVal {
 }
 
 impl std::fmt::Display for UntypedRetVal {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<untyped return value>")
     }
 }
@@ -173,6 +173,21 @@ impl std::fmt::Display for UntypedRetVal {
 impl UntypedRetVal {
     pub(crate) fn new(gp: u64, fp: __m128) -> UntypedRetVal {
         UntypedRetVal { gp, fp }
+    }
+}
+
+impl From<RegVal> for UntypedRetVal {
+    fn from(reg: RegVal) -> UntypedRetVal {
+        match reg {
+            RegVal::GpReg(r) => UntypedRetVal::new(r, unsafe { _mm_setzero_ps() }),
+            RegVal::FpReg(r) => UntypedRetVal::new(0, r),
+        }
+    }
+}
+
+impl<T: Into<Val>> From<T> for UntypedRetVal {
+    fn from(v: T) -> UntypedRetVal {
+        val_to_reg(&v.into()).into()
     }
 }
 

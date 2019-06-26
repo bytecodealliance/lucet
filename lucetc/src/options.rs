@@ -41,10 +41,15 @@ pub struct Options {
     pub reserved_size: Option<u64>,
     pub guard_size: Option<u64>,
     pub opt_level: OptLevel,
+    pub keygen: bool,
+    pub sign: bool,
+    pub verify: bool,
+    pub pk_path: Option<PathBuf>,
+    pub sk_path: Option<PathBuf>,
 }
 
 impl Options {
-    pub fn from_args(m: &ArgMatches) -> Result<Self, Error> {
+    pub fn from_args(m: &ArgMatches<'_>) -> Result<Self, Error> {
         let input: Vec<PathBuf> = m
             .values_of("input")
             .unwrap_or_default()
@@ -94,12 +99,18 @@ impl Options {
         };
 
         let opt_level = match m.value_of("opt_level") {
-            None => OptLevel::Default,
-            Some("default") => OptLevel::Default,
-            Some("best") => OptLevel::Best,
-            Some("fastest") => OptLevel::Fastest,
+            None => OptLevel::default(),
+            Some("0") => OptLevel::None,
+            Some("1") => OptLevel::Standard,
+            Some("2") | Some("fast") => OptLevel::Fast,
             Some(_) => panic!("unknown value for opt-level"),
         };
+
+        let keygen = m.is_present("keygen");
+        let sign = m.is_present("sign");
+        let verify = m.is_present("verify");
+        let sk_path = m.value_of("sk_path").map(PathBuf::from);
+        let pk_path = m.value_of("pk_path").map(PathBuf::from);
 
         Ok(Options {
             output,
@@ -112,6 +123,11 @@ impl Options {
             reserved_size,
             guard_size,
             opt_level,
+            keygen,
+            sign,
+            verify,
+            sk_path,
+            pk_path,
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -188,15 +204,45 @@ impl Options {
             .arg(
                 Arg::with_name("input")
                     .multiple(false)
-                    .required(true)
+                    .required(false)
                     .help("input file"),
             )
             .arg(
                 Arg::with_name("opt_level")
                     .long("--opt-level")
                     .takes_value(true)
-                    .possible_values(&["default", "fastest", "best"])
-                    .help("optimization level (default: 'default')"),
+                    .possible_values(&["0", "1", "2", "fast"])
+                    .help("optimization level (default: '1')"),
+            )
+            .arg(
+                Arg::with_name("keygen")
+                    .long("--signature-keygen")
+                    .takes_value(false)
+                    .help("Create a new key pair")
+            )
+            .arg(
+                Arg::with_name("verify")
+                     .long("--signature-verify")
+                     .takes_value(false)
+                     .help("Verify the signature of the source file")
+            )
+            .arg(
+                Arg::with_name("sign")
+                     .long("--signature-create")
+                     .takes_value(false)
+                     .help("Sign the object file")
+            )
+            .arg(
+                Arg::with_name("pk_path")
+                     .long("--signature-pk")
+                     .takes_value(true)
+                     .help("Path to the public key to verify the source code signature")
+            )
+            .arg(
+                Arg::with_name("sk_path")
+                     .long("--signature-sk")
+                     .takes_value(true)
+                     .help("Path to the secret key to sign the object file. The file can be prefixed with \"raw:\" in order to store a raw, unencrypted secret key")
             )
             .get_matches();
 

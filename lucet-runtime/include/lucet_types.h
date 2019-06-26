@@ -2,7 +2,7 @@
 #define LUCET_TYPES_H
 
 #ifndef _XOPEN_SOURCE
-# define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 500
 #endif
 
 #include <stdarg.h>
@@ -11,9 +11,9 @@
 #include <stdlib.h>
 
 #ifdef __APPLE__
-# include <sys/ucontext.h>
+#include <sys/ucontext.h>
 #else
-# include <ucontext.h>
+#include <ucontext.h>
 #endif
 
 enum lucet_error {
@@ -22,6 +22,7 @@ enum lucet_error {
     lucet_error_region_full,
     lucet_error_module,
     lucet_error_limits_exceeded,
+    lucet_error_no_linear_memory,
     lucet_error_symbol_not_found,
     lucet_error_func_not_found,
     lucet_error_runtime_fault,
@@ -46,23 +47,24 @@ enum lucet_state_tag {
 
 enum lucet_terminated_reason {
     lucet_terminated_reason_signal,
-    lucet_terminated_reason_get_embed_ctx,
+    lucet_terminated_reason_ctx_not_found,
+    lucet_terminated_reason_borrow_error,
     lucet_terminated_reason_provided,
 };
 
-enum lucet_trapcode_type {
-    lucet_trapcode_type_stack_overflow,
-    lucet_trapcode_type_heap_out_of_bounds,
-    lucet_trapcode_type_out_of_bounds,
-    lucet_trapcode_type_indirect_call_to_null,
-    lucet_trapcode_type_bad_signature,
-    lucet_trapcode_type_integer_overflow,
-    lucet_trapcode_type_integer_div_by_zero,
-    lucet_trapcode_type_bad_conversion_to_integer,
-    lucet_trapcode_type_interrupt,
-    lucet_trapcode_type_table_out_of_bounds,
-    lucet_trapcode_type_user,
-    lucet_trapcode_type_unknown,
+enum lucet_trapcode {
+    lucet_trapcode_stack_overflow,
+    lucet_trapcode_heap_out_of_bounds,
+    lucet_trapcode_out_of_bounds,
+    lucet_trapcode_indirect_call_to_null,
+    lucet_trapcode_bad_signature,
+    lucet_trapcode_integer_overflow,
+    lucet_trapcode_integer_div_by_zero,
+    lucet_trapcode_bad_conversion_to_integer,
+    lucet_trapcode_interrupt,
+    lucet_trapcode_table_out_of_bounds,
+    lucet_trapcode_user,
+    lucet_trapcode_unknown,
 };
 
 enum lucet_val_type {
@@ -125,13 +127,8 @@ struct lucet_alloc_limits {
     uint64_t globals_size;
 };
 
-struct lucet_trapcode {
-    enum lucet_trapcode_type code;
-    uint16_t                 tag;
-};
-
-typedef enum lucet_signal_behavior (*lucet_signal_handler)(struct lucet_instance *      inst,
-                                                           const struct lucet_trapcode *trap,
+typedef enum lucet_signal_behavior (*lucet_signal_handler)(struct lucet_instance *   inst,
+                                                           const enum lucet_trapcode trap,
                                                            int signum, const siginfo_t *siginfo,
                                                            const void *context);
 
@@ -151,7 +148,7 @@ struct lucet_module_addr_details {
 
 struct lucet_runtime_fault {
     bool                             fatal;
-    struct lucet_trapcode            trapcode;
+    enum lucet_trapcode              trapcode;
     uintptr_t                        rip_addr;
     struct lucet_module_addr_details rip_addr_details;
     siginfo_t                        signal_info;

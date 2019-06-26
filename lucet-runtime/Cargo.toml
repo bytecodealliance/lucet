@@ -8,7 +8,7 @@ license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"
 
 [dependencies]
-libc = "0.2.48"
+libc = "=0.2.54"
 lucet-runtime-internals = { path = "lucet-runtime-internals" }
 lucet-module-data = { path = "../lucet-module-data" }
 num-traits = "0.2"

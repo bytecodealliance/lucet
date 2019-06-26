@@ -40,6 +40,7 @@ tempfile = "3.0"
 bimap = "0.2"
 human-size = "0.4"
 parity-wasm = "0.35"
+minisign = "0.5.11"
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }

@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 use failure::{bail, ensure, format_err, Error};
 use libc::c_ulong;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
@@ -295,8 +297,6 @@ fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<
         cmd.args(flags.split_whitespace());
     }
     let res = cmd.output()?;
-
-    eprintln!("{}", String::from_utf8_lossy(&res.stderr));
 
     ensure!(res.status.success(), "native C compilation failed");
 

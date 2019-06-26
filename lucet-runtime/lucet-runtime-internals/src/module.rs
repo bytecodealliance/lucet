@@ -5,8 +5,8 @@ mod sparse_page_data;
 pub use crate::module::dl::DlModule;
 pub use crate::module::mock::{MockExportBuilder, MockModuleBuilder};
 pub use lucet_module_data::{
-    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Global, GlobalSpec, HeapSpec,
-    Signature, TrapCode, TrapManifest, ValueType,
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Global, GlobalSpec, GlobalValue,
+    HeapSpec, Signature, TrapCode, TrapManifest, ValueType,
 };
 
 use crate::alloc::Limits;
@@ -46,7 +46,7 @@ pub trait ModuleInternal: Send + Sync {
     ///
     /// The indices into the returned slice correspond to the WebAssembly indices of the globals
     /// (<https://webassembly.github.io/spec/core/syntax/modules.html#syntax-globalidx>)
-    fn globals(&self) -> &[GlobalSpec];
+    fn globals(&self) -> &[GlobalSpec<'_>];
 
     fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]>;
 

@@ -1,3 +1,4 @@
+use lucet_module_data::lucet_signature;
 use lucet_runtime::lucet_hostcalls;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use lucet_runtime_internals::module::{
@@ -191,10 +192,25 @@ pub fn many_args_mock() -> Arc<dyn Module> {
     }
 
     MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(
-            "f",
-            FunctionPointer::from_usize(f as usize),
-        ))
+        .with_export_func(
+            MockExportBuilder::new("f", FunctionPointer::from_usize(f as usize)).with_sig(
+                lucet_signature!(
+                    (
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64,
+                        I32, I32, I32, I64, F32, F64
+                    ) -> ()
+                ),
+            ),
+        )
         .build()
 }
 

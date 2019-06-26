@@ -18,6 +18,5 @@ lucet-runtime-internals = { path = "../lucet-runtime-internals" }
 lucet-wasi-sdk = { path = "../../lucet-wasi-sdk" }
 lucetc = { path = "../../lucetc" }
 
-
 [build-dependencies]
 cc = "1.0"

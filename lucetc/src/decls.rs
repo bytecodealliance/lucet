@@ -1,8 +1,8 @@
 use crate::bindings::Bindings;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::heap::HeapSettings;
-use crate::module::ModuleInfo;
 pub use crate::module::{Exportable, TableElems};
+use crate::module::{ModuleInfo, UniqueFuncIndex};
 use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
@@ -10,8 +10,8 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex,
-    Table, TableIndex,
+    Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
+    TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
 use lucet_module_data::{
@@ -44,8 +44,14 @@ impl<'a> FunctionDecl<'a> {
 /// Function provided by lucet-runtime to be called from generated code, e.g. memory size & grow
 /// functions.
 pub struct RuntimeDecl<'a> {
-    pub signature: &'a ir::Signature,
+    signature: &'a ir::Signature,
     pub name: Name,
+}
+
+impl<'a> RuntimeDecl<'a> {
+    pub fn signature(&self) -> &'a ir::Signature {
+        self.signature
+    }
 }
 
 #[derive(Debug)]
@@ -59,13 +65,12 @@ pub struct TableDecl<'a> {
 }
 
 pub struct ModuleDecls<'a> {
-    info: ModuleInfo<'a>,
-    runtime: Runtime,
-    function_names: PrimaryMap<FuncIndex, Name>,
+    pub info: ModuleInfo<'a>,
+    function_names: PrimaryMap<UniqueFuncIndex, Name>,
     imports: Vec<ImportFunction<'a>>,
     exports: Vec<ExportFunction<'a>>,
     table_names: PrimaryMap<TableIndex, (Name, Name)>,
-    runtime_names: HashMap<RuntimeFunc, Name>,
+    runtime_names: HashMap<RuntimeFunc, UniqueFuncIndex>,
     globals_spec: Vec<GlobalSpec<'a>>,
     linear_memory_spec: Option<OwnedLinearMemorySpec>,
 }
@@ -78,88 +83,121 @@ impl<'a> ModuleDecls<'a> {
         runtime: Runtime,
         heap_settings: HeapSettings,
     ) -> Result<Self, LucetcError> {
-        let (function_names, imports, exports) = Self::declare_funcs(&info, clif_module, bindings)?;
+        let imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
         let table_names = Self::declare_tables(&info, clif_module)?;
-        let runtime_names = Self::declare_runtime(&runtime, clif_module)?;
-        let globals_spec = Self::declare_globals_spec(&info)?;
-        let linear_memory_spec = Self::declare_linear_memory_spec(&info, heap_settings)?;
-        Ok(Self {
+        let globals_spec = Self::build_globals_spec(&info)?;
+        let linear_memory_spec = Self::build_linear_memory_spec(&info, heap_settings)?;
+        let mut decls = Self {
             info,
-            function_names,
+            function_names: PrimaryMap::new(),
             imports,
-            exports,
+            exports: vec![],
             table_names,
-            runtime_names,
-            runtime,
+            runtime_names: HashMap::new(),
             globals_spec,
             linear_memory_spec,
-        })
+        };
+
+        Self::declare_funcs(&mut decls, clif_module, bindings)?;
+        Self::declare_runtime(&mut decls, clif_module, runtime)?;
+
+        Ok(decls)
     }
 
     // ********************* Constructor auxillary functions ***********************
 
     fn declare_funcs<B: ClifBackend>(
-        info: &ModuleInfo<'a>,
+        decls: &mut ModuleDecls<'a>,
         clif_module: &mut ClifModule<B>,
         bindings: &Bindings,
-    ) -> Result<
-        (
-            PrimaryMap<FuncIndex, Name>,
-            Vec<ImportFunction<'a>>,
-            Vec<ExportFunction<'a>>,
-        ),
-        LucetcError,
-    > {
-        let mut function_names = PrimaryMap::new();
-        let mut exports: Vec<ExportFunction<'a>> = Vec::new();
-        let mut imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
+    ) -> Result<(), LucetcError> {
+        for ix in 0..decls.info.functions.len() {
+            let func_index = UniqueFuncIndex::new(ix);
 
-        for ix in 0..info.functions.len() {
-            let func_index = FuncIndex::new(ix);
-            let exportable_sigix = info.functions.get(func_index).unwrap();
-            let inner_sig_index = info.signature_mapping.get(exportable_sigix.entity).unwrap();
-            let signature = info.signatures.get(*inner_sig_index).unwrap();
+            fn export_name_for<'a>(
+                func_ix: UniqueFuncIndex,
+                decls: &mut ModuleDecls<'a>,
+            ) -> Option<(String, Linkage)> {
+                let export = decls.info.functions.get(func_ix).unwrap();
 
-            let exported_name = if !exportable_sigix.export_names.is_empty() {
-                exports.push(ExportFunction {
-                    fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
-                    names: exportable_sigix.export_names.clone(),
-                });
+                if !export.export_names.is_empty() {
+                    decls.exports.push(ExportFunction {
+                        fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
+                        names: export.export_names.clone(),
+                    });
 
-                Some((
-                    format!("guest_func_{}", exportable_sigix.export_names[0]),
-                    Linkage::Export,
-                ))
-            } else {
-                None
+                    Some((
+                        format!("guest_func_{}", export.export_names[0]),
+                        Linkage::Export,
+                    ))
+                } else {
+                    None
+                }
             };
 
-            let imported_name =
-                if let Some((import_mod, import_field)) = info.imported_funcs.get(func_index) {
-                    imports.push(ImportFunction {
-                        fn_idx: LucetFunctionIndex::from_u32(function_names.len() as u32),
+            fn import_name_for<'a>(
+                func_ix: UniqueFuncIndex,
+                decls: &mut ModuleDecls<'a>,
+                bindings: &Bindings,
+            ) -> Result<Option<(String, Linkage)>, failure::Context<LucetcErrorKind>> {
+                if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
+                    decls.imports.push(ImportFunction {
+                        fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                         module: import_mod,
                         name: import_field,
                     });
                     let import_symbol = bindings
                         .translate(import_mod, import_field)
                         .context(LucetcErrorKind::TranslatingModule)?;
-                    Some((import_symbol, Linkage::Import))
+                    Ok(Some((import_symbol, Linkage::Import)))
                 } else {
-                    None
-                };
+                    Ok(None)
+                }
+            };
 
-            let (decl_sym, decl_linkage) = imported_name
-                .or(exported_name)
+            let (decl_sym, decl_linkage) = import_name_for(func_index, decls, bindings)?
+                .or_else(|| export_name_for(func_index, decls))
                 .unwrap_or_else(|| (format!("guest_func_{}", ix), Linkage::Local));
 
-            let funcid = clif_module
-                .declare_function(&decl_sym, decl_linkage, signature)
-                .context(LucetcErrorKind::TranslatingModule)?;
-
-            function_names.push(Name::new_func(decl_sym, funcid));
+            decls.declare_function(clif_module, decl_sym, decl_linkage, func_index)?;
         }
-        Ok((function_names, imports, exports))
+        Ok(())
+    }
+
+    /// Insert a new function into this set of decls and declare it appropriately to `clif_module`.
+    /// This is intended for cases where `lucetc` adds a new function that was not present in the
+    /// original wasm - in these cases, Cranelift has not already declared the signature or
+    /// function type, let alone name, linkage, etc. So we must do that ourselves!
+    pub fn declare_new_function<B: ClifBackend>(
+        &mut self,
+        clif_module: &mut ClifModule<B>,
+        decl_sym: String,
+        decl_linkage: Linkage,
+        signature: ir::Signature,
+    ) -> Result<UniqueFuncIndex, LucetcError> {
+        let (new_funcidx, _) = self.info.declare_func_with_sig(signature);
+
+        self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)
+    }
+
+    /// The internal side of fixing up a new function declaration. This is also the work that must
+    /// be done when building a ModuleDecls record of functions that were described by ModuleInfo.
+    fn declare_function<B: ClifBackend>(
+        &mut self,
+        clif_module: &mut ClifModule<B>,
+        decl_sym: String,
+        decl_linkage: Linkage,
+        func_ix: UniqueFuncIndex,
+    ) -> Result<UniqueFuncIndex, LucetcError> {
+        let funcid = clif_module
+            .declare_function(
+                &decl_sym,
+                decl_linkage,
+                self.info.signature_for_function(func_ix),
+            )
+            .context(LucetcErrorKind::TranslatingModule)?;
+        self.function_names.push(Name::new_func(decl_sym, funcid));
+        Ok(UniqueFuncIndex::new(self.function_names.len() - 1))
     }
 
     fn declare_tables<B: ClifBackend>(
@@ -170,13 +208,13 @@ impl<'a> ModuleDecls<'a> {
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id = clif_module
-                .declare_data(&def_symbol, Linkage::Export, false)
+                .declare_data(&def_symbol, Linkage::Export, false, None)
                 .context(LucetcErrorKind::TranslatingModule)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             let len_symbol = format!("guest_table_{}_len", ix);
             let len_data_id = clif_module
-                .declare_data(&len_symbol, Linkage::Export, false)
+                .declare_data(&len_symbol, Linkage::Export, false, None)
                 .context(LucetcErrorKind::TranslatingModule)?;
             let len_name = Name::new_data(len_symbol, len_data_id);
 
@@ -186,27 +224,29 @@ impl<'a> ModuleDecls<'a> {
     }
 
     fn declare_runtime<B: ClifBackend>(
-        runtime: &Runtime,
+        decls: &mut ModuleDecls<'a>,
         clif_module: &mut ClifModule<B>,
-    ) -> Result<HashMap<RuntimeFunc, Name>, LucetcError> {
-        let mut runtime_names: HashMap<RuntimeFunc, Name> = HashMap::new();
+        runtime: Runtime,
+    ) -> Result<(), LucetcError> {
         for (func, (symbol, signature)) in runtime.functions.iter() {
-            let funcid = clif_module
-                .declare_function(&symbol, Linkage::Import, signature)
-                .context(LucetcErrorKind::TranslatingModule)?;
-            let name = Name::new_func(symbol.clone(), funcid);
+            let func_id = decls.declare_new_function(
+                clif_module,
+                symbol.clone(),
+                Linkage::Import,
+                signature.clone(),
+            )?;
 
-            runtime_names.insert(*func, name);
+            decls.runtime_names.insert(*func, func_id);
         }
-        Ok(runtime_names)
+        Ok(())
     }
 
-    fn declare_linear_memory_spec(
+    fn build_linear_memory_spec(
         info: &ModuleInfo<'a>,
         heap_settings: HeapSettings,
     ) -> Result<Option<OwnedLinearMemorySpec>, LucetcError> {
         use crate::sparsedata::owned_sparse_data_from_initializers;
-        if let Some(heap_spec) = Self::declare_heap_spec(info, heap_settings)? {
+        if let Some(heap_spec) = Self::build_heap_spec(info, heap_settings)? {
             let data_initializers = info
                 .data_initializers
                 .get(&MemoryIndex::new(0))
@@ -222,35 +262,52 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    fn declare_globals_spec(info: &ModuleInfo<'a>) -> Result<Vec<GlobalSpec<'a>>, LucetcError> {
+    fn build_globals_spec(info: &ModuleInfo<'a>) -> Result<Vec<GlobalSpec<'a>>, LucetcError> {
         let mut globals = Vec::new();
         for ix in 0..info.globals.len() {
             let ix = GlobalIndex::new(ix);
             let g_decl = info.globals.get(ix).unwrap();
-            let g_import = info.imported_globals.get(ix);
-            let g_variant = if let Some((module, field)) = g_import {
-                GlobalVariant::Import { module, field }
-            } else {
-                let init_val = match g_decl.entity.initializer {
-                    // Need to fix global spec in ModuleData and the runtime to support more:
-                    GlobalInit::I32Const(i) => i as i64,
-                    GlobalInit::I64Const(i) => i,
-                    _ => Err(format_err!(
-                        "non-integer global initializer: {:?}",
-                        g_decl.entity
-                    ))
-                    .context(LucetcErrorKind::Unsupported)?,
-                };
-                GlobalVariant::Def {
-                    def: GlobalDef::new(init_val),
+
+            let global = match g_decl.entity.initializer {
+                GlobalInit::I32Const(i) => Ok(GlobalVariant::Def(GlobalDef::I32(i))),
+                GlobalInit::I64Const(i) => Ok(GlobalVariant::Def(GlobalDef::I64(i))),
+                GlobalInit::F32Const(f) => {
+                    Ok(GlobalVariant::Def(GlobalDef::F32(f32::from_bits(f))))
                 }
-            };
-            globals.push(GlobalSpec::new(g_variant, None));
+                GlobalInit::F64Const(f) => {
+                    Ok(GlobalVariant::Def(GlobalDef::F64(f64::from_bits(f))))
+                }
+                GlobalInit::GetGlobal(ref_ix) => {
+                    let ref_decl = info.globals.get(ref_ix).unwrap();
+                    if let GlobalInit::Import = ref_decl.entity.initializer {
+                        if let Some((module, field)) = info.imported_globals.get(ref_ix) {
+                            Ok(GlobalVariant::Import { module, field })
+                        } else {
+                            Err(format_err!("inconsistent state: global {} is declared as an import but has no entry in imported_globals", ref_ix.as_u32()))
+                            .context(LucetcErrorKind::TranslatingModule)
+                        }
+                    } else {
+                        // This WASM restriction may be loosened in the future:
+                        Err(format_err!("invalid global declarations: global {} is initialized by referencing another global value, but the referenced global is not an import", ix.as_u32()))
+                        .context(LucetcErrorKind::TranslatingModule)
+                    }
+                }
+                GlobalInit::Import => {
+                    if let Some((module, field)) = info.imported_globals.get(ix) {
+                        Ok(GlobalVariant::Import { module, field })
+                    } else {
+                        Err(format_err!("inconsistent state: global {} is declared as an import but has no entry in imported_globals", ix.as_u32()))
+                        .context(LucetcErrorKind::TranslatingModule)
+                    }
+                }
+            }?;
+
+            globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));
         }
         Ok(globals)
     }
 
-    fn declare_heap_spec(
+    fn build_heap_spec(
         info: &ModuleInfo<'a>,
         heap_settings: HeapSettings,
     ) -> Result<Option<HeapSpec>, LucetcError> {
@@ -294,7 +351,7 @@ impl<'a> ModuleDecls<'a> {
         self.info.target_config()
     }
 
-    pub fn function_bodies(&self) -> impl Iterator<Item = (FunctionDecl, &(&'a [u8], usize))> {
+    pub fn function_bodies(&self) -> impl Iterator<Item = (FunctionDecl<'_>, &(&'a [u8], usize))> {
         Box::new(
             self.info
                 .function_bodies
@@ -303,7 +360,7 @@ impl<'a> ModuleDecls<'a> {
         )
     }
 
-    pub fn get_func(&self, func_index: FuncIndex) -> Result<FunctionDecl, Error> {
+    pub fn get_func(&self, func_index: UniqueFuncIndex) -> Result<FunctionDecl<'_>, Error> {
         let name = self
             .function_names
             .get(func_index)
@@ -321,24 +378,20 @@ impl<'a> ModuleDecls<'a> {
         })
     }
 
-    pub fn get_start_func(&self) -> Option<FuncIndex> {
+    pub fn get_start_func(&self) -> Option<UniqueFuncIndex> {
         self.info.start_func.clone()
     }
 
-    pub fn get_runtime(&self, runtime_func: RuntimeFunc) -> Result<RuntimeDecl, Error> {
-        let (_, signature) = self
-            .runtime
-            .functions
-            .get(&runtime_func)
-            .ok_or_else(|| format_err!("runtime func not supported: {:?}", runtime_func))?;
-        let name = self.runtime_names.get(&runtime_func).unwrap();
+    pub fn get_runtime(&self, runtime_func: RuntimeFunc) -> Result<RuntimeDecl<'_>, Error> {
+        let func_id = *self.runtime_names.get(&runtime_func).unwrap();
+        let name = self.function_names.get(func_id).unwrap();
         Ok(RuntimeDecl {
-            signature,
+            signature: self.info.signature_for_function(func_id),
             name: name.clone(),
         })
     }
 
-    pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl, Error> {
+    pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl<'_>, Error> {
         let (contents_name, len_name) = self
             .table_names
             .get(table_index)
@@ -376,7 +429,7 @@ impl<'a> ModuleDecls<'a> {
             .ok_or_else(|| format_err!("signature out of bounds: {:?}", signature_index))
     }
 
-    pub fn get_global(&self, global_index: GlobalIndex) -> Result<&Exportable<Global>, Error> {
+    pub fn get_global(&self, global_index: GlobalIndex) -> Result<&Exportable<'_, Global>, Error> {
         self.info
             .globals
             .get(global_index)
@@ -391,14 +444,14 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    pub fn get_module_data(&self) -> Result<ModuleData, LucetcError> {
+    pub fn get_module_data(&self) -> Result<ModuleData<'_>, LucetcError> {
         let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
             Some(spec.to_ref())
         } else {
             None
         };
 
-        let mut functions: Vec<FunctionMetadata> = Vec::new();
+        let mut functions: Vec<FunctionMetadata<'_>> = Vec::new();
         for fn_index in self.function_names.keys() {
             let decl = self.get_func(fn_index).unwrap();
 

@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 use failure::{Error, Fail};
 use std::env;
 use std::io::Write;
@@ -273,19 +275,19 @@ impl<'t> LinkOpt<'t> {
 }
 
 pub trait LinkOpts {
-    fn link_opt(&mut self, link_opt: LinkOpt);
-    fn with_link_opt(self, link_opt: LinkOpt) -> Self;
+    fn link_opt(&mut self, link_opt: LinkOpt<'_>);
+    fn with_link_opt(self, link_opt: LinkOpt<'_>) -> Self;
 
     fn export<S: AsRef<str>>(&mut self, export: S);
     fn with_export<S: AsRef<str>>(self, export: S) -> Self;
 }
 
 impl<T: AsLink> LinkOpts for T {
-    fn link_opt(&mut self, link_opt: LinkOpt) {
+    fn link_opt(&mut self, link_opt: LinkOpt<'_>) {
         self.as_link().ldflags.extend(link_opt.as_ldflags());
     }
 
-    fn with_link_opt(mut self, link_opt: LinkOpt) -> Self {
+    fn with_link_opt(mut self, link_opt: LinkOpt<'_>) -> Self {
         self.link_opt(link_opt);
         self
     }

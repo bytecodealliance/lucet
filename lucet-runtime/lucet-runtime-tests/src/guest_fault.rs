@@ -127,8 +127,8 @@ macro_rules! guest_fault_tests {
         use libc::{c_void, siginfo_t, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails,
-            FunctionPointer, Instance, Limits, Region, SignalBehavior, TrapCode,
+            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
+            Limits, Region, SignalBehavior, TrapCode,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -138,7 +138,9 @@ macro_rules! guest_fault_tests {
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::guest_fault::mock_traps_module;
-        use $crate::helpers::{test_ex, test_nonex, MockExportBuilder, MockModuleBuilder};
+        use $crate::helpers::{
+            test_ex, test_nonex, FunctionPointer, MockExportBuilder, MockModuleBuilder,
+        };
 
         lazy_static! {
             static ref RECOVERABLE_PTR_LOCK: Mutex<()> = Mutex::new(());

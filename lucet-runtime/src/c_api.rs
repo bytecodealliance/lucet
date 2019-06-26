@@ -303,12 +303,7 @@ pub unsafe extern "C" fn lucet_instance_set_signal_handler(
 ) -> lucet_error {
     let handler = move |inst: &Instance, trap: &Option<TrapCode>, signum, siginfo, context| {
         let inst = inst as *const Instance as *mut lucet_instance;
-        let trap = trap.into();
-        let trap_ptr = &trap as *const lucet_state::lucet_trapcode;
-        let res = signal_handler(inst, trap_ptr, signum, siginfo, context).into();
-        // make sure `trap_ptr` is live until the signal handler returns
-        drop(trap);
-        res
+        signal_handler(inst, trap.into(), signum, siginfo, context).into()
     };
     with_instance_ptr!(inst, {
         inst.set_signal_handler(handler);
@@ -388,7 +383,7 @@ lucet_hostcalls! {
     /// Get the number of WebAssembly pages currently in the heap.
     pub unsafe extern "C" fn lucet_vmctx_current_memory(
         &mut vmctx,
-    ) -> libc::uint32_t {
+    ) -> u32 {
         vmctx.instance().alloc().heap_len() as u32 / WASM_PAGE_SIZE
     }
 
@@ -398,10 +393,10 @@ lucet_hostcalls! {
     /// On success, returns the number of pages that existed before the call. On failure, returns `-1`.
     pub unsafe extern "C" fn lucet_vmctx_grow_memory(
         &mut vmctx,
-        additional_pages: libc::uint32_t,
-    ) -> libc::int32_t {
+        additional_pages: u32,
+    ) -> i32 {
         if let Ok(old_pages) = vmctx.instance_mut().grow_memory(additional_pages) {
-            old_pages as libc::int32_t
+            old_pages as i32
         } else {
             -1
         }

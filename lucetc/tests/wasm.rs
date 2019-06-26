@@ -36,16 +36,32 @@ mod module_data {
     use std::path::PathBuf;
 
     #[test]
+    fn globals_export() {
+        let m = load_wat_module("globals_export");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling globals_export");
+        let mdata = c.module_data().unwrap();
+
+        assert_eq!(mdata.globals_spec().len(), 1);
+        assert_eq!(mdata.globals_spec()[0].export_names(), &["start", "dupe"]);
+
+        assert_eq!(mdata.import_functions().len(), 0);
+        assert_eq!(mdata.export_functions().len(), 0);
+        assert_eq!(mdata.function_info().len(), 2);
+    }
+
+    #[test]
     fn fibonacci() {
         let m = load_wat_module("fibonacci");
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling fibonacci");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling fibonacci");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
         assert_eq!(mdata.import_functions().len(), 0);
-        assert_eq!(mdata.function_info().len(), 1);
+        assert_eq!(mdata.function_info().len(), 3);
         assert_eq!(mdata.export_functions()[0].names, vec!["main"]);
     }
 
@@ -54,14 +70,40 @@ mod module_data {
         let m = load_wat_module("arith");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling arith");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling arith");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
         assert_eq!(mdata.import_functions().len(), 0);
-        assert_eq!(mdata.function_info().len(), 1);
+        assert_eq!(mdata.function_info().len(), 3);
         assert_eq!(mdata.export_functions()[0].names, vec!["main"]);
     }
+
+    #[test]
+    fn duplicate_imports() {
+        let m = load_wat_module("duplicate_imports");
+        let b = Bindings::from_file(&PathBuf::from(
+            "tests/bindings/duplicate_imports_bindings.json",
+        ))
+        .unwrap();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile duplicate_imports");
+        let mdata = c.module_data().unwrap();
+
+        assert_eq!(mdata.import_functions().len(), 2);
+        assert_eq!(mdata.import_functions()[0].module, "env");
+        assert_eq!(mdata.import_functions()[0].name, "read");
+        assert_eq!(mdata.import_functions()[1].module, "env");
+        assert_eq!(mdata.import_functions()[1].name, "write");
+        assert_eq!(mdata.function_info().len(), 5);
+        assert_eq!(mdata.function_info()[0].name, Some("host_read"));
+        assert_eq!(mdata.function_info()[1].name, Some("host_write"));
+        assert_eq!(mdata.function_info()[2].name, Some("guest_func__start"));
+        assert_eq!(mdata.export_functions().len(), 1);
+        assert_eq!(mdata.export_functions()[0].names, ["_start"]);
+        assert_eq!(mdata.globals_spec().len(), 0);
+    }
+
     #[test]
     fn icall_import() {
         let m = load_wat_module("icall_import");
@@ -70,13 +112,13 @@ mod module_data {
         ))
         .unwrap();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile icall");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile icall");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.import_functions().len(), 1);
         assert_eq!(mdata.import_functions()[0].module, "env");
         assert_eq!(mdata.import_functions()[0].name, "icalltarget");
-        assert_eq!(mdata.function_info().len(), 5);
+        assert_eq!(mdata.function_info().len(), 7);
         assert_eq!(mdata.export_functions()[0].names, vec!["launchpad"]);
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -106,7 +148,7 @@ mod module_data {
         let m = load_wat_module("icall");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile icall");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile icall");
         let _module_data = c.module_data().unwrap();
 
         /*  TODO can't express these with module data
@@ -131,7 +173,7 @@ mod module_data {
         let m = load_wat_module("icall_sparse");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile icall_sparse");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile icall_sparse");
         let _module_data = c.module_data().unwrap();
 
         /*  TODO can't express these with module data
@@ -170,7 +212,7 @@ mod module_data {
         let b = Bindings::empty();
         let h = HeapSettings::default();
 
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile globals_import");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile globals_import");
         let module_data = c.module_data().unwrap();
         let gspec = module_data.globals_spec();
 
@@ -192,7 +234,7 @@ mod module_data {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let c =
-            Compiler::new(&m, OptLevel::Best, &b, h.clone()).expect("compiling heap_spec_import");
+            Compiler::new(&m, OptLevel::Fast, &b, h.clone()).expect("compiling heap_spec_import");
 
         assert_eq!(
             c.module_data().unwrap().heap_spec(),
@@ -214,7 +256,7 @@ mod module_data {
         let m = load_wat_module("heap_spec_definition");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h.clone())
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h.clone())
             .expect("compiling heap_spec_definition");
 
         assert_eq!(
@@ -236,7 +278,7 @@ mod module_data {
         let m = load_wat_module("heap_spec_none");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compiling heap_spec_none");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling heap_spec_none");
         assert_eq!(c.module_data().unwrap().heap_spec(), None,);
     }
 
@@ -245,7 +287,7 @@ mod module_data {
         let m = load_wat_module("oversize_data_segment");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h);
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h);
         assert!(
             c.is_err(),
             "compilation error because data initializers are oversized"
@@ -268,7 +310,7 @@ mod module_data {
 
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h);
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h);
         assert!(
             c.is_err(),
             "compilation error because wasm module is invalid"
@@ -281,7 +323,7 @@ mod module_data {
         let m = load_wat_module("start_section");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let _c = Compiler::new(&m, OptLevel::Best, &b, h).expect("compile start_section");
+        let _c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile start_section");
         /*
         assert!(
             p.module().start_section().is_some(),
@@ -299,7 +341,7 @@ mod compile {
         let m = load_wat_module(file);
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Best, &b, h).expect(&format!("compile {}", file));
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect(&format!("compile {}", file));
         let _obj = c.object_file().expect(&format!("codegen {}", file));
     }
     macro_rules! compile_test {

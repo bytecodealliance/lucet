@@ -23,7 +23,6 @@ pub struct OwnedLinearMemorySpec {
     pub initializer: OwnedSparseData,
 }
 
-
 impl OwnedLinearMemorySpec {
     pub fn to_ref<'a>(&'a self) -> LinearMemorySpec<'a> {
         LinearMemorySpec {

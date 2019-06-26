@@ -1,10 +1,13 @@
 use crate::{
-    functions::{ExportFunction, FunctionIndex, FunctionMetadata, ImportFunction, OwnedFunctionMetadata},
+    functions::{
+        ExportFunction, FunctionIndex, FunctionMetadata, ImportFunction, OwnedFunctionMetadata,
+    },
     globals::GlobalSpec,
     linear_memory::{HeapSpec, LinearMemorySpec, SparseData},
     types::Signature,
     Error,
 };
+use minisign::SignatureBones;
 use serde::{Deserialize, Serialize};
 
 /// The metadata (and some data) for a Lucet module.
@@ -28,6 +31,7 @@ pub struct ModuleData<'a> {
     #[serde(borrow)]
     export_functions: Vec<ExportFunction<'a>>,
     signatures: Vec<Signature>,
+    module_signature: Vec<u8>,
 }
 
 impl<'a> ModuleData<'a> {
@@ -39,6 +43,7 @@ impl<'a> ModuleData<'a> {
         export_functions: Vec<ExportFunction<'a>>,
         signatures: Vec<Signature>,
     ) -> Self {
+        let module_signature = vec![0u8; SignatureBones::BYTES];
         Self {
             linear_memory,
             globals_spec,
@@ -46,6 +51,7 @@ impl<'a> ModuleData<'a> {
             import_functions,
             export_functions,
             signatures,
+            module_signature,
         }
     }
 
@@ -73,11 +79,11 @@ impl<'a> ModuleData<'a> {
         &self.function_info
     }
 
-    pub fn import_functions(&self) -> &[ImportFunction] {
+    pub fn import_functions(&self) -> &[ImportFunction<'_>] {
         &self.import_functions
     }
 
-    pub fn export_functions(&self) -> &[ExportFunction] {
+    pub fn export_functions(&self) -> &[ExportFunction<'_>] {
         &self.export_functions
     }
 
@@ -101,6 +107,29 @@ impl<'a> ModuleData<'a> {
         &self.signatures
     }
 
+    pub fn get_module_signature(&self) -> &[u8] {
+        &self.module_signature
+    }
+
+    pub fn patch_module_signature(
+        module_data_bin: &'a [u8],
+        module_signature: &[u8],
+    ) -> Result<Vec<u8>, Error> {
+        assert_eq!(module_signature.len(), SignatureBones::BYTES);
+        let mut module_data = Self::deserialize(module_data_bin)?;
+        module_data
+            .module_signature
+            .copy_from_slice(module_signature);
+        let patched_module_data_bin = module_data.serialize()?;
+        assert_eq!(patched_module_data_bin.len(), module_data_bin.len());
+        Ok(patched_module_data_bin)
+    }
+
+    pub fn clear_module_signature(module_data_bin: &'a [u8]) -> Result<Vec<u8>, Error> {
+        let module_signature = vec![0u8; SignatureBones::BYTES];
+        Self::patch_module_signature(module_data_bin, &module_signature)
+    }
+
     /// Serialize to [`bincode`](https://github.com/TyOverby/bincode).
     pub fn serialize(&self) -> Result<Vec<u8>, Error> {
         bincode::serialize(self).map_err(Error::SerializationError)
@@ -113,9 +142,9 @@ impl<'a> ModuleData<'a> {
 }
 
 use crate::{
+    functions::{OwnedExportFunction, OwnedImportFunction},
     globals::OwnedGlobalSpec,
     linear_memory::{OwnedLinearMemorySpec, OwnedSparseData},
-    functions::{OwnedExportFunction, OwnedImportFunction},
 };
 
 /// The metadata (and some data) for a Lucet module.
@@ -161,7 +190,10 @@ impl OwnedModuleData {
                 None
             },
             self.globals_spec.iter().map(|gs| gs.to_ref()).collect(),
-            self.function_info.iter().map(|info| info.to_ref()).collect(),
+            self.function_info
+                .iter()
+                .map(|info| info.to_ref())
+                .collect(),
             self.imports.iter().map(|imp| imp.to_ref()).collect(),
             self.exports.iter().map(|exp| exp.to_ref()).collect(),
             self.signatures.clone(),

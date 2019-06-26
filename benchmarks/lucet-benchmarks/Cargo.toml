@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 criterion = "0.2"
 lucetc = { path = "../../lucetc" }
+lucet-module-data = { path = "../../lucet-module-data" }
 lucet-runtime = { path = "../../lucet-runtime" }
 lucet-runtime-internals = { path = "../../lucet-runtime/lucet-runtime-internals" }
 lucet-wasi = { path = "../../lucet-wasi" }

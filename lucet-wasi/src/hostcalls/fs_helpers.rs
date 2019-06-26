@@ -163,7 +163,7 @@ pub fn path_get<P: AsRef<OsStr>>(
                     || (component.ends_with(b"/") && !needs_final_component) =>
             {
                 match openat(
-                    *dir_stack.first().expect("dir_stack is never empty"),
+                    *dir_stack.last().expect("dir_stack is never empty"),
                     component,
                     OFlag::O_RDONLY | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW,
                     Mode::empty(),
@@ -173,8 +173,11 @@ pub fn path_get<P: AsRef<OsStr>>(
                         continue;
                     }
                     Err(e)
+                     // Check to see if it was a symlink. Linux indicates
+                        // this with ENOTDIR because of the O_DIRECTORY flag.
                         if e.as_errno() == Some(Errno::ELOOP)
-                            || e.as_errno() == Some(Errno::EMLINK) =>
+                            || e.as_errno() == Some(Errno::EMLINK)
+                            || e.as_errno() == Some(Errno::ENOTDIR) =>
                     {
                         // attempt symlink expansion
                         match readlinkat(

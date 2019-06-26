@@ -145,5 +145,14 @@ int main(void)
     res = closedir(dir);
     assert(res == 0);
 
+    res = mkdir("/sandbox/a", 0755);
+    assert(res == 0);
+    res = mkdir("/sandbox/a/b", 0755);
+    assert(res == 0);
+    res = mkdir("/sandbox/a/b/c", 0755);
+    assert(res == 0);
+    res = access("/sandbox/a/b/c", R_OK);
+    assert(res == 0);
+
     return 0;
 }

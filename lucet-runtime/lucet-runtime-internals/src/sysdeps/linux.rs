@@ -17,6 +17,7 @@ impl UContextPtr {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct UContext {
     context: ucontext_t,

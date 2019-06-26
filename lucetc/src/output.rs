@@ -19,7 +19,7 @@ pub struct CraneliftFuncs {
 }
 
 impl CraneliftFuncs {
-    pub fn new(funcs: HashMap<Name, ir::Function>, isa: Box<isa::TargetIsa>) -> Self {
+    pub fn new(funcs: HashMap<Name, ir::Function>, isa: Box<dyn isa::TargetIsa>) -> Self {
         Self { funcs, isa }
     }
     /// This outputs a .clif file
@@ -28,7 +28,7 @@ impl CraneliftFuncs {
         let mut buffer = String::new();
         for (n, func) in self.funcs.iter() {
             buffer.push_str(&format!("; {}\n", n.symbol()));
-            write_function(&mut buffer, func, Some(self.isa.as_ref()))
+            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into())
                 .context(format_err!("writing func {:?}", n))?
         }
         let mut file = File::create(path)?;
@@ -47,18 +47,26 @@ impl ObjectFile {
     ) -> Result<Self, Error> {
         stack_probe::declare_and_define(&mut product)?;
 
-        // stack_probe::declare_and_define adds a new function into `product`, but
-        // function_manifest was already constructed from all defined functions.
-        // So, we have to add a new entry to `function_manifest` for the stack probe
-        function_manifest.push((
-            stack_probe::STACK_PROBE_SYM.to_string(),
-            FunctionSpec::new(
+        // stack_probe::declare_and_define never exists as clif, and as a result never exist as
+        // compiled code. This means the declared length of the stack probe's code is 0. This is
+        // incorrect, and must be fixed up before writing out the function manifest.
+
+        // because the stack probe is the last declared function...
+        let last_idx = function_manifest.len() - 1;
+        let stack_probe_entry = function_manifest
+            .get_mut(last_idx)
+            .expect("function manifest has entries");
+        debug_assert!(stack_probe_entry.0 == stack_probe::STACK_PROBE_SYM);
+        debug_assert!(stack_probe_entry.1.code_len() == 0);
+        std::mem::swap(
+            &mut stack_probe_entry.1,
+            &mut FunctionSpec::new(
                 0, // there is no real address for the function until written to an object file
                 stack_probe::STACK_PROBE_BINARY.len() as u32,
                 0,
                 0, // fix up this FunctionSpec with trap info like any other
             ),
-        ));
+        );
 
         let trap_manifest = &product
             .trap_manifest

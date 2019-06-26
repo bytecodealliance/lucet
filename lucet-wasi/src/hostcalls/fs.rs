@@ -39,12 +39,12 @@ pub fn wasi_fd_fdstat_get(
     fdstat_ptr: wasm32::uintptr_t, // *mut wasm32::__wasi_fdstat_t
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let mut host_fdstat = match unsafe { dec_fdstat_byref(vmctx, fdstat_ptr) } {
+    let mut host_fdstat = match dec_fdstat_byref(vmctx, fdstat_ptr) {
         Ok(host_fdstat) => host_fdstat,
         Err(e) => return enc_errno(e),
     };
 
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let errno = if let Some(fe) = ctx.fds.get(&host_fd) {
         host_fdstat.fs_filetype = fe.fd_object.ty;
         host_fdstat.fs_rights_base = fe.rights_base;
@@ -60,12 +60,8 @@ pub fn wasi_fd_fdstat_get(
     } else {
         wasm32::__WASI_EBADF
     };
-
-    unsafe {
-        enc_fdstat_byref(vmctx, fdstat_ptr, host_fdstat)
-            .expect("can write back into the pointer we read from");
-    }
-
+    enc_fdstat_byref(vmctx, fdstat_ptr, host_fdstat)
+        .expect("can write back into the pointer we read from");
     errno
 }
 
@@ -78,8 +74,7 @@ pub fn wasi_fd_fdstat_set_flags(
     let host_fdflags = dec_fdflags(fdflags);
     let nix_flags = host::nix_from_fdflags(host_fdflags);
 
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
-
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     if let Some(fe) = ctx.fds.get(&host_fd) {
         match nix::fcntl::fcntl(fe.fd_object.rawfd, nix::fcntl::F_SETFL(nix_flags)) {
             Ok(_) => wasm32::__WASI_ESUCCESS,
@@ -95,7 +90,7 @@ pub fn wasi_fd_tell(
     fd: wasm32::__wasi_fd_t,
     offset: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let fd = dec_fd(fd);
 
     let host_offset = {
@@ -110,12 +105,9 @@ pub fn wasi_fd_tell(
             Err(e) => return enc_errno(e),
         }
     };
-
-    unsafe {
-        enc_filesize_byref(vmctx, offset, host_offset as u64)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_filesize_byref(vmctx, offset, host_offset as u64)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_seek(
@@ -125,7 +117,7 @@ pub fn wasi_fd_seek(
     whence: wasm32::__wasi_whence_t,
     newoffset: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let fd = dec_fd(fd);
     let offset = dec_filedelta(offset);
     let whence = dec_whence(whence);
@@ -152,12 +144,9 @@ pub fn wasi_fd_seek(
             Err(e) => return enc_errno(e),
         }
     };
-
-    unsafe {
-        enc_filesize_byref(vmctx, newoffset, host_newoffset as u64)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_filesize_byref(vmctx, newoffset, host_newoffset as u64)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_prestat_get(
@@ -175,23 +164,20 @@ pub fn wasi_fd_prestat_get(
                 if fe.fd_object.ty != host::__WASI_FILETYPE_DIRECTORY as host::__wasi_filetype_t {
                     return wasm32::__WASI_ENOTDIR;
                 }
-                unsafe {
-                    enc_prestat_byref(
-                        vmctx,
-                        prestat_ptr,
-                        host::__wasi_prestat_t {
-                            pr_type: host::__WASI_PREOPENTYPE_DIR as host::__wasi_preopentype_t,
-                            u: host::__wasi_prestat_t___wasi_prestat_u {
-                                dir:
-                                    host::__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t {
-                                        pr_name_len: po_path.as_os_str().as_bytes().len(),
-                                    },
+                enc_prestat_byref(
+                    vmctx,
+                    prestat_ptr,
+                    host::__wasi_prestat_t {
+                        pr_type: host::__WASI_PREOPENTYPE_DIR as host::__wasi_preopentype_t,
+                        u: host::__wasi_prestat_t___wasi_prestat_u {
+                            dir: host::__wasi_prestat_t___wasi_prestat_u___wasi_prestat_u_dir_t {
+                                pr_name_len: po_path.as_os_str().as_bytes().len(),
                             },
                         },
-                    )
-                    .map(|_| wasm32::__WASI_ESUCCESS)
-                    .unwrap_or_else(|e| e)
-                }
+                    },
+                )
+                .map(|_| wasm32::__WASI_ESUCCESS)
+                .unwrap_or_else(|e| e)
             } else {
                 wasm32::__WASI_ENOTSUP
             }
@@ -219,11 +205,9 @@ pub fn wasi_fd_prestat_dir_name(
                 if path_bytes.len() > dec_usize(path_len) {
                     return wasm32::__WASI_ENAMETOOLONG;
                 }
-                unsafe {
-                    enc_slice_of(vmctx, path_bytes, path_ptr)
-                        .map(|_| wasm32::__WASI_ESUCCESS)
-                        .unwrap_or_else(|e| e)
-                }
+                enc_slice_of(vmctx, path_bytes, path_ptr)
+                    .map(|_| wasm32::__WASI_ESUCCESS)
+                    .unwrap_or_else(|e| e)
             } else {
                 wasm32::__WASI_ENOTSUP
             }
@@ -242,7 +226,7 @@ pub fn wasi_fd_read(
     use nix::sys::uio::{readv, IoVec};
 
     let fd = dec_fd(fd);
-    let mut iovs = match unsafe { dec_iovec_slice(vmctx, iovs_ptr, iovs_len) } {
+    let mut iovs = match dec_iovec_slice(vmctx, iovs_ptr, iovs_len) {
         Ok(iovs) => iovs,
         Err(e) => return enc_errno(e),
     };
@@ -269,12 +253,9 @@ pub fn wasi_fd_read(
         let mut fe = ctx.fds.remove(&fd).expect("file entry is still there");
         fe.fd_object.needs_close = false;
     }
-
-    unsafe {
-        enc_usize_byref(vmctx, nread, host_nread)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, nread, host_nread)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_write(
@@ -287,7 +268,7 @@ pub fn wasi_fd_write(
     use nix::sys::uio::{writev, IoVec};
 
     let fd = dec_fd(fd);
-    let iovs = match unsafe { dec_ciovec_slice(vmctx, iovs_ptr, iovs_len) } {
+    let iovs = match dec_ciovec_slice(vmctx, iovs_ptr, iovs_len) {
         Ok(iovs) => iovs,
         Err(e) => return enc_errno(e),
     };
@@ -308,12 +289,9 @@ pub fn wasi_fd_write(
         Ok(len) => len,
         Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
     };
-
-    unsafe {
-        enc_usize_byref(vmctx, nwritten, host_nwritten)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, nwritten, host_nwritten)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_path_open(
@@ -347,7 +325,7 @@ pub fn wasi_path_open(
         & ((host::__WASI_RIGHT_FD_DATASYNC
             | host::__WASI_RIGHT_FD_WRITE
             | host::__WASI_RIGHT_FD_ALLOCATE
-            | host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE) as host::__wasi_rights_t)
+            | host::__WASI_RIGHT_FD_FILESTAT_SET_SIZE) as host::__wasi_rights_t)
         != 0;
 
     let mut nix_all_oflags = if read && write {
@@ -372,7 +350,7 @@ pub fn wasi_path_open(
         needed_base |= host::__WASI_RIGHT_PATH_CREATE_FILE as host::__wasi_rights_t;
     }
     if nix_all_oflags.contains(OFlag::O_TRUNC) {
-        needed_inheriting |= host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE as host::__wasi_rights_t;
+        needed_base |= host::__WASI_RIGHT_PATH_FILESTAT_SET_SIZE as host::__wasi_rights_t;
     }
 
     // convert file descriptor flags
@@ -388,8 +366,8 @@ pub fn wasi_path_open(
         nix_all_oflags.remove(OFlag::O_WRONLY);
         nix_all_oflags.insert(OFlag::O_RDONLY);
     }
-    let path = match unsafe { dec_slice_of::<u8>(vmctx, path_ptr, path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let path = match dec_slice_of::<u8>(vmctx, path_ptr, path_len) {
+        Ok(path_bytes) => OsStr::from_bytes(path_bytes),
         Err(e) => return enc_errno(e),
     };
 
@@ -406,11 +384,14 @@ pub fn wasi_path_open(
         Err(e) => return enc_errno(e),
     };
 
+    // Call openat. Use mode 0o666 so that we follow whatever the user's
+    // umask is, but don't set the executable flag, because it isn't yet
+    // meaningful for WASI programs to create executable files.
     let new_fd = match openat(
         dir,
         path.as_os_str(),
         nix_all_oflags,
-        Mode::from_bits_truncate(0o777),
+        Mode::from_bits_truncate(0o666),
     ) {
         Ok(fd) => fd,
         Err(e) => {
@@ -427,6 +408,23 @@ pub fn wasi_path_open(
                         return wasm32::__WASI_ENXIO;
                     }
                 }
+                // Linux returns ENOTDIR instead of ELOOP when using O_NOFOLLOW|O_DIRECTORY
+                // on a symlink.
+                Some(Errno::ENOTDIR)
+                    if !(nix_all_oflags & (OFlag::O_NOFOLLOW | OFlag::O_DIRECTORY)).is_empty() =>
+                {
+                    if let Ok(stat) = fstatat(dir, path.as_os_str(), AtFlags::AT_SYMLINK_NOFOLLOW) {
+                        if SFlag::from_bits_truncate(stat.st_mode).contains(SFlag::S_IFLNK) {
+                            return wasm32::__WASI_ELOOP;
+                        }
+                    }
+                    return wasm32::__WASI_ENOTDIR;
+                }
+                // FreeBSD returns EMLINK instead of ELOOP when using O_NOFOLLOW on
+                // a symlink.
+                Some(Errno::EMLINK) if !(nix_all_oflags & OFlag::O_NOFOLLOW).is_empty() => {
+                    return wasm32::__WASI_ELOOP;
+                }
                 Some(e) => return wasm32::errno_from_nix(e),
                 None => return wasm32::__WASI_ENOSYS,
             }
@@ -440,6 +438,9 @@ pub fn wasi_path_open(
             nix::unistd::close(new_fd).unwrap_or_else(|e| {
                 dbg!(e);
             });
+            if let Err(e) = enc_fd_byref(vmctx, fd_out_ptr, wasm32::__wasi_fd_t::max_value()) {
+                return enc_errno(e);
+            }
             return enc_errno(e);
         }
         Ok((_ty, max_base, max_inheriting)) => {
@@ -452,12 +453,9 @@ pub fn wasi_path_open(
             }
         }
     };
-
-    unsafe {
-        enc_fd_byref(vmctx, fd_out_ptr, guest_fd)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_fd_byref(vmctx, fd_out_ptr, guest_fd)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_filestat_get(
@@ -468,7 +466,7 @@ pub fn wasi_fd_filestat_get(
     use nix::sys::stat::fstat;
 
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
 
     let rights = host::__WASI_RIGHT_FD_FILESTAT_GET;
     match ctx.get_fd_entry(host_fd, rights.into(), 0) {
@@ -476,10 +474,8 @@ pub fn wasi_fd_filestat_get(
             Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
             Ok(filestat) => {
                 let host_filestat = host::filestat_from_nix(filestat);
-                unsafe {
-                    enc_filestat_byref(vmctx, filestat_ptr, host_filestat)
-                        .expect("can write into the pointer");
-                }
+                enc_filestat_byref(vmctx, filestat_ptr, host_filestat)
+                    .expect("can write into the pointer");
             }
         },
         Err(e) => return enc_errno(e),
@@ -500,8 +496,8 @@ pub fn wasi_path_filestat_get(
 
     let dirfd = dec_fd(dirfd);
     let dirflags = dec_lookupflags(dirflags);
-    let path = match unsafe { dec_slice_of::<u8>(vmctx, path_ptr, path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let path = match dec_slice_of::<u8>(vmctx, path_ptr, path_len) {
+        Ok(path_bytes) => OsStr::from_bytes(path_bytes),
         Err(e) => return enc_errno(e),
     };
     let rights = host::__WASI_RIGHT_PATH_FILESTAT_GET;
@@ -517,10 +513,8 @@ pub fn wasi_path_filestat_get(
         Err(e) => wasm32::errno_from_nix(e.as_errno().unwrap()),
         Ok(filestat) => {
             let host_filestat = host::filestat_from_nix(filestat);
-            unsafe {
-                enc_filestat_byref(vmctx, filestat_ptr, host_filestat)
-                    .expect("can write into the pointer");
-            }
+            enc_filestat_byref(vmctx, filestat_ptr, host_filestat)
+                .expect("can write into the pointer");
             wasm32::__WASI_ESUCCESS
         }
     }
@@ -536,8 +530,8 @@ pub fn wasi_path_create_directory(
     use nix::libc::mkdirat;
 
     let dirfd = dec_fd(dirfd);
-    let path = match unsafe { dec_slice_of::<u8>(vmctx, path_ptr, path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let path = match dec_slice_of::<u8>(vmctx, path_ptr, path_len) {
+        Ok(path_bytes) => OsStr::from_bytes(path_bytes),
         Err(e) => return enc_errno(e),
     };
     let rights = host::__WASI_RIGHT_PATH_CREATE_DIRECTORY;
@@ -566,8 +560,8 @@ pub fn wasi_path_unlink_file(
     use nix::libc::unlinkat;
 
     let dirfd = dec_fd(dirfd);
-    let path = match unsafe { dec_slice_of::<u8>(vmctx, path_ptr, path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let path = match dec_slice_of::<u8>(vmctx, path_ptr, path_len) {
+        Ok(path_bytes) => OsStr::from_bytes(path_bytes),
         Err(e) => return enc_errno(e),
     };
     let rights = host::__WASI_RIGHT_PATH_UNLINK_FILE;
@@ -582,7 +576,26 @@ pub fn wasi_path_unlink_file(
     // nix doesn't expose unlinkat() yet
     match unsafe { unlinkat(dir, path_cstr.as_ptr(), 0) } {
         0 => wasm32::__WASI_ESUCCESS,
-        _ => wasm32::errno_from_nix(errno::Errno::last()),
+        _ => {
+            let mut e = errno::Errno::last();
+            // Non-Linux implementations may return EPERM when attempting to remove a
+            // directory without `REMOVEDIR`. For WASI, adjust this to `EISDIR`.
+            #[cfg(not(linux))]
+            {
+                use nix::fcntl::AtFlags;
+                use nix::sys::stat::{fstatat, SFlag};
+                if e == errno::Errno::EPERM {
+                    if let Ok(stat) = fstatat(dir, path.as_os_str(), AtFlags::AT_SYMLINK_NOFOLLOW) {
+                        if SFlag::from_bits_truncate(stat.st_mode).contains(SFlag::S_IFDIR) {
+                            e = errno::Errno::EISDIR;
+                        }
+                    } else {
+                        e = errno::Errno::last();
+                    }
+                }
+            }
+            wasm32::errno_from_nix(e)
+        }
     }
 }
 
@@ -593,7 +606,7 @@ pub fn wasi_fd_allocate(
     len: wasm32::__wasi_filesize_t,
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_ALLOCATE;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -647,7 +660,7 @@ pub fn wasi_fd_advise(
     advice: wasm32::__wasi_advice_t,
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_ADVISE;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -700,7 +713,7 @@ pub fn wasi_fd_advise(
 
 pub fn wasi_fd_datasync(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_DATASYNC;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -726,7 +739,7 @@ pub fn wasi_fd_datasync(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::_
 
 pub fn wasi_fd_sync(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_SYNC;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -746,8 +759,8 @@ pub fn wasi_fd_fdstat_set_rights(
     fs_rights_inheriting: wasm32::__wasi_rights_t,
 ) -> wasm32::__wasi_errno_t {
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
-    let fe = match ctx.fds.get(&host_fd) {
+    let mut ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let fe = match ctx.fds.get_mut(&host_fd) {
         Some(fe) => fe,
         None => return wasm32::__WASI_EBADF,
     };
@@ -756,6 +769,8 @@ pub fn wasi_fd_fdstat_set_rights(
     {
         return wasm32::__WASI_ENOTCAPABLE;
     }
+    fe.rights_base = fs_rights_base;
+    fe.rights_inheriting = fs_rights_inheriting;
     wasm32::__WASI_ESUCCESS
 }
 
@@ -767,7 +782,7 @@ pub fn wasi_fd_filestat_set_size(
     use nix::unistd::ftruncate;
 
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_FILESTAT_SET_SIZE;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -793,7 +808,7 @@ pub fn wasi_fd_filestat_set_times(
     use nix::sys::time::{TimeSpec, TimeValLike};
 
     let host_fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_FILESTAT_SET_TIMES;
     let fe = match ctx.get_fd_entry(host_fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -854,8 +869,8 @@ pub fn wasi_path_filestat_set_times(
 
     let dirfd = dec_fd(dirfd);
     let dirflags = dec_lookupflags(dirflags);
-    let path = match unsafe { dec_slice_of::<u8>(vmctx, path_ptr, path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let path = match dec_slice_of::<u8>(vmctx, path_ptr, path_len) {
+        Ok(path_bytes) => OsStr::from_bytes(path_bytes),
         Err(e) => return enc_errno(e),
     };
     let rights = host::__WASI_RIGHT_PATH_FILESTAT_SET_TIMES;
@@ -924,11 +939,11 @@ pub fn wasi_fd_pread(
     use std::cmp;
 
     let fd = dec_fd(fd);
-    let iovs = match unsafe { dec_iovec_slice(vmctx, iovs_ptr, iovs_len) } {
+    let iovs = match dec_iovec_slice(vmctx, iovs_ptr, iovs_len) {
         Ok(iovs) => iovs,
         Err(e) => return enc_errno(e),
     };
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_READ;
     let fe = match ctx.get_fd_entry(fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -956,11 +971,9 @@ pub fn wasi_fd_pread(
         buf_offset += vec_len;
         left -= vec_len;
     }
-    unsafe {
-        enc_usize_byref(vmctx, nread, host_nread)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, nread, host_nread)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_pwrite(
@@ -974,11 +987,11 @@ pub fn wasi_fd_pwrite(
     use nix::sys::uio::pwrite;
 
     let fd = dec_fd(fd);
-    let iovs = match unsafe { dec_iovec_slice(vmctx, iovs_ptr, iovs_len) } {
+    let iovs = match dec_iovec_slice(vmctx, iovs_ptr, iovs_len) {
         Ok(iovs) => iovs,
         Err(e) => return enc_errno(e),
     };
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_READ;
     let fe = match ctx.get_fd_entry(fd, rights.into(), 0) {
         Ok(fe) => fe,
@@ -999,11 +1012,9 @@ pub fn wasi_fd_pwrite(
         Ok(len) => len,
         Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
     };
-    unsafe {
-        enc_usize_byref(vmctx, nwritten, host_nwritten)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, nwritten, host_nwritten)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_readdir(
@@ -1014,25 +1025,25 @@ pub fn wasi_fd_readdir(
     cookie: wasm32::__wasi_dircookie_t,
     bufused: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
-    use libc::{dirent, fdopendir, memcpy, readdir_r, seekdir};
+    use libc::{dirent, fdopendir, readdir_r, seekdir};
 
-    match unsafe { enc_usize_byref(vmctx, bufused, 0) } {
+    match enc_usize_byref(vmctx, bufused, 0) {
         Ok(_) => {}
         Err(e) => return enc_errno(e),
     };
     let fd = dec_fd(fd);
-    let ctx = vmctx.get_embed_ctx_mut::<WasiCtx>();
+    let ctx = vmctx.get_embed_ctx::<WasiCtx>();
     let rights = host::__WASI_RIGHT_FD_READDIR;
     let fe = match ctx.get_fd_entry(fd, rights.into(), 0) {
         Ok(fe) => fe,
         Err(e) => return enc_errno(e),
     };
-    let host_buf = match unsafe { dec_slice_of::<u8>(vmctx, buf, buf_len) } {
+    let host_buf = match dec_slice_of::<u8>(vmctx, buf, buf_len) {
         Ok(host_buf) => host_buf,
         Err(e) => return enc_errno(e),
     };
-    let host_buf_ptr = host_buf.0;
-    let host_buf_len = host_buf.1;
+    let host_buf_ptr = host_buf.as_ptr();
+    let host_buf_len = host_buf.len();
     let dir = unsafe { fdopendir(fe.fd_object.rawfd) };
     if dir.is_null() {
         return wasm32::errno_from_nix(nix::errno::Errno::last());
@@ -1070,9 +1081,9 @@ pub fn wasi_fd_readdir(
         host_buf_offset += std::mem::size_of_val(&entry);
         let name_ptr = unsafe { *host_entry }.d_name.as_ptr();
         unsafe {
-            memcpy(
-                host_buf_ptr.offset(host_buf_offset as isize) as *mut _,
+            std::ptr::copy_nonoverlapping(
                 name_ptr as *const _,
+                host_buf_ptr.offset(host_buf_offset as isize) as *mut _,
                 name_len,
             )
         };
@@ -1080,11 +1091,9 @@ pub fn wasi_fd_readdir(
         left -= required_space;
     }
     let host_bufused = host_buf_len - left;
-    unsafe {
-        enc_usize_byref(vmctx, bufused, host_bufused)
-            .map(|_| wasm32::__WASI_ESUCCESS)
-            .unwrap_or_else(|e| e)
-    }
+    enc_usize_byref(vmctx, bufused, host_bufused)
+        .map(|_| wasm32::__WASI_ESUCCESS)
+        .unwrap_or_else(|e| e)
 }
 
 pub fn wasi_fd_renumber(
@@ -1126,12 +1135,12 @@ pub fn wasi_path_link(
 
     let old_dirfd = dec_fd(old_dirfd);
     let new_dirfd = dec_fd(new_dirfd);
-    let old_path = match unsafe { dec_slice_of::<u8>(vmctx, old_path_ptr, old_path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let old_path = match dec_slice_of::<u8>(vmctx, old_path_ptr, old_path_len) {
+        Ok(old_path_bytes) => OsStr::from_bytes(old_path_bytes),
         Err(e) => return enc_errno(e),
     };
-    let new_path = match unsafe { dec_slice_of::<u8>(vmctx, new_path_ptr, new_path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let new_path = match dec_slice_of::<u8>(vmctx, new_path_ptr, new_path_len) {
+        Ok(new_path_bytes) => OsStr::from_bytes(new_path_bytes),
         Err(e) => return enc_errno(e),
     };
     let rights = host::__WASI_RIGHT_PATH_LINK_SOURCE;
@@ -1182,14 +1191,15 @@ pub fn wasi_path_readlink(
     bufused: wasm32::uintptr_t,
 ) -> wasm32::__wasi_errno_t {
     use nix::fcntl::readlinkat;
+    use std::cmp;
 
-    match unsafe { enc_usize_byref(vmctx, bufused, 0) } {
+    match enc_usize_byref(vmctx, bufused, 0) {
         Ok(_) => {}
         Err(e) => return enc_errno(e),
     };
     let dirfd = dec_fd(dirfd);
-    let path = match unsafe { dec_slice_of::<u8>(vmctx, path_ptr, path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let path = match dec_slice_of::<u8>(vmctx, path_ptr, path_len) {
+        Ok(path_bytes) => OsStr::from_bytes(path_bytes),
         Err(e) => return enc_errno(e),
     };
     let rights = host::__WASI_RIGHT_PATH_READLINK;
@@ -1197,16 +1207,21 @@ pub fn wasi_path_readlink(
         Ok((dir, path)) => (dir, path),
         Err(e) => return enc_errno(e),
     };
-    let mut buf = match unsafe { dec_slice_of::<u8>(vmctx, buf_ptr, buf_len) } {
-        Ok((ptr, len)) => unsafe { std::slice::from_raw_parts_mut(ptr, len) },
-        Err(e) => return enc_errno(e),
+    let dummy_buf = &mut [0u8];
+    let mut buf = if buf_len > 0 {
+        match dec_slice_of_mut::<u8>(vmctx, buf_ptr, buf_len) {
+            Ok(buf) => buf,
+            Err(e) => return enc_errno(e),
+        }
+    } else {
+        dummy_buf
     };
     let target_path = match readlinkat(dir, path.as_os_str(), &mut buf) {
         Err(e) => return wasm32::errno_from_nix(e.as_errno().unwrap()),
         Ok(target_path) => target_path,
     };
-    let host_bufused = target_path.len();
-    match unsafe { enc_usize_byref(vmctx, bufused, host_bufused) } {
+    let host_bufused = cmp::min(buf_len as usize, target_path.len());
+    match enc_usize_byref(vmctx, bufused, host_bufused) {
         Ok(_) => {}
         Err(e) => return enc_errno(e),
     };
@@ -1223,8 +1238,8 @@ pub fn wasi_path_remove_directory(
     use nix::libc::{unlinkat, AT_REMOVEDIR};
 
     let dirfd = dec_fd(dirfd);
-    let path = match unsafe { dec_slice_of::<u8>(vmctx, path_ptr, path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let path = match dec_slice_of::<u8>(vmctx, path_ptr, path_len) {
+        Ok(path_bytes) => OsStr::from_bytes(path_bytes),
         Err(e) => return enc_errno(e),
     };
     let rights = host::__WASI_RIGHT_PATH_REMOVE_DIRECTORY;
@@ -1256,12 +1271,12 @@ pub fn wasi_path_rename(
 
     let old_dirfd = dec_fd(old_dirfd);
     let new_dirfd = dec_fd(new_dirfd);
-    let old_path = match unsafe { dec_slice_of::<u8>(vmctx, old_path_ptr, old_path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let old_path = match dec_slice_of::<u8>(vmctx, old_path_ptr, old_path_len) {
+        Ok(old_path_bytes) => OsStr::from_bytes(old_path_bytes),
         Err(e) => return enc_errno(e),
     };
-    let new_path = match unsafe { dec_slice_of::<u8>(vmctx, new_path_ptr, new_path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let new_path = match dec_slice_of::<u8>(vmctx, new_path_ptr, new_path_len) {
+        Ok(new_path_bytes) => OsStr::from_bytes(new_path_bytes),
         Err(e) => return enc_errno(e),
     };
     let rights = host::__WASI_RIGHT_PATH_RENAME_SOURCE;
@@ -1309,12 +1324,12 @@ pub fn wasi_path_symlink(
     use nix::libc::symlinkat;
 
     let dirfd = dec_fd(dirfd);
-    let old_path = match unsafe { dec_slice_of::<u8>(vmctx, old_path_ptr, old_path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let old_path = match dec_slice_of::<u8>(vmctx, old_path_ptr, old_path_len) {
+        Ok(old_path_bytes) => OsStr::from_bytes(old_path_bytes),
         Err(e) => return enc_errno(e),
     };
-    let new_path = match unsafe { dec_slice_of::<u8>(vmctx, new_path_ptr, new_path_len) } {
-        Ok((ptr, len)) => OsStr::from_bytes(unsafe { std::slice::from_raw_parts(ptr, len) }),
+    let new_path = match dec_slice_of::<u8>(vmctx, new_path_ptr, new_path_len) {
+        Ok(new_path_bytes) => OsStr::from_bytes(new_path_bytes),
         Err(e) => return enc_errno(e),
     };
     let rights = host::__WASI_RIGHT_PATH_SYMLINK;

@@ -190,7 +190,7 @@ impl From<&lucet_signal_behavior> for SignalBehavior {
 
 pub type lucet_signal_handler = unsafe extern "C" fn(
     inst: *mut lucet_instance,
-    trap: *const lucet_state::lucet_trapcode,
+    trap: lucet_state::lucet_trapcode,
     signum: c_int,
     siginfo: *const libc::siginfo_t,
     context: *const c_void,
