@@ -1,4 +1,4 @@
-use lucetc::Bindings;
+use lucet_module_data::bindings::Bindings;
 use serde_json::json;
 
 pub fn spec_test_bindings() -> Bindings {

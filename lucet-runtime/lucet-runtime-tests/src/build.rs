@@ -1,7 +1,8 @@
 use failure::Error;
+use lucet_module_data::bindings::Bindings;
 use lucet_runtime_internals::module::DlModule;
 use lucet_wasi_sdk::{CompileOpts, Link, LinkOpt, LinkOpts};
-use lucetc::{Bindings, Lucetc, LucetcOpts};
+use lucetc::{Lucetc, LucetcOpts};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;

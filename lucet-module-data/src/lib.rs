@@ -5,6 +5,7 @@
 
 #![deny(bare_trait_objects)]
 
+pub mod bindings;
 mod error;
 mod functions;
 mod globals;
