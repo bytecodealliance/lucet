@@ -23,24 +23,21 @@ fn write_relocated_slice(
         })
         .context(format!("linking {} into function manifest", to))?;
     } else if imported {
-        let absolute_reloc =
-            match obj.target.binary_format {
-                BinaryFormat::Elf => {
-                    faerie::artifact::Reloc::Raw {
-                        reloc: 1, // this is an ELF R_X86_64_64
-                        addend: 0,
-                    }
+        let absolute_reloc = match obj.target.binary_format {
+            BinaryFormat::Elf => {
+                faerie::artifact::Reloc::Raw {
+                    reloc: 1, // this is an ELF R_X86_64_64
+                    addend: 0,
                 }
-                BinaryFormat::Macho => {
-                    faerie::artifact::Reloc::Raw {
-                        reloc: 0, // this is a MachO X86_64_RELOC_UNSIGNED
-                        addend: 0,
-                    }
+            }
+            BinaryFormat::Macho => {
+                faerie::artifact::Reloc::Raw {
+                    reloc: 0, // this is a MachO X86_64_RELOC_UNSIGNED
+                    addend: 0,
                 }
-                _ => {
-                    panic!("Unsupported target format!")
-                }
-            };
+            }
+            _ => panic!("Unsupported target format!"),
+        };
 
         obj.link_with(
             Link {
@@ -48,7 +45,7 @@ fn write_relocated_slice(
                 to,
                 at: buf.position(),
             },
-            absolute_reloc
+            absolute_reloc,
         )
         .context(format!("linking {} into function manifest", to))?;
     }
