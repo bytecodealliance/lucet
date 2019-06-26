@@ -11,45 +11,56 @@ fn write_relocated_slice(
     obj: &mut Artifact,
     buf: &mut Cursor<Vec<u8>>,
     from: &str,
-    to: &str,
+    to: Option<&str>,
     len: u64,
-    imported: bool,
 ) -> Result<(), Error> {
-    if len > 0 {
-        assert!(!imported, "imported data cannot have local data as well");
-
-        obj.link(Link {
-            from, // the data at `from` + `at` (eg. manifest_sym)
-            to,   // is a reference to `to`    (eg. fn_name)
-            at: buf.position(),
-        })
-        .context(format!("linking {} into function manifest", to))?;
-    } else if imported {
-        let absolute_reloc = match obj.target.binary_format {
-            BinaryFormat::Elf => {
-                faerie::artifact::Reloc::Raw {
-                    reloc: 1, // this is an ELF R_X86_64_64
-                    addend: 0,
+    match (to, len) {
+        (Some(to), 0) => {
+            // This is an imported slice of unknown size
+            let absolute_reloc = match obj.target.binary_format {
+                BinaryFormat::Elf => {
+                    faerie::artifact::Reloc::Raw {
+                        reloc: 1, // this is an ELF R_X86_64_64
+                        addend: 0,
+                    }
                 }
-            }
-            BinaryFormat::Macho => {
-                faerie::artifact::Reloc::Raw {
-                    reloc: 0, // this is a MachO X86_64_RELOC_UNSIGNED
-                    addend: 0,
+                BinaryFormat::Macho => {
+                    faerie::artifact::Reloc::Raw {
+                        reloc: 0, // this is a MachO X86_64_RELOC_UNSIGNED
+                        addend: 0,
+                    }
                 }
-            }
-            _ => panic!("Unsupported target format!"),
-        };
+                _ => panic!("Unsupported target format!"),
+            };
 
-        obj.link_with(
-            Link {
-                from,
-                to,
+            obj.link_with(
+                Link {
+                    from,
+                    to,
+                    at: buf.position(),
+                },
+                absolute_reloc,
+            )
+            .context(format!("linking {} into function manifest", to))?;
+        }
+        (Some(to), _len) => {
+            // This is a local buffer of known size
+            obj.link(Link {
+                from, // the data at `from` + `at` (eg. manifest_sym)
+                to,   // is a reference to `to`    (eg. fn_name)
                 at: buf.position(),
-            },
-            absolute_reloc,
-        )
-        .context(format!("linking {} into function manifest", to))?;
+            })
+            .context(format!("linking {} into function manifest", to))?;
+        }
+        (None, len) => {
+            // There's actually no relocation to add, because there's no slice to put here.
+            //
+            // Since there's no slice, its length must be zero.
+            assert!(
+                len == 0,
+                "Invalid slice: no data, but there are more than zero bytes of it"
+            );
+        }
     }
 
     buf.write_u64::<LittleEndian>(0).unwrap();
@@ -100,24 +111,21 @@ pub fn write_function_manifest(
             obj,
             &mut manifest_buf,
             &manifest_sym,
-            fn_name,
+            Some(fn_name),
             fn_spec.code_len() as u64,
-            // Functions are only 0 bytes if they are imported
-            if fn_spec.code_len() as u64 == 0 {
-                true
-            } else {
-                false
-            },
         )?;
         // Writes a (ptr, len) pair with relocation for this function's trap table
+        let trap_sym = trap_sym_for_func(fn_name);
         write_relocated_slice(
             obj,
             &mut manifest_buf,
             &manifest_sym,
-            &trap_sym_for_func(fn_name),
+            if fn_spec.traps_len() > 0 {
+                Some(&trap_sym)
+            } else {
+                None
+            },
             fn_spec.traps_len() as u64,
-            // we don't import trap tables from another module
-            false,
         )?;
     }
 
