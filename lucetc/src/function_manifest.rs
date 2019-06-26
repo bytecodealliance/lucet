@@ -12,6 +12,7 @@ fn write_relocated_slice(
     from: &str,
     to: &str,
     len: u64,
+    imported: bool,
 ) -> Result<(), Error> {
     if len > 0 {
         obj.link(Link {
@@ -20,6 +21,12 @@ fn write_relocated_slice(
             at: buf.position(),
         })
         .context(format!("linking {} into function manifest", to))?;
+    } else if imported {
+        obj.link_with(Link {
+            from,
+            to,
+            at: buf.position(),
+        }, faerie::artifact::Reloc::Raw { reloc: 1, addend: 0 })?;
     }
 
     buf.write_u64::<LittleEndian>(0).unwrap();
@@ -72,6 +79,7 @@ pub fn write_function_manifest(
             &manifest_sym,
             fn_name,
             fn_spec.code_len() as u64,
+            if fn_spec.code_len() as u64 == 0 { true } else { false }
         )?;
         // Writes a (ptr, len) pair with relocation for this function's trap table
         write_relocated_slice(
@@ -80,6 +88,7 @@ pub fn write_function_manifest(
             &manifest_sym,
             &trap_sym_for_func(fn_name),
             fn_spec.traps_len() as u64,
+            false,
         )?;
     }
 
