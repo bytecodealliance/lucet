@@ -16,6 +16,8 @@ fn write_relocated_slice(
     imported: bool,
 ) -> Result<(), Error> {
     if len > 0 {
+        assert!(!imported, "imported data cannot have local data as well");
+
         obj.link(Link {
             from, // the data at `from` + `at` (eg. manifest_sym)
             to,   // is a reference to `to`    (eg. fn_name)
