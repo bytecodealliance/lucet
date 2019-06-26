@@ -64,9 +64,9 @@ mod module_data {
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
-        assert_eq!(mdata.import_functions().len(), 4);
+        assert_eq!(mdata.import_functions().len(), 2);
         assert_eq!(mdata.export_functions().len(), 1);
-        assert_eq!(mdata.function_info().len(), 6);
+        assert_eq!(mdata.function_info().len(), 4);
         assert_eq!(mdata.export_functions()[0].names, vec!["exported_inc"]);
     }
 
@@ -133,8 +133,9 @@ mod module_data {
         assert_eq!(mdata.function_info()[0].name, Some("host_read"));
         assert_eq!(mdata.function_info()[1].name, Some("host_write"));
         assert_eq!(mdata.function_info()[2].name, Some("guest_func__start"));
-        assert_eq!(mdata.export_functions().len(), 1);
-        assert_eq!(mdata.export_functions()[0].names, ["_start"]);
+        assert_eq!(mdata.export_functions().len(), 3);
+        assert_eq!(mdata.export_functions()[0].names, ["read_2", "read"]);
+        assert_eq!(mdata.export_functions()[2].names, ["_start"]);
         assert_eq!(mdata.globals_spec().len(), 0);
     }
 
