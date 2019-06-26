@@ -145,7 +145,6 @@ impl<'a> ModuleDecls<'a> {
                         fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                         module: import_mod,
                         name: import_field,
-                        mapped_to: Some(import_symbol),
                     });
                     Ok(Some(import_symbol.to_string()))
                 } else {

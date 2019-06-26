@@ -1,13 +1,10 @@
-use crate::alloc;
 use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
-use libloading::os::unix;
 use libloading::{Library, Symbol};
 use lucet_module_data::{
     FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, Signature,
 };
-use nix::sys::mman::ProtFlags;
 use std::ffi::CStr;
 use std::mem;
 use std::path::Path;
@@ -76,22 +73,22 @@ impl DlModule {
 
         let function_manifest = unsafe {
             let manifest_len_ptr = lib.get::<*const u32>(b"lucet_function_manifest_len");
-            let manifest_ptr = lib.get::<*mut FunctionSpec>(b"lucet_function_manifest");
+            let manifest_ptr = lib.get::<*const FunctionSpec>(b"lucet_function_manifest");
 
             match (manifest_ptr, manifest_len_ptr) {
                 (Ok(ptr), Ok(len_ptr)) => {
                     let manifest_len = len_ptr.as_ref().ok_or(lucet_incorrect_module!(
                         "`lucet_function_manifest_len` is defined but null"
                     ))?;
-                    let manifest = ptr.as_mut().ok_or(lucet_incorrect_module!(
+                    let manifest = ptr.as_ref().ok_or(lucet_incorrect_module!(
                         "`lucet_function_manifest` is defined but null"
                     ))?;
 
-                    std::slice::from_raw_parts_mut(manifest, *manifest_len as usize)
+                    from_raw_parts(manifest, *manifest_len as usize)
                 }
                 (Err(ptr_err), Err(len_err)) => {
                     if is_undefined_symbol(&ptr_err) && is_undefined_symbol(&len_err) {
-                        &mut []
+                        &[]
                     } else {
                         // This is an unfortunate situation. Both attempts to look up symbols
                         // failed, but at least one is not due to an undefined symbol.
