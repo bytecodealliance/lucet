@@ -974,7 +974,6 @@ dependencies = [
  "human-size 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module-data 0.1.0",
- "lucet-wasi-sdk 0.1.0",
  "minisign 0.5.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "parity-wasm 0.35.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.93 (registry+https://github.com/rust-lang/crates.io-index)",
