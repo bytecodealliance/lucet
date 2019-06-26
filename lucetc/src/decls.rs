@@ -227,10 +227,9 @@ impl<'a> ModuleDecls<'a> {
             .context(LucetcErrorKind::TranslatingModule)?;
 
         if func_ix.as_u32() as usize >= self.function_names.len() {
-            // func_ix is new, so we need to add the name
-            //
-            // if func_ix is new, it should be an index for the Name we're about to add. So, it
-            // should be the same as the current value for `self.function_names.len()`.
+            // `func_ix` is new, so we need to add the name. If func_ix is new, it should be
+            // an index for the Name we're about to add. That is, it should be the same as the
+            // current value for `self.function_names.len()`.
             //
             // If this fails, we're declaring functions out of order. oops!
             debug_assert!(func_ix.as_u32() as usize == self.function_names.len());
