@@ -1,8 +1,12 @@
 [package]
 name = "lucet-module-data"
 version = "0.1.0"
-authors = ["Pat Hickey <phickey@fastly.com>"]
+description = "A structured interface for Lucet module data and metadata"
+homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Pat Hickey <phickey@fastly.com>"]
 edition = "2018"
 
 [dependencies]
