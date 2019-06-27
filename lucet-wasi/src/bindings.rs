@@ -1,4 +1,4 @@
-use lucetc::Bindings;
+use lucet_module_data::bindings::Bindings;
 
 pub fn bindings() -> Bindings {
     Bindings::from_str(include_str!("../bindings.json")).expect("lucet-wasi bindings.json is valid")

@@ -1,6 +1,5 @@
 #![deny(bare_trait_objects)]
 
-mod bindings;
 mod compiler;
 mod decls;
 mod error;
@@ -22,7 +21,6 @@ mod traps;
 
 use crate::load::read_bytes;
 pub use crate::{
-    bindings::Bindings,
     compiler::Compiler,
     compiler::OptLevel,
     error::{LucetcError, LucetcErrorKind},
@@ -31,6 +29,7 @@ pub use crate::{
     patch::patch_module,
 };
 use failure::{format_err, Error, ResultExt};
+pub use lucet_module_data::bindings::Bindings;
 use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};
