@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! strcmp_tests {
     ( $TestRegion:path ) => {
-        use libc::{c_char, c_int, c_void, strcmp, uint64_t};
+        use libc::{c_char, c_int, c_void, strcmp};
         use lucet_runtime::vmctx::lucet_vmctx;
         use lucet_runtime::{lucet_hostcalls, Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use std::ffi::CString;

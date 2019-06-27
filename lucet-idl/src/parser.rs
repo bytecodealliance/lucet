@@ -1,5 +1,5 @@
 use super::lexer::{LexError, Lexer, LocatedError, LocatedToken, Token};
-use super::types::{AtomType, Attr, Location};
+use super::types::{AtomType, Location};
 use std::error::Error;
 use std::fmt;
 
@@ -8,32 +8,27 @@ pub enum SyntaxDecl {
     Struct {
         name: String,
         members: Vec<StructMember>,
-        attrs: Vec<Attr>,
         location: Location,
     },
     Enum {
         name: String,
         variants: Vec<EnumVariant>,
-        attrs: Vec<Attr>,
         location: Location,
     },
     Alias {
         name: String,
         what: SyntaxRef,
-        attrs: Vec<Attr>,
         location: Location,
     },
     Module {
         name: String,
         decls: Vec<SyntaxDecl>,
-        attrs: Vec<Attr>,
         location: Location,
     },
     Function {
         name: String,
         args: Vec<FuncArgSyntax>,
         rets: Vec<FuncRetSyntax>,
-        attrs: Vec<Attr>,
         location: Location,
     },
 }
@@ -75,14 +70,12 @@ pub enum SyntaxRef {
 pub struct StructMember {
     pub name: String,
     pub type_: SyntaxRef,
-    pub attrs: Vec<Attr>,
     pub location: Location,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EnumVariant {
     pub name: String,
-    pub attrs: Vec<Attr>,
     pub location: Location,
 }
 
@@ -90,14 +83,12 @@ pub struct EnumVariant {
 pub struct FuncArgSyntax {
     pub name: String,
     pub type_: SyntaxRef,
-    pub attrs: Vec<Attr>,
     pub location: Location,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FuncRetSyntax {
     pub type_: SyntaxRef,
-    pub attrs: Vec<Attr>,
     pub location: Location,
 }
 
@@ -205,33 +196,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn match_attr_body(&mut self) -> Result<Attr, ParseError> {
-        let location = self.location;
-        self.match_token(Token::LBracket, "expected attribute start [")?;
-        let key = self.match_a_word("expected attribute key")?;
-        self.match_token(Token::Equals, "expected =")?;
-        let val = match self.token() {
-            Some(Token::Word(text)) => text,
-            Some(Token::Quote(text)) => text,
-            _ => parse_err!(self.location, "expected word or quoted string")?,
-        };
-        self.consume();
-        self.match_token(Token::RBracket, "expected ]")?;
-        Ok(Attr::new(key, val, location))
-    }
-
     fn match_struct_body(&mut self) -> Result<Vec<StructMember>, ParseError> {
         let mut members = Vec::new();
-        let mut attrs = Vec::new();
         loop {
             match self.token() {
                 Some(Token::RBrace) => {
                     self.consume();
                     break;
-                }
-                Some(Token::Hash) => {
-                    self.consume();
-                    attrs.push(self.match_attr_body()?);
                 }
                 Some(Token::Word(member_name)) => {
                     let location = self.location;
@@ -241,10 +212,8 @@ impl<'a> Parser<'a> {
                     members.push(StructMember {
                         name: member_name.to_string(),
                         type_: member_ref,
-                        attrs: attrs.clone(),
                         location,
                     });
-                    attrs.clear();
                     match self.token() {
                         Some(Token::Comma) => {
                             self.consume();
@@ -268,26 +237,19 @@ impl<'a> Parser<'a> {
 
     fn match_enum_body(&mut self) -> Result<Vec<EnumVariant>, ParseError> {
         let mut names = Vec::new();
-        let mut attrs = Vec::new();
         loop {
             match self.token() {
                 Some(Token::RBrace) => {
                     self.consume();
                     break;
                 }
-                Some(Token::Hash) => {
-                    self.consume();
-                    attrs.push(self.match_attr_body()?);
-                }
                 Some(Token::Word(name)) => {
                     let location = self.location;
                     self.consume();
                     names.push(EnumVariant {
                         name: name.to_owned(),
-                        attrs: attrs.clone(),
                         location,
                     });
-                    attrs.clear();
                     match self.token() {
                         Some(Token::Comma) => {
                             self.consume();
@@ -303,24 +265,16 @@ impl<'a> Parser<'a> {
                 _ => parse_err!(self.location, "expected variant")?,
             }
         }
-        if !attrs.is_empty() {
-            parse_err!(self.location, "attributes unattached to an enum variant")?
-        }
         Ok(names)
     }
 
     fn match_func_args(&mut self) -> Result<Vec<FuncArgSyntax>, ParseError> {
         let mut args = Vec::new();
-        let mut attrs = Vec::new();
         loop {
             match self.token() {
                 Some(Token::RPar) => {
                     self.consume();
                     break;
-                }
-                Some(Token::Hash) => {
-                    self.consume();
-                    attrs.push(self.match_attr_body()?);
                 }
                 Some(Token::Word(name)) => {
                     let location = self.location;
@@ -331,10 +285,8 @@ impl<'a> Parser<'a> {
                     args.push(FuncArgSyntax {
                         name: name.to_string(),
                         type_: type_ref,
-                        attrs: attrs.clone(),
                         location,
                     });
-                    attrs.clear();
                     match self.token() {
                         Some(Token::Comma) => {
                             self.consume();
@@ -350,37 +302,24 @@ impl<'a> Parser<'a> {
                 _ => parse_err!(self.location, "expected argument, or )")?,
             }
         }
-        if !attrs.is_empty() {
-            parse_err!(
-                self.location,
-                "attributes unattached to a function argument"
-            )?
-        }
         Ok(args)
     }
 
     fn match_func_rets(&mut self) -> Result<Vec<FuncRetSyntax>, ParseError> {
         let mut args = Vec::new();
-        let mut attrs = Vec::new();
         loop {
             match self.token() {
                 Some(Token::Semi) => {
                     self.consume();
                     break;
                 }
-                Some(Token::Hash) => {
-                    self.consume();
-                    attrs.push(self.match_attr_body()?);
-                }
                 _ => {
                     let location = self.location;
                     let type_ref = self.match_ref("expected type, attribute, or ;")?;
                     args.push(FuncRetSyntax {
                         type_: type_ref,
-                        attrs: attrs.clone(),
                         location,
                     });
-                    attrs.clear();
                     match self.token() {
                         Some(Token::Comma) => {
                             self.consume();
@@ -395,17 +334,10 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        if !attrs.is_empty() {
-            parse_err!(
-                self.location,
-                "attributes unattached to a function return type"
-            )?
-        }
         Ok(args)
     }
 
     pub fn match_decl(&mut self, err_msg: &str) -> Result<Option<SyntaxDecl>, ParseError> {
-        let mut attrs = Vec::new();
         loop {
             match self.token() {
                 Some(Token::Word("struct")) => {
@@ -417,7 +349,6 @@ impl<'a> Parser<'a> {
                     return Ok(Some(SyntaxDecl::Struct {
                         name: name.to_owned(),
                         members,
-                        attrs,
                         location,
                     }));
                 }
@@ -430,7 +361,6 @@ impl<'a> Parser<'a> {
                     return Ok(Some(SyntaxDecl::Enum {
                         name: name.to_owned(),
                         variants,
-                        attrs,
                         location,
                     }));
                 }
@@ -444,7 +374,6 @@ impl<'a> Parser<'a> {
                     return Ok(Some(SyntaxDecl::Alias {
                         name: name.to_owned(),
                         what,
-                        attrs,
                         location,
                     }));
                 }
@@ -471,7 +400,6 @@ impl<'a> Parser<'a> {
                     return Ok(Some(SyntaxDecl::Module {
                         name: name.to_owned(),
                         decls,
-                        attrs,
                         location,
                     }));
                 }
@@ -502,14 +430,8 @@ impl<'a> Parser<'a> {
                         name: name.to_owned(),
                         args,
                         rets,
-                        attrs,
                         location,
                     }));
-                }
-                Some(Token::Hash) => {
-                    self.consume();
-                    attrs.push(self.match_attr_body()?);
-                    continue;
                 }
                 Some(_) => {
                     return parse_err!(
@@ -519,9 +441,6 @@ impl<'a> Parser<'a> {
                     )
                 }
                 None => {
-                    if !attrs.is_empty() {
-                        parse_err!(self.location, "attributes unattached to a declaration")?
-                    }
                     return Ok(None);
                 }
             }
@@ -577,7 +496,6 @@ mod tests {
             SyntaxDecl::Struct {
                 name: "foo".to_string(),
                 members: Vec::new(),
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
         );
@@ -602,13 +520,11 @@ mod tests {
                             column: 15,
                         },
                     },
-                    attrs: Vec::new(),
                     location: Location {
                         line: 1,
                         column: 12,
                     },
                 }],
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
         );
@@ -633,13 +549,11 @@ mod tests {
                             column: 15,
                         },
                     },
-                    attrs: Vec::new(),
                     location: Location {
                         line: 1,
                         column: 12,
                     },
                 }],
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
         );
@@ -665,7 +579,6 @@ mod tests {
                                 column: 14,
                             },
                         },
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 11,
@@ -680,100 +593,12 @@ mod tests {
                                 column: 22,
                             },
                         },
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 19,
                         },
                     },
                 ],
-                attrs: Vec::new(),
-                location: Location { line: 1, column: 0 },
-            }
-        );
-    }
-    #[test]
-    fn struct_empty_one_attribute() {
-        // Test out attributes:
-        let mut parser = Parser::new("#[key1=val1] struct foo {}");
-        assert_eq!(
-            parser
-                .match_decl("empty struct")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Struct {
-                name: "foo".to_string(),
-                members: Vec::new(),
-                attrs: vec![Attr::new("key1", "val1", Location { line: 1, column: 0 })],
-                location: Location {
-                    line: 1,
-                    column: 13,
-                },
-            }
-        );
-    }
-    #[test]
-    fn struct_empty_one_attribute_with_spaces() {
-        let mut parser = Parser::new("#[key2=\"1 value with spaces!\"]\nstruct foo {}");
-        assert_eq!(
-            parser
-                .match_decl("empty struct")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Struct {
-                name: "foo".to_string(),
-                members: Vec::new(),
-                attrs: vec![Attr::new(
-                    "key2",
-                    "1 value with spaces!",
-                    Location { line: 1, column: 0 },
-                )],
-                location: Location { line: 2, column: 0 },
-            }
-        );
-    }
-    #[test]
-    fn struct_empty_multiple_attributes() {
-        let mut parser = Parser::new("#[key1=val1]\n\t#[key2 = \"val2\"   ]\nstruct foo {}");
-        assert_eq!(
-            parser
-                .match_decl("empty struct")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Struct {
-                name: "foo".to_string(),
-                members: Vec::new(),
-                attrs: vec![
-                    Attr::new("key1", "val1", Location { line: 1, column: 0 }),
-                    Attr::new("key2", "val2", Location { line: 2, column: 8 }),
-                ],
-                location: Location { line: 3, column: 0 },
-            }
-        );
-    }
-    #[test]
-    fn struct_member_attribute() {
-        let mut parser = Parser::new("struct foo {\n\t#[key=val]\n\tmem: f32,\n}");
-        assert_eq!(
-            parser
-                .match_decl("empty struct")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Struct {
-                name: "foo".to_string(),
-                members: vec![StructMember {
-                    name: "mem".to_owned(),
-                    type_: SyntaxRef::Atom {
-                        atom: AtomType::F32,
-                        location: Location {
-                            line: 3,
-                            column: 13,
-                        },
-                    },
-                    attrs: vec![Attr::new("key", "val", Location { line: 2, column: 8 })],
-                    location: Location { line: 3, column: 8 },
-                }],
-                attrs: Vec::new(), //
                 location: Location { line: 1, column: 0 },
             }
         );
@@ -800,7 +625,6 @@ mod tests {
                                 column: 15,
                             },
                         },
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 12,
@@ -815,14 +639,12 @@ mod tests {
                                 column: 28,
                             },
                         },
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 20,
                         },
                     }
                 ],
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
         );
@@ -839,7 +661,6 @@ mod tests {
             SyntaxDecl::Enum {
                 name: "foo".to_owned(),
                 variants: Vec::new(),
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             },
         );
@@ -857,13 +678,11 @@ mod tests {
                 name: "foo".to_owned(),
                 variants: vec![EnumVariant {
                     name: "first".to_owned(),
-                    attrs: Vec::new(),
                     location: Location {
                         line: 1,
                         column: 10,
                     },
                 }],
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             },
         );
@@ -881,60 +700,16 @@ mod tests {
                 name: "bar".to_owned(),
                 variants: vec![EnumVariant {
                     name: "first".to_owned(),
-                    attrs: Vec::new(),
                     location: Location {
                         line: 1,
                         column: 10,
                     },
                 }],
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             },
         );
     }
-    #[test]
-    fn enum_one_entry_with_attr() {
-        let mut parser = Parser::new("enum bar { #[a=b] first}");
-        //                            0    5    10
-        assert_eq!(
-            parser
-                .match_decl("one entry enum, no trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Enum {
-                name: "bar".to_owned(),
-                variants: vec![EnumVariant {
-                    name: "first".to_owned(),
-                    attrs: vec![Attr::new(
-                        "a",
-                        "b",
-                        Location {
-                            line: 1,
-                            column: 11
-                        }
-                    ),],
-                    location: Location {
-                        line: 1,
-                        column: 18,
-                    },
-                }],
-                attrs: Vec::new(),
-                location: Location { line: 1, column: 0 },
-            },
-        );
-    }
-    #[test]
-    fn enum_one_entry_trailing_attr() {
-        assert!(Parser::new("enum bar { #[a=b] first, #[c=d] }")
-            .match_decl("one entry enum")
-            .is_err());
-    }
-    #[test]
-    fn enum_no_entry_attr() {
-        assert!(Parser::new("enum bar { #[c=d] }")
-            .match_decl("zero entry enum")
-            .is_err());
-    }
+
     #[test]
     fn enum_four_entry() {
         let mut parser = Parser::new("enum baz { one, two, three\n, four, }");
@@ -949,7 +724,6 @@ mod tests {
                 variants: vec![
                     EnumVariant {
                         name: "one".to_owned(),
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 11,
@@ -957,7 +731,6 @@ mod tests {
                     },
                     EnumVariant {
                         name: "two".to_owned(),
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 16,
@@ -965,7 +738,6 @@ mod tests {
                     },
                     EnumVariant {
                         name: "three".to_owned(),
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 21,
@@ -973,11 +745,9 @@ mod tests {
                     },
                     EnumVariant {
                         name: "four".to_owned(),
-                        attrs: Vec::new(),
                         location: Location { line: 2, column: 2 },
                     },
                 ],
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             },
         );
@@ -995,7 +765,6 @@ mod tests {
             SyntaxDecl::Module {
                 name: "empty".to_owned(),
                 decls: Vec::new(),
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
         );
@@ -1017,19 +786,16 @@ mod tests {
                     decls: vec![SyntaxDecl::Module {
                         name: "three".to_owned(),
                         decls: Vec::new(),
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 20
                         },
                     }],
-                    attrs: Vec::new(),
                     location: Location {
                         line: 1,
                         column: 10
                     },
                 }],
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
         );
@@ -1050,7 +816,6 @@ mod tests {
                     SyntaxDecl::Enum {
                         name: "foo".to_owned(),
                         variants: Vec::new(),
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 10
@@ -1059,59 +824,13 @@ mod tests {
                     SyntaxDecl::Struct {
                         name: "bar".to_owned(),
                         members: Vec::new(),
-                        attrs: Vec::new(),
                         location: Location {
                             line: 1,
                             column: 22
                         },
                     }
                 ],
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
-            }
-        );
-    }
-
-    #[test]
-    fn mod_attrs() {
-        let mut parser = Parser::new("#[a=b]\nmod one { #[c=d] enum foo {} struct bar {} }");
-        //                                    0    5    10   15   20   25   30
-        assert_eq!(
-            parser
-                .match_decl("module with types")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Module {
-                name: "one".to_owned(),
-                decls: vec![
-                    SyntaxDecl::Enum {
-                        name: "foo".to_owned(),
-                        variants: Vec::new(),
-                        attrs: vec![Attr::new(
-                            "c",
-                            "d",
-                            Location {
-                                line: 2,
-                                column: 10
-                            }
-                        ),],
-                        location: Location {
-                            line: 2,
-                            column: 17
-                        },
-                    },
-                    SyntaxDecl::Struct {
-                        name: "bar".to_owned(),
-                        members: Vec::new(),
-                        attrs: Vec::new(),
-                        location: Location {
-                            line: 2,
-                            column: 29
-                        },
-                    }
-                ],
-                attrs: vec![Attr::new("a", "b", Location { line: 1, column: 0 }),],
-                location: Location { line: 2, column: 0 },
             }
         );
     }
@@ -1122,7 +841,6 @@ mod tests {
             name: "trivial".to_owned(),
             args: Vec::new(),
             rets: Vec::new(),
-            attrs: Vec::new(),
             location: Location { line: 1, column: 0 },
         }];
         assert_eq!(
@@ -1161,13 +879,11 @@ mod tests {
                         column: 14,
                     },
                 },
-                attrs: vec![],
                 location: Location {
                     line: 1,
                     column: 14,
                 },
             }],
-            attrs: Vec::new(),
             location: Location { line: 1, column: 0 },
         }];
         assert_eq!(
@@ -1206,11 +922,9 @@ mod tests {
                     },
                 },
                 name: "a".to_owned(),
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 7 },
             }],
             rets: Vec::new(),
-            attrs: Vec::new(),
             location: Location { line: 1, column: 0 },
         };
         assert_eq!(
@@ -1245,7 +959,6 @@ mod tests {
                         },
                     },
                     name: "a".to_owned(),
-                    attrs: Vec::new(),
                     location: Location { line: 1, column: 7 },
                 },
                 FuncArgSyntax {
@@ -1257,7 +970,6 @@ mod tests {
                         },
                     },
                     name: "b".to_owned(),
-                    attrs: Vec::new(),
                     location: Location {
                         line: 1,
                         column: 14,
@@ -1265,7 +977,6 @@ mod tests {
                 },
             ],
             rets: Vec::new(),
-            attrs: Vec::new(),
             location: Location { line: 1, column: 0 },
         };
         assert_eq!(
@@ -1306,7 +1017,6 @@ mod tests {
                                 column: 14,
                             },
                         },
-                        attrs: vec![],
                         location: Location {
                             line: 1,
                             column: 14,
@@ -1320,7 +1030,6 @@ mod tests {
                                 column: 18,
                             },
                         },
-                        attrs: vec![],
                         location: Location {
                             line: 1,
                             column: 18,
@@ -1334,99 +1043,12 @@ mod tests {
                                 column: 23,
                             },
                         },
-                        attrs: vec![],
                         location: Location {
                             line: 1,
                             column: 23,
                         },
                     },
                 ],
-                attrs: Vec::new(),
-                location: Location { line: 1, column: 0 },
-            }
-        );
-    }
-
-    #[test]
-    fn fn_many_returns_with_attrs() {
-        assert_eq!(
-            Parser::new("fn getch() -> #[a=b] u8, #[c=d] #[e=f] u16, u32;")
-                //       0    5    10   15   20   25   30   35   40   45
-                .match_decl("returns u8")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Function {
-                name: "getch".to_owned(),
-                args: Vec::new(),
-                rets: vec![
-                    FuncRetSyntax {
-                        type_: SyntaxRef::Atom {
-                            atom: AtomType::U8,
-                            location: Location {
-                                line: 1,
-                                column: 21,
-                            },
-                        },
-                        attrs: vec![Attr::new(
-                            "a",
-                            "b",
-                            Location {
-                                line: 1,
-                                column: 14
-                            }
-                        )],
-                        location: Location {
-                            line: 1,
-                            column: 21,
-                        },
-                    },
-                    FuncRetSyntax {
-                        type_: SyntaxRef::Atom {
-                            atom: AtomType::U16,
-                            location: Location {
-                                line: 1,
-                                column: 39,
-                            },
-                        },
-                        attrs: vec![
-                            Attr::new(
-                                "c",
-                                "d",
-                                Location {
-                                    line: 1,
-                                    column: 25
-                                }
-                            ),
-                            Attr::new(
-                                "e",
-                                "f",
-                                Location {
-                                    line: 1,
-                                    column: 32
-                                }
-                            ),
-                        ],
-                        location: Location {
-                            line: 1,
-                            column: 39,
-                        },
-                    },
-                    FuncRetSyntax {
-                        type_: SyntaxRef::Atom {
-                            atom: AtomType::U32,
-                            location: Location {
-                                line: 1,
-                                column: 44,
-                            },
-                        },
-                        attrs: vec![],
-                        location: Location {
-                            line: 1,
-                            column: 44,
-                        },
-                    },
-                ],
-                attrs: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
         );
