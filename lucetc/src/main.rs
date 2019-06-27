@@ -3,11 +3,11 @@ mod options;
 use crate::options::{CodegenOutput, Options};
 use failure::{format_err, Error, ResultExt};
 use log::info;
+use lucet_module_data::bindings::Bindings;
 use lucetc::{
     signature::{self, PublicKey},
-    Bindings, Lucetc, LucetcOpts,
+    Lucetc, LucetcOpts,
 };
-
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;

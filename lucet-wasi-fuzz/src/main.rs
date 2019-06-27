@@ -2,11 +2,12 @@
 
 use failure::{bail, ensure, format_err, Error};
 use libc::c_ulong;
+use lucet_module_data::bindings::Bindings;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::host::__wasi_exitcode_t;
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
-use lucetc::{Bindings, Lucetc, LucetcOpts};
+use lucetc::{Lucetc, LucetcOpts};
 use rand::prelude::random;
 use rayon::prelude::*;
 use regex::Regex;

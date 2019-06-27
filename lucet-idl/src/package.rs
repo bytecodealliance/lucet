@@ -3,7 +3,7 @@ use crate::module::Module;
 use crate::parser::SyntaxDecl;
 use crate::types::{Ident, Location, Name};
 use heck::SnakeCase;
-use lucetc::Bindings;
+use lucet_module_data::bindings::Bindings;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
