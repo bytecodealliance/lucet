@@ -1,9 +1,13 @@
 [package]
 name = "lucet-wasi"
 version = "0.1.0"
+description = "Fastly's runtime for the WebAssembly System Interface (WASI)"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
 authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
 edition = "2018"
-license = "Apache-2.0 WITH LLVM-exception"
 
 [dependencies]
 cast = "0.2"

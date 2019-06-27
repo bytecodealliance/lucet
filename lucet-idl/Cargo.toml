@@ -2,9 +2,11 @@
 name = "lucet-idl"
 version = "0.1.0"
 description = "Describe interfaces between WebAssembly guest programs and lucet-runtime hosts"
-authors = ["Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>"]
+homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
 license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>"]
 edition = "2018"
 
 [lib]

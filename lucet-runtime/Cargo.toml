@@ -1,10 +1,12 @@
 [package]
 name = "lucet-runtime"
 version = "0.1.0"
-description = "Pure Rust runtime for lucet WebAssembly toolchain"
+description = "Pure Rust runtime for Lucet WebAssembly toolchain"
+homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
-authors = ["Adam C. Foltzer <acfoltzer@fastly.com>", "Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>", "Tyler McMullen <tyler@fastly.com>"]
 license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Adam C. Foltzer <acfoltzer@fastly.com>", "Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>", "Tyler McMullen <tyler@fastly.com>"]
 edition = "2018"
 
 [dependencies]
