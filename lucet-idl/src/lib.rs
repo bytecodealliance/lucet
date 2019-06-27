@@ -3,49 +3,59 @@
 #[macro_use]
 extern crate failure;
 
-mod backend;
 mod c;
-mod cache;
 mod config;
-mod errors;
-mod generator;
+mod data_layout;
+mod error;
 mod lexer;
 mod module;
+mod package;
 mod parser;
 mod pretty_writer;
 mod rust;
-mod target;
 mod types;
 
-pub use crate::backend::{Backend, BackendConfig};
-pub use crate::config::Config;
-pub use crate::errors::IDLError;
-pub use crate::target::Target;
+pub use crate::config::{Backend, Config};
+pub use crate::error::IDLError;
+pub use crate::module::Module;
+pub use crate::package::Package;
+pub use crate::types::{
+    AliasDataType, AtomType, Attr, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl,
+    FuncRet, Ident, Location, Name, Named, StructDataType, StructMember,
+};
 
-use crate::cache::Cache;
-use crate::module::Module;
+use crate::c::CGenerator;
 use crate::parser::Parser;
-use crate::pretty_writer::PrettyWriter;
+use crate::rust::RustGenerator;
+use lucetc::Bindings;
 use std::io::Write;
 
-pub fn run<W: Write>(config: &Config, input: &str, output: W) -> Result<W, IDLError> {
+pub fn parse_package(input: &str) -> Result<Package, IDLError> {
     let mut parser = Parser::new(&input);
     let decls = parser.match_decls()?;
+    let pkg = Package::from_declarations(&decls)?;
+    Ok(pkg)
+}
 
-    let module = Module::from_declarations(&decls)?;
-    let deps = module
-        .ordered_dependencies()
-        .map_err(|_| IDLError::InternalError("Unable to resolve dependencies"))?;
-
-    let mut cache = Cache::default();
-    let mut generator = config.generator();
-
-    let mut pretty_writer = PrettyWriter::new(output);
-    generator.gen_prelude(&mut pretty_writer)?;
-    for id in deps {
-        generator.gen_for_id(&module, &mut cache, &mut pretty_writer, id)?;
+pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Result<(), IDLError> {
+    match config.backend {
+        Backend::CGuest => CGenerator::new(output).generate_guest(package)?,
+        Backend::RustGuest => RustGenerator::new(output).generate_guest(package)?,
+        Backend::RustHost => RustGenerator::new(output).generate_host(package)?,
+        Backend::Bindings => generate_bindings(&package.bindings(), output)?,
     }
-    Ok(pretty_writer
-        .into_inner()
-        .expect("outermost pretty_writer can unwrap"))
+    Ok(())
+}
+
+pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
+    let pkg = parse_package(input)?;
+    codegen(&pkg, config, output)
+}
+
+fn generate_bindings(bindings: &Bindings, mut output: Box<dyn Write>) -> Result<(), IDLError> {
+    let bindings_json = bindings
+        .to_string()
+        .map_err(|_| IDLError::InternalError("bindings generation"))?;
+    output.write_all(bindings_json.as_bytes())?;
+    Ok(())
 }

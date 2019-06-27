@@ -13,11 +13,11 @@ human-size = "0.4"
 libc = "=0.2.54"
 lucet-runtime = { path = "../lucet-runtime" }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals" }
+lucetc = { path = "../lucetc" }
 nix = "0.13"
 rand = "0.6"
 
 [dev-dependencies]
-lucetc = { path = "../lucetc" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 tempfile = "3.0"
 
@@ -38,7 +38,6 @@ assets = [
     ["target/release/liblucet_wasi.rlib", "/opt/fst-lucet-wasi/lib/", "644"],
     ["target/release/liblucet_wasi.so", "/opt/fst-lucet-wasi/lib/", "755"],
     ["include/*.h", "/opt/fst-lucet-wasi/include/", "644"],
-    ["README.md", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
     ["LICENSE", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
     ["LICENSE.wasmtime", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
     ["LICENSE.cloudabi-utils", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
