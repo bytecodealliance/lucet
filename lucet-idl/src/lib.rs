@@ -20,7 +20,7 @@ pub use crate::error::IDLError;
 pub use crate::module::Module;
 pub use crate::package::Package;
 pub use crate::types::{
-    AliasDataType, AtomType, Attr, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl,
+    AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl,
     FuncRet, Ident, Location, Name, Named, StructDataType, StructMember,
 };
 

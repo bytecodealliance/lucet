@@ -4,8 +4,7 @@ use crate::data_layout::{
 use crate::error::ValidationError;
 use crate::parser::{SyntaxDecl, SyntaxRef};
 use crate::types::{
-    Attr, DataType, DataTypeRef, EnumMember, FuncArg, FuncDecl, FuncRet, Ident, Location, Name,
-    Named,
+    DataType, DataTypeRef, EnumMember, FuncArg, FuncDecl, FuncRet, Ident, Location, Name, Named,
 };
 use heck::SnakeCase;
 use std::collections::HashMap;
@@ -13,7 +12,6 @@ use std::collections::HashMap;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Module {
     pub names: Vec<Name>,
-    pub attrs: Vec<Attr>,
     pub data_types: HashMap<Ident, DataType>,
     pub data_type_ordering: Vec<Ident>,
     pub funcs: HashMap<Ident, FuncDecl>,
@@ -22,10 +20,9 @@ pub struct Module {
 }
 
 impl Module {
-    fn new(attrs: &[Attr], module_name: String, binding_prefix: String) -> Self {
+    fn new(module_name: String, binding_prefix: String) -> Self {
         Self {
             names: Vec::new(),
-            attrs: attrs.to_vec(),
             data_types: HashMap::new(),
             data_type_ordering: Vec::new(),
             funcs: HashMap::new(),
@@ -92,7 +89,6 @@ impl Module {
             SyntaxDecl::Struct {
                 name,
                 members,
-                attrs,
                 location,
             } => {
                 let mut uniq_membs = HashMap::new();
@@ -119,7 +115,6 @@ impl Module {
                     dtype_members.push(StructMemberIR {
                         type_,
                         name: mem.name.clone(),
-                        attrs: mem.attrs.clone(),
                     })
                 }
 
@@ -128,14 +123,12 @@ impl Module {
                     VariantIR::Struct(StructIR {
                         members: dtype_members,
                     }),
-                    attrs.clone(),
                     location.clone(),
                 );
             }
             SyntaxDecl::Enum {
                 name,
                 variants,
-                attrs,
                 location,
             } => {
                 let mut uniq_vars = HashMap::new();
@@ -158,7 +151,6 @@ impl Module {
                     // build the struct with this as the member:
                     dtype_members.push(EnumMember {
                         name: var.name.clone(),
-                        attrs: var.attrs.clone(),
                     })
                 }
                 data_types_ir.define(
@@ -166,29 +158,17 @@ impl Module {
                     VariantIR::Enum(EnumIR {
                         members: dtype_members,
                     }),
-                    attrs.clone(),
                     location.clone(),
                 );
             }
-            SyntaxDecl::Alias {
-                what,
-                attrs,
-                location,
-                ..
-            } => {
+            SyntaxDecl::Alias { what, location, .. } => {
                 let to = self.get_ref(what)?;
-                data_types_ir.define(
-                    id,
-                    VariantIR::Alias(AliasIR { to }),
-                    attrs.clone(),
-                    location.clone(),
-                );
+                data_types_ir.define(id, VariantIR::Alias(AliasIR { to }), location.clone());
             }
             SyntaxDecl::Function {
                 name,
                 args,
                 rets,
-                attrs,
                 location,
                 ..
             } => {
@@ -209,7 +189,6 @@ impl Module {
                         Ok(FuncArg {
                             name: arg_syntax.name.clone(),
                             type_,
-                            attrs: arg_syntax.attrs.clone(),
                         })
                     })
                     .collect::<Result<Vec<FuncArg>, _>>()?;
@@ -218,10 +197,7 @@ impl Module {
                     .iter()
                     .map(|ret_syntax| {
                         let type_ = self.get_ref(&ret_syntax.type_)?;
-                        Ok(FuncRet {
-                            type_,
-                            attrs: ret_syntax.attrs.clone(),
-                        })
+                        Ok(FuncRet { type_ })
                     })
                     .collect::<Result<Vec<FuncRet>, _>>()?;
                 if rets.len() > 1 {
@@ -235,7 +211,6 @@ impl Module {
                 let decl = FuncDecl {
                     args,
                     rets,
-                    attrs: attrs.clone(),
                     field_name: name.clone(),
                     binding_name,
                 };
@@ -250,11 +225,10 @@ impl Module {
 
     pub fn from_declarations(
         decls: &[SyntaxDecl],
-        attrs: &[Attr],
         module_name: String,
         binding_prefix: String,
     ) -> Result<Module, ValidationError> {
-        let mut mod_ = Self::new(attrs, module_name, binding_prefix);
+        let mut mod_ = Self::new(module_name, binding_prefix);
         let mut idents: Vec<Ident> = Vec::new();
         for decl in decls {
             match decl {
@@ -357,18 +331,15 @@ mod tests {
                             StructMember {
                                 name: "a".to_owned(),
                                 type_: DataTypeRef::Atom(AtomType::I32),
-                                attrs: Vec::new(),
                                 offset: 0,
                             },
                             StructMember {
                                 name: "b".to_owned(),
                                 type_: DataTypeRef::Atom(AtomType::F32),
-                                attrs: Vec::new(),
                                 offset: 4,
                             },
                         ]
                     }),
-                    attrs: Vec::new(),
                     repr_size: 8,
                     align: 4,
                 }
@@ -547,7 +518,6 @@ mod tests {
                     FuncDecl {
                         args: Vec::new(),
                         rets: Vec::new(),
-                        attrs: Vec::new(),
                         binding_name: "_trivial".to_owned(),
                         field_name: "trivial".to_owned(),
                     }
@@ -556,7 +526,6 @@ mod tests {
                 .collect::<HashMap<_, _>>(),
                 data_types: HashMap::new(),
                 data_type_ordering: Vec::new(),
-                attrs: Vec::new(),
                 module_name: String::new(),
                 binding_prefix: String::new(),
             }
@@ -577,10 +546,8 @@ mod tests {
                         args: vec![FuncArg {
                             type_: DataTypeRef::Atom(AtomType::U8),
                             name: "a".to_owned(),
-                            attrs: Vec::new(),
                         }],
                         rets: Vec::new(),
-                        attrs: Vec::new(),
                         binding_name: "_trivial".to_owned(),
                         field_name: "trivial".to_owned(),
                     }
@@ -589,7 +556,6 @@ mod tests {
                 .collect::<HashMap<_, _>>(),
                 data_types: HashMap::new(),
                 data_type_ordering: Vec::new(),
-                attrs: Vec::new(),
                 module_name: String::new(),
                 binding_prefix: String::new(),
             }
@@ -611,9 +577,7 @@ mod tests {
                         args: Vec::new(),
                         rets: vec![FuncRet {
                             type_: DataTypeRef::Atom(AtomType::U8),
-                            attrs: Vec::new(),
                         }],
-                        attrs: Vec::new(),
                         binding_name: "_trivial".to_owned(),
                         field_name: "trivial".to_owned(),
                     }
@@ -622,7 +586,6 @@ mod tests {
                 .collect::<HashMap<_, _>>(),
                 data_types: HashMap::new(),
                 data_type_ordering: Vec::new(),
-                attrs: Vec::new(),
                 module_name: String::new(),
                 binding_prefix: String::new(),
             }
@@ -650,9 +613,7 @@ mod tests {
                         args: Vec::new(),
                         rets: vec![FuncRet {
                             type_: DataTypeRef::Defined(Ident(1)),
-                            attrs: Vec::new(),
                         }],
-                        attrs: Vec::new(),
                         binding_name: "_trivial".to_owned(),
                         field_name: "trivial".to_owned(),
                     }
@@ -665,7 +626,6 @@ mod tests {
                         variant: DataTypeVariant::Alias(AliasDataType {
                             to: DataTypeRef::Atom(AtomType::U8),
                         }),
-                        attrs: Vec::new(),
                         repr_size: 1,
                         align: 1,
                     }
@@ -673,7 +633,6 @@ mod tests {
                 .into_iter()
                 .collect::<HashMap<_, _>>(),
                 data_type_ordering: vec![Ident(1)],
-                attrs: Vec::new(),
                 module_name: String::new(),
                 binding_prefix: String::new(),
             }
