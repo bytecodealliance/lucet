@@ -204,9 +204,6 @@ impl<'a> Parser<'a> {
                     self.consume();
                     break;
                 }
-                Some(Token::Hash) => {
-                    self.consume();
-                }
                 Some(Token::Word(member_name)) => {
                     let location = self.location;
                     self.consume();
@@ -246,9 +243,6 @@ impl<'a> Parser<'a> {
                     self.consume();
                     break;
                 }
-                Some(Token::Hash) => {
-                    self.consume();
-                }
                 Some(Token::Word(name)) => {
                     let location = self.location;
                     self.consume();
@@ -281,9 +275,6 @@ impl<'a> Parser<'a> {
                 Some(Token::RPar) => {
                     self.consume();
                     break;
-                }
-                Some(Token::Hash) => {
-                    self.consume();
                 }
                 Some(Token::Word(name)) => {
                     let location = self.location;
@@ -321,9 +312,6 @@ impl<'a> Parser<'a> {
                 Some(Token::Semi) => {
                     self.consume();
                     break;
-                }
-                Some(Token::Hash) => {
-                    self.consume();
                 }
                 _ => {
                     let location = self.location;
@@ -444,10 +432,6 @@ impl<'a> Parser<'a> {
                         rets,
                         location,
                     }));
-                }
-                Some(Token::Hash) => {
-                    self.consume();
-                    continue;
                 }
                 Some(_) => {
                     return parse_err!(
