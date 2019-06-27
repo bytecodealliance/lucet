@@ -27,6 +27,48 @@ impl AtomType {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum AbiType {
+    I32,
+    I64,
+    F32,
+    F64,
+}
+
+impl AbiType {
+    pub fn repr_size(&self) -> usize {
+        match self {
+            AbiType::I32 | AbiType::F32 => 4,
+            AbiType::I64 | AbiType::F64 => 8,
+        }
+    }
+
+    pub fn from_atom<A: AsRef<AtomType>>(a: A) -> Self {
+        match a.as_ref() {
+            AtomType::Bool
+            | AtomType::U8
+            | AtomType::I8
+            | AtomType::U16
+            | AtomType::I16
+            | AtomType::U32
+            | AtomType::I32 => AbiType::I32,
+            AtomType::I64 | AtomType::U64 => AbiType::I64,
+            AtomType::F32 => AbiType::F32,
+            AtomType::F64 => AbiType::F64,
+        }
+    }
+
+    pub fn of_atom(a: AtomType) -> Option<Self> {
+        match a {
+            AtomType::I32 => Some(AbiType::I32),
+            AtomType::I64 => Some(AbiType::I64),
+            AtomType::F32 => Some(AbiType::F32),
+            AtomType::F64 => Some(AbiType::F64),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 pub struct Location {
     pub line: usize,
@@ -91,7 +133,7 @@ pub struct DataType {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FuncArg {
-    pub type_: DataTypeRef,
+    pub type_: AbiType,
     pub name: String,
 }
 
@@ -100,12 +142,7 @@ pub struct FuncDecl {
     pub field_name: String,
     pub binding_name: String,
     pub args: Vec<FuncArg>,
-    pub rets: Vec<FuncRet>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FuncRet {
-    pub type_: DataTypeRef,
+    pub rets: Vec<FuncArg>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

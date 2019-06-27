@@ -25,7 +25,7 @@ mod example {
 
     // functions
 
-    fn set_color(to: color) -> bool;
+    fn set_color(to: i32) -> r: i32;
 
-    fn get_structure(of: color) -> st;
+    fn get_structure(of: i32) -> s: i32;
 }

@@ -1,5 +1,5 @@
 use super::lexer::{LexError, Lexer, LocatedError, LocatedToken, Token};
-use super::types::{AtomType, Location};
+use super::types::{AbiType, AtomType, Location};
 use std::error::Error;
 use std::fmt;
 
@@ -28,7 +28,8 @@ pub enum SyntaxDecl {
     Function {
         name: String,
         args: Vec<FuncArgSyntax>,
-        rets: Vec<FuncRetSyntax>,
+        rets: Vec<FuncArgSyntax>,
+        where_clause: Vec<String>,
         location: Location,
     },
 }
@@ -82,13 +83,7 @@ pub struct EnumVariant {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FuncArgSyntax {
     pub name: String,
-    pub type_: SyntaxRef,
-    pub location: Location,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FuncRetSyntax {
-    pub type_: SyntaxRef,
+    pub type_: AbiType,
     pub location: Location,
 }
 
@@ -280,11 +275,11 @@ impl<'a> Parser<'a> {
                     let location = self.location;
                     self.consume();
                     self.match_token(Token::Colon, "expected :")?;
-                    let type_ref = self.match_ref("expected type")?;
+                    let type_ = self.match_abitype()?;
 
                     args.push(FuncArgSyntax {
                         name: name.to_string(),
-                        type_: type_ref,
+                        type_,
                         location,
                     });
                     match self.token() {
@@ -305,19 +300,21 @@ impl<'a> Parser<'a> {
         Ok(args)
     }
 
-    fn match_func_rets(&mut self) -> Result<Vec<FuncRetSyntax>, ParseError> {
+    fn match_func_rets(&mut self) -> Result<Vec<FuncArgSyntax>, ParseError> {
         let mut args = Vec::new();
         loop {
             match self.token() {
-                Some(Token::Semi) => {
-                    self.consume();
+                Some(Token::Semi) | Some(Token::Word("where")) => {
                     break;
                 }
-                _ => {
+                Some(Token::Word(name)) => {
                     let location = self.location;
-                    let type_ref = self.match_ref("expected type, attribute, or ;")?;
-                    args.push(FuncRetSyntax {
-                        type_: type_ref,
+                    self.consume();
+                    self.match_token(Token::Colon, "expected :")?;
+                    let type_ = self.match_abitype()?;
+                    args.push(FuncArgSyntax {
+                        type_,
+                        name: name.to_string(),
                         location,
                     });
                     match self.token() {
@@ -325,13 +322,13 @@ impl<'a> Parser<'a> {
                             self.consume();
                             continue;
                         }
-                        Some(Token::Semi) => {
-                            self.consume();
+                        Some(Token::Semi) | Some(Token::Word("where")) => {
                             break;
                         }
-                        _ => parse_err!(self.location, "expected , or ;")?,
+                        x => parse_err!(self.location, "expected ',', where, or ;, got {:?}", x)?,
                     }
                 }
+                x => parse_err!(self.location, "expected func return value, got {:?}", x)?,
             }
         }
         Ok(args)
@@ -416,20 +413,33 @@ impl<'a> Parser<'a> {
                             self.consume();
                             err_ctx!(err_msg, self.match_func_rets())?
                         }
+                        Some(Token::Semi) | Some(Token::Word("where")) => Vec::new(),
+                        t => err_ctx!(
+                            err_msg,
+                            parse_err!(self.location, "expected where, -> or ;, got {:?}", t)
+                        )?,
+                    };
+
+                    let where_clause = match self.token() {
                         Some(Token::Semi) => {
                             self.consume();
                             Vec::new()
                         }
-                        t => err_ctx!(
-                            err_msg,
-                            parse_err!(self.location, "expected -> or ;, got {:?}", t)
-                        )?,
+                        Some(Token::Word("where")) => {
+                            self.consume();
+                            unimplemented!()
+                        }
+                        x => unreachable!(
+                            "match func rets didnt leave us with semi or where: {:?}",
+                            x
+                        ),
                     };
 
                     return Ok(Some(SyntaxDecl::Function {
                         name: name.to_owned(),
                         args,
                         rets,
+                        where_clause,
                         location,
                     }));
                 }
@@ -478,6 +488,20 @@ impl<'a> Parser<'a> {
                 err_msg,
                 parse_err!(self.location, "expected atom, or type name")
             ),
+        }
+    }
+
+    fn match_abitype(&mut self) -> Result<AbiType, ParseError> {
+        match self.token() {
+            Some(Token::Atom(atom)) => match AbiType::of_atom(atom) {
+                Some(abitype) => {
+                    self.consume();
+                    Ok(abitype)
+                }
+                None => parse_err!(self.location, "expected abi type, got non-abi atom type"),
+            },
+            Some(Token::Word(w)) => parse_err!(self.location, "expected abi type, got '{}'", w),
+            _ => parse_err!(self.location, "expected abi type"),
         }
     }
 }
@@ -841,6 +865,7 @@ mod tests {
             name: "trivial".to_owned(),
             args: Vec::new(),
             rets: Vec::new(),
+            where_clause: Vec::new(),
             location: Location { line: 1, column: 0 },
         }];
         assert_eq!(
@@ -867,41 +892,37 @@ mod tests {
     }
 
     #[test]
-    fn fn_return_u8() {
+    fn fn_return_i32() {
         let canonical = vec![SyntaxDecl::Function {
             name: "getch".to_owned(),
             args: Vec::new(),
-            rets: vec![FuncRetSyntax {
-                type_: SyntaxRef::Atom {
-                    atom: AtomType::U8,
-                    location: Location {
-                        line: 1,
-                        column: 14,
-                    },
-                },
+            rets: vec![FuncArgSyntax {
+                type_: AbiType::I32,
+                name: "r".to_owned(),
                 location: Location {
                     line: 1,
                     column: 14,
                 },
             }],
+            where_clause: Vec::new(),
             location: Location { line: 1, column: 0 },
         }];
         assert_eq!(
-            Parser::new("fn getch() -> u8;")
+            Parser::new("fn getch() -> r:i32;")
                 //       0    5    10
                 .match_decls()
                 .expect("valid decls"),
             canonical
         );
         assert_eq!(
-            Parser::new("fn getch() -> u8,;")
+            Parser::new("fn getch() -> r: i32,;")
                 //       0    5    10
                 .match_decls()
                 .expect("valid decls"),
             canonical
         );
         assert_eq!(
-            Parser::new("fn getch() -> u8  , ;")
+            Parser::new("fn getch() -> r :i32 , ;")
                 //       0    5    10
                 .match_decls()
                 .expect("valid decls"),
@@ -914,31 +935,26 @@ mod tests {
         let canonical = SyntaxDecl::Function {
             name: "foo".to_owned(),
             args: vec![FuncArgSyntax {
-                type_: SyntaxRef::Atom {
-                    atom: AtomType::U8,
-                    location: Location {
-                        line: 1,
-                        column: 10,
-                    },
-                },
+                type_: AbiType::I32,
                 name: "a".to_owned(),
                 location: Location { line: 1, column: 7 },
             }],
             rets: Vec::new(),
+            where_clause: Vec::new(),
             location: Location { line: 1, column: 0 },
         };
         assert_eq!(
-            Parser::new("fn foo(a: u8);")
+            Parser::new("fn foo(a: i32);")
                 //       0    5    10   15   20    25
-                .match_decl("returns u8")
+                .match_decl("returns i32")
                 .expect("valid parse")
                 .expect("valid decl"),
             canonical
         );
         assert_eq!(
-            Parser::new("fn foo(a: u8,);")
+            Parser::new("fn foo(a: i32,);")
                 //       0    5    10   15   20    25
-                .match_decl("returns u8")
+                .match_decl("returns i32")
                 .expect("valid parse")
                 .expect("valid decl"),
             canonical
@@ -951,46 +967,35 @@ mod tests {
             name: "foo".to_owned(),
             args: vec![
                 FuncArgSyntax {
-                    type_: SyntaxRef::Atom {
-                        atom: AtomType::U8,
-                        location: Location {
-                            line: 1,
-                            column: 10,
-                        },
-                    },
+                    type_: AbiType::I32,
                     name: "a".to_owned(),
                     location: Location { line: 1, column: 7 },
                 },
                 FuncArgSyntax {
-                    type_: SyntaxRef::Atom {
-                        atom: AtomType::F64,
-                        location: Location {
-                            line: 1,
-                            column: 17,
-                        },
-                    },
+                    type_: AbiType::F64,
                     name: "b".to_owned(),
                     location: Location {
                         line: 1,
-                        column: 14,
+                        column: 15,
                     },
                 },
             ],
             rets: Vec::new(),
+            where_clause: Vec::new(),
             location: Location { line: 1, column: 0 },
         };
         assert_eq!(
-            Parser::new("fn foo(a: u8, b: f64);")
+            Parser::new("fn foo(a: i32, b: f64);")
                 //       0    5    10   15   20    25
-                .match_decl("returns u8")
+                .match_decl("two args")
                 .expect("valid parse")
                 .expect("valid decl"),
             canonical
         );
         assert_eq!(
-            Parser::new("fn foo(a: u8, b: f64, );")
+            Parser::new("fn foo(a: i32, b: f64, );")
                 //       0    5    10   15   20    25
-                .match_decl("returns u8")
+                .match_decl("two args with trailing comma")
                 .expect("valid parse")
                 .expect("valid decl"),
             canonical
@@ -1000,8 +1005,8 @@ mod tests {
     #[test]
     fn fn_many_returns() {
         assert_eq!(
-            Parser::new("fn getch() -> u8, u16, u32;")
-                //       0    5    10   15   20    25
+            Parser::new("fn getch() -> r1: i32, r2: i64, r3: f32;")
+                //       0    5    10   15   20   25   30
                 .match_decl("returns u8")
                 .expect("valid parse")
                 .expect("valid decl"),
@@ -1009,46 +1014,32 @@ mod tests {
                 name: "getch".to_owned(),
                 args: Vec::new(),
                 rets: vec![
-                    FuncRetSyntax {
-                        type_: SyntaxRef::Atom {
-                            atom: AtomType::U8,
-                            location: Location {
-                                line: 1,
-                                column: 14,
-                            },
-                        },
+                    FuncArgSyntax {
+                        type_: AbiType::I32,
+                        name: "r1".to_owned(),
                         location: Location {
                             line: 1,
                             column: 14,
                         },
                     },
-                    FuncRetSyntax {
-                        type_: SyntaxRef::Atom {
-                            atom: AtomType::U16,
-                            location: Location {
-                                line: 1,
-                                column: 18,
-                            },
-                        },
-                        location: Location {
-                            line: 1,
-                            column: 18,
-                        },
-                    },
-                    FuncRetSyntax {
-                        type_: SyntaxRef::Atom {
-                            atom: AtomType::U32,
-                            location: Location {
-                                line: 1,
-                                column: 23,
-                            },
-                        },
+                    FuncArgSyntax {
+                        type_: AbiType::I64,
+                        name: "r2".to_owned(),
                         location: Location {
                             line: 1,
                             column: 23,
                         },
                     },
+                    FuncArgSyntax {
+                        type_: AbiType::F32,
+                        name: "r3".to_owned(),
+                        location: Location {
+                            line: 1,
+                            column: 32,
+                        },
+                    },
                 ],
+                where_clause: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
         );

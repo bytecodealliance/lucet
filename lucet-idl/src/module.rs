@@ -2,9 +2,9 @@ use crate::data_layout::{
     AliasIR, DataTypeModuleBuilder, EnumIR, StructIR, StructMemberIR, VariantIR,
 };
 use crate::error::ValidationError;
-use crate::parser::{SyntaxDecl, SyntaxRef};
+use crate::parser::{FuncArgSyntax, SyntaxDecl, SyntaxRef};
 use crate::types::{
-    DataType, DataTypeRef, EnumMember, FuncArg, FuncDecl, FuncRet, Ident, Location, Name, Named,
+    DataType, DataTypeRef, EnumMember, FuncArg, FuncDecl, Ident, Location, Name, Named,
 };
 use heck::SnakeCase;
 use std::collections::HashMap;
@@ -172,34 +172,35 @@ impl Module {
                 location,
                 ..
             } => {
-                let mut arg_names: HashMap<String, Location> = HashMap::new();
-                let args = args
-                    .iter()
-                    .map(|arg_syntax| {
-                        let type_ = self.get_ref(&arg_syntax.type_)?;
-                        if let Some(previous_location) = arg_names.get(&arg_syntax.name) {
-                            Err(ValidationError::NameAlreadyExists {
+                fn unique_args(
+                    arg_names: &mut HashMap<String, Location>,
+                    args: &[FuncArgSyntax],
+                ) -> Result<Vec<FuncArg>, ValidationError> {
+                    args.iter()
+                        .map(|arg_syntax| {
+                            if let Some(previous_location) = arg_names.get(&arg_syntax.name) {
+                                Err(ValidationError::NameAlreadyExists {
+                                    name: arg_syntax.name.clone(),
+                                    at_location: arg_syntax.location,
+                                    previous_location: previous_location.clone(),
+                                })?;
+                            } else {
+                                arg_names
+                                    .insert(arg_syntax.name.clone(), arg_syntax.location.clone());
+                            }
+                            Ok(FuncArg {
                                 name: arg_syntax.name.clone(),
-                                at_location: arg_syntax.location,
-                                previous_location: previous_location.clone(),
-                            })?;
-                        } else {
-                            arg_names.insert(arg_syntax.name.clone(), arg_syntax.location.clone());
-                        }
-                        Ok(FuncArg {
-                            name: arg_syntax.name.clone(),
-                            type_,
+                                type_: arg_syntax.type_.clone(),
+                            })
                         })
-                    })
-                    .collect::<Result<Vec<FuncArg>, _>>()?;
+                        .collect::<Result<Vec<FuncArg>, _>>()
+                }
 
-                let rets = rets
-                    .iter()
-                    .map(|ret_syntax| {
-                        let type_ = self.get_ref(&ret_syntax.type_)?;
-                        Ok(FuncRet { type_ })
-                    })
-                    .collect::<Result<Vec<FuncRet>, _>>()?;
+                let mut arg_names: HashMap<String, Location> = HashMap::new();
+
+                let args = unique_args(&mut arg_names, args)?;
+                let rets = unique_args(&mut arg_names, rets)?;
+
                 if rets.len() > 1 {
                     Err(ValidationError::Syntax {
                         expected: "at most one return value",
@@ -305,7 +306,7 @@ impl Module {
 mod tests {
     use super::*;
     use crate::parser::Parser;
-    use crate::types::{AliasDataType, AtomType, DataTypeVariant, StructDataType, StructMember};
+    use crate::types::{AbiType, AtomType, DataTypeVariant, StructDataType, StructMember};
 
     fn mod_(syntax: &str) -> Result<Module, ValidationError> {
         let mut parser = Parser::new(syntax);
@@ -534,7 +535,7 @@ mod tests {
     #[test]
     fn func_one_arg() {
         assert_eq!(
-            mod_("fn trivial(a: u8);").ok().unwrap(),
+            mod_("fn trivial(a: i64);").ok().unwrap(),
             Module {
                 names: vec![Name {
                     name: "trivial".to_owned(),
@@ -544,7 +545,7 @@ mod tests {
                     Ident(0),
                     FuncDecl {
                         args: vec![FuncArg {
-                            type_: DataTypeRef::Atom(AtomType::U8),
+                            type_: AbiType::I64,
                             name: "a".to_owned(),
                         }],
                         rets: Vec::new(),
@@ -565,7 +566,7 @@ mod tests {
     #[test]
     fn func_one_ret() {
         assert_eq!(
-            mod_("fn trivial() -> u8;").ok().unwrap(),
+            mod_("fn trivial() -> r: i64;").ok().unwrap(),
             Module {
                 names: vec![Name {
                     name: "trivial".to_owned(),
@@ -575,8 +576,9 @@ mod tests {
                     Ident(0),
                     FuncDecl {
                         args: Vec::new(),
-                        rets: vec![FuncRet {
-                            type_: DataTypeRef::Atom(AtomType::U8),
+                        rets: vec![FuncArg {
+                            name: "r".to_owned(),
+                            type_: AbiType::I64,
                         }],
                         binding_name: "_trivial".to_owned(),
                         field_name: "trivial".to_owned(),
@@ -593,84 +595,11 @@ mod tests {
     }
 
     #[test]
-    fn func_one_ret_defined_type() {
-        assert_eq!(
-            mod_("fn trivial() -> foo;\ntype foo = u8;").ok().unwrap(),
-            Module {
-                names: vec![
-                    Name {
-                        name: "trivial".to_owned(),
-                        location: Location { line: 1, column: 0 }
-                    },
-                    Name {
-                        name: "foo".to_owned(),
-                        location: Location { line: 2, column: 0 }
-                    }
-                ],
-                funcs: vec![(
-                    Ident(0),
-                    FuncDecl {
-                        args: Vec::new(),
-                        rets: vec![FuncRet {
-                            type_: DataTypeRef::Defined(Ident(1)),
-                        }],
-                        binding_name: "_trivial".to_owned(),
-                        field_name: "trivial".to_owned(),
-                    }
-                )]
-                .into_iter()
-                .collect::<HashMap<_, _>>(),
-                data_types: vec![(
-                    Ident(1),
-                    DataType {
-                        variant: DataTypeVariant::Alias(AliasDataType {
-                            to: DataTypeRef::Atom(AtomType::U8),
-                        }),
-                        repr_size: 1,
-                        align: 1,
-                    }
-                )]
-                .into_iter()
-                .collect::<HashMap<_, _>>(),
-                data_type_ordering: vec![Ident(1)],
-                module_name: String::new(),
-                binding_prefix: String::new(),
-            }
-        );
-    }
-
-    #[test]
-    fn func_unknown_arg_type() {
-        assert_eq!(
-            mod_("fn trivial(a: foo);").err().unwrap(),
-            ValidationError::NameNotFound {
-                name: "foo".to_owned(),
-                use_location: Location {
-                    line: 1,
-                    column: 14
-                },
-            }
-        );
-    }
-
-    #[test]
-    fn func_unknown_ret_type() {
-        assert_eq!(
-            mod_("fn trivial(a: u8) -> foo;").err().unwrap(),
-            ValidationError::NameNotFound {
-                name: "foo".to_owned(),
-                use_location: Location {
-                    line: 1,
-                    column: 21
-                },
-            }
-        );
-    }
-
-    #[test]
     fn func_multiple_returns() {
         assert_eq!(
-            mod_("fn trivial(a: u8) -> bool, bool;").err().unwrap(),
+            mod_("fn trivial(a: i32) -> r1: i32, r2: i32;")
+                .err()
+                .unwrap(),
             ValidationError::Syntax {
                 expected: "at most one return value",
                 location: Location { line: 1, column: 0 },
@@ -681,12 +610,12 @@ mod tests {
     #[test]
     fn func_duplicate_arg() {
         assert_eq!(
-            mod_("fn trivial(a: u8, a: u8);").err().unwrap(),
+            mod_("fn trivial(a: i32, a: i32);").err().unwrap(),
             ValidationError::NameAlreadyExists {
                 name: "a".to_owned(),
                 at_location: Location {
                     line: 1,
-                    column: 18
+                    column: 19
                 },
                 previous_location: Location {
                     line: 1,

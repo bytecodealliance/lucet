@@ -5,10 +5,9 @@ use crate::error::IDLError;
 use crate::module::Module;
 use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
-use crate::types::AtomType;
 use crate::types::{
-    AliasDataType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl, Ident, Named,
-    StructDataType,
+    AbiType, AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType,
+    FuncDecl, Ident, Named, StructDataType,
 };
 use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
@@ -92,6 +91,16 @@ impl RustGenerator {
             U64 => "u64",
             I8 => "i8",
             I16 => "i16",
+            I32 => "i32",
+            I64 => "i64",
+            F32 => "f32",
+            F64 => "f64",
+        }
+    }
+
+    fn abitype_name(abi_type: &AbiType) -> &'static str {
+        use AbiType::*;
+        match abi_type {
             I32 => "i32",
             I64 => "i64",
             F32 => "f32",
@@ -208,16 +217,16 @@ impl RustGenerator {
             args += &format!(
                 "{}: {},",
                 a.name.to_snake_case(),
-                self.get_defined_typename(&a.type_)
+                Self::abitype_name(&a.type_)
             );
         }
 
         let func_rets = &func_decl_entry.entity.rets;
         let rets = if func_rets.len() == 0 {
-            "()".to_owned()
+            "()"
         } else {
             assert_eq!(func_rets.len(), 1);
-            self.get_defined_typename(&func_rets[0].type_).to_owned()
+            Self::abitype_name(&func_rets[0].type_)
         };
 
         self.w
@@ -238,16 +247,16 @@ impl RustGenerator {
             args += &format!(
                 "{}: {},",
                 a.name.to_snake_case(),
-                self.get_defined_typename(&a.type_)
+                Self::abitype_name(&a.type_)
             );
         }
 
         let func_rets = &func_decl_entry.entity.rets;
         let rets = if func_rets.len() == 0 {
-            "()".to_owned()
+            "()"
         } else {
             assert_eq!(func_rets.len(), 1);
-            self.get_defined_typename(&func_rets[0].type_).to_owned()
+            Self::abitype_name(&func_rets[0].type_)
         };
 
         self.w.writeln("#[no_mangle]")?.writeln(format!(
