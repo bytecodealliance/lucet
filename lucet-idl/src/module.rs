@@ -310,7 +310,7 @@ mod tests {
     fn mod_(syntax: &str) -> Result<Module, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
-        Module::from_declarations(&decls, &[], String::new(), String::new())
+        Module::from_declarations(&decls, String::new(), String::new())
     }
 
     #[test]
