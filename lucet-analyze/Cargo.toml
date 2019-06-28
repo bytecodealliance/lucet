@@ -1,16 +1,16 @@
 [package]
 name = "lucet-analyze"
-version = "0.1.0"
+version = "0.1.1"
 description = "Analyze object files emitted by the Lucet compiler"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
 license = "Apache-2.0 WITH LLVM-exception"
 categories = ["wasm"]
-authors = ["tyler <tyler@fastly.com>"]
+authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
 goblin="0.0.21"
 byteorder="1.2.1"
 colored="1.6.1"
-lucet-module-data = { path = "../lucet-module-data" }
+lucet-module-data = { path = "../lucet-module-data", version = "0.1.1" }

@@ -1,16 +1,21 @@
 [package]
 name = "lucet-runtime-internals"
-version = "0.1.0"
-authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
+version = "0.1.1"
+description = "Pure Rust runtime for Lucet WebAssembly toolchain (internals)"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-lucet-module-data = { path = "../../lucet-module-data" }
+lucet-module-data = { path = "../../lucet-module-data", version = "0.1.1" }
 
 bitflags = "1.0"
 bincode = "~1.0.1"
 byteorder = "1.3"
-cranelift-codegen = { path = "../../cranelift/cranelift-codegen" }
+cranelift-codegen = { path = "../../cranelift/cranelift-codegen", version = "0.31.0" }
 failure = "0.1"
 lazy_static = "1.1"
 libc = "0.2.47"

@@ -1,12 +1,12 @@
 [package]
 name = "lucetc"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fastly's WebAssembly to native code compiler"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
 license = "Apache-2.0 WITH LLVM-exception"
 categories = ["wasm"]
-authors = ["Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>", "Adam C. Foltzer <acfoltzer@fastly.com>", "Tyler McMullen <tyler@fastly.com>"]
+authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [lib]
@@ -18,15 +18,15 @@ path = "src/main.rs"
 
 [dependencies]
 bincode = "~1.0.1"
-cranelift-codegen = { path = "../cranelift/cranelift-codegen" }
-cranelift-entity = { path = "../cranelift/cranelift-entity" }
-cranelift-native = { path = "../cranelift/cranelift-native" }
-cranelift-frontend = { path = "../cranelift/cranelift-frontend" }
-cranelift-module = { path = "../cranelift/cranelift-module" }
-cranelift-faerie = { path = "../cranelift/cranelift-faerie" }
-cranelift-wasm = { path = "../cranelift/cranelift-wasm" }
+cranelift-codegen = { path = "../cranelift/cranelift-codegen", version = "0.31.0" }
+cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.31.0" }
+cranelift-native = { path = "../cranelift/cranelift-native", version = "0.31.0" }
+cranelift-frontend = { path = "../cranelift/cranelift-frontend", version = "0.31.0" }
+cranelift-module = { path = "../cranelift/cranelift-module", version = "0.31.0" }
+cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.31.0" }
+cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.31.0" }
 target-lexicon = "0.3"
-lucet-module-data = { path = "../lucet-module-data" }
+lucet-module-data = { path = "../lucet-module-data", version = "0.1.1" }
 wasmparser = "0.23"
 clap="2.32"
 log = "0.4"
@@ -34,7 +34,7 @@ env_logger = "0.6"
 faerie = "0.10.0"
 failure = "0.1"
 byteorder = "1.2"
-wasmonkey = { path = "../lucet-builtins/wasmonkey" }
+wasmonkey = { path = "../lucet-builtins/wasmonkey", version = "0.1.7" }
 wabt = "0.7"
 tempfile = "3.0"
 bimap = "0.2"

@@ -1,18 +1,18 @@
 [package]
 name = "lucet-runtime"
-version = "0.1.0"
+version = "0.1.1"
 description = "Pure Rust runtime for Lucet WebAssembly toolchain"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
 license = "Apache-2.0 WITH LLVM-exception"
 categories = ["wasm"]
-authors = ["Adam C. Foltzer <acfoltzer@fastly.com>", "Pat Hickey <phickey@fastly.com>", "Frank Denis <fdenis@fastly.com>", "Tyler McMullen <tyler@fastly.com>"]
+authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
 libc = "0.2.48"
-lucet-runtime-internals = { path = "lucet-runtime-internals" }
-lucet-module-data = { path = "../lucet-module-data" }
+lucet-runtime-internals = { path = "lucet-runtime-internals", version = "0.1.1" }
+lucet-module-data = { path = "../lucet-module-data", version = "0.1.1" }
 num-traits = "0.2"
 num-derive = "0.2"
 
@@ -20,7 +20,7 @@ num-derive = "0.2"
 byteorder = "1.2"
 failure = "0.1"
 lazy_static = "1.1"
-lucet-runtime-tests = { path = "lucet-runtime-tests" }
+lucet-runtime-tests = { path = "lucet-runtime-tests", version = "0.1.1" }
 nix = "0.13"
 
 [lib]
