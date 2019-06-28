@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-include!(concat!(env!("OUT_DIR"), "/wasi_host.rs"));
+include!("wasi_host.rs");
 
 pub type void = ::std::os::raw::c_void;
 
