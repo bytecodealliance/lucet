@@ -1,15 +1,15 @@
-use errors::*;
-use functions_ids::*;
-use functions_names::*;
-use map::*;
+use crate::errors::*;
+use crate::functions_ids::*;
+use crate::functions_names::*;
+use crate::map::*;
+use crate::sections::*;
+use crate::symbols::{self, ExtractedSymbols};
 use parity_wasm;
 use parity_wasm::elements::{
-    self, External, ImportEntry, ImportSection, Internal, Module, NameSection, Section,
+    self, External, ImportEntry, ImportSection, Internal, Module, Section,
 };
-use sections::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use symbols::{self, ExtractedSymbols};
 
 pub const BUILTIN_PREFIX: &str = "builtin_";
 
@@ -176,11 +176,11 @@ fn prepend_builtin_to_names_section(module: &mut Module, builtin: &Builtin) -> R
     let names_section = module
         .names_section_mut()
         .expect("Names section not present");
-    let function_names_section = match names_section {
-        NameSection::Function(function_names_section) => function_names_section,
+    let function_names_subsection = match names_section.functions_mut() {
+        Some(function_names_subsection) => function_names_subsection,
         _ => xbail!(WError::InternalError("Unexpected names section")),
     };
-    prepend_function_name(function_names_section, import_name)?;
+    prepend_function_name(function_names_subsection, import_name)?;
     Ok(())
 }
 
