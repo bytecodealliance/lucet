@@ -1,5 +1,5 @@
 use super::lexer::{LexError, Lexer, LocatedError, LocatedToken, Token};
-use super::types::{AbiType, AtomType, Location};
+use super::types::{AbiType, AtomType, BindDirection, Location};
 use std::error::Error;
 use std::fmt;
 
@@ -29,7 +29,7 @@ pub enum SyntaxDecl {
         name: String,
         args: Vec<FuncArgSyntax>,
         rets: Vec<FuncArgSyntax>,
-        where_clause: Vec<String>,
+        bindings: Vec<BindingSyntax>,
         location: Location,
     },
 }
@@ -91,6 +91,22 @@ pub struct FuncArgSyntax {
 pub struct ParseError {
     pub location: Location,
     pub message: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct BindingSyntax {
+    pub name: String,
+    pub type_: SyntaxRef,
+    pub direction: BindDirection,
+    pub from: BindingRefSyntax,
+    pub location: Location,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum BindingRefSyntax {
+    Ptr(Box<BindingRefSyntax>),
+    Slice(Box<BindingRefSyntax>, Box<BindingRefSyntax>),
+    Name(String),
 }
 
 impl fmt::Display for ParseError {
@@ -334,6 +350,76 @@ impl<'a> Parser<'a> {
         Ok(args)
     }
 
+    fn match_binding_exprs(&mut self) -> Result<Vec<BindingSyntax>, ParseError> {
+        let mut bindings = Vec::new();
+        loop {
+            match self.token() {
+                Some(Token::Semi) => break,
+                Some(Token::Word(name)) => {
+                    let location = self.location;
+                    self.consume();
+                    self.match_token(Token::Colon, "expected :")?;
+                    let type_ = self.match_ref("type value")?;
+                    self.match_token(Token::LArrow, "expected <-")?;
+                    let direction = self.match_bind_direction()?;
+                    let from = self.match_binding_ref()?;
+                    bindings.push(BindingSyntax {
+                        name: name.to_string(),
+                        type_,
+                        direction,
+                        from,
+                        location,
+                    });
+                    match self.token() {
+                        Some(Token::Semi) => break,
+                        Some(Token::Comma) => {
+                            self.consume();
+                            continue;
+                        }
+                        _ => parse_err!(self.location, "expected , or ;")?,
+                    }
+                }
+                _ => parse_err!(self.location, "expected binding expression")?,
+            }
+        }
+        Ok(bindings)
+    }
+
+    fn match_bind_direction(&mut self) -> Result<BindDirection, ParseError> {
+        match self.token() {
+            Some(Token::Word("in")) => {
+                self.consume();
+                Ok(BindDirection::In)
+            }
+            Some(Token::Word("inout")) | Some(Token::Word("io")) => {
+                self.consume();
+                Ok(BindDirection::InOut)
+            }
+            Some(Token::Word("out")) => {
+                self.consume();
+                Ok(BindDirection::Out)
+            }
+            _ => parse_err!(
+                self.location,
+                "expected binding direction (in, out, inout, io)"
+            ),
+        }
+    }
+
+    fn match_binding_ref(&mut self) -> Result<BindingRefSyntax, ParseError> {
+        match self.token() {
+            Some(Token::Star) => {
+                self.consume();
+                Ok(BindingRefSyntax::Ptr(Box::new(self.match_binding_ref()?)))
+            }
+            Some(Token::Word(name)) => {
+                self.consume();
+                Ok(BindingRefSyntax::Name(name.to_string()))
+            }
+            x => parse_err!(self.location, "expected binding ref, got {:?}", x),
+        }
+    }
+
     pub fn match_decl(&mut self, err_msg: &str) -> Result<Option<SyntaxDecl>, ParseError> {
         loop {
             match self.token() {
@@ -409,7 +495,7 @@ impl<'a> Parser<'a> {
                     let args = err_ctx!(err_msg, self.match_func_args())?;
 
                     let rets = match self.token() {
-                        Some(Token::Arrow) => {
+                        Some(Token::RArrow) => {
                             self.consume();
                             err_ctx!(err_msg, self.match_func_rets())?
                         }
@@ -420,14 +506,14 @@ impl<'a> Parser<'a> {
                         )?,
                     };
 
-                    let where_clause = match self.token() {
+                    let bindings = match self.token() {
                         Some(Token::Semi) => {
                             self.consume();
                             Vec::new()
                         }
                         Some(Token::Word("where")) => {
                             self.consume();
-                            unimplemented!()
+                            err_ctx!(err_msg, self.match_binding_exprs())?
                         }
                         x => unreachable!(
                             "match func rets didnt leave us with semi or where: {:?}",
@@ -439,7 +525,7 @@ impl<'a> Parser<'a> {
                         name: name.to_owned(),
                         args,
                         rets,
-                        where_clause,
+                        bindings,
                         location,
                     }));
                 }
@@ -865,7 +951,7 @@ mod tests {
             name: "trivial".to_owned(),
             args: Vec::new(),
             rets: Vec::new(),
-            where_clause: Vec::new(),
+            bindings: Vec::new(),
             location: Location { line: 1, column: 0 },
         }];
         assert_eq!(
@@ -904,7 +990,7 @@ mod tests {
                     column: 14,
                 },
             }],
-            where_clause: Vec::new(),
+            bindings: Vec::new(),
             location: Location { line: 1, column: 0 },
         }];
         assert_eq!(
@@ -940,7 +1026,7 @@ mod tests {
                 location: Location { line: 1, column: 7 },
             }],
             rets: Vec::new(),
-            where_clause: Vec::new(),
+            bindings: Vec::new(),
             location: Location { line: 1, column: 0 },
         };
         assert_eq!(
@@ -981,7 +1067,7 @@ mod tests {
                 },
             ],
             rets: Vec::new(),
-            where_clause: Vec::new(),
+            bindings: Vec::new(),
             location: Location { line: 1, column: 0 },
         };
         assert_eq!(
@@ -1039,7 +1125,66 @@ mod tests {
                         },
                     },
                 ],
-                where_clause: Vec::new(),
+                bindings: Vec::new(),
+                location: Location { line: 1, column: 0 },
+            }
+        );
+    }
+
+    #[test]
+    fn fn_with_bindings() {
+        assert_eq!(
+            Parser::new(
+                "fn fgetch(fptr: i32) -> r: i32 where
+file: file_t <- in *fptr,
+r: u8 <- out r;"
+            )
+            //       0    5    10   15   20   25   30
+            .match_decl("returns u8")
+            .expect("valid parse")
+            .expect("valid decl"),
+            SyntaxDecl::Function {
+                name: "fgetch".to_owned(),
+                args: vec![FuncArgSyntax {
+                    type_: AbiType::I32,
+                    name: "fptr".to_owned(),
+                    location: Location {
+                        line: 1,
+                        column: 10,
+                    },
+                },],
+                rets: vec![FuncArgSyntax {
+                    type_: AbiType::I32,
+                    name: "r".to_owned(),
+                    location: Location {
+                        line: 1,
+                        column: 24,
+                    },
+                }],
+                bindings: vec![
+                    BindingSyntax {
+                        name: "file".to_owned(),
+                        type_: SyntaxRef::Name {
+                            name: "file_t".to_owned(),
+                            location: Location { line: 2, column: 6 },
+                        },
+                        direction: BindDirection::In,
+                        from: BindingRefSyntax::Ptr(Box::new(BindingRefSyntax::Name(
+                            "fptr".to_owned()
+                        ))),
+                        location: Location { line: 2, column: 0 },
+                    },
+                    BindingSyntax {
+                        name: "r".to_owned(),
+                        type_: SyntaxRef::Atom {
+                            atom: AtomType::U8,
+                            location: Location { line: 3, column: 3 },
+                        },
+                        direction: BindDirection::Out,
+                        from: BindingRefSyntax::Name("r".to_owned()),
+                        location: Location { line: 3, column: 0 },
+                    }
+                ],
                 location: Location { line: 1, column: 0 },
             }
         );

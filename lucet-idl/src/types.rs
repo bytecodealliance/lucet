@@ -146,6 +146,13 @@ pub struct FuncDecl {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum BindDirection {
+    In,
+    Out,
+    InOut,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Name {
     pub name: String,
     pub location: Location,

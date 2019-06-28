@@ -15,7 +15,8 @@ pub enum Token<'a> {
     Comma,    // ,
     Hash,     // #
     Equals,   // =
-    Arrow,    // ->
+    LArrow,   // <-
+    RArrow,   // ->
     Atom(AtomType),
     Word(&'a str),
     Quote(&'a str), // Found between balanced "". No escaping.
@@ -219,10 +220,20 @@ impl<'a> Lexer<'a> {
                         if self.looking_at("->") {
                             self.next_ch(); // Consume -
                             self.next_ch(); // Consume >
-                            token(Token::Arrow, loc)
+                            token(Token::RArrow, loc)
                         } else {
                             self.next_ch();
-                            error(LexError::InvalidChar('/'), loc)
+                            error(LexError::InvalidChar('-'), loc)
+                        }
+                    }
+                    '<' => {
+                        if self.looking_at("<-") {
+                            self.next_ch(); // Consume <
+                            self.next_ch(); // Consume -
+                            token(Token::LArrow, loc)
+                        } else {
+                            self.next_ch();
+                            error(LexError::InvalidChar('<'), loc)
                         }
                     }
                     '/' => {
@@ -349,6 +360,16 @@ mod tests {
         assert_eq!(lex.next(), token(Token::Colon, 1, 12));
         assert_eq!(lex.next(), token(Token::Comma, 1, 13));
         assert_eq!(lex.next(), token(Token::Semi, 1, 14));
+        assert_eq!(lex.next(), None);
+    }
+
+    #[test]
+    fn arrows() {
+        let mut lex = Lexer::new("<-->\n<- ->");
+        assert_eq!(lex.next(), token(Token::LArrow, 1, 0));
+        assert_eq!(lex.next(), token(Token::RArrow, 1, 2));
+        assert_eq!(lex.next(), token(Token::LArrow, 2, 0));
+        assert_eq!(lex.next(), token(Token::RArrow, 2, 3));
         assert_eq!(lex.next(), None);
     }
 }
