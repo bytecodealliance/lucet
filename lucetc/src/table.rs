@@ -1,14 +1,12 @@
 use crate::decls::{ModuleDecls, TableDecl};
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::module::UniqueFuncIndex;
-use crate::name::Name;
 use crate::pointer::NATIVE_POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
 use cranelift_wasm::{TableElementType, TableIndex};
-use faerie::{Artifact, Link};
-use failure::{format_err, Error, ResultExt};
+use failure::{format_err, ResultExt};
 use std::io::Cursor;
 
 /// This symbol will be used to reference the `tables` field in `Module` - a sequence of tables.
@@ -53,24 +51,12 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, LucetcError> {
     Ok(elems)
 }
 
-pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
-    for (idx, table) in tables.iter().enumerate() {
-        obj.link(Link {
-            from: TABLE_SYM,
-            to: table.symbol(),
-            at: (TABLE_REF_SIZE * idx) as u64,
-        })
-        .context(LucetcErrorKind::Table)?;
-    }
-    Ok(())
-}
-
 pub fn write_table_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     decls: &ModuleDecls<'_>,
-) -> Result<Vec<Name>, LucetcError> {
+) -> Result<usize, LucetcError> {
+    let mut table_data_ctx = DataContext::new();
     let mut tables_vec = Cursor::new(Vec::new());
-    let mut table_names: Vec<Name> = Vec::new();
 
     if let Ok(table_decl) = decls.get_table(TableIndex::new(0)) {
         // Indirect calls are performed by looking up the callee function and type in a table that
@@ -130,6 +116,8 @@ pub fn write_table_data<B: ClifBackend>(
             .context(LucetcErrorKind::Table)?;
 
         // have to link TABLE_SYM, table_id,
+        let data_id = clif_module.declare_data_in_data(table_id, &mut table_data_ctx);
+        table_data_ctx.write_data_addr(tables_vec.get_ref().len() as u32, data_id, 0);
         // add space for the TABLE_SYM pointer
         tables_vec.write_u64::<LittleEndian>(0).unwrap();
 
@@ -137,13 +125,10 @@ pub fn write_table_data<B: ClifBackend>(
         tables_vec
             .write_u64::<LittleEndian>(elements.len() as u64)
             .unwrap();
-        table_names.push(table_decl.contents_name.clone())
     }
 
-    let inner = tables_vec.into_inner();
-
-    let mut table_data_ctx = DataContext::new();
-    table_data_ctx.define(inner.into_boxed_slice());
+    let tables_len = tables_vec.get_ref().len() / TABLE_REF_SIZE;
+    table_data_ctx.define(tables_vec.into_inner().into_boxed_slice());
 
     clif_module
         .define_data(
@@ -154,5 +139,5 @@ pub fn write_table_data<B: ClifBackend>(
             &table_data_ctx,
         )
         .context(LucetcErrorKind::Table)?;
-    Ok(table_names)
+    Ok(tables_len)
 }

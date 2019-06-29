@@ -14,11 +14,10 @@ use cranelift_codegen::binemit::TrapSink;
 use cranelift_codegen::ir;
 use cranelift_codegen::ir::{types, AbiParam, Signature};
 use cranelift_codegen::isa::CallConv;
-use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
-use cranelift_faerie::FaerieProduct;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
-use faerie::Decl;
+use cranelift_object::{ObjectTrapSink, ObjectTrapSite};
 use failure::Error;
+use object::write::{Object, StandardSection, SymbolId};
 
 /// Stack probe symbol name
 pub const STACK_PROBE_SYM: &'static str = "lucet_probestack";
@@ -58,24 +57,16 @@ pub fn declare_metadata<'a, B: ClifBackend>(
         .unwrap())
 }
 
-pub fn declare_and_define(product: &mut FaerieProduct) -> Result<(), Error> {
-    product.artifact.declare_with(
-        STACK_PROBE_SYM,
-        Decl::function(),
-        STACK_PROBE_BINARY.to_vec(),
-    )?;
-    add_sink(
-        product
-            .trap_manifest
-            .as_mut()
-            .expect("trap manifest is present"),
-    );
-    Ok(())
+pub fn define(object: &mut Object) -> Result<(SymbolId, Vec<ObjectTrapSite>), Error> {
+    let symbol = object.symbol_id(STACK_PROBE_SYM.as_bytes()).unwrap();
+    let section = object.section_id(StandardSection::Text);
+    object.add_symbol_data(symbol, section, STACK_PROBE_BINARY, 1);
+    let traps = add_sink();
+    Ok((symbol, traps))
 }
 
-fn add_sink(manifest: &mut FaerieTrapManifest) {
-    let mut stack_probe_trap_sink =
-        FaerieTrapSink::new(STACK_PROBE_SYM, STACK_PROBE_BINARY.len() as u32);
+fn add_sink() -> Vec<ObjectTrapSite> {
+    let mut stack_probe_trap_sink = ObjectTrapSink::default();
     stack_probe_trap_sink.trap(
         10, /* test %rsp,0x8(%rsp) */
         ir::SourceLoc::default(),
@@ -86,5 +77,5 @@ fn add_sink(manifest: &mut FaerieTrapManifest) {
         ir::SourceLoc::default(),
         ir::TrapCode::StackOverflow,
     );
-    manifest.add_sink(stack_probe_trap_sink);
+    stack_probe_trap_sink.sites
 }

@@ -1,45 +1,56 @@
 use cranelift_codegen::ir;
-use cranelift_faerie::traps::FaerieTrapManifest;
+use cranelift_object::ObjectTrapSite;
 
-use faerie::{Artifact, Decl};
-use failure::{Error, ResultExt};
+use failure::Error;
 use lucet_module::TrapSite;
+use object::write::{Object, StandardSection, Symbol, SymbolId};
+use object::{SymbolKind, SymbolScope};
 
-pub fn write_trap_tables(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> Result<(), Error> {
-    for sink in manifest.sinks.iter() {
-        let func_sym = &sink.name;
-        let trap_sym = trap_sym_for_func(func_sym);
+pub fn write_trap_table(
+    func_sym: SymbolId,
+    traps: &[ObjectTrapSite],
+    obj: &mut Object,
+) -> Result<SymbolId, Error> {
+    let func_name = &obj.symbol(func_sym).name;
+    let trap_sym = trap_sym_for_func(func_name);
 
-        obj.declare(&trap_sym, Decl::data())
-            .context(format!("declaring {}", &trap_sym))?;
+    // write the actual function-level trap table
+    let traps: Vec<TrapSite> = traps
+        .iter()
+        .map(|site| TrapSite {
+            offset: site.offset,
+            code: translate_trapcode(site.code),
+        })
+        .collect();
 
-        // write the actual function-level trap table
-        let traps: Vec<TrapSite> = sink
-            .sites
-            .iter()
-            .map(|site| TrapSite {
-                offset: site.offset,
-                code: translate_trapcode(site.code),
-            })
-            .collect();
+    let trap_site_bytes = unsafe {
+        std::slice::from_raw_parts(
+            traps.as_ptr() as *const u8,
+            traps.len() * std::mem::size_of::<TrapSite>(),
+        )
+    };
 
-        let trap_site_bytes = unsafe {
-            std::slice::from_raw_parts(
-                traps.as_ptr() as *const u8,
-                traps.len() * std::mem::size_of::<TrapSite>(),
-            )
-        };
+    // and write the function trap table into the object
+    let section_id = obj.section_id(StandardSection::ReadOnlyData);
+    let value = obj.append_section_data(section_id, trap_site_bytes, 4);
+    let size = trap_site_bytes.len() as u64;
+    let symbol_id = obj.add_symbol(Symbol {
+        name: trap_sym,
+        value,
+        size,
+        kind: SymbolKind::Data,
+        scope: SymbolScope::Dynamic,
+        weak: false,
+        section: Some(section_id),
+    });
 
-        // and write the function trap table into the object
-        obj.define(&trap_sym, trap_site_bytes.to_vec())
-            .context(format!("defining {}", &trap_sym))?;
-    }
-
-    Ok(())
+    Ok(symbol_id)
 }
 
-pub(crate) fn trap_sym_for_func(sym: &str) -> String {
-    return format!("lucet_trap_table_{}", sym);
+fn trap_sym_for_func(sym: &[u8]) -> Vec<u8> {
+    let mut trap_sym = b"lucet_trap_table_".to_vec();
+    trap_sym.extend_from_slice(sym);
+    trap_sym
 }
 
 // Trapcodes can be thought of as a tuple of (type, subtype). Each are

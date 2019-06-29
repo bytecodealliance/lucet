@@ -13,13 +13,13 @@ use cranelift_codegen::{
     settings::{self, Configurable},
     Context as ClifContext,
 };
-use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
+use cranelift_object::{ObjectBackend, ObjectBuilder, ObjectTrapCollection};
 use cranelift_wasm::{translate_module, FuncTranslator, WasmError};
 use failure::{format_err, Fail, ResultExt};
 use lucet_module::bindings::Bindings;
-use lucet_module::{FunctionSpec, ModuleData, MODULE_DATA_SYM};
+use lucet_module::{ModuleData, MODULE_DATA_SYM};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
@@ -46,7 +46,7 @@ impl OptLevel {
 
 pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
-    clif_module: ClifModule<FaerieBackend>,
+    clif_module: ClifModule<ObjectBackend>,
     opt_level: OptLevel,
     count_instructions: bool,
 }
@@ -85,11 +85,11 @@ impl<'a> Compiler<'a> {
             _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
-        let mut clif_module: ClifModule<FaerieBackend> = ClifModule::new(
-            FaerieBuilder::new(
+        let mut clif_module: ClifModule<ObjectBackend> = ClifModule::new(
+            ObjectBuilder::new(
                 isa,
                 "lucet_guest".to_owned(),
-                FaerieTrapCollection::Enabled,
+                ObjectTrapCollection::Enabled,
                 libcalls,
             )
             .context(LucetcErrorKind::Validation)?,
@@ -142,29 +142,9 @@ impl<'a> Compiler<'a> {
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
         let table_names = write_table_data(&mut self.clif_module, &self.decls)?;
 
-        let function_manifest: Vec<(String, FunctionSpec)> = self
-            .clif_module
-            .declared_functions()
-            .map(|f| {
-                (
-                    f.decl.name.to_owned(), // this copy is only necessary because `clif_module` is moved in `finish, below`
-                    FunctionSpec::new(
-                        0,
-                        f.compiled.as_ref().map(|c| c.code_length()).unwrap_or(0),
-                        0,
-                        0,
-                    ),
-                )
-            })
-            .collect();
-
-        let obj = ObjectFile::new(
-            self.clif_module.finish(),
-            module_data_len,
-            function_manifest,
-            table_names,
-        )
-        .context(LucetcErrorKind::Output)?;
+        self.clif_module.finalize_definitions();
+        let obj = ObjectFile::new(self.clif_module.finish(), module_data_len, table_names)
+            .context(LucetcErrorKind::Output)?;
         Ok(obj)
     }
 
