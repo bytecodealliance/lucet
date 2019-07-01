@@ -7,6 +7,7 @@ mod c;
 mod config;
 mod data_layout;
 mod error;
+mod function;
 mod lexer;
 mod module;
 mod package;

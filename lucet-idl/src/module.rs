@@ -2,9 +2,11 @@ use crate::data_layout::{
     AliasIR, DataTypeModuleBuilder, EnumIR, StructIR, StructMemberIR, VariantIR,
 };
 use crate::error::ValidationError;
-use crate::parser::{FuncArgSyntax, SyntaxDecl, SyntaxRef};
+use crate::function::validate_func_args;
+use crate::parser::{SyntaxDecl, SyntaxTypeRef};
 use crate::types::{
-    DataType, DataTypeRef, EnumMember, FuncArg, FuncDecl, Ident, Location, Name, Named,
+    AbiType, DataType, DataTypeRef, DataTypeVariant, EnumMember, FuncDecl, Ident, Location, Name,
+    Named,
 };
 use heck::SnakeCase;
 use std::collections::HashMap;
@@ -65,16 +67,47 @@ impl Module {
         None
     }
 
-    fn get_ref(&self, syntax_ref: &SyntaxRef) -> Result<DataTypeRef, ValidationError> {
+    pub fn get_typeref(&self, syntax_ref: &SyntaxTypeRef) -> Result<DataTypeRef, ValidationError> {
         match syntax_ref {
-            SyntaxRef::Atom { atom, .. } => Ok(DataTypeRef::Atom(*atom)),
-            SyntaxRef::Name { name, location } => match self.id_for_name(name) {
+            SyntaxTypeRef::Atom { atom, .. } => Ok(DataTypeRef::Atom(*atom)),
+            SyntaxTypeRef::Name { name, location } => match self.id_for_name(name) {
                 Some(id) => Ok(DataTypeRef::Defined(id)),
                 None => Err(ValidationError::NameNotFound {
                     name: name.clone(),
                     use_location: *location,
                 }),
             },
+        }
+    }
+
+    // If a DataType is representable by an atomic AbiType, get it. Otherwise the DataType must
+    // be pointed to across ABI boundaries
+    pub fn get_abi_repr(&self, dtref: &DataTypeRef) -> Option<AbiType> {
+        match dtref {
+            DataTypeRef::Defined(ident) => {
+                let dt = self
+                    .data_types
+                    .get(ident)
+                    .expect("abi representation of valid dtref");
+                match &dt.variant {
+                    DataTypeVariant::Struct(struct_) => {
+                        if struct_.members.len() == 1 {
+                            self.get_abi_repr(&struct_.members[0].type_)
+                        } else {
+                            None
+                        }
+                    }
+                    DataTypeVariant::Enum(enum_) => {
+                        if enum_.members.len() < u32::max_value() as usize {
+                            Some(AbiType::I32)
+                        } else {
+                            None
+                        }
+                    }
+                    DataTypeVariant::Alias(alias) => self.get_abi_repr(&alias.to),
+                }
+            }
+            DataTypeRef::Atom(atom) => Some(AbiType::from_atom(atom)),
         }
     }
 
@@ -110,7 +143,7 @@ impl Module {
                     }
                     // Get the DataTypeRef for the member, which ensures that it refers only to
                     // defined types:
-                    let type_ = self.get_ref(&mem.type_)?;
+                    let type_ = self.get_typeref(&mem.type_)?;
                     // build the struct with this as the member:
                     dtype_members.push(StructMemberIR {
                         type_,
@@ -162,7 +195,7 @@ impl Module {
                 );
             }
             SyntaxDecl::Alias { what, location, .. } => {
-                let to = self.get_ref(what)?;
+                let to = self.get_typeref(what)?;
                 data_types_ir.define(id, VariantIR::Alias(AliasIR { to }), location.clone());
             }
             SyntaxDecl::Function {
@@ -170,50 +203,17 @@ impl Module {
                 args,
                 rets,
                 location,
-                ..
+                bindings,
             } => {
-                fn unique_args(
-                    arg_names: &mut HashMap<String, Location>,
-                    args: &[FuncArgSyntax],
-                ) -> Result<Vec<FuncArg>, ValidationError> {
-                    args.iter()
-                        .map(|arg_syntax| {
-                            if let Some(previous_location) = arg_names.get(&arg_syntax.name) {
-                                Err(ValidationError::NameAlreadyExists {
-                                    name: arg_syntax.name.clone(),
-                                    at_location: arg_syntax.location,
-                                    previous_location: previous_location.clone(),
-                                })?;
-                            } else {
-                                arg_names
-                                    .insert(arg_syntax.name.clone(), arg_syntax.location.clone());
-                            }
-                            Ok(FuncArg {
-                                name: arg_syntax.name.clone(),
-                                type_: arg_syntax.type_.clone(),
-                            })
-                        })
-                        .collect::<Result<Vec<FuncArg>, _>>()
-                }
-
-                let mut arg_names: HashMap<String, Location> = HashMap::new();
-
-                let args = unique_args(&mut arg_names, args)?;
-                let rets = unique_args(&mut arg_names, rets)?;
-
-                if rets.len() > 1 {
-                    Err(ValidationError::Syntax {
-                        expected: "at most one return value",
-                        location: location.clone(),
-                    })?
-                }
-
+                let (args, rets, bindings) =
+                    validate_func_args(args, rets, bindings, location, self)?;
                 let binding_name = self.binding_prefix.clone() + "_" + &name.to_snake_case();
                 let decl = FuncDecl {
-                    args,
-                    rets,
                     field_name: name.clone(),
                     binding_name,
+                    args,
+                    rets,
+                    bindings,
                 };
                 if let Some(prev_def) = funcs_ir.insert(id, decl) {
                     panic!("id {} already defined: {:?}", id, prev_def)
@@ -517,10 +517,11 @@ mod tests {
                 funcs: vec![(
                     Ident(0),
                     FuncDecl {
-                        args: Vec::new(),
-                        rets: Vec::new(),
                         binding_name: "_trivial".to_owned(),
                         field_name: "trivial".to_owned(),
+                        args: Vec::new(),
+                        rets: Vec::new(),
+                        bindings: Vec::new(),
                     }
                 )]
                 .into_iter()
@@ -544,13 +545,14 @@ mod tests {
                 funcs: vec![(
                     Ident(0),
                     FuncDecl {
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
                         args: vec![FuncArg {
                             type_: AbiType::I64,
                             name: "a".to_owned(),
                         }],
                         rets: Vec::new(),
-                        binding_name: "_trivial".to_owned(),
-                        field_name: "trivial".to_owned(),
+                        bindings: Vec::new(),
                     }
                 )]
                 .into_iter()
@@ -575,13 +577,14 @@ mod tests {
                 funcs: vec![(
                     Ident(0),
                     FuncDecl {
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
                         args: Vec::new(),
                         rets: vec![FuncArg {
                             name: "r".to_owned(),
                             type_: AbiType::I64,
                         }],
-                        binding_name: "_trivial".to_owned(),
-                        field_name: "trivial".to_owned(),
+                        bindings: Vec::new(),
                     }
                 )]
                 .into_iter()

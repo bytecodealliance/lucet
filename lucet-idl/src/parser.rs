@@ -17,7 +17,7 @@ pub enum SyntaxDecl {
     },
     Alias {
         name: String,
-        what: SyntaxRef,
+        what: SyntaxTypeRef,
         location: Location,
     },
     Module {
@@ -62,7 +62,7 @@ impl SyntaxDecl {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum SyntaxRef {
+pub enum SyntaxTypeRef {
     Atom { atom: AtomType, location: Location },
     Name { name: String, location: Location },
 }
@@ -70,7 +70,7 @@ pub enum SyntaxRef {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StructMember {
     pub name: String,
-    pub type_: SyntaxRef,
+    pub type_: SyntaxTypeRef,
     pub location: Location,
 }
 
@@ -96,7 +96,7 @@ pub struct ParseError {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BindingSyntax {
     pub name: String,
-    pub type_: SyntaxRef,
+    pub type_: SyntaxTypeRef,
     pub direction: BindDirection,
     pub from: BindingRefSyntax,
     pub location: Location,
@@ -105,7 +105,6 @@ pub struct BindingSyntax {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BindingRefSyntax {
     Ptr(Box<BindingRefSyntax>),
-    Slice(Box<BindingRefSyntax>, Box<BindingRefSyntax>),
     Name(String),
 }
 
@@ -555,17 +554,17 @@ impl<'a> Parser<'a> {
         Ok(decls)
     }
 
-    fn match_ref(&mut self, err_msg: &str) -> Result<SyntaxRef, ParseError> {
+    fn match_ref(&mut self, err_msg: &str) -> Result<SyntaxTypeRef, ParseError> {
         match self.token() {
             Some(Token::Atom(atom)) => {
                 let location = self.location;
                 self.consume();
-                Ok(SyntaxRef::Atom { atom, location })
+                Ok(SyntaxTypeRef::Atom { atom, location })
             }
             Some(Token::Word(name)) => {
                 let location = self.location;
                 self.consume();
-                Ok(SyntaxRef::Name {
+                Ok(SyntaxTypeRef::Name {
                     name: name.to_string(),
                     location,
                 })
@@ -623,7 +622,7 @@ mod tests {
                 name: "foo".to_string(),
                 members: vec![StructMember {
                     name: "a".to_owned(),
-                    type_: SyntaxRef::Atom {
+                    type_: SyntaxTypeRef::Atom {
                         atom: AtomType::I32,
                         location: Location {
                             line: 1,
@@ -652,7 +651,7 @@ mod tests {
                 name: "foo".to_string(),
                 members: vec![StructMember {
                     name: "b".to_owned(),
-                    type_: SyntaxRef::Atom {
+                    type_: SyntaxTypeRef::Atom {
                         atom: AtomType::I32,
                         location: Location {
                             line: 1,
@@ -682,7 +681,7 @@ mod tests {
                 members: vec![
                     StructMember {
                         name: "d".to_owned(),
-                        type_: SyntaxRef::Atom {
+                        type_: SyntaxTypeRef::Atom {
                             atom: AtomType::F64,
                             location: Location {
                                 line: 1,
@@ -696,7 +695,7 @@ mod tests {
                     },
                     StructMember {
                         name: "e".to_owned(),
-                        type_: SyntaxRef::Atom {
+                        type_: SyntaxTypeRef::Atom {
                             atom: AtomType::U8,
                             location: Location {
                                 line: 1,
@@ -728,7 +727,7 @@ mod tests {
                 members: vec![
                     StructMember {
                         name: "a".to_owned(),
-                        type_: SyntaxRef::Name {
+                        type_: SyntaxTypeRef::Name {
                             name: "mod".to_owned(),
                             location: Location {
                                 line: 1,
@@ -742,7 +741,7 @@ mod tests {
                     },
                     StructMember {
                         name: "struct".to_owned(),
-                        type_: SyntaxRef::Name {
+                        type_: SyntaxTypeRef::Name {
                             name: "enum".to_owned(),
                             location: Location {
                                 line: 1,
@@ -1164,7 +1163,7 @@ r: u8 <- out r;"
                 bindings: vec![
                     BindingSyntax {
                         name: "file".to_owned(),
-                        type_: SyntaxRef::Name {
+                        type_: SyntaxTypeRef::Name {
                             name: "file_t".to_owned(),
                             location: Location { line: 2, column: 6 },
                         },
@@ -1176,7 +1175,7 @@ r: u8 <- out r;"
                     },
                     BindingSyntax {
                         name: "r".to_owned(),
-                        type_: SyntaxRef::Atom {
+                        type_: SyntaxTypeRef::Atom {
                             atom: AtomType::U8,
                             location: Location { line: 3, column: 3 },
                         },

@@ -43,8 +43,8 @@ impl AbiType {
         }
     }
 
-    pub fn from_atom<A: AsRef<AtomType>>(a: A) -> Self {
-        match a.as_ref() {
+    pub fn from_atom(a: &AtomType) -> Self {
+        match a {
             AtomType::Bool
             | AtomType::U8
             | AtomType::I8
@@ -133,8 +133,8 @@ pub struct DataType {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FuncArg {
-    pub type_: AbiType,
     pub name: String,
+    pub type_: AbiType,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -143,6 +143,21 @@ pub struct FuncDecl {
     pub binding_name: String,
     pub args: Vec<FuncArg>,
     pub rets: Vec<FuncArg>,
+    pub bindings: Vec<FuncBinding>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct FuncBinding {
+    pub name: String,
+    pub type_: DataTypeRef,
+    pub direction: BindDirection,
+    pub from: BindingRef,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum BindingRef {
+    Ptr(String),   // Treat the argument of that name as a pointer
+    Value(String), // Treat the argument of that name as a value
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

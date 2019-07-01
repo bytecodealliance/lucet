@@ -60,6 +60,15 @@ pub enum ValidationError {
         expected: &'static str,
         location: Location,
     },
+    BindingNameAlreadyBound {
+        name: String,
+        at_location: Location,
+        bound_location: Location,
+    },
+    BindingTypeError {
+        expected: &'static str,
+        location: Location,
+    },
 }
 
 impl fmt::Display for ValidationError {
@@ -89,6 +98,20 @@ impl fmt::Display for ValidationError {
                 f,
                 "Invalid syntax: expected {} at line {}",
                 expected, location.line
+            ),
+            ValidationError::BindingNameAlreadyBound {
+                name,
+                at_location,
+                bound_location,
+            } => write!(
+                f,
+                "Argument {} used in binding at line {} - previously bound at line {}",
+                name, at_location.line, bound_location.line
+            ),
+            ValidationError::BindingTypeError { expected, location } => write!(
+                f,
+                "type error: expected {} - in binding at line {}",
+                expected, location.line,
             ),
         }
     }
