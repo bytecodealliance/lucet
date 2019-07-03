@@ -1,10 +1,10 @@
-use lucet_module_data::{lucet_signature, FunctionPointer};
+use lucet_module_data::{bindings::Bindings, lucet_signature, FunctionPointer};
 use lucet_runtime::lucet_hostcalls;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder, Module};
 use lucet_runtime_tests::helpers::MockExportBuilder;
 use lucet_wasi_sdk::{CompileOpts, Lucetc};
-use lucetc::{Bindings, LucetcOpts, OptLevel};
+use lucetc::{LucetcOpts, OptLevel};
 use std::path::Path;
 use std::sync::Arc;
 

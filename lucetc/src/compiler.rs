@@ -1,4 +1,3 @@
-use crate::bindings::Bindings;
 use crate::decls::ModuleDecls;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::function::FuncInfo;
@@ -19,6 +18,7 @@ use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator, WasmError};
 use failure::{format_err, Fail, ResultExt};
+use lucet_module_data::bindings::Bindings;
 use lucet_module_data::{FunctionSpec, ModuleData};
 
 #[derive(Debug, Clone, Copy)]

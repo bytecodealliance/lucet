@@ -1,6 +1,6 @@
+use crate::{PatcherConfig, WError};
 use clap::{App, Arg};
 use std::path::PathBuf;
-use {PatcherConfig, WError};
 
 #[derive(Default, Clone, Debug)]
 pub struct Config {

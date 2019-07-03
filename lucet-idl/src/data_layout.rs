@@ -1,14 +1,13 @@
 use crate::error::ValidationError;
 use crate::types::{
-    AliasDataType, AtomType, Attr, DataType, DataTypeRef, DataTypeVariant, EnumDataType,
-    EnumMember, Ident, Location, Name, StructDataType, StructMember,
+    AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, EnumMember,
+    Ident, Location, Name, StructDataType, StructMember,
 };
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct DataTypeIR {
     pub variant: VariantIR,
-    pub attrs: Vec<Attr>,
     pub location: Location,
 }
 
@@ -16,7 +15,6 @@ struct DataTypeIR {
 pub struct StructMemberIR {
     pub type_: DataTypeRef,
     pub name: String,
-    pub attrs: Vec<Attr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -53,12 +51,11 @@ impl DataTypeModuleBuilder {
         }
     }
 
-    pub fn define(&mut self, id: Ident, variant: VariantIR, attrs: Vec<Attr>, location: Location) {
+    pub fn define(&mut self, id: Ident, variant: VariantIR, location: Location) {
         if let Some(prev_def) = self.data_types.insert(
             id,
             DataTypeIR {
                 variant,
-                attrs: attrs.clone(),
                 location: location.clone(),
             },
         ) {
@@ -104,7 +101,6 @@ impl DataTypeModuleBuilder {
                         members.push(StructMember {
                             type_: mem.type_.clone(),
                             name: mem.name.clone(),
-                            attrs: mem.attrs.clone(),
                             offset,
                         });
                         offset += repr_size;
@@ -116,7 +112,6 @@ impl DataTypeModuleBuilder {
                         id,
                         DataType {
                             variant: DataTypeVariant::Struct(StructDataType { members }),
-                            attrs: dt.attrs.clone(),
                             repr_size,
                             align: struct_align,
                         },
@@ -134,7 +129,6 @@ impl DataTypeModuleBuilder {
                         id,
                         DataType {
                             variant: DataTypeVariant::Alias(AliasDataType { to: a.to.clone() }),
-                            attrs: dt.attrs.clone(),
                             repr_size,
                             align,
                         },
@@ -153,7 +147,6 @@ impl DataTypeModuleBuilder {
                             variant: DataTypeVariant::Enum(EnumDataType {
                                 members: e.members.clone(),
                             }),
-                            attrs: dt.attrs.clone(),
                             repr_size,
                             align,
                         },

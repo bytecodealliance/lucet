@@ -3,7 +3,7 @@ use crate::module::Module;
 use crate::parser::SyntaxDecl;
 use crate::types::{Ident, Location, Name};
 use heck::SnakeCase;
-use lucetc::Bindings;
+use lucet_module_data::bindings::Bindings;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -77,13 +77,11 @@ impl Package {
 
         for (decl, id) in decls.iter().zip(&idents) {
             match decl {
-                SyntaxDecl::Module {
-                    decls, attrs, name, ..
-                } => {
+                SyntaxDecl::Module { decls, name, .. } => {
                     let binding_prefix = "__".to_owned() + &name.to_snake_case();
                     pkg.define_module(
                         *id,
-                        Module::from_declarations(decls, attrs, name.clone(), binding_prefix)?,
+                        Module::from_declarations(decls, name.clone(), binding_prefix)?,
                     );
                 }
                 _ => unreachable!(),
@@ -130,7 +128,6 @@ mod test {
                 Ident(0),
                 Module {
                     names: Vec::new(),
-                    attrs: Vec::new(),
                     data_types: HashMap::new(),
                     data_type_ordering: Vec::new(),
                     funcs: HashMap::new(),
@@ -176,7 +173,6 @@ mod test {
                     Ident(0),
                     Module {
                         names: Vec::new(),
-                        attrs: Vec::new(),
                         data_types: HashMap::new(),
                         data_type_ordering: Vec::new(),
                         funcs: HashMap::new(),
@@ -188,7 +184,6 @@ mod test {
                     Ident(1),
                     Module {
                         names: Vec::new(),
-                        attrs: Vec::new(),
                         data_types: HashMap::new(),
                         data_type_ordering: Vec::new(),
                         funcs: HashMap::new(),
@@ -200,7 +195,6 @@ mod test {
                     Ident(2),
                     Module {
                         names: Vec::new(),
-                        attrs: Vec::new(),
                         data_types: HashMap::new(),
                         data_type_ordering: Vec::new(),
                         funcs: HashMap::new(),
@@ -236,7 +230,6 @@ mod test {
                             column: 10
                         }
                     }],
-                    attrs: Vec::new(),
                     funcs: HashMap::new(),
                     data_types: vec![(
                         Ident(0),
@@ -244,7 +237,6 @@ mod test {
                             variant: DataTypeVariant::Alias(AliasDataType {
                                 to: DataTypeRef::Atom(AtomType::U8)
                             }),
-                            attrs: Vec::new(),
                             repr_size: 1,
                             align: 1,
                         }

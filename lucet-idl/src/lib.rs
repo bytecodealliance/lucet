@@ -20,14 +20,14 @@ pub use crate::error::IDLError;
 pub use crate::module::Module;
 pub use crate::package::Package;
 pub use crate::types::{
-    AliasDataType, AtomType, Attr, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl,
+    AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl,
     FuncRet, Ident, Location, Name, Named, StructDataType, StructMember,
 };
 
 use crate::c::CGenerator;
 use crate::parser::Parser;
 use crate::rust::RustGenerator;
-use lucetc::Bindings;
+use lucet_module_data::bindings::Bindings;
 use std::io::Write;
 
 pub fn parse_package(input: &str) -> Result<Package, IDLError> {

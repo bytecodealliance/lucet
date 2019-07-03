@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::env;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -32,6 +34,21 @@ fn wasm_clang_root() -> PathBuf {
     }
 }
 
+// `src/wasi_host.rs` is automatically generated using clang and
+// wasi-libc headers. This requires these to be present, and installed
+// at specific paths, which is not something we can rely on outside
+// of our environment.
+// So, we follow what most other tools using `bindgen` do, and provide
+// a pre-generated version of the file, along with a way to update it.
+// This is what the `update-bindings` feature do. It requires the WASI SDK
+// to be either installed in `/opt/wasi-sdk`, or at a location defined by
+// a `WASI_SDK` environment variable, as well as `clang` headers either
+// being part of `WASI_SDK`, or found in a path defined by a
+// `CLANG_ROOT` environment variable.
+#[cfg(not(feature = "update-bindings"))]
+fn main() {}
+
+#[cfg(feature = "update-bindings")]
 fn main() {
     let wasi_sysroot = wasi_sysroot();
     let wasm_clang_root = wasm_clang_root();
@@ -88,9 +105,10 @@ fn main() {
         .whitelist_type("__wasi_.*")
         .whitelist_var("__WASI_.*");
 
+    let src_path = Path::new("src");
     host_builder
         .generate()
         .expect("can generate host bindings")
-        .write_to_file(out_path.join("wasi_host.rs"))
+        .write_to_file(src_path.join("wasi_host.rs"))
         .expect("can write host bindings");
 }

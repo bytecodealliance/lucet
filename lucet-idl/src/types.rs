@@ -33,23 +33,6 @@ pub struct Location {
     pub column: usize,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Attr {
-    pub key: String,
-    pub val: String,
-    pub location: Location,
-}
-
-impl Attr {
-    pub fn new(key: &str, val: &str, location: Location) -> Attr {
-        Attr {
-            key: key.to_owned(),
-            val: val.to_owned(),
-            location,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Ident(pub usize);
 
@@ -69,7 +52,6 @@ pub enum DataTypeRef {
 pub struct StructMember {
     pub type_: DataTypeRef,
     pub name: String,
-    pub attrs: Vec<Attr>,
     pub offset: usize,
 }
 
@@ -81,7 +63,6 @@ pub struct StructDataType {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EnumMember {
     pub name: String,
-    pub attrs: Vec<Attr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -104,7 +85,6 @@ pub enum DataTypeVariant {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DataType {
     pub variant: DataTypeVariant,
-    pub attrs: Vec<Attr>,
     pub repr_size: usize,
     pub align: usize,
 }
@@ -113,7 +93,6 @@ pub struct DataType {
 pub struct FuncArg {
     pub type_: DataTypeRef,
     pub name: String,
-    pub attrs: Vec<Attr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -122,13 +101,11 @@ pub struct FuncDecl {
     pub binding_name: String,
     pub args: Vec<FuncArg>,
     pub rets: Vec<FuncRet>,
-    pub attrs: Vec<Attr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FuncRet {
     pub type_: DataTypeRef,
-    pub attrs: Vec<Attr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

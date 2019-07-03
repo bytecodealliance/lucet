@@ -1,11 +1,24 @@
 #! /bin/sh
 
 LUCET_DIR="."
-LUCET_TARGET_DIR="${LUCET_DIR}/target/debug"
 TMPDIR="$(mktemp -d)"
 
-if [ -d "${LUCET_DIR}/target/release" ]; then
-    LUCET_TARGET_DIR="${LUCET_DIR}/target/release"
+if [ -x "${LUCET_DIR}/target/release/lucetc" ]; then
+    LUCETC="${LUCET_DIR}/target/release/lucetc"
+elif [ -x "${LUCET_DIR}/target/debug/lucetc" ]; then
+    LUCETC="${LUCET_DIR}/target/debug/lucetc"
+else
+    echo "lucetc not found" >&2
+    exit 1
+fi
+
+if [ -x "${LUCET_DIR}/target/release/lucet-wasi" ]; then
+    LUCET_WASI="${LUCET_DIR}/target/release/lucet-wasi"
+elif [ -x "${LUCET_DIR}/target/debug/lucet-wasi" ]; then
+    LUCET_WASI="${LUCET_DIR}/target/debug/lucet-wasi"
+else
+    echo "lucet-wasi not found" >&2
+    exit 1
 fi
 
 if ! command -v rsign >/dev/null; then
@@ -24,7 +37,7 @@ cp "${LUCET_DIR}/lucetc/tests/wasm/call.wat" "${TMPDIR}/test.wat"
 echo x | rsign sign -p "${TMPDIR}/src_public.key" -s "${TMPDIR}/src_secret.key" "${TMPDIR}/test.wat" >/dev/null
 
 echo "Creating a key pair using lucetc for the compiled code"
-if ! "${LUCET_TARGET_DIR}/lucetc" \
+if ! "${LUCETC}" \
     --signature-keygen \
     --signature-pk="${TMPDIR}/public.key" \
     --signature-sk="raw:${TMPDIR}/secret.key"; then
@@ -33,7 +46,7 @@ if ! "${LUCET_TARGET_DIR}/lucetc" \
 fi
 
 echo "Trying to compile source code whose signature is invalid"
-if "${LUCET_TARGET_DIR}/lucetc" \
+if "${LUCETC}" \
     "${TMPDIR}/test.wat" \
     -o "${TMPDIR}/test.so" \
     --signature-verify \
@@ -43,7 +56,7 @@ if "${LUCET_TARGET_DIR}/lucetc" \
 fi
 
 echo "Compiling the verified source code"
-if ! "${LUCET_TARGET_DIR}/lucetc" \
+if ! "${LUCETC}" \
     "${TMPDIR}/test.wat" \
     -o "${TMPDIR}/test.so" \
     --signature-verify \
@@ -53,7 +66,7 @@ if ! "${LUCET_TARGET_DIR}/lucetc" \
 fi
 
 echo "Compiling the verified source code and embedding a signature into the resulting object"
-if ! "${LUCET_TARGET_DIR}/lucetc" \
+if ! "${LUCETC}" \
     "${TMPDIR}/test.wat" \
     -o "${TMPDIR}/test.so" \
     --signature-create \
@@ -65,7 +78,7 @@ if ! "${LUCET_TARGET_DIR}/lucetc" \
 fi
 
 echo "Running the resulting object"
-if ! "${LUCET_TARGET_DIR}/lucet-wasi" \
+if ! "${LUCET_WASI}" \
     "${TMPDIR}/test.so" \
     --signature-verify \
     --signature-pk="${TMPDIR}/public.key" \
@@ -77,7 +90,7 @@ fi
 echo >>"${TMPDIR}/test.so"
 
 echo "Trying to run a tampered version of the object"
-if "${LUCET_TARGET_DIR}/lucet-wasi" \
+if "${LUCET_WASI}" \
     "${TMPDIR}/test.so" \
     --signature-verify \
     --signature-pk="${TMPDIR}/public.key" \

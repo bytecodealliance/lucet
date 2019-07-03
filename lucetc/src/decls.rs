@@ -1,4 +1,3 @@
-use crate::bindings::Bindings;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::heap::HeapSettings;
 pub use crate::module::{Exportable, TableElems};
@@ -14,6 +13,7 @@ use cranelift_wasm::{
     TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
+use lucet_module_data::bindings::Bindings;
 use lucet_module_data::{
     owned::OwnedLinearMemorySpec, ExportFunction, FunctionIndex as LucetFunctionIndex,
     FunctionMetadata, Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec, ImportFunction,

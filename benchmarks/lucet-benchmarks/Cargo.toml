@@ -1,7 +1,12 @@
 [package]
 name = "lucet-benchmarks"
-version = "0.1.0"
-authors = ["Adam C. Foltzer <acfoltzer@fastly.com>"]
+version = "0.1.1"
+description = "Benchmarks for the Lucet runtime"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
