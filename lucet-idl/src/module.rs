@@ -306,7 +306,10 @@ impl Module {
 mod tests {
     use super::*;
     use crate::parser::Parser;
-    use crate::types::{AbiType, AtomType, DataTypeVariant, StructDataType, StructMember};
+    use crate::types::{
+        AbiType, AtomType, BindDirection, BindingRef, DataTypeVariant, FuncArg, FuncBinding,
+        StructDataType, StructMember,
+    };
 
     fn mod_(syntax: &str) -> Result<Module, ValidationError> {
         let mut parser = Parser::new(syntax);
@@ -624,6 +627,319 @@ mod tests {
                     line: 1,
                     column: 11
                 },
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_arg_value_binding() {
+        assert_eq!(
+            mod_("fn trivial(a: i32) where\na_binding: in i8 <- a;")
+                .ok()
+                .unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
+                        args: vec![FuncArg {
+                            type_: AbiType::I32,
+                            name: "a".to_owned(),
+                        }],
+                        rets: Vec::new(),
+                        bindings: vec![FuncBinding {
+                            name: "a_binding".to_owned(),
+                            type_: DataTypeRef::Atom(AtomType::I8),
+                            direction: BindDirection::In,
+                            from: BindingRef::Value("a".to_owned()),
+                        }],
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_arg_ptr_binding() {
+        assert_eq!(
+            mod_("fn trivial(a: i32) where\na_binding: inout i8 <- *a;")
+                .ok()
+                .unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
+                        args: vec![FuncArg {
+                            type_: AbiType::I32,
+                            name: "a".to_owned(),
+                        }],
+                        rets: Vec::new(),
+                        bindings: vec![FuncBinding {
+                            name: "a_binding".to_owned(),
+                            type_: DataTypeRef::Atom(AtomType::I8),
+                            direction: BindDirection::InOut,
+                            from: BindingRef::Ptr("a".to_owned()),
+                        }],
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_arg_binding_wrong_direction() {
+        assert_eq!(
+            mod_("fn trivial(a: i32) where\na_binding: out i8 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "argument value must be input-only binding",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+    }
+
+    #[test]
+    fn func_one_arg_binding_wrong_type() {
+        // Cant convert int to float
+        assert_eq!(
+            mod_("fn trivial(a: i32) where\na_binding: out f32 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "binding type representation to match argument type",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+        // Cant convert float to int
+        assert_eq!(
+            mod_("fn trivial(a: f32) where\na_binding: out i32 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "binding type representation to match argument type",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+        // Cant represent i64 with i32
+        assert_eq!(
+            mod_("fn trivial(a: i32) where\na_binding: out i64 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "binding type representation to match argument type",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+        // Cant represent ptr with float
+        assert_eq!(
+            mod_("fn trivial(a: f32) where\na_binding: out i8 <- *a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "pointer bindings to be represented as an i32",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+        // Cant represent ptr with i64
+        assert_eq!(
+            mod_("fn trivial(a: i64) where\na_binding: out i8 <- *a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "pointer bindings to be represented as an i32",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+    }
+
+    #[test]
+    fn func_one_ret_value_binding() {
+        assert_eq!(
+            mod_("fn trivial() -> a: i32 where\na_binding: out i8 <- a;")
+                .ok()
+                .unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
+                        args: Vec::new(),
+                        rets: vec![FuncArg {
+                            type_: AbiType::I32,
+                            name: "a".to_owned(),
+                        }],
+                        bindings: vec![FuncBinding {
+                            name: "a_binding".to_owned(),
+                            type_: DataTypeRef::Atom(AtomType::I8),
+                            direction: BindDirection::Out,
+                            from: BindingRef::Value("a".to_owned()),
+                        }],
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_ret_pointer_binding() {
+        assert_eq!(
+            mod_("fn trivial() -> a: i32 where\na_binding: out i8 <- *a;")
+                .ok()
+                .unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
+                        args: Vec::new(),
+                        rets: vec![FuncArg {
+                            type_: AbiType::I32,
+                            name: "a".to_owned(),
+                        }],
+                        bindings: vec![FuncBinding {
+                            name: "a_binding".to_owned(),
+                            type_: DataTypeRef::Atom(AtomType::I8),
+                            direction: BindDirection::Out,
+                            from: BindingRef::Ptr("a".to_owned()),
+                        }],
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
+            }
+        );
+    }
+    #[test]
+    fn func_one_ret_wrong_direction() {
+        assert_eq!(
+            mod_("fn trivial() -> a: i32 where\na_binding: in i8 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "return value must be output-only binding",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+    }
+    #[test]
+    fn func_buncha_bindings() {
+        assert_eq!(
+            mod_(
+                "fn nontrivial(a: i32, b: i32, c: f32) -> d: i32 where\n\
+                 a_binding: out u8 <- *a,\n\
+                 b_binding: inout u16 <- *b,\n\
+                 c_binding: in f32 <- c,\n\
+                 d_binding: out i8 <- *d;\n\
+                 "
+            )
+            .ok()
+            .unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "nontrivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        binding_name: "_nontrivial".to_owned(),
+                        field_name: "nontrivial".to_owned(),
+                        args: vec![
+                            FuncArg {
+                                type_: AbiType::I32,
+                                name: "a".to_owned(),
+                            },
+                            FuncArg {
+                                type_: AbiType::I32,
+                                name: "b".to_owned(),
+                            },
+                            FuncArg {
+                                type_: AbiType::F32,
+                                name: "c".to_owned(),
+                            }
+                        ],
+                        rets: vec![FuncArg {
+                            type_: AbiType::I32,
+                            name: "d".to_owned(),
+                        }],
+                        bindings: vec![
+                            FuncBinding {
+                                name: "a_binding".to_owned(),
+                                type_: DataTypeRef::Atom(AtomType::U8),
+                                direction: BindDirection::Out,
+                                from: BindingRef::Ptr("a".to_owned()),
+                            },
+                            FuncBinding {
+                                name: "b_binding".to_owned(),
+                                type_: DataTypeRef::Atom(AtomType::U16),
+                                direction: BindDirection::InOut,
+                                from: BindingRef::Ptr("b".to_owned()),
+                            },
+                            FuncBinding {
+                                name: "c_binding".to_owned(),
+                                type_: DataTypeRef::Atom(AtomType::F32),
+                                direction: BindDirection::In,
+                                from: BindingRef::Value("c".to_owned()),
+                            },
+                            FuncBinding {
+                                name: "d_binding".to_owned(),
+                                type_: DataTypeRef::Atom(AtomType::I8),
+                                direction: BindDirection::Out,
+                                from: BindingRef::Ptr("d".to_owned()),
+                            },
+                        ],
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
             }
         );
     }

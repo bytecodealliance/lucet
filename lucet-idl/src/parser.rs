@@ -358,9 +358,9 @@ impl<'a> Parser<'a> {
                     let location = self.location;
                     self.consume();
                     self.match_token(Token::Colon, "expected :")?;
+                    let direction = self.match_bind_direction()?;
                     let type_ = self.match_ref("type value")?;
                     self.match_token(Token::LArrow, "expected <-")?;
-                    let direction = self.match_bind_direction()?;
                     let from = self.match_binding_ref()?;
                     bindings.push(BindingSyntax {
                         name: name.to_string(),
@@ -370,7 +370,10 @@ impl<'a> Parser<'a> {
                         location,
                     });
                     match self.token() {
-                        Some(Token::Semi) => break,
+                        Some(Token::Semi) => {
+                            self.consume();
+                            break;
+                        }
                         Some(Token::Comma) => {
                             self.consume();
                             continue;
@@ -1135,8 +1138,8 @@ mod tests {
         assert_eq!(
             Parser::new(
                 "fn fgetch(fptr: i32) -> r: i32 where
-file: file_t <- in *fptr,
-r: u8 <- out r;"
+file: in file_t <- *fptr,
+r: out u8 <- r;"
             )
             //       0    5    10   15   20   25   30
             .match_decl("returns u8")
@@ -1165,7 +1168,7 @@ r: u8 <- out r;"
                         name: "file".to_owned(),
                         type_: SyntaxTypeRef::Name {
                             name: "file_t".to_owned(),
-                            location: Location { line: 2, column: 6 },
+                            location: Location { line: 2, column: 9 },
                         },
                         direction: BindDirection::In,
                         from: BindingRefSyntax::Ptr(Box::new(BindingRefSyntax::Name(
@@ -1177,7 +1180,7 @@ r: u8 <- out r;"
                         name: "r".to_owned(),
                         type_: SyntaxTypeRef::Atom {
                             atom: AtomType::U8,
-                            location: Location { line: 3, column: 3 },
+                            location: Location { line: 3, column: 7 },
                         },
                         direction: BindDirection::Out,
                         from: BindingRefSyntax::Name("r".to_owned()),
