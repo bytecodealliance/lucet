@@ -18,18 +18,14 @@ fn write_relocated_slice(
         (Some(to), 0) => {
             // This is an imported slice of unknown size
             let absolute_reloc = match obj.target.binary_format {
-                BinaryFormat::Elf => {
-                    faerie::artifact::Reloc::Raw {
-                        reloc: 1, // this is an ELF R_X86_64_64
-                        addend: 0,
-                    }
-                }
-                BinaryFormat::Macho => {
-                    faerie::artifact::Reloc::Raw {
-                        reloc: 0, // this is a MachO X86_64_RELOC_UNSIGNED
-                        addend: 0,
-                    }
-                }
+                BinaryFormat::Elf => faerie::artifact::Reloc::Raw {
+                    reloc: goblin::elf::reloc::R_X86_64_64,
+                    addend: 0,
+                },
+                BinaryFormat::Macho => faerie::artifact::Reloc::Raw {
+                    reloc: goblin::mach::relocation::X86_64_RELOC_UNSIGNED as u32,
+                    addend: 0,
+                },
                 _ => panic!("Unsupported target format!"),
             };
 
