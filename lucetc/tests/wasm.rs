@@ -71,6 +71,7 @@ mod module_data {
         assert_eq!(mdata.export_functions()[0].names, vec!["exported_inc"]);
     }
 
+    #[test]
     fn globals_export() {
         let m = load_wat_module("globals_export");
         let b = super::test_bindings();
