@@ -28,4 +28,8 @@ mod example {
     fn set_color(to: i32) -> r: i32;
 
     fn get_structure(of: i32) -> s: i32;
+
+    fn debug_str(ptr: i32, len: i32) -> r: i32
+    where str: out u8 <- [ptr, len];
+
 }

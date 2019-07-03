@@ -865,6 +865,54 @@ mod tests {
             },
         );
     }
+
+    #[test]
+    fn func_two_arg_slice_binding() {
+        assert_eq!(
+            mod_(
+                "fn trivial(a_ptr: i32, a_len: i32) where\na_binding: inout i8 <- [a_ptr, a_len];"
+            )
+            .ok()
+            .unwrap(),
+            Module {
+                names: vec![Name {
+                    name: "trivial".to_owned(),
+                    location: Location { line: 1, column: 0 }
+                }],
+                funcs: vec![(
+                    Ident(0),
+                    FuncDecl {
+                        binding_name: "_trivial".to_owned(),
+                        field_name: "trivial".to_owned(),
+                        args: vec![
+                            FuncArg {
+                                type_: AbiType::I32,
+                                name: "a_ptr".to_owned(),
+                            },
+                            FuncArg {
+                                type_: AbiType::I32,
+                                name: "a_len".to_owned(),
+                            }
+                        ],
+                        rets: Vec::new(),
+                        bindings: vec![FuncBinding {
+                            name: "a_binding".to_owned(),
+                            type_: DataTypeRef::Atom(AtomType::I8),
+                            direction: BindDirection::InOut,
+                            from: BindingRef::Slice("a_ptr".to_owned(), "a_len".to_owned()),
+                        }],
+                    }
+                )]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+                data_types: HashMap::new(),
+                data_type_ordering: Vec::new(),
+                module_name: String::new(),
+                binding_prefix: String::new(),
+            }
+        );
+    }
+
     #[test]
     fn func_buncha_bindings() {
         assert_eq!(

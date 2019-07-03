@@ -105,6 +105,7 @@ pub struct BindingSyntax {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BindingRefSyntax {
     Ptr(Box<BindingRefSyntax>),
+    Slice(Box<BindingRefSyntax>, Box<BindingRefSyntax>),
     Name(String),
 }
 
@@ -417,6 +418,17 @@ impl<'a> Parser<'a> {
             Some(Token::Word(name)) => {
                 self.consume();
                 Ok(BindingRefSyntax::Name(name.to_string()))
+            }
+            Some(Token::LBracket) => {
+                self.consume();
+                let ptr_arg = self.match_binding_ref()?;
+                let _ = self.match_token(Token::Comma, ", in binding ref slice");
+                let len_arg = self.match_binding_ref()?;
+                let _ = self.match_token(Token::RBracket, "] at end of binding ref slice");
+                Ok(BindingRefSyntax::Slice(
+                    Box::new(ptr_arg),
+                    Box::new(len_arg),
+                ))
             }
             x => parse_err!(self.location, "expected binding ref, got {:?}", x),
         }
@@ -1137,11 +1149,12 @@ mod tests {
     fn fn_with_bindings() {
         assert_eq!(
             Parser::new(
-                "fn fgetch(fptr: i32) -> r: i32 where
-file: in file_t <- *fptr,
-r: out u8 <- r;"
+                "fn fgetch(fptr: i32) -> r: i32 where \n\
+                 file: in file_t <- *fptr,\n\
+                 r: out u8 <- r,\n\
+                 some_slice: out something <- [a, b];"
             )
-            //       0    5    10   15   20   25   30
+            //   0    5    10   15   20   25   30
             .match_decl("returns u8")
             .expect("valid parse")
             .expect("valid decl"),
@@ -1185,6 +1198,22 @@ r: out u8 <- r;"
                         direction: BindDirection::Out,
                         from: BindingRefSyntax::Name("r".to_owned()),
                         location: Location { line: 3, column: 0 },
+                    },
+                    BindingSyntax {
+                        name: "some_slice".to_owned(),
+                        type_: SyntaxTypeRef::Name {
+                            name: "something".to_owned(),
+                            location: Location {
+                                line: 4,
+                                column: 16
+                            },
+                        },
+                        direction: BindDirection::Out,
+                        from: BindingRefSyntax::Slice(
+                            Box::new(BindingRefSyntax::Name("a".to_owned())),
+                            Box::new(BindingRefSyntax::Name("b".to_owned()))
+                        ),
+                        location: Location { line: 4, column: 0 },
                     }
                 ],
                 location: Location { line: 1, column: 0 },

@@ -195,10 +195,62 @@ impl<'a> FuncValidator<'a> {
                     Ok(BindingRef::Ptr(name.clone()))
                 }
                 _ => Err(ValidationError::Syntax {
-                    expected: "FIXME binding must be only one pointer deep from arg",
+                    expected: "pointer binding must be of form *arg",
                     location: binding.location.clone(),
                 }),
             },
+            // A slice of two names is accepted:
+            BindingRefSyntax::Slice(ref ptr_ref, ref len_ref) => {
+                match (ptr_ref.deref(), len_ref.deref()) {
+                    (
+                        BindingRefSyntax::Name(ref ptr_name),
+                        BindingRefSyntax::Name(ref len_name),
+                    ) => {
+                        let (ptr_position, ptr_arg) =
+                            self.validate_binding_arg_mapping(ptr_name, &binding.location)?;
+                        if ptr_arg.type_ != AbiType::I32 {
+                            Err(ValidationError::BindingTypeError {
+                                expected: "slice pointer must be i32",
+                                location: binding.location.clone(),
+                            })?;
+                        }
+                        let (len_position, len_arg) =
+                            self.validate_binding_arg_mapping(len_name, &binding.location)?;
+                        if len_arg.type_ != AbiType::I32 {
+                            Err(ValidationError::BindingTypeError {
+                                expected: "slice len must be i32",
+                                location: binding.location.clone(),
+                            })?;
+                        }
+                        match (ptr_position, len_position) {
+                            (Position::Arg(_), Position::Arg(_)) => {}
+                            _ => {
+                                Err(ValidationError::BindingTypeError {
+                                    expected: "slice bindings must be inputs",
+                                    location: binding.location.clone(),
+                                })?;
+                            }
+                        }
+                        Ok(BindingRef::Slice(ptr_name.to_owned(), len_name.to_owned()))
+                    }
+                    (
+                        BindingRefSyntax::Name(ref _ptr_name),
+                        BindingRefSyntax::Ptr(ref len_ptr_ref),
+                    ) => match len_ptr_ref.deref() {
+                        BindingRefSyntax::Name(_len_ptr_name) => {
+                            unimplemented!("slice syntax [ptr, *len] for an output slice");
+                        }
+                        _ => Err(ValidationError::Syntax {
+                            expected: "slice binding must be of form [ptr, len] or [ptr, *len]",
+                            location: binding.location.clone(),
+                        }),
+                    },
+                    _ => Err(ValidationError::Syntax {
+                        expected: "slice binding must be of form [ptr, len] or [ptr, *len]",
+                        location: binding.location.clone(),
+                    }),
+                }
+            }
             // A bare name is accepted:
             BindingRefSyntax::Name(ref name) => {
                 let (position, funcarg) =

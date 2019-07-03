@@ -156,8 +156,9 @@ pub struct FuncBinding {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BindingRef {
-    Ptr(String),   // Treat the argument of that name as a pointer
-    Value(String), // Treat the argument of that name as a value
+    Ptr(String),           // Treat the argument of that name as a pointer
+    Slice(String, String), // Treat first argument as a pointer, second as the length
+    Value(String),         // Treat the argument of that name as a value
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
