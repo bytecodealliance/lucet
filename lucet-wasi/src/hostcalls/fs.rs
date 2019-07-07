@@ -11,6 +11,7 @@ use lucet_runtime::vmctx::Vmctx;
 
 use nix::libc::{self, c_long, c_void, off_t};
 use std::ffi::OsStr;
+use std::mem::MaybeUninit;
 use std::os::unix::prelude::{FromRawFd, OsStrExt};
 
 pub fn wasi_fd_close(vmctx: &mut Vmctx, fd: wasm32::__wasi_fd_t) -> wasm32::__wasi_errno_t {
@@ -819,11 +820,12 @@ pub fn wasi_fd_filestat_set_times(
     let fst_flags = dec_fstflags(fst_flags);
     if fst_flags & (host::__WASI_FILESTAT_SET_MTIM_NOW as host::__wasi_fstflags_t) != 0 {
         let clock_id = libc::CLOCK_REALTIME;
-        let mut timespec = unsafe { std::mem::uninitialized::<libc::timespec>() };
-        let res = unsafe { libc::clock_gettime(clock_id, &mut timespec as *mut libc::timespec) };
+        let mut timespec = MaybeUninit::<libc::timespec>::uninit();
+        let res = unsafe { libc::clock_gettime(clock_id, timespec.as_mut_ptr()) };
         if res != 0 {
             return wasm32::errno_from_nix(nix::errno::Errno::last());
         }
+        let timespec = unsafe { timespec.assume_init() };
         let time_ns = match (timespec.tv_sec as host::__wasi_timestamp_t)
             .checked_mul(1_000_000_000)
             .and_then(|sec_ns| sec_ns.checked_add(timespec.tv_nsec as host::__wasi_timestamp_t))
@@ -887,11 +889,12 @@ pub fn wasi_path_filestat_set_times(
     let fst_flags = dec_fstflags(fst_flags);
     if fst_flags & (host::__WASI_FILESTAT_SET_MTIM_NOW as host::__wasi_fstflags_t) != 0 {
         let clock_id = libc::CLOCK_REALTIME;
-        let mut timespec = unsafe { std::mem::uninitialized::<libc::timespec>() };
-        let res = unsafe { libc::clock_gettime(clock_id, &mut timespec as *mut libc::timespec) };
+        let mut timespec = MaybeUninit::<libc::timespec>::uninit();
+        let res = unsafe { libc::clock_gettime(clock_id, timespec.as_mut_ptr()) };
         if res != 0 {
             return wasm32::errno_from_nix(nix::errno::Errno::last());
         }
+        let timespec = unsafe { timespec.assume_init() };
         let time_ns = match (timespec.tv_sec as host::__wasi_timestamp_t)
             .checked_mul(1_000_000_000)
             .and_then(|sec_ns| sec_ns.checked_add(timespec.tv_nsec as host::__wasi_timestamp_t))
@@ -1052,18 +1055,19 @@ pub fn wasi_fd_readdir(
     if cookie != wasm32::__WASI_DIRCOOKIE_START {
         unsafe { seekdir(dir, cookie as c_long) };
     }
-    let mut entry_buf = unsafe { std::mem::uninitialized::<dirent>() };
+    let mut entry_buf = MaybeUninit::<dirent>::uninit();
     let mut left = host_buf_len;
     let mut host_buf_offset: usize = 0;
     while left > 0 {
         let mut host_entry: *mut dirent = std::ptr::null_mut();
-        let res = unsafe { readdir_r(dir, &mut entry_buf, &mut host_entry) };
+        let res = unsafe { readdir_r(dir, entry_buf.as_mut_ptr(), &mut host_entry) };
         if res == -1 {
             return wasm32::errno_from_nix(nix::errno::Errno::last());
         }
         if host_entry.is_null() {
             break;
         }
+        unsafe { entry_buf.assume_init() };
         let entry: wasm32::__wasi_dirent_t = match dirent_from_host(&unsafe { *host_entry }) {
             Ok(entry) => entry,
             Err(e) => return enc_errno(e),

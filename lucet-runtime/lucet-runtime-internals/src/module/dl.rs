@@ -7,7 +7,7 @@ use lucet_module_data::{
     PublicKey, Signature,
 };
 use std::ffi::CStr;
-use std::mem;
+use std::mem::MaybeUninit;
 use std::path::Path;
 use std::slice;
 use std::slice::from_raw_parts;
@@ -267,10 +267,10 @@ fn is_undefined_symbol(e: &std::io::Error) -> bool {
 // TODO: PR to nix or libloading?
 // TODO: possibly not safe to use without grabbing the mutex within libloading::Library?
 fn dladdr(addr: *const c_void) -> Option<libc::Dl_info> {
-    let mut info = unsafe { mem::uninitialized::<libc::Dl_info>() };
-    let res = unsafe { libc::dladdr(addr, &mut info as *mut libc::Dl_info) };
+    let mut info = MaybeUninit::<libc::Dl_info>::uninit();
+    let res = unsafe { libc::dladdr(addr, info.as_mut_ptr()) };
     if res != 0 {
-        Some(info)
+        Some(unsafe { info.assume_init() })
     } else {
         None
     }
