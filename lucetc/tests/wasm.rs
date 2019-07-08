@@ -21,6 +21,7 @@ fn test_bindings() -> Bindings {
         ("imp_1".into(), "imp_1".into()),             // import_many
         ("imp_2".into(), "imp_2".into()),             // import_many
         ("imp_3".into(), "imp_3".into()),             // import_many
+        ("imported_main".into(), "imported_main".into()), // exported_import
     ]
     .iter()
     .cloned()
@@ -35,6 +36,40 @@ mod module_data {
     use lucet_module_data::bindings::Bindings;
     use lucetc::{Compiler, HeapSettings, LucetcErrorKind, OptLevel};
     use std::path::PathBuf;
+
+    #[test]
+    fn exported_import() {
+        let m = load_wat_module("exported_import");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling exported_import");
+        let mdata = c.module_data().unwrap();
+        assert_eq!(mdata.globals_spec().len(), 0);
+
+        assert_eq!(mdata.import_functions().len(), 2);
+        assert_eq!(mdata.export_functions().len(), 2);
+        assert_eq!(mdata.function_info().len(), 4);
+        // This ordering is actually arbitrary. Cranelift hoists additional declaration modifiers
+        // up to the function declaration. This means inc comes first, and main second, in
+        // `exported_import.wat`.
+        assert_eq!(mdata.export_functions()[0].names, vec!["exported_inc"]);
+        assert_eq!(mdata.export_functions()[1].names, vec!["exported_main"]);
+    }
+
+    #[test]
+    fn multiple_import() {
+        let m = load_wat_module("multiple_import");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling multiple_import");
+        let mdata = c.module_data().unwrap();
+        assert_eq!(mdata.globals_spec().len(), 0);
+
+        assert_eq!(mdata.import_functions().len(), 2);
+        assert_eq!(mdata.export_functions().len(), 1);
+        assert_eq!(mdata.function_info().len(), 4);
+        assert_eq!(mdata.export_functions()[0].names, vec!["exported_inc"]);
+    }
 
     #[test]
     fn globals_export() {
@@ -100,8 +135,9 @@ mod module_data {
         assert_eq!(mdata.function_info()[0].name, Some("host_read"));
         assert_eq!(mdata.function_info()[1].name, Some("host_write"));
         assert_eq!(mdata.function_info()[2].name, Some("guest_func__start"));
-        assert_eq!(mdata.export_functions().len(), 1);
-        assert_eq!(mdata.export_functions()[0].names, ["_start"]);
+        assert_eq!(mdata.export_functions().len(), 3);
+        assert_eq!(mdata.export_functions()[0].names, ["read_2", "read"]);
+        assert_eq!(mdata.export_functions()[2].names, ["_start"]);
         assert_eq!(mdata.globals_spec().len(), 0);
     }
 

@@ -1,10 +1,6 @@
-extern crate clap;
-extern crate failure;
-extern crate wasmonkey;
-
 mod config;
 
-use config::*;
+use crate::config::*;
 use wasmonkey::*;
 
 fn main() -> Result<(), WError> {

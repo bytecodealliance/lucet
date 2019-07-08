@@ -79,7 +79,7 @@ impl<'a> ModuleDecls<'a> {
     pub fn new<B: ClifBackend>(
         info: ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
-        bindings: &Bindings,
+        bindings: &'a Bindings,
         runtime: Runtime,
         heap_settings: HeapSettings,
     ) -> Result<Self, LucetcError> {
@@ -109,7 +109,7 @@ impl<'a> ModuleDecls<'a> {
     fn declare_funcs<B: ClifBackend>(
         decls: &mut ModuleDecls<'a>,
         clif_module: &mut ClifModule<B>,
-        bindings: &Bindings,
+        bindings: &'a Bindings,
     ) -> Result<(), LucetcError> {
         for ix in 0..decls.info.functions.len() {
             let func_index = UniqueFuncIndex::new(ix);
@@ -117,7 +117,7 @@ impl<'a> ModuleDecls<'a> {
             fn export_name_for<'a>(
                 func_ix: UniqueFuncIndex,
                 decls: &mut ModuleDecls<'a>,
-            ) -> Option<(String, Linkage)> {
+            ) -> Option<String> {
                 let export = decls.info.functions.get(func_ix).unwrap();
 
                 if !export.export_names.is_empty() {
@@ -126,10 +126,7 @@ impl<'a> ModuleDecls<'a> {
                         names: export.export_names.clone(),
                     });
 
-                    Some((
-                        format!("guest_func_{}", export.export_names[0]),
-                        Linkage::Export,
-                    ))
+                    Some(format!("guest_func_{}", export.export_names[0]))
                 } else {
                     None
                 }
@@ -138,28 +135,51 @@ impl<'a> ModuleDecls<'a> {
             fn import_name_for<'a>(
                 func_ix: UniqueFuncIndex,
                 decls: &mut ModuleDecls<'a>,
-                bindings: &Bindings,
-            ) -> Result<Option<(String, Linkage)>, failure::Context<LucetcErrorKind>> {
+                bindings: &'a Bindings,
+            ) -> Result<Option<String>, failure::Context<LucetcErrorKind>> {
                 if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
+                    let import_symbol = bindings
+                        .translate(import_mod, import_field)
+                        .context(LucetcErrorKind::TranslatingModule)?;
                     decls.imports.push(ImportFunction {
                         fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                         module: import_mod,
                         name: import_field,
                     });
-                    let import_symbol = bindings
-                        .translate(import_mod, import_field)
-                        .context(LucetcErrorKind::TranslatingModule)?;
-                    Ok(Some((import_symbol, Linkage::Import)))
+                    Ok(Some(import_symbol.to_string()))
                 } else {
                     Ok(None)
                 }
             };
 
-            let (decl_sym, decl_linkage) = import_name_for(func_index, decls, bindings)?
-                .or_else(|| export_name_for(func_index, decls))
-                .unwrap_or_else(|| (format!("guest_func_{}", ix), Linkage::Local));
+            let import_info = import_name_for(func_index, decls, bindings)?;
+            let export_info = export_name_for(func_index, decls);
 
-            decls.declare_function(clif_module, decl_sym, decl_linkage, func_index)?;
+            match (import_info, export_info) {
+                (Some(import_sym), _) => {
+                    // if a function is only an import, declare the corresponding artifact import.
+                    // if a function is an export and import, it will not have a real function body
+                    // in this program, and we must not declare it with Linkage::Export (there will
+                    // never be a define to satisfy the symbol!)
+
+                    decls.declare_function(clif_module, import_sym, Linkage::Import, func_index)?;
+                }
+                (None, Some(export_sym)) => {
+                    // This is a function that is only exported, so there will be a body in this
+                    // artifact. We can declare the export.
+                    decls.declare_function(clif_module, export_sym, Linkage::Export, func_index)?;
+                }
+                (None, None) => {
+                    // No import or export for this function. It's local, and we have to make up a
+                    // name.
+                    decls.declare_function(
+                        clif_module,
+                        format!("guest_func_{}", ix),
+                        Linkage::Local,
+                        func_index,
+                    )?;
+                }
+            }
         }
         Ok(())
     }
@@ -177,7 +197,9 @@ impl<'a> ModuleDecls<'a> {
     ) -> Result<UniqueFuncIndex, LucetcError> {
         let (new_funcidx, _) = self.info.declare_func_with_sig(signature);
 
-        self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)
+        self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)?;
+
+        Ok(new_funcidx)
     }
 
     /// The internal side of fixing up a new function declaration. This is also the work that must
@@ -189,6 +211,13 @@ impl<'a> ModuleDecls<'a> {
         decl_linkage: Linkage,
         func_ix: UniqueFuncIndex,
     ) -> Result<UniqueFuncIndex, LucetcError> {
+        // This function declaration may be a subsequent additional declaration for a function
+        // we've already been told about. In that case, func_ix will already be a valid index for a
+        // function name, and we should not try to declare it again.
+        //
+        // Regardless of the function being known internally, we must forward the additional
+        // declaration to `clif_module` so functions with multiple forms of linkage (import +
+        // export, exported twice, ...) are correctly declared in the resultant artifact.
         let funcid = clif_module
             .declare_function(
                 &decl_sym,
@@ -196,7 +225,18 @@ impl<'a> ModuleDecls<'a> {
                 self.info.signature_for_function(func_ix),
             )
             .context(LucetcErrorKind::TranslatingModule)?;
-        self.function_names.push(Name::new_func(decl_sym, funcid));
+
+        if func_ix.as_u32() as usize >= self.function_names.len() {
+            // `func_ix` is new, so we need to add the name. If func_ix is new, it should be
+            // an index for the Name we're about to add. That is, it should be the same as the
+            // current value for `self.function_names.len()`.
+            //
+            // If this fails, we're declaring functions out of order. oops!
+            debug_assert!(func_ix.as_u32() as usize == self.function_names.len());
+
+            self.function_names.push(Name::new_func(decl_sym, funcid));
+        }
+
         Ok(UniqueFuncIndex::new(self.function_names.len() - 1))
     }
 

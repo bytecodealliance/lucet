@@ -1,8 +1,8 @@
-use errors::*;
+use crate::errors::*;
+use crate::patcher::BUILTIN_PREFIX;
 use goblin::elf::Elf;
 use goblin::mach::{self, Mach, MachO};
 use goblin::Object;
-use patcher::BUILTIN_PREFIX;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -36,7 +36,7 @@ impl ExtractedSymbols {
 
     pub fn merge_additional(mut self, additional_names: &[String]) -> Self {
         let mut additional_symbols: Vec<_> = additional_names
-            .into_iter()
+            .iter()
             .map(|name| ExtractedSymbol {
                 name: name.to_string(),
             })
@@ -47,7 +47,7 @@ impl ExtractedSymbols {
     }
 }
 
-fn parse_elf(elf: &Elf) -> Result<ExtractedSymbols, WError> {
+fn parse_elf(elf: &Elf<'_>) -> Result<ExtractedSymbols, WError> {
     let mut symbols = vec![];
 
     for symbol in elf
@@ -67,7 +67,7 @@ fn parse_elf(elf: &Elf) -> Result<ExtractedSymbols, WError> {
     Ok(symbols.into())
 }
 
-fn parse_macho(macho: &MachO) -> Result<ExtractedSymbols, WError> {
+fn parse_macho(macho: &MachO<'_>) -> Result<ExtractedSymbols, WError> {
     let mut symbols = vec![];
 
     // Start by finding the boundaries of the text section
