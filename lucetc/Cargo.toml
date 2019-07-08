@@ -25,13 +25,14 @@ cranelift-frontend = { path = "../cranelift/cranelift-frontend", version = "0.31
 cranelift-module = { path = "../cranelift/cranelift-module", version = "0.31.0" }
 cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.31.0" }
 cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.31.0" }
-target-lexicon = "0.3"
+target-lexicon = "0.4.0"
 lucet-module-data = { path = "../lucet-module-data", version = "0.1.1" }
 wasmparser = "0.23"
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"
 faerie = "0.10.0"
+goblin = "0.0.22"
 failure = "0.1"
 byteorder = "1.2"
 wasmonkey = { path = "../lucet-builtins/wasmonkey", version = "0.1.7" }

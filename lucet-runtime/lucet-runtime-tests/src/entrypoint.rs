@@ -14,6 +14,16 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
         arg0 + arg1
     }
 
+    extern "C" fn add_4_hostcall(
+        _vmctx: *mut lucet_vmctx,
+        arg0: u64,
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+    ) -> u64 {
+        arg0 + arg1 + arg2 + arg3
+    }
+
     extern "C" fn add_10(
         _vmctx: *mut lucet_vmctx,
         arg0: u64,
@@ -123,6 +133,11 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
         .with_export_func(
             MockExportBuilder::new("add_2", FunctionPointer::from_usize(add_2 as usize))
                 .with_sig(lucet_signature!((I64, I64) -> I64)),
+        )
+        .with_exported_import_func(
+            "add_4_reexport",
+            FunctionPointer::from_usize(add_4_hostcall as usize),
+            lucet_signature!((I64, I64, I64, I64) -> I64),
         )
         .with_export_func(
             MockExportBuilder::new("add_10", FunctionPointer::from_usize(add_10 as usize))
@@ -585,6 +600,31 @@ macro_rules! entrypoint_tests {
             }
         }
 
+        #[test]
+        fn mock_imported_entrypoint() {
+            imported_entrypoint(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_imported_entrypoint() {
+            imported_entrypoint(wat_calculator_module())
+        }
+
+        fn imported_entrypoint(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run(
+                "add_4_reexport",
+                &[123u64.into(), 456u64.into(), 789u64.into(), 432u64.into()],
+            ) {
+                Ok(res) => assert_eq!(u64::from(res), 1800),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
         use $crate::build::test_module_c;
         const TEST_REGION_INIT_VAL: libc::c_int = 123;
         const TEST_REGION_SIZE: libc::size_t = 4;
@@ -850,6 +890,19 @@ macro_rules! entrypoint_tests {
                     extern "C" fn(*mut lucet_vmctx, u64) -> u64
                 >(func.ptr.as_usize());
                 (func)(vmctx.as_raw(), x) + 1
+            }
+        }
+
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn add_4_hostcall(
+                &mut vmctx,
+                x: u64,
+                y: u64,
+                z: u64,
+                w: u64,
+            ) -> u64 {
+                x + y + z + w
             }
         }
 

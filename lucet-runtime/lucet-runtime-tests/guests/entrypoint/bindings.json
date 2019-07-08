@@ -1,6 +1,7 @@
 {
     "env": {
         "black_box": "black_box",
-        "callback_hostcall": "callback_hostcall"
+        "callback_hostcall": "callback_hostcall",
+        "add_4_hostcall": "add_4_hostcall"
     }
 }
