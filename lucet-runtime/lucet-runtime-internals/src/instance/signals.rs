@@ -11,7 +11,7 @@ use lucet_module_data::TrapCode;
 use nix::sys::signal::{
     pthread_sigmask, raise, sigaction, SaFlags, SigAction, SigHandler, SigSet, SigmaskHow, Signal,
 };
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::panic;
 use std::sync::{Arc, Mutex};
 
@@ -375,18 +375,20 @@ pub struct SigStack {
 
 impl SigStack {
     pub fn new(sp: *mut libc::c_void, flags: SigStackFlags, size: libc::size_t) -> SigStack {
-        let mut stack = unsafe { mem::uninitialized::<libc::stack_t>() };
-        stack.ss_sp = sp;
-        stack.ss_flags = flags.bits();
-        stack.ss_size = size;
+        let stack = libc::stack_t {
+            ss_sp: sp,
+            ss_flags: flags.bits(),
+            ss_size: size,
+        };
         SigStack { stack }
     }
 
     pub fn disabled() -> SigStack {
-        let mut stack = unsafe { mem::uninitialized::<libc::stack_t>() };
-        stack.ss_sp = std::ptr::null_mut();
-        stack.ss_flags = SigStackFlags::SS_DISABLE.bits();
-        stack.ss_size = libc::SIGSTKSZ;
+        let stack = libc::stack_t {
+            ss_sp: std::ptr::null_mut(),
+            ss_flags: SigStackFlags::SS_DISABLE.bits(),
+            ss_size: libc::SIGSTKSZ,
+        };
         SigStack { stack }
     }
 
