@@ -61,7 +61,6 @@ pub struct TableDecl<'a> {
     pub table: &'a Table,
     pub elems: &'a [TableElems],
     pub contents_name: Name,
-    pub len_name: Name,
 }
 
 pub struct ModuleDecls<'a> {
@@ -69,7 +68,7 @@ pub struct ModuleDecls<'a> {
     function_names: PrimaryMap<UniqueFuncIndex, Name>,
     imports: Vec<ImportFunction<'a>>,
     exports: Vec<ExportFunction<'a>>,
-    table_names: PrimaryMap<TableIndex, (Name, Name)>,
+    table_names: PrimaryMap<TableIndex, Name>,
     runtime_names: HashMap<RuntimeFunc, UniqueFuncIndex>,
     globals_spec: Vec<GlobalSpec<'a>>,
     linear_memory_spec: Option<OwnedLinearMemorySpec>,
@@ -243,7 +242,7 @@ impl<'a> ModuleDecls<'a> {
     fn declare_tables<B: ClifBackend>(
         info: &ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
-    ) -> Result<PrimaryMap<TableIndex, (Name, Name)>, LucetcError> {
+    ) -> Result<PrimaryMap<TableIndex, Name>, LucetcError> {
         let mut table_names = PrimaryMap::new();
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
@@ -252,13 +251,7 @@ impl<'a> ModuleDecls<'a> {
                 .context(LucetcErrorKind::TranslatingModule)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
-            let len_symbol = format!("guest_table_{}_len", ix);
-            let len_data_id = clif_module
-                .declare_data(&len_symbol, Linkage::Export, false, None)
-                .context(LucetcErrorKind::TranslatingModule)?;
-            let len_name = Name::new_data(len_symbol, len_data_id);
-
-            table_names.push((def_name, len_name));
+            table_names.push(def_name);
         }
         Ok(table_names)
     }
@@ -432,7 +425,7 @@ impl<'a> ModuleDecls<'a> {
     }
 
     pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl<'_>, Error> {
-        let (contents_name, len_name) = self
+        let contents_name = self
             .table_names
             .get(table_index)
             .ok_or_else(|| format_err!("table index out of bounds: {:?}", table_index))?;
@@ -445,7 +438,6 @@ impl<'a> ModuleDecls<'a> {
             export_names: exportable_tbl.export_names.clone(),
             import_name: import_name.cloned(),
             contents_name: contents_name.clone(),
-            len_name: len_name.clone(),
         })
     }
 

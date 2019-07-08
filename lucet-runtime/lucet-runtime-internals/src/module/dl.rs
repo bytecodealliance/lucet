@@ -170,21 +170,31 @@ impl ModuleInternal for DlModule {
     }
 
     fn table_elements(&self) -> Result<&[TableElement], Error> {
-        let p_table_segment: Symbol<'_, *const TableElement> = unsafe {
-            self.lib.get(b"guest_table_0").map_err(|e| {
-                lucet_incorrect_module!("error loading required symbol `guest_table_0`: {}", e)
+        let p_tables: Symbol<'_, *const &[TableElement]> = unsafe {
+            self.lib.get(b"lucet_tables").map_err(|e| {
+                lucet_incorrect_module!("error loading required symbol `lucet_tables`: {}", e)
             })?
         };
-        let p_table_segment_len: Symbol<'_, *const usize> = unsafe {
-            self.lib.get(b"guest_table_0_len").map_err(|e| {
+        unsafe {
+            println!(
+                "table pointer: {:p}",
+                p_tables.as_ref().unwrap() as *const &[TableElement]
+            );
+        }
+        /*
+        let p_tables_count: Symbol<'_, *const usize> = unsafe {
+            self.lib.get(b"lucet_tables_count").map_err(|e| {
                 lucet_incorrect_module!("error loading required symbol `guest_table_0_len`: {}", e)
             })?
-        };
-        let len = unsafe { **p_table_segment_len };
+        }
+        */
+        let len = 1; //unsafe { **p_table_segment_len };
         if len > std::u32::MAX as usize {
             lucet_incorrect_module!("table segment too long: {}", len);
         }
-        Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize) })
+        let tables_slice: &'static [&'static [TableElement]] =
+            unsafe { from_raw_parts(*p_tables, len as usize) };
+        Ok(tables_slice[0])
     }
 
     fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error> {

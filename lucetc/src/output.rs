@@ -2,6 +2,7 @@ use crate::error::LucetcErrorKind;
 use crate::function_manifest::write_function_manifest;
 use crate::name::Name;
 use crate::stack_probe;
+use crate::table::link_tables;
 use crate::traps::write_trap_tables;
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
@@ -44,6 +45,7 @@ impl ObjectFile {
     pub fn new(
         mut product: FaerieProduct,
         mut function_manifest: Vec<(String, FunctionSpec)>,
+        mut table_manifest: Vec<Name>,
     ) -> Result<Self, Error> {
         stack_probe::declare_and_define(&mut product)?;
 
@@ -97,11 +99,13 @@ impl ObjectFile {
 
         write_trap_tables(trap_manifest, &mut product.artifact)?;
         write_function_manifest(function_manifest.as_slice(), &mut product.artifact)?;
+        link_tables(table_manifest.as_slice(), &mut product.artifact)?;
 
         Ok(Self {
             artifact: product.artifact,
         })
     }
+
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
         let _ = path.as_ref().file_name().ok_or(format_err!(
             "path {:?} needs to have filename",

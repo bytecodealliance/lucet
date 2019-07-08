@@ -137,7 +137,7 @@ impl<'a> Compiler<'a> {
 
         write_module_data(&mut self.clif_module, &self.decls)?;
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
-        write_table_data(&mut self.clif_module, &self.decls)?;
+        let table_names = write_table_data(&mut self.clif_module, &self.decls)?;
 
         let function_manifest: Vec<(String, FunctionSpec)> = self
             .clif_module
@@ -155,7 +155,7 @@ impl<'a> Compiler<'a> {
             })
             .collect();
 
-        let obj = ObjectFile::new(self.clif_module.finish(), function_manifest)
+        let obj = ObjectFile::new(self.clif_module.finish(), function_manifest, table_names)
             .context(LucetcErrorKind::Output)?;
         Ok(obj)
     }

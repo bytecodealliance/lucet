@@ -132,7 +132,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             colocated: true,
         });
         let bound_ptr_gv = func.create_global_value(ir::GlobalValueData::Symbol {
-            name: table_decl.len_name.into(),
+            name: panic!("table_decl.len_name.into()"),
             offset: 0.into(),
             colocated: true,
         });
