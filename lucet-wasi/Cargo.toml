@@ -28,7 +28,7 @@ cast = "0.2"
 clap = "2.23"
 failure = "0.1"
 human-size = "0.4"
-libc = "=0.2.54"
+libc = "=0.2.59"
 lucet-runtime = { path = "../lucet-runtime", version = "0.1.1" }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "0.1.1" }
 lucet-module-data = { path = "../lucet-module-data", version = "0.1.1" }
