@@ -11,6 +11,7 @@ use lucet_module_data::TrapCode;
 use nix::sys::signal::{
     pthread_sigmask, raise, sigaction, SaFlags, SigAction, SigHandler, SigSet, SigmaskHow, Signal,
 };
+use std::mem::MaybeUninit;
 use std::panic;
 use std::sync::{Arc, Mutex};
 
@@ -374,18 +375,20 @@ pub struct SigStack {
 
 impl SigStack {
     pub fn new(sp: *mut libc::c_void, flags: SigStackFlags, size: libc::size_t) -> SigStack {
-        let mut stack = unsafe { std::mem::uninitialized::<libc::stack_t>() };
-        stack.ss_sp = sp;
-        stack.ss_flags = flags.bits();
-        stack.ss_size = size;
+        let stack = libc::stack_t {
+            ss_sp: sp,
+            ss_flags: flags.bits(),
+            ss_size: size,
+        };
         SigStack { stack }
     }
 
     pub fn disabled() -> SigStack {
-        let mut stack = unsafe { std::mem::uninitialized::<libc::stack_t>() };
-        stack.ss_sp = std::ptr::null_mut();
-        stack.ss_flags = SigStackFlags::SS_DISABLE.bits();
-        stack.ss_size = libc::SIGSTKSZ;
+        let stack = libc::stack_t {
+            ss_sp: std::ptr::null_mut(),
+            ss_flags: SigStackFlags::SS_DISABLE.bits(),
+            ss_size: libc::SIGSTKSZ,
+        };
         SigStack { stack }
     }
 
@@ -414,7 +417,7 @@ bitflags! {
 }
 
 pub unsafe fn sigaltstack(new_sigstack: Option<SigStack>) -> nix::Result<Option<SigStack>> {
-    let mut previous_stack = std::mem::uninitialized::<libc::stack_t>();
+    let mut previous_stack = MaybeUninit::<libc::stack_t>::uninit();
     let disabled_sigstack = SigStack::disabled();
     let new_stack = match new_sigstack {
         None => &disabled_sigstack.stack,
@@ -422,11 +425,11 @@ pub unsafe fn sigaltstack(new_sigstack: Option<SigStack>) -> nix::Result<Option<
     };
     let res = libc::sigaltstack(
         new_stack as *const libc::stack_t,
-        &mut previous_stack as *mut libc::stack_t,
+        previous_stack.as_mut_ptr(),
     );
     nix::errno::Errno::result(res).map(|_| {
         let sigstack = SigStack {
-            stack: previous_stack,
+            stack: previous_stack.assume_init(),
         };
         if sigstack.flags().contains(SigStackFlags::SS_DISABLE) {
             None
@@ -437,11 +440,8 @@ pub unsafe fn sigaltstack(new_sigstack: Option<SigStack>) -> nix::Result<Option<
 }
 
 pub unsafe fn altstack_flags() -> nix::Result<SigStackFlags> {
-    let mut current_stack = std::mem::uninitialized::<libc::stack_t>();
-    let res = libc::sigaltstack(
-        std::ptr::null_mut(),
-        &mut current_stack as *mut libc::stack_t,
-    );
+    let mut current_stack = MaybeUninit::<libc::stack_t>::uninit();
+    let res = libc::sigaltstack(std::ptr::null_mut(), current_stack.as_mut_ptr());
     nix::errno::Errno::result(res)
-        .map(|_| SigStackFlags::from_bits_truncate(current_stack.ss_flags))
+        .map(|_| SigStackFlags::from_bits_truncate(current_stack.assume_init().ss_flags))
 }

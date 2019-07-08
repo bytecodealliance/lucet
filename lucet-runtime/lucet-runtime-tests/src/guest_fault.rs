@@ -700,14 +700,15 @@ macro_rules! guest_fault_tests {
         #[test]
         fn sigaltstack_restores() {
             use libc::*;
+            use std::mem::MaybeUninit;
 
             test_nonex(|| {
                 // any alternate stack present before a thread runs an instance should be restored
                 // after the instance returns
+                let mut beforestack = MaybeUninit::<stack_t>::uninit();
                 let beforestack = unsafe {
-                    let mut beforestack = std::mem::uninitialized::<stack_t>();
-                    sigaltstack(std::ptr::null(), &mut beforestack as *mut stack_t);
-                    beforestack
+                    sigaltstack(std::ptr::null(), beforestack.as_mut_ptr());
+                    beforestack.assume_init()
                 };
 
                 let module = mock_traps_module();
@@ -718,10 +719,10 @@ macro_rules! guest_fault_tests {
                     .expect("instance can be created");
                 run_onetwothree(&mut inst);
 
+                let mut afterstack = MaybeUninit::<stack_t>::uninit();
                 let afterstack = unsafe {
-                    let mut afterstack = std::mem::uninitialized::<stack_t>();
-                    sigaltstack(std::ptr::null(), &mut afterstack as *mut stack_t);
-                    afterstack
+                    sigaltstack(std::ptr::null(), afterstack.as_mut_ptr());
+                    afterstack.assume_init()
                 };
 
                 assert_eq!(beforestack.ss_sp, afterstack.ss_sp);

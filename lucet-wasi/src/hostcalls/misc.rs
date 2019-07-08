@@ -12,6 +12,7 @@ use lucet_runtime::vmctx::Vmctx;
 use nix::convert_ioctl_res;
 use nix::libc::{self, c_int};
 use std::cmp;
+use std::mem::MaybeUninit;
 use std::time::SystemTime;
 
 // define the `fionread()` function, equivalent to `ioctl(fd, FIONREAD, *bytes)`
@@ -123,11 +124,12 @@ pub fn wasi_clock_res_get(
     };
 
     // no `nix` wrapper for clock_getres, so we do it ourselves
-    let mut timespec = unsafe { std::mem::uninitialized::<libc::timespec>() };
-    let res = unsafe { libc::clock_getres(clock_id, &mut timespec as *mut libc::timespec) };
+    let mut timespec = MaybeUninit::<libc::timespec>::uninit();
+    let res = unsafe { libc::clock_getres(clock_id, timespec.as_mut_ptr()) };
     if res != 0 {
         return wasm32::errno_from_nix(nix::errno::Errno::last());
     }
+    let timespec = unsafe { timespec.assume_init() };
 
     // convert to nanoseconds, returning EOVERFLOW in case of overflow; this is freelancing a bit
     // from the spec but seems like it'll be an unusual situation to hit
@@ -166,12 +168,12 @@ pub fn wasi_clock_time_get(
     };
 
     // no `nix` wrapper for clock_getres, so we do it ourselves
-    let mut timespec = unsafe { std::mem::uninitialized::<libc::timespec>() };
-    let res = unsafe { libc::clock_gettime(clock_id, &mut timespec as *mut libc::timespec) };
+    let mut timespec = MaybeUninit::<libc::timespec>::uninit();
+    let res = unsafe { libc::clock_gettime(clock_id, timespec.as_mut_ptr()) };
     if res != 0 {
         return wasm32::errno_from_nix(nix::errno::Errno::last());
     }
-
+    let timespec = unsafe { timespec.assume_init() };
     // convert to nanoseconds, returning EOVERFLOW in case of overflow; this is freelancing a bit
     // from the spec but seems like it'll be an unusual situation to hit
     (timespec.tv_sec as host::__wasi_timestamp_t)
