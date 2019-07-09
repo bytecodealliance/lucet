@@ -1,17 +1,19 @@
 use crate::error::LucetcErrorKind;
-use crate::function_manifest::write_function_manifest;
+use crate::function_manifest::{write_function_manifest, FUNCTION_MANIFEST_SYM};
 use crate::name::Name;
+use crate::pointer::NATIVE_POINTER_SIZE;
 use crate::stack_probe;
-use crate::table::link_tables;
+use crate::table::{link_tables, TABLE_SYM};
 use crate::traps::write_trap_tables;
+use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
-use faerie::Artifact;
+use faerie::{Artifact, Decl, Link};
 use failure::{format_err, Error, ResultExt};
-use lucet_module_data::FunctionSpec;
+use lucet_module_data::{FunctionSpec, LUCET_MODULE_SYM, MODULE_DATA_SYM};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::path::Path;
 
 pub struct CraneliftFuncs {
@@ -44,8 +46,9 @@ pub struct ObjectFile {
 impl ObjectFile {
     pub fn new(
         mut product: FaerieProduct,
+        module_data_len: usize,
         mut function_manifest: Vec<(String, FunctionSpec)>,
-        mut table_manifest: Vec<Name>,
+        table_manifest: Vec<Name>,
     ) -> Result<Self, Error> {
         stack_probe::declare_and_define(&mut product)?;
 
@@ -100,6 +103,46 @@ impl ObjectFile {
         write_trap_tables(trap_manifest, &mut product.artifact)?;
         write_function_manifest(function_manifest.as_slice(), &mut product.artifact)?;
         link_tables(table_manifest.as_slice(), &mut product.artifact)?;
+
+        // And now we write out fields for the non-#[derive(Serialize)]-able parts of `Module`
+        let mut native_data = Cursor::new(Vec::with_capacity(NATIVE_POINTER_SIZE * 4));
+        product
+            .artifact
+            .declare(LUCET_MODULE_SYM, Decl::data().global())
+            .context(format!("declaring {}", LUCET_MODULE_SYM))?;
+
+        product.artifact.link(Link {
+            from: LUCET_MODULE_SYM,
+            to: MODULE_DATA_SYM,
+            at: native_data.position(),
+        })?;
+        native_data.write_u64::<LittleEndian>(0).unwrap();
+        native_data
+            .write_u64::<LittleEndian>(module_data_len as u64)
+            .unwrap();
+        product.artifact.link(Link {
+            from: LUCET_MODULE_SYM,
+            to: TABLE_SYM,
+            at: native_data.position(),
+        })?;
+        native_data.write_u64::<LittleEndian>(0).unwrap();
+        native_data
+            .write_u64::<LittleEndian>(table_manifest.len() as u64)
+            .unwrap();
+        product.artifact.link(Link {
+            from: LUCET_MODULE_SYM,
+            to: FUNCTION_MANIFEST_SYM,
+            at: native_data.position(),
+        })?;
+        native_data.write_u64::<LittleEndian>(0).unwrap();
+        native_data
+            .write_u64::<LittleEndian>(function_manifest.len() as u64)
+            .unwrap();
+
+        product
+            .artifact
+            .define(LUCET_MODULE_SYM, native_data.into_inner())
+            .context(format!("defining {}", LUCET_MODULE_SYM))?;
 
         Ok(Self {
             artifact: product.artifact,

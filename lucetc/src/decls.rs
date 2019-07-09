@@ -4,6 +4,7 @@ pub use crate::module::{Exportable, TableElems};
 use crate::module::{ModuleInfo, UniqueFuncIndex};
 use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
+use crate::table::TABLE_SYM;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -68,6 +69,7 @@ pub struct ModuleDecls<'a> {
     function_names: PrimaryMap<UniqueFuncIndex, Name>,
     imports: Vec<ImportFunction<'a>>,
     exports: Vec<ExportFunction<'a>>,
+    tables_list_name: Name,
     table_names: PrimaryMap<TableIndex, Name>,
     runtime_names: HashMap<RuntimeFunc, UniqueFuncIndex>,
     globals_spec: Vec<GlobalSpec<'a>>,
@@ -83,7 +85,7 @@ impl<'a> ModuleDecls<'a> {
         heap_settings: HeapSettings,
     ) -> Result<Self, LucetcError> {
         let imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
-        let table_names = Self::declare_tables(&info, clif_module)?;
+        let (tables_list_name, table_names) = Self::declare_tables(&info, clif_module)?;
         let globals_spec = Self::build_globals_spec(&info)?;
         let linear_memory_spec = Self::build_linear_memory_spec(&info, heap_settings)?;
         let mut decls = Self {
@@ -91,6 +93,7 @@ impl<'a> ModuleDecls<'a> {
             function_names: PrimaryMap::new(),
             imports,
             exports: vec![],
+            tables_list_name,
             table_names,
             runtime_names: HashMap::new(),
             globals_spec,
@@ -242,7 +245,7 @@ impl<'a> ModuleDecls<'a> {
     fn declare_tables<B: ClifBackend>(
         info: &ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
-    ) -> Result<PrimaryMap<TableIndex, Name>, LucetcError> {
+    ) -> Result<(Name, PrimaryMap<TableIndex, Name>), LucetcError> {
         let mut table_names = PrimaryMap::new();
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
@@ -253,7 +256,13 @@ impl<'a> ModuleDecls<'a> {
 
             table_names.push(def_name);
         }
-        Ok(table_names)
+
+        let tables_list_id = clif_module
+            .declare_data(TABLE_SYM, Linkage::Export, false, None)
+            .context(LucetcErrorKind::Table)?;
+        let tables_list = Name::new_data(TABLE_SYM.to_string(), tables_list_id);
+
+        Ok((tables_list, table_names))
     }
 
     fn declare_runtime<B: ClifBackend>(
@@ -422,6 +431,10 @@ impl<'a> ModuleDecls<'a> {
             signature: self.info.signature_for_function(func_id),
             name: name.clone(),
         })
+    }
+
+    pub fn get_tables_list_name(&self) -> &Name {
+        &self.tables_list_name
     }
 
     pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl<'_>, Error> {

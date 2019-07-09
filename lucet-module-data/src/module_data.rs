@@ -10,6 +10,8 @@ use crate::{
 use minisign::SignatureBones;
 use serde::{Deserialize, Serialize};
 
+pub const MODULE_DATA_SYM: &str = "lucet_module_data";
+
 /// The metadata (and some data) for a Lucet module.
 ///
 /// The lifetime parameter exists to support zero-copy deserialization for the `&str` and `&[u8]`

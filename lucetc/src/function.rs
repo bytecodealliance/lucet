@@ -1,6 +1,7 @@
 use super::runtime::RuntimeFunc;
 use crate::decls::ModuleDecls;
 use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
+use crate::table::{TABLE_ENTRY_SIZE, TABLE_SYM};
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, InstBuilder};
@@ -132,8 +133,10 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             colocated: true,
         });
         let bound_ptr_gv = func.create_global_value(ir::GlobalValueData::Symbol {
-            name: panic!("table_decl.len_name.into()"),
-            offset: 0.into(),
+            name: self.module_decls.get_tables_list_name().as_externalname(),
+            offset: (((TABLE_ENTRY_SIZE * index.as_u32() as usize) + NATIVE_POINTER_SIZE) as u64
+                as i64)
+                .into(),
             colocated: true,
         });
         let bound_gv = func.create_global_value(ir::GlobalValueData::Load {
