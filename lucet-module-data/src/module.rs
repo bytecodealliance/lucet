@@ -1,6 +1,6 @@
+use crate::functions::FunctionSpec;
 use crate::module_data::ModuleData;
 use crate::tables::TableElement;
-use crate::functions::FunctionSpec;
 
 pub const LUCET_MODULE_SYM: &str = "lucet_module";
 

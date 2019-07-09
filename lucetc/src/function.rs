@@ -138,11 +138,10 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             colocated: true,
         });
 
-        let table_bound_offset =
-            (TABLE_ENTRY_SIZE as u32)
-                .checked_mul(index.as_u32())
-                .and_then(|entry| entry.checked_add(NATIVE_POINTER_SIZE as u32))
-                .ok_or(WasmError::ImplLimitExceeded)?;
+        let table_bound_offset = (TABLE_ENTRY_SIZE as u32)
+            .checked_mul(index.as_u32())
+            .and_then(|entry| entry.checked_add(NATIVE_POINTER_SIZE as u32))
+            .ok_or(WasmError::ImplLimitExceeded)?;
 
         if table_bound_offset > std::i32::MAX as u32 {
             return Err(WasmError::ImplLimitExceeded);
