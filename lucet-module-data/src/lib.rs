@@ -10,8 +10,10 @@ mod error;
 mod functions;
 mod globals;
 mod linear_memory;
+mod module;
 mod module_data;
 mod signature;
+mod tables;
 mod traps;
 mod types;
 
@@ -22,8 +24,10 @@ pub use crate::functions::{
 };
 pub use crate::globals::{Global, GlobalDef, GlobalSpec, GlobalValue};
 pub use crate::linear_memory::{HeapSpec, LinearMemorySpec, SparseData};
+pub use crate::module::Module;
 pub use crate::module_data::ModuleData;
 pub use crate::signature::{ModuleSignature, PublicKey};
+pub use crate::tables::TableElement;
 pub use crate::traps::{TrapCode, TrapManifest, TrapSite};
 pub use crate::types::{Signature, ValueType};
 

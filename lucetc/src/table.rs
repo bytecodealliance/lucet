@@ -12,6 +12,7 @@ use failure::{format_err, Error, ResultExt};
 use std::io::Cursor;
 
 pub const TABLE_SYM: &str = "lucet_tables";
+pub const TABLE_COUNT_SYM: &str = "lucet_tables_count";
 const TABLE_ENTRY_SIZE: usize = NATIVE_POINTER_SIZE * 2;
 
 #[derive(Debug, Clone)]
@@ -141,13 +142,28 @@ pub fn write_table_data<B: ClifBackend>(
     }
 
     let inner = tables_vec.into_inner();
-    println!("{:?}", inner);
 
     let mut table_data_ctx = DataContext::new();
     table_data_ctx.define(inner.into_boxed_slice());
 
     clif_module
         .define_data(tables_data_decl, &table_data_ctx)
+        .context(LucetcErrorKind::Table)?;
+
+    let mut tables_count_vec = Cursor::new(Vec::new());
+    tables_count_vec
+        .write_u64::<LittleEndian>(table_names.len() as u64)
+        .unwrap();
+
+    let mut table_count_data_ctx = DataContext::new();
+    table_count_data_ctx.define(tables_count_vec.into_inner().into_boxed_slice());
+
+    let tables_count_data_decl = clif_module
+        .declare_data(TABLE_COUNT_SYM, Linkage::Export, true, None)
+        .context(LucetcErrorKind::Table)?;
+
+    clif_module
+        .define_data(tables_count_data_decl, &table_count_data_ctx)
         .context(LucetcErrorKind::Table)?;
     Ok(table_names)
 }

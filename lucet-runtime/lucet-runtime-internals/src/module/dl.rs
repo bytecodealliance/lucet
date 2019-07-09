@@ -3,8 +3,8 @@ use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, T
 use libc::c_void;
 use libloading::{Library, Symbol};
 use lucet_module_data::{
-    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, ModuleSignature,
-    PublicKey, Signature,
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Module as ModuleDataModule,
+    ModuleData, ModuleSignature, PublicKey, Signature,
 };
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -21,9 +21,7 @@ pub struct DlModule {
     fbase: *const c_void,
 
     /// Metadata decoded from inside the module
-    module_data: ModuleData<'static>,
-
-    function_manifest: &'static [FunctionSpec],
+    module: ModuleDataModule<'static>,
 }
 
 // for the one raw pointer only
@@ -91,6 +89,30 @@ impl DlModule {
             std::ptr::null()
         };
 
+        let tables = {
+            let p_tables: Symbol<'_, *const &[TableElement]> = unsafe {
+                lib.get(b"lucet_tables").map_err(|e| {
+                    lucet_incorrect_module!("error loading required symbol `lucet_tables`: {}", e)
+                })?
+            };
+            let p_tables_count: Symbol<'_, *const usize> = unsafe {
+                lib.get(b"lucet_tables_count").map_err(|e| {
+                    lucet_incorrect_module!(
+                        "error loading required symbol `lucet_tables_count`: {}",
+                        e
+                    )
+                })?
+            };
+
+            let len = unsafe { **p_tables_count };
+            if len > std::u32::MAX as usize {
+                lucet_incorrect_module!("table segment too long: {}", len);
+            }
+            let tables_slice: &'static [&'static [TableElement]] =
+                unsafe { from_raw_parts(*p_tables, len as usize) };
+            tables_slice
+        };
+
         let function_manifest = unsafe {
             let manifest_len_ptr = lib.get::<*const u32>(b"lucet_function_manifest_len");
             let manifest_ptr = lib.get::<*const FunctionSpec>(b"lucet_function_manifest");
@@ -140,8 +162,11 @@ impl DlModule {
         Ok(Arc::new(DlModule {
             lib,
             fbase,
-            module_data,
-            function_manifest,
+            module: ModuleDataModule {
+                module_data,
+                tables,
+                function_manifest,
+            },
         }))
     }
 }
@@ -150,15 +175,15 @@ impl Module for DlModule {}
 
 impl ModuleInternal for DlModule {
     fn heap_spec(&self) -> Option<&HeapSpec> {
-        self.module_data.heap_spec()
+        self.module.module_data.heap_spec()
     }
 
     fn globals(&self) -> &[GlobalSpec<'_>] {
-        self.module_data.globals_spec()
+        self.module.module_data.globals_spec()
     }
 
     fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]> {
-        if let Some(ref sparse_data) = self.module_data.sparse_data() {
+        if let Some(ref sparse_data) = self.module.module_data.sparse_data() {
             *sparse_data.get_page(page)
         } else {
             None
@@ -166,39 +191,23 @@ impl ModuleInternal for DlModule {
     }
 
     fn sparse_page_data_len(&self) -> usize {
-        self.module_data.sparse_data().map(|d| d.len()).unwrap_or(0)
+        self.module
+            .module_data
+            .sparse_data()
+            .map(|d| d.len())
+            .unwrap_or(0)
     }
 
     fn table_elements(&self) -> Result<&[TableElement], Error> {
-        let p_tables: Symbol<'_, *const &[TableElement]> = unsafe {
-            self.lib.get(b"lucet_tables").map_err(|e| {
-                lucet_incorrect_module!("error loading required symbol `lucet_tables`: {}", e)
-            })?
-        };
-        unsafe {
-            println!(
-                "table pointer: {:p}",
-                p_tables.as_ref().unwrap() as *const &[TableElement]
-            );
+        match self.module.tables.get(0) {
+            Some(table) => Ok(table),
+            None => Err(lucet_incorrect_module!("table 0 is not present")),
         }
-        /*
-        let p_tables_count: Symbol<'_, *const usize> = unsafe {
-            self.lib.get(b"lucet_tables_count").map_err(|e| {
-                lucet_incorrect_module!("error loading required symbol `guest_table_0_len`: {}", e)
-            })?
-        }
-        */
-        let len = 1; //unsafe { **p_table_segment_len };
-        if len > std::u32::MAX as usize {
-            lucet_incorrect_module!("table segment too long: {}", len);
-        }
-        let tables_slice: &'static [&'static [TableElement]] =
-            unsafe { from_raw_parts(*p_tables, len as usize) };
-        Ok(tables_slice[0])
     }
 
     fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error> {
-        self.module_data
+        self.module
+            .module_data
             .get_export_func_id(sym)
             .ok_or_else(|| Error::SymbolNotFound(sym.to_string()))
             .map(|id| {
@@ -237,7 +246,7 @@ impl ModuleInternal for DlModule {
     }
 
     fn function_manifest(&self) -> &[FunctionSpec] {
-        self.function_manifest
+        self.module.function_manifest
     }
 
     fn addr_details(&self, addr: *const c_void) -> Result<Option<AddrDetails>, Error> {
@@ -263,7 +272,7 @@ impl ModuleInternal for DlModule {
     }
 
     fn get_signature(&self, fn_id: FunctionIndex) -> &Signature {
-        self.module_data.get_signature(fn_id)
+        self.module.module_data.get_signature(fn_id)
     }
 }
 
