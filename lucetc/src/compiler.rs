@@ -202,7 +202,6 @@ fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     decls: &ModuleDecls<'_>,
 ) -> Result<usize, LucetcError> {
-    use byteorder::{LittleEndian, WriteBytesExt};
     use cranelift_module::{DataContext, Linkage};
 
     let module_data_serialized: Vec<u8> = decls

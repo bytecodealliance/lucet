@@ -5,7 +5,7 @@ use crate::name::Name;
 use crate::pointer::NATIVE_POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
-use cranelift_module::{Backend as ClifBackend, DataContext, Linkage, Module as ClifModule};
+use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
 use cranelift_wasm::{TableElementType, TableIndex};
 use faerie::{Artifact, Link};
 use failure::{format_err, Error, ResultExt};
