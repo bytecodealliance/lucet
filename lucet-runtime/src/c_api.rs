@@ -303,12 +303,7 @@ pub unsafe extern "C" fn lucet_instance_set_signal_handler(
 ) -> lucet_error {
     let handler = move |inst: &Instance, trap: &Option<TrapCode>, signum, siginfo, context| {
         let inst = inst as *const Instance as *mut lucet_instance;
-        let trap = trap.into();
-        let trap_ptr = &trap as *const lucet_state::lucet_trapcode;
-        let res = signal_handler(inst, trap_ptr, signum, siginfo, context).into();
-        // make sure `trap_ptr` is live until the signal handler returns
-        drop(trap);
-        res
+        signal_handler(inst, trap.into(), signum, siginfo, context).into()
     };
     with_instance_ptr!(inst, {
         inst.set_signal_handler(handler);
@@ -449,5 +444,39 @@ lucet_hostcalls! {
             .get_embed_ctx::<*mut c_void>()
             .map(|r| r.map(|p| *p).unwrap_or(ptr::null_mut()))
             .unwrap_or(std::ptr::null_mut())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lucet_dl_module;
+    use crate::DlModule;
+    use lucet_wasi_sdk::{LinkOpt, LinkOpts, Lucetc};
+    use std::sync::Arc;
+    use tempfile::TempDir;
+
+    extern "C" {
+        fn lucet_runtime_test_expand_heap(module: *mut lucet_dl_module) -> bool;
+    }
+
+    #[test]
+    fn expand_heap() {
+        let workdir = TempDir::new().expect("create working directory");
+
+        let native_build = Lucetc::new(&["tests/guests/null.c"])
+            .with_link_opt(LinkOpt::NoDefaultEntryPoint)
+            .with_link_opt(LinkOpt::AllowUndefinedAll);
+
+        let so_file = workdir.path().join("null.so");
+
+        native_build.build(so_file.clone()).unwrap();
+
+        let dlmodule = DlModule::load(so_file).unwrap();
+
+        unsafe {
+            assert!(lucet_runtime_test_expand_heap(
+                Arc::into_raw(dlmodule) as *mut lucet_dl_module
+            ));
+        }
     }
 }

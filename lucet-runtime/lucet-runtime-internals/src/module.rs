@@ -5,8 +5,8 @@ mod sparse_page_data;
 pub use crate::module::dl::DlModule;
 pub use crate::module::mock::{MockExportBuilder, MockModuleBuilder};
 pub use lucet_module_data::{
-    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Global, GlobalSpec, HeapSpec,
-    Signature, TrapCode, TrapManifest, ValueType,
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Global, GlobalSpec, GlobalValue,
+    HeapSpec, Signature, TrapCode, TrapManifest, ValueType,
 };
 
 use crate::alloc::Limits;

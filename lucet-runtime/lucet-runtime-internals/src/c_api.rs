@@ -99,14 +99,17 @@ impl From<Error> for lucet_error {
     }
 }
 
+#[repr(C)]
 pub struct lucet_instance {
     _unused: [u8; 0],
 }
 
+#[repr(C)]
 pub struct lucet_region {
     _unused: [u8; 0],
 }
 
+#[repr(C)]
 pub struct lucet_dl_module {
     _unused: [u8; 0],
 }
@@ -187,7 +190,7 @@ impl From<&lucet_signal_behavior> for SignalBehavior {
 
 pub type lucet_signal_handler = unsafe extern "C" fn(
     inst: *mut lucet_instance,
-    trap: *const lucet_state::lucet_trapcode,
+    trap: lucet_state::lucet_trapcode,
     signum: c_int,
     siginfo: *const libc::siginfo_t,
     context: *const c_void,
@@ -205,10 +208,9 @@ unsafe impl Sync for CTerminationDetails {}
 pub mod lucet_state {
     use crate::c_api::{lucet_val, CTerminationDetails};
     use crate::instance::{State, TerminationDetails};
-    use crate::module::AddrDetails;
+    use crate::module::{AddrDetails, TrapCode};
     use crate::sysdeps::UContext;
     use libc::{c_char, c_void};
-    use lucet_module_data::TrapCode;
     use num_derive::FromPrimitive;
     use std::ffi::CString;
     use std::ptr;

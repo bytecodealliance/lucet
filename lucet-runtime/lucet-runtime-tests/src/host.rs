@@ -3,7 +3,6 @@ macro_rules! host_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::c_void;
-        use lucet_module_data::FunctionPointer;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, Limits, Region,
@@ -12,7 +11,7 @@ macro_rules! host_tests {
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
-        use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
+        use $crate::helpers::{FunctionPointer, MockExportBuilder, MockModuleBuilder};
         #[test]
         fn load_module() {
             let _module = test_module_c("host", "trivial.c").expect("build and load module");

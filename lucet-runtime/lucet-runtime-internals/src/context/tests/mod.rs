@@ -1,7 +1,6 @@
 mod c_child;
 mod rust_child;
 use crate::context::{Context, ContextHandle, Error};
-use lucet_module_data::FunctionPointer;
 use memoffset::offset_of;
 use std::slice;
 
@@ -33,12 +32,8 @@ fn init_rejects_unaligned() {
 
     // now we have the unaligned stack, let's make sure it blows up right
     let mut parent = ContextHandle::new();
-    let res = ContextHandle::create_and_init(
-        &mut stack_unaligned,
-        &mut parent,
-        FunctionPointer::from_usize(dummy as usize),
-        &[],
-    );
+    let res =
+        ContextHandle::create_and_init(&mut stack_unaligned, &mut parent, dummy as usize, &[]);
 
     if let Err(Error::UnalignedStack) = res {
         assert!(true);

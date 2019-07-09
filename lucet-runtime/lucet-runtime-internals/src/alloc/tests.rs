@@ -2,13 +2,12 @@
 macro_rules! alloc_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
-        use lucet_module_data::{FunctionPointer, GlobalValue};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
         use $crate::context::{Context, ContextHandle};
         use $crate::instance::InstanceInternal;
-        use $crate::module::{HeapSpec, MockModuleBuilder};
+        use $crate::module::{GlobalValue, HeapSpec, MockModuleBuilder};
         use $crate::region::Region;
         use $crate::val::Val;
 
@@ -606,7 +605,7 @@ macro_rules! alloc_tests {
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
-                    FunctionPointer::from_usize(heap_touching_child as usize),
+                    heap_touching_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
@@ -648,7 +647,7 @@ macro_rules! alloc_tests {
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
-                    FunctionPointer::from_usize(stack_pattern_child as usize),
+                    stack_pattern_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
