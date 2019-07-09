@@ -99,7 +99,7 @@ fn run_creduce_driver(seed: Seed) {
         .unwrap();
     assert!(st.success());
 
-    let st = Command::new(native_clang())
+    let st = Command::new(host_clang())
         .arg("-I/usr/include/csmith")
         .arg("-m32")
         .arg("-E")
@@ -284,7 +284,7 @@ fn run_both<P: AsRef<Path>>(
 fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<Vec<u8>>, Error> {
     let gen_path = tmpdir.path().join("gen");
 
-    let mut cmd = Command::new(native_clang());
+    let mut cmd = Command::new(host_clang());
     cmd.arg("-m32")
         .arg("-std=c11")
         .arg("-Werror=format")
@@ -294,7 +294,7 @@ fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<
         .arg(gen_c_path.as_ref())
         .arg("-o")
         .arg(&gen_path);
-    if let Ok(flags) = std::env::var("NATIVE_CLANG_FLAGS") {
+    if let Ok(flags) = std::env::var("HOST_CLANG_FLAGS") {
         cmd.args(flags.split_whitespace());
     }
     let res = cmd.output()?;
@@ -431,8 +431,8 @@ fn wasi_test<P: AsRef<Path>>(tmpdir: &TempDir, c_file: P) -> Result<Arc<dyn Modu
     Ok(dlmodule as Arc<dyn Module>)
 }
 
-fn native_clang() -> PathBuf {
-    match std::env::var("NATIVE_CLANG") {
+fn host_clang() -> PathBuf {
+    match std::env::var("HOST_CLANG") {
         Ok(clang) => PathBuf::from(clang),
         Err(_) => PathBuf::from("clang"),
     }

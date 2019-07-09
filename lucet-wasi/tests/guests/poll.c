@@ -1,6 +1,5 @@
 #include <assert.h>
 #include <poll.h>
-#include <stdio.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -20,17 +19,13 @@ int main(void)
 
     fds[0] = (struct pollfd){ .fd = 0, .events = POLLIN, .revents = 0 };
     time(&before);
-    printf("time before = %lld\n", before);
     ret = poll(fds, 1, 2000);
-    printf("ret = %d\n", ret);
     time(&now);
-    printf("time now = %lld\n", now);
     assert(ret == 0);
     assert(now - before >= 2);
 
     sleep(1);
     time(&now);
-    printf("time now = %lld\n", now);
     assert(now - before >= 3);
 
     return 0;

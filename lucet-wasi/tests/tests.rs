@@ -369,11 +369,7 @@ fn pseudoquine() {
 
 #[test]
 fn poll() {
-    let ctx = WasiCtxBuilder::new()
-        .args(&["poll"])
-        .inherit_stdio()
-        .build()
-        .unwrap();
+    let ctx = WasiCtxBuilder::new().args(&["poll"]).build().unwrap();
     let exitcode = run("poll.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 }
