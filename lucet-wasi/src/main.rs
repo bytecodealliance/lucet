@@ -4,7 +4,7 @@
 extern crate clap;
 
 use clap::Arg;
-use human_size::{Byte, Size};
+use failure::{format_err, Error};
 use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region};
 use lucet_runtime_internals::module::ModuleInternal;
 use lucet_wasi::{hostcalls, WasiCtxBuilder};
@@ -20,6 +20,18 @@ struct Config<'a> {
     limits: Limits,
     verify: bool,
     pk_path: Option<PathBuf>,
+}
+
+fn parse_humansized(desc: &str) -> Result<u64, Error> {
+    use human_size::{Byte, ParsingError, Size, SpecificSize};
+    match desc.parse::<Size>() {
+        Ok(s) => {
+            let bytes: SpecificSize<Byte> = s.into();
+            Ok(bytes.value() as u64)
+        }
+        Err(ParsingError::MissingMultiple) => Ok(desc.parse::<u64>()?),
+        Err(e) => Err(e)?,
+    }
 }
 
 fn main() {
@@ -128,14 +140,17 @@ fn main() {
         })
         .unwrap_or(vec![]);
 
-    let heap_memory_size = value_t!(matches, "heap_memory_size", Size)
-        .unwrap_or_else(|e| e.exit())
-        .into::<Byte>()
-        .value() as usize;
-    let heap_address_space_size = value_t!(matches, "heap_address_space_size", Size)
-        .unwrap_or_else(|e| e.exit())
-        .into::<Byte>()
-        .value() as usize;
+    let heap_memory_size = matches
+        .value_of("heap_memory_size")
+        .ok_or_else(|| format_err!("missing heap memory size"))
+        .and_then(|v| parse_humansized(v))
+        .unwrap() as usize;
+
+    let heap_address_space_size = matches
+        .value_of("heap_address_space_size")
+        .ok_or_else(|| format_err!("missing heap address space size"))
+        .and_then(|v| parse_humansized(v))
+        .unwrap() as usize;
 
     if heap_memory_size > heap_address_space_size {
         println!("`heap-address-space` must be at least as large as `max-heap-size`");
@@ -143,10 +158,11 @@ fn main() {
         std::process::exit(1);
     }
 
-    let stack_size = value_t!(matches, "stack_size", Size)
-        .unwrap_or_else(|e| e.exit())
-        .into::<Byte>()
-        .value() as usize;
+    let stack_size = matches
+        .value_of("stack_size")
+        .ok_or_else(|| format_err!("missing stack size"))
+        .and_then(|v| parse_humansized(v))
+        .unwrap() as usize;
 
     let limits = Limits {
         heap_memory_size,
