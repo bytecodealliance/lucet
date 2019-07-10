@@ -62,6 +62,7 @@ impl ModuleSignature {
     }
 }
 
+#[allow(dead_code)]
 struct SymbolData {
     offset: usize,
     len: usize,

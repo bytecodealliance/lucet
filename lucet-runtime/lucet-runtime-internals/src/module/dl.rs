@@ -3,8 +3,8 @@ use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, T
 use libc::c_void;
 use libloading::Library;
 use lucet_module_data::{
-    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Module as ModuleDataModule,
-    ModuleData, ModuleSignature, NativeData, PublicKey, Signature, LUCET_MODULE_SYM,
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, ModuleSignature,
+    NativeData, PublicKey, Signature, LUCET_MODULE_SYM,
 };
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -21,7 +21,7 @@ pub struct DlModule {
     fbase: *const c_void,
 
     /// Metadata decoded from inside the module
-    module: ModuleDataModule<'static>,
+    module: lucet_module_data::Module<'static>,
 }
 
 // for the one raw pointer only
@@ -111,7 +111,7 @@ impl DlModule {
         Ok(Arc::new(DlModule {
             lib,
             fbase,
-            module: ModuleDataModule {
+            module: lucet_module_data::Module {
                 module_data,
                 tables,
                 function_manifest,
@@ -170,9 +170,9 @@ impl ModuleInternal for DlModule {
             return Err(Error::FuncNotFound(table_id, func_id));
         }
         let table = self.table_elements()?;
-        let func: FunctionPointer = table
+        let func = table
             .get(func_id as usize)
-            .map(|element| FunctionPointer::from_usize(element.rf as usize))
+            .map(|element| element.function_pointer())
             .ok_or(Error::FuncNotFound(table_id, func_id))?;
 
         Ok(self.function_handle_from_ptr(func))
