@@ -1,17 +1,21 @@
 use crate::error::LucetcErrorKind;
-use crate::function_manifest::write_function_manifest;
+use crate::function_manifest::{write_function_manifest, FUNCTION_MANIFEST_SYM};
 use crate::name::Name;
+use crate::pointer::NATIVE_POINTER_SIZE;
 use crate::stack_probe;
+use crate::table::{link_tables, TABLE_SYM};
 use crate::traps::write_trap_tables;
+use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
-use faerie::Artifact;
+use faerie::{Artifact, Decl, Link};
 use failure::{format_err, Error, ResultExt};
-use lucet_module_data::FunctionSpec;
+use lucet_module_data::{FunctionSpec, LUCET_MODULE_SYM, MODULE_DATA_SYM};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::path::Path;
+use target_lexicon::BinaryFormat;
 
 pub struct CraneliftFuncs {
     funcs: HashMap<Name, ir::Function>,
@@ -43,13 +47,16 @@ pub struct ObjectFile {
 impl ObjectFile {
     pub fn new(
         mut product: FaerieProduct,
+        module_data_len: usize,
         mut function_manifest: Vec<(String, FunctionSpec)>,
+        table_manifest: Vec<Name>,
     ) -> Result<Self, Error> {
         stack_probe::declare_and_define(&mut product)?;
 
-        // stack_probe::declare_and_define never exists as clif, and as a result never exist as
-        // compiled code. This means the declared length of the stack probe's code is 0. This is
-        // incorrect, and must be fixed up before writing out the function manifest.
+        // stack_probe::declare_and_define never exists as clif, and as a result never exists a
+        // cranelift-compiled function. As a result, the declared length of the stack probe's
+        // "code" is 0. This is incorrect, and must be fixed up before writing out the function
+        // manifest.
 
         // because the stack probe is the last declared function...
         let last_idx = function_manifest.len() - 1;
@@ -97,11 +104,21 @@ impl ObjectFile {
 
         write_trap_tables(trap_manifest, &mut product.artifact)?;
         write_function_manifest(function_manifest.as_slice(), &mut product.artifact)?;
+        link_tables(table_manifest.as_slice(), &mut product.artifact)?;
+
+        // And now write out the actual structure tying together all the data in this module.
+        write_module(
+            module_data_len,
+            table_manifest.len(),
+            function_manifest.len(),
+            &mut product.artifact,
+        )?;
 
         Ok(Self {
             artifact: product.artifact,
         })
     }
+
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
         let _ = path.as_ref().file_name().ok_or(format_err!(
             "path {:?} needs to have filename",
@@ -111,4 +128,100 @@ impl ObjectFile {
         self.artifact.write(file)?;
         Ok(())
     }
+}
+
+fn write_module(
+    module_data_len: usize,
+    table_manifest_len: usize,
+    function_manifest_len: usize,
+    obj: &mut Artifact,
+) -> Result<(), Error> {
+    let mut native_data = Cursor::new(Vec::with_capacity(NATIVE_POINTER_SIZE * 4));
+    obj.declare(LUCET_MODULE_SYM, Decl::data().global())
+        .context(format!("declaring {}", LUCET_MODULE_SYM))?;
+
+    write_relocated_slice(
+        obj,
+        &mut native_data,
+        LUCET_MODULE_SYM,
+        Some(MODULE_DATA_SYM),
+        module_data_len as u64,
+    )?;
+    write_relocated_slice(
+        obj,
+        &mut native_data,
+        LUCET_MODULE_SYM,
+        Some(TABLE_SYM),
+        table_manifest_len as u64,
+    )?;
+    write_relocated_slice(
+        obj,
+        &mut native_data,
+        LUCET_MODULE_SYM,
+        Some(FUNCTION_MANIFEST_SYM),
+        function_manifest_len as u64,
+    )?;
+
+    obj.define(LUCET_MODULE_SYM, native_data.into_inner())
+        .context(format!("defining {}", LUCET_MODULE_SYM))?;
+
+    Ok(())
+}
+
+pub(crate) fn write_relocated_slice(
+    obj: &mut Artifact,
+    buf: &mut Cursor<Vec<u8>>,
+    from: &str,
+    to: Option<&str>,
+    len: u64,
+) -> Result<(), Error> {
+    match (to, len) {
+        (Some(to), 0) => {
+            // This is an imported slice of unknown size
+            let absolute_reloc = match obj.target.binary_format {
+                BinaryFormat::Elf => faerie::artifact::Reloc::Raw {
+                    reloc: goblin::elf::reloc::R_X86_64_64,
+                    addend: 0,
+                },
+                BinaryFormat::Macho => faerie::artifact::Reloc::Raw {
+                    reloc: goblin::mach::relocation::X86_64_RELOC_UNSIGNED as u32,
+                    addend: 0,
+                },
+                _ => panic!("Unsupported target format!"),
+            };
+
+            obj.link_with(
+                Link {
+                    from,
+                    to,
+                    at: buf.position(),
+                },
+                absolute_reloc,
+            )
+            .context(format!("linking {} into function manifest", to))?;
+        }
+        (Some(to), _len) => {
+            // This is a local buffer of known size
+            obj.link(Link {
+                from, // the data at `from` + `at` (eg. FUNCTION_MANIFEST_SYM)
+                to,   // is a reference to `to`    (eg. fn_name)
+                at: buf.position(),
+            })
+            .context(format!("linking {} into function manifest", to))?;
+        }
+        (None, len) => {
+            // There's actually no relocation to add, because there's no slice to put here.
+            //
+            // Since there's no slice, its length must be zero.
+            assert!(
+                len == 0,
+                "Invalid slice: no data, but there are more than zero bytes of it"
+            );
+        }
+    }
+
+    buf.write_u64::<LittleEndian>(0).unwrap();
+    buf.write_u64::<LittleEndian>(len).unwrap();
+
+    Ok(())
 }

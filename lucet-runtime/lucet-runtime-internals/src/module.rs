@@ -6,19 +6,12 @@ pub use crate::module::dl::DlModule;
 pub use crate::module::mock::{MockExportBuilder, MockModuleBuilder};
 pub use lucet_module_data::{
     FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Global, GlobalSpec, GlobalValue,
-    HeapSpec, Signature, TrapCode, TrapManifest, ValueType,
+    HeapSpec, Signature, TableElement, TrapCode, TrapManifest, ValueType,
 };
 
 use crate::alloc::Limits;
 use crate::error::Error;
 use libc::c_void;
-
-#[repr(C)]
-#[derive(Clone, Debug)]
-pub struct TableElement {
-    ty: u64,
-    rf: u64,
-}
 
 /// Details about a program address.
 ///

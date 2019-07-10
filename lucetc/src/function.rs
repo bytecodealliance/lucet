@@ -1,6 +1,7 @@
 use super::runtime::RuntimeFunc;
 use crate::decls::ModuleDecls;
 use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
+use crate::table::TABLE_REF_SIZE;
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, InstBuilder};
@@ -131,15 +132,25 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             offset: 0.into(),
             colocated: true,
         });
-        let bound_ptr_gv = func.create_global_value(ir::GlobalValueData::Symbol {
-            name: table_decl.len_name.into(),
+        let tables_list_gv = func.create_global_value(ir::GlobalValueData::Symbol {
+            name: self.module_decls.get_tables_list_name().as_externalname(),
             offset: 0.into(),
             colocated: true,
         });
+
+        let table_bound_offset = (TABLE_REF_SIZE as u32)
+            .checked_mul(index.as_u32())
+            .and_then(|entry| entry.checked_add(NATIVE_POINTER_SIZE as u32))
+            .ok_or(WasmError::ImplLimitExceeded)?;
+
+        if table_bound_offset > std::i32::MAX as u32 {
+            return Err(WasmError::ImplLimitExceeded);
+        }
+
         let bound_gv = func.create_global_value(ir::GlobalValueData::Load {
-            base: bound_ptr_gv,
+            base: tables_list_gv,
             global_type: index_type,
-            offset: 0.into(),
+            offset: (table_bound_offset as i32).into(),
             readonly: true,
         });
         let element_size = ((NATIVE_POINTER_SIZE * 2) as u64).into();

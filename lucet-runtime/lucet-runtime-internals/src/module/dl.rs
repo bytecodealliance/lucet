@@ -1,10 +1,10 @@
 use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
-use libloading::{Library, Symbol};
+use libloading::Library;
 use lucet_module_data::{
     FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, ModuleSignature,
-    PublicKey, Signature,
+    PublicKey, SerializedModule, Signature, LUCET_MODULE_SYM,
 };
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -21,9 +21,7 @@ pub struct DlModule {
     fbase: *const c_void,
 
     /// Metadata decoded from inside the module
-    module_data: ModuleData<'static>,
-
-    function_manifest: &'static [FunctionSpec],
+    module: lucet_module_data::Module<'static>,
 }
 
 // for the one raw pointer only
@@ -53,20 +51,15 @@ impl DlModule {
         let abs_so_path = so_path.as_ref().canonicalize().map_err(Error::DlError)?;
         let lib = Library::new(abs_so_path.as_os_str()).map_err(Error::DlError)?;
 
-        let module_data_ptr = unsafe {
-            lib.get::<*const u8>(b"lucet_module_data").map_err(|e| {
-                lucet_incorrect_module!("error loading required symbol `lucet_module_data`: {}", e)
-            })?
+        let serialized_module_ptr = unsafe {
+            lib.get::<*const SerializedModule>(LUCET_MODULE_SYM.as_bytes())
+                .map_err(|e| {
+                    lucet_incorrect_module!("error loading required symbol `lucet_module`: {}", e)
+                })?
         };
 
-        let module_data_len = unsafe {
-            lib.get::<usize>(b"lucet_module_data_len").map_err(|e| {
-                lucet_incorrect_module!(
-                    "error loading required symbol `lucet_module_data_len`: {}",
-                    e
-                )
-            })?
-        };
+        let serialized_module: &SerializedModule =
+            unsafe { serialized_module_ptr.as_ref().unwrap() };
 
         // Deserialize the slice into ModuleData, which will hold refs into the loaded
         // shared object file in `module_data_slice`. Both of these get a 'static lifetime because
@@ -75,8 +68,12 @@ impl DlModule {
         //
         // The exposed lifetime of ModuleData will be the same as the lifetime of the
         // dynamically loaded library. This makes the interface safe.
-        let module_data_slice: &'static [u8] =
-            unsafe { slice::from_raw_parts(*module_data_ptr, *module_data_len) };
+        let module_data_slice: &'static [u8] = unsafe {
+            slice::from_raw_parts(
+                serialized_module.module_data_ptr as *const u8,
+                serialized_module.module_data_len as usize,
+            )
+        };
         let module_data = ModuleData::deserialize(module_data_slice)?;
 
         // If a public key has been provided, verify the module signature
@@ -85,63 +82,43 @@ impl DlModule {
             ModuleSignature::verify(so_path, &pk, &module_data)?;
         }
 
-        let fbase = if let Some(dli) = dladdr(*module_data_ptr as *const c_void) {
+        let fbase = if let Some(dli) =
+            dladdr(serialized_module as *const SerializedModule as *const c_void)
+        {
             dli.dli_fbase
         } else {
             std::ptr::null()
         };
 
-        let function_manifest = unsafe {
-            let manifest_len_ptr = lib.get::<*const u32>(b"lucet_function_manifest_len");
-            let manifest_ptr = lib.get::<*const FunctionSpec>(b"lucet_function_manifest");
+        if serialized_module.tables_len > std::u32::MAX as u64 {
+            lucet_incorrect_module!("table segment too long: {}", serialized_module.tables_len);
+        }
+        let tables: &'static [&'static [TableElement]] = unsafe {
+            from_raw_parts(
+                serialized_module.tables_ptr as *const &[TableElement],
+                serialized_module.tables_len as usize,
+            )
+        };
 
-            match (manifest_ptr, manifest_len_ptr) {
-                (Ok(ptr), Ok(len_ptr)) => {
-                    let manifest_len = len_ptr.as_ref().ok_or(lucet_incorrect_module!(
-                        "`lucet_function_manifest_len` is defined but null"
-                    ))?;
-                    let manifest = ptr.as_ref().ok_or(lucet_incorrect_module!(
-                        "`lucet_function_manifest` is defined but null"
-                    ))?;
-
-                    from_raw_parts(manifest, *manifest_len as usize)
-                }
-                (Err(ptr_err), Err(len_err)) => {
-                    if is_undefined_symbol(&ptr_err) && is_undefined_symbol(&len_err) {
-                        &[]
-                    } else {
-                        // This is an unfortunate situation. Both attempts to look up symbols
-                        // failed, but at least one is not due to an undefined symbol.
-                        if !is_undefined_symbol(&ptr_err) {
-                            // This returns `ptr_err` (rather than `len_err` or some mix) because
-                            // of the following hunch: if both failed, and neither are undefined
-                            // symbols, they are probably the same error.
-                            return Err(Error::DlError(ptr_err));
-                        } else {
-                            return Err(Error::DlError(len_err));
-                        }
-                    }
-                }
-                (Ok(_), Err(e)) => {
-                    return Err(lucet_incorrect_module!(
-                        "error loading symbol `lucet_function_manifest_len`: {}",
-                        e
-                    ));
-                }
-                (Err(e), Ok(_)) => {
-                    return Err(lucet_incorrect_module!(
-                        "error loading symbol `lucet_function_manifest`: {}",
-                        e
-                    ));
-                }
+        let function_manifest = if serialized_module.function_manifest_ptr != 0 {
+            unsafe {
+                from_raw_parts(
+                    serialized_module.function_manifest_ptr as *const FunctionSpec,
+                    serialized_module.function_manifest_len as usize,
+                )
             }
+        } else {
+            &[]
         };
 
         Ok(Arc::new(DlModule {
             lib,
             fbase,
-            module_data,
-            function_manifest,
+            module: lucet_module_data::Module {
+                module_data,
+                tables,
+                function_manifest,
+            },
         }))
     }
 }
@@ -150,15 +127,15 @@ impl Module for DlModule {}
 
 impl ModuleInternal for DlModule {
     fn heap_spec(&self) -> Option<&HeapSpec> {
-        self.module_data.heap_spec()
+        self.module.module_data.heap_spec()
     }
 
     fn globals(&self) -> &[GlobalSpec<'_>] {
-        self.module_data.globals_spec()
+        self.module.module_data.globals_spec()
     }
 
     fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]> {
-        if let Some(ref sparse_data) = self.module_data.sparse_data() {
+        if let Some(ref sparse_data) = self.module.module_data.sparse_data() {
             *sparse_data.get_page(page)
         } else {
             None
@@ -166,29 +143,23 @@ impl ModuleInternal for DlModule {
     }
 
     fn sparse_page_data_len(&self) -> usize {
-        self.module_data.sparse_data().map(|d| d.len()).unwrap_or(0)
+        self.module
+            .module_data
+            .sparse_data()
+            .map(|d| d.len())
+            .unwrap_or(0)
     }
 
     fn table_elements(&self) -> Result<&[TableElement], Error> {
-        let p_table_segment: Symbol<'_, *const TableElement> = unsafe {
-            self.lib.get(b"guest_table_0").map_err(|e| {
-                lucet_incorrect_module!("error loading required symbol `guest_table_0`: {}", e)
-            })?
-        };
-        let p_table_segment_len: Symbol<'_, *const usize> = unsafe {
-            self.lib.get(b"guest_table_0_len").map_err(|e| {
-                lucet_incorrect_module!("error loading required symbol `guest_table_0_len`: {}", e)
-            })?
-        };
-        let len = unsafe { **p_table_segment_len };
-        if len > std::u32::MAX as usize {
-            lucet_incorrect_module!("table segment too long: {}", len);
+        match self.module.tables.get(0) {
+            Some(table) => Ok(table),
+            None => Err(lucet_incorrect_module!("table 0 is not present")),
         }
-        Ok(unsafe { from_raw_parts(*p_table_segment, **p_table_segment_len as usize) })
     }
 
     fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error> {
-        self.module_data
+        self.module
+            .module_data
             .get_export_func_id(sym)
             .ok_or_else(|| Error::SymbolNotFound(sym.to_string()))
             .map(|id| {
@@ -202,9 +173,9 @@ impl ModuleInternal for DlModule {
             return Err(Error::FuncNotFound(table_id, func_id));
         }
         let table = self.table_elements()?;
-        let func: FunctionPointer = table
+        let func = table
             .get(func_id as usize)
-            .map(|element| FunctionPointer::from_usize(element.rf as usize))
+            .map(|element| element.function_pointer())
             .ok_or(Error::FuncNotFound(table_id, func_id))?;
 
         Ok(self.function_handle_from_ptr(func))
@@ -227,7 +198,7 @@ impl ModuleInternal for DlModule {
     }
 
     fn function_manifest(&self) -> &[FunctionSpec] {
-        self.function_manifest
+        self.module.function_manifest
     }
 
     fn addr_details(&self, addr: *const c_void) -> Result<Option<AddrDetails>, Error> {
@@ -253,15 +224,8 @@ impl ModuleInternal for DlModule {
     }
 
     fn get_signature(&self, fn_id: FunctionIndex) -> &Signature {
-        self.module_data.get_signature(fn_id)
+        self.module.module_data.get_signature(fn_id)
     }
-}
-
-fn is_undefined_symbol(e: &std::io::Error) -> bool {
-    // gross, but I'm not sure how else to differentiate this type of error from other
-    // IO errors
-    let msg = format!("{}", e);
-    msg.contains("undefined symbol") || msg.contains("symbol not found")
 }
 
 // TODO: PR to nix or libloading?

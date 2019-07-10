@@ -1,6 +1,8 @@
 #![deny(bare_trait_objects)]
 
-use lucet_module_data::{Error, FunctionSpec, ModuleData, TrapManifest, TrapSite};
+use lucet_module_data::{
+    FunctionSpec, Module, ModuleData, SerializedModule, TableElement, TrapManifest, TrapSite,
+};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use colored::Colorize;
@@ -9,6 +11,7 @@ use std::env;
 use std::fs::File;
 use std::io::Cursor;
 use std::io::Read;
+use std::mem;
 
 #[derive(Debug)]
 struct ArtifactSummary<'a> {
@@ -16,20 +19,14 @@ struct ArtifactSummary<'a> {
     elf: &'a elf::Elf<'a>,
     symbols: StandardSymbols,
     data_segments: Option<DataSegments>,
-    module_data_bytes: Vec<u8>,
-    module_data: Option<Result<ModuleData<'a>, Error>>,
+    serialized_module: Option<SerializedModule>,
     exported_functions: Vec<&'a str>,
     imported_symbols: Vec<&'a str>,
 }
 
 #[derive(Debug)]
 struct StandardSymbols {
-    wasm_data_segments: Option<elf::sym::Sym>,
-    wasm_data_segments_len: Option<elf::sym::Sym>,
-    lucet_module_data: Option<elf::sym::Sym>,
-    lucet_module_data_len: Option<elf::sym::Sym>,
-    lucet_function_manifest: Option<elf::sym::Sym>,
-    lucet_function_manifest_len: Option<elf::sym::Sym>,
+    lucet_module: Option<elf::sym::Sym>,
 }
 
 #[derive(Debug)]
@@ -49,17 +46,9 @@ impl<'a> ArtifactSummary<'a> {
         Self {
             buffer: buffer,
             elf: elf,
-            symbols: StandardSymbols {
-                wasm_data_segments: None,
-                wasm_data_segments_len: None,
-                lucet_module_data: None,
-                lucet_module_data_len: None,
-                lucet_function_manifest: None,
-                lucet_function_manifest_len: None,
-            },
+            symbols: StandardSymbols { lucet_module: None },
             data_segments: None,
-            module_data_bytes: vec![],
-            module_data: None,
+            serialized_module: None,
             exported_functions: Vec::new(),
             imported_symbols: Vec::new(),
         }
@@ -91,16 +80,7 @@ impl<'a> ArtifactSummary<'a> {
                 .expect("strtab entry");
 
             match name {
-                "lucet_module_data" => self.symbols.lucet_module_data = Some(sym.clone()),
-                "lucet_module_data_len" => self.symbols.lucet_module_data_len = Some(sym.clone()),
-                "lucet_function_manifest" => {
-                    self.symbols.lucet_function_manifest = Some(sym.clone())
-                }
-                "lucet_function_manifest_len" => {
-                    self.symbols.lucet_function_manifest_len = Some(sym.clone())
-                }
-                "wasm_data_segments" => self.symbols.wasm_data_segments = Some(sym.clone()),
-                "wasm_data_segments_len" => self.symbols.wasm_data_segments_len = Some(sym.clone()),
+                "lucet_module" => self.symbols.lucet_module = Some(sym.clone()),
                 _ => {
                     if sym.st_bind() == elf::sym::STB_GLOBAL {
                         if sym.is_function() {
@@ -112,130 +92,25 @@ impl<'a> ArtifactSummary<'a> {
                 }
             }
         }
-    }
 
-    fn load_module_data(&self) -> Option<Result<ModuleData<'a>, Error>> {
-        if let (Some(ref data_sym), Some(ref data_len_sym)) = (
-            &self.symbols.lucet_module_data,
-            &self.symbols.lucet_module_data_len,
-        ) {
-            // TODO: validate that sym.st_size == 4
+        self.serialized_module = self.symbols.lucet_module.as_ref().map(|module_sym| {
             let buffer = self
-                .read_memory(data_len_sym.st_value, data_len_sym.st_size)
-                .unwrap();
-            let mut rdr = Cursor::new(buffer);
-            let data_len = rdr.read_u32::<LittleEndian>().unwrap();
-
-            if data_len as u64 != data_sym.st_size {
-                print!("{}",
-                    format!(
-                        "Module data reported size ({} bytes) does not match size declared for symbol ({} bytes).",
-                        data_len,
-                        data_sym.st_size
-                    ).red().bold()
-                );
-                println!(" Assuming the symbol is correct, wish me luck!");
-            }
-
-            let module_data_bytes = self
-                .read_memory(data_sym.st_value, data_sym.st_size)
-                .unwrap();
-            Some(ModuleData::deserialize(module_data_bytes))
-        } else {
-            None
-        }
-    }
-
-    fn load_function_manifest(&self) -> Option<&'a [FunctionSpec]> {
-        if let (Some(ref data_sym), Some(ref data_len_sym)) = (
-            &self.symbols.lucet_function_manifest,
-            &self.symbols.lucet_function_manifest_len,
-        ) {
-            // TODO: validate that sym.st_size == 4
-            let buffer = self
-                .read_memory(data_len_sym.st_value, data_len_sym.st_size)
-                .unwrap();
-            let mut rdr = Cursor::new(buffer);
-            let data_len = rdr.read_u32::<LittleEndian>().unwrap();
-
-            // cast up to u64 here to not overflow if data_len were an order of magnitude or so
-            // from u32::MAX
-            let expected_data_size = data_len as u64 * std::mem::size_of::<FunctionSpec>() as u64;
-            if expected_data_size != data_sym.st_size {
-                println!("{}",
-                    format!(
-                        "Function manifest expected size ({} bytes) does not match size declared for symbol ({} bytes).",
-                        expected_data_size,
-                        data_sym.st_size
-                    ).red().bold()
-                );
-                println!("  Assuming the symbol is correct, wish me luck!");
-            }
-
-            let module_data_bytes = self
-                .read_memory(data_sym.st_value, data_sym.st_size)
-                .unwrap();
-            Some(unsafe {
-                std::slice::from_raw_parts(
-                    module_data_bytes.as_ptr() as *const FunctionSpec,
-                    data_len as usize,
+                .read_memory(
+                    module_sym.st_value,
+                    mem::size_of::<SerializedModule>() as u64,
                 )
-            })
-        } else {
-            None
-        }
-    }
+                .unwrap();
+            let mut rdr = Cursor::new(buffer);
 
-    fn parse_data_segments(&self) -> Option<DataSegments> {
-        if let Some(ref data_sym) = self.symbols.wasm_data_segments {
-            if let Some(ref data_len_sym) = self.symbols.wasm_data_segments_len {
-                let mut data_segments = DataSegments {
-                    segments: Vec::new(),
-                };
-
-                // TODO: validate that sym.st_size == 4
-                let buffer = self
-                    .read_memory(data_len_sym.st_value, data_len_sym.st_size)
-                    .unwrap();
-                let mut rdr = Cursor::new(buffer);
-                let data_len = rdr.read_u32::<LittleEndian>().unwrap();
-                // TODO: validate that data_len == data_sym.st_size
-
-                let buffer = self
-                    .read_memory(data_sym.st_value, data_sym.st_size)
-                    .unwrap();
-                let mut rdr = Cursor::new(&buffer);
-
-                while rdr.position() < data_len as u64 {
-                    let _memory_index = rdr.read_u32::<LittleEndian>();
-                    // TODO: validate that memory_index == 0
-                    let offset = rdr.read_u32::<LittleEndian>().unwrap();
-                    let len = rdr.read_u32::<LittleEndian>().unwrap();
-
-                    let pos = rdr.position() as usize;
-                    let data_slice = &buffer[pos..pos + len as usize];
-
-                    let mut data = Vec::new();
-                    data.extend_from_slice(data_slice);
-
-                    let pad = (8 - (pos + len as usize) % 8) % 8;
-                    let new_pos = pos as u64 + len as u64 + pad as u64;
-                    rdr.set_position(new_pos);
-
-                    data_segments.segments.push(DataSegment {
-                        offset: offset,
-                        len: len,
-                        data: data,
-                    });
-                }
-
-                Some(data_segments)
-            } else {
-                None
+            SerializedModule {
+                module_data_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
+                module_data_len: rdr.read_u64::<LittleEndian>().unwrap(),
+                tables_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
+                tables_len: rdr.read_u64::<LittleEndian>().unwrap(),
+                function_manifest_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
+                function_manifest_len: rdr.read_u64::<LittleEndian>().unwrap(),
             }
-        } else {
-            None
-        }
+        });
     }
 
     fn get_func_name_for_addr(&self, addr: u64) -> Option<&str> {
@@ -308,10 +183,45 @@ fn parse_trap_manifest<'a>(
     }
 }
 
-fn summarize_module_data<'a, 'b: 'a>(
+fn load_module<'b, 'a: 'b>(
     summary: &'a ArtifactSummary<'a>,
-    module_data: ModuleData<'b>,
-) {
+    serialized_module: &SerializedModule,
+    tables: &'b [&[TableElement]],
+) -> Module<'b> {
+    let module_data_bytes = summary
+        .read_memory(
+            serialized_module.module_data_ptr,
+            serialized_module.module_data_len,
+        )
+        .unwrap();
+
+    let module_data =
+        ModuleData::deserialize(module_data_bytes).expect("ModuleData can be deserialized");
+
+    let function_manifest_bytes = summary
+        .read_memory(
+            serialized_module.function_manifest_ptr,
+            serialized_module.function_manifest_len,
+        )
+        .unwrap();
+    let function_manifest = unsafe {
+        std::slice::from_raw_parts(
+            function_manifest_bytes.as_ptr() as *const FunctionSpec,
+            serialized_module.function_manifest_len as usize,
+        )
+    };
+    Module {
+        module_data,
+        tables,
+        function_manifest,
+    }
+}
+
+fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Module<'b>) {
+    let module_data = &module.module_data;
+    let tables = module.tables;
+    let function_manifest = module.function_manifest;
+
     println!("  Heap Specification:");
     if let Some(heap_spec) = module_data.heap_spec() {
         println!("  {:9}: {} bytes", "Reserved", heap_spec.reserved_size);
@@ -323,7 +233,7 @@ fn summarize_module_data<'a, 'b: 'a>(
             println!("  {:9}: None", "Maximum");
         }
     } else {
-        println!("    {}", "MISSING".red().bold());
+        println!("  {}", "MISSING".red().bold());
     }
 
     println!("");
@@ -366,6 +276,16 @@ fn summarize_module_data<'a, 'b: 'a>(
     }
 
     println!("");
+    println!("Tables:");
+    if tables.len() == 0 {
+        println!("  No tables.");
+    } else {
+        for (i, table) in tables.iter().enumerate() {
+            println!("  Table {}: {:?}", i, table);
+        }
+    }
+
+    println!("");
     println!("Signatures:");
     for (i, s) in module_data.signatures().iter().enumerate() {
         println!("  Signature {}: {}", i, s);
@@ -373,88 +293,84 @@ fn summarize_module_data<'a, 'b: 'a>(
 
     println!("");
     println!("Functions:");
-    if let Some(function_manifest) = summary.load_function_manifest() {
-        if function_manifest.len() != module_data.function_info().len() {
+    if function_manifest.len() != module_data.function_info().len() {
+        println!(
+            "    {} function manifest and function info have diverging function counts",
+            "lucetc bug:".red().bold()
+        );
+        println!(
+            "      function_manifest length   : {}",
+            function_manifest.len()
+        );
+        println!(
+            "      module data function count : {}",
+            module_data.function_info().len()
+        );
+        println!("    Will attempt to display information about functions anyway, but trap/code information may be misaligned with symbols and signatures.");
+    }
+
+    for (i, f) in function_manifest.iter().enumerate() {
+        let header_name = summary.get_func_name_for_addr(f.ptr().as_usize() as u64);
+
+        if i >= module_data.function_info().len() {
+            // This is one form of the above-mentioned bug case
+            // Half the function information is missing, so just report the issue and continue.
             println!(
-                "    {} function manifest and function info have diverging function counts",
-                "lucetc bug:".red().bold()
+                "  Function {} {}",
+                i,
+                "is missing the module data part of its declaration".red()
             );
-            println!(
-                "      function_manifest length   : {}",
-                function_manifest.len()
-            );
-            println!(
-                "      module data function count : {}",
-                module_data.function_info().len()
-            );
-            println!("    Will attempt to display information about functions anyway, but trap/code information may be misaligned with symbols and signatures.");
-        }
-
-        for (i, f) in function_manifest.iter().enumerate() {
-            let header_name = summary.get_func_name_for_addr(f.ptr().as_usize() as u64);
-
-            if i >= module_data.function_info().len() {
-                // This is one form of the above-mentioned bug case
-                // Half the function information is missing, so just report the issue and continue.
-                println!(
-                    "  Function {} {}",
-                    i,
-                    "is missing the module data part of its declaration".red()
-                );
-                match header_name {
-                    Some(name) => {
-                        println!("    ELF header name: {}", name);
-                    }
-                    None => {
-                        println!("    No corresponding ELF symbol.");
-                    }
-                };
-                break;
-            }
-
-            let colorize_name = |x: Option<&str>| match x {
-                Some(name) => name.green(),
-                None => "None".red().bold(),
-            };
-
-            let fn_meta = &module_data.function_info()[i];
-            println!("  Function {} (name: {}):", i, colorize_name(fn_meta.name));
-            if fn_meta.name != header_name {
-                println!(
-                    "    Name {} with name declared in ELF headers: {}",
-                    "DISAGREES".red().bold(),
-                    colorize_name(header_name)
-                );
-            }
-
-            println!(
-                "    Signature (index {}): {}",
-                fn_meta.signature.as_u32() as usize,
-                module_data.signatures()[fn_meta.signature.as_u32() as usize]
-            );
-
-            println!("    Start: {:#010x}", f.ptr().as_usize());
-            println!("    Code length: {} bytes", f.code_len());
-            if let Some(trap_manifest) = parse_trap_manifest(&summary, f) {
-                let trap_count = trap_manifest.traps.len();
-
-                println!("    Trap information:");
-                if trap_count > 0 {
-                    println!(
-                        "      {} {} ...",
-                        trap_manifest.traps.len(),
-                        if trap_count == 1 { "trap" } else { "traps" },
-                    );
-                    for trap in trap_manifest.traps {
-                        println!("        $+{:#06x}: {:?}", trap.offset, trap.code);
-                    }
-                } else {
-                    println!("      No traps for this function");
+            match header_name {
+                Some(name) => {
+                    println!("    ELF header name: {}", name);
                 }
+                None => {
+                    println!("    No corresponding ELF symbol.");
+                }
+            };
+            break;
+        }
+
+        let colorize_name = |x: Option<&str>| match x {
+            Some(name) => name.green(),
+            None => "None".red().bold(),
+        };
+
+        let fn_meta = &module_data.function_info()[i];
+        println!("  Function {} (name: {}):", i, colorize_name(fn_meta.name));
+        if fn_meta.name != header_name {
+            println!(
+                "    Name {} with name declared in ELF headers: {}",
+                "DISAGREES".red().bold(),
+                colorize_name(header_name)
+            );
+        }
+
+        println!(
+            "    Signature (index {}): {}",
+            fn_meta.signature.as_u32() as usize,
+            module_data.signatures()[fn_meta.signature.as_u32() as usize]
+        );
+
+        println!("    Start: {:#010x}", f.ptr().as_usize());
+        println!("    Code length: {} bytes", f.code_len());
+        if let Some(trap_manifest) = parse_trap_manifest(&summary, f) {
+            let trap_count = trap_manifest.traps.len();
+
+            println!("    Trap information:");
+            if trap_count > 0 {
+                println!(
+                    "      {} {} ...",
+                    trap_manifest.traps.len(),
+                    if trap_count == 1 { "trap" } else { "traps" },
+                );
+                for trap in trap_manifest.traps {
+                    println!("        $+{:#06x}: {:?}", trap.offset, trap.code);
+                }
+            } else {
+                println!("      No traps for this function");
             }
         }
-    } else {
-        println!("  {}", "MISSING!".red().bold());
     }
 
     println!("");
@@ -536,52 +452,67 @@ fn print_summary(summary: ArtifactSummary<'_>) {
     println!("Required Symbols:");
     println!(
         "  {:30}: {}",
-        "lucet_module_data",
-        exists_to_str(&summary.symbols.lucet_module_data)
+        "lucet_module",
+        exists_to_str(&summary.symbols.lucet_module)
     );
-    println!(
-        "  {:30}: {}",
-        "lucet_module_data_len",
-        exists_to_str(&summary.symbols.lucet_module_data_len)
-    );
-    println!(
-        "  {:30}: {}",
-        "lucet_function_manifest",
-        exists_to_str(&summary.symbols.lucet_function_manifest)
-    );
-    println!(
-        "  {:30}: {}",
-        "lucet_function_manifest_len",
-        exists_to_str(&summary.symbols.lucet_function_manifest_len)
-    );
-    println!(
-        "  {:30}: {}",
-        "wasm_data_segments",
-        exists_to_str(&summary.symbols.wasm_data_segments)
-    );
-    println!(
-        "  {:30}: {}",
-        "wasm_data_segments_len",
-        exists_to_str(&summary.symbols.wasm_data_segments_len)
-    );
+    if let Some(ref serialized_module) = summary.serialized_module {
+        println!("Native module components:");
+        println!(
+            "  {:30}: {}",
+            "module_data_ptr",
+            ptr_to_str(serialized_module.module_data_ptr)
+        );
+        println!(
+            "  {:30}: {}",
+            "module_data_len", serialized_module.module_data_len
+        );
+        println!(
+            "  {:30}: {}",
+            "tables_ptr",
+            ptr_to_str(serialized_module.tables_ptr)
+        );
+        println!("  {:30}: {}", "tables_len", serialized_module.tables_len);
+        println!(
+            "  {:30}: {}",
+            "function_manifest_ptr",
+            ptr_to_str(serialized_module.function_manifest_ptr)
+        );
+        println!(
+            "  {:30}: {}",
+            "function_manifest_len", serialized_module.function_manifest_len
+        );
 
-    println!("\nModule data:");
-    match summary.load_module_data() {
-        Some(Ok(module_data)) => {
-            summarize_module_data(&summary, module_data);
+        let tables = unsafe {
+            std::slice::from_raw_parts(
+                serialized_module.tables_ptr as *const &[TableElement],
+                serialized_module.tables_len as usize,
+            )
+        };
+        let mut reconstructed_tables = Vec::new();
+        // same situation as trap tables - these slices are valid as if the module was
+        // dlopen'd, but we jsut read it as a flat file. So read through the ELF view and use
+        // pointers to that for the real slices.
+
+        for table in tables {
+            let table_bytes = summary
+                .read_memory(
+                    table.as_ptr() as usize as u64,
+                    (table.len() * mem::size_of::<TableElement>()) as u64,
+                )
+                .unwrap();
+            reconstructed_tables.push(unsafe {
+                std::slice::from_raw_parts(
+                    table_bytes.as_ptr() as *const TableElement,
+                    table.len() as usize,
+                )
+            });
         }
-        Some(Err(e)) => {
-            println!("  ERROR: {}", e.to_string().red().bold());
-        }
-        None => {
-            println!("  MISSING SYMBOL:");
-            if summary.symbols.lucet_module_data.is_none() {
-                println!("  - {}", "lucet_module_data".red().bold());
-            }
-            if summary.symbols.lucet_module_data_len.is_none() {
-                println!("  - {}", "lucet_module_data_len".red().bold());
-            }
-        }
+
+        let module = load_module(&summary, serialized_module, &reconstructed_tables);
+        println!("\nModule:");
+        summarize_module(&summary, &module);
+    } else {
+        println!("The symbol `lucet_module` is {}, so lucet-analyze cannot look at most of the interesting parts.", "MISSING".red().bold());
     }
 
     println!("");
@@ -596,6 +527,14 @@ fn print_summary(summary: ArtifactSummary<'_>) {
         }
     } else {
         println!("  {}", "MISSING!".red().bold());
+    }
+}
+
+fn ptr_to_str(p: u64) -> colored::ColoredString {
+    if p != 0 {
+        format!("exists; address: {:#x}", p).green()
+    } else {
+        "MISSING!".red().bold()
     }
 }
 

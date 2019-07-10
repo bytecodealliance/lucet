@@ -1,4 +1,6 @@
 use crate::error::Error::{self, IOError, ModuleSignatureError};
+use crate::module::LUCET_MODULE_SYM;
+use crate::module_data::MODULE_DATA_SYM;
 use crate::ModuleData;
 use byteorder::{ByteOrder, LittleEndian};
 pub use minisign::{PublicKey, SecretKey};
@@ -60,6 +62,7 @@ impl ModuleSignature {
     }
 }
 
+#[allow(dead_code)]
 struct SymbolData {
     offset: usize,
     len: usize,
@@ -76,25 +79,28 @@ impl RawModuleAndData {
         let mut obj_bin: Vec<u8> = Vec::new();
         File::open(&path)?.read_to_end(&mut obj_bin)?;
 
-        let module_data_symbol_data = Self::symbol_data(&obj_bin, "lucet_module_data", true)?
-            .ok_or(io::Error::new(
+        let native_data_symbol_data =
+            Self::symbol_data(&obj_bin, LUCET_MODULE_SYM, true)?.ok_or(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "module data not found",
+                format!("`{}` symbol not present", LUCET_MODULE_SYM),
             ))?;
-        let module_data_len_symbol_data =
-            Self::symbol_data(&obj_bin, "lucet_module_data_len", true)?.ok_or(io::Error::new(
+
+        // While `module_data` is the first field of the `SerializedModule` that `lucet_module` points
+        // to, it is a virtual address, not a file offset. The translation is somewhat tricky at
+        // the moment, so just look at the corresponding `lucet_module_data` symbol for now.
+        let module_data_symbol_data =
+            Self::symbol_data(&obj_bin, MODULE_DATA_SYM, true)?.ok_or(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "module length not found",
+                format!("`{}` symbol not present", MODULE_DATA_SYM),
             ))?;
-        assert_eq!(module_data_len_symbol_data.len, 4);
-        assert_eq!(
-            LittleEndian::read_u32(&obj_bin[module_data_len_symbol_data.offset..]) as usize,
-            module_data_symbol_data.len
-        );
+
+        let module_data_len =
+            LittleEndian::read_u64(&obj_bin[(native_data_symbol_data.offset + 8)..]) as usize;
+
         Ok(RawModuleAndData {
             obj_bin,
             module_data_offset: module_data_symbol_data.offset,
-            module_data_len: module_data_symbol_data.len,
+            module_data_len: module_data_len,
         })
     }
 
