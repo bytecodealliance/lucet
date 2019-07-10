@@ -24,7 +24,7 @@ pub use crate::functions::{
 };
 pub use crate::globals::{Global, GlobalDef, GlobalSpec, GlobalValue};
 pub use crate::linear_memory::{HeapSpec, LinearMemorySpec, SparseData};
-pub use crate::module::{Module, NativeData, LUCET_MODULE_SYM};
+pub use crate::module::{Module, SerializedModule, LUCET_MODULE_SYM};
 pub use crate::module_data::{ModuleData, MODULE_DATA_SYM};
 pub use crate::signature::{ModuleSignature, PublicKey};
 pub use crate::tables::TableElement;

@@ -4,7 +4,7 @@ use libc::c_void;
 use libloading::Library;
 use lucet_module_data::{
     FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, ModuleSignature,
-    NativeData, PublicKey, Signature, LUCET_MODULE_SYM,
+    PublicKey, SerializedModule, Signature, LUCET_MODULE_SYM,
 };
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -51,14 +51,15 @@ impl DlModule {
         let abs_so_path = so_path.as_ref().canonicalize().map_err(Error::DlError)?;
         let lib = Library::new(abs_so_path.as_os_str()).map_err(Error::DlError)?;
 
-        let native_data_ptr = unsafe {
-            lib.get::<*const NativeData>(LUCET_MODULE_SYM.as_bytes())
+        let serialized_module_ptr = unsafe {
+            lib.get::<*const SerializedModule>(LUCET_MODULE_SYM.as_bytes())
                 .map_err(|e| {
                     lucet_incorrect_module!("error loading required symbol `lucet_module`: {}", e)
                 })?
         };
 
-        let native_data: &NativeData = unsafe { native_data_ptr.as_ref().unwrap() };
+        let serialized_module: &SerializedModule =
+            unsafe { serialized_module_ptr.as_ref().unwrap() };
 
         // Deserialize the slice into ModuleData, which will hold refs into the loaded
         // shared object file in `module_data_slice`. Both of these get a 'static lifetime because
@@ -69,8 +70,8 @@ impl DlModule {
         // dynamically loaded library. This makes the interface safe.
         let module_data_slice: &'static [u8] = unsafe {
             slice::from_raw_parts(
-                native_data.module_data_ptr as *const u8,
-                native_data.module_data_len as usize,
+                serialized_module.module_data_ptr as *const u8,
+                serialized_module.module_data_len as usize,
             )
         };
         let module_data = ModuleData::deserialize(module_data_slice)?;
@@ -81,27 +82,29 @@ impl DlModule {
             ModuleSignature::verify(so_path, &pk, &module_data)?;
         }
 
-        let fbase = if let Some(dli) = dladdr(native_data as *const NativeData as *const c_void) {
+        let fbase = if let Some(dli) =
+            dladdr(serialized_module as *const SerializedModule as *const c_void)
+        {
             dli.dli_fbase
         } else {
             std::ptr::null()
         };
 
-        if native_data.tables_len > std::u32::MAX as u64 {
-            lucet_incorrect_module!("table segment too long: {}", native_data.tables_len);
+        if serialized_module.tables_len > std::u32::MAX as u64 {
+            lucet_incorrect_module!("table segment too long: {}", serialized_module.tables_len);
         }
         let tables: &'static [&'static [TableElement]] = unsafe {
             from_raw_parts(
-                native_data.tables_ptr as *const &[TableElement],
-                native_data.tables_len as usize,
+                serialized_module.tables_ptr as *const &[TableElement],
+                serialized_module.tables_len as usize,
             )
         };
 
-        let function_manifest = if native_data.function_manifest_ptr != 0 {
+        let function_manifest = if serialized_module.function_manifest_ptr != 0 {
             unsafe {
                 from_raw_parts(
-                    native_data.function_manifest_ptr as *const FunctionSpec,
-                    native_data.function_manifest_len as usize,
+                    serialized_module.function_manifest_ptr as *const FunctionSpec,
+                    serialized_module.function_manifest_len as usize,
                 )
             }
         } else {

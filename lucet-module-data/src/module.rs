@@ -12,13 +12,12 @@ pub struct Module<'a> {
     pub function_manifest: &'a [FunctionSpec],
 }
 
-/// NativeData is a serialization-friendly form of Module, in that `ModuleData` is serialized, with
-/// the `module_data_*` fields here referring to that serialized data, while `tables_*` and
-/// `function_manifest_*` refer to the actual tables and function manifest data written in the
-/// binary.
+/// SerializedModule is a serialization-friendly form of Module, in that the `module_data_*` fields
+/// here refer to a serialized `ModuleData`, while `tables_*` and `function_manifest_*` refer to
+/// the actual tables and function manifest written in the binary.
 #[repr(C)]
 #[derive(Debug)]
-pub struct NativeData {
+pub struct SerializedModule {
     pub module_data_ptr: u64,
     pub module_data_len: u64,
     pub tables_ptr: u64,

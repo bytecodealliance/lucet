@@ -85,7 +85,7 @@ impl RawModuleAndData {
                 format!("`{}` symbol not present", LUCET_MODULE_SYM),
             ))?;
 
-        // While `module_data` is the first field of the `NativeData` that `lucet_module` points
+        // While `module_data` is the first field of the `SerializedModule` that `lucet_module` points
         // to, it is a virtual address, not a file offset. The translation is somewhat tricky at
         // the moment, so just look at the corresponding `lucet_module_data` symbol for now.
         let module_data_symbol_data =

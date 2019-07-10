@@ -1,7 +1,7 @@
 #![deny(bare_trait_objects)]
 
 use lucet_module_data::{
-    FunctionSpec, Module, ModuleData, NativeData, TableElement, TrapManifest, TrapSite,
+    FunctionSpec, Module, ModuleData, SerializedModule, TableElement, TrapManifest, TrapSite,
 };
 
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -19,7 +19,7 @@ struct ArtifactSummary<'a> {
     elf: &'a elf::Elf<'a>,
     symbols: StandardSymbols,
     data_segments: Option<DataSegments>,
-    native_data: Option<NativeData>,
+    serialized_module: Option<SerializedModule>,
     exported_functions: Vec<&'a str>,
     imported_symbols: Vec<&'a str>,
 }
@@ -48,7 +48,7 @@ impl<'a> ArtifactSummary<'a> {
             elf: elf,
             symbols: StandardSymbols { lucet_module: None },
             data_segments: None,
-            native_data: None,
+            serialized_module: None,
             exported_functions: Vec::new(),
             imported_symbols: Vec::new(),
         }
@@ -93,13 +93,16 @@ impl<'a> ArtifactSummary<'a> {
             }
         }
 
-        self.native_data = self.symbols.lucet_module.as_ref().map(|module_sym| {
+        self.serialized_module = self.symbols.lucet_module.as_ref().map(|module_sym| {
             let buffer = self
-                .read_memory(module_sym.st_value, mem::size_of::<NativeData>() as u64)
+                .read_memory(
+                    module_sym.st_value,
+                    mem::size_of::<SerializedModule>() as u64,
+                )
                 .unwrap();
             let mut rdr = Cursor::new(buffer);
 
-            NativeData {
+            SerializedModule {
                 module_data_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
                 module_data_len: rdr.read_u64::<LittleEndian>().unwrap(),
                 tables_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
@@ -182,11 +185,14 @@ fn parse_trap_manifest<'a>(
 
 fn load_module<'b, 'a: 'b>(
     summary: &'a ArtifactSummary<'a>,
-    native_data: &NativeData,
+    serialized_module: &SerializedModule,
     tables: &'b [&[TableElement]],
 ) -> Module<'b> {
     let module_data_bytes = summary
-        .read_memory(native_data.module_data_ptr, native_data.module_data_len)
+        .read_memory(
+            serialized_module.module_data_ptr,
+            serialized_module.module_data_len,
+        )
         .unwrap();
 
     let module_data =
@@ -194,14 +200,14 @@ fn load_module<'b, 'a: 'b>(
 
     let function_manifest_bytes = summary
         .read_memory(
-            native_data.function_manifest_ptr,
-            native_data.function_manifest_len,
+            serialized_module.function_manifest_ptr,
+            serialized_module.function_manifest_len,
         )
         .unwrap();
     let function_manifest = unsafe {
         std::slice::from_raw_parts(
             function_manifest_bytes.as_ptr() as *const FunctionSpec,
-            native_data.function_manifest_len as usize,
+            serialized_module.function_manifest_len as usize,
         )
     };
     Module {
@@ -449,37 +455,37 @@ fn print_summary(summary: ArtifactSummary<'_>) {
         "lucet_module",
         exists_to_str(&summary.symbols.lucet_module)
     );
-    if let Some(ref native_data) = summary.native_data {
+    if let Some(ref serialized_module) = summary.serialized_module {
         println!("Native module components:");
         println!(
             "  {:30}: {}",
             "module_data_ptr",
-            ptr_to_str(native_data.module_data_ptr)
+            ptr_to_str(serialized_module.module_data_ptr)
         );
         println!(
             "  {:30}: {}",
-            "module_data_len", native_data.module_data_len
+            "module_data_len", serialized_module.module_data_len
         );
         println!(
             "  {:30}: {}",
             "tables_ptr",
-            ptr_to_str(native_data.tables_ptr)
+            ptr_to_str(serialized_module.tables_ptr)
         );
-        println!("  {:30}: {}", "tables_len", native_data.tables_len);
+        println!("  {:30}: {}", "tables_len", serialized_module.tables_len);
         println!(
             "  {:30}: {}",
             "function_manifest_ptr",
-            ptr_to_str(native_data.function_manifest_ptr)
+            ptr_to_str(serialized_module.function_manifest_ptr)
         );
         println!(
             "  {:30}: {}",
-            "function_manifest_len", native_data.function_manifest_len
+            "function_manifest_len", serialized_module.function_manifest_len
         );
 
         let tables = unsafe {
             std::slice::from_raw_parts(
-                native_data.tables_ptr as *const &[TableElement],
-                native_data.tables_len as usize,
+                serialized_module.tables_ptr as *const &[TableElement],
+                serialized_module.tables_len as usize,
             )
         };
         let mut reconstructed_tables = Vec::new();
@@ -502,7 +508,7 @@ fn print_summary(summary: ArtifactSummary<'_>) {
             });
         }
 
-        let module = load_module(&summary, native_data, &reconstructed_tables);
+        let module = load_module(&summary, serialized_module, &reconstructed_tables);
         println!("\nModule:");
         summarize_module(&summary, &module);
     } else {
