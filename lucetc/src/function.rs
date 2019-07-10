@@ -1,7 +1,7 @@
 use super::runtime::RuntimeFunc;
 use crate::decls::ModuleDecls;
 use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
-use crate::table::TABLE_ENTRY_SIZE;
+use crate::table::TABLE_REF_SIZE;
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, InstBuilder};
@@ -138,7 +138,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             colocated: true,
         });
 
-        let table_bound_offset = (TABLE_ENTRY_SIZE as u32)
+        let table_bound_offset = (TABLE_REF_SIZE as u32)
             .checked_mul(index.as_u32())
             .and_then(|entry| entry.checked_add(NATIVE_POINTER_SIZE as u32))
             .ok_or(WasmError::ImplLimitExceeded)?;

@@ -180,12 +180,17 @@ fn parse_trap_manifest<'a>(
     }
 }
 
-fn load_module<'b, 'a: 'b>(summary: &'a ArtifactSummary<'a>, native_data: &NativeData, tables: &'b [&[TableElement]]) -> Module<'b> {
+fn load_module<'b, 'a: 'b>(
+    summary: &'a ArtifactSummary<'a>,
+    native_data: &NativeData,
+    tables: &'b [&[TableElement]],
+) -> Module<'b> {
     let module_data_bytes = summary
         .read_memory(native_data.module_data_ptr, native_data.module_data_len)
         .unwrap();
 
-    let module_data = ModuleData::deserialize(module_data_bytes).expect("ModuleData can be deserialized");
+    let module_data =
+        ModuleData::deserialize(module_data_bytes).expect("ModuleData can be deserialized");
 
     let function_manifest_bytes = summary
         .read_memory(
@@ -474,7 +479,7 @@ fn print_summary(summary: ArtifactSummary<'_>) {
         let tables = unsafe {
             std::slice::from_raw_parts(
                 native_data.tables_ptr as *const &[TableElement],
-                native_data.tables_len as usize
+                native_data.tables_len as usize,
             )
         };
         let mut reconstructed_tables = Vec::new();
@@ -484,12 +489,15 @@ fn print_summary(summary: ArtifactSummary<'_>) {
 
         for table in tables {
             let table_bytes = summary
-                .read_memory(table.as_ptr() as usize as u64, (table.len() * mem::size_of::<TableElement>()) as u64)
+                .read_memory(
+                    table.as_ptr() as usize as u64,
+                    (table.len() * mem::size_of::<TableElement>()) as u64,
+                )
                 .unwrap();
             reconstructed_tables.push(unsafe {
                 std::slice::from_raw_parts(
                     table_bytes.as_ptr() as *const TableElement,
-                    table.len() as usize
+                    table.len() as usize,
                 )
             });
         }

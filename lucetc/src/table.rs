@@ -11,8 +11,12 @@ use faerie::{Artifact, Link};
 use failure::{format_err, Error, ResultExt};
 use std::io::Cursor;
 
+/// This symbol will be used to reference the `tables` field in `Module` - a sequence of tables.
+/// At the moment it will either be one or no tables, but in the future may grow.
 pub const TABLE_SYM: &str = "lucet_tables";
-pub const TABLE_ENTRY_SIZE: usize = NATIVE_POINTER_SIZE * 2;
+/// This is functionally the size of `&[TableEntry]`, but defined here because it may not
+/// necessarily have the same field ordering.
+pub const TABLE_REF_SIZE: usize = NATIVE_POINTER_SIZE * 2;
 
 #[derive(Debug, Clone)]
 enum Elem {
@@ -54,7 +58,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
         obj.link(Link {
             from: TABLE_SYM,
             to: table.symbol(),
-            at: (TABLE_ENTRY_SIZE * idx) as u64,
+            at: (TABLE_REF_SIZE * idx) as u64,
         })
         .context(LucetcErrorKind::Table)?;
     }
