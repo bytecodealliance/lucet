@@ -85,8 +85,10 @@ This command reads the `README.md` file, as well as the key pair, and computes a
 Signature verification:
 
 ```sh
-lucet-wasi --entrypoint main --dir .:. example verify README.md 94b8eb14373eb245c1daaacb2c24e2cb554bdd723009423aae5a8ca5fa99fa16 deedf3910d5b166ca17e0e307312a422cb50efcbcc90754cf0e2d528a9159c4ad3ac973e3cd9b2c2986fb2e467a0506bc9a5ceb9c7d6d30e360fb4d1cef3c50d
+lucet-wasi --entrypoint main --dir .:. example verify README.md <public key> <signature>
 ```
+
+`<public key>` and `<signature>` must be replaced with output from the previous commands.
 
 ```text
 This is a valid signature for that file
