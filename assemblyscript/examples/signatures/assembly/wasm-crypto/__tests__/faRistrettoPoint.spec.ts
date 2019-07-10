@@ -4,7 +4,7 @@ describe("Ristretto arithmetic", (): void => {
         for (let i = 0; i < 64; i++) {
             uniform[i] = i;
         }
-        let p = faPointFromUniform(uniform);
+        let p = faPointFromHash(uniform);
         expect<bool>(faPointValidate(p)).toBeTruthy();
         p[0]++;
         expect<bool>(faPointValidate(p)).toBeFalsy();
@@ -14,7 +14,7 @@ describe("Ristretto arithmetic", (): void => {
         for (let i = 0; i < 64; i++) {
             uniform2[i] = ~i;
         }
-        let p2 = faPointFromUniform(uniform2);
+        let p2 = faPointFromHash(uniform2);
         expect<bool>(faPointValidate(p2)).toBeTruthy();
         p2[0]++;
         expect<bool>(faPointValidate(p2)).toBeFalsy();

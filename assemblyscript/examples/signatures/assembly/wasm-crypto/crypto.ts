@@ -1,10 +1,11 @@
 // tslint:disable-next-line:no-reference
 /// <reference path="../node_modules/assemblyscript/index.d.ts" />
 
-import { LOAD, STORE } from 'internal/arraybuffer';
 import { precompBase } from './precomp';
 
 const RELEASE: bool = true;
+
+export const U8ARRAY_ID = idof<Uint8Array>();
 
 // Helpers
 
@@ -40,12 +41,12 @@ const RELEASE: bool = true;
     return (x & y) ^ (x & z) ^ (y & z);
 }
 
-function load64(x: Uint8Array, offset: isize): u64 {
-    return LOAD<u64>(x.buffer, 0, offset);
+function load64_be(x: Uint8Array, offset: isize): u64 {
+    return bswap(load<u64>(changetype<usize>(x.buffer) + offset));
 }
 
-function store64(x: Uint8Array, offset: isize, u: u64): void {
-    STORE<u64>(x.buffer, 0, u, offset);
+function store64_be(x: Uint8Array, offset: isize, u: u64): void {
+    store<u64>(changetype<usize>(x.buffer) + offset, bswap(u));
 }
 
 const K: u64[] = [
@@ -79,12 +80,12 @@ function _hashblocks(st: Uint8Array, m: Uint8Array, n: isize): isize {
         t: u64;
 
     for (let i = 0; i < 8; ++i) {
-        z[i] = a[i] = load64(st, i << 3);
+        z[i] = a[i] = load64_be(st, i << 3);
     }
     let pos = 0;
     while (n >= 128) {
         for (let i = 0; i < 16; ++i) {
-            w[i] = load64(m, (i << 3) + pos);
+            w[i] = load64_be(m, (i << 3) + pos);
         }
         for (let i = 0; i < 80; ++i) {
             for (let j = 0; j < 8; ++j) {
@@ -110,7 +111,7 @@ function _hashblocks(st: Uint8Array, m: Uint8Array, n: isize): isize {
         n -= 128;
     }
     for (let i = 0; i < 8; ++i) {
-        store64(st, i << 3, z[i]);
+        store64_be(st, i << 3, z[i]);
     }
     return n;
 }
@@ -138,14 +139,13 @@ function _hashInit(): Uint8Array {
 
 function _hashUpdate(st: Uint8Array, m: Uint8Array, n: isize, r: isize): isize {
     let w = st.subarray(64);
-    let pos = 0;
     let av = 128 - r;
     let tc = min(n, av);
 
     setU8(w, m.subarray(0, tc), r);
     r += tc;
     n -= tc;
-    pos += tc;
+    let pos = tc;
     if (r === 128) {
         _hashblocks(st, w, 128);
         r = 0;
@@ -153,8 +153,8 @@ function _hashUpdate(st: Uint8Array, m: Uint8Array, n: isize, r: isize): isize {
     if (r === 0 && n > 0) {
         let rb = _hashblocks(st, m.subarray(pos), n);
         if (rb > 0) {
-            setU8(w, m.subarray(pos + n - rb), r);
-            r += rb;
+            setU8(w, m.subarray(pos + n - rb));
+            r = rb;
         }
     }
     return r;
@@ -168,7 +168,7 @@ function _hashFinal(st: Uint8Array, out: Uint8Array, t: isize, r: isize): void {
     x[r] = 128;
     r = 256 - (isize(r < 112) << 7);
     x[r - 9] = 0;
-    store64(x, r - 8, t << 3);
+    store64_be(x, r - 8, t << 3);
     _hashblocks(st, x, r);
     for (let i = 0; i < 64; ++i) {
         out[i] = st[i];
@@ -574,9 +574,9 @@ function fe25519Pack(o: Fe25519Packed, n: Fe25519): void {
 }
 
 function fe25519Unpack(o: Fe25519, n: Fe25519Packed): void {
-    let nb = n.buffer;
+    let nb = changetype<usize>(n.buffer);
     for (let i = 0; i < 16; ++i) {
-        o[i] = LOAD<u16, i64>(nb, i);
+        o[i] = load<u16>(nb + 2 * i) as i64;
     }
     o[15] &= 0x7fff;
 }
@@ -832,7 +832,7 @@ function scalarmult(p: Ge, s: ScalarPacked, q: Ge): void {
     }
 }
 
-@inline function fe25519CopyA(r: Fe25519, a: Array<i64>): void {
+@inline function fe25519CopyPrecomp(r: Fe25519, a: Array<i64>): void {
     r[0] = unchecked(a[0]);
     r[1] = unchecked(a[1]);
     r[2] = unchecked(a[2]);
@@ -867,10 +867,9 @@ function scalarmultBase(p: Ge, s: ScalarPacked): void {
     for (let i = 0; i <= 255; ++i) {
         b = (s[(i >>> 3)] >>> (i as u8 & 7)) & 1;
         let precomp = precomp_base[i];
-
-        fe25519CopyA(q.x, precomp[0]);
-        fe25519CopyA(q.y, precomp[1]);
-        fe25519CopyA(q.t, precomp[2]);
+        fe25519CopyPrecomp(q.x, precomp[0]);
+        fe25519CopyPrecomp(q.y, precomp[1]);
+        fe25519CopyPrecomp(q.t, precomp[2]);
         geCopy(t, p);
         add(t, q);
         cmov(p, t, b);
@@ -1124,9 +1123,9 @@ function ristrettoElligator(p: Ge, t: Fe25519): void {
     fe25519Mult(p.t, w0, w2);
 }
 
-type Uniform = Uint8Array(64);
+type Hash512 = Uint8Array(64);
 
-function ristrettoFromUniform(s: GePacked, r: Uniform): void {
+function ristrettoFromHash(s: GePacked, r: Hash512): void {
     let r0 = newFe25519(), r1 = newFe25519();
     let p0 = newGe(), p1 = newGe();
 
@@ -1613,14 +1612,14 @@ function _signVerifyDetached(sig: Signature, m: Uint8Array, pk: GePacked): bool 
  * @param m (partial) message
  */
 @global export function hashUpdate(st: Uint8Array, m: Uint8Array): void {
-    let r = load64(st, 64 + 128);
-    let t = load64(st, 64 + 128 + 8);
+    let r = load64_be(st, 64 + 128);
+    let t = load64_be(st, 64 + 128 + 8);
     let n = m.length;
 
     t += n;
     r = _hashUpdate(st, m, n, r as isize);
-    store64(st, 64 + 128, r as u64);
-    store64(st, 64 + 128 + 8, t as u64);
+    store64_be(st, 64 + 128, r as u64);
+    store64_be(st, 64 + 128 + 8, t as u64);
 }
 
 /**
@@ -1630,8 +1629,8 @@ function _signVerifyDetached(sig: Signature, m: Uint8Array, pk: GePacked): bool 
  */
 @global export function hashFinal(st: Uint8Array): Uint8Array {
     let h = new Uint8Array(HASH_BYTES);
-    let r = load64(st, 64 + 128);
-    let t = load64(st, 64 + 128 + 8);
+    let r = load64_be(st, 64 + 128);
+    let t = load64_be(st, 64 + 128 + 8);
 
     _hashFinal(st, h, t as isize, r as isize);
 
@@ -2024,10 +2023,10 @@ function _signVerifyDetached(sig: Signature, m: Uint8Array, pk: GePacked): bool 
  * @param r 512 bit hash
  * @returns Ristretto-compressed EC point
  */
-@global export function faPointFromUniform(r: Uint8Array): Uint8Array {
+@global export function faPointFromHash(r: Uint8Array): Uint8Array {
     let p = newGePacked();
 
-    ristrettoFromUniform(p, r);
+    ristrettoFromHash(p, r);
 
     return p;
 }
