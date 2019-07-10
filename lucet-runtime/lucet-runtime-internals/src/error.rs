@@ -85,8 +85,8 @@ impl From<std::ffi::IntoStringError> for Error {
     }
 }
 
-impl From<lucet_module_data::Error> for Error {
-    fn from(e: lucet_module_data::Error) -> Error {
+impl From<lucet_module::Error> for Error {
+    fn from(e: lucet_module::Error) -> Error {
         Error::ModuleError(ModuleError::ModuleDataError(e))
     }
 }
@@ -100,7 +100,7 @@ pub enum ModuleError {
 
     /// An error occurred with the module data section, likely during deserialization.
     #[fail(display = "Module data error: {}", _0)]
-    ModuleDataError(#[cause] lucet_module_data::Error),
+    ModuleDataError(#[cause] lucet_module::Error),
 }
 
 #[macro_export]

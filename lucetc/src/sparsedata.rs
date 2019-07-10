@@ -1,12 +1,12 @@
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::module::DataInitializer;
 use failure::{format_err, ResultExt};
-use lucet_module_data::owned::OwnedSparseData;
-use lucet_module_data::HeapSpec;
+use lucet_module::owned::OwnedSparseData;
+use lucet_module::HeapSpec;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
-pub use lucet_module_data::SparseData;
+pub use lucet_module::SparseData;
 
 const PAGE_SIZE: usize = 4096;
 

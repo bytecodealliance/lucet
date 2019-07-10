@@ -1,4 +1,4 @@
-use lucet_module_data::lucet_signature;
+use lucet_module::lucet_signature;
 use lucet_runtime::lucet_hostcalls;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use lucet_runtime_internals::module::{

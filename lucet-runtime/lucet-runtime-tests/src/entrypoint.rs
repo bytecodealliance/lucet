@@ -1,6 +1,6 @@
 use crate::build::test_module_wasm;
 use crate::helpers::{MockExportBuilder, MockModuleBuilder};
-use lucet_module_data::{lucet_signature, FunctionPointer};
+use lucet_module::{lucet_signature, FunctionPointer};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;

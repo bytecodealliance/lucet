@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
 use libloading::Library;
-use lucet_module_data::{
+use lucet_module::{
     FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, ModuleSignature,
     PublicKey, SerializedModule, Signature, LUCET_MODULE_SYM,
 };
@@ -21,7 +21,7 @@ pub struct DlModule {
     fbase: *const c_void,
 
     /// Metadata decoded from inside the module
-    module: lucet_module_data::Module<'static>,
+    module: lucet_module::Module<'static>,
 }
 
 // for the one raw pointer only
@@ -114,7 +114,7 @@ impl DlModule {
         Ok(Arc::new(DlModule {
             lib,
             fbase,
-            module: lucet_module_data::Module {
+            module: lucet_module::Module {
                 module_data,
                 tables,
                 function_manifest,

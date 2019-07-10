@@ -27,7 +27,7 @@ pub use crate::types::{
 use crate::c::CGenerator;
 use crate::parser::Parser;
 use crate::rust::RustGenerator;
-use lucet_module_data::bindings::Bindings;
+use lucet_module::bindings::Bindings;
 use std::io::Write;
 
 pub fn parse_package(input: &str) -> Result<Package, IDLError> {

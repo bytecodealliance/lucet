@@ -14,8 +14,8 @@ use cranelift_wasm::{
     TableIndex,
 };
 use failure::{format_err, Error, ResultExt};
-use lucet_module_data::bindings::Bindings;
-use lucet_module_data::{
+use lucet_module::bindings::Bindings;
+use lucet_module::{
     owned::OwnedLinearMemorySpec, ExportFunction, FunctionIndex as LucetFunctionIndex,
     FunctionMetadata, Global as GlobalVariant, GlobalDef, GlobalSpec, HeapSpec, ImportFunction,
     ModuleData, Signature as LucetSignature, UniqueSignatureIndex,

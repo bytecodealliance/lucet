@@ -11,7 +11,7 @@ use crate::error::Error;
 use crate::instance::{
     Instance, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
 };
-use lucet_module_data::{FunctionHandle, GlobalValue};
+use lucet_module::{FunctionHandle, GlobalValue};
 use std::any::Any;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Ref, RefCell, RefMut};

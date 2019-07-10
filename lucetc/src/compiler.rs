@@ -18,8 +18,8 @@ use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator, WasmError};
 use failure::{format_err, Fail, ResultExt};
-use lucet_module_data::bindings::Bindings;
-use lucet_module_data::{FunctionSpec, ModuleData, MODULE_DATA_SYM};
+use lucet_module::bindings::Bindings;
+use lucet_module::{FunctionSpec, ModuleData, MODULE_DATA_SYM};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {

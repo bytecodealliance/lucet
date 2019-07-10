@@ -29,7 +29,7 @@ pub use crate::{
     patch::patch_module,
 };
 use failure::{format_err, Error, ResultExt};
-pub use lucet_module_data::bindings::Bindings;
+pub use lucet_module::bindings::Bindings;
 use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};

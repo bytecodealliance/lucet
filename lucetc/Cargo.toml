@@ -26,7 +26,7 @@ cranelift-module = { path = "../cranelift/cranelift-module", version = "0.31.0" 
 cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.31.0" }
 cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.31.0" }
 target-lexicon = "0.4.0"
-lucet-module-data = { path = "../lucet-module-data", version = "0.1.1" }
+lucet-module = { path = "../lucet-module", version = "0.1.1" }
 wasmparser = "0.23"
 clap="2.32"
 log = "0.4"

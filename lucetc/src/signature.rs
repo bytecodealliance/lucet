@@ -1,5 +1,5 @@
 use failure::*;
-use lucet_module_data::ModuleSignature;
+use lucet_module::ModuleSignature;
 pub use minisign::{KeyPair, PublicKey, SecretKey, SignatureBones, SignatureBox};
 use std::fs::File;
 use std::io::{Cursor, Read, Write};

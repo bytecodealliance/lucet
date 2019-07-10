@@ -7,7 +7,7 @@ use cranelift_wasm::{
     FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
     TableElementType, TableIndex, WasmResult,
 };
-use lucet_module_data::UniqueSignatureIndex;
+use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
 
 /// UniqueFuncIndex names a function after merging duplicate function declarations to a single

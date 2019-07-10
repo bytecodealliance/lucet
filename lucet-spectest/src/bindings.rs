@@ -1,4 +1,4 @@
-use lucet_module_data::bindings::Bindings;
+use lucet_module::bindings::Bindings;
 use serde_json::json;
 
 use lucet_runtime::lucet_hostcalls;

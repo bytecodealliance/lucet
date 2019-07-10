@@ -3,7 +3,7 @@ mod options;
 use crate::options::{CodegenOutput, Options};
 use failure::{format_err, Error, ResultExt};
 use log::info;
-use lucet_module_data::bindings::Bindings;
+use lucet_module::bindings::Bindings;
 use lucetc::{
     signature::{self, PublicKey},
     Lucetc, LucetcOpts,

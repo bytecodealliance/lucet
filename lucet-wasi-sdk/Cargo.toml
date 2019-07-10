@@ -12,5 +12,5 @@ edition = "2018"
 [dependencies]
 failure = "0.1"
 lucetc = { path = "../lucetc", version = "0.1.1" }
-lucet-module-data = { path = "../lucet-module-data", version = "0.1.1" }
+lucet-module = { path = "../lucet-module", version = "0.1.1" }
 tempfile = "3.0"

@@ -1,11 +1,11 @@
 use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
 use libc::c_void;
-use lucet_module_data::owned::{
+use lucet_module::owned::{
     OwnedExportFunction, OwnedFunctionMetadata, OwnedGlobalSpec, OwnedImportFunction,
     OwnedLinearMemorySpec, OwnedModuleData, OwnedSparseData,
 };
-use lucet_module_data::{
+use lucet_module::{
     FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, Signature, TrapSite,
     UniqueSignatureIndex,
 };
