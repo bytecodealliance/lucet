@@ -87,7 +87,7 @@ impl RawModuleAndData {
 
         // While `module_data` is the first field of the `SerializedModule` that `lucet_module` points
         // to, it is a virtual address, not a file offset. The translation is somewhat tricky at
-        // the moment, so just look at the corresponding `lucet_module` symbol for now.
+        // the moment, so just look at the corresponding `lucet_module_data` symbol for now.
         let module_data_symbol_data =
             Self::symbol_data(&obj_bin, MODULE_DATA_SYM, true)?.ok_or(io::Error::new(
                 io::ErrorKind::InvalidInput,
