@@ -164,11 +164,11 @@ TEARDOWN_NOWRAP(nestedloop)
 
 SETUP(random2)
 BODY(random2)
-TEARDOWN(random2)
+TEARDOWN_NOWRAP(random2)
 
 SETUP(random)
 BODY(random)
-TEARDOWN(random)
+TEARDOWN_NOWRAP(random)
 
 SETUP(ratelimit)
 BODY(ratelimit)
