@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! globals_tests {
     ( $TestRegion:path ) => {
-        use lucet_module_data::{lucet_signature, FunctionPointer, GlobalValue};
+        use lucet_module::{lucet_signature, FunctionPointer, GlobalValue};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{Error, Limits, Module, Region};
         use std::sync::Arc;

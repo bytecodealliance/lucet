@@ -1,6 +1,6 @@
 #![deny(bare_trait_objects)]
 
-use lucet_module_data::{
+use lucet_module::{
     FunctionSpec, Module, ModuleData, SerializedModule, TableElement, TrapManifest, TrapSite,
 };
 

@@ -10,7 +10,7 @@ use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
 use failure::{format_err, Error, ResultExt};
-use lucet_module_data::{FunctionSpec, LUCET_MODULE_SYM, MODULE_DATA_SYM};
+use lucet_module::{FunctionSpec, LUCET_MODULE_SYM, MODULE_DATA_SYM};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Cursor, Write};

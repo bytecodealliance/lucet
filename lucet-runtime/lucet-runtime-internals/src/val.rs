@@ -7,7 +7,7 @@ use std::arch::x86_64::{
     _mm_storeu_pd, _mm_storeu_ps,
 };
 
-use lucet_module_data::ValueType;
+use lucet_module::ValueType;
 
 impl Val {
     pub fn value_type(&self) -> ValueType {

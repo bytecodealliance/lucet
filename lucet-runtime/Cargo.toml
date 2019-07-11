@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 libc = "=0.2.59"
 lucet-runtime-internals = { path = "lucet-runtime-internals", version = "0.1.1" }
-lucet-module-data = { path = "../lucet-module-data", version = "0.1.1" }
+lucet-module = { path = "../lucet-module", version = "0.1.1" }
 num-traits = "0.2"
 num-derive = "0.2"
 

@@ -15,7 +15,7 @@ failure = "0.1"
 libc = "=0.2.59"
 lucetc = { path = "../lucetc" }
 lucet-runtime = { path = "../lucet-runtime" }
-lucet-module-data = { path = "../lucet-module-data" }
+lucet-module = { path = "../lucet-module" }
 lucet-wasi = { path = "../lucet-wasi" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 nix = "0.13"

@@ -25,7 +25,7 @@ test: indent-check
 	cargo test --no-fail-fast \
             -p lucet-runtime-internals \
             -p lucet-runtime \
-            -p lucet-module-data \
+            -p lucet-module \
             -p lucetc \
             -p lucet-idl \
             -p lucet-wasi-sdk \
@@ -68,7 +68,7 @@ watch:
 	cargo watch --exec "test \
             -p lucet-runtime-internals \
             -p lucet-runtime \
-            -p lucet-module-data \
+            -p lucet-module \
             -p lucetc \
             -p lucet-idl \
             -p lucet-wasi-sdk \

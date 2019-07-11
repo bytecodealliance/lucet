@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::module::Module;
 use crate::region::RegionInternal;
 use libc::{c_void, SIGSTKSZ};
-use lucet_module_data::GlobalValue;
+use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
 use std::sync::{Arc, Once, Weak};
 

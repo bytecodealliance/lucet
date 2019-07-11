@@ -18,7 +18,7 @@ test = false
 failure = "0.1"
 lazy_static = "1.1"
 tempfile = "3.0"
-lucet-module-data = { path = "../../lucet-module-data", version = "0.1.1" }
+lucet-module = { path = "../../lucet-module", version = "0.1.1" }
 lucet-runtime-internals = { path = "../lucet-runtime-internals", version = "0.1.1" }
 lucet-wasi-sdk = { path = "../../lucet-wasi-sdk", version = "0.1.1" }
 lucetc = { path = "../../lucetc", version = "0.1.1" }

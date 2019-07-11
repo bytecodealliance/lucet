@@ -1,5 +1,5 @@
 use failure::Error;
-use lucet_module_data::bindings::Bindings;
+use lucet_module::bindings::Bindings;
 use lucet_runtime_internals::module::DlModule;
 use lucet_wasi_sdk::{CompileOpts, Link, LinkOpt, LinkOpts};
 use lucetc::{Lucetc, LucetcOpts};
