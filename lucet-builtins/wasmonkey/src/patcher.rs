@@ -6,7 +6,8 @@ use crate::sections::*;
 use crate::symbols::{self, ExtractedSymbols};
 use parity_wasm;
 use parity_wasm::elements::{
-    self, External, ImportEntry, ImportSection, Internal, Module, Section,
+    self, External, FunctionNameSubsection, ImportEntry, ImportSection, Internal, Module,
+    NameSection, Section,
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -173,6 +174,12 @@ fn prepend_builtin_to_import_section(module: &mut Module, builtin: &Builtin) -> 
 
 fn prepend_builtin_to_names_section(module: &mut Module, builtin: &Builtin) -> Result<(), WError> {
     let import_name = builtin.import_name();
+    if module.names_section().is_none() {
+        let sections = module.sections_mut();
+        let function_names_subsection = FunctionNameSubsection::default();
+        let name_section = NameSection::new(None, Some(function_names_subsection), None);
+        sections.push(Section::Name(name_section));
+    }
     let names_section = module
         .names_section_mut()
         .expect("Names section not present");
