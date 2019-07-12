@@ -6,8 +6,8 @@ use crate::module::Module;
 use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
 use crate::types::{
-    AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl, Named,
-    StructDataType,
+    AbiType, AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType,
+    FuncDecl, Named, StructDataType,
 };
 use std::io::prelude::*;
 
@@ -148,12 +148,28 @@ impl CGenerator {
         Ok(())
     }
 
-    fn gen_function(
-        &mut self,
-        _module: &Module,
-        _func_decl_entry: &Named<FuncDecl>,
-    ) -> Result<(), IDLError> {
-        // UNIMPLEMENTED!!
+    /// Currently support generating ABI level definition for C guests. Bindings not supported.
+    fn gen_function(&mut self, _module: &Module, func: &Named<FuncDecl>) -> Result<(), IDLError> {
+        let func = func.entity;
+
+        let return_decl = match func.rets.len() {
+            0 => "void",
+            1 => abi_type_name(&func.rets[0].type_),
+            _ => unreachable!("functions limited to 0 or 1 return arguments"),
+        };
+
+        let arg_list = func
+            .args
+            .iter()
+            .map(|a| format!("{} {}", abi_type_name(&a.type_), a.name))
+            .collect::<Vec<String>>()
+            .join(",");
+
+        self.w.writeln(format!(
+            "extern {} {}({});",
+            return_decl, func.binding_name, arg_list,
+        ))?;
+
         Ok(())
     }
 
@@ -201,6 +217,15 @@ impl CGenerator {
                 self.type_name(dt)
             }
         }
+    }
+}
+
+fn abi_type_name(abi_type: &AbiType) -> &'static str {
+    match abi_type {
+        AbiType::I32 => atom_type_name(&AtomType::I32),
+        AbiType::I64 => atom_type_name(&AtomType::I64),
+        AbiType::F32 => atom_type_name(&AtomType::F32),
+        AbiType::F64 => atom_type_name(&AtomType::F64),
     }
 }
 
