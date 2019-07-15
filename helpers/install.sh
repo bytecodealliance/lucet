@@ -29,6 +29,8 @@ LUCET_BUNDLE_DOC_DIR=${LUCET_BUNDLE_DOC_DIR:-"${LUCET_DOC_DIR}/lucet"}
 WASI_SDK_PREFIX=${WASI_SDK_PREFIX:-${WASI_SDK:-"/opt/wasi-sdk"}}
 WASI_TARGET=${WASI_TARGET:-"wasm32-wasi"}
 WASI_BIN_PREFIX=${WASI_BIN_PREFIX:-"$WASI_TARGET"}
+BINARYEN_DIR=${BINARYEN_DIR:-"/opt/binaryen"}
+BINARYEN_BIN_DIR=${BINARYEN_BIN_DIR:-"${BINARYEN_DIR}/bin"}
 
 if [ "$(uname -s)" = "Darwin" ]; then
     DYLIB_SUFFIX="dylib"
@@ -217,6 +219,10 @@ rm -f "$wrapper_file"
     find assemblyscript -type d -exec install -d -v "${LUCET_SHARE_DIR}/{}" \;
     find assemblyscript -type f -exec install -p -v -m 0644 "{}" "${LUCET_SHARE_DIR}/{}" \;
 )
+
+for file in wasm-opt wasm-reduce; do
+    ln -sfv "${BINARYEN_BIN_DIR}/${file}" "${LUCET_BIN_DIR}/${file}"
+done
 
 if test -t 0; then
     echo

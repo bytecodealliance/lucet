@@ -1,7 +1,9 @@
 LUCET_ROOT:=$(abspath ../..)
 
 WASI_SDK?=/opt/wasi-sdk
-WASI_CC=$(WASI_SDK)/bin/clang
+WASI_CC?=$(WASI_SDK)/bin/clang
+BINARYEN_DIR?=/opt/binaryen
+WASM_OPT?=$(shell command -v wasm-opt || echo $(BINARYEN_DIR)/bin/wasm-opt)
 
 LUCETC:=$(LUCET_ROOT)/target/release/lucetc
 
@@ -22,6 +24,8 @@ COMMON_CFLAGS:=--std=c99 -Ofast -Wall -W -I$(SIGHTGLASS)/include
 SHOOTOUT_NATIVE_CFLAGS:=-march=native -fPIC \
 	-DIMPL_REFERENCE -DUSE_LEND \
 	-Dmalloc=lend_malloc -Dcalloc=lend_calloc -Dfree=lend_free
+
+BINARYEN_VERSION=86
 
 ifdef CI
 	SIGHTGLASS_ARGS:=--quick
@@ -60,9 +64,12 @@ build/lucet/shootout/%.o: $(SHOOTOUT)/%.c
 	@mkdir -p $(@D)
 	$(WASI_CC) $(COMMON_CFLAGS) -c $^ -o $@
 
-build/lucet/module.wasm: $(patsubst %.c, %.o, $(addprefix build/lucet/shootout/, $(notdir $(SHOOTOUT_SRCS))))
+build/lucet/module.wasm.unoptimized: $(patsubst %.c, %.o, $(addprefix build/lucet/shootout/, $(notdir $(SHOOTOUT_SRCS))))
 	@mkdir -p $(@D)
 	$(WASI_CC) $^ -o $@ -nostartfiles -Wl,--no-entry -Wl,--export-all
+
+build/lucet/module.wasm: build/lucet/module.wasm.unoptimized
+	$(WASM_OPT) -mvp --disable-mutable-globals -O4 -o $@ $^
 
 # Don't emit the shared object, we need a saparate link step below.
 build/lucet/module.o: build/lucet/module.wasm $(LIBBUILTINS)
