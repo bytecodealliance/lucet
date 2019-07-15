@@ -444,7 +444,15 @@ impl<'a> ModuleDecls<'a> {
             .ok_or_else(|| format_err!("table index out of bounds: {:?}", table_index))?;
         let exportable_tbl = self.info.tables.get(table_index).unwrap();
         let import_name = self.info.imported_tables.get(table_index);
-        let elems = self.info.table_elems.get(&table_index).unwrap().as_slice();
+        let elems = self
+            .info
+            .table_elems
+            .get(&table_index)
+            .ok_or_else(|| {
+                format_err!("table is not local: {:?}", table_index)
+                    .context(LucetcErrorKind::Unsupported)
+            })?
+            .as_slice();
         Ok(TableDecl {
             table: &exportable_tbl.entity,
             elems,
