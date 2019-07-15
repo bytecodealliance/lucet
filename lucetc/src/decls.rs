@@ -448,7 +448,10 @@ impl<'a> ModuleDecls<'a> {
             .info
             .table_elems
             .get(&table_index)
-            .ok_or_else(|| format_err!("table is not local: {:?}", table_index))?
+            .ok_or_else(|| {
+                format_err!("table is not local: {:?}", table_index)
+                    .context(LucetcErrorKind::Unsupported)
+            })?
             .as_slice();
         Ok(TableDecl {
             table: &exportable_tbl.entity,
