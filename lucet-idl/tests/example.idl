@@ -27,8 +27,8 @@ mod example {
 
     fn set_color(to: i32) -> r: i32;
 
-    fn get_color_as_ptr() -> c_ptr: i32
-    where color: out color <- *c_ptr;
+    fn get_color_by_ptr(color_ptr: i32)
+    where color: out color <- *color_ptr;
 
 
     fn get_structure(of: i32) -> s: i32;

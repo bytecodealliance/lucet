@@ -2,11 +2,10 @@ use crate::data_layout::{
     AliasIR, DataTypeModuleBuilder, EnumIR, StructIR, StructMemberIR, VariantIR,
 };
 use crate::error::ValidationError;
-use crate::function::validate_func_args;
+use crate::function::FuncDecl;
 use crate::parser::{SyntaxDecl, SyntaxTypeRef};
 use crate::types::{
-    AbiType, DataType, DataTypeRef, DataTypeVariant, EnumMember, FuncDecl, Ident, Location, Name,
-    Named,
+    AbiType, DataType, DataTypeRef, DataTypeVariant, EnumMember, Ident, Location, Name, Named,
 };
 use heck::SnakeCase;
 use std::collections::HashMap;
@@ -205,16 +204,16 @@ impl Module {
                 location,
                 bindings,
             } => {
-                let (args, rets, bindings) =
-                    validate_func_args(args, rets, bindings, location, self)?;
                 let binding_name = self.binding_prefix.clone() + "_" + &name.to_snake_case();
-                let decl = FuncDecl {
-                    field_name: name.clone(),
+                let decl = FuncDecl::from_syntax(
+                    name.clone(),
                     binding_name,
                     args,
                     rets,
                     bindings,
-                };
+                    location,
+                    self,
+                )?;
                 if let Some(prev_def) = funcs_ir.insert(id, decl) {
                     panic!("id {} already defined: {:?}", id, prev_def)
                 }
@@ -305,12 +304,9 @@ impl Module {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::function::{BindingRef, FuncArg, FuncBinding, ParamPosition};
     use crate::parser::Parser;
-    use crate::types::{
-        AbiType, AtomType, BindDirection, BindingRef, DataTypeVariant, FuncArg, FuncBinding,
-        StructDataType, StructMember,
-    };
-
+    use crate::types::{AbiType, AtomType, DataTypeVariant, StructDataType, StructMember};
     fn mod_(syntax: &str) -> Result<Module, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
@@ -524,7 +520,9 @@ mod tests {
                         field_name: "trivial".to_owned(),
                         args: Vec::new(),
                         rets: Vec::new(),
-                        bindings: Vec::new(),
+                        in_bindings: Vec::new(),
+                        inout_bindings: Vec::new(),
+                        out_bindings: Vec::new(),
                     }
                 )]
                 .into_iter()
@@ -555,7 +553,13 @@ mod tests {
                             name: "a".to_owned(),
                         }],
                         rets: Vec::new(),
-                        bindings: Vec::new(),
+                        in_bindings: vec![FuncBinding {
+                            name: "a".to_owned(),
+                            type_: DataTypeRef::Atom(AtomType::I64),
+                            from: BindingRef::Value(ParamPosition::Arg(0)),
+                        },],
+                        inout_bindings: Vec::new(),
+                        out_bindings: Vec::new(),
                     }
                 )]
                 .into_iter()
@@ -587,7 +591,13 @@ mod tests {
                             name: "r".to_owned(),
                             type_: AbiType::I64,
                         }],
-                        bindings: Vec::new(),
+                        in_bindings: Vec::new(),
+                        inout_bindings: Vec::new(),
+                        out_bindings: vec![FuncBinding {
+                            name: "r".to_owned(),
+                            type_: DataTypeRef::Atom(AtomType::I64),
+                            from: BindingRef::Value(ParamPosition::Ret(0)),
+                        },]
                     }
                 )]
                 .into_iter()
@@ -652,12 +662,13 @@ mod tests {
                             name: "a".to_owned(),
                         }],
                         rets: Vec::new(),
-                        bindings: vec![FuncBinding {
+                        in_bindings: vec![FuncBinding {
                             name: "a_binding".to_owned(),
                             type_: DataTypeRef::Atom(AtomType::I8),
-                            direction: BindDirection::In,
-                            from: BindingRef::Value("a".to_owned()),
+                            from: BindingRef::Value(ParamPosition::Arg(0)),
                         }],
+                        inout_bindings: Vec::new(),
+                        out_bindings: Vec::new(),
                     }
                 )]
                 .into_iter()
@@ -691,12 +702,13 @@ mod tests {
                             name: "a".to_owned(),
                         }],
                         rets: Vec::new(),
-                        bindings: vec![FuncBinding {
+                        in_bindings: Vec::new(),
+                        inout_bindings: vec![FuncBinding {
                             name: "a_binding".to_owned(),
                             type_: DataTypeRef::Atom(AtomType::I8),
-                            direction: BindDirection::InOut,
-                            from: BindingRef::Ptr("a".to_owned()),
+                            from: BindingRef::Ptr(ParamPosition::Arg(0)),
                         }],
+                        out_bindings: Vec::new(),
                     }
                 )]
                 .into_iter()
@@ -797,11 +809,12 @@ mod tests {
                             type_: AbiType::I32,
                             name: "a".to_owned(),
                         }],
-                        bindings: vec![FuncBinding {
+                        in_bindings: Vec::new(),
+                        inout_bindings: Vec::new(),
+                        out_bindings: vec![FuncBinding {
                             name: "a_binding".to_owned(),
                             type_: DataTypeRef::Atom(AtomType::I8),
-                            direction: BindDirection::Out,
-                            from: BindingRef::Value("a".to_owned()),
+                            from: BindingRef::Value(ParamPosition::Ret(0)),
                         }],
                     }
                 )]
@@ -819,37 +832,11 @@ mod tests {
     fn func_one_ret_pointer_binding() {
         assert_eq!(
             mod_("fn trivial() -> a: i32 where\na_binding: out i8 <- *a;")
-                .ok()
+                .err()
                 .unwrap(),
-            Module {
-                names: vec![Name {
-                    name: "trivial".to_owned(),
-                    location: Location { line: 1, column: 0 }
-                }],
-                funcs: vec![(
-                    Ident(0),
-                    FuncDecl {
-                        binding_name: "_trivial".to_owned(),
-                        field_name: "trivial".to_owned(),
-                        args: Vec::new(),
-                        rets: vec![FuncArg {
-                            type_: AbiType::I32,
-                            name: "a".to_owned(),
-                        }],
-                        bindings: vec![FuncBinding {
-                            name: "a_binding".to_owned(),
-                            type_: DataTypeRef::Atom(AtomType::I8),
-                            direction: BindDirection::Out,
-                            from: BindingRef::Ptr("a".to_owned()),
-                        }],
-                    }
-                )]
-                .into_iter()
-                .collect::<HashMap<_, _>>(),
-                data_types: HashMap::new(),
-                data_type_ordering: Vec::new(),
-                module_name: String::new(),
-                binding_prefix: String::new(),
+            ValidationError::BindingTypeError {
+                expected: "return value cannot be bound to pointer",
+                location: Location { line: 2, column: 0 },
             }
         );
     }
@@ -895,12 +882,13 @@ mod tests {
                             }
                         ],
                         rets: Vec::new(),
-                        bindings: vec![FuncBinding {
+                        in_bindings: Vec::new(),
+                        inout_bindings: vec![FuncBinding {
                             name: "a_binding".to_owned(),
                             type_: DataTypeRef::Atom(AtomType::I8),
-                            direction: BindDirection::InOut,
-                            from: BindingRef::Slice("a_ptr".to_owned(), "a_len".to_owned()),
+                            from: BindingRef::Slice(ParamPosition::Arg(0), ParamPosition::Arg(1)),
                         }],
+                        out_bindings: Vec::new(),
                     }
                 )]
                 .into_iter()
@@ -921,7 +909,7 @@ mod tests {
                  a_binding: out u8 <- *a,\n\
                  b_binding: inout u16 <- *b,\n\
                  c_binding: in f32 <- c,\n\
-                 d_binding: out i8 <- *d;\n\
+                 d_binding: out i8 <- d;\n\
                  "
             )
             .ok()
@@ -954,30 +942,26 @@ mod tests {
                             type_: AbiType::I32,
                             name: "d".to_owned(),
                         }],
-                        bindings: vec![
+                        in_bindings: vec![FuncBinding {
+                            name: "c_binding".to_owned(),
+                            type_: DataTypeRef::Atom(AtomType::F32),
+                            from: BindingRef::Value(ParamPosition::Arg(2)),
+                        },],
+                        inout_bindings: vec![FuncBinding {
+                            name: "b_binding".to_owned(),
+                            type_: DataTypeRef::Atom(AtomType::U16),
+                            from: BindingRef::Ptr(ParamPosition::Arg(1)),
+                        },],
+                        out_bindings: vec![
                             FuncBinding {
                                 name: "a_binding".to_owned(),
                                 type_: DataTypeRef::Atom(AtomType::U8),
-                                direction: BindDirection::Out,
-                                from: BindingRef::Ptr("a".to_owned()),
-                            },
-                            FuncBinding {
-                                name: "b_binding".to_owned(),
-                                type_: DataTypeRef::Atom(AtomType::U16),
-                                direction: BindDirection::InOut,
-                                from: BindingRef::Ptr("b".to_owned()),
-                            },
-                            FuncBinding {
-                                name: "c_binding".to_owned(),
-                                type_: DataTypeRef::Atom(AtomType::F32),
-                                direction: BindDirection::In,
-                                from: BindingRef::Value("c".to_owned()),
+                                from: BindingRef::Ptr(ParamPosition::Arg(0)),
                             },
                             FuncBinding {
                                 name: "d_binding".to_owned(),
                                 type_: DataTypeRef::Atom(AtomType::I8),
-                                direction: BindDirection::Out,
-                                from: BindingRef::Ptr("d".to_owned()),
+                                from: BindingRef::Value(ParamPosition::Ret(0)),
                             },
                         ],
                     }

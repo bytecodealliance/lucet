@@ -2,12 +2,13 @@
 #![allow(unused_variables)]
 
 use crate::error::IDLError;
+use crate::function::{BindingRef, FuncDecl};
 use crate::module::Module;
 use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
 use crate::types::{
-    AbiType, AliasDataType, AtomType, BindDirection, BindingRef, DataType, DataTypeRef,
-    DataTypeVariant, EnumDataType, FuncDecl, Ident, Named, StructDataType,
+    AbiType, AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, Ident,
+    Named, StructDataType,
 };
 use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
@@ -249,58 +250,71 @@ impl RustGenerator {
         let mut before_abi_call: Vec<String> = Vec::new();
         let mut after_abi_call: Vec<String> = Vec::new();
 
-        for input in func.bindings_with(BindDirection::In) {
+        for input in func.in_bindings.iter() {
             match &input.from {
                 BindingRef::Ptr(ptr) => {
+                    let ptr = func.get_param(ptr).expect("valid param");
                     args.push(format!(
                         "{}: &{}",
                         input.name,
                         self.get_defined_typename(&input.type_)
                     ));
-                    before_abi_call
-                        .push(format!("let {} = {} as *const _ as i32;", ptr, input.name,));
+                    before_abi_call.push(format!(
+                        "let {} = {} as *const _ as i32;",
+                        ptr.name, input.name,
+                    ));
                 }
                 BindingRef::Slice(ptr, len) => {
+                    let ptr = func.get_param(ptr).expect("valid param");
+                    let len = func.get_param(len).expect("lenid param");
                     args.push(format!(
                         "{}: &[{}]",
                         input.name,
                         self.get_defined_typename(&input.type_)
                     ));
-                    before_abi_call.push(format!("let {} = {}.as_ptr() as i32;", ptr, input.name,));
-                    before_abi_call.push(format!("let {} = {}.len() as i32;", len, input.name,));
+                    before_abi_call.push(format!(
+                        "let {} = {}.as_ptr() as i32;",
+                        ptr.name, input.name,
+                    ));
+                    before_abi_call
+                        .push(format!("let {} = {}.len() as i32;", len.name, input.name,));
                 }
                 BindingRef::Value(val) => {
+                    let val = func.get_param(val).expect("valid param");
                     args.push(format!(
                         "{}: {}",
                         input.name,
                         self.get_defined_typename(&input.type_)
                     ));
-                    before_abi_call.push(format!("// TODO: cast {} to abi type", val,));
+                    before_abi_call.push(format!("// TODO: cast {:?} to abi type", val,));
                 }
             }
         }
 
-        for io in func.bindings_with(BindDirection::InOut) {
+        for io in func.inout_bindings.iter() {
             match &io.from {
                 BindingRef::Ptr(ptr) => {
+                    let ptr = func.get_param(ptr).expect("valid param");
                     args.push(format!(
                         "{}: &mut {}",
                         io.name,
                         self.get_defined_typename(&io.type_)
                     ));
                     before_abi_call.push(format!(
-                        "// TODO: cast the ref to a pointer, and then to u32 named {}: {:?}",
+                        "// TODO: cast the ref to a pointer, and then to u32 {:?}: {:?}",
                         ptr, io
                     ));
                 }
                 BindingRef::Slice(ptr, len) => {
+                    let ptr = func.get_param(ptr).expect("ptrid param");
+                    let len = func.get_param(len).expect("lenid param");
                     args.push(format!(
                         "{}: &mut [{}]",
                         io.name,
                         self.get_defined_typename(&io.type_)
                     ));
                     before_abi_call.push(format!(
-                        "// TODO: destructure {} into ptr {} and arg {}",
+                        "// TODO: destructure {} into ptr {:?} and arg {:?}",
                         io.name, ptr, len
                     ));
                 }
@@ -312,28 +326,27 @@ impl RustGenerator {
             args.push(format!("/* FIXME inout binding {:?} */", io));
         }
 
-        for input in func.unbound_args() {
-            args.push(format!(
-                "{}: {}",
-                input.name,
-                Self::abitype_name(&input.type_)
-            ));
-        }
-
         let mut rets = Vec::new();
-        for o in func.bindings_with(BindDirection::Out) {
+        for o in func.out_bindings.iter() {
             match &o.from {
                 BindingRef::Ptr(ptr) => {
-                    rets.push(format!("&'static {}", self.get_defined_typename(&o.type_))); // XXX this should be boxed? need to define allocation protocol like we did in terrarium?
+                    let ptr = func.get_param(ptr).expect("valid param");
+                    let otypename = self.get_defined_typename(&o.type_);
+                    rets.push(otypename.clone());
+                    before_abi_call.push(format!(
+                        "let mut {} = ::std::mem::MaybeUninit::<{}>::uninit();",
+                        ptr.name, otypename
+                    ));
                     after_abi_call.push(format!(
-                        "// TODO: cast the u32 named {} ptr, then to a ref, {:?}. FALLIBLE!!",
+                        "// TODO: cast the u32 {:?} ptr, then to a ref, {:?}. FALLIBLE!!",
                         ptr, o
                     ));
                 }
                 BindingRef::Value(val) => {
+                    let val = func.get_param(val).expect("valid param");
                     rets.push(format!("{}", self.get_defined_typename(&o.type_)));
                     after_abi_call.push(format!(
-                        "// TODO: cast the ret named {} to a value {:?}",
+                        "// TODO: cast the ret {:?} to a value {:?}",
                         val, o
                     ));
                 }
@@ -341,9 +354,6 @@ impl RustGenerator {
                     panic!("it should not be possible to have an out slice {:?}", o);
                 }
             }
-        }
-        for o in func.unbound_rets() {
-            rets.push(Self::abitype_name(&o.type_).to_owned());
         }
 
         let name = func.field_name.to_snake_case();

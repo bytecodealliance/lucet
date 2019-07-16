@@ -1,5 +1,5 @@
 use super::lexer::{LexError, Lexer, LocatedError, LocatedToken, Token};
-use super::types::{AbiType, AtomType, BindDirection, Location};
+use super::types::{AbiType, AtomType, Location};
 use std::error::Error;
 use std::fmt;
 
@@ -94,10 +94,17 @@ pub struct ParseError {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum BindingDirSyntax {
+    In,
+    Out,
+    InOut,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BindingSyntax {
     pub name: String,
     pub type_: SyntaxTypeRef,
-    pub direction: BindDirection,
+    pub direction: BindingDirSyntax,
     pub from: BindingRefSyntax,
     pub location: Location,
 }
@@ -388,19 +395,19 @@ impl<'a> Parser<'a> {
         Ok(bindings)
     }
 
-    fn match_bind_direction(&mut self) -> Result<BindDirection, ParseError> {
+    fn match_bind_direction(&mut self) -> Result<BindingDirSyntax, ParseError> {
         match self.token() {
             Some(Token::Word("in")) => {
                 self.consume();
-                Ok(BindDirection::In)
+                Ok(BindingDirSyntax::In)
             }
             Some(Token::Word("inout")) | Some(Token::Word("io")) => {
                 self.consume();
-                Ok(BindDirection::InOut)
+                Ok(BindingDirSyntax::InOut)
             }
             Some(Token::Word("out")) => {
                 self.consume();
-                Ok(BindDirection::Out)
+                Ok(BindingDirSyntax::Out)
             }
             _ => parse_err!(
                 self.location,
@@ -1183,7 +1190,7 @@ mod tests {
                             name: "file_t".to_owned(),
                             location: Location { line: 2, column: 9 },
                         },
-                        direction: BindDirection::In,
+                        direction: BindingDirSyntax::In,
                         from: BindingRefSyntax::Ptr(Box::new(BindingRefSyntax::Name(
                             "fptr".to_owned()
                         ))),
@@ -1195,7 +1202,7 @@ mod tests {
                             atom: AtomType::U8,
                             location: Location { line: 3, column: 7 },
                         },
-                        direction: BindDirection::Out,
+                        direction: BindingDirSyntax::Out,
                         from: BindingRefSyntax::Name("r".to_owned()),
                         location: Location { line: 3, column: 0 },
                     },
@@ -1208,7 +1215,7 @@ mod tests {
                                 column: 16
                             },
                         },
-                        direction: BindDirection::Out,
+                        direction: BindingDirSyntax::Out,
                         from: BindingRefSyntax::Slice(
                             Box::new(BindingRefSyntax::Name("a".to_owned())),
                             Box::new(BindingRefSyntax::Name("b".to_owned()))

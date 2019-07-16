@@ -1,3 +1,4 @@
+pub use crate::function::{BindingRef, FuncArg, FuncDecl, ParamPosition};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -69,6 +70,17 @@ impl AbiType {
     }
 }
 
+impl From<AbiType> for AtomType {
+    fn from(abi: AbiType) -> AtomType {
+        match abi {
+            AbiType::I32 => AtomType::I32,
+            AbiType::I64 => AtomType::I64,
+            AbiType::F32 => AtomType::F32,
+            AbiType::F64 => AtomType::F64,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 pub struct Location {
     pub line: usize,
@@ -129,81 +141,6 @@ pub struct DataType {
     pub variant: DataTypeVariant,
     pub repr_size: usize,
     pub align: usize,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FuncArg {
-    pub name: String,
-    pub type_: AbiType,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FuncDecl {
-    pub field_name: String,
-    pub binding_name: String,
-    pub args: Vec<FuncArg>,
-    pub rets: Vec<FuncArg>,
-    pub bindings: Vec<FuncBinding>,
-}
-
-impl FuncDecl {
-    pub fn bindings_with(&self, direction: BindDirection) -> impl Iterator<Item = &FuncBinding> {
-        self.bindings
-            .iter()
-            .filter(move |b| b.direction == direction)
-    }
-
-    fn bound_params(&self) -> Vec<String> {
-        self.bindings.iter().flat_map(|b| b.referents()).collect()
-    }
-
-    pub fn unbound_args(&self) -> Vec<&FuncArg> {
-        let bound = self.bound_params();
-        self.args
-            .iter()
-            .filter(|a| !bound.contains(&a.name))
-            .collect()
-    }
-
-    pub fn unbound_rets(&self) -> Vec<&FuncArg> {
-        let bound = self.bound_params();
-        self.rets
-            .iter()
-            .filter(|a| !bound.contains(&a.name))
-            .collect()
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FuncBinding {
-    pub name: String,
-    pub type_: DataTypeRef,
-    pub direction: BindDirection,
-    pub from: BindingRef,
-}
-
-impl FuncBinding {
-    pub fn referents(&self) -> Vec<String> {
-        match &self.from {
-            BindingRef::Ptr(s) => vec![s.clone()],
-            BindingRef::Slice(s1, s2) => vec![s1.clone(), s2.clone()],
-            BindingRef::Value(s) => vec![s.clone()],
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum BindingRef {
-    Ptr(String),           // Treat the argument of that name as a pointer
-    Slice(String, String), // Treat first argument as a pointer, second as the length
-    Value(String),         // Treat the argument of that name as a value
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum BindDirection {
-    In,
-    Out,
-    InOut,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
