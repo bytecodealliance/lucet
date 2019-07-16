@@ -6,8 +6,8 @@ use crate::module::Module;
 use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
 use crate::types::{
-    AbiType, AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType,
-    FuncDecl, Ident, Named, StructDataType,
+    AbiType, AliasDataType, AtomType, BindDirection, BindingRef, DataType, DataTypeRef,
+    DataTypeVariant, EnumDataType, FuncDecl, Ident, Named, StructDataType,
 };
 use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
@@ -30,11 +30,24 @@ impl RustGenerator {
     pub fn generate_guest(&mut self, package: &Package) -> Result<(), IDLError> {
         for (_ident, module) in package.modules.iter() {
             self.generate_datatypes(module)?;
+
+            for fdecl in module.func_decls() {
+                self.guest_idiomatic_def(module, &fdecl.entity)?;
+            }
+
+            self.w.writeln("mod abi {")?;
+            self.w.indent();
+            self.w.writeln(format!(
+                "#[link(wasm_import_module=\"{}\")]",
+                module.module_name
+            ))?;
             self.w.writeln("extern \"C\" {")?;
             self.w.indent();
             for fdecl in module.func_decls() {
-                self.guest_function_import(module, &fdecl)?;
+                self.guest_abi_import(module, &fdecl.entity)?;
             }
+            self.w.eob()?;
+            self.w.writeln("}")?;
             self.w.eob()?;
             self.w.writeln("}")?;
         }
@@ -48,7 +61,7 @@ impl RustGenerator {
             self.w.writeln("lucet_hostcalls! {")?;
             self.w.indent();
             for fdecl in module.func_decls() {
-                self.host_function_definition(module, &fdecl)?;
+                self.host_abi_definition(module, &fdecl.entity)?;
             }
             self.w.eob()?;
             self.w.writeln("}")?;
@@ -206,14 +219,9 @@ impl RustGenerator {
         Ok(())
     }
 
-    fn guest_function_import(
-        &mut self,
-        module: &Module,
-        func_decl_entry: &Named<FuncDecl>,
-    ) -> Result<(), IDLError> {
-        let name = func_decl_entry.name.name.to_snake_case();
+    fn guest_abi_import(&mut self, module: &Module, func: &FuncDecl) -> Result<(), IDLError> {
         let mut args = String::new();
-        for a in func_decl_entry.entity.args.iter() {
+        for a in func.args.iter() {
             args += &format!(
                 "{}: {},",
                 a.name.to_snake_case(),
@@ -221,29 +229,171 @@ impl RustGenerator {
             );
         }
 
-        let func_rets = &func_decl_entry.entity.rets;
-        let rets = if func_rets.len() == 0 {
+        let rets = if func.rets.len() == 0 {
             "()"
         } else {
-            assert_eq!(func_rets.len(), 1);
-            Self::abitype_name(&func_rets[0].type_)
+            assert_eq!(func.rets.len(), 1);
+            Self::abitype_name(&func.rets[0].type_)
         };
 
         self.w
             .writeln("#[no_mangle]")?
-            .writeln(format!("fn {}({}) -> {};", name, args, rets))?;
+            .writeln(format!("pub fn {}({}) -> {};", func.field_name, args, rets))?;
 
         Ok(())
     }
 
-    fn host_function_definition(
-        &mut self,
-        module: &Module,
-        func_decl_entry: &Named<FuncDecl>,
-    ) -> Result<(), IDLError> {
-        let name = func_decl_entry.name.name.to_snake_case();
+    fn guest_idiomatic_def(&mut self, module: &Module, func: &FuncDecl) -> Result<(), IDLError> {
+        let mut args = Vec::new();
+
+        let mut before_abi_call: Vec<String> = Vec::new();
+        let mut after_abi_call: Vec<String> = Vec::new();
+
+        for input in func.bindings_with(BindDirection::In) {
+            match &input.from {
+                BindingRef::Ptr(ptr) => {
+                    args.push(format!(
+                        "{}: &{}",
+                        input.name,
+                        self.get_defined_typename(&input.type_)
+                    ));
+                    before_abi_call
+                        .push(format!("let {} = {} as *const _ as i32;", ptr, input.name,));
+                }
+                BindingRef::Slice(ptr, len) => {
+                    args.push(format!(
+                        "{}: &[{}]",
+                        input.name,
+                        self.get_defined_typename(&input.type_)
+                    ));
+                    before_abi_call.push(format!("let {} = {}.as_ptr() as i32;", ptr, input.name,));
+                    before_abi_call.push(format!("let {} = {}.len() as i32;", len, input.name,));
+                }
+                BindingRef::Value(val) => {
+                    args.push(format!(
+                        "{}: {}",
+                        input.name,
+                        self.get_defined_typename(&input.type_)
+                    ));
+                    before_abi_call.push(format!("// TODO: cast {} to abi type", val,));
+                }
+            }
+        }
+
+        for io in func.bindings_with(BindDirection::InOut) {
+            match &io.from {
+                BindingRef::Ptr(ptr) => {
+                    args.push(format!(
+                        "{}: &mut {}",
+                        io.name,
+                        self.get_defined_typename(&io.type_)
+                    ));
+                    before_abi_call.push(format!(
+                        "// TODO: cast the ref to a pointer, and then to u32 named {}: {:?}",
+                        ptr, io
+                    ));
+                }
+                BindingRef::Slice(ptr, len) => {
+                    args.push(format!(
+                        "{}: &mut [{}]",
+                        io.name,
+                        self.get_defined_typename(&io.type_)
+                    ));
+                    before_abi_call.push(format!(
+                        "// TODO: destructure {} into ptr {} and arg {}",
+                        io.name, ptr, len
+                    ));
+                }
+                BindingRef::Value(_val) => {
+                    panic!("it should not be possible to have an inout value {:?}", io);
+                }
+            }
+
+            args.push(format!("/* FIXME inout binding {:?} */", io));
+        }
+
+        for input in func.unbound_args() {
+            args.push(format!(
+                "{}: {}",
+                input.name,
+                Self::abitype_name(&input.type_)
+            ));
+        }
+
+        let mut rets = Vec::new();
+        for o in func.bindings_with(BindDirection::Out) {
+            match &o.from {
+                BindingRef::Ptr(ptr) => {
+                    rets.push(format!("&'static {}", self.get_defined_typename(&o.type_))); // XXX this should be boxed? need to define allocation protocol like we did in terrarium?
+                    after_abi_call.push(format!(
+                        "// TODO: cast the u32 named {} ptr, then to a ref, {:?}. FALLIBLE!!",
+                        ptr, o
+                    ));
+                }
+                BindingRef::Value(val) => {
+                    rets.push(format!("{}", self.get_defined_typename(&o.type_)));
+                    after_abi_call.push(format!(
+                        "// TODO: cast the ret named {} to a value {:?}",
+                        val, o
+                    ));
+                }
+                BindingRef::Slice(_ptr, _len) => {
+                    panic!("it should not be possible to have an out slice {:?}", o);
+                }
+            }
+        }
+        for o in func.unbound_rets() {
+            rets.push(Self::abitype_name(&o.type_).to_owned());
+        }
+
+        let name = func.field_name.to_snake_case();
+        let arg_syntax = args.join(", ");
+        let ret_syntax = if rets.is_empty() {
+            "Result<(),()>".to_owned()
+        } else {
+            assert_eq!(rets.len(), 1);
+            format!("Result<{},()>", rets[0])
+        };
+        self.w.writeln(format!(
+            "pub fn {}({}) -> {} {{",
+            name, arg_syntax, ret_syntax
+        ))?;
+        self.w.indent();
+        for l in before_abi_call {
+            self.w.writeln(l)?;
+        }
+
+        {
+            // Do the ABI call
+            let ret_syntax = if func.rets.is_empty() {
+                String::new()
+            } else {
+                format!("let {} = ", func.rets[0].name)
+            };
+            let arg_syntax = func
+                .args
+                .iter()
+                .map(|a| a.name.clone())
+                .collect::<Vec<String>>()
+                .join(", ");
+            self.w
+                .writeln(format!("{}abi::{}({});", ret_syntax, name, arg_syntax))?;
+        }
+        for l in after_abi_call {
+            self.w.writeln(l)?;
+        }
+        if !func.rets.is_empty() {
+            self.w
+                .writeln(format!("Ok({})", func.rets[0].name.clone()))?;
+        }
+        self.w.eob()?;
+        self.w.writeln("}")?;
+        Ok(())
+    }
+
+    fn host_abi_definition(&mut self, module: &Module, func: &FuncDecl) -> Result<(), IDLError> {
         let mut args = format!("&mut vmctx,");
-        for a in func_decl_entry.entity.args.iter() {
+        for a in func.args.iter() {
             args += &format!(
                 "{}: {},",
                 a.name.to_snake_case(),
@@ -251,22 +401,17 @@ impl RustGenerator {
             );
         }
 
-        let func_rets = &func_decl_entry.entity.rets;
-        let rets = if func_rets.len() == 0 {
+        let rets = if func.rets.len() == 0 {
             "()"
         } else {
-            assert_eq!(func_rets.len(), 1);
-            Self::abitype_name(&func_rets[0].type_)
+            assert_eq!(func.rets.len(), 1);
+            Self::abitype_name(&func.rets[0].type_)
         };
 
         self.w.writeln("#[no_mangle]")?.writeln(format!(
             "// Wasm func {}::{}
 pub unsafe extern \"C\" fn {}({}) -> {} {{",
-            module.module_name,
-            func_decl_entry.entity.field_name,
-            func_decl_entry.entity.binding_name,
-            args,
-            rets
+            module.module_name, func.field_name, func.binding_name, args, rets
         ))?;
 
         self.w.indent();

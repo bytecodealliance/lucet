@@ -146,12 +146,50 @@ pub struct FuncDecl {
     pub bindings: Vec<FuncBinding>,
 }
 
+impl FuncDecl {
+    pub fn bindings_with(&self, direction: BindDirection) -> impl Iterator<Item = &FuncBinding> {
+        self.bindings
+            .iter()
+            .filter(move |b| b.direction == direction)
+    }
+
+    fn bound_params(&self) -> Vec<String> {
+        self.bindings.iter().flat_map(|b| b.referents()).collect()
+    }
+
+    pub fn unbound_args(&self) -> Vec<&FuncArg> {
+        let bound = self.bound_params();
+        self.args
+            .iter()
+            .filter(|a| !bound.contains(&a.name))
+            .collect()
+    }
+
+    pub fn unbound_rets(&self) -> Vec<&FuncArg> {
+        let bound = self.bound_params();
+        self.rets
+            .iter()
+            .filter(|a| !bound.contains(&a.name))
+            .collect()
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FuncBinding {
     pub name: String,
     pub type_: DataTypeRef,
     pub direction: BindDirection,
     pub from: BindingRef,
+}
+
+impl FuncBinding {
+    pub fn referents(&self) -> Vec<String> {
+        match &self.from {
+            BindingRef::Ptr(s) => vec![s.clone()],
+            BindingRef::Slice(s1, s2) => vec![s1.clone(), s2.clone()],
+            BindingRef::Value(s) => vec![s.clone()],
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

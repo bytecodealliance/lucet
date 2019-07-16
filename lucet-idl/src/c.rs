@@ -163,11 +163,11 @@ impl CGenerator {
             .iter()
             .map(|a| format!("{} {}", abi_type_name(&a.type_), a.name))
             .collect::<Vec<String>>()
-            .join(",");
+            .join(", ");
 
         self.w.writeln(format!(
             "extern {} {}({});",
-            return_decl, func.binding_name, arg_list,
+            return_decl, func.field_name, arg_list,
         ))?;
 
         Ok(())
