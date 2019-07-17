@@ -36,36 +36,34 @@ impl RustGenerator {
                 self.guest_idiomatic_def(module, &fdecl.entity)?;
             }
 
-            self.w.writeln("mod abi {")?;
-            self.w.indent();
-            self.w.writeln(format!(
-                "#[link(wasm_import_module=\"{}\")]",
-                module.module_name
-            ))?;
-            self.w.writeln("extern \"C\" {")?;
-            self.w.indent();
+            self.w
+                .writeln("mod abi {")
+                .indent()
+                .writeln(format!(
+                    "#[link(wasm_import_module=\"{}\")]",
+                    module.module_name
+                ))
+                .writeln("extern \"C\" {")
+                .indent();
             for fdecl in module.func_decls() {
-                self.guest_abi_import(module, &fdecl.entity)?;
+                self.guest_abi_import(module, &fdecl.entity);
             }
-            self.w.eob()?;
-            self.w.writeln("}")?;
-            self.w.eob()?;
-            self.w.writeln("}")?;
+            self.w.eob().writeln("}").eob().writeln("}");
         }
         Ok(())
     }
 
     pub fn generate_host(&mut self, package: &Package) -> Result<(), IDLError> {
         for (_ident, module) in package.modules.iter() {
-            self.w.writeln("use lucet_runtime::lucet_hostcalls;")?;
+            self.w.writeln("use lucet_runtime::lucet_hostcalls;");
             self.generate_datatypes(module)?;
-            self.w.writeln("lucet_hostcalls! {")?;
+            self.w.writeln("lucet_hostcalls! {");
             self.w.indent();
             for fdecl in module.func_decls() {
                 self.host_abi_definition(module, &fdecl.entity)?;
             }
-            self.w.eob()?;
-            self.w.writeln("}")?;
+            self.w.eob();
+            self.w.writeln("}");
         }
         Ok(())
     }
@@ -132,14 +130,14 @@ impl RustGenerator {
         let pointee_name = self.get_defined_typename(&alias.to);
 
         self.w
-            .writeln(format!("pub type {} = {};", typename, pointee_name))?
-            .eob()?;
+            .writeln(format!("pub type {} = {};", typename, pointee_name))
+            .eob();
 
         gen_testcase(&mut self.w, &dt.name.name.to_snake_case(), move |w| {
             w.writeln(format!(
                 "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
                 dt.entity.repr_size, typename
-            ))?;
+            ));
             Ok(())
         })?;
 
@@ -155,8 +153,8 @@ impl RustGenerator {
         let typename = self.define_name(dt);
 
         self.w
-            .writeln("#[repr(C)]")?
-            .writeln(format!("pub struct {} {{", typename))?;
+            .writeln("#[repr(C)]")
+            .writeln(format!("pub struct {} {{", typename));
 
         let mut w = self.w.new_block();
         for m in struct_.members.iter() {
@@ -164,22 +162,22 @@ impl RustGenerator {
                 "{}: {},",
                 m.name.to_snake_case(),
                 self.get_defined_typename(&m.type_)
-            ))?;
+            ));
         }
 
-        self.w.writeln("}")?.eob()?;
+        self.w.writeln("}").eob();
 
         gen_testcase(&mut self.w, &dt.name.name.to_snake_case(), |w| {
             w.writeln(format!(
                 "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
                 dt.entity.repr_size, typename
-            ))?;
+            ));
 
             for m in struct_.members.iter() {
                 w.writeln(format!(
                     "assert_eq!({}, {{ let base = ::std::ptr::null::<super::{}>(); unsafe {{ (&(*base).{}) as *const _ as usize }} }});",
                     m.offset, typename, m.name,
-                ))?;
+                ));
             }
             Ok(())
         })?;
@@ -198,22 +196,22 @@ impl RustGenerator {
         let typename = self.define_name(dt);
 
         self.w
-            .writeln("#[repr(C)]")?
-            .writeln("#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]")?
-            .writeln(format!("pub enum {} {{", typename))?;
+            .writeln("#[repr(C)]")
+            .writeln("#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]")
+            .writeln(format!("pub enum {} {{", typename));
 
         let mut w = self.w.new_block();
         for m in enum_.members.iter() {
-            w.writeln(format!("{},", m.name.to_camel_case()))?;
+            w.writeln(format!("{},", m.name.to_camel_case()));
         }
 
-        self.w.writeln("}")?.eob()?;
+        self.w.writeln("}").eob();
 
         gen_testcase(&mut self.w, &dt.name.name.to_snake_case(), |w| {
             w.writeln(format!(
                 "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
                 dt.entity.repr_size, typename
-            ))?;
+            ));
             Ok(())
         })?;
 
@@ -238,8 +236,8 @@ impl RustGenerator {
         };
 
         self.w
-            .writeln("#[no_mangle]")?
-            .writeln(format!("pub fn {}({}) -> {};", func.field_name, args, rets))?;
+            .writeln("#[no_mangle]")
+            .writeln(format!("pub fn {}({}) -> {};", func.field_name, args, rets));
 
         Ok(())
     }
@@ -364,40 +362,39 @@ impl RustGenerator {
             assert_eq!(rets.len(), 1);
             format!("Result<{},()>", rets[0])
         };
-        self.w.writeln(format!(
-            "pub fn {}({}) -> {} {{",
-            name, arg_syntax, ret_syntax
-        ))?;
-        self.w.indent();
+        self.w
+            .writeln(format!(
+                "pub fn {}({}) -> {} {{",
+                name, arg_syntax, ret_syntax
+            ))
+            .indent();
+
         for l in before_abi_call {
-            self.w.writeln(l)?;
+            self.w.writeln(l);
         }
 
-        {
-            // Do the ABI call
-            let ret_syntax = if func.rets.is_empty() {
-                String::new()
-            } else {
-                format!("let {} = ", func.rets[0].name)
-            };
-            let arg_syntax = func
-                .args
-                .iter()
-                .map(|a| a.name.clone())
-                .collect::<Vec<String>>()
-                .join(", ");
-            self.w
-                .writeln(format!("{}abi::{}({});", ret_syntax, name, arg_syntax))?;
-        }
+        // Do the ABI call
+        let ret_syntax = if func.rets.is_empty() {
+            String::new()
+        } else {
+            format!("let {} = ", func.rets[0].name)
+        };
+        let arg_syntax = func
+            .args
+            .iter()
+            .map(|a| a.name.clone())
+            .collect::<Vec<String>>()
+            .join(", ");
+        self.w
+            .writeln(format!("{}abi::{}({});", ret_syntax, name, arg_syntax));
+
         for l in after_abi_call {
-            self.w.writeln(l)?;
+            self.w.writeln(l);
         }
         if !func.rets.is_empty() {
-            self.w
-                .writeln(format!("Ok({})", func.rets[0].name.clone()))?;
+            self.w.writeln(format!("Ok({})", func.rets[0].name.clone()));
         }
-        self.w.eob()?;
-        self.w.writeln("}")?;
+        self.w.eob().writeln("}");
         Ok(())
     }
 
@@ -418,17 +415,16 @@ impl RustGenerator {
             Self::abitype_name(&func.rets[0].type_)
         };
 
-        self.w.writeln("#[no_mangle]")?.writeln(format!(
+        self.w.writeln("#[no_mangle]").writeln(format!(
             "// Wasm func {}::{}
 pub unsafe extern \"C\" fn {}({}) -> {} {{",
             module.module_name, func.field_name, func.binding_name, args, rets
-        ))?;
+        ));
 
         self.w.indent();
-        self.w.writeln("unimplemented!()")?;
-        self.w.eob()?;
+        self.w.writeln("unimplemented!()");
 
-        self.w.writeln("}")?;
+        self.w.eob().writeln("}");
 
         Ok(())
     }
@@ -438,16 +434,13 @@ fn gen_testcase<F>(w: &mut PrettyWriter, name: &str, f: F) -> Result<(), IDLErro
 where
     F: FnOnce(&mut PrettyWriter) -> Result<(), IDLError>,
 {
-    w.writeln("#[cfg(test)]")?;
-    w.writeln(format!("mod {} {{", name))?;
+    w.writeln("#[cfg(test)]")
+        .writeln(format!("mod {} {{", name));
     let mut ww = w.new_block();
-    ww.writeln("#[test]")?;
-    ww.writeln("fn test() {")?;
+    ww.writeln("#[test]").writeln("fn test() {");
     let mut www = ww.new_block();
     f(&mut www)?;
-    ww.writeln("}")?;
-    ww.eob()?;
-    w.writeln("}")?;
-    w.eob()?;
+    ww.writeln("}").eob();
+    w.writeln("}").eob();
     Ok(())
 }

@@ -25,9 +25,9 @@ impl CGenerator {
 #include <stdint.h>
 #include <stddef.h>";
         for line in prelude.lines() {
-            w.write_line(line.as_ref()).unwrap();
+            w.write_line(line.as_ref());
         }
-        w.eob().unwrap();
+        w.eob();
         Self { w }
     }
 
@@ -50,9 +50,9 @@ impl CGenerator {
 
     fn gen_type_header(&mut self, _module: &Module, dt: &Named<DataType>) -> Result<(), IDLError> {
         self.w
-            .eob()?
-            .writeln(format!("// ---------- {} ----------", dt.name.name))?
-            .eob()?;
+            .eob()
+            .writeln(format!("// ---------- {} ----------", dt.name.name))
+            .eob();
         Ok(())
     }
 
@@ -65,19 +65,21 @@ impl CGenerator {
         alias: &AliasDataType,
     ) -> Result<(), IDLError> {
         let dtname = self.type_name(dt);
-        self.w.writeln(format!(
-            "typedef {} {};",
-            self.type_ref_name(module, &alias.to),
-            dtname
-        ))?;
-        self.w.eob()?;
+        self.w
+            .writeln(format!(
+                "typedef {} {};",
+                self.type_ref_name(module, &alias.to),
+                dtname
+            ))
+            .eob();
 
         // Add an assertion to check that resolved size is the one we computed
-        self.w.writeln(format!(
-            "_Static_assert(sizeof({}) == {}, \"unexpected alias size\");",
-            dtname, dt.entity.repr_size
-        ))?;
-        self.w.eob()?;
+        self.w
+            .writeln(format!(
+                "_Static_assert(sizeof({}) == {}, \"unexpected alias size\");",
+                dtname, dt.entity.repr_size
+            ))
+            .eob();
 
         Ok(())
     }
@@ -89,32 +91,32 @@ impl CGenerator {
         struct_: &StructDataType,
     ) -> Result<(), IDLError> {
         let dtname = self.type_name(dt);
-        self.w.writeln(format!("{} {{", dtname))?;
+        self.w.writeln(format!("{} {{", dtname));
         let mut w_block = self.w.new_block();
         for member in struct_.members.iter() {
             w_block.writeln(format!(
                 "{} {};",
                 self.type_ref_name(module, &member.type_),
                 member.name
-            ))?;
+            ));
         }
-        self.w.writeln("};")?;
-        self.w.eob()?;
+        self.w.writeln("};").eob();
 
         // Skip the first member, as it will always be at the beginning of the structure
         for (i, member) in struct_.members.iter().enumerate().skip(1) {
             self.w.writeln(format!(
                 "_Static_assert(offsetof({}, {}) == {}, \"unexpected offset\");",
                 dtname, member.name, member.offset
-            ))?;
+            ));
         }
 
         let struct_size = dt.entity.repr_size;
-        self.w.writeln(format!(
-            "_Static_assert(sizeof({}) == {}, \"unexpected structure size\");",
-            dtname, struct_size,
-        ))?;
-        self.w.eob()?;
+        self.w
+            .writeln(format!(
+                "_Static_assert(sizeof({}) == {}, \"unexpected structure size\");",
+                dtname, struct_size,
+            ))
+            .eob();
 
         Ok(())
     }
@@ -129,22 +131,22 @@ impl CGenerator {
     ) -> Result<(), IDLError> {
         let dtname = self.type_name(dt);
         let type_size = dt.entity.repr_size;
-        self.w.writeln(format!("{} {{", dtname))?;
+        self.w.writeln(format!("{} {{", dtname));
         let mut pretty_writer_i1 = self.w.new_block();
         for (i, named_member) in enum_.members.iter().enumerate() {
             pretty_writer_i1.writeln(format!(
                 "{}, // {}",
                 macro_for(&dt.name.name, &named_member.name),
                 i
-            ))?;
+            ));
         }
-        self.w.writeln("};")?;
-        self.w.eob()?;
-        self.w.writeln(format!(
-            "_Static_assert(sizeof({}) == {}, \"unexpected enumeration size\");",
-            dtname, type_size
-        ))?;
-        self.w.eob()?;
+        self.w.writeln("};").eob();
+        self.w
+            .writeln(format!(
+                "_Static_assert(sizeof({}) == {}, \"unexpected enumeration size\");",
+                dtname, type_size
+            ))
+            .eob();
         Ok(())
     }
 
@@ -168,7 +170,7 @@ impl CGenerator {
         self.w.writeln(format!(
             "extern {} {}({});",
             return_decl, func.field_name, arg_list,
-        ))?;
+        ));
 
         Ok(())
     }
