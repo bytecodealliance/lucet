@@ -18,7 +18,6 @@ use wasmparser::Operator;
 
 pub struct FuncInfo<'a> {
     op_offsets: Vec<u32>,
-    op_offset: usize,
     module_decls: &'a ModuleDecls<'a>,
     vmctx_value: Option<ir::GlobalValue>,
     global_base_value: Option<ir::GlobalValue>,
@@ -29,7 +28,6 @@ impl<'a> FuncInfo<'a> {
     pub fn new(module_decls: &'a ModuleDecls<'a>) -> Self {
         Self {
             op_offsets: vec![0],
-            op_offset: 0,
             module_decls,
             vmctx_value: None,
             global_base_value: None,
@@ -413,8 +411,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             _ => { /* regular operation, do nothing */ }
         }
 
-        // and finally, we might have to set up a new counter for a new scope, or fix up counts a
-        // bit
+        // finally, we might have to set up a new counter for a new scope, or fix up counts a bit
         match op {
             Operator::CallIndirect { .. } | Operator::Call { .. } => {
                 // add 1 to count the return from the called function
