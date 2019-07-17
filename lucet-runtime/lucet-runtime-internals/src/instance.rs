@@ -539,7 +539,6 @@ impl Instance {
     pub fn set_instruction_count(&mut self, instruction_count: u64) {
         self.get_instance_implicits_mut().instruction_count = instruction_count;
     }
-
 }
 
 // Private API

@@ -336,16 +336,25 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             if environ.op_offsets.last() == Some(&0) {
                 return;
             }
-            let instr_count_offset: ir::immediates::Offset32 = (-(std::mem::size_of::<InstanceRuntimeData>() as i32) + offset_of!(InstanceRuntimeData, instruction_count) as i32).into();
+            let instr_count_offset: ir::immediates::Offset32 =
+                (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
+                    + offset_of!(InstanceRuntimeData, instruction_count) as i32)
+                    .into();
             let vmctx_gv = environ.get_vmctx(builder.func);
             let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
             let flags = ir::MemFlags::trusted();
-            let cur_instr_count = builder.ins().load(ir::types::I64, flags, addr, instr_count_offset);
-            let update_const = builder
-                .ins()
-                .iconst(ir::types::I64, i64::from(*environ.op_offsets.last().unwrap()));
+            let cur_instr_count =
+                builder
+                    .ins()
+                    .load(ir::types::I64, flags, addr, instr_count_offset);
+            let update_const = builder.ins().iconst(
+                ir::types::I64,
+                i64::from(*environ.op_offsets.last().unwrap()),
+            );
             let new_instr_count = builder.ins().iadd(cur_instr_count, update_const.into());
-            builder.ins().store(flags, new_instr_count, addr, instr_count_offset);
+            builder
+                .ins()
+                .store(flags, new_instr_count, addr, instr_count_offset);
             *environ.op_offsets.last_mut().unwrap() = 0;
         };
 
