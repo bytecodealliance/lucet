@@ -271,7 +271,7 @@ impl MmapRegion {
     /// 0x0XXX: |  ...                  |
     /// 0x0XXX: |      ~padding~        |
     /// 0x0XXX: |  ...                  |
-    /// 0x0XXX: |  .globals    = 0xM000 | <-- InstanceImplicits
+    /// 0x0XXX: |  .globals    = 0xM000 | <-- InstanceRuntimeData
     /// 0x0XXX: |  .inst_count = 0x0000 |
     /// 0x1000: +-----------------------+ <-- Heap, and `lucet_vmctx`
     /// 0x1XXX: |                       |
