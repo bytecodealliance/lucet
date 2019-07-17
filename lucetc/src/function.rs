@@ -11,10 +11,8 @@ use cranelift_wasm::{
     TableIndex, WasmError, WasmResult,
 };
 use std::collections::HashMap;
-
-// VMContext points directly to the heap (offset 0).
-// Directly before the heao is a pointer to the globals (offset -NATIVE_POINTER_SIZE).
-const GLOBAL_BASE_OFFSET: i32 = -1 * NATIVE_POINTER_SIZE as i32;
+use lucet_module::InstanceRuntimeData;
+use memoffset::offset_of;
 
 pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
@@ -46,7 +44,9 @@ impl<'a> FuncInfo<'a> {
             let vmctx = self.get_vmctx(func);
             let global_base_value = func.create_global_value(ir::GlobalValueData::Load {
                 base: vmctx,
-                offset: GLOBAL_BASE_OFFSET.into(),
+                offset: (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
+                    + (offset_of!(InstanceRuntimeData, globals_ptr) as i32))
+                    .into(),
                 global_type: ir::types::I64,
                 readonly: false,
             });

@@ -14,6 +14,7 @@ use crate::sysdeps::UContext;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
+use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
@@ -173,6 +174,36 @@ impl Drop for InstanceHandle {
 /// [`InstanceHandle`](struct.InstanceHandle.html) smart pointers. This guarantees that instances
 /// and their fields are never moved in memory, otherwise raw pointers in the metadata could be
 /// unsafely invalidated.
+///
+/// An instance occupies one 4096-byte page in memory, with a layout like:
+/// Page {
+///   Instance {
+///     .magic
+///     .embed_ctx
+///      ... etc ...
+///   }
+///
+///   // unused space
+///
+///   InstanceInternals {
+///     .globals
+///     .instruction_counter
+///   }
+/// }
+/// VMContext points right here:
+/// Heap {
+///   ..
+/// }
+///
+/// This layout allows modules to tightly couple to a handful of fields related to the instance,
+/// rather than possibly requiring compiler-side changes (and recompiles) whenever `Instance`
+/// changes.
+///
+/// It also obligates `Instance` to be immediately followed by the heap, but otherwise leaves the
+/// locations of the stack, globals, and any other data, to be implementation-defined by the
+/// `Region` that actually creates `Slot`s onto which `Instance` are mapped.
+/// For information about the layout of all instance-related memory, see the documentation of
+/// `./src/region/mmap.rs#MmapRegion`.
 #[repr(C)]
 #[repr(align(4096))]
 pub struct Instance {
@@ -520,6 +551,7 @@ impl Instance {
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
+        inst.set_instruction_count(0);
 
         assert_eq!(mem::size_of::<Instance>(), HOST_PAGE_SIZE_EXPECTED);
         let unpadded_size = offset_of!(Instance, _padding);
@@ -531,22 +563,46 @@ impl Instance {
     // so that it is 8 bytes before the heap.
     // For this reason, the alignment of the structure is set to 4096, and we define accessors that
     // read/write the globals pointer as bytes [4096-8..4096] of that structure represented as raw bytes.
+    // InstanceRuntimeData is placed such that it ends at the end of the page this `Instance` starts
+    // on. So we can access it by *self + PAGE_SIZE - size_of::<InstanceRuntimeData>
     #[inline]
-    pub fn get_globals_ptr(&self) -> *const i64 {
+    fn get_instance_implicits(&self) -> &InstanceRuntimeData {
         unsafe {
-            *((self as *const _ as *const u8)
-                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>()) as isize)
-                as *const *const i64)
+            let implicits_ptr = (self as *const _ as *const u8)
+                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<InstanceRuntimeData>()) as isize)
+                as *const InstanceRuntimeData;
+            mem::transmute::<*const InstanceRuntimeData, &InstanceRuntimeData>(implicits_ptr)
         }
     }
 
     #[inline]
-    pub fn set_globals_ptr(&mut self, globals_ptr: *const i64) {
+    fn get_instance_implicits_mut(&mut self) -> &mut InstanceRuntimeData {
         unsafe {
-            *((self as *mut _ as *mut u8)
-                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>()) as isize)
-                as *mut *const i64) = globals_ptr;
+            let implicits_ptr = (self as *mut _ as *mut u8)
+                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<InstanceRuntimeData>()) as isize)
+                as *mut InstanceRuntimeData;
+            mem::transmute::<*mut InstanceRuntimeData, &mut InstanceRuntimeData>(implicits_ptr)
         }
+    }
+
+    #[inline]
+    pub fn get_globals_ptr(&self) -> *mut i64 {
+        self.get_instance_implicits().globals_ptr
+    }
+
+    #[inline]
+    pub fn set_globals_ptr(&mut self, globals_ptr: *mut i64) {
+        self.get_instance_implicits_mut().globals_ptr = globals_ptr
+    }
+
+    #[inline]
+    pub fn get_instruction_count(&self) -> u64 {
+        self.get_instance_implicits().instruction_count
+    }
+
+    #[inline]
+    pub fn set_instruction_count(&mut self, instruction_count: u64) {
+        self.get_instance_implicits_mut().instruction_count = instruction_count;
     }
 
     /// Run a function in guest context at the given entrypoint.
