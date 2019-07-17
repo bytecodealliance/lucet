@@ -529,6 +529,17 @@ impl Instance {
     pub fn set_c_fatal_handler(&mut self, handler: unsafe extern "C" fn(*mut Instance)) {
         self.c_fatal_handler = Some(handler);
     }
+
+    #[inline]
+    pub fn get_instruction_count(&self) -> u64 {
+        self.get_instance_implicits().instruction_count
+    }
+
+    #[inline]
+    pub fn set_instruction_count(&mut self, instruction_count: u64) {
+        self.get_instance_implicits_mut().instruction_count = instruction_count;
+    }
+
 }
 
 // Private API
@@ -593,16 +604,6 @@ impl Instance {
     #[inline]
     pub fn set_globals_ptr(&mut self, globals_ptr: *mut i64) {
         self.get_instance_implicits_mut().globals_ptr = globals_ptr
-    }
-
-    #[inline]
-    pub fn get_instruction_count(&self) -> u64 {
-        self.get_instance_implicits().instruction_count
-    }
-
-    #[inline]
-    pub fn set_instruction_count(&mut self, instruction_count: u64) {
-        self.get_instance_implicits_mut().instruction_count = instruction_count;
     }
 
     /// Run a function in guest context at the given entrypoint.

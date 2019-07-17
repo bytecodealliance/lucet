@@ -4,7 +4,6 @@ use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
 use crate::table::TABLE_REF_SIZE;
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::entity::EntityRef;
-use cranelift_codegen::ir::types::{I32, I64};
 use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_frontend::FunctionBuilder;
@@ -316,7 +315,6 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         builder: &mut FunctionBuilder,
         state: &cranelift_wasm::TranslationState,
     ) -> WasmResult<()> {
-        println!("{} {:?}", "  ".repeat(state.control_stack.len()), op);
         // So the operation counting works like this:
         // record a stack corresponding with the stack of control flow in the wasm function.
         // for non-control-flow-affecting instructions, increment the top of the stack.
@@ -340,17 +338,16 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             if environ.op_offsets.last() == Some(&0) {
                 return;
             }
-            //             println!("  insert increment of instruction counter by {} for {}", count, reason);
-            let INSTR_COUNT_TY = I64;
+            let instr_count_offset: ir::immediates::Offset32 = (-(std::mem::size_of::<InstanceRuntimeData>() as i32) + offset_of!(InstanceRuntimeData, instruction_count) as i32).into();
             let vmctx_gv = environ.get_vmctx(builder.func);
             let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
             let flags = ir::MemFlags::trusted();
-            let cur_instr_count = builder.ins().load(INSTR_COUNT_TY, flags, addr, -16);
+            let cur_instr_count = builder.ins().load(ir::types::I64, flags, addr, instr_count_offset);
             let update_const = builder
                 .ins()
-                .iconst(I64, i64::from(*environ.op_offsets.last().unwrap()));
-            let new_instr_count = builder.ins().iadd(cur_instr_count, update_const);
-            builder.ins().store(flags, new_instr_count, addr, -16);
+                .iconst(ir::types::I64, i64::from(*environ.op_offsets.last().unwrap()));
+            let new_instr_count = builder.ins().iadd(cur_instr_count, update_const.into());
+            builder.ins().store(flags, new_instr_count, addr, instr_count_offset);
             *environ.op_offsets.last_mut().unwrap() = 0;
         };
 
