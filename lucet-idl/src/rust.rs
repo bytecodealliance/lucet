@@ -14,6 +14,8 @@ use heck::{CamelCase, SnakeCase};
 use std::collections::HashMap;
 use std::io::Write;
 
+mod guest_funcs;
+
 /// Generator for the Rust backend
 pub struct RustGenerator {
     pub defined: HashMap<Ident, String>,
@@ -46,7 +48,7 @@ impl RustGenerator {
                 .writeln("extern \"C\" {")
                 .indent();
             for fdecl in module.func_decls() {
-                self.guest_abi_import(module, &fdecl.entity);
+                self.guest_abi_import(module, &fdecl.entity)?;
             }
             self.w.eob().writeln("}").eob().writeln("}");
         }
@@ -243,110 +245,122 @@ impl RustGenerator {
     }
 
     fn guest_idiomatic_def(&mut self, module: &Module, func: &FuncDecl) -> Result<(), IDLError> {
-        let mut args = Vec::new();
+        use guest_funcs::{AbiCallBuilder, FuncBuilder};
 
-        let mut before_abi_call: Vec<String> = Vec::new();
-        let mut after_abi_call: Vec<String> = Vec::new();
+        let name = func.field_name.to_snake_case();
+        let mut def = FuncBuilder::new(name, "()".to_owned());
+        let mut abi_call = AbiCallBuilder::new(func);
 
         for input in func.in_bindings.iter() {
             match &input.from {
-                BindingRef::Ptr(ptr) => {
-                    let ptr = func.get_param(ptr).expect("valid param");
-                    args.push(format!(
+                BindingRef::Ptr(ptr_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("valid param");
+                    def.arg(format!(
                         "{}: &{}",
                         input.name,
                         self.get_defined_typename(&input.type_)
                     ));
-                    before_abi_call.push(format!(
+                    abi_call.before(format!(
                         "let {} = {} as *const _ as i32;",
                         ptr.name, input.name,
                     ));
+                    abi_call.param(ptr_pos, ptr.name.clone());
                 }
-                BindingRef::Slice(ptr, len) => {
-                    let ptr = func.get_param(ptr).expect("valid param");
-                    let len = func.get_param(len).expect("lenid param");
-                    args.push(format!(
+                BindingRef::Slice(ptr_pos, len_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("valid param");
+                    let len = func.get_param(len_pos).expect("lenid param");
+                    def.arg(format!(
                         "{}: &[{}]",
                         input.name,
                         self.get_defined_typename(&input.type_)
                     ));
-                    before_abi_call.push(format!(
+
+                    abi_call.before(format!(
                         "let {} = {}.as_ptr() as i32;",
                         ptr.name, input.name,
                     ));
-                    before_abi_call
-                        .push(format!("let {} = {}.len() as i32;", len.name, input.name,));
+                    abi_call.param(ptr_pos, ptr.name.clone());
+
+                    abi_call.before(format!("let {} = {}.len() as i32;", len.name, input.name,));
+                    abi_call.param(len_pos, len.name.clone());
                 }
-                BindingRef::Value(val) => {
-                    let val = func.get_param(val).expect("valid param");
-                    args.push(format!(
+                BindingRef::Value(val_pos) => {
+                    let val = func.get_param(val_pos).expect("valid param");
+                    def.arg(format!(
                         "{}: {}",
                         input.name,
                         self.get_defined_typename(&input.type_)
                     ));
-                    before_abi_call.push(format!("// TODO: cast {:?} to abi type", val,));
+                    abi_call.before(format!(
+                        "let {} = {} as {};",
+                        val.name,
+                        input.name,
+                        Self::abitype_name(&val.type_)
+                    ));
+                    abi_call.param(val_pos, val.name.clone());
                 }
             }
         }
 
         for io in func.inout_bindings.iter() {
             match &io.from {
-                BindingRef::Ptr(ptr) => {
-                    let ptr = func.get_param(ptr).expect("valid param");
-                    args.push(format!(
+                BindingRef::Ptr(ptr_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("valid param");
+                    def.arg(format!(
                         "{}: &mut {}",
                         io.name,
                         self.get_defined_typename(&io.type_)
                     ));
-                    before_abi_call.push(format!(
-                        "// TODO: cast the ref to a pointer, and then to u32 {:?}: {:?}",
-                        ptr, io
-                    ));
+                    abi_call.before(format!("let {} = {} as *mut _ as i32;", ptr.name, io.name));
+                    abi_call.param(ptr_pos, ptr.name.clone());
                 }
-                BindingRef::Slice(ptr, len) => {
-                    let ptr = func.get_param(ptr).expect("ptrid param");
-                    let len = func.get_param(len).expect("lenid param");
-                    args.push(format!(
+                BindingRef::Slice(ptr_pos, len_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("ptrid param");
+                    let len = func.get_param(len_pos).expect("lenid param");
+                    def.arg(format!(
                         "{}: &mut [{}]",
                         io.name,
                         self.get_defined_typename(&io.type_)
                     ));
-                    before_abi_call.push(format!(
-                        "// TODO: destructure {} into ptr {:?} and arg {:?}",
-                        io.name, ptr, len
-                    ));
+                    abi_call.before(format!("let {} = {}.as_ptr() as i32;", ptr.name, io.name));
+                    abi_call.before(format!("let {} = {}.len() as i32;", len.name, io.name));
+                    abi_call.param(ptr_pos, ptr.name.clone());
+                    abi_call.param(len_pos, len.name.clone());
                 }
                 BindingRef::Value(_val) => {
                     panic!("it should not be possible to have an inout value {:?}", io);
                 }
             }
-
-            args.push(format!("/* FIXME inout binding {:?} */", io));
         }
 
-        let mut rets = Vec::new();
         for o in func.out_bindings.iter() {
             match &o.from {
-                BindingRef::Ptr(ptr) => {
-                    let ptr = func.get_param(ptr).expect("valid param");
+                BindingRef::Ptr(ptr_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("valid param");
                     let otypename = self.get_defined_typename(&o.type_);
-                    rets.push(otypename.clone());
-                    before_abi_call.push(format!(
+                    def.ok_type(otypename.clone());
+                    abi_call.before(format!(
                         "let mut {} = ::std::mem::MaybeUninit::<{}>::uninit();",
                         ptr.name, otypename
                     ));
-                    after_abi_call.push(format!(
-                        "// TODO: cast the u32 {:?} ptr, then to a ref, {:?}. FALLIBLE!!",
-                        ptr, o
+                    abi_call.param(ptr_pos, format!("{}.as_mut_ptr() as i32", ptr.name));
+                    abi_call.after(format!(
+                        "let {} = unsafe {{ {}.assume_init() }};",
+                        ptr.name, ptr.name
                     ));
+                    def.ok_value(ptr.name.clone());
                 }
-                BindingRef::Value(val) => {
-                    let val = func.get_param(val).expect("valid param");
-                    rets.push(format!("{}", self.get_defined_typename(&o.type_)));
-                    after_abi_call.push(format!(
-                        "// TODO: cast the ret {:?} to a value {:?}",
-                        val, o
+                BindingRef::Value(val_pos) => {
+                    let val = func.get_param(val_pos).expect("valid param");
+                    def.ok_type(self.get_defined_typename(&o.type_));
+                    abi_call.param(val_pos, val.name.clone());
+                    abi_call.after(format!(
+                        "let {} = {} as {};",
+                        val.name,
+                        val.name,
+                        self.get_defined_typename(&o.type_),
                     ));
+                    def.ok_value(val.name.clone());
                 }
                 BindingRef::Slice(_ptr, _len) => {
                     panic!("it should not be possible to have an out slice {:?}", o);
@@ -354,47 +368,8 @@ impl RustGenerator {
             }
         }
 
-        let name = func.field_name.to_snake_case();
-        let arg_syntax = args.join(", ");
-        let ret_syntax = if rets.is_empty() {
-            "Result<(),()>".to_owned()
-        } else {
-            assert_eq!(rets.len(), 1);
-            format!("Result<{},()>", rets[0])
-        };
-        self.w
-            .writeln(format!(
-                "pub fn {}({}) -> {} {{",
-                name, arg_syntax, ret_syntax
-            ))
-            .indent();
+        def.render(&mut self.w, |mut w| abi_call.render(&mut w))?;
 
-        for l in before_abi_call {
-            self.w.writeln(l);
-        }
-
-        // Do the ABI call
-        let ret_syntax = if func.rets.is_empty() {
-            String::new()
-        } else {
-            format!("let {} = ", func.rets[0].name)
-        };
-        let arg_syntax = func
-            .args
-            .iter()
-            .map(|a| a.name.clone())
-            .collect::<Vec<String>>()
-            .join(", ");
-        self.w
-            .writeln(format!("{}abi::{}({});", ret_syntax, name, arg_syntax));
-
-        for l in after_abi_call {
-            self.w.writeln(l);
-        }
-        if !func.rets.is_empty() {
-            self.w.writeln(format!("Ok({})", func.rets[0].name.clone()));
-        }
-        self.w.eob().writeln("}");
         Ok(())
     }
 
