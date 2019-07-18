@@ -6,7 +6,7 @@
     "asbuild": "npm run asbuild:optimized"
   },
   "devDependencies": {
-    "as-pect": "github:jtenner/as-pect",
+    "@as-pect/cli": "^2.2.0",
     "assemblyscript": "github:AssemblyScript/assemblyscript"
   }
 }
