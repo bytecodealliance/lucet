@@ -1,5 +1,5 @@
 use crate::workspace::Workspace;
-use failure::{format_err, Error};
+use failure::Error;
 use lucet_idl::{self, Backend, Config, Package};
 use lucet_wasi;
 use lucet_wasi_sdk::{CompileOpts, Link};
@@ -7,7 +7,6 @@ use lucetc::{Lucetc, LucetcOpts};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
 
 pub struct CGuestApp {
     work: Workspace,
