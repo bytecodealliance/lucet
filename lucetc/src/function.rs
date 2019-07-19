@@ -142,12 +142,13 @@ impl<'a> FuncInfo<'a> {
             Operator::Call { .. } => 1,
             // but indirect calls take some extra work to validate at runtime
             Operator::CallIndirect { .. } => 2,
-            // Entering a loop and testing for an if involve some overhead, for now say it's also 1
-            Operator::Loop { .. } |
+            // Testing for an if involve some overhead, for now say it's also 1
             Operator::If { .. } => 1,
             // Else is a fallthrough or alternate case for something that's been tested as `if`, so
             // it's already counted
             Operator::Else => 0,
+            // Entering a loop is a syntactic operation, and free.
+            Operator::Loop { .. } => 0,
             // Closing a scope is a syntactic operation, and free.
             Operator::End => 0,
             // Taking a branch is an operation
