@@ -1,8 +1,8 @@
 use lucet_idl::{
-    AliasDataType, AtomType, DataTypeRef, DataTypeVariant, EnumDataType, Module, Named,
-    StructDataType, StructMember,
+    AliasDataType, AtomType, BindingRef, DataTypeRef, DataTypeVariant, EnumDataType, FuncBinding,
+    FuncDecl, Module, Named, StructDataType, StructMember,
 };
-use proptest::{self, prelude::*};
+use proptest::prelude::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AtomVal {
@@ -46,11 +46,9 @@ pub struct EnumVal {
 impl EnumVal {
     pub fn strat(enum_datatype: &Named<EnumDataType>) -> impl Strategy<Value = Self> {
         let name = enum_datatype.name.name.clone();
-        proptest::sample::select(enum_datatype.entity.members.clone()).prop_map(move |mem| {
-            EnumVal {
-                enum_name: name.clone(),
-                member_name: mem.name,
-            }
+        prop::sample::select(enum_datatype.entity.members.clone()).prop_map(move |mem| EnumVal {
+            enum_name: name.clone(),
+            member_name: mem.name,
         })
     }
 }
@@ -127,6 +125,7 @@ pub enum DataTypeVal {
 
 pub trait ModuleExt {
     fn datatype_strat(&self, dtref: &DataTypeRef) -> BoxedStrategy<DataTypeVal>;
+    fn function_strat(&self) -> BoxedStrategy<FuncDecl>;
 }
 
 impl ModuleExt for Module {
@@ -152,5 +151,70 @@ impl ModuleExt for Module {
             }
             DataTypeRef::Atom(a) => AtomVal::strat(&a).prop_map(DataTypeVal::Atom).boxed(),
         }
+    }
+
+    fn function_strat(&self) -> BoxedStrategy<FuncDecl> {
+        let decls = self.funcs.values().cloned().collect::<Vec<FuncDecl>>();
+        prop::sample::select(decls).boxed()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindingVal {
+    Value(DataTypeVal),
+    Array(Vec<DataTypeVal>),
+}
+
+impl BindingVal {
+    fn value_strat(module: &Module, dtref: &DataTypeRef) -> BoxedStrategy<Self> {
+        module
+            .datatype_strat(dtref)
+            .prop_map(BindingVal::Value)
+            .boxed()
+    }
+    fn array_strat(module: &Module, dtref: &DataTypeRef) -> BoxedStrategy<Self> {
+        prop::collection::vec(module.datatype_strat(dtref), 100)
+            .prop_map(BindingVal::Array)
+            .boxed()
+    }
+
+    fn binding_strat(module: &Module, binding: &FuncBinding) -> BoxedStrategy<(String, Self)> {
+        let name = binding.name.clone();
+        match binding.from {
+            BindingRef::Value(_) | BindingRef::Ptr(_) => Self::value_strat(module, &binding.type_)
+                .prop_map(move |v| (name.clone(), v))
+                .boxed(),
+            BindingRef::Slice(_, _) => Self::array_strat(module, &binding.type_)
+                .prop_map(move |v| (name.clone(), v))
+                .boxed(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FuncCallPredicate {
+    pub pre: Vec<(String, BindingVal)>,
+    pub post: Vec<(String, BindingVal)>,
+}
+
+impl FuncCallPredicate {
+    pub fn strat(module: &Module, func: &FuncDecl) -> BoxedStrategy<FuncCallPredicate> {
+        let pre_strat: Vec<BoxedStrategy<(String, BindingVal)>> = func
+            .in_bindings
+            .iter()
+            .chain(func.inout_bindings.iter())
+            .map(|binding| BindingVal::binding_strat(module, binding))
+            .collect();
+
+        let post_strat: Vec<BoxedStrategy<(String, BindingVal)>> = func
+            .inout_bindings
+            .iter()
+            .chain(func.out_bindings.iter())
+            .map(|binding| BindingVal::binding_strat(module, binding))
+            .collect();
+
+        (pre_strat, post_strat)
+            .prop_map(|(pre, post)| FuncCallPredicate { pre, post })
+            .boxed()
     }
 }
