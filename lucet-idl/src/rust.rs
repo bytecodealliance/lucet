@@ -59,13 +59,12 @@ impl RustGenerator {
         for (_ident, module) in package.modules.iter() {
             self.w.writeln("use lucet_runtime::lucet_hostcalls;");
             self.generate_datatypes(module)?;
-            self.w.writeln("lucet_hostcalls! {");
-            self.w.indent();
+
+            self.w.writeln("lucet_hostcalls! {").indent();
             for fdecl in module.func_decls() {
                 self.host_abi_definition(module, &fdecl.entity)?;
             }
-            self.w.eob();
-            self.w.writeln("}");
+            self.w.eob().writeln("}");
         }
         Ok(())
     }
@@ -384,15 +383,15 @@ impl RustGenerator {
         }
 
         let rets = if func.rets.len() == 0 {
-            "()"
+            format!(" -> ()")
         } else {
             assert_eq!(func.rets.len(), 1);
-            Self::abitype_name(&func.rets[0].type_)
+            format!(" -> {}", Self::abitype_name(&func.rets[0].type_))
         };
 
         self.w.writeln("#[no_mangle]").writeln(format!(
-            "// Wasm func {}::{}
-pub unsafe extern \"C\" fn {}({}) -> {} {{",
+            "// Wasm func {}::{} \n\
+             pub unsafe extern \"C\" fn {}({}){} {{",
             module.module_name, func.field_name, func.binding_name, args, rets
         ));
 
@@ -401,6 +400,18 @@ pub unsafe extern \"C\" fn {}({}) -> {} {{",
 
         self.w.eob().writeln("}");
 
+        Ok(())
+    }
+
+    fn host_trait_definition(&mut self, module: &Module) -> Result<(), IDLError> {
+        self.w
+            .writeln(format!(
+                "pub trait {} {{",
+                module.module_name.to_camel_case()
+            ))
+            .indent();
+
+        self.w.eob().writeln("}");
         Ok(())
     }
 }

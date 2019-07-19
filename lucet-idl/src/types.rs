@@ -1,4 +1,3 @@
-pub use crate::function::{BindingRef, FuncArg, FuncDecl, ParamPosition};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

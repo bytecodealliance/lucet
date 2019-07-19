@@ -18,10 +18,11 @@ mod types;
 
 pub use crate::config::{Backend, Config};
 pub use crate::error::IDLError;
+pub use crate::function::{BindingRef, FuncArg, FuncBinding, FuncDecl, ParamPosition};
 pub use crate::module::Module;
 pub use crate::package::Package;
 pub use crate::types::{
-    AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl, Ident,
+    AbiType, AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, Ident,
     Location, Name, Named, StructDataType, StructMember,
 };
 

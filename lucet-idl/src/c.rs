@@ -2,12 +2,13 @@
 #![allow(unused_variables)]
 
 use crate::error::IDLError;
+use crate::function::FuncDecl;
 use crate::module::Module;
 use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
 use crate::types::{
-    AbiType, AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType,
-    FuncDecl, Named, StructDataType,
+    AbiType, AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, Named,
+    StructDataType,
 };
 use std::io::prelude::*;
 
