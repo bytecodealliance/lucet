@@ -67,7 +67,7 @@ impl ScriptEnv {
     }
     pub fn instantiate(&mut self, module: &[u8], name: &Option<String>) -> Result<(), ScriptError> {
         let bindings = bindings::spec_test_bindings();
-        let compiler = Compiler::new(module, OptLevel::Fast, &bindings, HeapSettings::default())
+        let compiler = Compiler::new(module, OptLevel::Fast, &bindings, HeapSettings::default(), false)
             .map_err(program_error)?;
 
         let dir = tempfile::Builder::new().prefix("codegen").tempdir()?;

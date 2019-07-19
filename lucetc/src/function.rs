@@ -17,18 +17,20 @@ use std::collections::HashMap;
 use wasmparser::Operator;
 
 pub struct FuncInfo<'a> {
-    op_offsets: Vec<u32>,
     module_decls: &'a ModuleDecls<'a>,
+    count_instructions: bool,
+    op_offsets: Vec<u32>,
     vmctx_value: Option<ir::GlobalValue>,
     global_base_value: Option<ir::GlobalValue>,
     runtime_funcs: HashMap<RuntimeFunc, ir::FuncRef>,
 }
 
 impl<'a> FuncInfo<'a> {
-    pub fn new(module_decls: &'a ModuleDecls<'a>) -> Self {
+    pub fn new(module_decls: &'a ModuleDecls<'a>, count_instructions: bool) -> Self {
         Self {
-            op_offsets: vec![0],
             module_decls,
+            count_instructions,
+            op_offsets: vec![0],
             vmctx_value: None,
             global_base_value: None,
             runtime_funcs: HashMap::new(),
@@ -81,6 +83,133 @@ impl<'a> FuncInfo<'a> {
                 self.runtime_funcs.insert(runtime_func, fref);
                 fref
             })
+    }
+
+    fn update_instruction_count_instrumentation(&mut self, op: &Operator, builder: &mut FunctionBuilder, state: &cranelift_wasm::TranslationState) -> WasmResult<()> {
+        // So the operation counting works like this:
+        // record a stack corresponding with the stack of control flow in the wasm function.
+        // for non-control-flow-affecting instructions, increment the top of the stack.
+        // for control-flow-affecting operations (If, Else, Unreachable, Call, End, Return, Block,
+        // Loop, BrIf, CallIndirect), update the wasm instruction counter and:
+        // * if the operation introduces a new scope (If, Block, Loop), push a new 0 on the
+        // stack corresponding with that frame.
+        // * if the operation does not introduce a new scope (Else, Call, CallIndirect, BrIf),
+        // reset the top of stack to 0
+        // * if the operation completes a scope (End), pop the top of the stack and reset the new
+        // top of stack to 0
+        // * this leaves no special behavior for Unreachable and Return. This is acceptable as they
+        // are always followed by an End and are either about to trap, or return from a function.
+        // * Unreachable is either the end of VM execution and we are off by one instruction, or,
+        // is about to dispatch to an exception handler, which we should account for out of band
+        // anyway (exception dispatch is much more expensive than a single wasm op)
+        // * Return corresponds to exactly one function call, so we can count it by resetting the
+        // stack to 1 at return of a function.
+
+        fn flush_counter(environ: &mut FuncInfo, builder: &mut FunctionBuilder) {
+            if environ.op_offsets.last() == Some(&0) {
+                return;
+            }
+            let instr_count_offset: ir::immediates::Offset32 =
+                (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
+                    + offset_of!(InstanceRuntimeData, instruction_count) as i32)
+                    .into();
+            let vmctx_gv = environ.get_vmctx(builder.func);
+            let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
+            let flags = ir::MemFlags::trusted();
+            let cur_instr_count =
+                builder
+                    .ins()
+                    .load(ir::types::I64, flags, addr, instr_count_offset);
+            let update_const = builder.ins().iconst(
+                ir::types::I64,
+                i64::from(*environ.op_offsets.last().unwrap()),
+            );
+            let new_instr_count = builder.ins().iadd(cur_instr_count, update_const.into());
+            builder
+                .ins()
+                .store(flags, new_instr_count, addr, instr_count_offset);
+            *environ.op_offsets.last_mut().unwrap() = 0;
+        };
+
+        // Update the instruction counter, if necessary
+        let op_cost = match op {
+            // Opening a scope is a syntactic operation, and free.
+            Operator::Block { .. } |
+            // These do not add counts, see above comment about return/unreachable
+            Operator::Unreachable |
+            Operator::Return => 0,
+            // Call is quick
+            Operator::Call { .. } => 1,
+            // but indirect calls take some extra work to validate at runtime
+            Operator::CallIndirect { .. } => 2,
+            // Entering a loop and testing for an if involve some overhead, for now say it's also 1
+            Operator::Loop { .. } |
+            Operator::If { .. } => 1,
+            // Else is a fallthrough or alternate case for something that's been tested as `if`, so
+            // it's already counted
+            Operator::Else => 0,
+            // Closing a scope is a syntactic operation, and free.
+            Operator::End => 0,
+            // Taking a branch is an operation
+            Operator::Br { .. } => 1,
+            // brif might be two operations?
+            Operator::BrIf { .. } => 1,
+            // brtable is kind of cpu intensive compared to other wasm ops
+            Operator::BrTable { .. } => 2,
+            // nop and drop are free
+            Operator::Nop |
+            Operator::Drop => 0,
+            // everything else, just call it one operation.
+            _ => 1,
+        };
+        self.op_offsets.last_mut().map(|x| *x += op_cost);
+
+        // apply flushing behavior if applicable
+        match op {
+            Operator::Unreachable
+            | Operator::Return
+            | Operator::CallIndirect { .. }
+            | Operator::Call { .. }
+            | Operator::Block { .. }
+            | Operator::Loop { .. }
+            | Operator::If { .. }
+            | Operator::Else
+            | Operator::Br { .. }
+            | Operator::BrIf { .. }
+            | Operator::BrTable { .. } => {
+                flush_counter(self, builder);
+            }
+            Operator::End => {
+                // We have to be really careful here to avoid violating a cranelift invariant:
+                // if the next operation is `End` as well, this end will have marked the block
+                // finished, and attempting to add instruction to update the instruction counter
+                // will cause a panic.
+                //
+                // We can avoid that case by ensuring instruction counts are flushed at the *entry*
+                // of any block-opening operation, so that at the exit the `End` will update the
+                // count by 0, the update is discarded, and we don't cause a panic.
+                flush_counter(self, builder);
+            }
+            _ => { /* regular operation, do nothing */ }
+        }
+
+        // finally, we might have to set up a new counter for a new scope, or fix up counts a bit
+        match op {
+            Operator::CallIndirect { .. } | Operator::Call { .. } => {
+                // add 1 to count the return from the called function
+                self.op_offsets.last_mut().map(|x| *x = 1);
+            }
+            Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
+                // open a new scope
+                self.op_offsets.push(0);
+            }
+            Operator::End => {
+                // close the current scope
+                self.op_offsets.pop();
+            }
+            _ => {}
+        }
+        Ok(())
     }
 }
 
@@ -313,128 +442,8 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         builder: &mut FunctionBuilder,
         state: &cranelift_wasm::TranslationState,
     ) -> WasmResult<()> {
-        // So the operation counting works like this:
-        // record a stack corresponding with the stack of control flow in the wasm function.
-        // for non-control-flow-affecting instructions, increment the top of the stack.
-        // for control-flow-affecting operations (If, Else, Unreachable, Call, End, Return, Block,
-        // Loop, BrIf, CallIndirect), update the wasm instruction counter and:
-        // * if the operation introduces a new scope (If, Block, Loop), push a new 0 on the
-        // stack corresponding with that frame.
-        // * if the operation does not introduce a new scope (Else, Call, CallIndirect, BrIf),
-        // reset the top of stack to 0
-        // * if the operation completes a scope (End), pop the top of the stack and reset the new
-        // top of stack to 0
-        // * this leaves no special behavior for Unreachable and Return. This is acceptable as they
-        // are always followed by an End and are either about to trap, or return from a function.
-        // * Unreachable is either the end of VM execution and we are off by one instruction, or,
-        // is about to dispatch to an exception handler, which we should account for out of band
-        // anyway (exception dispatch is much more expensive than a single wasm op)
-        // * Return corresponds to exactly one function call, so we can count it by resetting the
-        // stack to 1 at return of a function.
-
-        fn flush_counter(environ: &mut FuncInfo, builder: &mut FunctionBuilder) {
-            if environ.op_offsets.last() == Some(&0) {
-                return;
-            }
-            let instr_count_offset: ir::immediates::Offset32 =
-                (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
-                    + offset_of!(InstanceRuntimeData, instruction_count) as i32)
-                    .into();
-            let vmctx_gv = environ.get_vmctx(builder.func);
-            let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
-            let flags = ir::MemFlags::trusted();
-            let cur_instr_count =
-                builder
-                    .ins()
-                    .load(ir::types::I64, flags, addr, instr_count_offset);
-            let update_const = builder.ins().iconst(
-                ir::types::I64,
-                i64::from(*environ.op_offsets.last().unwrap()),
-            );
-            let new_instr_count = builder.ins().iadd(cur_instr_count, update_const.into());
-            builder
-                .ins()
-                .store(flags, new_instr_count, addr, instr_count_offset);
-            *environ.op_offsets.last_mut().unwrap() = 0;
-        };
-
-        // Update the instruction counter, if necessary
-        let op_cost = match op {
-            // Opening a scope is a syntactic operation, and free.
-            Operator::Block { .. } |
-            // These do not add counts, see above comment about return/unreachable
-            Operator::Unreachable |
-            Operator::Return => 0,
-            // Call is quick
-            Operator::Call { .. } => 1,
-            // but indirect calls take some extra work to validate at runtime
-            Operator::CallIndirect { .. } => 2,
-            // Entering a loop and testing for an if involve some overhead, for now say it's also 1
-            Operator::Loop { .. } |
-            Operator::If { .. } => 1,
-            // Else is a fallthrough or alternate case for something that's been tested as `if`, so
-            // it's already counted
-            Operator::Else => 0,
-            // Closing a scope is a syntactic operation, and free.
-            Operator::End => 0,
-            // Taking a branch is an operation
-            Operator::Br { .. } => 1,
-            // brif might be two operations?
-            Operator::BrIf { .. } => 1,
-            // brtable is kind of cpu intensive compared to other wasm ops
-            Operator::BrTable { .. } => 2,
-            // nop and drop are free
-            Operator::Nop |
-            Operator::Drop => 0,
-            // everything else, just call it one operation.
-            _ => 1,
-        };
-        self.op_offsets.last_mut().map(|x| *x += op_cost);
-
-        // apply flushing behavior if applicable
-        match op {
-            Operator::Unreachable
-            | Operator::Return
-            | Operator::CallIndirect { .. }
-            | Operator::Call { .. }
-            | Operator::Block { .. }
-            | Operator::Loop { .. }
-            | Operator::If { .. }
-            | Operator::Else
-            | Operator::Br { .. }
-            | Operator::BrIf { .. }
-            | Operator::BrTable { .. } => {
-                flush_counter(self, builder);
-            }
-            Operator::End => {
-                // We have to be really careful here to avoid violating a cranelift invariant:
-                // if the next operation is `End` as well, this end will have marked the block
-                // finished, and attempting to add instruction to update the instruction counter
-                // will cause a panic.
-                //
-                // We can avoid that case by ensuring instruction counts are flushed at the *entry*
-                // of any block-opening operation, so that at the exit the `End` will update the
-                // count by 0, the update is discarded, and we don't cause a panic.
-                flush_counter(self, builder);
-            }
-            _ => { /* regular operation, do nothing */ }
-        }
-
-        // finally, we might have to set up a new counter for a new scope, or fix up counts a bit
-        match op {
-            Operator::CallIndirect { .. } | Operator::Call { .. } => {
-                // add 1 to count the return from the called function
-                self.op_offsets.last_mut().map(|x| *x = 1);
-            }
-            Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
-                // open a new scope
-                self.op_offsets.push(0);
-            }
-            Operator::End => {
-                // close the current scope
-                self.op_offsets.pop();
-            }
-            _ => {}
+        if self.count_instructions {
+            self.update_instruction_count_instrumentation(op, builder, state)?;
         }
         Ok(())
     }
