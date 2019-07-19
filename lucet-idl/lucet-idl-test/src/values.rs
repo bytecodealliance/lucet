@@ -35,6 +35,21 @@ impl AtomVal {
             AtomType::F64 => any::<f64>().prop_map(AtomVal::F64).boxed(),
         }
     }
+    pub fn render_rustval(&self) -> String {
+        match self {
+            AtomVal::Bool(v) => format!("{}", v),
+            AtomVal::U8(v) => format!("{}", v),
+            AtomVal::U16(v) => format!("{}", v),
+            AtomVal::U32(v) => format!("{}", v),
+            AtomVal::U64(v) => format!("{}", v),
+            AtomVal::I8(v) => format!("{}", v),
+            AtomVal::I16(v) => format!("{}", v),
+            AtomVal::I32(v) => format!("{}", v),
+            AtomVal::I64(v) => format!("{}", v),
+            AtomVal::F32(v) => format!("{}f32", v),
+            AtomVal::F64(v) => format!("{}f64", v),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +65,9 @@ impl EnumVal {
             enum_name: name.clone(),
             member_name: mem.name,
         })
+    }
+    pub fn render_rustval(&self) -> String {
+        format!("{}::{}", self.enum_name, self.member_name)
     }
 }
 
@@ -74,6 +92,14 @@ impl StructVal {
                 members,
             })
             .boxed()
+    }
+    pub fn render_rustval(&self) -> String {
+        let members = self
+            .members
+            .iter()
+            .map(|v| format!("{}: {}", v.name, v.value.render_rustval()))
+            .collect::<Vec<String>>();
+        format!("{} {{ {} }}", self.struct_name, members.join(", "))
     }
 }
 
@@ -113,6 +139,9 @@ impl AliasVal {
             })
             .boxed()
     }
+    pub fn render_rustval(&self) -> String {
+        self.value.render_rustval()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -121,6 +150,17 @@ pub enum DataTypeVal {
     Struct(StructVal),
     Alias(AliasVal),
     Atom(AtomVal),
+}
+
+impl DataTypeVal {
+    pub fn render_rustval(&self) -> String {
+        match self {
+            DataTypeVal::Enum(a) => a.render_rustval(),
+            DataTypeVal::Struct(a) => a.render_rustval(),
+            DataTypeVal::Alias(a) => a.render_rustval(),
+            DataTypeVal::Atom(a) => a.render_rustval(),
+        }
+    }
 }
 
 pub trait ModuleExt {
@@ -162,39 +202,62 @@ impl ModuleExt for Module {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BindingVal {
     Value(DataTypeVal),
+    Ptr(DataTypeVal),
     Array(Vec<DataTypeVal>),
 }
 
 impl BindingVal {
-    fn value_strat(module: &Module, dtref: &DataTypeRef) -> BoxedStrategy<Self> {
-        module
-            .datatype_strat(dtref)
-            .prop_map(BindingVal::Value)
-            .boxed()
-    }
-    fn array_strat(module: &Module, dtref: &DataTypeRef) -> BoxedStrategy<Self> {
-        prop::collection::vec(module.datatype_strat(dtref), 100)
-            .prop_map(BindingVal::Array)
-            .boxed()
-    }
-
     fn binding_strat(module: &Module, binding: &FuncBinding) -> BoxedStrategy<(String, Self)> {
         let name = binding.name.clone();
         match binding.from {
-            BindingRef::Value(_) | BindingRef::Ptr(_) => Self::value_strat(module, &binding.type_)
-                .prop_map(move |v| (name.clone(), v))
+            BindingRef::Value(_) => module
+                .datatype_strat(&binding.type_)
+                .prop_map(move |v| (name.clone(), BindingVal::Value(v)))
                 .boxed(),
-            BindingRef::Slice(_, _) => Self::array_strat(module, &binding.type_)
-                .prop_map(move |v| (name.clone(), v))
+            BindingRef::Ptr(_) => module
+                .datatype_strat(&binding.type_)
+                .prop_map(move |v| (name.clone(), BindingVal::Ptr(v)))
                 .boxed(),
+            BindingRef::Slice(_, _) => {
+                prop::collection::vec(module.datatype_strat(&binding.type_), 100)
+                    .prop_map(move |v| (name.clone(), BindingVal::Array(v)))
+                    .boxed()
+            }
+        }
+    }
+    fn render_rust_constructor(&self) -> String {
+        match self {
+            BindingVal::Value(v) => v.render_rustval(),
+            BindingVal::Ptr(v) => v.render_rustval(),
+            BindingVal::Array(vs) => format!(
+                "vec![{}]",
+                vs.iter()
+                    .map(|v| v.render_rustval())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+        }
+    }
+    fn render_rust_ref(&self) -> String {
+        match self {
+            BindingVal::Value(v) => v.render_rustval(),
+            BindingVal::Ptr(v) => format!("&{}", v.render_rustval()),
+            BindingVal::Array(vs) => format!(
+                "&[{}]",
+                vs.iter()
+                    .map(|v| v.render_rustval())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct FuncCallPredicate {
-    pub pre: Vec<(String, BindingVal)>,
-    pub post: Vec<(String, BindingVal)>,
+    func: FuncDecl,
+    pre: Vec<(String, BindingVal)>,
+    post: Vec<(String, BindingVal)>,
 }
 
 impl FuncCallPredicate {
@@ -213,8 +276,80 @@ impl FuncCallPredicate {
             .map(|binding| BindingVal::binding_strat(module, binding))
             .collect();
 
+        let func = func.clone();
         (pre_strat, post_strat)
-            .prop_map(|(pre, post)| FuncCallPredicate { pre, post })
+            .prop_map(move |(pre, post)| FuncCallPredicate {
+                pre,
+                post,
+                func: func.clone(),
+            })
             .boxed()
+    }
+
+    pub fn render_caller(&self) -> Vec<String> {
+        let mut lines: Vec<String> = self
+            .pre
+            .iter()
+            .map(|(name, val)| format!("let {} = {};", name, val.render_rust_constructor()))
+            .collect();
+
+        let mut arg_syntax = Vec::new();
+        for in_binding in self.func.in_bindings.iter() {
+            arg_syntax.push(match in_binding.from {
+                BindingRef::Ptr(_) => format!("&{}", in_binding.name),
+                BindingRef::Slice(_, _) => format!("&{}", in_binding.name),
+                BindingRef::Value(_) => in_binding.name.clone(),
+            })
+        }
+        for io_binding in self.func.inout_bindings.iter() {
+            arg_syntax.push(match io_binding.from {
+                BindingRef::Ptr(_) => format!("&mut {}", io_binding.name),
+                BindingRef::Slice(_, _) => format!("&mut {}", io_binding.name),
+                BindingRef::Value(_) => unreachable!("should be no such thing as an io value"),
+            })
+        }
+
+        lines.push(format!(
+            "let {} = {}({});",
+            render_tuple(
+                self.func
+                    .out_bindings
+                    .iter()
+                    .map(|b| b.name.clone())
+                    .collect::<Vec<String>>(),
+                "_"
+            ),
+            self.func.field_name,
+            arg_syntax.join(",")
+        ));
+        lines.append(
+            &mut self
+                .post
+                .iter()
+                .map(|(name, val)| format!("assert_eq!({}, {});", name, val.render_rust_ref()))
+                .collect(),
+        );
+        lines
+    }
+
+    pub fn render_postcondition_bindings(&self) -> Vec<String> {
+        self.post
+            .iter()
+            .map(|(name, val)| format!("let {} = {};", name, val.render_rust_constructor()))
+            .collect()
+    }
+    pub fn render_postcondition_assertions(&self) -> Vec<String> {
+        self.post
+            .iter()
+            .map(|(name, val)| format!("assert_eq!({}, {});", name, val.render_rust_ref()))
+            .collect()
+    }
+}
+
+fn render_tuple(vs: Vec<String>, base_case: &str) -> String {
+    match vs.len() {
+        0 => base_case.to_owned(),
+        1 => vs[0].clone(),
+        _ => format!("({})", vs.join(", ")),
     }
 }

@@ -34,6 +34,10 @@ fn main() {
         process::exit(0);
     }
 
+    if exe_config.generate_calls {
+        generate_calls(&pkg);
+        process::exit(0);
+    }
     // Workspace deleted when dropped - need to keep it alive for app to be run
     let mut guest_apps: Vec<(PathBuf, Workspace)> = Vec::new();
 
@@ -67,6 +71,7 @@ struct ExeConfig {
     pub build_c_guest: bool,
     pub run_guests: bool,
     pub generate_values: bool,
+    pub generate_calls: bool,
 }
 
 impl ExeConfig {
@@ -114,6 +119,13 @@ impl ExeConfig {
                     .long("generate-values")
                     .help(""),
             )
+            .arg(
+                Arg::with_name("generate_calls")
+                    .required(false)
+                    .takes_value(false)
+                    .long("generate-calls")
+                    .help(""),
+            )
             .get_matches();
 
         ExeConfig {
@@ -123,6 +135,7 @@ impl ExeConfig {
             build_rust_guest: !matches.is_present("no_rust_guest"),
             run_guests: !matches.is_present("no_run") || !matches.is_present("no_host"),
             generate_values: matches.is_present("generate_values"),
+            generate_calls: matches.is_present("generate_calls"),
         }
     }
 }
@@ -139,6 +152,25 @@ fn generate_values(package: &Package) {
                 .expect("create valuetree")
                 .current();
             println!("type: {:?}\nvalue: {:?}", dt, value);
+        }
+    }
+}
+
+fn generate_calls(package: &Package) {
+    use lucet_idl_test::values::*;
+
+    for (_, m) in package.modules.iter() {
+        for fdecl in m.func_decls() {
+            let func_pred_gen = FuncCallPredicate::strat(&m, &fdecl.entity);
+            let mut runner = TestRunner::default();
+            let value = func_pred_gen
+                .new_tree(&mut runner)
+                .expect("create valuetree")
+                .current();
+            println!(
+                "==========\n{}\n=========",
+                value.render_caller().join("\n")
+            );
         }
     }
 }
