@@ -170,13 +170,14 @@ impl Drop for InstanceHandle {
 /// WebAssembly heap.
 ///
 /// `Instance`s are never created by runtime users directly, but rather are acquired from
-/// [`Region`](trait.Region.html)s and often accessed through
-/// [`InstanceHandle`](struct.InstanceHandle.html) smart pointers. This guarantees that instances
+/// [`Region`](../region/trait.Region.html)s and often accessed through
+/// [`InstanceHandle`](../instance/struct.InstanceHandle.html) smart pointers. This guarantees that instances
 /// and their fields are never moved in memory, otherwise raw pointers in the metadata could be
 /// unsafely invalidated.
 ///
 /// An instance occupies one 4096-byte page in memory, with a layout like:
-/// Page {
+/// ```
+/// 0xXXXXX000:
 ///   Instance {
 ///     .magic
 ///     .embed_ctx
@@ -188,12 +189,12 @@ impl Drop for InstanceHandle {
 ///   InstanceInternals {
 ///     .globals
 ///     .instruction_counter
+///   } // last address *inside* `InstanceInternals` is 0xXXXXXFFF
+/// 0xXXXXY000: // start of next page, VMContext points here
+///   Heap {
+///     ..
 ///   }
-/// }
-/// VMContext points right here:
-/// Heap {
-///   ..
-/// }
+/// ```
 ///
 /// This layout allows modules to tightly couple to a handful of fields related to the instance,
 /// rather than possibly requiring compiler-side changes (and recompiles) whenever `Instance`
@@ -203,7 +204,7 @@ impl Drop for InstanceHandle {
 /// locations of the stack, globals, and any other data, to be implementation-defined by the
 /// `Region` that actually creates `Slot`s onto which `Instance` are mapped.
 /// For information about the layout of all instance-related memory, see the documentation of
-/// `./src/region/mmap.rs#MmapRegion`.
+/// [MmapRegion](../region/mmap/struct.MmapRegion.html).
 #[repr(C)]
 #[repr(align(4096))]
 pub struct Instance {
