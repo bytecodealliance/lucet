@@ -1,3 +1,4 @@
+use heck::CamelCase;
 use lucet_idl::{
     AliasDataType, AtomType, BindingRef, DataTypeRef, DataTypeVariant, EnumDataType, FuncBinding,
     FuncDecl, Module, Named, StructDataType, StructMember,
@@ -67,7 +68,11 @@ impl EnumVal {
         })
     }
     pub fn render_rustval(&self) -> String {
-        format!("{}::{}", self.enum_name, self.member_name)
+        format!(
+            "{}::{}",
+            self.enum_name.to_camel_case(),
+            self.member_name.to_camel_case()
+        )
     }
 }
 
@@ -99,7 +104,11 @@ impl StructVal {
             .iter()
             .map(|v| format!("{}: {}", v.name, v.value.render_rustval()))
             .collect::<Vec<String>>();
-        format!("{} {{ {} }}", self.struct_name, members.join(", "))
+        format!(
+            "{} {{ {} }}",
+            self.struct_name.to_camel_case(),
+            members.join(", ")
+        )
     }
 }
 
@@ -200,36 +209,64 @@ impl ModuleExt for Module {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BindingVal {
+pub struct BindingVal {
+    name: String,
+    mutable: bool,
+    variant: BindingValVariant,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindingValVariant {
     Value(DataTypeVal),
     Ptr(DataTypeVal),
     Array(Vec<DataTypeVal>),
 }
 
 impl BindingVal {
-    fn binding_strat(module: &Module, binding: &FuncBinding) -> BoxedStrategy<(String, Self)> {
+    fn binding_strat(module: &Module, binding: &FuncBinding, mutable: bool) -> BoxedStrategy<Self> {
         let name = binding.name.clone();
         match binding.from {
             BindingRef::Value(_) => module
                 .datatype_strat(&binding.type_)
-                .prop_map(move |v| (name.clone(), BindingVal::Value(v)))
+                .prop_map(move |v| BindingVal {
+                    name: name.clone(),
+                    mutable,
+                    variant: BindingValVariant::Value(v),
+                })
                 .boxed(),
             BindingRef::Ptr(_) => module
                 .datatype_strat(&binding.type_)
-                .prop_map(move |v| (name.clone(), BindingVal::Ptr(v)))
+                .prop_map(move |v| BindingVal {
+                    name: name.clone(),
+                    mutable,
+                    variant: BindingValVariant::Ptr(v),
+                })
                 .boxed(),
             BindingRef::Slice(_, _) => {
                 prop::collection::vec(module.datatype_strat(&binding.type_), 100)
-                    .prop_map(move |v| (name.clone(), BindingVal::Array(v)))
+                    .prop_map(move |v| BindingVal {
+                        name: name.clone(),
+                        mutable,
+                        variant: BindingValVariant::Array(v),
+                    })
                     .boxed()
             }
         }
     }
+    fn render_rust_binding(&self) -> String {
+        format!(
+            "let {}{} = {};",
+            if self.mutable { "mut " } else { "" },
+            self.name,
+            self.render_rust_constructor(),
+        )
+    }
+
     fn render_rust_constructor(&self) -> String {
-        match self {
-            BindingVal::Value(v) => v.render_rustval(),
-            BindingVal::Ptr(v) => v.render_rustval(),
-            BindingVal::Array(vs) => format!(
+        match &self.variant {
+            BindingValVariant::Value(v) => v.render_rustval(),
+            BindingValVariant::Ptr(v) => v.render_rustval(),
+            BindingValVariant::Array(vs) => format!(
                 "vec![{}]",
                 vs.iter()
                     .map(|v| v.render_rustval())
@@ -238,11 +275,12 @@ impl BindingVal {
             ),
         }
     }
+
     fn render_rust_ref(&self) -> String {
-        match self {
-            BindingVal::Value(v) => v.render_rustval(),
-            BindingVal::Ptr(v) => format!("&{}", v.render_rustval()),
-            BindingVal::Array(vs) => format!(
+        match &self.variant {
+            BindingValVariant::Value(v) => v.render_rustval(),
+            BindingValVariant::Ptr(v) => format!("&{}", v.render_rustval()),
+            BindingValVariant::Array(vs) => format!(
                 "&[{}]",
                 vs.iter()
                     .map(|v| v.render_rustval())
@@ -256,24 +294,30 @@ impl BindingVal {
 #[derive(Debug, Clone)]
 pub struct FuncCallPredicate {
     func: FuncDecl,
-    pre: Vec<(String, BindingVal)>,
-    post: Vec<(String, BindingVal)>,
+    pre: Vec<BindingVal>,
+    post: Vec<BindingVal>,
 }
 
 impl FuncCallPredicate {
     pub fn strat(module: &Module, func: &FuncDecl) -> BoxedStrategy<FuncCallPredicate> {
-        let pre_strat: Vec<BoxedStrategy<(String, BindingVal)>> = func
+        let mut pre_strat: Vec<BoxedStrategy<BindingVal>> = func
             .in_bindings
             .iter()
-            .chain(func.inout_bindings.iter())
-            .map(|binding| BindingVal::binding_strat(module, binding))
+            .map(|binding| BindingVal::binding_strat(module, binding, false))
             .collect();
 
-        let post_strat: Vec<BoxedStrategy<(String, BindingVal)>> = func
+        pre_strat.append(
+            &mut func
+                .inout_bindings
+                .iter()
+                .map(|binding| BindingVal::binding_strat(module, binding, true))
+                .collect(),
+        );
+        let post_strat: Vec<BoxedStrategy<BindingVal>> = func
             .inout_bindings
             .iter()
             .chain(func.out_bindings.iter())
-            .map(|binding| BindingVal::binding_strat(module, binding))
+            .map(|binding| BindingVal::binding_strat(module, binding, false))
             .collect();
 
         let func = func.clone();
@@ -290,7 +334,7 @@ impl FuncCallPredicate {
         let mut lines: Vec<String> = self
             .pre
             .iter()
-            .map(|(name, val)| format!("let {} = {};", name, val.render_rust_constructor()))
+            .map(|val| val.render_rust_binding())
             .collect();
 
         let mut arg_syntax = Vec::new();
@@ -326,7 +370,7 @@ impl FuncCallPredicate {
             &mut self
                 .post
                 .iter()
-                .map(|(name, val)| format!("assert_eq!({}, {});", name, val.render_rust_ref()))
+                .map(|val| format!("assert_eq!({}, {});", val.name, val.render_rust_ref()))
                 .collect(),
         );
         lines
@@ -335,13 +379,13 @@ impl FuncCallPredicate {
     pub fn render_postcondition_bindings(&self) -> Vec<String> {
         self.post
             .iter()
-            .map(|(name, val)| format!("let {} = {};", name, val.render_rust_constructor()))
+            .map(|val| format!("let {} = {};", val.name, val.render_rust_constructor()))
             .collect()
     }
     pub fn render_postcondition_assertions(&self) -> Vec<String> {
         self.post
             .iter()
-            .map(|(name, val)| format!("assert_eq!({}, {});", name, val.render_rust_ref()))
+            .map(|val| format!("assert_eq!({}, {});", val.name, val.render_rust_ref()))
             .collect()
     }
 }
