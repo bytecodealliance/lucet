@@ -42,7 +42,7 @@ mod module_data {
         let m = load_wat_module("exported_import");
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling exported_import");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compiling exported_import");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -61,7 +61,7 @@ mod module_data {
         let m = load_wat_module("multiple_import");
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling multiple_import");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compiling multiple_import");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -76,7 +76,7 @@ mod module_data {
         let m = load_wat_module("globals_export");
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling globals_export");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compiling globals_export");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.globals_spec().len(), 1);
@@ -92,7 +92,7 @@ mod module_data {
         let m = load_wat_module("fibonacci");
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling fibonacci");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compiling fibonacci");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -106,7 +106,7 @@ mod module_data {
         let m = load_wat_module("arith");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling arith");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compiling arith");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -123,7 +123,7 @@ mod module_data {
         ))
         .unwrap();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile duplicate_imports");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compile duplicate_imports");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.import_functions().len(), 2);
@@ -149,7 +149,7 @@ mod module_data {
         ))
         .unwrap();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile icall");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compile icall");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.import_functions().len(), 1);
@@ -185,7 +185,7 @@ mod module_data {
         let m = load_wat_module("icall");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile icall");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compile icall");
         let _module_data = c.module_data().unwrap();
 
         /*  TODO can't express these with module data
@@ -210,7 +210,7 @@ mod module_data {
         let m = load_wat_module("icall_sparse");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile icall_sparse");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compile icall_sparse");
         let _module_data = c.module_data().unwrap();
 
         /*  TODO can't express these with module data
@@ -249,7 +249,7 @@ mod module_data {
         let b = Bindings::empty();
         let h = HeapSettings::default();
 
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile globals_import");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compile globals_import");
         let module_data = c.module_data().unwrap();
         let gspec = module_data.globals_spec();
 
@@ -270,8 +270,8 @@ mod module_data {
         let m = load_wat_module("heap_spec_import");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c =
-            Compiler::new(&m, OptLevel::Fast, &b, h.clone()).expect("compiling heap_spec_import");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h.clone(), false)
+            .expect("compiling heap_spec_import");
 
         assert_eq!(
             c.module_data().unwrap().heap_spec(),
@@ -293,7 +293,7 @@ mod module_data {
         let m = load_wat_module("heap_spec_definition");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h.clone())
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h.clone(), false)
             .expect("compiling heap_spec_definition");
 
         assert_eq!(
@@ -315,7 +315,7 @@ mod module_data {
         let m = load_wat_module("heap_spec_none");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compiling heap_spec_none");
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compiling heap_spec_none");
         assert_eq!(c.module_data().unwrap().heap_spec(), None,);
     }
 
@@ -324,7 +324,7 @@ mod module_data {
         let m = load_wat_module("oversize_data_segment");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h);
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false);
         assert!(
             c.is_err(),
             "compilation error because data initializers are oversized"
@@ -347,7 +347,7 @@ mod module_data {
 
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h);
+        let c = Compiler::new(&m, OptLevel::Fast, &b, h, false);
         assert!(
             c.is_err(),
             "compilation error because wasm module is invalid"
@@ -360,7 +360,7 @@ mod module_data {
         let m = load_wat_module("start_section");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let _c = Compiler::new(&m, OptLevel::Fast, &b, h).expect("compile start_section");
+        let _c = Compiler::new(&m, OptLevel::Fast, &b, h, false).expect("compile start_section");
         /*
         assert!(
             p.module().start_section().is_some(),
@@ -378,7 +378,8 @@ mod compile {
         let m = load_wat_module(file);
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::Fast, &b, h).expect(&format!("compile {}", file));
+        let c =
+            Compiler::new(&m, OptLevel::Fast, &b, h, false).expect(&format!("compile {}", file));
         let _obj = c.object_file().expect(&format!("codegen {}", file));
     }
     macro_rules! compile_test {
