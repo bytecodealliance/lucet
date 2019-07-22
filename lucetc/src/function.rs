@@ -85,7 +85,11 @@ impl<'a> FuncInfo<'a> {
             })
     }
 
-    fn update_instruction_count_instrumentation(&mut self, op: &Operator, builder: &mut FunctionBuilder, state: &cranelift_wasm::TranslationState) -> WasmResult<()> {
+    fn update_instruction_count_instrumentation(
+        &mut self,
+        op: &Operator,
+        builder: &mut FunctionBuilder,
+    ) -> WasmResult<()> {
         // So the operation counting works like this:
         // record a stack corresponding with the stack of control flow in the wasm function.
         // for non-control-flow-affecting instructions, increment the top of the stack.
@@ -441,10 +445,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         &mut self,
         op: &Operator,
         builder: &mut FunctionBuilder,
-        state: &cranelift_wasm::TranslationState,
     ) -> WasmResult<()> {
         if self.count_instructions {
-            self.update_instruction_count_instrumentation(op, builder, state)?;
+            self.update_instruction_count_instrumentation(op, builder)?;
         }
         Ok(())
     }

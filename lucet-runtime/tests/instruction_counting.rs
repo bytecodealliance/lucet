@@ -1,11 +1,11 @@
-use lucet_runtime_internals::module::DlModule;
-use lucetc::{Lucetc, LucetcOpts};
-use std::path::{Path};
-use tempfile::TempDir;
 use lucet_runtime::{Error, Limits};
+use lucet_runtime_internals::module::DlModule;
 use lucet_runtime_internals::region::mmap::MmapRegion;
 use lucet_runtime_internals::region::Region;
+use lucetc::{Lucetc, LucetcOpts};
+use std::path::Path;
 use std::sync::Arc;
+use tempfile::TempDir;
 
 pub fn wasm_test<P: AsRef<Path>>(wasm_file: P) -> Result<Arc<DlModule>, Error> {
     let workdir = TempDir::new().expect("create working directory");
@@ -44,11 +44,16 @@ pub fn check_instruction_counts() {
 
         assert_eq!(
             instruction_count,
-            inst.run("instruction_count", &[]).expect("instance still runs").as_i64() as u64,
+            inst.run("instruction_count", &[])
+                .expect("instance still runs")
+                .as_i64() as u64,
             "instruction count for test case {} is incorrect",
             wasm_path.display()
         );
     }
 
-    assert!(any_tests, "there are no test cases in the `instruction_counting` directory");
+    assert!(
+        any_tests,
+        "there are no test cases in the `instruction_counting` directory"
+    );
 }
