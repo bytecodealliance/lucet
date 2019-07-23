@@ -92,4 +92,12 @@ impl PrettyWriter {
     pub fn writeln<S: AsRef<str>>(&mut self, buf: S) -> &mut Self {
         self.write_line(buf.as_ref().as_bytes())
     }
+
+    /// Indent, write raw data and terminate with an end of line
+    pub fn writelns<S: AsRef<str>>(&mut self, lines: &[S]) -> &mut Self {
+        for line in lines.iter() {
+            self.write_line(line.as_ref().as_bytes());
+        }
+        self
+    }
 }

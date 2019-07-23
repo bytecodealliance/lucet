@@ -57,9 +57,13 @@ impl RustGenerator {
 
     pub fn generate_host(&mut self, package: &Package) -> Result<(), IDLError> {
         for (_ident, module) in package.modules.iter() {
-            self.w.writeln("use lucet_runtime::lucet_hostcalls;");
             self.generate_datatypes(module)?;
 
+            self.host_trait_definition(module)?;
+            self.w.eob();
+
+            self.w
+                .writeln("use lucet_runtime::{lucet_hostcalls, lucet_hostcall_terminate};");
             self.w.writeln("lucet_hostcalls! {").indent();
             for fdecl in module.func_decls() {
                 self.host_abi_definition(module, &fdecl.entity)?;
@@ -327,7 +331,7 @@ impl RustGenerator {
                     abi_call.param(len_pos, len.name.clone());
                 }
                 BindingRef::Value(_val) => {
-                    panic!("it should not be possible to have an inout value {:?}", io);
+                    unreachable!("it should not be possible to have an inout value {:?}", io);
                 }
             }
         }
@@ -362,7 +366,7 @@ impl RustGenerator {
                     def.ok_value(val.name.clone());
                 }
                 BindingRef::Slice(_ptr, _len) => {
-                    panic!("it should not be possible to have an out slice {:?}", o);
+                    unreachable!("it should not be possible to have an out slice {:?}", o);
                 }
             }
         }
@@ -373,34 +377,195 @@ impl RustGenerator {
     }
 
     fn host_abi_definition(&mut self, module: &Module, func: &FuncDecl) -> Result<(), IDLError> {
-        let mut args = format!("&mut vmctx,");
+        let mut args = vec![format!("&mut vmctx")];
         for a in func.args.iter() {
-            args += &format!(
-                "{}: {},",
+            args.push(format!(
+                "{}: {}",
                 a.name.to_snake_case(),
                 Self::abitype_name(&a.type_)
-            );
+            ));
         }
 
-        let rets = if func.rets.len() == 0 {
-            format!(" -> ()")
+        let abi_rettype = if func.rets.len() == 0 {
+            "()"
         } else {
             assert_eq!(func.rets.len(), 1);
-            format!(" -> {}", Self::abitype_name(&func.rets[0].type_))
+            Self::abitype_name(&func.rets[0].type_)
         };
 
-        self.w.writeln("#[no_mangle]").writeln(format!(
-            "// Wasm func {}::{} \n\
-             pub unsafe extern \"C\" fn {}({}){} {{",
-            module.module_name, func.field_name, func.binding_name, args, rets
-        ));
+        self.w
+            .writeln("#[no_mangle]")
+            .writeln(format!(
+                "// Wasm func {}::{}",
+                module.module_name, func.field_name
+            ))
+            .writeln(format!(
+                "pub unsafe extern \"C\" fn {}({},) -> {} {{",
+                func.binding_name,
+                args.join(", "),
+                abi_rettype
+            ));
 
         self.w.indent();
-        self.w.writeln("unimplemented!()");
 
+        let typename = module.module_name.to_camel_case();
+
+        self.w.writeln(format!(
+            "fn inner(obj: &mut dyn {}, {}) -> Result<{},()> {{",
+            typename,
+            func.args
+                .iter()
+                .map(|a| format!(
+                    "{}: {}",
+                    a.name.to_snake_case(),
+                    Self::abitype_name(&a.type_)
+                ))
+                .collect::<Vec<String>>()
+                .join(", "),
+            abi_rettype,
+        ));
+        self.w.indent();
+        {
+            let (pre, post, trait_args, trait_rets, func_rets) = self.trait_dispatch(func);
+            self.w.writelns(&pre);
+            self.w.writeln(format!(
+                "let {} = obj.{}({})?;",
+                render_tuple(&trait_rets),
+                func.field_name.to_snake_case(),
+                trait_args.join(", ")
+            ));
+            self.w.writelns(&post);
+            self.w.writeln(format!("Ok({})", render_tuple(&func_rets)));
+        }
+        self.w.eob().writeln("}");
+
+        self.w.writeln(format!(
+            "let mut ctx: ::std::cell::RefMut<Box<{typename}>> = vmctx.get_embed_ctx_mut::<Box<{typename}>>();",
+            typename = typename
+        ));
+        self.w.writeln(format!(
+            "match inner(&mut **ctx, {}) {{ Ok(v) => v, Err(e) => lucet_hostcall_terminate!(\"FIXME\"), }}",
+            func.args
+                .iter()
+                .map(|a| a.name.to_snake_case())
+                .collect::<Vec<String>>()
+                .join(", "),
+        ));
         self.w.eob().writeln("}");
 
         Ok(())
+    }
+
+    fn trait_dispatch(
+        &self,
+        func: &FuncDecl,
+    ) -> (
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+    ) {
+        let mut pre = Vec::new();
+        let mut post = Vec::new();
+        let mut trait_args = Vec::new();
+        let mut trait_rets = Vec::new();
+        let mut func_rets = Vec::new();
+
+        for input in func.in_bindings.iter() {
+            match &input.from {
+                BindingRef::Ptr(ptr_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("valid param");
+                    pre.push(format!(
+                        "let {}: &{} = unimplemented!(); // convert pointer in linear memory to ref, or fail: {:?}",
+                        input.name,
+                        self.get_defined_typename(&input.type_),
+                        ptr
+                    ));
+                    trait_args.push(input.name.clone());
+                }
+                BindingRef::Slice(ptr_pos, len_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("valid param");
+                    let len = func.get_param(len_pos).expect("valid param");
+                    pre.push(format!(
+                        "let {}: &[{}] = unimplemented!(); // convert pointer, len to slice {:?} {:?}",
+                        input.name,
+                        self.get_defined_typename(&input.type_),
+                        ptr,
+                        len
+                    ));
+                    trait_args.push(input.name.clone());
+                }
+                BindingRef::Value(value_pos) => {
+                    let value = func.get_param(value_pos).expect("valid param");
+                    pre.push(format!(
+                        "let {}: {} = unimplemented!(); // cast value {:?}",
+                        input.name,
+                        self.get_defined_typename(&input.type_),
+                        value
+                    ));
+                    trait_args.push(value.name.clone());
+                }
+            }
+        }
+        for io in func.inout_bindings.iter() {
+            match &io.from {
+                BindingRef::Ptr(ptr_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("valid param");
+                    pre.push(format!(
+                        "let mut {}: &{} = unimplemented!(); // convert pointer to mut ref {:?}",
+                        io.name,
+                        self.get_defined_typename(&io.type_),
+                        ptr,
+                    ));
+                    trait_args.push(format!("&mut {}", io.name));
+                }
+                BindingRef::Slice(ptr_pos, len_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("valid param");
+                    let len = func.get_param(len_pos).expect("valid param");
+                    pre.push(format!(
+                        "let mut {}: &[{}] = unimplemented!(); // convert pointer, len to slice {:?} {:?}",
+                        io.name,
+                        self.get_defined_typename(&io.type_),
+                        ptr,
+                        len
+                    ));
+                    trait_args.push(format!("&mut {}", io.name.clone()));
+                }
+                BindingRef::Value { .. } => unreachable!(),
+            }
+        }
+        for out in func.out_bindings.iter() {
+            match &out.from {
+                BindingRef::Ptr(ptr_pos) => {
+                    let ptr = func.get_param(ptr_pos).expect("valid param");
+                    pre.push(format!(
+                        "let mut {}: &{} = unimplemented!(); // pointer to {:?}",
+                        ptr.name,
+                        self.get_defined_typename(&out.type_),
+                        ptr,
+                    ));
+                    trait_rets.push(out.name.clone());
+                    post.push(format!(
+                        "*{} = {}; // Copy into out-pointer reference",
+                        ptr.name, out.name,
+                    ));
+                }
+                BindingRef::Value(value_pos) => {
+                    let value = func.get_param(value_pos).expect("valid param");
+                    trait_rets.push(out.name.clone());
+                    post.push(format!(
+                        "let {}: {} = unimplemented!(); // cast value to abi type {:?}",
+                        value.name,
+                        Self::abitype_name(&value.type_),
+                        out
+                    ));
+                    func_rets.push(value.name.clone())
+                }
+                BindingRef::Slice { .. } => unreachable!(),
+            }
+        }
+        (pre, post, trait_args, trait_rets, func_rets)
     }
 
     fn host_trait_definition(&mut self, module: &Module) -> Result<(), IDLError> {
@@ -410,9 +575,71 @@ impl RustGenerator {
                 module.module_name.to_camel_case()
             ))
             .indent();
+        for fdecl in module.func_decls() {
+            let func_name = fdecl.entity.field_name.to_snake_case();
+
+            let (mut args, rets) = self.trait_idiomatic_params(&fdecl.entity);
+            args.insert(0, "&mut self".to_owned());
+
+            self.w.writeln(format!(
+                "fn {}({}) -> {};",
+                func_name,
+                args.join(", "),
+                format!("Result<{},()>", render_tuple(&rets)),
+            ));
+        }
 
         self.w.eob().writeln("}");
+
         Ok(())
+    }
+
+    fn trait_idiomatic_params(&self, func: &FuncDecl) -> (Vec<String>, Vec<String>) {
+        let mut args = Vec::new();
+        for input in func.in_bindings.iter() {
+            match &input.from {
+                BindingRef::Ptr { .. } => args.push(format!(
+                    "{}: &{}",
+                    input.name,
+                    self.get_defined_typename(&input.type_)
+                )),
+                BindingRef::Slice { .. } => args.push(format!(
+                    "{}: &[{}]",
+                    input.name,
+                    self.get_defined_typename(&input.type_)
+                )),
+                BindingRef::Value { .. } => args.push(format!(
+                    "{}: {}",
+                    input.name,
+                    self.get_defined_typename(&input.type_)
+                )),
+            }
+        }
+        for io in func.inout_bindings.iter() {
+            match &io.from {
+                BindingRef::Ptr { .. } => args.push(format!(
+                    "{}: &mut {}",
+                    io.name,
+                    self.get_defined_typename(&io.type_)
+                )),
+                BindingRef::Slice { .. } => args.push(format!(
+                    "{}: &mut [{}]",
+                    io.name,
+                    self.get_defined_typename(&io.type_)
+                )),
+                BindingRef::Value { .. } => unreachable!(),
+            }
+        }
+        let mut rets = Vec::new();
+        for out in func.out_bindings.iter() {
+            match &out.from {
+                BindingRef::Ptr { .. } | BindingRef::Value { .. } => {
+                    rets.push(format!("{}", self.get_defined_typename(&out.type_)))
+                }
+                BindingRef::Slice { .. } => unreachable!(),
+            }
+        }
+        (args, rets)
     }
 }
 
@@ -429,4 +656,12 @@ where
     ww.writeln("}").eob();
     w.writeln("}").eob();
     Ok(())
+}
+
+pub fn render_tuple(members: &[String]) -> String {
+    match members.len() {
+        0 => "()".to_owned(),
+        1 => members[0].clone(),
+        _ => format!("({})", members.join(", ")),
+    }
 }

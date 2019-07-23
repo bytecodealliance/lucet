@@ -1,3 +1,4 @@
+use super::render_tuple;
 use crate::error::IDLError;
 use crate::function::{FuncDecl, ParamPosition};
 use crate::pretty_writer::PrettyWriter;
@@ -70,18 +71,14 @@ impl<'a> AbiCallBuilder<'a> {
             format!("let {} = ", rets[0])
         };
 
-        for b in self.before.iter() {
-            w.writeln(b);
-        }
+        w.writelns(&self.before);
 
         w.writeln(format!(
             "{}unsafe {{ abi::{}({}) }};",
             ret_syntax, name, arg_syntax
         ));
 
-        for a in self.after.iter() {
-            w.writeln(a);
-        }
+        w.writelns(&self.after);
 
         Ok(())
     }
@@ -118,14 +115,6 @@ impl FuncBuilder {
         self.ok_values.push(val);
     }
 
-    fn render_tuple(members: &[String]) -> String {
-        match members.len() {
-            0 => "()".to_owned(),
-            1 => members[0].clone(),
-            _ => format!("({})", members.join(", ")),
-        }
-    }
-
     pub fn render<F>(&self, w: &mut PrettyWriter, body: F) -> Result<(), IDLError>
     where
         F: FnOnce(&mut PrettyWriter) -> Result<(), IDLError>,
@@ -138,7 +127,7 @@ impl FuncBuilder {
         let arg_syntax = self.args.join(", ");
         let ret_syntax = format!(
             "Result<{},{}>",
-            Self::render_tuple(&self.ok_types),
+            render_tuple(&self.ok_types),
             self.error_type
         );
         w.writeln(format!(
@@ -147,7 +136,7 @@ impl FuncBuilder {
         ))
         .indent();
         body(w)?;
-        w.writeln(format!("Ok({})", Self::render_tuple(&self.ok_values)));
+        w.writeln(format!("Ok({})", render_tuple(&self.ok_values)));
         w.eob().writeln("}".to_owned());
         Ok(())
     }
