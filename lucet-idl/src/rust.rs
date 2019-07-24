@@ -492,7 +492,7 @@ impl RustGenerator {
                         len = input_mem.repr_size(),
                     ));
                     pre.push(format!(
-                        "let {name}: &{typename} = unsafe {{ ({name}___MEM.as_ptr() as *const {typename}).as_ref().unwrap()  }}; // convert pointer in linear memory to ref, or fail: {:?}",
+                        "let {name}: &{typename} = unsafe {{ ({name}___MEM.as_ptr() as *const {typename}).as_ref().unwrap()  }}; // convert pointer in linear memory to ref",
                         name = input.name,
                         typename = self.get_defined_typename(&input.type_),
                     ));
@@ -538,27 +538,55 @@ impl RustGenerator {
             }
         }
         for io in func.inout_bindings.iter() {
+            let io_mem = module.get_mem_area(&io.type_);
             match &io.from {
                 BindingRef::Ptr(ptr_pos) => {
                     let ptr = func.get_param(ptr_pos).expect("valid param");
+                    pre.push(format!("let {ptr} = {ptr} as usize;", ptr = ptr.name));
                     pre.push(format!(
-                        "let mut {}: &{} = unimplemented!(); // convert pointer to mut ref {:?}",
-                        io.name,
-                        self.get_defined_typename(&io.type_),
-                        ptr,
+                        "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
+                        ptr = ptr.name,
+                        align = io_mem.align(),
+                    ));
+                    pre.push(format!(
+                        "#[allow(non_snake_case)] let mut {name}___MEM: &mut [u8] = heap.get_mut({ptr}..({ptr}+{len})).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
+                        name = io.name,
+                        ptr = ptr.name,
+                        len = io_mem.repr_size(),
+                    ));
+                    pre.push(format!(
+                        "let mut {name}: &mut {typename} = unsafe {{ ({name}___MEM.as_mut_ptr() as *mut {typename}).as_mut().unwrap()  }}; // convert pointer in linear memory to ref",
+                        name = io.name,
+                        typename = self.get_defined_typename(&io.type_),
                     ));
                     trait_args.push(format!("&mut {}", io.name));
                 }
                 BindingRef::Slice(ptr_pos, len_pos) => {
                     let ptr = func.get_param(ptr_pos).expect("valid param");
                     let len = func.get_param(len_pos).expect("valid param");
+
+                    pre.push(format!("let {ptr} = {ptr} as usize;", ptr = ptr.name));
+                    pre.push(format!("let {len} = {len} as usize;", len = len.name));
                     pre.push(format!(
-                        "let mut {}: &[{}] = unimplemented!(); // convert pointer, len to slice {:?} {:?}",
-                        io.name,
-                        self.get_defined_typename(&io.type_),
-                        ptr,
-                        len
+                        "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
+                        ptr = ptr.name,
+                        align = io_mem.align(),
                     ));
+                    pre.push(format!(
+                        "#[allow(non_snake_case)] let mut {name}___MEM: &mut [u8] = heap.get_mut({ptr}..({ptr}+({len}*{elem_len}))).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
+                        name = io.name,
+                        ptr = ptr.name,
+                        len = len.name,
+                        elem_len = io_mem.repr_size(),
+                    ));
+
+                    pre.push(format!(
+                        "let mut {}: &mut [{}] = unsafe {{ ::std::slice::from_raw_parts_mut({name}___MEM.as_mut_ptr() as *mut {typename}, {len}) }};",
+                        name = io.name,
+                        typename = self.get_defined_typename(&io.type_),
+                        len = len.name,
+                    ));
+
                     trait_args.push(format!("&mut {}", io.name.clone()));
                 }
                 BindingRef::Value { .. } => unreachable!(),
