@@ -1,7 +1,7 @@
 use crate::error::ValidationError;
 use crate::types::{
     AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, EnumMember,
-    Ident, Location, Name, StructDataType, StructMember,
+    Ident, Location, MemArea, Name, StructDataType, StructMember,
 };
 use std::collections::HashMap;
 

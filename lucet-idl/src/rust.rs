@@ -411,7 +411,7 @@ impl RustGenerator {
         let typename = module.module_name.to_camel_case();
 
         self.w.writeln(format!(
-            "fn inner(obj: &mut dyn {}, {}) -> Result<{},()> {{",
+            "fn inner(heap: &mut [u8], obj: &mut dyn {}, {}) -> Result<{},()> {{",
             typename,
             func.args
                 .iter()
@@ -426,7 +426,7 @@ impl RustGenerator {
         ));
         self.w.indent();
         {
-            let (pre, post, trait_args, trait_rets, func_rets) = self.trait_dispatch(func);
+            let (pre, post, trait_args, trait_rets, func_rets) = self.trait_dispatch(module, func);
             self.w.writelns(&pre);
             self.w.writeln(format!(
                 "let {} = obj.{}({})?;",
@@ -443,8 +443,9 @@ impl RustGenerator {
             "let mut ctx: ::std::cell::RefMut<Box<{typename}>> = vmctx.get_embed_ctx_mut::<Box<{typename}>>();",
             typename = typename
         ));
+        self.w.writeln("let mut heap = vmctx.heap_mut();");
         self.w.writeln(format!(
-            "match inner(&mut **ctx, {}) {{ Ok(v) => v, Err(e) => lucet_hostcall_terminate!(\"FIXME\"), }}",
+            "match inner(&mut *heap, &mut **ctx, {}) {{ Ok(v) => v, Err(e) => lucet_hostcall_terminate!(\"FIXME\"), }}",
             func.args
                 .iter()
                 .map(|a| a.name.to_snake_case())
@@ -458,6 +459,7 @@ impl RustGenerator {
 
     fn trait_dispatch(
         &self,
+        module: &Module,
         func: &FuncDecl,
     ) -> (
         Vec<String>,
@@ -473,36 +475,63 @@ impl RustGenerator {
         let mut func_rets = Vec::new();
 
         for input in func.in_bindings.iter() {
+            let input_mem = module.get_mem_area(&input.type_);
             match &input.from {
                 BindingRef::Ptr(ptr_pos) => {
                     let ptr = func.get_param(ptr_pos).expect("valid param");
+                    pre.push(format!("let {ptr} = {ptr} as usize;", ptr = ptr.name));
                     pre.push(format!(
-                        "let {}: &{} = unimplemented!(); // convert pointer in linear memory to ref, or fail: {:?}",
-                        input.name,
-                        self.get_defined_typename(&input.type_),
-                        ptr
+                        "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
+                        ptr = ptr.name,
+                        align = input_mem.align(),
+                    ));
+                    pre.push(format!(
+                        "#[allow(non_snake_case)] let {name}___MEM: &[u8] = heap.get({ptr}..({ptr}+{len})).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
+                        name = input.name,
+                        ptr = ptr.name,
+                        len = input_mem.repr_size(),
+                    ));
+                    pre.push(format!(
+                        "let {name}: &{typename} = unsafe {{ ({name}___MEM.as_ptr() as *const {typename}).as_ref().unwrap()  }}; // convert pointer in linear memory to ref, or fail: {:?}",
+                        name = input.name,
+                        typename = self.get_defined_typename(&input.type_),
                     ));
                     trait_args.push(input.name.clone());
                 }
                 BindingRef::Slice(ptr_pos, len_pos) => {
                     let ptr = func.get_param(ptr_pos).expect("valid param");
                     let len = func.get_param(len_pos).expect("valid param");
+
+                    pre.push(format!("let {ptr} = {ptr} as usize;", ptr = ptr.name));
+                    pre.push(format!("let {len} = {len} as usize;", len = len.name));
                     pre.push(format!(
-                        "let {}: &[{}] = unimplemented!(); // convert pointer, len to slice {:?} {:?}",
-                        input.name,
-                        self.get_defined_typename(&input.type_),
-                        ptr,
-                        len
+                        "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
+                        ptr = ptr.name,
+                        align = input_mem.align(),
+                    ));
+                    pre.push(format!(
+                        "#[allow(non_snake_case)] let {name}___MEM: &[u8] = heap.get({ptr}..({ptr}+({len}*{elem_len}))).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
+                        name = input.name,
+                        ptr = ptr.name,
+                        len = len.name,
+                        elem_len = input_mem.repr_size(),
+                    ));
+
+                    pre.push(format!(
+                        "let {}: &[{}] = unsafe {{ ::std::slice::from_raw_parts({name}___MEM.as_ptr() as *const {typename}, {len}) }};",
+                        name = input.name,
+                        typename = self.get_defined_typename(&input.type_),
+                        len = len.name,
                     ));
                     trait_args.push(input.name.clone());
                 }
                 BindingRef::Value(value_pos) => {
                     let value = func.get_param(value_pos).expect("valid param");
                     pre.push(format!(
-                        "let {}: {} = unimplemented!(); // cast value {:?}",
-                        input.name,
-                        self.get_defined_typename(&input.type_),
-                        value
+                        "let {name}: {typename} = {value} as {typename};",
+                        name = input.name,
+                        typename = self.get_defined_typename(&input.type_),
+                        value = value.name
                     ));
                     trait_args.push(value.name.clone());
                 }

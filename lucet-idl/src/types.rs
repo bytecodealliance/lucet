@@ -1,5 +1,10 @@
 use std::fmt;
 
+pub trait MemArea {
+    fn repr_size(&self) -> usize;
+    fn align(&self) -> usize;
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum AtomType {
     Bool,
@@ -15,8 +20,8 @@ pub enum AtomType {
     F64,
 }
 
-impl AtomType {
-    pub fn repr_size(&self) -> usize {
+impl MemArea for AtomType {
+    fn repr_size(&self) -> usize {
         match self {
             AtomType::Bool => 1,
             AtomType::U8 | AtomType::I8 => 1,
@@ -24,6 +29,9 @@ impl AtomType {
             AtomType::U32 | AtomType::I32 | AtomType::F32 => 4,
             AtomType::U64 | AtomType::I64 | AtomType::F64 => 8,
         }
+    }
+    fn align(&self) -> usize {
+        self.repr_size()
     }
 }
 
@@ -146,6 +154,15 @@ pub struct DataType {
 pub struct Name {
     pub name: String,
     pub location: Location,
+}
+
+impl MemArea for DataType {
+    fn repr_size(&self) -> usize {
+        self.repr_size
+    }
+    fn align(&self) -> usize {
+        self.align
+    }
 }
 
 impl fmt::Display for Name {

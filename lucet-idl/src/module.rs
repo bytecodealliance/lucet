@@ -5,7 +5,8 @@ use crate::error::ValidationError;
 use crate::function::FuncDecl;
 use crate::parser::{SyntaxDecl, SyntaxTypeRef};
 use crate::types::{
-    AbiType, DataType, DataTypeRef, DataTypeVariant, EnumMember, Ident, Location, Name, Named,
+    AbiType, DataType, DataTypeRef, DataTypeVariant, EnumMember, Ident, Location, MemArea, Name,
+    Named,
 };
 use heck::SnakeCase;
 use std::collections::HashMap;
@@ -266,6 +267,18 @@ impl Module {
             })
         } else {
             None
+        }
+    }
+
+    pub fn get_mem_area(&self, dtref: &DataTypeRef) -> Box<dyn MemArea> {
+        match dtref {
+            DataTypeRef::Defined(ident) => Box::new(
+                self.get_datatype(*ident)
+                    .expect("valid datatype")
+                    .entity
+                    .clone(),
+            ),
+            DataTypeRef::Atom(atom) => Box::new(*atom),
         }
     }
 

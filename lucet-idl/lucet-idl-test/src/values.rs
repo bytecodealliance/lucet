@@ -388,6 +388,18 @@ impl FuncCallPredicate {
             .map(|val| format!("assert_eq!({}, {});", val.name, val.render_rust_ref()))
             .collect()
     }
+
+    pub fn render_callee(&self, module: &Module) -> Vec<String> {
+        let mut lines = Vec::new();
+        lines.push("struct Test;".to_owned());
+        lines.push(format!(
+            "impl {} for Test {{",
+            module.module_name.to_camel_case()
+        ));
+
+        lines.push("}".to_owned());
+        lines
+    }
 }
 
 fn render_tuple(vs: Vec<String>, base_case: &str) -> String {
