@@ -69,6 +69,8 @@ impl RustGenerator {
                 self.host_abi_definition(module, &fdecl.entity)?;
             }
             self.w.eob().writeln("}");
+
+            self.host_ensure_linked(module);
         }
         Ok(())
     }
@@ -593,15 +595,30 @@ impl RustGenerator {
             }
         }
         for out in func.out_bindings.iter() {
+            let out_mem = module.get_mem_area(&out.type_);
             match &out.from {
                 BindingRef::Ptr(ptr_pos) => {
                     let ptr = func.get_param(ptr_pos).expect("valid param");
+
+                    pre.push(format!("let {ptr} = {ptr} as usize;", ptr = ptr.name));
                     pre.push(format!(
-                        "let mut {}: &{} = unimplemented!(); // pointer to {:?}",
-                        ptr.name,
-                        self.get_defined_typename(&out.type_),
-                        ptr,
+                        "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
+                        ptr = ptr.name,
+                        align = out_mem.align(),
                     ));
+                    pre.push(format!(
+                        "#[allow(non_snake_case)] let mut {name}___MEM: &mut [u8] = heap.get_mut({ptr}..({ptr}+{len})).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
+                        name = out.name,
+                        ptr = ptr.name,
+                        len = out_mem.repr_size(),
+                    ));
+                    pre.push(format!(
+                        "let mut {ptr}: &mut {typename} = unsafe {{ ({name}___MEM.as_mut_ptr() as *mut {typename}).as_mut().unwrap()  }}; // convert pointer in linear memory to ref",
+                        name = out.name,
+                        typename = self.get_defined_typename(&out.type_),
+                        ptr = ptr.name,
+                    ));
+
                     trait_rets.push(out.name.clone());
                     post.push(format!(
                         "*{} = {}; // Copy into out-pointer reference",
@@ -612,10 +629,10 @@ impl RustGenerator {
                     let value = func.get_param(value_pos).expect("valid param");
                     trait_rets.push(out.name.clone());
                     post.push(format!(
-                        "let {}: {} = unimplemented!(); // cast value to abi type {:?}",
-                        value.name,
-                        Self::abitype_name(&value.type_),
-                        out
+                        "let {value}: {typename} = {arg} as {typename};",
+                        value = value.name,
+                        typename = Self::abitype_name(&value.type_),
+                        arg = out.name,
                     ));
                     func_rets.push(value.name.clone())
                 }
@@ -697,6 +714,19 @@ impl RustGenerator {
             }
         }
         (args, rets)
+    }
+
+    fn host_ensure_linked(&mut self, module: &Module) {
+        self.w.writeln("pub fn ensure_linked() {").indent();
+        self.w.writeln("unsafe {");
+        for fdecl in module.func_decls() {
+            self.w.writeln(format!(
+                "::std::ptr::read_volatile({} as *const extern \"C\" fn());",
+                fdecl.entity.binding_name,
+            ));
+        }
+        self.w.eob().writeln("}");
+        self.w.eob().writeln("}");
     }
 }
 
