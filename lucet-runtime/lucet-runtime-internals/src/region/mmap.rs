@@ -36,18 +36,20 @@ use std::sync::{Arc, Mutex, Weak};
 /// 0x0XXX: |  .inst_count = 0x0000 |
 /// 0x1000: +-----------------------+ <-- Heap, and `lucet_vmctx`
 /// 0x1XXX: |                       |
-/// 0xXXXX: ~  .......heap.......   ~
+/// 0xXXXX: ~  .......heap.......   ~ // heap size is coverned by limits.heap_address_space_size
 /// 0xXXXX: |                       |
-/// 0xN000: +-----------------------| <-- Stack (at 0x1000 + max_heap_size)
+/// 0xN000: +-----------------------| <-- Stack (at limits.heap_address_space_size + PAGE_SIZE)
 /// 0xNXXX: |                       |
-/// 0xXXXX: ~  .......stack......   ~
+/// 0xXXXX: ~  .......stack......   ~ // stack size is governed by limits.stack_size
 /// 0xXXXX: |                       |
-/// 0xM000: +-----------------------| <-- Globals (at 0x1000 + max_{heap,stack}_size)
+/// 0xXXXx: --- stack guard page ----
+/// 0xM000: +-----------------------| <-- Globals (at stack_start + limits.stack_size + PAGE_SIZE)
 /// 0xMXXX: |                       |
 /// 0xXXXX: ~  ......globals.....   ~
 /// 0xXXXX: |                       |
-/// 0xS000: +-----------------------| <-- Sigstack (at 0x1000 + max_{heap,stack,globals}_size)
-/// 0xSXXX: |  ......sigstack....   |
+/// 0xXXXX  --- global guard page ---
+/// 0xS000: +-----------------------| <-- Sigstack (at globals_start + globals_size + PAGE_SIZE)
+/// 0xSXXX: |  ......sigstack....   | // sigstack is SIGSTKSZ bytes
 /// 0xSXXX: +-----------------------|
 /// ```
 pub struct MmapRegion {
