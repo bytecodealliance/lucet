@@ -249,7 +249,7 @@ impl Options {
             )
             .arg(
                 Arg::with_name("count_instructions")
-                    .long("--count_instructions")
+                    .long("--count-instructions")
                     .takes_value(false)
                     .help("Instrument the produced binary to count the number of wasm operations the translated program executes")
             )

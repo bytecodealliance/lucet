@@ -1,16 +1,15 @@
-use lucet_runtime::{Error, Limits};
-use lucet_runtime_internals::module::DlModule;
-use lucet_runtime_internals::region::mmap::MmapRegion;
-use lucet_runtime_internals::region::Region;
+use lucet_runtime::{Error, Limits, DlModule, MmapRegion, Region};
 use lucetc::{Lucetc, LucetcOpts};
 use std::path::Path;
 use std::sync::Arc;
+use std::fs::DirEntry;
 use tempfile::TempDir;
+use rayon::prelude::*;
 
 pub fn wasm_test<P: AsRef<Path>>(wasm_file: P) -> Result<Arc<DlModule>, Error> {
     let workdir = TempDir::new().expect("create working directory");
 
-    let native_build = Lucetc::new(wasm_file).with_count_instructions();
+    let native_build = Lucetc::new(wasm_file).with_count_instructions(true);
 
     let so_file = workdir.path().join("out.so");
 
@@ -23,13 +22,22 @@ pub fn wasm_test<P: AsRef<Path>>(wasm_file: P) -> Result<Arc<DlModule>, Error> {
 
 #[test]
 pub fn check_instruction_counts() {
-    let mut any_tests = false;
-    for ent in std::fs::read_dir("./tests/instruction_counting").expect("can iterate test files") {
-        let ent = ent.expect("can get test files");
-        println!("looking at file {}", ent.path().display());
+    let files: Vec<DirEntry> = std::fs::read_dir("./tests/instruction_counting")
+        .expect("can iterate test files")
+        .map(|ent| {
+            let ent = ent.expect("can get test files");
+            assert!(ent.file_type().unwrap().is_file(), "directories not supported in test/instruction_counting");
+            ent
+        })
+        .collect();
+
+    assert!(
+        files.len() > 0,
+        "there are no test cases in the `instruction_counting` directory"
+    );
+
+    files.par_iter().for_each(|ent| {
         let wasm_path = ent.path();
-        assert!(ent.file_type().unwrap().is_file());
-        any_tests = true;
         let module = wasm_test(&wasm_path).expect("can load module");
 
         let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
@@ -50,10 +58,5 @@ pub fn check_instruction_counts() {
             "instruction count for test case {} is incorrect",
             wasm_path.display()
         );
-    }
-
-    assert!(
-        any_tests,
-        "there are no test cases in the `instruction_counting` directory"
-    );
+    });
 }

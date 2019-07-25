@@ -99,8 +99,8 @@ pub trait LucetcOpts {
     fn with_verify(self) -> Self;
     fn sign(&mut self);
     fn with_sign(self) -> Self;
-    fn count_instructions(&mut self);
-    fn with_count_instructions(self) -> Self;
+    fn count_instructions(&mut self, enable_count: bool);
+    fn with_count_instructions(self, enable_count: bool) -> Self;
 }
 
 impl<T: AsLucetc> LucetcOpts for T {
@@ -206,12 +206,12 @@ impl<T: AsLucetc> LucetcOpts for T {
         self
     }
 
-    fn count_instructions(&mut self) {
-        self.as_lucetc().count_instructions = true;
+    fn count_instructions(&mut self, count_instructions: bool) {
+        self.as_lucetc().count_instructions = count_instructions;
     }
 
-    fn with_count_instructions(mut self) -> Self {
-        self.count_instructions();
+    fn with_count_instructions(mut self, count_instructions: bool) -> Self {
+        self.count_instructions(count_instructions);
         self
     }
 }

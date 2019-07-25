@@ -19,7 +19,7 @@ use wasmparser::Operator;
 pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
     count_instructions: bool,
-    op_offsets: Vec<u32>,
+    scope_costs: Vec<u32>,
     vmctx_value: Option<ir::GlobalValue>,
     global_base_value: Option<ir::GlobalValue>,
     runtime_funcs: HashMap<RuntimeFunc, ir::FuncRef>,
@@ -30,7 +30,7 @@ impl<'a> FuncInfo<'a> {
         Self {
             module_decls,
             count_instructions,
-            op_offsets: vec![0],
+            scope_costs: vec![0],
             vmctx_value: None,
             global_base_value: None,
             runtime_funcs: HashMap::new(),
@@ -110,7 +110,7 @@ impl<'a> FuncInfo<'a> {
         // stack to 1 at return of a function.
 
         fn flush_counter(environ: &mut FuncInfo, builder: &mut FunctionBuilder) {
-            if environ.op_offsets.last() == Some(&0) {
+            if environ.scope_costs.last() == Some(&0) {
                 return;
             }
             let instr_count_offset: ir::immediates::Offset32 =
@@ -119,20 +119,28 @@ impl<'a> FuncInfo<'a> {
                     .into();
             let vmctx_gv = environ.get_vmctx(builder.func);
             let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
-            let flags = ir::MemFlags::trusted();
+            let trusted_mem = ir::MemFlags::trusted();
+
+            //    Now insert a sequence of clif that is, functionally:
+            //
+            //    let instruction_count_ptr: &mut u64 = vmctx.instruction_count;
+            //    let mut instruction_count: u64 = *instruction_count_ptr;
+            //    instruction_count += <counter>;
+            //    *instruction_count_ptr = instruction_count;
+
             let cur_instr_count =
                 builder
                     .ins()
-                    .load(ir::types::I64, flags, addr, instr_count_offset);
+                    .load(ir::types::I64, trusted_mem, addr, instr_count_offset);
             let update_const = builder.ins().iconst(
                 ir::types::I64,
-                i64::from(*environ.op_offsets.last().unwrap()),
+                i64::from(*environ.scope_costs.last().unwrap()),
             );
             let new_instr_count = builder.ins().iadd(cur_instr_count, update_const.into());
             builder
                 .ins()
-                .store(flags, new_instr_count, addr, instr_count_offset);
-            *environ.op_offsets.last_mut().unwrap() = 0;
+                .store(trusted_mem, new_instr_count, addr, instr_count_offset);
+            *environ.scope_costs.last_mut().unwrap() = 0;
         };
 
         // Update the instruction counter, if necessary
@@ -167,7 +175,7 @@ impl<'a> FuncInfo<'a> {
             // everything else, just call it one operation.
             _ => 1,
         };
-        self.op_offsets.last_mut().map(|x| *x += op_cost);
+        self.scope_costs.last_mut().map(|x| *x += op_cost);
 
         // apply flushing behavior if applicable
         match op {
@@ -190,9 +198,26 @@ impl<'a> FuncInfo<'a> {
                 // finished, and attempting to add instruction to update the instruction counter
                 // will cause a panic.
                 //
-                // We can avoid that case by ensuring instruction counts are flushed at the *entry*
-                // of any block-opening operation, so that at the exit the `End` will update the
-                // count by 0, the update is discarded, and we don't cause a panic.
+                // The only situation where this can occur is if the last structure in a scope is a
+                // subscope (the body of a Loop, If, or Else), so we flush the counter entering
+                // those structures, and guarantee the `End` for their enclosing scope will have a
+                // counter value of 0. In other cases, we're not at risk of closing a scope leading
+                // to closing another scope, and it's safe to flush the counter.
+                //
+                // An example to help:
+                // ```
+                // block
+                //   i32.const 4   ; counter += 1
+                //   i32.const -5  ; counter += 1
+                //   i32.add       ; counter += 1
+                //   block         ; flush counter (counter = 3 -> 0), flush here to avoid having
+                //                 ;                                   accumulated count at the
+                //                 ;                                   final `end`
+                //     i32.const 4 ; counter += 1
+                //     i32.add     ; counter += 1
+                //   end           ; flush counter (counter = 2 -> 0)
+                // end             ; flush counter (counter = 0 -> 0) and is a no-op
+                // ```
                 flush_counter(self, builder);
             }
             _ => { /* regular operation, do nothing */ }
@@ -202,15 +227,15 @@ impl<'a> FuncInfo<'a> {
         match op {
             Operator::CallIndirect { .. } | Operator::Call { .. } => {
                 // add 1 to count the return from the called function
-                self.op_offsets.last_mut().map(|x| *x = 1);
+                self.scope_costs.last_mut().map(|x| *x = 1);
             }
             Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
                 // open a new scope
-                self.op_offsets.push(0);
+                self.scope_costs.push(0);
             }
             Operator::End => {
                 // close the current scope
-                self.op_offsets.pop();
+                self.scope_costs.pop();
             }
             _ => {}
         }
