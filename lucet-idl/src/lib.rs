@@ -6,6 +6,7 @@ extern crate failure;
 mod c;
 mod config;
 mod data_layout;
+mod datatypes;
 mod error;
 mod function;
 mod lexer;

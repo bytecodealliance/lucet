@@ -255,7 +255,7 @@ impl Module {
 
         Ok(mod_)
     }
-
+    /* ACCESSORS */
     /// Retrieve information about a data type given its identifier
     pub fn get_datatype(&self, id: Ident) -> Option<Named<DataType>> {
         let name = &self.names[id.0];
