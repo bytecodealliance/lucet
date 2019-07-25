@@ -376,27 +376,52 @@ impl FuncCallPredicate {
         lines
     }
 
-    pub fn render_postcondition_bindings(&self) -> Vec<String> {
-        self.post
-            .iter()
-            .map(|val| format!("let {} = {};", val.name, val.render_rust_constructor()))
-            .collect()
-    }
-    pub fn render_postcondition_assertions(&self) -> Vec<String> {
-        self.post
-            .iter()
-            .map(|val| format!("assert_eq!({}, {});", val.name, val.render_rust_ref()))
-            .collect()
+    pub fn render_callee(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        // Assert preconditions hold
+        lines.append(
+            &mut self
+                .pre
+                .iter()
+                .map(|val| format!("assert_eq!({}, {};", val.name, val.render_rust_ref()))
+                .collect(),
+        );
+        // Make postconditions hold
+        lines.append(
+            &mut self
+                .post
+                .iter()
+                .map(|val| format!("*{} = {};", val.name, val.render_rust_constructor()))
+                .collect(),
+        );
+        lines
     }
 
-    pub fn render_callee(&self, module: &Module) -> Vec<String> {
+    pub fn render_host_trait(&self, module: &Module) -> Vec<String> {
         let mut lines = Vec::new();
-        lines.push("struct Test;".to_owned());
+        lines.push("struct TestHarness;".to_owned());
         lines.push(format!(
-            "impl {} for Test {{",
+            "impl {} for TesHarnesst {{",
             module.module_name.to_camel_case()
         ));
-
+        for func in module.func_decls() {
+            let func = func.entity;
+            let mut args: Vec<String> = Vec::new();
+            for input in func.in_bindings.iter() {}
+            let mut rets = Vec::new();
+            lines.push(format!(
+                "fn {}(&mut self, {}) -> Result<{}, ()>",
+                func.field_name,
+                args.join(","),
+                render_tuple(rets, "()")
+            ));
+            if func.field_name == self.func.field_name {
+                lines.append(&mut self.render_callee());
+            } else {
+                lines.push("panic!(\"should not be called\")".to_owned());
+            }
+            lines.push("}".to_owned());
+        }
         lines.push("}".to_owned());
         lines
     }

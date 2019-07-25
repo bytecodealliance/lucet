@@ -17,6 +17,12 @@ pub struct HostApp {
 
 impl HostApp {
     pub fn new(package: &Package) -> Result<Self, Error> {
+        if package.modules.len() != 1 {
+            Err(format_err!(
+                "only one module per package supported at this time"
+            ))?
+        }
+
         // Need a system-wide lock on the source directory, because we will modify its contents and
         // call `cargo run` on it.
         // This way we can use the cache of compiled crates in the project cargo workspace.
@@ -45,6 +51,12 @@ impl HostApp {
                 backend: Backend::RustHost,
             },
             Box::new(idl_file),
+        )?;
+
+        let harness_file = hostapp.source_file("harness.rs")?;
+        self.test_harness(
+            Box::new(harness_file),
+            package.modules.get(0).expect("one module per package"),
         )?;
 
         Ok(hostapp)
@@ -101,3 +113,5 @@ impl Drop for HostApp {
         }
     }
 }
+
+fn test_harness(out: Box<dyn Write>, module: &Module) -> Result<(), Error> {}

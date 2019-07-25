@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-#[allow(unused)]
+mod harness;
 mod idl;
 mod run;
 
