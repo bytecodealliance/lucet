@@ -72,7 +72,7 @@ impl ScriptEnv {
             OptLevel::Fast,
             &bindings,
             HeapSettings::default(),
-            false,
+            true,
         )
         .map_err(program_error)?;
 

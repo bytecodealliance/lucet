@@ -16,10 +16,117 @@ use memoffset::offset_of;
 use std::collections::HashMap;
 use wasmparser::Operator;
 
+enum ScopeControlFlow {
+    // this scope has linear control flow, where `bool` is if it's still reachable
+    Linear(bool),
+    // this scope has conditional control flow, `bool` is for the branch being reachable,
+    // where `Option<bool>` describes reachability of the alternate branch
+    Conditional(bool, Option<bool>)
+}
+impl ScopeControlFlow {
+    pub fn terminates(&self) -> bool {
+        match self {
+            ScopeControlFlow::Linear(reachable) => { !reachable },
+            ScopeControlFlow::Conditional(_, None) => {
+                // this never terminates because the maybe-terminal branch can be skipped
+                false
+            },
+            ScopeControlFlow::Conditional(fallthrough, Some(alternate)) => {
+                // an if terminuates if the fallthrough terminates and the alternate, when present,
+                // terminates
+                !fallthrough && !alternate
+            }
+        }
+    }
+}
+
+struct ScopeTracker {
+    scopes: Vec<ScopeControlFlow>
+}
+
+impl ScopeTracker {
+    pub fn new() -> Self {
+        ScopeTracker {
+            scopes: vec![ScopeControlFlow::Linear(true)]
+        }
+    }
+
+    // this is not exactly the same as asking if a scope terminates, because "unreachable" is
+    // implcitly asking if the currently active region is reachable (eg only one of the two
+    // branches inside a conditional scope)
+    pub fn unreachable(&self) -> bool {
+        match self.scopes.last().unwrap() {
+            ScopeControlFlow::Linear(reachable) => { !reachable },
+            ScopeControlFlow::Conditional(reachable, None) => { !reachable },
+            ScopeControlFlow::Conditional(_, Some(reachable)) => { !reachable },
+        }
+    }
+
+    pub fn set_unreachable(&mut self) {
+        match self.scopes.last_mut().unwrap() {
+            ScopeControlFlow::Linear(ref mut reachable) => {
+                *reachable = false;
+            }
+            ScopeControlFlow::Conditional(ref mut reachable, None) => {
+                *reachable = false;
+            }
+            ScopeControlFlow::Conditional(_, Some(ref mut reachable)) => {
+                *reachable = false;
+            }
+        }
+    }
+
+    pub fn close_scope(&mut self) {
+        let top_scope = self.scopes.pop();
+        if self.scopes.len() > 0 && top_scope.unwrap().terminates() {
+            self.set_unreachable();
+        }
+    }
+
+    pub fn open_scope(&mut self) {
+        self.scopes.push(
+            ScopeControlFlow::Linear(
+                // the scope still has reachable code if the parent scope did not terminate
+                !self.scopes.last().unwrap().terminates()
+            )
+        )
+    }
+
+    pub fn open_conditional(&mut self) {
+        let new_scope = if self.scopes.last().unwrap().terminates() {
+            ScopeControlFlow::Conditional(false, Some(false))
+        } else {
+            ScopeControlFlow::Conditional(true, None)
+        };
+
+        self.scopes.push(new_scope);
+    }
+
+    pub fn add_alternate_branch(&mut self) {
+        if let Some(ScopeControlFlow::Conditional(_, ref mut alternate)) = self.scopes.last_mut() {
+            match alternate {
+                None => {
+                    *alternate = Some(true);
+                },
+                Some(false) => {
+                    // the parent scope was unreachable, we're walking through dead code anyway.
+                },
+                Some(true) => {
+                    // this is the second alternate branch added on an if? that's possible.
+                    panic!("Impossible control flow state: if with multiple else's");
+                }
+            }
+        } else {
+            panic!("Inconsistent internal state: adding alternate branch for a scope with unconditional control flow.");
+        }
+    }
+}
+
 pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
     count_instructions: bool,
     scope_costs: Vec<u32>,
+    scope_tracker: ScopeTracker,
     vmctx_value: Option<ir::GlobalValue>,
     global_base_value: Option<ir::GlobalValue>,
     runtime_funcs: HashMap<RuntimeFunc, ir::FuncRef>,
@@ -31,6 +138,7 @@ impl<'a> FuncInfo<'a> {
             module_decls,
             count_instructions,
             scope_costs: vec![0],
+            scope_tracker: ScopeTracker::new(),
             vmctx_value: None,
             global_base_value: None,
             runtime_funcs: HashMap::new(),
@@ -143,99 +251,123 @@ impl<'a> FuncInfo<'a> {
             *environ.scope_costs.last_mut().unwrap() = 0;
         };
 
-        // Update the instruction counter, if necessary
-        let op_cost = match op {
-            // Opening a scope is a syntactic operation, and free.
-            Operator::Block { .. } |
-            // These do not add counts, see above comment about return/unreachable
-            Operator::Unreachable |
-            Operator::Return => 0,
-            // Call is quick
-            Operator::Call { .. } => 1,
-            // but indirect calls take some extra work to validate at runtime
-            Operator::CallIndirect { .. } => 2,
-            // Testing for an if involve some overhead, for now say it's also 1
-            Operator::If { .. } => 1,
-            // Else is a fallthrough or alternate case for something that's been tested as `if`, so
-            // it's already counted
-            Operator::Else => 0,
-            // Entering a loop is a syntactic operation, and free.
-            Operator::Loop { .. } => 0,
-            // Closing a scope is a syntactic operation, and free.
-            Operator::End => 0,
-            // Taking a branch is an operation
-            Operator::Br { .. } => 1,
-            // brif might be two operations?
-            Operator::BrIf { .. } => 1,
-            // brtable is kind of cpu intensive compared to other wasm ops
-            Operator::BrTable { .. } => 2,
-            // nop and drop are free
-            Operator::Nop |
-            Operator::Drop => 0,
-            // everything else, just call it one operation.
-            _ => 1,
-        };
-        self.scope_costs.last_mut().map(|x| *x += op_cost);
+        // Only update or flush the counter when the scope is not sealed.
+        //
+        // Cranelift dutifully translates the entire wasm body, including dead code, and we can try
+        // to insert instrumentation for dead code, but Cranelift seals blocks at operations that
+        // involve control flow away from the current block. So we have to track when operations
+        // are unreachable and not instrument them, lest we cause a Cranelift panic trying to
+        // modify sealed basic blocks.
+        if !self.scope_tracker.unreachable() {
+            // Update the instruction counter, if necessary
+            let op_cost = match op {
+                // Opening a scope is a syntactic operation, and free.
+                Operator::Block { .. } |
+                // These do not add counts, see above comment about return/unreachable
+                Operator::Unreachable |
+                Operator::Return => 0,
+                // Call is quick
+                Operator::Call { .. } => 1,
+                // but indirect calls take some extra work to validate at runtime
+                Operator::CallIndirect { .. } => 2,
+                // Testing for an if involve some overhead, for now say it's also 1
+                Operator::If { .. } => 1,
+                // Else is a fallthrough or alternate case for something that's been tested as `if`, so
+                // it's already counted
+                Operator::Else => 0,
+                // Entering a loop is a syntactic operation, and free.
+                Operator::Loop { .. } => 0,
+                // Closing a scope is a syntactic operation, and free.
+                Operator::End => 0,
+                // Taking a branch is an operation
+                Operator::Br { .. } => 1,
+                // brif might be two operations?
+                Operator::BrIf { .. } => 1,
+                // brtable is kind of cpu intensive compared to other wasm ops
+                Operator::BrTable { .. } => 2,
+                // nop and drop are free
+                Operator::Nop |
+                Operator::Drop => 0,
+                // everything else, just call it one operation.
+                _ => 1,
+            };
+            self.scope_costs.last_mut().map(|x| *x += op_cost);
 
-        // apply flushing behavior if applicable
-        match op {
-            Operator::Unreachable
-            | Operator::Return
-            | Operator::CallIndirect { .. }
-            | Operator::Call { .. }
-            | Operator::Block { .. }
-            | Operator::Loop { .. }
-            | Operator::If { .. }
-            | Operator::Else
-            | Operator::Br { .. }
-            | Operator::BrIf { .. }
-            | Operator::BrTable { .. } => {
-                flush_counter(self, builder);
+            // apply flushing behavior if applicable
+            match op {
+                Operator::Unreachable
+                | Operator::Return
+                | Operator::CallIndirect { .. }
+                | Operator::Call { .. }
+                | Operator::Block { .. }
+                | Operator::Loop { .. }
+                | Operator::If { .. }
+                | Operator::Else
+                | Operator::Br { .. }
+                | Operator::BrIf { .. }
+                | Operator::BrTable { .. } => {
+                    flush_counter(self, builder);
+                }
+                Operator::End => {
+                    // We have to be really careful here to avoid violating a cranelift invariant:
+                    // if the next operation is `End` as well, this end will have marked the block
+                    // finished, and attempting to add instruction to update the instruction counter
+                    // will cause a panic.
+                    //
+                    // The only situation where this can occur is if the last structure in a scope is a
+                    // subscope (the body of a Loop, If, or Else), so we flush the counter entering
+                    // those structures, and guarantee the `End` for their enclosing scope will have a
+                    // counter value of 0. In other cases, we're not at risk of closing a scope leading
+                    // to closing another scope, and it's safe to flush the counter.
+                    //
+                    // An example to help:
+                    // ```
+                    // block
+                    //   i32.const 4   ; counter += 1
+                    //   i32.const -5  ; counter += 1
+                    //   i32.add       ; counter += 1
+                    //   block         ; flush counter (counter = 3 -> 0), flush here to avoid having
+                    //                 ;                                   accumulated count at the
+                    //                 ;                                   final `end`
+                    //     i32.const 4 ; counter += 1
+                    //     i32.add     ; counter += 1
+                    //   end           ; flush counter (counter = 2 -> 0)
+                    // end             ; flush counter (counter = 0 -> 0) and is a no-op
+                    // ```
+                    flush_counter(self, builder);
+                }
+                _ => { /* regular operation, do nothing */ }
             }
-            Operator::End => {
-                // We have to be really careful here to avoid violating a cranelift invariant:
-                // if the next operation is `End` as well, this end will have marked the block
-                // finished, and attempting to add instruction to update the instruction counter
-                // will cause a panic.
-                //
-                // The only situation where this can occur is if the last structure in a scope is a
-                // subscope (the body of a Loop, If, or Else), so we flush the counter entering
-                // those structures, and guarantee the `End` for their enclosing scope will have a
-                // counter value of 0. In other cases, we're not at risk of closing a scope leading
-                // to closing another scope, and it's safe to flush the counter.
-                //
-                // An example to help:
-                // ```
-                // block
-                //   i32.const 4   ; counter += 1
-                //   i32.const -5  ; counter += 1
-                //   i32.add       ; counter += 1
-                //   block         ; flush counter (counter = 3 -> 0), flush here to avoid having
-                //                 ;                                   accumulated count at the
-                //                 ;                                   final `end`
-                //     i32.const 4 ; counter += 1
-                //     i32.add     ; counter += 1
-                //   end           ; flush counter (counter = 2 -> 0)
-                // end             ; flush counter (counter = 0 -> 0) and is a no-op
-                // ```
-                flush_counter(self, builder);
-            }
-            _ => { /* regular operation, do nothing */ }
         }
 
         // finally, we might have to set up a new counter for a new scope, or fix up counts a bit
         match op {
+            Operator::Br { .. }
+            | Operator::BrTable { .. }
+            | Operator::Unreachable
+            | Operator::Return => {
+                self.scope_tracker.set_unreachable();
+            }
             Operator::CallIndirect { .. } | Operator::Call { .. } => {
                 // add 1 to count the return from the called function
                 self.scope_costs.last_mut().map(|x| *x = 1);
             }
-            Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
-                // open a new scope
+            Operator::Block { .. } | Operator::Loop { .. } => {
+                // open a new scope. it will be exactly as reachable as the current scope.
                 self.scope_costs.push(0);
+                self.scope_tracker.open_scope();
+            }
+            Operator::If { .. } => {
+                self.scope_costs.push(0);
+                self.scope_tracker.open_conditional();
+            }
+            Operator::Else => {
+                self.scope_tracker.add_alternate_branch();
             }
             Operator::End => {
                 // close the current scope
                 self.scope_costs.pop();
+                self.scope_tracker.close_scope();
             }
             _ => {}
         }
