@@ -36,7 +36,7 @@ use std::sync::{Arc, Mutex, Weak};
 /// 0x0XXX: |  .inst_count = 0x0000 |
 /// 0x1000: +-----------------------+ <-- Heap, and `lucet_vmctx`
 /// 0x1XXX: |                       |
-/// 0xXXXX: ~  .......heap.......   ~ // heap size is coverned by limits.heap_address_space_size
+/// 0xXXXX: ~  .......heap.......   ~ // heap size is governed by limits.heap_address_space_size
 /// 0xXXXX: |                       |
 /// 0xN000: +-----------------------| <-- Stack (at limits.heap_address_space_size + PAGE_SIZE)
 /// 0xNXXX: |                       |

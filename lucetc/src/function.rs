@@ -32,7 +32,7 @@ impl ScopeControlFlow {
                 false
             }
             ScopeControlFlow::Conditional(fallthrough, Some(alternate)) => {
-                // an if terminuates if the fallthrough terminates and the alternate, when present,
+                // an if terminates if the fallthrough terminates and the alternate, when present,
                 // terminates
                 !fallthrough && !alternate
             }
@@ -52,7 +52,7 @@ impl ScopeTracker {
     }
 
     // this is not exactly the same as asking if a scope terminates, because "unreachable" is
-    // implcitly asking if the currently active region is reachable (eg only one of the two
+    // implicitly asking if the currently active region is reachable (eg only one of the two
     // branches inside a conditional scope)
     pub fn unreachable(&self) -> bool {
         match self.scopes.last().unwrap() {
@@ -110,7 +110,7 @@ impl ScopeTracker {
                     // the parent scope was unreachable, we're walking through dead code anyway.
                 }
                 Some(true) => {
-                    // this is the second alternate branch added on an if? that's possible.
+                    // this is the second alternate branch added on an if? that's not possible.
                     panic!("Impossible control flow state: if with multiple else's");
                 }
             }
@@ -310,7 +310,7 @@ impl<'a> FuncInfo<'a> {
                 Operator::End => {
                     // We have to be really careful here to avoid violating a cranelift invariant:
                     // if the next operation is `End` as well, this end will have marked the block
-                    // finished, and attempting to add instruction to update the instruction counter
+                    // finished, and attempting to add instructions to update the instruction counter
                     // will cause a panic.
                     //
                     // The only situation where this can occur is if the last structure in a scope is a
