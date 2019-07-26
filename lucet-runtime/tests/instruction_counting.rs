@@ -1,10 +1,10 @@
-use lucet_runtime::{Error, Limits, DlModule, MmapRegion, Region};
+use lucet_runtime::{DlModule, Error, Limits, MmapRegion, Region};
 use lucetc::{Lucetc, LucetcOpts};
+use rayon::prelude::*;
+use std::fs::DirEntry;
 use std::path::Path;
 use std::sync::Arc;
-use std::fs::DirEntry;
 use tempfile::TempDir;
-use rayon::prelude::*;
 
 pub fn wasm_test<P: AsRef<Path>>(wasm_file: P) -> Result<Arc<DlModule>, Error> {
     let workdir = TempDir::new().expect("create working directory");
@@ -26,7 +26,10 @@ pub fn check_instruction_counts() {
         .expect("can iterate test files")
         .map(|ent| {
             let ent = ent.expect("can get test files");
-            assert!(ent.file_type().unwrap().is_file(), "directories not supported in test/instruction_counting");
+            assert!(
+                ent.file_type().unwrap().is_file(),
+                "directories not supported in test/instruction_counting"
+            );
             ent
         })
         .collect();

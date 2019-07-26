@@ -21,16 +21,16 @@ enum ScopeControlFlow {
     Linear(bool),
     // this scope has conditional control flow, `bool` is for the branch being reachable,
     // where `Option<bool>` describes reachability of the alternate branch
-    Conditional(bool, Option<bool>)
+    Conditional(bool, Option<bool>),
 }
 impl ScopeControlFlow {
     pub fn terminates(&self) -> bool {
         match self {
-            ScopeControlFlow::Linear(reachable) => { !reachable },
+            ScopeControlFlow::Linear(reachable) => !reachable,
             ScopeControlFlow::Conditional(_, None) => {
                 // this never terminates because the maybe-terminal branch can be skipped
                 false
-            },
+            }
             ScopeControlFlow::Conditional(fallthrough, Some(alternate)) => {
                 // an if terminuates if the fallthrough terminates and the alternate, when present,
                 // terminates
@@ -41,13 +41,13 @@ impl ScopeControlFlow {
 }
 
 struct ScopeTracker {
-    scopes: Vec<ScopeControlFlow>
+    scopes: Vec<ScopeControlFlow>,
 }
 
 impl ScopeTracker {
     pub fn new() -> Self {
         ScopeTracker {
-            scopes: vec![ScopeControlFlow::Linear(true)]
+            scopes: vec![ScopeControlFlow::Linear(true)],
         }
     }
 
@@ -56,9 +56,9 @@ impl ScopeTracker {
     // branches inside a conditional scope)
     pub fn unreachable(&self) -> bool {
         match self.scopes.last().unwrap() {
-            ScopeControlFlow::Linear(reachable) => { !reachable },
-            ScopeControlFlow::Conditional(reachable, None) => { !reachable },
-            ScopeControlFlow::Conditional(_, Some(reachable)) => { !reachable },
+            ScopeControlFlow::Linear(reachable) => !reachable,
+            ScopeControlFlow::Conditional(reachable, None) => !reachable,
+            ScopeControlFlow::Conditional(_, Some(reachable)) => !reachable,
         }
     }
 
@@ -84,12 +84,10 @@ impl ScopeTracker {
     }
 
     pub fn open_scope(&mut self) {
-        self.scopes.push(
-            ScopeControlFlow::Linear(
-                // the scope still has reachable code if the parent scope did not terminate
-                !self.scopes.last().unwrap().terminates()
-            )
-        )
+        self.scopes.push(ScopeControlFlow::Linear(
+            // the scope still has reachable code if the parent scope did not terminate
+            !self.scopes.last().unwrap().terminates(),
+        ))
     }
 
     pub fn open_conditional(&mut self) {
@@ -107,10 +105,10 @@ impl ScopeTracker {
             match alternate {
                 None => {
                     *alternate = Some(true);
-                },
+                }
                 Some(false) => {
                     // the parent scope was unreachable, we're walking through dead code anyway.
-                },
+                }
                 Some(true) => {
                     // this is the second alternate branch added on an if? that's possible.
                     panic!("Impossible control flow state: if with multiple else's");
