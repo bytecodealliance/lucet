@@ -176,7 +176,7 @@ impl Drop for InstanceHandle {
 /// unsafely invalidated.
 ///
 /// An instance occupies one 4096-byte page in memory, with a layout like:
-/// ```
+/// ```text
 /// 0xXXXXX000:
 ///   Instance {
 ///     .magic
@@ -596,6 +596,7 @@ impl Instance {
         }
     }
 
+    #[allow(dead_code)]
     #[inline]
     fn get_globals_ptr(&self) -> *mut i64 {
         self.get_instance_implicits().globals_ptr

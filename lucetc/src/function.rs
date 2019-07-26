@@ -246,6 +246,7 @@ impl<'a> FuncInfo<'a> {
             builder
                 .ins()
                 .store(trusted_mem, new_instr_count, addr, instr_count_offset);
+
             *environ.scope_costs.last_mut().unwrap() = 0;
         };
 

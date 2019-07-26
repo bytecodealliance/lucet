@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex, Weak};
 /// with an Instance's space reserved, followed by heap, stack, globals, and sigstack.
 ///
 /// This results in an actual layout of an instance on an `MmapRegion`-produced `Slot` being:
-/// ```
+/// ```text
 /// 0x0000: +-----------------------+ <-- Instance
 /// 0x0000: |  .magic               |
 /// 0x0008: |  ...                  |

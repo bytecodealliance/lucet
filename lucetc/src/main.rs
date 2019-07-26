@@ -92,7 +92,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     }
 
     if opts.count_instructions {
-        c.count_instructions();
+        c.count_instructions(true);
     }
 
     match opts.codegen {
