@@ -597,12 +597,12 @@ impl Instance {
     }
 
     #[inline]
-    pub fn get_globals_ptr(&self) -> *mut i64 {
+    fn get_globals_ptr(&self) -> *mut i64 {
         self.get_instance_implicits().globals_ptr
     }
 
     #[inline]
-    pub fn set_globals_ptr(&mut self, globals_ptr: *mut i64) {
+    fn set_globals_ptr(&mut self, globals_ptr: *mut i64) {
         self.get_instance_implicits_mut().globals_ptr = globals_ptr
     }
 
