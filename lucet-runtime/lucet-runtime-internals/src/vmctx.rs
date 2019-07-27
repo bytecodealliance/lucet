@@ -9,7 +9,7 @@ use crate::alloc::instance_heap_offset;
 use crate::context::Context;
 use crate::error::Error;
 use crate::instance::{
-    Instance, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE, HOST_CTX,
+    Instance, InstanceInternal, State, TerminationDetails, YieldedVal, CURRENT_INSTANCE, HOST_CTX,
 };
 use lucet_module::{FunctionHandle, GlobalValue};
 use std::any::Any;
@@ -267,6 +267,48 @@ impl Vmctx {
         self.instance()
             .module()
             .get_func_from_idx(table_idx, func_idx)
+    }
+
+    pub fn yield_(&self) {
+        let inst = unsafe { self.instance_mut() };
+        inst.state = State::Yielded {
+            val: YieldedVal::none(),
+        };
+        HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
+    }
+
+    pub fn yield_expecting_val<R: Any + 'static>(&self) -> R {
+        self.yield_();
+        self.get_expected_val()
+    }
+
+    pub fn yield_val<A: Any + 'static + Send + Sync>(&self, val: A) {
+        let inst = unsafe { self.instance_mut() };
+        inst.state = State::Yielded {
+            val: YieldedVal::some(val),
+        };
+        HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
+    }
+
+    pub fn yield_val_expecting_val<A: Any + 'static + Send + Sync, R: Any + 'static>(
+        &self,
+        val: A,
+    ) -> R {
+        self.yield_val(val);
+        self.get_expected_val()
+    }
+
+    fn get_expected_val<R: Any + 'static>(&self) -> R {
+        let inst = unsafe { self.instance_mut() };
+        if let Some(val) = inst.val_from_host.take() {
+            if let Ok(val) = val.downcast() {
+                *val
+            } else {
+                panic!(TerminationDetails::YieldTypeMismatch)
+            }
+        } else {
+            panic!(TerminationDetails::YieldTypeMismatch)
+        }
     }
 }
 

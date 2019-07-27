@@ -100,6 +100,64 @@ macro_rules! host_tests {
 
                 res
             }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_yields(
+                &mut vmctx,
+            ) -> () {
+                vmctx.yield_();
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_yield_expects_5(
+                &mut vmctx,
+            ) -> u64 {
+                vmctx.yield_expecting_val()
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_yields_5(
+                &mut vmctx,
+            ) -> () {
+                vmctx.yield_val(5u64);
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_yield_facts(
+                &mut vmctx,
+                n: u64,
+            ) -> () {
+                fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
+                    if n <= 1 {
+                        vmctx.yield_val(1u64);
+                        1
+                    } else {
+                        let n = n * fact(vmctx, n - 1);
+                        vmctx.yield_val(n);
+                        n
+                    }
+                }
+                fact(vmctx, n);
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_coop_facts(
+                &mut vmctx,
+                n: u64,
+            ) -> () {
+                fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
+                    if n <= 1 {
+                        vmctx.yield_val(1u64);
+                        1
+                    } else {
+                        let n_rec = fact(vmctx, n - 1);
+                        let n = vmctx.yield_val_expecting_val((n, n_rec));
+                        vmctx.yield_val(n);
+                        n
+                    }
+                }
+                fact(vmctx, n);
+            }
         }
 
         #[test]
@@ -294,6 +352,143 @@ macro_rules! host_tests {
 
             let retval = inst.run("f", &[]).expect("instance runs");
             assert_eq!(bool::from(retval), true);
+        }
+
+        #[test]
+        fn run_hostcall_yields_5() {
+            extern "C" {
+                fn hostcall_yields_5(vmctx: *mut lucet_vmctx);
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                hostcall_yields_5(vmctx);
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
+                assert_eq!(*val.downcast::<u64>().unwrap(), 5u64);
+            } else {
+                panic!("instance didn't yield");
+            }
+        }
+
+        #[test]
+        fn run_hostcall_yield_expects_5() {
+            extern "C" {
+                fn hostcall_yield_expects_5(vmctx: *mut lucet_vmctx) -> u64;
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                hostcall_yield_expects_5(vmctx)
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
+                assert!(val.is_none());
+            } else {
+                panic!("instance didn't yield");
+            }
+
+            let retval = inst.resume_with_val(5u64).expect("instance resumes");
+            assert_eq!(u64::from(retval), 5u64);
+        }
+
+        #[test]
+        fn yield_factorials() {
+            extern "C" {
+                fn hostcall_yield_facts(vmctx: *mut lucet_vmctx, n: u64);
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                hostcall_yield_facts(vmctx, 5);
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            let mut facts = vec![];
+
+            let mut res = inst.run("f", &[]);
+
+            while let Err(Error::InstanceYielded(val)) = res {
+                facts.push(*val.downcast::<u64>().unwrap());
+                res = inst.resume();
+            }
+
+            assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
+        }
+
+        #[test]
+        fn coop_factorials() {
+            extern "C" {
+                fn hostcall_coop_facts(vmctx: *mut lucet_vmctx, n: u64);
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                hostcall_coop_facts(vmctx, 5);
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            let mut facts = vec![];
+
+            let mut res = inst.run("f", &[]);
+
+            while let Err(Error::InstanceYielded(val)) = res {
+                if let Some((n, n_rec)) = val.downcast_ref::<(u64, u64)>() {
+                    // guest wants us to multiply for it
+                    res = inst.resume_with_val(n * n_rec);
+                } else if let Some(n) = val.downcast_ref::<u64>() {
+                    // guest is returning an answer
+                    facts.push(*n);
+                    res = inst.resume();
+                } else {
+                    panic!("didn't yield with expected type");
+                }
+            }
+
+            assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
         }
     };
 }

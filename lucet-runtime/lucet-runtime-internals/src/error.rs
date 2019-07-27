@@ -1,4 +1,4 @@
-use crate::instance::{FaultDetails, TerminationDetails};
+use crate::instance::{FaultDetails, TerminationDetails, YieldedVal};
 use failure::Fail;
 
 /// Lucet runtime errors.
@@ -44,6 +44,9 @@ pub enum Error {
     /// that returns [`SignalBehavior::Terminate`](enum.SignalBehavior.html#variant.Terminate).
     #[fail(display = "Runtime terminated")]
     RuntimeTerminated(TerminationDetails),
+
+    #[fail(display = "Instance yielded")]
+    InstanceYielded(YieldedVal),
 
     /// IO errors arising during dynamic loading with [`DlModule`](struct.DlModule.html).
     #[fail(display = "Dynamic loading error: {}", _0)]

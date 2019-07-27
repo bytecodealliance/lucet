@@ -187,7 +187,7 @@ pub struct Instance {
     module: Arc<dyn Module>,
 
     /// The `Context` in which the guest program runs
-    ctx: Context,
+    pub(crate) ctx: Context,
 
     /// Instance state and error information
     pub(crate) state: State,
@@ -215,6 +215,8 @@ pub struct Instance {
 
     /// Pointer to the function used as the entrypoint (for use in backtraces)
     entrypoint: Option<FunctionPointer>,
+
+    pub(crate) val_from_host: Option<Box<dyn Any + 'static>>,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -517,6 +519,7 @@ impl Instance {
             c_fatal_handler: None,
             signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
             entrypoint: None,
+            val_from_host: None,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
@@ -595,6 +598,30 @@ impl Instance {
             )
         })?;
 
+        self.swap_and_return()
+    }
+
+    pub fn resume(&mut self) -> Result<UntypedRetVal, Error> {
+        lucet_ensure!(
+            self.state.is_yielded(),
+            "can only resume from a call to `Vmctx::yield_*()`"
+        );
+
+        self.swap_and_return()
+    }
+
+    pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<UntypedRetVal, Error> {
+        lucet_ensure!(
+            self.state.is_yielded(),
+            "can only resume from a call to `Vmctx::yield_*()`"
+        );
+
+        self.val_from_host = Some(Box::new(val) as Box<dyn Any + 'static>);
+
+        self.swap_and_return()
+    }
+
+    fn swap_and_return(&mut self) -> Result<UntypedRetVal, Error> {
         self.state = State::Running;
 
         // there should never be another instance running on this thread when we enter this function
@@ -634,6 +661,7 @@ impl Instance {
                 Ok(retval)
             }
             State::Terminated { details, .. } => Err(Error::RuntimeTerminated(details.clone())),
+            State::Yielded { val, .. } => Err(Error::InstanceYielded(val.clone())),
             State::Fault { .. } => {
                 // Sandbox is no longer runnable. It's unsafe to determine all error details in the signal
                 // handler, so we fill in extra details here.
@@ -707,6 +735,9 @@ pub enum State {
     Terminated {
         details: TerminationDetails,
     },
+    Yielded {
+        val: YieldedVal,
+    },
 }
 
 /// Information about a runtime fault.
@@ -772,6 +803,7 @@ pub enum TerminationDetails {
     Signal,
     /// Returned when `get_embed_ctx` or `get_embed_ctx_mut` are used with a type that is not present.
     CtxNotFound,
+    YieldTypeMismatch,
     /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
     BorrowError(&'static str),
     /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
@@ -823,6 +855,7 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::Signal => write!(f, "Signal"),
             TerminationDetails::BorrowError(msg) => write!(f, "BorrowError({})", msg),
             TerminationDetails::CtxNotFound => write!(f, "CtxNotFound"),
+            TerminationDetails::YieldTypeMismatch => write!(f, "YieldTypeMismatch"),
             TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
         }
     }
@@ -830,6 +863,56 @@ impl std::fmt::Debug for TerminationDetails {
 
 unsafe impl Send for TerminationDetails {}
 unsafe impl Sync for TerminationDetails {}
+
+#[derive(Clone)]
+pub struct YieldedVal {
+    val: Option<Arc<dyn Any + 'static + Send + Sync>>,
+}
+
+impl std::fmt::Debug for YieldedVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.val.is_none() {
+            write!(f, "YieldedVal {{ val: None }}")
+        } else {
+            write!(f, "YieldedVal {{ val: Some }}")
+        }
+    }
+}
+
+impl YieldedVal {
+    pub(crate) fn some<A: Any + 'static + Send + Sync>(val: A) -> Self {
+        YieldedVal {
+            val: Some(Arc::new(val)),
+        }
+    }
+
+    pub(crate) fn none() -> Self {
+        YieldedVal { val: None }
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.val.is_none()
+    }
+
+    pub fn is_some(&self) -> bool {
+        self.val.is_some()
+    }
+
+    pub fn downcast<A: Any + 'static + Send + Sync>(self) -> Result<Arc<A>, YieldedVal> {
+        if let Some(val) = self.val {
+            match val.downcast() {
+                Ok(val) => Ok(val),
+                Err(val) => Err(YieldedVal { val: Some(val) }),
+            }
+        } else {
+            Err(self)
+        }
+    }
+
+    pub fn downcast_ref<A: Any + 'static + Send + Sync>(&self) -> Option<&A> {
+        self.val.as_ref().and_then(|val| val.downcast_ref())
+    }
+}
 
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -860,6 +943,7 @@ impl std::fmt::Display for State {
                 Ok(())
             }
             State::Terminated { .. } => write!(f, "terminated"),
+            State::Yielded { .. } => write!(f, "yielded"),
         }
     }
 }
@@ -903,6 +987,14 @@ impl State {
 
     pub fn is_terminated(&self) -> bool {
         if let State::Terminated { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_yielded(&self) -> bool {
+        if let State::Yielded { .. } = self {
             true
         } else {
             false

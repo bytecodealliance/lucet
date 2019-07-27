@@ -75,6 +75,7 @@ pub enum lucet_error {
     FuncNotFound,
     RuntimeFault,
     RuntimeTerminated,
+    InstanceYielded,
     Dl,
     Internal,
     Unsupported,
@@ -92,6 +93,7 @@ impl From<Error> for lucet_error {
             Error::FuncNotFound(_, _) => lucet_error::FuncNotFound,
             Error::RuntimeFault(_) => lucet_error::RuntimeFault,
             Error::RuntimeTerminated(_) => lucet_error::RuntimeTerminated,
+            Error::InstanceYielded(_) => lucet_error::InstanceYielded,
             Error::DlError(_) => lucet_error::Dl,
             Error::InternalError(_) => lucet_error::Internal,
             Error::Unsupported(_) => lucet_error::Unsupported,
@@ -205,8 +207,15 @@ pub struct CTerminationDetails {
 unsafe impl Send for CTerminationDetails {}
 unsafe impl Sync for CTerminationDetails {}
 
+pub struct CYieldedVal {
+    pub val: *mut c_void,
+}
+
+unsafe impl Send for CYieldedVal {}
+unsafe impl Sync for CYieldedVal {}
+
 pub mod lucet_state {
-    use crate::c_api::{lucet_val, CTerminationDetails};
+    use crate::c_api::{lucet_val, CTerminationDetails, CYieldedVal};
     use crate::instance::{State, TerminationDetails};
     use crate::module::{AddrDetails, TrapCode};
     use crate::sysdeps::UContext;
@@ -257,6 +266,10 @@ pub mod lucet_state {
                                 reason: lucet_terminated_reason::CtxNotFound,
                                 provided: std::ptr::null_mut(),
                             },
+                            TerminationDetails::YieldTypeMismatch => lucet_terminated {
+                                reason: lucet_terminated_reason::YieldTypeMismatch,
+                                provided: std::ptr::null_mut(),
+                            },
                             TerminationDetails::BorrowError(_) => lucet_terminated {
                                 reason: lucet_terminated_reason::BorrowError,
                                 provided: std::ptr::null_mut(),
@@ -268,6 +281,17 @@ pub mod lucet_state {
                                     .map(|CTerminationDetails { details }| *details)
                                     .unwrap_or(std::ptr::null_mut()),
                             },
+                        },
+                    },
+                },
+                State::Yielded { val, .. } => lucet_state {
+                    tag: lucet_state_tag::Yielded,
+                    val: lucet_state_val {
+                        yielded: lucet_yielded {
+                            val: val
+                                .downcast_ref()
+                                .map(|CYieldedVal { val }| *val)
+                                .unwrap_or(std::ptr::null_mut()),
                         },
                     },
                 },
@@ -289,6 +313,7 @@ pub mod lucet_state {
         Running,
         Fault,
         Terminated,
+        Yielded,
     }
 
     #[repr(C)]
@@ -299,6 +324,7 @@ pub mod lucet_state {
         pub running: bool,
         pub fault: lucet_runtime_fault,
         pub terminated: lucet_terminated,
+        pub yielded: lucet_yielded,
     }
 
     #[repr(C)]
@@ -313,8 +339,15 @@ pub mod lucet_state {
     pub enum lucet_terminated_reason {
         Signal,
         CtxNotFound,
+        YieldTypeMismatch,
         BorrowError,
         Provided,
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct lucet_yielded {
+        pub val: *mut c_void,
     }
 
     #[repr(C)]

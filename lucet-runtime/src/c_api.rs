@@ -45,6 +45,7 @@ pub extern "C" fn lucet_error_name(e: c_int) -> *const c_char {
             FuncNotFound => "lucet_error_func_not_found\0".as_ptr() as _,
             RuntimeFault => "lucet_error_runtime_fault\0".as_ptr() as _,
             RuntimeTerminated => "lucet_error_runtime_terminated\0".as_ptr() as _,
+            InstanceYielded => "lucet_error_instance_yielded\0".as_ptr() as _,
             Dl => "lucet_error_dl\0".as_ptr() as _,
             Internal => "lucet_error_internal\0".as_ptr() as _,
             Unsupported => "lucet_error_unsupported\0".as_ptr() as _,
@@ -63,6 +64,7 @@ pub extern "C" fn lucet_state_tag_name(tag: libc::c_int) -> *const c_char {
             Running => "lucet_state_tag_running\0".as_ptr() as _,
             Fault => "lucet_state_tag_fault\0".as_ptr() as _,
             Terminated => "lucet_state_tag_terminated\0".as_ptr() as _,
+            Yielded => "lucet_state_tag_yielded\0".as_ptr() as _,
         }
     } else {
         "!!! unknown lucet_state_tag variant!\0".as_ptr() as _
@@ -430,7 +432,7 @@ lucet_hostcalls! {
         &mut _vmctx,
         details: *mut c_void,
     ) -> () {
-        lucet_hostcall_terminate!(CTerminationDetails { details});
+        lucet_hostcall_terminate!(CTerminationDetails { details });
     }
 
     #[no_mangle]
