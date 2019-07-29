@@ -232,9 +232,20 @@ impl<'a> FuncInfo<'a> {
                 }
                 _ => { /* regular operation, do nothing */ }
             }
+        } else {
+            // just a consistency check - the counter must be 0 when exiting a region of
+            // unreachable code. If this assertion fails it means we either counted instructions
+            // we shouldn't (because they're unreachable), or we didn't flush the counter before
+            // starting to also instrument unreachable instructions (and would have tried to
+            // overcount)
+            assert_eq!(*self.scope_costs.last().unwrap(), 0);
         }
 
-        // finally, we might have to set up a new counter for a new scope, or fix up counts a bit
+        // finally, we might have to set up a new counter for a new scope, or fix up counts a bit.
+        //
+        // Note that nothing is required for `Else`, because it will have been preceded by an `End`
+        // to close the "then" arm of its enclosing `If`, so the counter will have already been
+        // flushed and reset to 0.
         match op {
             Operator::CallIndirect { .. } | Operator::Call { .. } => {
                 // add 1 to count the return from the called function
