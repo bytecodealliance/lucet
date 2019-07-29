@@ -1,5 +1,3 @@
-use crate::datatypes::{AbiType, AtomType};
-
 use cranelift_entity::{entity_impl, PrimaryMap};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -7,8 +5,8 @@ pub struct ModuleIx(u32);
 entity_impl!(ModuleIx);
 
 #[derive(Debug, Clone)]
-struct PackageRepr {
-    pub names: Vec<String>,
+pub struct PackageRepr {
+    pub names: PrimaryMap<ModuleIx, String>,
     pub modules: PrimaryMap<ModuleIx, ModuleRepr>,
 }
 
@@ -16,8 +14,17 @@ struct PackageRepr {
 pub struct DatatypeIx(u32);
 entity_impl!(DatatypeIx);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatatypeIdent(ModuleIx, DatatypeIx);
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct DatatypeIdent {
+    pub module: ModuleIx,
+    pub datatype: DatatypeIx,
+}
+
+impl DatatypeIdent {
+    pub fn new(module: ModuleIx, datatype: DatatypeIx) -> Self {
+        DatatypeIdent { module, datatype }
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FuncIx(u32);
@@ -28,37 +35,108 @@ pub struct FuncIdent(ModuleIx, FuncIx);
 
 #[derive(Debug, Clone)]
 pub struct ModuleRepr {
-    pub datatype_names: Vec<String>,
+    pub datatypes: ModuleDatatypesRepr,
+    pub funcs: ModuleFuncsRepr,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModuleDatatypesRepr {
+    pub names: PrimaryMap<DatatypeIx, String>,
     pub datatypes: PrimaryMap<DatatypeIx, DatatypeRepr>,
-    pub func_names: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModuleFuncsRepr {
+    pub names: PrimaryMap<FuncIx, String>,
     pub funcs: PrimaryMap<FuncIx, FuncRepr>,
 }
 
 #[derive(Debug, Clone)]
 pub struct DatatypeRepr {
-    pub variant: DatatypeVariant,
+    pub variant: DatatypeVariantRepr,
     pub repr_size: usize,
     pub align: usize,
 }
 
 #[derive(Debug, Clone)]
-pub enum DatatypeVariant {
+pub enum DatatypeVariantRepr {
     Atom(AtomType),
-    Struct(StructDatatype),
-    Enum(EnumDatatype),
-    Alias(AliasDatatype),
+    Struct(StructDatatypeRepr),
+    Enum(EnumDatatypeRepr),
+    Alias(AliasDatatypeRepr),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum AtomType {
+    Bool,
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum AbiType {
+    I32,
+    I64,
+    F32,
+    F64,
+}
+
+impl AbiType {
+    pub fn from_atom(a: &AtomType) -> Self {
+        match a {
+            AtomType::Bool
+            | AtomType::U8
+            | AtomType::I8
+            | AtomType::U16
+            | AtomType::I16
+            | AtomType::U32
+            | AtomType::I32 => AbiType::I32,
+            AtomType::I64 | AtomType::U64 => AbiType::I64,
+            AtomType::F32 => AbiType::F32,
+            AtomType::F64 => AbiType::F64,
+        }
+    }
+
+    pub fn of_atom(a: AtomType) -> Option<Self> {
+        match a {
+            AtomType::I32 => Some(AbiType::I32),
+            AtomType::I64 => Some(AbiType::I64),
+            AtomType::F32 => Some(AbiType::F32),
+            AtomType::F64 => Some(AbiType::F64),
+            _ => None,
+        }
+    }
+}
+
+impl From<AbiType> for AtomType {
+    fn from(abi: AbiType) -> AtomType {
+        match abi {
+            AbiType::I32 => AtomType::I32,
+            AbiType::I64 => AtomType::I64,
+            AbiType::F32 => AtomType::F32,
+            AbiType::F64 => AtomType::F64,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct StructMember {
+pub struct StructMemberRepr {
     pub type_: DatatypeIdent,
     pub name: String,
     pub offset: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct StructDatatype {
-    pub members: Vec<StructMember>,
+pub struct StructDatatypeRepr {
+    pub members: Vec<StructMemberRepr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -67,12 +145,12 @@ pub struct EnumMember {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct EnumDatatype {
+pub struct EnumDatatypeRepr {
     pub members: Vec<EnumMember>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct AliasDatatype {
+pub struct AliasDatatypeRepr {
     pub to: DatatypeIdent,
 }
 

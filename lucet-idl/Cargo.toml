@@ -23,6 +23,7 @@ xfailure = "0.1"
 heck = "0.3"
 lucetc = { path = "../lucetc" }
 lucet-module = { path = "../lucet-module" }
+cranelift-entity = { path = "../cranelift/cranelift-entity" }
 
 [dev-dependencies]
 tempfile = "3.0"
