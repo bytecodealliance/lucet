@@ -451,6 +451,14 @@ unsafe fn setup_guest_signal_state(ostate: &mut Option<SignalState>) {
     });
 }
 
+#[no_mangle]
+extern "C" fn win() {
+    use std::io::Write;
+    // ... wonder what happens if we try to call this stuff while panicked?
+    std::io::stdout().write_all(b"thank you libunwind! but our princess is in another castle!");
+    std::io::stdout().flush();
+}
+
 fn setup_guest_panic_hook() -> Arc<Box<dyn Fn(&panic::PanicInfo<'_>) + Sync + Send + 'static>> {
     let saved_panic_hook = Arc::new(panic::take_hook());
     let closure_saved_panic_hook = saved_panic_hook.clone();
