@@ -148,8 +148,8 @@
 //! | [`yield_expecting_val`](vmctx/struct.Vmctx.html#method.yield_)     | ❌            | ✅              |
 //! | [`yield_val_expecting_val`](vmctx/struct.Vmctx.html#method.yield_) | ✅             | ✅              |
 //!
-//! The host is free to ignore values yielded by guests, but a yielded instance must be resumed with
-//! a value of the correct type using
+//! The host is free to ignore values yielded by guests, but a yielded instance may only be resumed
+//! with a value of the correct type using
 //! [`Instance::resume_with_val()`](struct.Instance.html#method.resume_with_val), if one is
 //! expected. Otherwise, the instance will terminate.
 //!
@@ -157,10 +157,10 @@
 //!
 //! In this example, we use yielding and resuming to offload multiplication to the host context, and
 //! to incrementally return results to the host. While certainly overkill for computing a factorial
-//! function, this structure mirrors that of many asynchronous I/O interfaces.
+//! function, this structure mirrors that of many asynchronous workflows.
 //!
 //! Since the focus of this example is on the behavior of hostcalls that yield, our Lucet guest
-//! program just calls a hostcall:
+//! program just invokes a hostcall:
 //!
 //! ```no_run
 //! // factorials_guest.rs

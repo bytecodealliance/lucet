@@ -78,10 +78,12 @@ impl VmctxInternal for Vmctx {
     fn try_take_resumed_val<R: Any + 'static + Send>(&self) -> Option<R> {
         let inst = unsafe { self.instance_mut() };
         if let Some(val) = inst.resumed_val.take() {
-            if let Ok(val) = val.downcast() {
-                Some(*val)
-            } else {
-                None
+            match val.downcast() {
+                Ok(val) => Some(*val),
+                Err(val) => {
+                    inst.resumed_val = Some(val);
+                    None
+                }
             }
         } else {
             None
