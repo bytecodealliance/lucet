@@ -139,7 +139,14 @@ macro_rules! host_tests {
                 }
                 fact(vmctx, n);
             }
+        }
 
+        pub enum CoopFactsK {
+            Mult(u64, u64),
+            Result(u64),
+        }
+
+        lucet_hostcalls! {
             #[no_mangle]
             pub unsafe extern "C" fn hostcall_coop_facts(
                 &mut vmctx,
@@ -147,12 +154,12 @@ macro_rules! host_tests {
             ) -> () {
                 fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
                     if n <= 1 {
-                        vmctx.yield_val(1u64);
+                        vmctx.yield_val(CoopFactsK::Result(1));
                         1
                     } else {
                         let n_rec = fact(vmctx, n - 1);
-                        let n = vmctx.yield_val_expecting_val((n, n_rec));
-                        vmctx.yield_val(n);
+                        let n = vmctx.yield_val_expecting_val(CoopFactsK::Mult(n, n_rec));
+                        vmctx.yield_val(CoopFactsK::Result(n));
                         n
                     }
                 }
@@ -476,13 +483,18 @@ macro_rules! host_tests {
             let mut res = inst.run("f", &[]);
 
             while let Err(Error::InstanceYielded(val)) = res {
-                if let Some((n, n_rec)) = val.downcast_ref::<(u64, u64)>() {
-                    // guest wants us to multiply for it
-                    res = inst.resume_with_val(n * n_rec);
-                } else if let Some(n) = val.downcast_ref::<u64>() {
-                    // guest is returning an answer
-                    facts.push(*n);
-                    res = inst.resume();
+                if let Some(k) = val.downcast_ref::<CoopFactsK>() {
+                    match k {
+                        CoopFactsK::Mult(n, n_rec) => {
+                            // guest wants us to multiply for it
+                            res = inst.resume_with_val(n * n_rec);
+                        }
+                        CoopFactsK::Result(n) => {
+                            // guest is returning an answer
+                            facts.push(*n);
+                            res = inst.resume();
+                        }
+                    }
                 } else {
                     panic!("didn't yield with expected type");
                 }
