@@ -7,7 +7,6 @@ use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 use failure::Fail;
 use nix;
 use nix::sys::signal;
-use std::any::Any;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::mem;
 use std::ptr::NonNull;
@@ -116,7 +115,6 @@ pub struct Context {
     retvals_gp: [u64; 2],
     retval_fp: __m128,
     sigset: signal::SigSet,
-    yielded: Option<Box<dyn Any>>,
 }
 
 impl Context {
@@ -128,7 +126,6 @@ impl Context {
             retvals_gp: [0; 2],
             retval_fp: unsafe { _mm_setzero_ps() },
             sigset: signal::SigSet::empty(),
-            yielded: None,
         }
     }
 }
@@ -449,11 +446,6 @@ impl Context {
     #[inline]
     pub unsafe fn swap(from: &mut Context, to: &Context) {
         lucet_context_swap(from as *mut Context, to as *const Context);
-    }
-
-    pub unsafe fn swap_yield<A: Any>(from: &mut Context, to: &Context, val: A) {
-        from.yielded = Some(Box::new(val));
-        Context::swap(from, to);
     }
 
     /// Swap to another context without saving the current context.
