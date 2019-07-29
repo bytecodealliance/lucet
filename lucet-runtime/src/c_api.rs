@@ -211,6 +211,24 @@ pub unsafe extern "C" fn lucet_instance_run_func_idx(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn lucet_instance_resume(
+    inst: *const lucet_instance,
+    val: *mut c_void,
+) -> lucet_error {
+    with_instance_ptr!(inst, {
+        if val.is_null() {
+            inst.resume()
+                .map(|_| lucet_error::Ok)
+                .unwrap_or_else(|e| e.into())
+        } else {
+            inst.resume_with_val(CYieldedVal { val })
+                .map(|_| lucet_error::Ok)
+                .unwrap_or_else(|e| e.into())
+        }
+    })
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn lucet_instance_state(
     inst: *const lucet_instance,
     state_out: *mut lucet_state::lucet_state,
@@ -447,18 +465,41 @@ lucet_hostcalls! {
             .map(|r| r.map(|p| *p).unwrap_or(ptr::null_mut()))
             .unwrap_or(std::ptr::null_mut())
     }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn lucet_vmctx_yield(
+        &mut vmctx,
+        val: *mut c_void,
+    ) -> *mut c_void {
+        // only yield a value if val is non-NULL
+        if val.is_null() {
+            vmctx.yield_();
+        } else {
+            vmctx.yield_val(CYieldedVal { val });
+        }
+
+        // return any `CYieldedVal` pointer that comes back, otherwise NULL
+        if let Some(CYieldedVal { val }) = vmctx.try_take_yielded_val() {
+            val
+        } else {
+            std::ptr::null_mut()
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::lucet_dl_module;
     use crate::DlModule;
-    use lucet_wasi_sdk::{LinkOpt, LinkOpts, Lucetc};
+    use lucet_module::bindings::Bindings;
+    use lucet_wasi_sdk::{CompileOpts, LinkOpt, LinkOpts, Lucetc};
+    use lucetc::LucetcOpts;
     use std::sync::Arc;
     use tempfile::TempDir;
 
     extern "C" {
         fn lucet_runtime_test_expand_heap(module: *mut lucet_dl_module) -> bool;
+        fn lucet_runtime_test_yield_resume(module: *mut lucet_dl_module) -> bool;
     }
 
     #[test]
@@ -466,8 +507,10 @@ mod tests {
         let workdir = TempDir::new().expect("create working directory");
 
         let native_build = Lucetc::new(&["tests/guests/null.c"])
+            .with_cflag("-nostartfiles")
             .with_link_opt(LinkOpt::NoDefaultEntryPoint)
-            .with_link_opt(LinkOpt::AllowUndefinedAll);
+            .with_link_opt(LinkOpt::AllowUndefinedAll)
+            .with_link_opt(LinkOpt::ExportAll);
 
         let so_file = workdir.path().join("null.so");
 
@@ -477,6 +520,30 @@ mod tests {
 
         unsafe {
             assert!(lucet_runtime_test_expand_heap(
+                Arc::into_raw(dlmodule) as *mut lucet_dl_module
+            ));
+        }
+    }
+
+    #[test]
+    fn yield_resume() {
+        let workdir = TempDir::new().expect("create working directory");
+
+        let native_build = Lucetc::new(&["tests/guests/yield_resume.c"])
+            .with_cflag("-nostartfiles")
+            .with_link_opt(LinkOpt::NoDefaultEntryPoint)
+            .with_link_opt(LinkOpt::AllowUndefinedAll)
+            .with_link_opt(LinkOpt::ExportAll)
+            .with_bindings(Bindings::from_file("tests/guests/yield_resume_bindings.json").unwrap());
+
+        let so_file = workdir.path().join("yield_resume.so");
+
+        native_build.build(so_file.clone()).unwrap();
+
+        let dlmodule = DlModule::load(so_file).unwrap();
+
+        unsafe {
+            assert!(lucet_runtime_test_yield_resume(
                 Arc::into_raw(dlmodule) as *mut lucet_dl_module
             ));
         }

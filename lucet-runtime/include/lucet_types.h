@@ -44,6 +44,7 @@ enum lucet_state_tag {
     lucet_state_tag_running,
     lucet_state_tag_fault,
     lucet_state_tag_terminated,
+    lucet_state_tag_yielded,
 };
 
 enum lucet_terminated_reason {

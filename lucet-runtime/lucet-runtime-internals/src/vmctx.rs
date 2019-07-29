@@ -58,6 +58,8 @@ pub trait VmctxInternal {
     /// you could not use orthogonal `&mut` refs that come from `Vmctx`, like the heap or
     /// terminating the instance.
     unsafe fn instance_mut(&self) -> &mut Instance;
+
+    fn try_take_yielded_val<R: Any + 'static + Send>(&self) -> Option<R>;
 }
 
 impl VmctxInternal for Vmctx {
@@ -67,6 +69,19 @@ impl VmctxInternal for Vmctx {
 
     unsafe fn instance_mut(&self) -> &mut Instance {
         instance_from_vmctx(self.vmctx)
+    }
+
+    fn try_take_yielded_val<R: Any + 'static + Send>(&self) -> Option<R> {
+        let inst = unsafe { self.instance_mut() };
+        if let Some(val) = inst.val_from_host.take() {
+            if let Ok(val) = val.downcast() {
+                Some(*val)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -277,9 +292,9 @@ impl Vmctx {
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
     }
 
-    pub fn yield_expecting_val<R: Any + 'static>(&self) -> R {
+    pub fn yield_expecting_val<R: Any + 'static + Send>(&self) -> R {
         self.yield_();
-        self.get_expected_val()
+        self.take_yielded_val()
     }
 
     pub fn yield_val<A: Any + 'static + Send + Sync>(&self, val: A) {
@@ -290,25 +305,17 @@ impl Vmctx {
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
     }
 
-    pub fn yield_val_expecting_val<A: Any + 'static + Send + Sync, R: Any + 'static>(
+    pub fn yield_val_expecting_val<A: Any + 'static + Send + Sync, R: Any + 'static + Send>(
         &self,
         val: A,
     ) -> R {
         self.yield_val(val);
-        self.get_expected_val()
+        self.take_yielded_val()
     }
 
-    fn get_expected_val<R: Any + 'static>(&self) -> R {
-        let inst = unsafe { self.instance_mut() };
-        if let Some(val) = inst.val_from_host.take() {
-            if let Ok(val) = val.downcast() {
-                *val
-            } else {
-                panic!(TerminationDetails::YieldTypeMismatch)
-            }
-        } else {
-            panic!(TerminationDetails::YieldTypeMismatch)
-        }
+    fn take_yielded_val<R: Any + 'static + Send>(&self) -> R {
+        self.try_take_yielded_val()
+            .unwrap_or_else(|| panic!(TerminationDetails::YieldTypeMismatch))
     }
 }
 

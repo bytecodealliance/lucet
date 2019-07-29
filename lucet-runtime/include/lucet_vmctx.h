@@ -26,6 +26,8 @@ void *lucet_vmctx_get_delegate(struct lucet_vmctx const *);
 
 void lucet_vmctx_terminate(struct lucet_vmctx const *, void *info);
 
+void *lucet_vmctx_yield(struct lucet_vmctx const *, void *val);
+
 // returns the current number of wasm pages
 uint32_t lucet_vmctx_current_memory(struct lucet_vmctx const *);
 
