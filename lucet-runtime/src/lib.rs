@@ -133,6 +133,133 @@
 //! unsafe { Box::from_raw(foreign_ctx) };
 //! ```
 //!
+//! ## Yielding and Resuming
+//!
+//! Lucet hostcalls can use the `vmctx` argument to yield, suspending themselves and optionally
+//! returning a value back to the host context. A yielded instance can then be resumed by the host,
+//! and execution will continue from the point of the yield.
+//!
+//! Four yield methods are available for hostcall implementors:
+//!
+//! |                                                                    | Yields value? | Expects value? |
+//! |--------------------------------------------------------------------|---------------|----------------|
+//! | [`yield_`](vmctx/struct.Vmctx.html#method.yield_)                  | ❌            | ❌             |
+//! | [`yield_val`](vmctx/struct.Vmctx.html#method.yield_)               | ✅             | ❌             |
+//! | [`yield_expecting_val`](vmctx/struct.Vmctx.html#method.yield_)     | ❌            | ✅              |
+//! | [`yield_val_expecting_val`](vmctx/struct.Vmctx.html#method.yield_) | ✅             | ✅              |
+//!
+//! The host is free to ignore values yielded by guests, but a yielded instance must be resumed with
+//! a value of the correct type using
+//! [`Instance::resume_with_val()`](struct.Instance.html#method.resume_with_val), if one is
+//! expected. Otherwise, the instance will terminate.
+//!
+//! ### Factorial example
+//!
+//! In this example, we use yielding and resuming to offload multiplication to the host context, and
+//! to incrementally return results to the host. While certainly overkill for computing a factorial
+//! function, this structure mirrors that of many asynchronous I/O interfaces.
+//!
+//! Since the focus of this example is on the behavior of hostcalls that yield, our Lucet guest
+//! program just calls a hostcall:
+//!
+//! ```no_run
+//! // factorials_guest.rs
+//! extern "C" {
+//!     fn hostcall_factorials(n: u64);
+//! }
+//!
+//! #[no_mangle]
+//! pub extern "C" fn run() {
+//!     unsafe {
+//!         hostcall_factorials(5);
+//!     }
+//! }
+//! ```
+//!
+//! In our hostcall, there are two changes from a standard recursive implementation of factorial.
+//!
+//! - Instead of performing the `n * fact(n - 1)` multiplication ourselves, we yield the operands
+//! and expect the product when resumed.
+//!
+//! - Whenever we have an intermediate answer, we yield it.
+//!
+//! To implement this, we introduce a new `enum` type to represent what we want the host to do next,
+//! and yield it when appropriate.
+//!
+//! ```no_run
+//! use lucet_runtime::lucet_hostcalls;
+//! use lucet_runtime::vmctx::Vmctx;
+//!
+//! pub enum FactorialsK {
+//!     Mult(u64, u64),
+//!     Result(u64),
+//! }
+//!
+//! lucet_hostcalls! {
+//!     #[no_mangle]
+//!     pub unsafe extern "C" fn hostcall_factorials(
+//!         &mut vmctx,
+//!         n: u64,
+//!     ) -> () {
+//!         fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
+//!             if n <= 1 {
+//!                 // yield an answer
+//!                 vmctx.yield_val(FactorialsK::Result(1));
+//!                 1
+//!             } else {
+//!                 let n_rec = fact(vmctx, n - 1);
+//!                 // yield a request for the host to perform multiplication
+//!                 let n = vmctx.yield_val_expecting_val(FactorialsK::Mult(n, n_rec));
+//!                 // yield an answer
+//!                 vmctx.yield_val(FactorialsK::Result(n));
+//!                 n
+//!             }
+//!         }
+//!         fact(vmctx, n);
+//!     }
+//! }
+//! ```
+//!
+//! The host side of the code, then, is an interpreter that repeatedly checks the yielded value and
+//! performs the appropriate operation. The hostcall returns normally when it is finished, so we
+//! exit the loop when the run/resume result is `Ok`.
+//!
+//! ```no_run
+//! # pub enum FactorialsK {
+//! #     Mult(u64, u64),
+//! #     Result(u64),
+//! # }
+//! use lucet_runtime::{DlModule, Error, Limits, MmapRegion, Region};
+//!
+//! let module = DlModule::load("factorials_guest.so").unwrap();
+//! let region = MmapRegion::create(1, &Limits::default()).unwrap();
+//! let mut inst = region.new_instance(module).unwrap();
+//!
+//! let mut factorials = vec![];
+//!
+//! let mut res = inst.run("run", &[]);
+//!
+//! while let Err(Error::InstanceYielded(val)) = res {
+//!     if let Some(k) = val.downcast_ref::<FactorialsK>() {
+//!         match k {
+//!             FactorialsK::Mult(n, n_rec) => {
+//!                 // guest wants us to multiply for it
+//!                 res = inst.resume_with_val(n * n_rec);
+//!             }
+//!             FactorialsK::Result(n) => {
+//!                 // guest is returning an answer
+//!                 factorials.push(*n);
+//!                 res = inst.resume();
+//!             }
+//!         }
+//!     } else {
+//!         panic!("didn't yield with expected type");
+//!     }
+//! }
+//!
+//! assert_eq!(factorials.as_slice(), &[1, 2, 6, 24, 120]);
+//! ```
+//!
 //! ## Custom Signal Handlers
 //!
 //! Since Lucet programs are run as native machine code, signals such as `SIGSEGV` and `SIGFPE` can
@@ -206,7 +333,7 @@ pub use lucet_module::{PublicKey, TrapCode};
 pub use lucet_runtime_internals::alloc::Limits;
 pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::{
-    FaultDetails, Instance, InstanceHandle, SignalBehavior, TerminationDetails,
+    FaultDetails, Instance, InstanceHandle, SignalBehavior, TerminationDetails, YieldedVal,
 };
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;

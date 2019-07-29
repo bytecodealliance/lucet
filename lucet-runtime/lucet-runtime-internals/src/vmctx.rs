@@ -59,7 +59,11 @@ pub trait VmctxInternal {
     /// terminating the instance.
     unsafe fn instance_mut(&self) -> &mut Instance;
 
-    fn try_take_yielded_val<R: Any + 'static + Send>(&self) -> Option<R>;
+    /// Try to take and return the value passed to `Instance::resume_with_val()`.
+    ///
+    /// If there is no resumed value, or if the dynamic type check of the value fails, this returns
+    /// `None`.
+    fn try_take_resumed_val<R: Any + 'static + Send>(&self) -> Option<R>;
 }
 
 impl VmctxInternal for Vmctx {
@@ -71,9 +75,9 @@ impl VmctxInternal for Vmctx {
         instance_from_vmctx(self.vmctx)
     }
 
-    fn try_take_yielded_val<R: Any + 'static + Send>(&self) -> Option<R> {
+    fn try_take_resumed_val<R: Any + 'static + Send>(&self) -> Option<R> {
         let inst = unsafe { self.instance_mut() };
-        if let Some(val) = inst.val_from_host.take() {
+        if let Some(val) = inst.resumed_val.take() {
             if let Ok(val) = val.downcast() {
                 Some(*val)
             } else {
@@ -284,6 +288,13 @@ impl Vmctx {
             .get_func_from_idx(table_idx, func_idx)
     }
 
+    /// Suspend the instance, returning an empty `Error::InstanceYielded` to where the instance was
+    /// run or resumed.
+    ///
+    /// After suspending, the instance may be resumed by the host using
+    /// [`Instance::resume()`](../struct.Instance.html#method.resume) or
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val), although
+    /// the value passed in the latter case will be ignored.
     pub fn yield_(&self) {
         let inst = unsafe { self.instance_mut() };
         inst.state = State::Yielded {
@@ -292,11 +303,26 @@ impl Vmctx {
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
     }
 
+    /// Suspend the instance, returning an empty `Error::InstanceYielded` to where the instance was
+    /// run or resumed.
+    ///
+    /// After suspending, the instance may be resumed by the host
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val). The type of
+    /// the value passed when resuming must match the return type of this function. If the types do
+    /// not match, or if [`Instance::resume()`](../struct.Instance.html#method.resume) is used
+    /// instead, the instance will terminate.
     pub fn yield_expecting_val<R: Any + 'static + Send>(&self) -> R {
         self.yield_();
-        self.take_yielded_val()
+        self.take_resumed_val()
     }
 
+    /// Suspend the instance, returning a value in `Error::InstanceYielded` to where the instance
+    /// was run or resumed.
+    ///
+    /// After suspending, the instance may be resumed by the host using
+    /// [`Instance::resume()`](../struct.Instance.html#method.resume) or
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val), although
+    /// the value passed in the latter case will be ignored.
     pub fn yield_val<A: Any + 'static + Send + Sync>(&self, val: A) {
         let inst = unsafe { self.instance_mut() };
         inst.state = State::Yielded {
@@ -305,16 +331,27 @@ impl Vmctx {
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
     }
 
+    /// Suspend the instance, returning a value in `Error::InstanceYielded` to where the instance
+    /// was run or resumed.
+    ///
+    /// After suspending, the instance may be resumed by the host
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val). The type of
+    /// the value passed when resuming must match the return type of this function. If the types do
+    /// not match, or if [`Instance::resume()`](../struct.Instance.html#method.resume) is used
+    /// instead, the instance will terminate.
     pub fn yield_val_expecting_val<A: Any + 'static + Send + Sync, R: Any + 'static + Send>(
         &self,
         val: A,
     ) -> R {
         self.yield_val(val);
-        self.take_yielded_val()
+        self.take_resumed_val()
     }
 
-    fn take_yielded_val<R: Any + 'static + Send>(&self) -> R {
-        self.try_take_yielded_val()
+    /// Take and return the value passed to
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val), terminating
+    /// the instance if there is no value present, or the dynamic type check of the value fails.
+    fn take_resumed_val<R: Any + 'static + Send>(&self) -> R {
+        self.try_take_resumed_val()
             .unwrap_or_else(|| panic!(TerminationDetails::YieldTypeMismatch))
     }
 }

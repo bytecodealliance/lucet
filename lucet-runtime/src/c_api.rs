@@ -479,7 +479,7 @@ lucet_hostcalls! {
         }
 
         // return any `CYieldedVal` pointer that comes back, otherwise NULL
-        if let Some(CYieldedVal { val }) = vmctx.try_take_yielded_val() {
+        if let Some(CYieldedVal { val }) = vmctx.try_take_resumed_val() {
             val
         } else {
             std::ptr::null_mut()

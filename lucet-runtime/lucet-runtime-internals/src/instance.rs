@@ -216,7 +216,8 @@ pub struct Instance {
     /// Pointer to the function used as the entrypoint (for use in backtraces)
     entrypoint: Option<FunctionPointer>,
 
-    pub(crate) val_from_host: Option<Box<dyn Any + 'static>>,
+    /// The value passed back to the guest when resuming a yielded instance.
+    pub(crate) resumed_val: Option<Box<dyn Any + 'static + Send>>,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -328,6 +329,52 @@ impl Instance {
     ) -> Result<UntypedRetVal, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
         self.run_func(func, &args)
+    }
+
+    /// Resume execution of an instance that has yielded without providing a value to the guest.
+    ///
+    /// This should only be used when the guest yielded with
+    /// [`Vmctx::yield_()`](vmctx/struct.Vmctx.html#method.yield_) or
+    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val). Otherwise, the guest will
+    /// be expecting a value to be returned from the host, and will terminate the instance when one
+    /// is not found.
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub fn resume(&mut self) -> Result<UntypedRetVal, Error> {
+        lucet_ensure!(
+            self.state.is_yielded(),
+            "can only resume from a call to `Vmctx::yield_*()`"
+        );
+
+        self.swap_and_return()
+    }
+
+    /// Resume execution of an instance that has yielded, providing a value to the guest.
+    ///
+    /// If the guest yielded with [`Vmctx::yield_()`](vmctx/struct.Vmctx.html#method.yield_) or
+    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val), the provided value will be
+    /// ignored. Otherwise, the type of the provided value must match the type expected by
+    /// [`Vmctx::yield_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_expecting_val) or
+    /// [`Vmctx::yield_val_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_val_expecting_val).
+    ///
+    /// The guest will dynamically check that the types match, and will terminate the instance with
+    /// `TerminationDetails::YieldTypeMismatch` if the check fails.
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub fn resume_with_val<A: Any + 'static + Send>(
+        &mut self,
+        val: A,
+    ) -> Result<UntypedRetVal, Error> {
+        lucet_ensure!(
+            self.state.is_yielded(),
+            "can only resume from a call to `Vmctx::yield_*()`"
+        );
+
+        self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static + Send>);
+
+        self.swap_and_return()
     }
 
     /// Reset the instance's heap and global variables to their initial state.
@@ -519,7 +566,7 @@ impl Instance {
             c_fatal_handler: None,
             signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
             entrypoint: None,
-            val_from_host: None,
+            resumed_val: None,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
@@ -601,27 +648,16 @@ impl Instance {
         self.swap_and_return()
     }
 
-    pub fn resume(&mut self) -> Result<UntypedRetVal, Error> {
-        lucet_ensure!(
-            self.state.is_yielded(),
-            "can only resume from a call to `Vmctx::yield_*()`"
-        );
-
-        self.swap_and_return()
-    }
-
-    pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<UntypedRetVal, Error> {
-        lucet_ensure!(
-            self.state.is_yielded(),
-            "can only resume from a call to `Vmctx::yield_*()`"
-        );
-
-        self.val_from_host = Some(Box::new(val) as Box<dyn Any + 'static>);
-
-        self.swap_and_return()
-    }
-
+    /// The core routine for context switching into a guest, and extracting a result.
+    ///
+    /// This must only be called for an instance in a ready, non-fatally faulted, or yielded
+    /// state. The public wrappers around this function should make sure the state is appropriate.
     fn swap_and_return(&mut self) -> Result<UntypedRetVal, Error> {
+        debug_assert!(
+            self.state.is_ready()
+                || (self.state.is_fault() && !self.state.is_fatal())
+                || self.state.is_yielded()
+        );
         self.state = State::Running;
 
         // there should never be another instance running on this thread when we enter this function
@@ -803,6 +839,9 @@ pub enum TerminationDetails {
     Signal,
     /// Returned when `get_embed_ctx` or `get_embed_ctx_mut` are used with a type that is not present.
     CtxNotFound,
+    /// Returned when the type of the value passed to `Instance::resume_with_val()` does not match
+    /// the type expected by `Vmctx::yield_expecting_val()` or `Vmctx::yield_val_expecting_val`, or
+    /// if `Instance::resume()` was called when a value was expected.
     YieldTypeMismatch,
     /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
     BorrowError(&'static str),
@@ -864,6 +903,10 @@ impl std::fmt::Debug for TerminationDetails {
 unsafe impl Send for TerminationDetails {}
 unsafe impl Sync for TerminationDetails {}
 
+/// The value yielded by the guest and returned to the host.
+///
+/// **Note**: The `Sync` trait bound is only present because yielded values are (temporarily)
+/// returned as a variant of `Error`. In the future, this bound may be dropped.
 #[derive(Clone)]
 pub struct YieldedVal {
     val: Option<Arc<dyn Any + 'static + Send + Sync>>,
@@ -890,14 +933,18 @@ impl YieldedVal {
         YieldedVal { val: None }
     }
 
+    /// Returns `true` if the guest yielded without a value.
     pub fn is_none(&self) -> bool {
         self.val.is_none()
     }
 
+    /// Returns `true` if the guest yielded with a value.
     pub fn is_some(&self) -> bool {
         self.val.is_some()
     }
 
+    /// Attempt to downcast the yielded value to a concrete type, returning the original
+    /// `YieldedVal` if unsuccessful.
     pub fn downcast<A: Any + 'static + Send + Sync>(self) -> Result<Arc<A>, YieldedVal> {
         if let Some(val) = self.val {
             match val.downcast() {
@@ -909,6 +956,8 @@ impl YieldedVal {
         }
     }
 
+    /// Returns a reference to the yielded value if it is present and of type `A`, or `None` if it
+    /// isn't.
     pub fn downcast_ref<A: Any + 'static + Send + Sync>(&self) -> Option<&A> {
         self.val.as_ref().and_then(|val| val.downcast_ref())
     }

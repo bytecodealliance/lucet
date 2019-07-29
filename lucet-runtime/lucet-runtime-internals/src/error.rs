@@ -40,11 +40,26 @@ pub enum Error {
     /// An instance terminated, potentially with extra information about the termination.
     ///
     /// This condition can arise from a hostcall explicitly calling
-    /// [`Vmctx::terminate()`](struct.Vmctx.html#method.terminate), or via a custom signal handler
+    /// [`Vmctx::terminate()`](vmctx/struct.Vmctx.html#method.terminate), or via a custom signal handler
     /// that returns [`SignalBehavior::Terminate`](enum.SignalBehavior.html#variant.Terminate).
     #[fail(display = "Runtime terminated")]
     RuntimeTerminated(TerminationDetails),
 
+    /// An instance yielded, potentially with a value.
+    ///
+    /// This arises when a hostcall invokes one of the
+    /// [`Vmctx::yield_*()`](vmctx/struct.Vmctx.html#method.yield_) family of methods. Depending on which
+    /// variant is used, the `YieldedVal` may contain a value passed from the guest context to the
+    /// host.
+    ///
+    /// An instance that has returned may only be resumed
+    /// ([with](struct.Instance.html#method.resume_with_val) or
+    /// [without](struct.Instance.html#method.resume) a value to returned to the guest),
+    /// [reset](struct.Instance.html#method.reset), or dropped. Attempting to run an instance that
+    /// has yielded will result in an error.
+    ///
+    /// **Note**: This is not really an error, so once the `Try` trait is stabilized, this will
+    /// likely be moved out of this type and into a custom return type for `Instance::run()`.
     #[fail(display = "Instance yielded")]
     InstanceYielded(YieldedVal),
 
