@@ -1,10 +1,10 @@
 use crate::context::Context;
+use crate::error::Error;
 use crate::instance::{
     siginfo_ext::SiginfoExt, FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE,
     HOST_CTX,
 };
 use crate::sysdeps::UContextPtr;
-use failure::Error;
 use lazy_static::lazy_static;
 use libc::{c_int, c_void, siginfo_t, SIGBUS, SIGSEGV};
 use lucet_module::TrapCode;

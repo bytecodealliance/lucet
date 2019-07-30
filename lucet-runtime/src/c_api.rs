@@ -45,8 +45,10 @@ pub extern "C" fn lucet_error_name(e: c_int) -> *const c_char {
             FuncNotFound => "lucet_error_func_not_found\0".as_ptr() as _,
             RuntimeFault => "lucet_error_runtime_fault\0".as_ptr() as _,
             RuntimeTerminated => "lucet_error_runtime_terminated\0".as_ptr() as _,
-            InstanceYielded => "lucet_error_instance_yielded\0".as_ptr() as _,
             Dl => "lucet_error_dl\0".as_ptr() as _,
+            InstanceNotReturned => "lucet_error_instance_not_returned\0".as_ptr() as _,
+            InstanceNotYielded => "lucet_error_instance_not_yielded\0".as_ptr() as _,
+            StartYielded => "lucet_error_start_yielded\0".as_ptr() as _,
             Internal => "lucet_error_internal\0".as_ptr() as _,
             Unsupported => "lucet_error_unsupported\0".as_ptr() as _,
         }
@@ -216,18 +218,9 @@ pub unsafe extern "C" fn lucet_instance_resume(
     val: *mut c_void,
 ) -> lucet_error {
     with_instance_ptr!(inst, {
-        // resume without typechecking, since the C version of `yield` translates type errors into
-        // null/non-null return values
-        if val.is_null() {
-            let none: Option<()> = None;
-            inst.resume_impl(none, false)
-                .map(|_| lucet_error::Ok)
-                .unwrap_or_else(|e| e.into())
-        } else {
-            inst.resume_impl(Some(CYieldedVal { val }), false)
-                .map(|_| lucet_error::Ok)
-                .unwrap_or_else(|e| e.into())
-        }
+        inst.resume_with_val(CYieldedVal { val })
+            .map(|_| lucet_error::Ok)
+            .unwrap_or_else(|e| e.into())
     })
 }
 
@@ -474,19 +467,10 @@ lucet_hostcalls! {
         &mut vmctx,
         val: *mut c_void,
     ) -> *mut c_void {
-        // only yield a value if val is non-NULL
-        if val.is_null() {
-            vmctx.yield_();
-        } else {
-            vmctx.yield_val(CYieldedVal { val });
-        }
-
-        // return any `CYieldedVal` pointer that comes back, otherwise NULL
-        if let Some(CYieldedVal { val }) = vmctx.try_take_resumed_val() {
-            val
-        } else {
-            std::ptr::null_mut()
-        }
+        vmctx
+            .yield_val_try_val(CYieldedVal { val })
+            .map(|CYieldedVal { val }| val)
+            .unwrap_or(std::ptr::null_mut())
     }
 }
 

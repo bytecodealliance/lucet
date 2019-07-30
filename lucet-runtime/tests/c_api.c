@@ -118,12 +118,7 @@ bool lucet_runtime_test_yield_resume(struct lucet_dl_module *mod)
     size_t   i          = 0;
 
     err = lucet_instance_run(inst, "f", 0, (const struct lucet_val[]){});
-    while (err == lucet_error_instance_yielded) {
-        if (i >= 5) {
-            fprintf(stderr, "hostcall yielded too many results\n");
-            goto fail3;
-        }
-
+    while (err == lucet_error_ok) {
         struct lucet_state st;
         err = lucet_instance_state(inst, &st);
         if (err != lucet_error_ok) {
@@ -131,9 +126,14 @@ bool lucet_runtime_test_yield_resume(struct lucet_dl_module *mod)
             goto fail3;
         }
         if (st.tag != lucet_state_tag_yielded) {
-            fprintf(stderr, "instance state wasn't yielded\n");
+            break;
+        }
+
+        if (i >= 5) {
+            fprintf(stderr, "hostcall yielded too many results\n");
             goto fail3;
         }
+
         struct yield_resume_val val = *(struct yield_resume_val *) st.val.yielded.val;
 
         switch (val.tag) {

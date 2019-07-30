@@ -75,8 +75,10 @@ pub enum lucet_error {
     FuncNotFound,
     RuntimeFault,
     RuntimeTerminated,
-    InstanceYielded,
     Dl,
+    InstanceNotReturned,
+    InstanceNotYielded,
+    StartYielded,
     Internal,
     Unsupported,
 }
@@ -93,8 +95,10 @@ impl From<Error> for lucet_error {
             Error::FuncNotFound(_, _) => lucet_error::FuncNotFound,
             Error::RuntimeFault(_) => lucet_error::RuntimeFault,
             Error::RuntimeTerminated(_) => lucet_error::RuntimeTerminated,
-            Error::InstanceYielded(_) => lucet_error::InstanceYielded,
             Error::DlError(_) => lucet_error::Dl,
+            Error::InstanceNotReturned => lucet_error::InstanceNotReturned,
+            Error::InstanceNotYielded => lucet_error::InstanceNotYielded,
+            Error::StartYielded => lucet_error::StartYielded,
             Error::InternalError(_) => lucet_error::Internal,
             Error::Unsupported(_) => lucet_error::Unsupported,
         }

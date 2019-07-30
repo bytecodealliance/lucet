@@ -48,7 +48,8 @@ macro_rules! strcmp_tests {
                     "run_strcmp",
                     &[Val::GuestPtr(s1_ptr as u32), Val::GuestPtr(s2_ptr as u32)],
                 )
-                .expect("instance runs"),
+                .expect("instance runs")
+                .unwrap_returned(),
             );
 
             let host_strcmp_res =

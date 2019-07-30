@@ -9,7 +9,8 @@ use crate::alloc::instance_heap_offset;
 use crate::context::Context;
 use crate::error::Error;
 use crate::instance::{
-    Instance, InstanceInternal, State, TerminationDetails, YieldedVal, CURRENT_INSTANCE, HOST_CTX,
+    EmptyYieldVal, Instance, InstanceInternal, State, TerminationDetails, YieldedVal,
+    CURRENT_INSTANCE, HOST_CTX,
 };
 use lucet_module::{FunctionHandle, GlobalValue};
 use std::any::Any;
@@ -65,6 +66,22 @@ pub trait VmctxInternal {
     /// If there is no resumed value, or if the dynamic type check of the value fails, this returns
     /// `None`.
     fn try_take_resumed_val<R: Any + 'static + Send>(&self) -> Option<R>;
+
+    /// Suspend the instance, returning a value in
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
+    ///
+    /// After suspending, the instance may be resumed by calling
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
+    /// host with a value of type `R`. If resumed with a value of some other type, this returns
+    /// `None`.
+    ///
+    /// The dynamic type checks used by the other yield methods should make this explicit option
+    /// type redundant, however this interface is used to avoid exposing a panic to the C API.
+    fn yield_val_try_val<A: Any + 'static + Send + Sync, R: Any + 'static + Send>(
+        &self,
+        val: A,
+    ) -> Option<R>;
 }
 
 impl VmctxInternal for Vmctx {
@@ -89,6 +106,14 @@ impl VmctxInternal for Vmctx {
         } else {
             None
         }
+    }
+
+    fn yield_val_try_val<A: Any + 'static + Send + Sync, R: Any + 'static + Send>(
+        &self,
+        val: A,
+    ) -> Option<R> {
+        self.yield_impl::<A, R>(val);
+        self.try_take_resumed_val()
     }
 }
 
@@ -291,8 +316,9 @@ impl Vmctx {
             .get_func_from_idx(table_idx, func_idx)
     }
 
-    /// Suspend the instance, returning an empty `Error::InstanceYielded` to where the instance was
-    /// run or resumed.
+    /// Suspend the instance, returning an empty
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
     ///
     /// After suspending, the instance may be resumed by the host using
     /// [`Instance::resume()`](../struct.Instance.html#method.resume).
@@ -300,63 +326,53 @@ impl Vmctx {
     /// (The reason for the trailing underscore in the name is that Rust reserves `yield` as a
     /// keyword for future use.)
     pub fn yield_(&self) {
-        let inst = unsafe { self.instance_mut() };
-        inst.state = State::Yielded {
-            val: YieldedVal::none(),
-            expected: None,
-        };
-        HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
+        self.yield_val_expecting_val::<EmptyYieldVal, EmptyYieldVal>(EmptyYieldVal);
     }
 
-    /// Suspend the instance, returning an empty `Error::InstanceYielded` to where the instance was
-    /// run or resumed.
+    /// Suspend the instance, returning an empty
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
     ///
-    /// After suspending, the instance may be resumed by the host
-    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) with a value
-    /// of type `R`.
+    /// After suspending, the instance may be resumed by calling
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
+    /// host with a value of type `R`.
     pub fn yield_expecting_val<R: Any + 'static + Send>(&self) -> R {
-        let inst = unsafe { self.instance_mut() };
-        let expected: Box<PhantomData<R>> = Box::new(PhantomData);
-        inst.state = State::Yielded {
-            val: YieldedVal::none(),
-            expected: Some(expected as Box<dyn Any>),
-        };
-        HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
-        self.take_resumed_val()
+        self.yield_val_expecting_val::<EmptyYieldVal, R>(EmptyYieldVal)
     }
 
-    /// Suspend the instance, returning a value in `Error::InstanceYielded` to where the instance
-    /// was run or resumed.
+    /// Suspend the instance, returning a value in
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
     ///
     /// After suspending, the instance may be resumed by the host using
     /// [`Instance::resume()`](../struct.Instance.html#method.resume).
     pub fn yield_val<A: Any + 'static + Send + Sync>(&self, val: A) {
-        let inst = unsafe { self.instance_mut() };
-        inst.state = State::Yielded {
-            val: YieldedVal::some(val),
-            expected: None,
-        };
-        HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
+        self.yield_val_expecting_val::<A, EmptyYieldVal>(val);
     }
 
-    /// Suspend the instance, returning a value in `Error::InstanceYielded` to where the instance
-    /// was run or resumed.
+    /// Suspend the instance, returning a value in
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
     ///
-    /// After suspending, the instance may be resumed by the host
-    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) with a value
-    /// of type `R`.
+    /// After suspending, the instance may be resumed by calling
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
+    /// host with a value of type `R`.
     pub fn yield_val_expecting_val<A: Any + 'static + Send + Sync, R: Any + 'static + Send>(
         &self,
         val: A,
     ) -> R {
+        self.yield_impl::<A, R>(val);
+        self.take_resumed_val()
+    }
+
+    fn yield_impl<A: Any + 'static + Send + Sync, R: Any + 'static + Send>(&self, val: A) {
         let inst = unsafe { self.instance_mut() };
         let expected: Box<PhantomData<R>> = Box::new(PhantomData);
         inst.state = State::Yielded {
-            val: YieldedVal::some(val),
-            expected: Some(expected as Box<dyn Any>),
+            val: YieldedVal::new(val),
+            expected: expected as Box<dyn Any>,
         };
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
-        self.take_resumed_val()
     }
 
     /// Take and return the value passed to

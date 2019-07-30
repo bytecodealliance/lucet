@@ -1,4 +1,4 @@
-use crate::instance::{FaultDetails, TerminationDetails, YieldedVal};
+use crate::instance::{FaultDetails, TerminationDetails};
 use failure::Fail;
 
 /// Lucet runtime errors.
@@ -45,27 +45,18 @@ pub enum Error {
     #[fail(display = "Runtime terminated")]
     RuntimeTerminated(TerminationDetails),
 
-    /// An instance yielded, potentially with a value.
-    ///
-    /// This arises when a hostcall invokes one of the
-    /// [`Vmctx::yield_*()`](vmctx/struct.Vmctx.html#method.yield_) family of methods. Depending on which
-    /// variant is used, the `YieldedVal` may contain a value passed from the guest context to the
-    /// host.
-    ///
-    /// An instance that has yielded may only be resumed
-    /// ([with](struct.Instance.html#method.resume_with_val) or
-    /// [without](struct.Instance.html#method.resume) a value to returned to the guest),
-    /// [reset](struct.Instance.html#method.reset), or dropped. Attempting to run an instance from a
-    /// new entrypoint after it has yielded but without first resetting will result in an error.
-    ///
-    /// **Note**: This is not really an error, so once the `Try` trait is stabilized, this will
-    /// likely be moved out of this type and into a custom return type for `Instance::run()`.
-    #[fail(display = "Instance yielded")]
-    InstanceYielded(YieldedVal),
-
     /// IO errors arising during dynamic loading with [`DlModule`](struct.DlModule.html).
     #[fail(display = "Dynamic loading error: {}", _0)]
     DlError(#[cause] std::io::Error),
+
+    #[fail(display = "Instance not returned")]
+    InstanceNotReturned,
+
+    #[fail(display = "Instance not yielded")]
+    InstanceNotYielded,
+
+    #[fail(display = "Start function yielded")]
+    StartYielded,
 
     /// A catch-all for internal errors that are likely unrecoverable by the runtime user.
     ///

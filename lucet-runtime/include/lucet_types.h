@@ -27,8 +27,8 @@ enum lucet_error {
     lucet_error_func_not_found,
     lucet_error_runtime_fault,
     lucet_error_runtime_terminated,
-    lucet_error_instance_yielded,
     lucet_error_dl,
+    lucet_error_start_yielded,
     lucet_error_internal,
     lucet_error_unsupported,
 };

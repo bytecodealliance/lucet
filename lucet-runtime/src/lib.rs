@@ -37,9 +37,17 @@
 //! arguments. These can be created using `From` implementations of primitive types, for example
 //! `5u64.into()` in the example below.
 //!
+//! - [`RunResult`](enum.RunResult.html): the result of running or resuming an instance. These
+//! contain either `UntypedRetVal`s for WebAssembly functions that have returned, or `YieldedVal`s
+//! for WebAssembly programs that have yielded.
+//!
 //! - [`UntypedRetVal`](struct.UntypedRetVal.html): values returned from WebAssembly
 //! functions. These must be interpreted at the correct type by the user via `From` implementations
 //! or `retval.as_T()` methods, for example `u64::from(retval)` in the example below.
+//!
+//! - [`YieldedVal`](struct.YieldedVal.html): dynamically-values yielded by WebAssembly
+//! programs. Not all yield points are given values, so this may be empty. To use the values, if
+//! present, you must first downcast them with the provided methods.
 //!
 //! To run a Lucet program, you start by creating a region, capable of backing a number of
 //! instances. You then load a module and then create a new instance using the region and the
@@ -53,7 +61,7 @@
 //! let region = MmapRegion::create(1, &Limits::default()).unwrap();
 //! let mut inst = region.new_instance(module).unwrap();
 //!
-//! let retval = inst.run("factorial", &[5u64.into()]).unwrap();
+//! let retval = inst.run("factorial", &[5u64.into()]).unwrap().unwrap_returned();
 //! assert_eq!(u64::from(retval), 120u64);
 //! ```
 //!
@@ -239,19 +247,19 @@
 //!
 //! let mut factorials = vec![];
 //!
-//! let mut res = inst.run("run", &[]);
+//! let mut res = inst.run("run", &[]).unwrap();
 //!
-//! while let Err(Error::InstanceYielded(val)) = res {
+//! while let Ok(val) = res.yielded_ref() {
 //!     if let Some(k) = val.downcast_ref::<FactorialsK>() {
 //!         match k {
 //!             FactorialsK::Mult(n, n_rec) => {
 //!                 // guest wants us to multiply for it
-//!                 res = inst.resume_with_val(n * n_rec);
+//!                 res = inst.resume_with_val(n * n_rec).unwrap();
 //!             }
 //!             FactorialsK::Result(n) => {
 //!                 // guest is returning an answer
 //!                 factorials.push(*n);
-//!                 res = inst.resume();
+//!                 res = inst.resume().unwrap();
 //!             }
 //!         }
 //!     } else {
@@ -262,7 +270,7 @@
 //! // intermediate values are correct
 //! assert_eq!(factorials.as_slice(), &[1, 2, 6, 24, 120]);
 //! // final value is correct
-//! assert_eq!(u64::from(res.unwrap()), 120u64);
+//! assert_eq!(u64::from(res.unwrap_returned()), 120u64);
 //! ```
 //!
 //! ## Custom Signal Handlers
@@ -338,7 +346,8 @@ pub use lucet_module::{PublicKey, TrapCode};
 pub use lucet_runtime_internals::alloc::Limits;
 pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::{
-    FaultDetails, Instance, InstanceHandle, SignalBehavior, TerminationDetails, YieldedVal,
+    FaultDetails, Instance, InstanceHandle, RunResult, SignalBehavior, TerminationDetails,
+    YieldedVal,
 };
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;

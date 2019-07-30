@@ -1,13 +1,13 @@
 #[macro_export]
 macro_rules! globals_tests {
     ( $TestRegion:path ) => {
+        use $crate::build::test_module_wasm;
+        use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
         use lucet_module::{lucet_signature, FunctionPointer, GlobalValue};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{Error, Limits, Module, Region};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
-        use $crate::build::test_module_wasm;
-        use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
 
         #[test]
         fn defined_globals() {
@@ -84,16 +84,25 @@ macro_rules! globals_tests {
                 .with_global(0, -1)
                 .with_global(1, 420)
                 .with_export_func(
-                    MockExportBuilder::new("get_global0", FunctionPointer::from_usize(get_global0 as usize))
-                        .with_sig(lucet_signature!(() -> I64))
+                    MockExportBuilder::new(
+                        "get_global0",
+                        FunctionPointer::from_usize(get_global0 as usize),
+                    )
+                    .with_sig(lucet_signature!(() -> I64)),
                 )
                 .with_export_func(
-                    MockExportBuilder::new("set_global0", FunctionPointer::from_usize(set_global0 as usize))
-                        .with_sig(lucet_signature!((I64) -> ()))
+                    MockExportBuilder::new(
+                        "set_global0",
+                        FunctionPointer::from_usize(set_global0 as usize),
+                    )
+                    .with_sig(lucet_signature!((I64) -> ())),
                 )
                 .with_export_func(
-                    MockExportBuilder::new("get_global1", FunctionPointer::from_usize(get_global1 as usize))
-                        .with_sig(lucet_signature!(() -> I64))
+                    MockExportBuilder::new(
+                        "get_global1",
+                        FunctionPointer::from_usize(get_global1 as usize),
+                    )
+                    .with_sig(lucet_signature!(() -> I64)),
                 )
                 .build()
         }
@@ -121,7 +130,10 @@ macro_rules! globals_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            let retval = inst.run("get_global0", &[]).expect("instance runs");
+            let retval = inst
+                .run("get_global0", &[])
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(i64::from(retval), -1);
         }
 
@@ -133,10 +145,16 @@ macro_rules! globals_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            let retval = inst.run("get_global0", &[]).expect("instance runs");
+            let retval = inst
+                .run("get_global0", &[])
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(i64::from(retval), -1);
 
-            let retval = inst.run("get_global1", &[]).expect("instance runs");
+            let retval = inst
+                .run("get_global1", &[])
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(i64::from(retval), 420);
         }
 
@@ -151,7 +169,10 @@ macro_rules! globals_tests {
             inst.run("set_global0", &[666i64.into()])
                 .expect("instance runs");
 
-            let retval = inst.run("get_global0", &[]).expect("instance runs");
+            let retval = inst
+                .run("get_global0", &[])
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(i64::from(retval), 666);
         }
     };

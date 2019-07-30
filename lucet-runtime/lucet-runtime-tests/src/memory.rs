@@ -16,7 +16,10 @@ macro_rules! memory_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            let retval = inst.run("main", &[]).expect("instance runs");
+            let retval = inst
+                .run("main", &[])
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(u32::from(retval), 4);
         }
 

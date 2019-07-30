@@ -355,7 +355,10 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            let retval = inst.run("f", &[]).expect("instance runs");
+            let retval = inst
+                .run("f", &[])
+                .expect("instance runs")
+                .expect_returned("instance returned");
             assert_eq!(bool::from(retval), true);
         }
 
@@ -381,11 +384,15 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
-                assert_eq!(*val.downcast::<u64>().unwrap(), 5u64);
-            } else {
-                panic!("instance didn't yield");
-            }
+            assert_eq!(
+                *inst
+                    .run("f", &[])
+                    .unwrap()
+                    .unwrap_yielded()
+                    .downcast::<u64>()
+                    .unwrap(),
+                5u64
+            );
         }
 
         #[test]
@@ -410,13 +417,12 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
-                assert!(val.is_none());
-            } else {
-                panic!("instance didn't yield");
-            }
+            assert!(inst.run("f", &[]).unwrap().unwrap_yielded().is_none());
 
-            let retval = inst.resume_with_val(5u64).expect("instance resumes");
+            let retval = inst
+                .resume_with_val(5u64)
+                .expect("instance resumes")
+                .unwrap_returned();
             assert_eq!(u64::from(retval), 5u64);
         }
 
@@ -444,15 +450,15 @@ macro_rules! host_tests {
 
             let mut facts = vec![];
 
-            let mut res = inst.run("f", &[]);
+            let mut res = inst.run("f", &[]).unwrap();
 
-            while let Err(Error::InstanceYielded(val)) = res {
-                facts.push(*val.downcast::<u64>().unwrap());
-                res = inst.resume();
+            while res.is_yielded() {
+                facts.push(*res.unwrap_yielded().downcast::<u64>().unwrap());
+                res = inst.resume().unwrap();
             }
 
             assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
-            assert_eq!(u64::from(res.unwrap()), 120u64);
+            assert_eq!(u64::from(res.unwrap_returned()), 120u64);
         }
 
         #[test]
@@ -479,19 +485,19 @@ macro_rules! host_tests {
 
             let mut facts = vec![];
 
-            let mut res = inst.run("f", &[]);
+            let mut res = inst.run("f", &[]).unwrap();
 
-            while let Err(Error::InstanceYielded(val)) = res {
+            while let Ok(val) = res.yielded_ref() {
                 if let Some(k) = val.downcast_ref::<CoopFactsK>() {
                     match k {
                         CoopFactsK::Mult(n, n_rec) => {
                             // guest wants us to multiply for it
-                            res = inst.resume_with_val(n * n_rec);
+                            res = inst.resume_with_val(n * n_rec).unwrap();
                         }
                         CoopFactsK::Result(n) => {
                             // guest is returning an answer
                             facts.push(*n);
-                            res = inst.resume();
+                            res = inst.resume().unwrap();
                         }
                     }
                 } else {
@@ -500,7 +506,7 @@ macro_rules! host_tests {
             }
 
             assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
-            assert_eq!(u64::from(res.unwrap()), 120u64);
+            assert_eq!(u64::from(res.unwrap_returned()), 120u64);
         }
 
         #[test]
@@ -525,11 +531,15 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
-                assert_eq!(*val.downcast::<u64>().unwrap(), 5u64);
-            } else {
-                panic!("instance didn't yield");
-            }
+            assert_eq!(
+                *inst
+                    .run("f", &[])
+                    .unwrap()
+                    .unwrap_yielded()
+                    .downcast::<u64>()
+                    .unwrap(),
+                5u64
+            );
 
             match inst.resume_with_val(5u64) {
                 Err(Error::InvalidArgument(_)) => (),
@@ -560,11 +570,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
-                assert!(val.is_none());
-            } else {
-                panic!("instance didn't yield");
-            }
+            assert!(inst.run("f", &[]).unwrap().unwrap_yielded().is_none());
 
             match inst.resume() {
                 Err(Error::InvalidArgument(_)) => (),
@@ -595,11 +601,7 @@ macro_rules! host_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
-                assert!(val.is_none());
-            } else {
-                panic!("instance didn't yield");
-            }
+            assert!(inst.run("f", &[]).unwrap().unwrap_yielded().is_none());
 
             match inst.resume_with_val(true) {
                 Err(Error::InvalidArgument(_)) => (),
