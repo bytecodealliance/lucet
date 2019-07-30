@@ -9,7 +9,7 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_frontend::FunctionBuilder;
 use cranelift_wasm::{
     FuncEnvironment, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex, SignatureIndex,
-    TableIndex, TranslationState, WasmError, WasmResult,
+    TableIndex, VisibleTranslationState, WasmError, WasmResult,
 };
 use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
@@ -89,7 +89,7 @@ impl<'a> FuncInfo<'a> {
         &mut self,
         op: &Operator,
         builder: &mut FunctionBuilder,
-        state: &TranslationState,
+        reachable: bool,
     ) -> WasmResult<()> {
         // So the operation counting works like this:
         // record a stack corresponding with the stack of control flow in the wasm function.
@@ -152,7 +152,7 @@ impl<'a> FuncInfo<'a> {
         // involve control flow away from the current block. So we have to track when operations
         // are unreachable and not instrument them, lest we cause a Cranelift panic trying to
         // modify sealed basic blocks.
-        if state.reachable {
+        if reachable {
             // Update the instruction counter, if necessary
             let op_cost = match op {
                 // Opening a scope is a syntactic operation, and free.
@@ -492,10 +492,10 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         &mut self,
         op: &Operator,
         builder: &mut FunctionBuilder,
-        state: &mut TranslationState,
+        state: &VisibleTranslationState,
     ) -> WasmResult<()> {
         if self.count_instructions {
-            self.update_instruction_count_instrumentation(op, builder, state)?;
+            self.update_instruction_count_instrumentation(op, builder, state.reachable())?;
         }
         Ok(())
     }
