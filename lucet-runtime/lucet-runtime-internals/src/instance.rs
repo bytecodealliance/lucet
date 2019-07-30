@@ -18,6 +18,7 @@ use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
 use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
@@ -335,31 +336,33 @@ impl Instance {
     ///
     /// This should only be used when the guest yielded with
     /// [`Vmctx::yield_()`](vmctx/struct.Vmctx.html#method.yield_) or
-    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val). Otherwise, the guest will
-    /// be expecting a value to be returned from the host, and will terminate the instance when one
-    /// is not found.
+    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val). Otherwise, this call will
+    /// fail with `Error::InvalidArgument`.
     ///
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume(&mut self) -> Result<UntypedRetVal, Error> {
-        lucet_ensure!(
-            self.state.is_yielded(),
-            "can only resume from a call to `Vmctx::yield_*()`"
-        );
+        match &self.state {
+            State::Yielded { expected: None, .. } => (),
+            State::Yielded { expected: _, .. } => {
+                return Err(Error::InvalidArgument(
+                    "yielded instance expects a value when resuming",
+                ))
+            }
+            _ => lucet_bail!("can only resume a yielded instance"),
+        }
 
         self.swap_and_return()
     }
 
     /// Resume execution of an instance that has yielded, providing a value to the guest.
     ///
-    /// If the guest yielded with [`Vmctx::yield_()`](vmctx/struct.Vmctx.html#method.yield_) or
-    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val), the provided value will be
-    /// ignored. Otherwise, the type of the provided value must match the type expected by
+    /// The type of the provided value must match the type expected by
     /// [`Vmctx::yield_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_expecting_val) or
     /// [`Vmctx::yield_val_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_val_expecting_val).
     ///
-    /// The guest will dynamically check that the types match, and will terminate the instance with
-    /// `TerminationDetails::YieldTypeMismatch` if the check fails.
+    /// The provided value will be dynamically typechecked against the type the guest expects to
+    /// receive, and if that check fails, this call will fail with `Error::InvalidArgument`.
     ///
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
@@ -367,10 +370,24 @@ impl Instance {
         &mut self,
         val: A,
     ) -> Result<UntypedRetVal, Error> {
-        lucet_ensure!(
-            self.state.is_yielded(),
-            "can only resume from a call to `Vmctx::yield_*()`"
-        );
+        match &self.state {
+            State::Yielded {
+                expected: Some(expected),
+                ..
+            } => {
+                if !expected.is::<PhantomData<A>>() {
+                    return Err(Error::InvalidArgument(
+                        "type mismatch between yielded instance expected value and resumed value",
+                    ));
+                }
+            }
+            State::Yielded { expected: None, .. } => {
+                return Err(Error::InvalidArgument(
+                    "yielded instance does not expect a value when resuming",
+                ))
+            }
+            _ => lucet_bail!("can only resume a yielded instance"),
+        }
 
         self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static + Send>);
 
@@ -773,6 +790,9 @@ pub enum State {
     },
     Yielded {
         val: YieldedVal,
+        /// Concretely, this should only ever be `Option<Box<PhantomData<R>>>` where `R` is the type
+        /// the guest expects upon resumption.
+        expected: Option<Box<dyn Any>>,
     },
 }
 
@@ -842,6 +862,10 @@ pub enum TerminationDetails {
     /// Returned when the type of the value passed to `Instance::resume_with_val()` does not match
     /// the type expected by `Vmctx::yield_expecting_val()` or `Vmctx::yield_val_expecting_val`, or
     /// if `Instance::resume()` was called when a value was expected.
+    ///
+    /// **Note**: If you see this termination value, please report it as a Lucet bug. The types of
+    /// resumed values are dynamically checked by `Instance::resume()` and
+    /// `Instance::resume_with_val()`, so this should never arise.
     YieldTypeMismatch,
     /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
     BorrowError(&'static str),

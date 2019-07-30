@@ -15,6 +15,7 @@ use lucet_module::{FunctionHandle, GlobalValue};
 use std::any::Any;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Ref, RefCell, RefMut};
+use std::marker::PhantomData;
 
 /// An opaque handle to a running instance's context.
 #[derive(Debug)]
@@ -294,13 +295,12 @@ impl Vmctx {
     /// run or resumed.
     ///
     /// After suspending, the instance may be resumed by the host using
-    /// [`Instance::resume()`](../struct.Instance.html#method.resume) or
-    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val), although
-    /// the value passed in the latter case will be ignored.
+    /// [`Instance::resume()`](../struct.Instance.html#method.resume).
     pub fn yield_(&self) {
         let inst = unsafe { self.instance_mut() };
         inst.state = State::Yielded {
             val: YieldedVal::none(),
+            expected: None,
         };
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
     }
@@ -309,12 +309,16 @@ impl Vmctx {
     /// run or resumed.
     ///
     /// After suspending, the instance may be resumed by the host
-    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val). The type of
-    /// the value passed when resuming must match the return type of this function. If the types do
-    /// not match, or if [`Instance::resume()`](../struct.Instance.html#method.resume) is used
-    /// instead, the instance will terminate.
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) with a value
+    /// of type `R`.
     pub fn yield_expecting_val<R: Any + 'static + Send>(&self) -> R {
-        self.yield_();
+        let inst = unsafe { self.instance_mut() };
+        let expected: Box<PhantomData<R>> = Box::new(PhantomData);
+        inst.state = State::Yielded {
+            val: YieldedVal::none(),
+            expected: Some(expected as Box<dyn Any>),
+        };
+        HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
         self.take_resumed_val()
     }
 
@@ -322,13 +326,12 @@ impl Vmctx {
     /// was run or resumed.
     ///
     /// After suspending, the instance may be resumed by the host using
-    /// [`Instance::resume()`](../struct.Instance.html#method.resume) or
-    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val), although
-    /// the value passed in the latter case will be ignored.
+    /// [`Instance::resume()`](../struct.Instance.html#method.resume).
     pub fn yield_val<A: Any + 'static + Send + Sync>(&self, val: A) {
         let inst = unsafe { self.instance_mut() };
         inst.state = State::Yielded {
             val: YieldedVal::some(val),
+            expected: None,
         };
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
     }
@@ -337,15 +340,19 @@ impl Vmctx {
     /// was run or resumed.
     ///
     /// After suspending, the instance may be resumed by the host
-    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val). The type of
-    /// the value passed when resuming must match the return type of this function. If the types do
-    /// not match, or if [`Instance::resume()`](../struct.Instance.html#method.resume) is used
-    /// instead, the instance will terminate.
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) with a value
+    /// of type `R`.
     pub fn yield_val_expecting_val<A: Any + 'static + Send + Sync, R: Any + 'static + Send>(
         &self,
         val: A,
     ) -> R {
-        self.yield_val(val);
+        let inst = unsafe { self.instance_mut() };
+        let expected: Box<PhantomData<R>> = Box::new(PhantomData);
+        inst.state = State::Yielded {
+            val: YieldedVal::some(val),
+            expected: Some(expected as Box<dyn Any>),
+        };
+        HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
         self.take_resumed_val()
     }
 

@@ -502,5 +502,110 @@ macro_rules! host_tests {
 
             assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
         }
+
+        #[test]
+        fn resume_unexpected() {
+            extern "C" {
+                fn hostcall_yields_5(vmctx: *mut lucet_vmctx);
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                hostcall_yields_5(vmctx);
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
+                assert_eq!(*val.downcast::<u64>().unwrap(), 5u64);
+            } else {
+                panic!("instance didn't yield");
+            }
+
+            match inst.resume_with_val(5u64) {
+                Err(Error::InvalidArgument(_)) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+                Ok(_) => panic!("unexpected success"),
+            }
+        }
+
+        #[test]
+        fn missing_resume_val() {
+            extern "C" {
+                fn hostcall_yield_expects_5(vmctx: *mut lucet_vmctx) -> u64;
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                hostcall_yield_expects_5(vmctx)
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
+                assert!(val.is_none());
+            } else {
+                panic!("instance didn't yield");
+            }
+
+            match inst.resume() {
+                Err(Error::InvalidArgument(_)) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+                Ok(_) => panic!("unexpected success"),
+            }
+        }
+
+        #[test]
+        fn resume_wrong_type() {
+            extern "C" {
+                fn hostcall_yield_expects_5(vmctx: *mut lucet_vmctx) -> u64;
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                hostcall_yield_expects_5(vmctx)
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            if let Err(Error::InstanceYielded(val)) = inst.run("f", &[]) {
+                assert!(val.is_none());
+            } else {
+                panic!("instance didn't yield");
+            }
+
+            match inst.resume_with_val(true) {
+                Err(Error::InvalidArgument(_)) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+                Ok(_) => panic!("unexpected success"),
+            }
+        }
     };
 }

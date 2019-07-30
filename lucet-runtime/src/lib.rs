@@ -151,7 +151,7 @@
 //! The host is free to ignore values yielded by guests, but a yielded instance may only be resumed
 //! with a value of the correct type using
 //! [`Instance::resume_with_val()`](struct.Instance.html#method.resume_with_val), if one is
-//! expected. Otherwise, the instance will terminate.
+//! expected.
 //!
 //! ### Factorial example
 //!
