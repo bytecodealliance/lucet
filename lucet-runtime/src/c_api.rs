@@ -216,12 +216,15 @@ pub unsafe extern "C" fn lucet_instance_resume(
     val: *mut c_void,
 ) -> lucet_error {
     with_instance_ptr!(inst, {
+        // resume without typechecking, since the C version of `yield` translates type errors into
+        // null/non-null return values
         if val.is_null() {
-            inst.resume()
+            let none: Option<()> = None;
+            inst.resume_impl(none, false)
                 .map(|_| lucet_error::Ok)
                 .unwrap_or_else(|e| e.into())
         } else {
-            inst.resume_with_val(CYieldedVal { val })
+            inst.resume_impl(Some(CYieldedVal { val }), false)
                 .map(|_| lucet_error::Ok)
                 .unwrap_or_else(|e| e.into())
         }

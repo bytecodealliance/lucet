@@ -126,18 +126,17 @@ macro_rules! host_tests {
             pub unsafe extern "C" fn hostcall_yield_facts(
                 &mut vmctx,
                 n: u64,
-            ) -> () {
+            ) -> u64 {
                 fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
-                    if n <= 1 {
-                        vmctx.yield_val(1u64);
+                    let result = if n <= 1 {
                         1
                     } else {
-                        let n = n * fact(vmctx, n - 1);
-                        vmctx.yield_val(n);
-                        n
-                    }
+                        n * fact(vmctx, n - 1)
+                    };
+                    vmctx.yield_val(result);
+                    result
                 }
-                fact(vmctx, n);
+                fact(vmctx, n)
             }
         }
 
@@ -151,19 +150,18 @@ macro_rules! host_tests {
             pub unsafe extern "C" fn hostcall_coop_facts(
                 &mut vmctx,
                 n: u64,
-            ) -> () {
+            ) -> u64 {
                 fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
-                    if n <= 1 {
-                        vmctx.yield_val(CoopFactsK::Result(1));
+                    let result = if n <= 1 {
                         1
                     } else {
                         let n_rec = fact(vmctx, n - 1);
-                        let n = vmctx.yield_val_expecting_val(CoopFactsK::Mult(n, n_rec));
-                        vmctx.yield_val(CoopFactsK::Result(n));
-                        n
-                    }
+                        vmctx.yield_val_expecting_val(CoopFactsK::Mult(n, n_rec))
+                    };
+                    vmctx.yield_val(CoopFactsK::Result(result));
+                    result
                 }
-                fact(vmctx, n);
+                fact(vmctx, n)
             }
         }
 
@@ -425,11 +423,11 @@ macro_rules! host_tests {
         #[test]
         fn yield_factorials() {
             extern "C" {
-                fn hostcall_yield_facts(vmctx: *mut lucet_vmctx, n: u64);
+                fn hostcall_yield_facts(vmctx: *mut lucet_vmctx, n: u64) -> u64;
             }
 
-            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
-                hostcall_yield_facts(vmctx, 5);
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                hostcall_yield_facts(vmctx, 5)
             }
 
             let module = MockModuleBuilder::new()
@@ -454,16 +452,17 @@ macro_rules! host_tests {
             }
 
             assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
+            assert_eq!(u64::from(res.unwrap()), 120u64);
         }
 
         #[test]
         fn coop_factorials() {
             extern "C" {
-                fn hostcall_coop_facts(vmctx: *mut lucet_vmctx, n: u64);
+                fn hostcall_coop_facts(vmctx: *mut lucet_vmctx, n: u64) -> u64;
             }
 
-            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
-                hostcall_coop_facts(vmctx, 5);
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                hostcall_coop_facts(vmctx, 5)
             }
 
             let module = MockModuleBuilder::new()
@@ -501,6 +500,7 @@ macro_rules! host_tests {
             }
 
             assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
+            assert_eq!(u64::from(res.unwrap()), 120u64);
         }
 
         #[test]

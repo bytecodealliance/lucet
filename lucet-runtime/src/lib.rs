@@ -141,12 +141,12 @@
 //!
 //! Four yield methods are available for hostcall implementors:
 //!
-//! |                                                                    | Yields value? | Expects value? |
-//! |--------------------------------------------------------------------|---------------|----------------|
-//! | [`yield_`](vmctx/struct.Vmctx.html#method.yield_)                  | ❌            | ❌             |
-//! | [`yield_val`](vmctx/struct.Vmctx.html#method.yield_)               | ✅             | ❌             |
-//! | [`yield_expecting_val`](vmctx/struct.Vmctx.html#method.yield_)     | ❌            | ✅              |
-//! | [`yield_val_expecting_val`](vmctx/struct.Vmctx.html#method.yield_) | ✅             | ✅              |
+//! |                                                                                     | Yields value? | Expects value? |
+//! |-------------------------------------------------------------------------------------|---------------|----------------|
+//! | [`yield_`](vmctx/struct.Vmctx.html#method.yield_)                                   | ❌            | ❌             |
+//! | [`yield_val`](vmctx/struct.Vmctx.html#method.yield_val)                             | ✅             | ❌             |
+//! | [`yield_expecting_val`](vmctx/struct.Vmctx.html#method.yield_expecting_val)         | ❌            | ✅              |
+//! | [`yield_val_expecting_val`](vmctx/struct.Vmctx.html#method.yield_val_expecting_val) | ✅             | ✅              |
 //!
 //! The host is free to ignore values yielded by guests, but a yielded instance may only be resumed
 //! with a value of the correct type using
@@ -165,13 +165,13 @@
 //! ```no_run
 //! // factorials_guest.rs
 //! extern "C" {
-//!     fn hostcall_factorials(n: u64);
+//!     fn hostcall_factorials(n: u64) -> u64;
 //! }
 //!
 //! #[no_mangle]
-//! pub extern "C" fn run() {
+//! pub extern "C" fn run() -> u64 {
 //!     unsafe {
-//!         hostcall_factorials(5);
+//!         hostcall_factorials(5)
 //!     }
 //! }
 //! ```
@@ -181,7 +181,10 @@
 //! - Instead of performing the `n * fact(n - 1)` multiplication ourselves, we yield the operands
 //! and expect the product when resumed.
 //!
-//! - Whenever we have an intermediate answer, we yield it.
+//! - Whenever we have computed a factorial, including both intermediate values and the final
+//! answer, we yield it.
+//!
+//! The final answer is returned normally as the result of the guest function.
 //!
 //! To implement this, we introduce a new `enum` type to represent what we want the host to do next,
 //! and yield it when appropriate.
@@ -200,29 +203,28 @@
 //!     pub unsafe extern "C" fn hostcall_factorials(
 //!         &mut vmctx,
 //!         n: u64,
-//!     ) -> () {
+//!     ) -> u64 {
 //!         fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
-//!             if n <= 1 {
-//!                 // yield an answer
-//!                 vmctx.yield_val(FactorialsK::Result(1));
+//!             let result = if n <= 1 {
 //!                 1
 //!             } else {
 //!                 let n_rec = fact(vmctx, n - 1);
 //!                 // yield a request for the host to perform multiplication
-//!                 let n = vmctx.yield_val_expecting_val(FactorialsK::Mult(n, n_rec));
-//!                 // yield an answer
-//!                 vmctx.yield_val(FactorialsK::Result(n));
-//!                 n
-//!             }
+//!                 vmctx.yield_val_expecting_val(FactorialsK::Mult(n, n_rec))
+//!                 // once resumed, that yield evaluates to the multiplication result
+//!             };
+//!             // yield a result
+//!             vmctx.yield_val(FactorialsK::Result(result));
+//!             result
 //!         }
-//!         fact(vmctx, n);
+//!         fact(vmctx, n)
 //!     }
 //! }
 //! ```
 //!
 //! The host side of the code, then, is an interpreter that repeatedly checks the yielded value and
-//! performs the appropriate operation. The hostcall returns normally when it is finished, so we
-//! exit the loop when the run/resume result is `Ok`.
+//! performs the appropriate operation. The hostcall returns normally with the final answer when it
+//! is finished, so we exit the loop when the run/resume result is `Ok`.
 //!
 //! ```no_run
 //! # pub enum FactorialsK {
@@ -257,7 +259,10 @@
 //!     }
 //! }
 //!
+//! // intermediate values are correct
 //! assert_eq!(factorials.as_slice(), &[1, 2, 6, 24, 120]);
+//! // final value is correct
+//! assert_eq!(u64::from(res.unwrap()), 120u64);
 //! ```
 //!
 //! ## Custom Signal Handlers

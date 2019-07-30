@@ -137,21 +137,24 @@ bool lucet_runtime_test_yield_resume(struct lucet_dl_module *mod)
         struct yield_resume_val val = *(struct yield_resume_val *) st.val.yielded.val;
 
         switch (val.tag) {
-        case yield_resume_tag_mult:;
+        case yield_resume_tag_mult: {
             uint64_t mult_result = val.val.mult.x * val.val.mult.y;
             err                  = lucet_instance_resume(inst, &mult_result);
             continue;
-        case yield_resume_tag_result:
+        }
+        case yield_resume_tag_result: {
             results[i++] = val.val.result;
             err          = lucet_instance_resume(inst, NULL);
             continue;
-        default:
+        }
+        default: {
             fprintf(stderr, "unexpected yield_resume_tag\n");
             goto fail3;
         }
+        }
     }
     if (err != lucet_error_ok) {
-        fprintf(stderr, "instance finished with non-ok error\n");
+        fprintf(stderr, "instance finished with non-ok error: %s\n", lucet_error_name(err));
         goto fail3;
     }
 

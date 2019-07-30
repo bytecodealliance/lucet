@@ -252,6 +252,11 @@ pub trait InstanceInternal {
     fn module(&self) -> &dyn Module;
     fn state(&self) -> &State;
     fn valid_magic(&self) -> bool;
+    fn resume_impl<A: Any + 'static + Send>(
+        &mut self,
+        val: Option<A>,
+        typecheck: bool,
+    ) -> Result<UntypedRetVal, Error>;
 }
 
 impl InstanceInternal for Instance {
@@ -278,6 +283,39 @@ impl InstanceInternal for Instance {
     /// Check whether the instance magic is valid.
     fn valid_magic(&self) -> bool {
         self.magic == LUCET_INSTANCE_MAGIC
+    }
+
+    fn resume_impl<A: Any + 'static + Send>(
+        &mut self,
+        val: Option<A>,
+        typecheck: bool,
+    ) -> Result<UntypedRetVal, Error> {
+        match &self.state {
+            State::Yielded {
+                expected: Some(expected),
+                ..
+            } => {
+                if typecheck
+                    && ((val.is_some() && !expected.is::<PhantomData<A>>()) || val.is_none())
+                {
+                    return Err(Error::InvalidArgument(
+                        "type mismatch between yielded instance expected value and resumed value",
+                    ));
+                }
+            }
+            State::Yielded { expected: None, .. } => {
+                if typecheck && val.is_some() {
+                    return Err(Error::InvalidArgument(
+                        "yielded instance does not expect a value when resuming",
+                    ));
+                }
+            }
+            _ => lucet_bail!("can only resume a yielded instance"),
+        }
+
+        self.resumed_val = val.map(|val| Box::new(val) as Box<dyn Any + 'static + Send>);
+
+        self.swap_and_return()
     }
 }
 
@@ -342,17 +380,8 @@ impl Instance {
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume(&mut self) -> Result<UntypedRetVal, Error> {
-        match &self.state {
-            State::Yielded { expected: None, .. } => (),
-            State::Yielded { expected: _, .. } => {
-                return Err(Error::InvalidArgument(
-                    "yielded instance expects a value when resuming",
-                ))
-            }
-            _ => lucet_bail!("can only resume a yielded instance"),
-        }
-
-        self.swap_and_return()
+        let none: Option<()> = None;
+        self.resume_impl(none, true)
     }
 
     /// Resume execution of an instance that has yielded, providing a value to the guest.
@@ -370,28 +399,7 @@ impl Instance {
         &mut self,
         val: A,
     ) -> Result<UntypedRetVal, Error> {
-        match &self.state {
-            State::Yielded {
-                expected: Some(expected),
-                ..
-            } => {
-                if !expected.is::<PhantomData<A>>() {
-                    return Err(Error::InvalidArgument(
-                        "type mismatch between yielded instance expected value and resumed value",
-                    ));
-                }
-            }
-            State::Yielded { expected: None, .. } => {
-                return Err(Error::InvalidArgument(
-                    "yielded instance does not expect a value when resuming",
-                ))
-            }
-            _ => lucet_bail!("can only resume a yielded instance"),
-        }
-
-        self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static + Send>);
-
-        self.swap_and_return()
+        self.resume_impl(Some(val), true)
     }
 
     /// Reset the instance's heap and global variables to their initial state.

@@ -296,6 +296,9 @@ impl Vmctx {
     ///
     /// After suspending, the instance may be resumed by the host using
     /// [`Instance::resume()`](../struct.Instance.html#method.resume).
+    ///
+    /// (The reason for the trailing underscore in the name is that Rust reserves `yield` as a
+    /// keyword for future use.)
     pub fn yield_(&self) {
         let inst = unsafe { self.instance_mut() };
         inst.state = State::Yielded {
