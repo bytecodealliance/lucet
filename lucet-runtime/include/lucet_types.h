@@ -28,6 +28,8 @@ enum lucet_error {
     lucet_error_runtime_fault,
     lucet_error_runtime_terminated,
     lucet_error_dl,
+    lucet_error_instance_not_returned,
+    lucet_error_instance_not_yielded,
     lucet_error_start_yielded,
     lucet_error_internal,
     lucet_error_unsupported,
