@@ -158,12 +158,26 @@ bool lucet_runtime_test_yield_resume(struct lucet_dl_module *mod)
         goto fail3;
     }
 
+    struct lucet_state st;
+    err = lucet_instance_state(inst, &st);
+    if (err != lucet_error_ok) {
+        fprintf(stderr, "couldn't get instance state\n");
+        goto fail3;
+    }
+
+    if (st.tag != lucet_state_tag_returned) {
+        fprintf(stderr, "final instance state wasn't returned\n");
+        goto fail3;
+    }
+
+    uint64_t final_result = LUCET_UNTYPED_RETVAL_TO_U64(st.val.returned);
+
     lucet_instance_release(inst);
     lucet_region_release(region);
     lucet_dl_module_release(mod);
 
     uint64_t expected_results[5] = { 1, 2, 6, 24, 120 };
-    bool     results_correct     = true;
+    bool     results_correct     = final_result == 120;
     for (i = 0; i < 5; i++) {
         results_correct = results_correct && (results[i] == expected_results[i]);
     }
