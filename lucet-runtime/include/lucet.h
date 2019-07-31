@@ -46,6 +46,8 @@ enum lucet_error lucet_instance_run_func_idx(struct lucet_instance * inst,
                                              uintptr_t               argc,
                                              const struct lucet_val *argv);
 
+enum lucet_error lucet_instance_resume(struct lucet_instance *inst, void *val);
+
 enum lucet_error lucet_instance_set_fatal_handler(struct lucet_instance *inst,
                                                   lucet_fatal_handler    fatal_handler);
 

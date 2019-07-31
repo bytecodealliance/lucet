@@ -18,6 +18,7 @@ use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
 use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
@@ -187,7 +188,7 @@ pub struct Instance {
     module: Arc<dyn Module>,
 
     /// The `Context` in which the guest program runs
-    ctx: Context,
+    pub(crate) ctx: Context,
 
     /// Instance state and error information
     pub(crate) state: State,
@@ -216,6 +217,9 @@ pub struct Instance {
     /// Pointer to the function used as the entrypoint (for use in backtraces)
     entrypoint: Option<FunctionPointer>,
 
+    /// The value passed back to the guest when resuming a yielded instance.
+    pub(crate) resumed_val: Option<Box<dyn Any + 'static + Send>>,
+
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
     /// It is also used to compute the size of the structure up to that point, i.e. without padding.
@@ -234,6 +238,114 @@ impl Drop for Instance {
         // Reset magic to indicate this instance
         // is no longer valid
         self.magic = 0;
+    }
+}
+
+/// The result of running or resuming an [`Instance`](struct.Instance.html).
+#[derive(Debug)]
+pub enum RunResult {
+    /// An instance returned with a value.
+    ///
+    /// The actual type of the contained value depends on the return type of the guest function that
+    /// was called. For guest functions with no return value, it is undefined behavior to do
+    /// anything with this value.
+    Returned(UntypedRetVal),
+    /// An instance yielded, potentially with a value.
+    ///
+    /// This arises when a hostcall invokes one of the
+    /// [`Vmctx::yield_*()`](vmctx/struct.Vmctx.html#method.yield_) family of methods. Depending on which
+    /// variant is used, the `YieldedVal` may contain a value passed from the guest context to the
+    /// host.
+    ///
+    /// An instance that has yielded may only be resumed
+    /// ([with](struct.Instance.html#method.resume_with_val) or
+    /// [without](struct.Instance.html#method.resume) a value to returned to the guest),
+    /// [reset](struct.Instance.html#method.reset), or dropped. Attempting to run an instance from a
+    /// new entrypoint after it has yielded but without first resetting will result in an error.
+    Yielded(YieldedVal),
+}
+
+impl RunResult {
+    /// Try to get a return value from a run result, returning `Error::InstanceNotReturned` if the
+    /// instance instead yielded.
+    pub fn returned(self) -> Result<UntypedRetVal, Error> {
+        match self {
+            RunResult::Returned(rv) => Ok(rv),
+            RunResult::Yielded(_) => Err(Error::InstanceNotReturned),
+        }
+    }
+
+    /// Try to get a reference to a return value from a run result, returning
+    /// `Error::InstanceNotReturned` if the instance instead yielded.
+    pub fn returned_ref(&self) -> Result<&UntypedRetVal, Error> {
+        match self {
+            RunResult::Returned(rv) => Ok(rv),
+            RunResult::Yielded(_) => Err(Error::InstanceNotReturned),
+        }
+    }
+
+    /// Returns `true` if the instance returned a value.
+    pub fn is_returned(&self) -> bool {
+        self.returned_ref().is_ok()
+    }
+
+    /// Unwraps a run result into a return value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the instance instead yielded, with a panic message including the passed message.
+    pub fn expect_returned(self, msg: &str) -> UntypedRetVal {
+        self.returned().expect(msg)
+    }
+
+    /// Unwraps a run result into a returned value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the instance instead yielded.
+    pub fn unwrap_returned(self) -> UntypedRetVal {
+        self.returned().unwrap()
+    }
+
+    /// Try to get a yielded value from a run result, returning `Error::InstanceNotYielded` if the
+    /// instance instead returned.
+    pub fn yielded(self) -> Result<YieldedVal, Error> {
+        match self {
+            RunResult::Returned(_) => Err(Error::InstanceNotYielded),
+            RunResult::Yielded(yv) => Ok(yv),
+        }
+    }
+
+    /// Try to get a reference to a yielded value from a run result, returning
+    /// `Error::InstanceNotYielded` if the instance instead returned.
+    pub fn yielded_ref(&self) -> Result<&YieldedVal, Error> {
+        match self {
+            RunResult::Returned(_) => Err(Error::InstanceNotYielded),
+            RunResult::Yielded(yv) => Ok(yv),
+        }
+    }
+
+    /// Returns `true` if the instance yielded.
+    pub fn is_yielded(&self) -> bool {
+        self.yielded_ref().is_ok()
+    }
+
+    /// Unwraps a run result into a yielded value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the instance instead returned, with a panic message including the passed message.
+    pub fn expect_yielded(self, msg: &str) -> YieldedVal {
+        self.yielded().expect(msg)
+    }
+
+    /// Unwraps a run result into a yielded value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the instance instead returned.
+    pub fn unwrap_yielded(self) -> YieldedVal {
+        self.yielded().unwrap()
     }
 }
 
@@ -285,7 +397,7 @@ impl Instance {
     /// # use lucet_runtime_internals::instance::InstanceHandle;
     /// # let instance: InstanceHandle = unimplemented!();
     /// // regular execution yields `Ok(UntypedRetVal)`
-    /// let retval = instance.run("factorial", &[5u64.into()]).unwrap();
+    /// let retval = instance.run("factorial", &[5u64.into()]).unwrap().unwrap_returned();
     /// assert_eq!(u64::from(retval), 120u64);
     ///
     /// // runtime faults yield `Err(Error)`
@@ -309,7 +421,7 @@ impl Instance {
     ///
     /// For the moment, we do not mark this as `unsafe` in the Rust type system, but that may change
     /// in the future.
-    pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<UntypedRetVal, Error> {
+    pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<RunResult, Error> {
         let func = self.module.get_export_func(entrypoint)?;
         self.run_func(func, &args)
     }
@@ -317,15 +429,63 @@ impl Instance {
     /// Run a function with arguments in the guest context from the [WebAssembly function
     /// table](https://webassembly.github.io/spec/core/syntax/modules.html#tables).
     ///
+    /// # Safety
+    ///
     /// The same safety caveats of [`Instance::run()`](struct.Instance.html#method.run) apply.
     pub fn run_func_idx(
         &mut self,
         table_idx: u32,
         func_idx: u32,
         args: &[Val],
-    ) -> Result<UntypedRetVal, Error> {
+    ) -> Result<RunResult, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
         self.run_func(func, &args)
+    }
+
+    /// Resume execution of an instance that has yielded without providing a value to the guest.
+    ///
+    /// This should only be used when the guest yielded with
+    /// [`Vmctx::yield_()`](vmctx/struct.Vmctx.html#method.yield_) or
+    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val). Otherwise, this call will
+    /// fail with `Error::InvalidArgument`.
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub fn resume(&mut self) -> Result<RunResult, Error> {
+        self.resume_with_val(EmptyYieldVal)
+    }
+
+    /// Resume execution of an instance that has yielded, providing a value to the guest.
+    ///
+    /// The type of the provided value must match the type expected by
+    /// [`Vmctx::yield_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_expecting_val) or
+    /// [`Vmctx::yield_val_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_val_expecting_val).
+    ///
+    /// The provided value will be dynamically typechecked against the type the guest expects to
+    /// receive, and if that check fails, this call will fail with `Error::InvalidArgument`.
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub fn resume_with_val<A: Any + 'static + Send>(&mut self, val: A) -> Result<RunResult, Error> {
+        match &self.state {
+            State::Yielded { expected, .. } => {
+                // make sure the resumed value is of the right type
+                if !expected.is::<PhantomData<A>>() {
+                    return Err(Error::InvalidArgument(
+                        "type mismatch between yielded instance expected value and resumed value",
+                    ));
+                }
+            }
+            _ => return Err(Error::InvalidArgument("can only resume a yielded instance")),
+        }
+
+        self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static + Send>);
+
+        self.swap_and_return()
     }
 
     /// Reset the instance's heap and global variables to their initial state.
@@ -517,6 +677,7 @@ impl Instance {
             c_fatal_handler: None,
             signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
             entrypoint: None,
+            resumed_val: None,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
@@ -532,7 +693,8 @@ impl Instance {
     // For this reason, the alignment of the structure is set to 4096, and we define accessors that
     // read/write the globals pointer as bytes [4096-8..4096] of that structure represented as raw bytes.
     #[inline]
-    pub fn get_globals_ptr(&self) -> *const i64 {
+    #[allow(dead_code)]
+    fn get_globals_ptr(&self) -> *const i64 {
         unsafe {
             *((self as *const _ as *const u8)
                 .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>()) as isize)
@@ -541,7 +703,7 @@ impl Instance {
     }
 
     #[inline]
-    pub fn set_globals_ptr(&mut self, globals_ptr: *const i64) {
+    fn set_globals_ptr(&mut self, globals_ptr: *const i64) {
         unsafe {
             *((self as *mut _ as *mut u8)
                 .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>()) as isize)
@@ -550,11 +712,12 @@ impl Instance {
     }
 
     /// Run a function in guest context at the given entrypoint.
-    fn run_func(&mut self, func: FunctionHandle, args: &[Val]) -> Result<UntypedRetVal, Error> {
-        lucet_ensure!(
-            self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal()),
-            "instance must be ready or non-fatally faulted"
-        );
+    fn run_func(&mut self, func: FunctionHandle, args: &[Val]) -> Result<RunResult, Error> {
+        if !(self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal())) {
+            return Err(Error::InvalidArgument(
+                "instance must be ready or non-fatally faulted",
+            ));
+        }
         if func.ptr.as_usize() == 0 {
             return Err(Error::InvalidArgument(
                 "entrypoint function cannot be null; this is probably a malformed module",
@@ -595,6 +758,19 @@ impl Instance {
             )
         })?;
 
+        self.swap_and_return()
+    }
+
+    /// The core routine for context switching into a guest, and extracting a result.
+    ///
+    /// This must only be called for an instance in a ready, non-fatally faulted, or yielded
+    /// state. The public wrappers around this function should make sure the state is appropriate.
+    fn swap_and_return(&mut self) -> Result<RunResult, Error> {
+        debug_assert!(
+            self.state.is_ready()
+                || (self.state.is_fault() && !self.state.is_fatal())
+                || self.state.is_yielded()
+        );
         self.state = State::Running;
 
         // there should never be another instance running on this thread when we enter this function
@@ -631,9 +807,10 @@ impl Instance {
             State::Running => {
                 let retval = self.ctx.get_untyped_retval();
                 self.state = State::Ready { retval };
-                Ok(retval)
+                Ok(RunResult::Returned(retval))
             }
             State::Terminated { details, .. } => Err(Error::RuntimeTerminated(details.clone())),
+            State::Yielded { val, .. } => Ok(RunResult::Yielded(val.clone())),
             State::Fault { .. } => {
                 // Sandbox is no longer runnable. It's unsafe to determine all error details in the signal
                 // handler, so we fill in extra details here.
@@ -668,7 +845,10 @@ impl Instance {
 
     fn run_start(&mut self) -> Result<(), Error> {
         if let Some(start) = self.module.get_start_func()? {
-            self.run_func(start, &[])?;
+            let res = self.run_func(start, &[])?;
+            if res.is_yielded() {
+                return Err(Error::StartYielded);
+            }
         }
         Ok(())
     }
@@ -706,6 +886,12 @@ pub enum State {
     },
     Terminated {
         details: TerminationDetails,
+    },
+    Yielded {
+        val: YieldedVal,
+        /// Concretely, this should only ever be `Box<PhantomData<R>>` where `R` is the type
+        /// the guest expects upon resumption.
+        expected: Box<dyn Any>,
     },
 }
 
@@ -772,6 +958,14 @@ pub enum TerminationDetails {
     Signal,
     /// Returned when `get_embed_ctx` or `get_embed_ctx_mut` are used with a type that is not present.
     CtxNotFound,
+    /// Returned when the type of the value passed to `Instance::resume_with_val()` does not match
+    /// the type expected by `Vmctx::yield_expecting_val()` or `Vmctx::yield_val_expecting_val`, or
+    /// if `Instance::resume()` was called when a value was expected.
+    ///
+    /// **Note**: If you see this termination value, please report it as a Lucet bug. The types of
+    /// resumed values are dynamically checked by `Instance::resume()` and
+    /// `Instance::resume_with_val()`, so this should never arise.
+    YieldTypeMismatch,
     /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
     BorrowError(&'static str),
     /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
@@ -823,6 +1017,7 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::Signal => write!(f, "Signal"),
             TerminationDetails::BorrowError(msg) => write!(f, "BorrowError({})", msg),
             TerminationDetails::CtxNotFound => write!(f, "CtxNotFound"),
+            TerminationDetails::YieldTypeMismatch => write!(f, "YieldTypeMismatch"),
             TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
         }
     }
@@ -830,6 +1025,61 @@ impl std::fmt::Debug for TerminationDetails {
 
 unsafe impl Send for TerminationDetails {}
 unsafe impl Sync for TerminationDetails {}
+
+/// The value yielded by an instance through a [`Vmctx`](vmctx/struct.Vmctx.html) and returned to
+/// the host.
+#[derive(Clone)]
+pub struct YieldedVal {
+    val: Arc<dyn Any + 'static + Send + Sync>,
+}
+
+impl std::fmt::Debug for YieldedVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_none() {
+            write!(f, "YieldedVal {{ val: None }}")
+        } else {
+            write!(f, "YieldedVal {{ val: Some }}")
+        }
+    }
+}
+
+impl YieldedVal {
+    pub(crate) fn new<A: Any + 'static + Send + Sync>(val: A) -> Self {
+        YieldedVal { val: Arc::new(val) }
+    }
+
+    /// Returns `true` if the guest yielded without a value.
+    pub fn is_none(&self) -> bool {
+        self.val.is::<EmptyYieldVal>()
+    }
+
+    /// Returns `true` if the guest yielded with a value.
+    pub fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+
+    /// Attempt to downcast the yielded value to a concrete type, returning the original
+    /// `YieldedVal` if unsuccessful.
+    pub fn downcast<A: Any + 'static + Send + Sync>(self) -> Result<Arc<A>, YieldedVal> {
+        match self.val.downcast() {
+            Ok(val) => Ok(val),
+            Err(val) => Err(YieldedVal { val }),
+        }
+    }
+
+    /// Returns a reference to the yielded value if it is present and of type `A`, or `None` if it
+    /// isn't.
+    pub fn downcast_ref<A: Any + 'static + Send + Sync>(&self) -> Option<&A> {
+        self.val.downcast_ref()
+    }
+}
+
+/// A marker value to indicate a yield or resume with no value.
+///
+/// This exists to unify the implementations of the various operators, and should only ever be
+/// created by internal code.
+#[derive(Debug)]
+pub(crate) struct EmptyYieldVal;
 
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -860,6 +1110,7 @@ impl std::fmt::Display for State {
                 Ok(())
             }
             State::Terminated { .. } => write!(f, "terminated"),
+            State::Yielded { .. } => write!(f, "yielded"),
         }
     }
 }
@@ -903,6 +1154,14 @@ impl State {
 
     pub fn is_terminated(&self) -> bool {
         if let State::Terminated { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_yielded(&self) -> bool {
+        if let State::Yielded { .. } = self {
             true
         } else {
             false

@@ -5,8 +5,7 @@ extern crate clap;
 
 use clap::Arg;
 use failure::{format_err, Error};
-use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region};
-use lucet_runtime_internals::module::ModuleInternal;
+use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region, RunResult};
 use lucet_wasi::{hostcalls, WasiCtxBuilder};
 use std::fs::File;
 use std::path::PathBuf;
@@ -209,7 +208,7 @@ fn run(config: Config<'_>) {
         } else {
             DlModule::load(&config.lucet_module).expect("module can be loaded")
         };
-        let min_globals_size = module.globals().len() * std::mem::size_of::<u64>();
+        let min_globals_size = module.initial_globals_size();
         let globals_size = ((min_globals_size + 4096 - 1) / 4096) * 4096;
 
         let region = MmapRegion::create(
@@ -240,7 +239,9 @@ fn run(config: Config<'_>) {
 
         match inst.run(config.entrypoint, &[]) {
             // normal termination implies 0 exit code
-            Ok(_) => 0,
+            Ok(RunResult::Returned(_)) => 0,
+            // none of the WASI hostcalls use yield yet, so this shouldn't happen
+            Ok(RunResult::Yielded(_)) => panic!("lucet-wasi unexpectedly yielded"),
             Err(lucet_runtime::Error::RuntimeTerminated(
                 lucet_runtime::TerminationDetails::Provided(any),
             )) => *any
