@@ -3,7 +3,7 @@ use crate::env::atoms::AtomType;
 use crate::env::cursor::Package;
 use crate::env::repr::{
     AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
-    EnumDatatypeRepr, EnumMember, ModuleDatatypesRepr, StructDatatypeRepr, StructMemberRepr,
+    EnumDatatypeRepr, EnumMemberRepr, ModuleDatatypesRepr, StructDatatypeRepr, StructMemberRepr,
 };
 use crate::env::MemArea;
 use crate::error::ValidationError;
@@ -33,7 +33,7 @@ struct StructIR {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct EnumIR {
-    members: Vec<EnumMember>,
+    members: Vec<EnumMemberRepr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -140,7 +140,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
                 })?
             }
             // build the struct with this as the member:
-            members.push(EnumMember {
+            members.push(EnumMemberRepr {
                 name: var.name.clone(),
             })
         }
@@ -185,6 +185,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
 
     pub fn build(self) -> Result<ModuleDatatypesRepr, ValidationError> {
         let mut finalized = SecondaryMap::new();
+        finalized.resize(self.names.types.len());
         let mut ordered = Vec::new();
         // Important to iterate in name order, so error messages are consistient.
         // HashMap iteration order is not stable.

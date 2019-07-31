@@ -1,8 +1,7 @@
 use crate::env::atoms::{AbiType, AtomType};
 use crate::env::repr::{
     AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
-    EnumDatatypeRepr, EnumMember, ModuleIx, ModuleRepr, PackageRepr, StructDatatypeRepr,
-    StructMemberRepr,
+    EnumDatatypeRepr, ModuleIx, ModuleRepr, PackageRepr, StructDatatypeRepr, StructMemberRepr,
 };
 use crate::env::MemArea;
 use crate::parser::SyntaxTypeRef;
@@ -212,6 +211,15 @@ impl<'a> StructDatatype<'a> {
         }
         .name()
     }
+    pub fn member(&self, name: &str) -> Option<StructMember<'a>> {
+        let pkg = self.pkg;
+        self.repr
+            .members
+            .iter()
+            .find(|m| m.name == name)
+            .map(move |repr| StructMember { pkg, repr })
+    }
+
     pub fn members(&self) -> impl Iterator<Item = StructMember<'a>> {
         let pkg = self.pkg;
         self.repr
@@ -266,16 +274,44 @@ impl<'a> EnumDatatype<'a> {
         }
         .name()
     }
-    pub fn members(&self) -> &'a [EnumMember] {
-        &self.repr.members
+    pub fn variants(&self) -> impl Iterator<Item = EnumMember<'a>> {
+        let repr = self.clone();
+        (0..self.repr.members.len())
+            .into_iter()
+            .map(move |ix| EnumMember {
+                repr: repr.clone(),
+                index: ix,
+            })
+    }
+
+    pub fn variant(&self, name: &str) -> Option<EnumMember<'a>> {
+        self.variants().find(|v| v.name() == name)
     }
 }
+
 impl<'a> From<EnumDatatype<'a>> for Datatype<'a> {
     fn from(e: EnumDatatype<'a>) -> Datatype<'a> {
         Datatype {
             pkg: e.pkg,
             id: e.id,
         }
+    }
+}
+
+pub struct EnumMember<'a> {
+    repr: EnumDatatype<'a>,
+    index: usize,
+}
+
+impl<'a> EnumMember<'a> {
+    pub fn parent(&self) -> EnumDatatype<'a> {
+        self.repr.clone()
+    }
+    pub fn name(&self) -> &str {
+        &self.repr.repr.members[self.index].name
+    }
+    pub fn value(&self) -> usize {
+        self.index
     }
 }
 

@@ -96,13 +96,13 @@ pub struct StructDatatypeRepr {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct EnumMember {
+pub struct EnumMemberRepr {
     pub name: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EnumDatatypeRepr {
-    pub members: Vec<EnumMember>,
+    pub members: Vec<EnumMemberRepr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
