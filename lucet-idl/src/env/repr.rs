@@ -102,15 +102,15 @@ pub struct FuncRepr {
     pub bindings: PrimaryMap<BindingIx, BindingRepr>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ArgIx(u32);
 entity_impl!(ArgIx);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct RetIx(u32);
 entity_impl!(RetIx);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ParamIx {
     Arg(ArgIx),
     Ret(RetIx),

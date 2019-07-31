@@ -1,4 +1,3 @@
-#![allow(unused_imports)] // XXX remove me when more complete
 use crate::env::atoms::AtomType;
 use crate::env::cursor::Package;
 use crate::env::repr::{

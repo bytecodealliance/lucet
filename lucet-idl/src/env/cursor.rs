@@ -1,10 +1,11 @@
-use crate::env::atoms::AtomType;
+use crate::env::atoms::{AbiType, AtomType};
 use crate::env::repr::{
     AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
     EnumDatatypeRepr, EnumMember, ModuleIx, ModuleRepr, PackageRepr, StructDatatypeRepr,
     StructMemberRepr,
 };
 use crate::env::MemArea;
+use crate::parser::SyntaxTypeRef;
 
 #[derive(Debug, Clone)]
 pub struct Package<'a> {
@@ -20,7 +21,12 @@ impl<'a> Package<'a> {
             .and_then(|(ix, _)| self.module_by_ix(ix))
     }
 
-    pub(crate) fn module_by_ix(&self, ix: ModuleIx) -> Option<Module<'a>> {
+    pub fn modules(&self) -> impl Iterator<Item = Module<'a>> {
+        let pkg = self.repr;
+        self.repr.names.keys().map(move |ix| Module { pkg, ix })
+    }
+
+    pub fn module_by_ix(&self, ix: ModuleIx) -> Option<Module<'a>> {
         if self.repr.modules.is_valid(ix) {
             Some(Module {
                 pkg: &self.repr,
@@ -31,7 +37,7 @@ impl<'a> Package<'a> {
         }
     }
 
-    pub(crate) fn datatype_by_id(&self, id: DatatypeIdent) -> Option<Datatype<'a>> {
+    pub fn datatype_by_id(&self, id: DatatypeIdent) -> Option<Datatype<'a>> {
         self.module_by_ix(id.module)
             .and_then(|m| m.datatype_by_ix(id.datatype))
     }
@@ -48,6 +54,10 @@ impl<'a> Module<'a> {
         self.pkg.modules.get(self.ix).expect("i exist")
     }
 
+    pub fn package(&self) -> Package<'a> {
+        Package { repr: self.pkg }
+    }
+
     pub fn name(&self) -> &str {
         self.pkg.names.get(self.ix).expect("i exist")
     }
@@ -61,7 +71,7 @@ impl<'a> Module<'a> {
             .and_then(|(ix, _)| self.datatype_by_ix(ix))
     }
 
-    pub(crate) fn datatype_by_ix(&self, ix: DatatypeIx) -> Option<Datatype<'a>> {
+    pub fn datatype_by_ix(&self, ix: DatatypeIx) -> Option<Datatype<'a>> {
         if self.repr().datatypes.datatypes.is_valid(ix) {
             Some(Datatype {
                 pkg: self.pkg,
@@ -84,6 +94,16 @@ impl<'a> Module<'a> {
                 id: DatatypeIdent::new(mix, ix),
             })
     }
+
+    // XXX move this to a trait that we dont export, eventaully...
+    pub fn datatype_by_syntax(&self, tref: &SyntaxTypeRef) -> Option<Datatype<'a>> {
+        match tref {
+            SyntaxTypeRef::Name { name, .. } => self.datatype(name),
+            SyntaxTypeRef::Atom { atom, .. } => {
+                self.package().datatype_by_id(atom.datatype_ident())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -102,6 +122,10 @@ impl<'a> Datatype<'a> {
             .datatypes
             .get(self.id.datatype)
             .expect("i exist")
+    }
+
+    pub fn id(&self) -> DatatypeIdent {
+        self.id
     }
 
     pub fn name(&self) -> &'a str {
@@ -135,6 +159,10 @@ impl<'a> Datatype<'a> {
             }),
         }
     }
+
+    pub fn abi_type(&self) -> Option<AbiType> {
+        self.variant().abi_type()
+    }
 }
 
 impl<'a> MemArea for Datatype<'a> {
@@ -152,6 +180,17 @@ pub enum DatatypeVariant<'a> {
     Struct(StructDatatype<'a>),
     Enum(EnumDatatype<'a>),
     Alias(AliasDatatype<'a>),
+}
+
+impl<'a> DatatypeVariant<'a> {
+    pub fn abi_type(&self) -> Option<AbiType> {
+        match self {
+            DatatypeVariant::Atom(a) => Some(AbiType::from_atom(a)),
+            DatatypeVariant::Struct(_) => None,
+            DatatypeVariant::Enum(_) => Some(AbiType::I32),
+            DatatypeVariant::Alias(a) => a.to().abi_type(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

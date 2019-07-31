@@ -1,6 +1,7 @@
 pub mod atoms;
 pub mod cursor;
 pub mod datatypes;
+pub mod function;
 pub mod prelude;
 pub mod repr;
 
