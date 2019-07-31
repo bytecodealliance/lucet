@@ -139,7 +139,7 @@ impl DataTypeModuleBuilder {
                 // No recursion to do on the dfs.
                 if !finalized_types.contains_key(&id) {
                     // x86_64 ABI says enum is 32 bits wide
-                    let repr_size = AtomType::U32.repr_size();
+                    let repr_size = AtomType::U32.mem_size();
                     let align = repr_size;
                     finalized_types.insert(
                         id,
@@ -193,7 +193,7 @@ fn datatype_repr_size_align(
 ) -> Option<(usize, usize)> {
     let (size, align) = match datatype_ref {
         DataTypeRef::Atom(a) => {
-            let s = a.repr_size();
+            let s = a.mem_size();
             (s, s)
         }
         DataTypeRef::Defined(ref member_ident) => {

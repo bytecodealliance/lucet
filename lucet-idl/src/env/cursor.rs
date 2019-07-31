@@ -1,17 +1,27 @@
-use crate::env::memarea::MemArea;
-pub use crate::env::types::EnumMember;
-use crate::env::types::{
-    AliasDatatypeRepr, AtomType, DatatypeIdent, DatatypeRepr, DatatypeVariantRepr,
-    EnumDatatypeRepr, ModuleIx, ModuleRepr, PackageRepr, StructDatatypeRepr, StructMemberRepr,
+use crate::env::atoms::AtomType;
+use crate::env::repr::{
+    AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
+    EnumDatatypeRepr, EnumMember, ModuleIx, ModuleRepr, PackageRepr, StructDatatypeRepr,
+    StructMemberRepr,
 };
+use crate::env::MemArea;
 
-pub struct Package {
-    repr: PackageRepr,
+#[derive(Debug, Clone)]
+pub struct Package<'a> {
+    repr: &'a PackageRepr,
 }
 
-impl Package {
-    pub fn module<'a>(&'a self, name: &str) -> Option<Module<'a>> {
-        if let Some((ix, _)) = self.repr.names.iter().find(|(_, n)| *n == name) {
+impl<'a> Package<'a> {
+    pub fn module(&self, name: &str) -> Option<Module<'a>> {
+        self.repr
+            .names
+            .iter()
+            .find(|(_, n)| *n == name)
+            .and_then(|(ix, _)| self.module_by_ix(ix))
+    }
+
+    pub(crate) fn module_by_ix(&self, ix: ModuleIx) -> Option<Module<'a>> {
+        if self.repr.modules.is_valid(ix) {
             Some(Module {
                 pkg: &self.repr,
                 ix,
@@ -20,8 +30,14 @@ impl Package {
             None
         }
     }
+
+    pub(crate) fn datatype_by_id(&self, id: DatatypeIdent) -> Option<Datatype<'a>> {
+        self.module_by_ix(id.module)
+            .and_then(|m| m.datatype_by_ix(id.datatype))
+    }
 }
 
+#[derive(Debug, Clone)]
 pub struct Module<'a> {
     pkg: &'a PackageRepr,
     ix: ModuleIx,
@@ -37,7 +53,16 @@ impl<'a> Module<'a> {
     }
 
     pub fn datatype(&self, name: &str) -> Option<Datatype<'a>> {
-        if let Some((ix, _)) = self.repr().datatypes.names.iter().find(|(_, n)| *n == name) {
+        self.repr()
+            .datatypes
+            .names
+            .iter()
+            .find(|(_, n)| *n == name)
+            .and_then(|(ix, _)| self.datatype_by_ix(ix))
+    }
+
+    pub(crate) fn datatype_by_ix(&self, ix: DatatypeIx) -> Option<Datatype<'a>> {
+        if self.repr().datatypes.datatypes.is_valid(ix) {
             Some(Datatype {
                 pkg: self.pkg,
                 id: DatatypeIdent::new(self.ix, ix),
@@ -61,6 +86,7 @@ impl<'a> Module<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Datatype<'a> {
     pkg: &'a PackageRepr,
     id: DatatypeIdent,
@@ -112,11 +138,11 @@ impl<'a> Datatype<'a> {
 }
 
 impl<'a> MemArea for Datatype<'a> {
-    fn repr_size(&self) -> usize {
-        self.repr().repr_size
+    fn mem_size(&self) -> usize {
+        self.repr().mem_size
     }
-    fn align(&self) -> usize {
-        self.repr().align
+    fn mem_align(&self) -> usize {
+        self.repr().mem_align
     }
 }
 
@@ -161,6 +187,7 @@ impl<'a> From<StructDatatype<'a>> for Datatype<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct StructMember<'a> {
     pkg: &'a PackageRepr,
     repr: &'a StructMemberRepr,

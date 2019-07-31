@@ -6,7 +6,6 @@ extern crate failure;
 mod c;
 mod config;
 mod data_layout;
-mod datatypes;
 pub mod env;
 mod error;
 mod function;

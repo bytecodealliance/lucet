@@ -1,5 +1,10 @@
+pub mod atoms;
 pub mod cursor;
 pub mod datatypes;
-pub mod memarea;
 pub mod prelude;
-pub mod types;
+pub mod repr;
+
+pub trait MemArea {
+    fn mem_size(&self) -> usize;
+    fn mem_align(&self) -> usize;
+}

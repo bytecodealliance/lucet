@@ -1,4 +1,5 @@
-pub use crate::datatypes::{AbiType, AtomType, MemArea};
+pub use crate::env::atoms::{AbiType, AtomType};
+pub use crate::env::MemArea;
 
 use std::fmt;
 
@@ -71,10 +72,10 @@ pub struct Name {
 }
 
 impl MemArea for DataType {
-    fn repr_size(&self) -> usize {
+    fn mem_size(&self) -> usize {
         self.repr_size
     }
-    fn align(&self) -> usize {
+    fn mem_align(&self) -> usize {
         self.align
     }
 }

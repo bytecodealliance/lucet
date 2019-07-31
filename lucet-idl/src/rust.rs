@@ -485,13 +485,13 @@ impl RustGenerator {
                     pre.push(format!(
                         "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
                         ptr = ptr.name,
-                        align = input_mem.align(),
+                        align = input_mem.mem_align(),
                     ));
                     pre.push(format!(
                         "#[allow(non_snake_case)] let {name}___MEM: &[u8] = heap.get({ptr}..({ptr}+{len})).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
                         name = input.name,
                         ptr = ptr.name,
-                        len = input_mem.repr_size(),
+                        len = input_mem.mem_size(),
                     ));
                     pre.push(format!(
                         "let {name}: &{typename} = unsafe {{ ({name}___MEM.as_ptr() as *const {typename}).as_ref().unwrap()  }}; // convert pointer in linear memory to ref",
@@ -509,14 +509,14 @@ impl RustGenerator {
                     pre.push(format!(
                         "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
                         ptr = ptr.name,
-                        align = input_mem.align(),
+                        align = input_mem.mem_align(),
                     ));
                     pre.push(format!(
                         "#[allow(non_snake_case)] let {name}___MEM: &[u8] = heap.get({ptr}..({ptr}+({len}*{elem_len}))).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
                         name = input.name,
                         ptr = ptr.name,
                         len = len.name,
-                        elem_len = input_mem.repr_size(),
+                        elem_len = input_mem.mem_size(),
                     ));
 
                     pre.push(format!(
@@ -548,13 +548,13 @@ impl RustGenerator {
                     pre.push(format!(
                         "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
                         ptr = ptr.name,
-                        align = io_mem.align(),
+                        align = io_mem.mem_align(),
                     ));
                     pre.push(format!(
                         "#[allow(non_snake_case)] let mut {name}___MEM: &mut [u8] = heap.get_mut({ptr}..({ptr}+{len})).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
                         name = io.name,
                         ptr = ptr.name,
-                        len = io_mem.repr_size(),
+                        len = io_mem.mem_size(),
                     ));
                     pre.push(format!(
                         "let mut {name}: &mut {typename} = unsafe {{ ({name}___MEM.as_mut_ptr() as *mut {typename}).as_mut().unwrap()  }}; // convert pointer in linear memory to ref",
@@ -572,14 +572,14 @@ impl RustGenerator {
                     pre.push(format!(
                         "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
                         ptr = ptr.name,
-                        align = io_mem.align(),
+                        align = io_mem.mem_align(),
                     ));
                     pre.push(format!(
                         "#[allow(non_snake_case)] let mut {name}___MEM: &mut [u8] = heap.get_mut({ptr}..({ptr}+({len}*{elem_len}))).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
                         name = io.name,
                         ptr = ptr.name,
                         len = len.name,
-                        elem_len = io_mem.repr_size(),
+                        elem_len = io_mem.mem_size(),
                     ));
 
                     pre.push(format!(
@@ -604,13 +604,13 @@ impl RustGenerator {
                     pre.push(format!(
                         "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
                         ptr = ptr.name,
-                        align = out_mem.align(),
+                        align = out_mem.mem_align(),
                     ));
                     pre.push(format!(
                         "#[allow(non_snake_case)] let mut {name}___MEM: &mut [u8] = heap.get_mut({ptr}..({ptr}+{len})).ok_or_else(|| () /* FIXME: bounds check failed */)?;",
                         name = out.name,
                         ptr = ptr.name,
-                        len = out_mem.repr_size(),
+                        len = out_mem.mem_size(),
                     ));
                     pre.push(format!(
                         "let mut {ptr}: &mut {typename} = unsafe {{ ({name}___MEM.as_mut_ptr() as *mut {typename}).as_mut().unwrap()  }}; // convert pointer in linear memory to ref",

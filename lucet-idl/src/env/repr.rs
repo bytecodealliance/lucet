@@ -1,3 +1,4 @@
+use crate::env::atoms::{AbiType, AtomType};
 use cranelift_entity::{entity_impl, PrimaryMap};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -43,6 +44,7 @@ pub struct ModuleRepr {
 pub struct ModuleDatatypesRepr {
     pub names: PrimaryMap<DatatypeIx, String>,
     pub datatypes: PrimaryMap<DatatypeIx, DatatypeRepr>,
+    pub topological_order: Vec<DatatypeIx>,
 }
 
 #[derive(Debug, Clone)]
@@ -54,8 +56,8 @@ pub struct ModuleFuncsRepr {
 #[derive(Debug, Clone)]
 pub struct DatatypeRepr {
     pub variant: DatatypeVariantRepr,
-    pub repr_size: usize,
-    pub align: usize,
+    pub mem_size: usize,
+    pub mem_align: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -64,67 +66,6 @@ pub enum DatatypeVariantRepr {
     Struct(StructDatatypeRepr),
     Enum(EnumDatatypeRepr),
     Alias(AliasDatatypeRepr),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum AtomType {
-    Bool,
-    U8,
-    U16,
-    U32,
-    U64,
-    I8,
-    I16,
-    I32,
-    I64,
-    F32,
-    F64,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum AbiType {
-    I32,
-    I64,
-    F32,
-    F64,
-}
-
-impl AbiType {
-    pub fn from_atom(a: &AtomType) -> Self {
-        match a {
-            AtomType::Bool
-            | AtomType::U8
-            | AtomType::I8
-            | AtomType::U16
-            | AtomType::I16
-            | AtomType::U32
-            | AtomType::I32 => AbiType::I32,
-            AtomType::I64 | AtomType::U64 => AbiType::I64,
-            AtomType::F32 => AbiType::F32,
-            AtomType::F64 => AbiType::F64,
-        }
-    }
-
-    pub fn of_atom(a: AtomType) -> Option<Self> {
-        match a {
-            AtomType::I32 => Some(AbiType::I32),
-            AtomType::I64 => Some(AbiType::I64),
-            AtomType::F32 => Some(AbiType::F32),
-            AtomType::F64 => Some(AbiType::F64),
-            _ => None,
-        }
-    }
-}
-
-impl From<AbiType> for AtomType {
-    fn from(abi: AbiType) -> AtomType {
-        match abi {
-            AbiType::I32 => AtomType::I32,
-            AbiType::I64 => AtomType::I64,
-            AbiType::F32 => AtomType::F32,
-            AbiType::F64 => AtomType::F64,
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

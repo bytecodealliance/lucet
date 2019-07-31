@@ -1,8 +1,9 @@
-use crate::env::memarea::MemArea;
-use crate::env::types::{
-    AtomType, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr, ModuleDatatypesRepr,
+use crate::env::atoms::AtomType;
+use crate::env::repr::{
+    DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr, ModuleDatatypesRepr,
     ModuleFuncsRepr, ModuleIx, ModuleRepr, PackageRepr,
 };
+use crate::env::MemArea;
 use cranelift_entity::{EntityRef, PrimaryMap};
 
 pub fn base_package() -> PackageRepr {
@@ -20,38 +21,37 @@ pub fn base_package() -> PackageRepr {
 }
 
 fn atom_datatypes() -> ModuleDatatypesRepr {
-    fn create_atom(
-        names: &mut PrimaryMap<DatatypeIx, String>,
-        datatypes: &mut PrimaryMap<DatatypeIx, DatatypeRepr>,
-        name: &str,
-        atom: AtomType,
-    ) {
-        let ix = names.push(name.to_owned());
-        let repr_size = atom.repr_size();
-        let align = atom.align();
-        let dix = datatypes.push(DatatypeRepr {
+    fn create_atom(repr: &mut ModuleDatatypesRepr, name: &str, atom: AtomType) {
+        let ix = repr.names.push(name.to_owned());
+        let mem_size = atom.mem_size();
+        let mem_align = atom.mem_align();
+        let dix = repr.datatypes.push(DatatypeRepr {
             variant: DatatypeVariantRepr::Atom(atom),
-            repr_size,
-            align,
+            mem_size,
+            mem_align,
         });
         assert_eq!(ix, dix, "names and datatypes out of sync");
+        repr.topological_order.push(ix);
     }
 
-    let mut names = PrimaryMap::new();
-    let mut datatypes = PrimaryMap::new();
-    create_atom(&mut names, &mut datatypes, "bool", AtomType::Bool);
-    create_atom(&mut names, &mut datatypes, "u8", AtomType::U8);
-    create_atom(&mut names, &mut datatypes, "u16", AtomType::U16);
-    create_atom(&mut names, &mut datatypes, "u32", AtomType::U32);
-    create_atom(&mut names, &mut datatypes, "u64", AtomType::U64);
-    create_atom(&mut names, &mut datatypes, "i8", AtomType::I8);
-    create_atom(&mut names, &mut datatypes, "i16", AtomType::I16);
-    create_atom(&mut names, &mut datatypes, "i32", AtomType::I32);
-    create_atom(&mut names, &mut datatypes, "i64", AtomType::I64);
-    create_atom(&mut names, &mut datatypes, "f32", AtomType::F32);
-    create_atom(&mut names, &mut datatypes, "f64", AtomType::F64);
+    let mut repr = ModuleDatatypesRepr {
+        names: PrimaryMap::new(),
+        datatypes: PrimaryMap::new(),
+        topological_order: Vec::new(),
+    };
+    create_atom(&mut repr, "bool", AtomType::Bool);
+    create_atom(&mut repr, "u8", AtomType::U8);
+    create_atom(&mut repr, "u16", AtomType::U16);
+    create_atom(&mut repr, "u32", AtomType::U32);
+    create_atom(&mut repr, "u64", AtomType::U64);
+    create_atom(&mut repr, "i8", AtomType::I8);
+    create_atom(&mut repr, "i16", AtomType::I16);
+    create_atom(&mut repr, "i32", AtomType::I32);
+    create_atom(&mut repr, "i64", AtomType::I64);
+    create_atom(&mut repr, "f32", AtomType::F32);
+    create_atom(&mut repr, "f64", AtomType::F64);
 
-    ModuleDatatypesRepr { names, datatypes }
+    repr
 }
 
 impl AtomType {
@@ -76,7 +76,8 @@ impl AtomType {
 #[cfg(test)]
 mod test {
     use super::base_package;
-    use crate::env::types::{AtomType, DatatypeIdent, DatatypeVariantRepr, PackageRepr};
+    use crate::env::atoms::AtomType;
+    use crate::env::repr::{DatatypeIdent, DatatypeVariantRepr, PackageRepr};
     #[test]
     fn atom_idents() {
         use AtomType::*;

@@ -1,21 +1,24 @@
 #![allow(unused_imports)] // XXX remove me when more complete
-use crate::env::memarea::MemArea;
-use crate::env::types::{
-    AliasDatatypeRepr, AtomType, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
-    EnumDatatypeRepr, EnumMember, ModuleIx, StructDatatypeRepr, StructMemberRepr,
+use crate::env::atoms::AtomType;
+use crate::env::cursor::Package;
+use crate::env::repr::{
+    AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
+    EnumDatatypeRepr, EnumMember, ModuleDatatypesRepr, ModuleIx, StructDatatypeRepr,
+    StructMemberRepr,
 };
+use crate::env::MemArea;
 use crate::error::ValidationError;
 use crate::parser::{
     EnumVariant as EnumVariantSyntax, StructMember as StructMemberSyntax, SyntaxTypeRef,
 };
 use crate::types::Location;
-use cranelift_entity::PrimaryMap;
+use cranelift_entity::{PrimaryMap, SecondaryMap};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct DatatypeIR {
-    pub variant: VariantIR,
-    pub location: Location,
+    variant: VariantIR,
+    location: Location,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -46,17 +49,19 @@ enum VariantIR {
     Alias(AliasIR),
 }
 
-#[derive(Debug, Clone)]
-pub struct DatatypeModuleBuilder {
+#[derive(Clone)]
+pub struct DatatypeModuleBuilder<'a> {
+    env: Package<'a>,
     module: ModuleIx,
     name_decls: HashMap<String, (Location, DatatypeIx)>,
     name_map: PrimaryMap<DatatypeIx, String>,
     types: PrimaryMap<DatatypeIx, DatatypeIR>,
 }
 
-impl DatatypeModuleBuilder {
-    pub fn new(module: ModuleIx) -> Self {
+impl<'a> DatatypeModuleBuilder<'a> {
+    pub fn new(env: Package<'a>, module: ModuleIx) -> Self {
         Self {
+            env,
             module,
             name_decls: HashMap::new(),
             name_map: PrimaryMap::new(),
@@ -81,7 +86,7 @@ impl DatatypeModuleBuilder {
         Ok(dix)
     }
 
-    pub fn lookup_datatype_ident(
+    fn datatype_ident_from_syntax(
         &self,
         syntax: &SyntaxTypeRef,
     ) -> Result<DatatypeIdent, ValidationError> {
@@ -125,23 +130,20 @@ impl DatatypeModuleBuilder {
             }
             // Get the DatatypeIdent for the member, which ensures that it refers only to
             // defined types:
-            let type_ = self.lookup_datatype_ident(&mem.type_)?;
+            let type_ = self.datatype_ident_from_syntax(&mem.type_)?;
             // build the struct with this as the member:
             members.push(StructMemberIR {
                 type_,
                 name: mem.name.clone(),
             });
         }
-        let type_ix = self.types.push(DatatypeIR {
-            variant: VariantIR::Struct(StructIR { members }),
-            location: *location,
-        });
-
-        assert_eq!(
-            ix, type_ix,
-            "datatypes must be introduced in the same order as their names"
+        self.define_datatype(
+            ix,
+            DatatypeIR {
+                variant: VariantIR::Struct(StructIR { members }),
+                location: *location,
+            },
         );
-
         Ok(())
     }
 
@@ -175,13 +177,12 @@ impl DatatypeModuleBuilder {
                 name: var.name.clone(),
             })
         }
-        let type_ix = self.types.push(DatatypeIR {
-            variant: VariantIR::Enum(EnumIR { members }),
-            location: *location,
-        });
-        assert_eq!(
-            ix, type_ix,
-            "datatypes must be introduced in the same order as their names"
+        self.define_datatype(
+            ix,
+            DatatypeIR {
+                variant: VariantIR::Enum(EnumIR { members }),
+                location: *location,
+            },
         );
         Ok(())
     }
@@ -192,165 +193,204 @@ impl DatatypeModuleBuilder {
         dest: &SyntaxTypeRef,
         location: &Location,
     ) -> Result<(), ValidationError> {
-        let to = self.lookup_datatype_ident(dest)?;
-        let type_ix = self.types.push(DatatypeIR {
-            variant: VariantIR::Alias(AliasIR { to }),
-            location: *location,
-        });
-        assert_eq!(
-            ix, type_ix,
-            "datatypes must be introduced in the same order as their names"
+        let to = self.datatype_ident_from_syntax(dest)?;
+        self.define_datatype(
+            ix,
+            DatatypeIR {
+                variant: VariantIR::Alias(AliasIR { to }),
+                location: *location,
+            },
         );
         Ok(())
     }
 
-    /*
-    pub fn validate_datatypes(
-        &self,
-        names: &[Name],
-    ) -> Result<(HashMap<Ident, DataType>, Vec<Ident>), ValidationError> {
-        let mut finalized = HashMap::new();
+    fn define_datatype(&mut self, ix: DatatypeIx, ir: DatatypeIR) {
+        let type_ix = self.types.push(ir);
+        assert_eq!(
+            ix, type_ix,
+            "datatypes must be introduced in the same order as their names"
+        );
+    }
+
+    pub fn build(self) -> Result<ModuleDatatypesRepr, ValidationError> {
+        let mut finalized = SecondaryMap::new();
         let mut ordered = Vec::new();
         // Important to iterate in name order, so error messages are consistient.
         // HashMap iteration order is not stable.
-        for (ix, name) in names.iter().enumerate() {
-            let id = Ident(ix);
-            if let Some(decl) = self.data_types.get(&id) {
-                // First, make sure datatypes are finite
-                let mut visited = Vec::new();
-                visited.resize(names.len(), false);
+        for (ix, name) in self.name_map.iter() {
+            let decl = self
+                .types
+                .get(ix)
+                .expect("all datatypes declared were defined");
 
-                self.dfs_walk(id, &mut visited, &mut ordered, &mut finalized)
-                    .map_err(|_| ValidationError::Infinite {
-                        name: name.name.clone(),
-                        location: decl.location.clone(),
-                    })?;
-            }
+            // Depth first search through datatypes will return an error if they
+            // are infinite, and insert
+            let mut visited = SecondaryMap::new();
+            visited.resize(self.name_map.len());
+
+            self.dfs_walk(ix, &mut visited, &mut ordered, &mut finalized)
+                .map_err(|_| ValidationError::Infinite {
+                    name: name.clone(),
+                    location: decl.location.clone(),
+                })?;
         }
-        Ok((finalized, ordered))
+
+        let mut datatypes = PrimaryMap::new();
+        for dt in finalized.values() {
+            datatypes.push(dt.clone().expect("all datatypes finalized"));
+        }
+
+        assert_eq!(
+            self.name_map.len(),
+            datatypes.len(),
+            "each datatype defined"
+        );
+        assert_eq!(
+            self.name_map.len(),
+            ordered.len(),
+            "each datatype present in topological sort"
+        );
+
+        Ok(ModuleDatatypesRepr {
+            names: self.name_map,
+            datatypes,
+            topological_order: ordered,
+        })
     }
 
     fn dfs_walk(
         &self,
-        id: Ident,
-        visited: &mut [bool],
-        ordered: &mut Vec<Ident>,
-        finalized_types: &mut HashMap<Ident, DataType>,
+        ix: DatatypeIx,
+        visited: &mut SecondaryMap<DatatypeIx, bool>,
+        ordered: &mut Vec<DatatypeIx>,
+        finalized_types: &mut SecondaryMap<DatatypeIx, Option<DatatypeRepr>>,
     ) -> Result<(), ()> {
-        if visited[id.0] {
+        // Ensure that dfs terminates:
+        if visited[ix] {
             Err(())?
         }
-        visited[id.0] = true;
-        let dt = self.data_types.get(&id).expect("data type IR is defined");
+        visited[ix] = true;
+
+        let dt = self.types.get(ix).expect("data type IR is defined");
 
         match &dt.variant {
             VariantIR::Struct(ref s) => {
                 // First, iterate down the member to ensure this is finite, and fill in type
-                // info for leaves first
+                // info for leaves first.
+                // IMPORTANT: assumes any type defined outside this module is an atom!
                 for mem in s.members.iter() {
-                    if let DataTypeRef::Defined(id) = mem.type_ {
-                        self.dfs_walk(id, visited, ordered, finalized_types)?;
-                    };
+                    if mem.type_.module == self.module {
+                        self.dfs_walk(mem.type_.datatype, visited, ordered, finalized_types)?;
+                    }
                 }
                 // If finalized type information has not yet been computed, we can now compute it:
-                if !finalized_types.contains_key(&id) {
+                if finalized_types
+                    .get(ix)
+                    .expect("ix exists in types")
+                    .is_none()
+                {
                     let mut offset = 0;
                     let mut struct_align = 1;
-                    let mut members: Vec<StructMember> = Vec::new();
+                    let mut members: Vec<StructMemberRepr> = Vec::new();
                     for mem in s.members.iter() {
-                        let (repr_size, align) =
-                            datatype_repr_size_align(&mem.type_, finalized_types)
-                                .expect("datatype is defined by prior dfs_walk");
+                        let (mem_size, align) =
+                            self.datatype_size_align(mem.type_, finalized_types);
 
                         offset = align_to(offset, align);
                         struct_align = ::std::cmp::max(struct_align, align);
 
-                        members.push(StructMember {
+                        members.push(StructMemberRepr {
                             type_: mem.type_.clone(),
                             name: mem.name.clone(),
                             offset,
                         });
-                        offset += repr_size;
+                        offset += mem_size;
                     }
 
-                    let repr_size = align_to(offset, struct_align);
+                    let mem_size = align_to(offset, struct_align);
 
-                    finalized_types.insert(
-                        id,
-                        DataType {
-                            variant: DataTypeVariant::Struct(StructDataType { members }),
-                            repr_size,
-                            align: struct_align,
-                        },
-                    );
+                    finalized_types[ix] = Some(DatatypeRepr {
+                        variant: DatatypeVariantRepr::Struct(StructDatatypeRepr { members }),
+                        mem_size,
+                        mem_align: struct_align,
+                    });
                 }
             }
             VariantIR::Alias(ref a) => {
-                if let DataTypeRef::Defined(pointee_id) = a.to {
-                    self.dfs_walk(pointee_id, visited, ordered, finalized_types)?;
-                };
-                if !finalized_types.contains_key(&id) {
-                    let (repr_size, align) = datatype_repr_size_align(&a.to, finalized_types)
-                        .expect("datatype is defined by prior dfs_walk");
-                    finalized_types.insert(
-                        id,
-                        DataType {
-                            variant: DataTypeVariant::Alias(AliasDataType { to: a.to.clone() }),
-                            repr_size,
-                            align,
-                        },
-                    );
+                // Iterate down the pointer to ensure this is finite, and fill in type
+                // info for pointee first.
+                // IMPORTANT: assumes any type defined outside this module is an atom!
+                if a.to.module == self.module {
+                    self.dfs_walk(a.to.datatype, visited, ordered, finalized_types)?;
+                }
+
+                // If finalized type information has not yet been computed, we can now compute it:
+                if finalized_types
+                    .get(ix)
+                    .expect("ix exists in types")
+                    .is_none()
+                {
+                    let (mem_size, mem_align) = self.datatype_size_align(a.to, finalized_types);
+                    finalized_types[ix] = Some(DatatypeRepr {
+                        variant: DatatypeVariantRepr::Alias(AliasDatatypeRepr { to: a.to.clone() }),
+                        mem_size,
+                        mem_align,
+                    });
                 }
             }
             VariantIR::Enum(ref e) => {
                 // No recursion to do on the dfs.
-                if !finalized_types.contains_key(&id) {
+                if finalized_types
+                    .get(ix)
+                    .expect("ix exists in types")
+                    .is_none()
+                {
                     // x86_64 ABI says enum is 32 bits wide
-                    let repr_size = AtomType::U32.repr_size();
-                    let align = repr_size;
-                    finalized_types.insert(
-                        id,
-                        DataType {
-                            variant: DataTypeVariant::Enum(EnumDataType {
-                                members: e.members.clone(),
-                            }),
-                            repr_size,
-                            align,
-                        },
-                    );
+                    let mem_size = AtomType::U32.mem_size();
+                    let mem_align = mem_size;
+                    finalized_types[ix] = Some(DatatypeRepr {
+                        variant: DatatypeVariantRepr::Enum(EnumDatatypeRepr {
+                            members: e.members.clone(),
+                        }),
+                        mem_size,
+                        mem_align,
+                    });
                 }
             }
         }
-        if !ordered.contains(&id) {
-            ordered.push(id)
+        if !ordered.contains(&ix) {
+            ordered.push(ix)
         }
-        visited[id.0] = false;
+
+        // dfs: allowed to visit here again
+        visited[ix] = false;
         Ok(())
     }
 
-    */
+    fn datatype_size_align(
+        &self,
+        id: DatatypeIdent,
+        finalized_types: &SecondaryMap<DatatypeIx, Option<DatatypeRepr>>,
+    ) -> (usize, usize) {
+        let (size, align) = if id.module == self.module {
+            let t = finalized_types
+                .get(id.datatype)
+                .cloned()
+                .expect("looking up identifier in this module")
+                .expect("looking up type defined in this module");
+            (t.mem_size, t.mem_align)
+        } else {
+            let dt = self
+                .env
+                .datatype_by_id(id)
+                .expect("looking up identifier external to this module");
+            (dt.mem_size(), dt.mem_align())
+        };
+        assert!(size > 0);
+        assert!(align > 0);
+        (size, align)
+    }
 }
-
-/*
-fn datatype_repr_size_align(
-    datatype_ref: &DataTypeRef,
-    finalized_types: &HashMap<Ident, DataType>,
-) -> Option<(usize, usize)> {
-    let (size, align) = match datatype_ref {
-        DataTypeRef::Atom(a) => {
-            let s = a.repr_size();
-            (s, s)
-        }
-        DataTypeRef::Defined(ref member_ident) => {
-            let t = finalized_types.get(member_ident)?;
-            (t.repr_size, t.align)
-        }
-    };
-    assert!(size > 0);
-    assert!(align > 0);
-    Some((size, align))
-}
-*/
 
 fn align_to(offs: usize, alignment: usize) -> usize {
     offs + alignment - 1 - ((offs + alignment - 1) % alignment)
