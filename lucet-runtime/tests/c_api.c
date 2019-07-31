@@ -117,34 +117,25 @@ bool lucet_runtime_test_yield_resume(struct lucet_dl_module *mod)
     uint64_t results[5] = { 0 };
     size_t   i          = 0;
 
-    err = lucet_instance_run(inst, "f", 0, (const struct lucet_val[]){});
-    while (err == lucet_error_ok) {
-        struct lucet_state st;
-        err = lucet_instance_state(inst, &st);
-        if (err != lucet_error_ok) {
-            fprintf(stderr, "couldn't get instance state\n");
-            goto fail3;
-        }
-        if (st.tag != lucet_state_tag_yielded) {
-            break;
-        }
-
+    struct lucet_result res;
+    lucet_instance_run(inst, "f", 0, (const struct lucet_val[]){}, &res);
+    while (res.tag == lucet_result_tag_yielded) {
         if (i >= 5) {
             fprintf(stderr, "hostcall yielded too many results\n");
             goto fail3;
         }
 
-        struct yield_resume_val val = *(struct yield_resume_val *) st.val.yielded.val;
+        struct yield_resume_val val = *(struct yield_resume_val *) res.val.yielded.val;
 
         switch (val.tag) {
         case yield_resume_tag_mult: {
             uint64_t mult_result = val.val.mult.x * val.val.mult.y;
-            err                  = lucet_instance_resume(inst, &mult_result);
+            lucet_instance_resume(inst, &mult_result, &res);
             continue;
         }
         case yield_resume_tag_result: {
             results[i++] = val.val.result;
-            err          = lucet_instance_resume(inst, NULL);
+            lucet_instance_resume(inst, NULL, &res);
             continue;
         }
         default: {
@@ -158,19 +149,12 @@ bool lucet_runtime_test_yield_resume(struct lucet_dl_module *mod)
         goto fail3;
     }
 
-    struct lucet_state st;
-    err = lucet_instance_state(inst, &st);
-    if (err != lucet_error_ok) {
-        fprintf(stderr, "couldn't get instance state\n");
+    if (res.tag != lucet_result_tag_returned) {
+        fprintf(stderr, "final instance result wasn't returned\n");
         goto fail3;
     }
 
-    if (st.tag != lucet_state_tag_returned) {
-        fprintf(stderr, "final instance state wasn't returned\n");
-        goto fail3;
-    }
-
-    uint64_t final_result = LUCET_UNTYPED_RETVAL_TO_U64(st.val.returned);
+    uint64_t final_result = LUCET_UNTYPED_RETVAL_TO_U64(res.val.returned);
 
     lucet_instance_release(inst);
     lucet_region_release(region);

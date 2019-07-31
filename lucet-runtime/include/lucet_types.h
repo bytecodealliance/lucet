@@ -41,14 +41,6 @@ enum lucet_signal_behavior {
     lucet_signal_behavior_terminate,
 };
 
-enum lucet_state_tag {
-    lucet_state_tag_returned,
-    lucet_state_tag_running,
-    lucet_state_tag_fault,
-    lucet_state_tag_terminated,
-    lucet_state_tag_yielded,
-};
-
 enum lucet_terminated_reason {
     lucet_terminated_reason_signal,
     lucet_terminated_reason_ctx_not_found,
@@ -144,20 +136,20 @@ struct lucet_untyped_retval {
     char gp[8];
 };
 
+#define LUCET_MODULE_ADDR_DETAILS_NAME_LEN 256
+
 struct lucet_module_addr_details {
-    bool        module_code_resolvable;
-    bool        in_module_code;
-    const char *file_name;
-    const char *sym_name;
+    bool module_code_resolvable;
+    bool in_module_code;
+    char file_name[LUCET_MODULE_ADDR_DETAILS_NAME_LEN];
+    char sym_name[LUCET_MODULE_ADDR_DETAILS_NAME_LEN];
 };
 
-struct lucet_runtime_fault {
+struct lucet_runtime_faulted {
     bool                             fatal;
     enum lucet_trapcode              trapcode;
     uintptr_t                        rip_addr;
     struct lucet_module_addr_details rip_addr_details;
-    siginfo_t                        signal_info;
-    ucontext_t                       context;
 };
 
 struct lucet_terminated {
@@ -169,17 +161,25 @@ struct lucet_yielded {
     void *val;
 };
 
-union lucet_state_val {
-    struct lucet_untyped_retval returned;
-    bool                        running;
-    struct lucet_runtime_fault  fault;
-    struct lucet_terminated     terminated;
-    struct lucet_yielded        yielded;
+union lucet_result_val {
+    struct lucet_untyped_retval  returned;
+    struct lucet_yielded         yielded;
+    struct lucet_runtime_faulted faulted;
+    struct lucet_terminated      terminated;
+    enum lucet_error             errored;
 };
 
-struct lucet_state {
-    enum lucet_state_tag  tag;
-    union lucet_state_val val;
+enum lucet_result_tag {
+    lucet_result_tag_returned,
+    lucet_result_tag_yielded,
+    lucet_result_tag_faulted,
+    lucet_result_tag_terminated,
+    lucet_result_tag_errored,
+};
+
+struct lucet_result {
+    enum lucet_result_tag  tag;
+    union lucet_result_val val;
 };
 
 union lucet_retval_gp {

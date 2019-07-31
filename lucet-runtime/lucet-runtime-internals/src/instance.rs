@@ -218,7 +218,7 @@ pub struct Instance {
     entrypoint: Option<FunctionPointer>,
 
     /// The value passed back to the guest when resuming a yielded instance.
-    pub(crate) resumed_val: Option<Box<dyn Any + 'static + Send>>,
+    pub(crate) resumed_val: Option<Box<dyn Any + 'static>>,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -470,7 +470,7 @@ impl Instance {
     ///
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
-    pub fn resume_with_val<A: Any + 'static + Send>(&mut self, val: A) -> Result<RunResult, Error> {
+    pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
         match &self.state {
             State::Yielded { expected, .. } => {
                 // make sure the resumed value is of the right type
@@ -483,7 +483,7 @@ impl Instance {
             _ => return Err(Error::InvalidArgument("can only resume a yielded instance")),
         }
 
-        self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static + Send>);
+        self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static>);
 
         self.swap_and_return()
     }
@@ -800,41 +800,58 @@ impl Instance {
 
         // Sandbox has jumped back to the host process, indicating it has either:
         //
-        // * trapped, or called hostcall_error: state tag changed to something other than `Running`
+        // * returned: state should be `Running`; transition to Ready and return a RunResult
+        // * yielded: state should be `Yielded`; take the yielded value and return a RunResult
+        // * trapped: state should be `Fault`; populate details and return an error or call a hanlder as appropriate
+        // * terminated: state should be `Terminated`; take the termination details and return as an Err
         // * function body returned: set state back to `Ready` with return value
+        //
+        // The state should never be `Ready` at this point
 
-        match &self.state {
+        match &mut self.state {
             State::Running => {
                 let retval = self.ctx.get_untyped_retval();
                 self.state = State::Ready { retval };
                 Ok(RunResult::Returned(retval))
             }
-            State::Terminated { details, .. } => Err(Error::RuntimeTerminated(details.clone())),
-            State::Yielded { val, .. } => Ok(RunResult::Yielded(val.clone())),
-            State::Fault { .. } => {
+            State::Terminated { details, .. } => {
+                Err(Error::RuntimeTerminated(details.take().ok_or_else(
+                    || lucet_format_err!("terminated state contained no details"),
+                )?))
+            }
+            State::Yielded { val, .. } => {
+                Ok(RunResult::Yielded(val.take().ok_or_else(|| {
+                    lucet_format_err!("yielded state contained no value")
+                })?))
+            }
+            State::Fault {
+                ref mut details, ..
+            } => {
                 // Sandbox is no longer runnable. It's unsafe to determine all error details in the signal
                 // handler, so we fill in extra details here.
-                self.populate_fault_detail()?;
-                if let State::Fault { ref details, .. } = self.state {
-                    if details.fatal {
-                        // Some errors indicate that the guest is not functioning correctly or that
-                        // the loaded code violated some assumption, so bail out via the fatal
-                        // handler.
+                //
+                // FIXME after lucet-module is complete it should be possible to fill this in without
+                // consulting the process symbol table
+                details.rip_addr_details = self
+                    .module
+                    .addr_details(details.rip_addr as *const c_void)?;
 
-                        // Run the C-style fatal handler, if it exists.
-                        self.c_fatal_handler
-                            .map(|h| unsafe { h(self as *mut Instance) });
+                if details.fatal {
+                    // Some errors indicate that the guest is not functioning correctly or that
+                    // the loaded code violated some assumption, so bail out via the fatal
+                    // handler.
 
-                        // If there is no C-style fatal handler, or if it (erroneously) returns,
-                        // call the Rust handler that we know will not return
-                        (self.fatal_handler)(self)
-                    } else {
-                        // leave the full fault details in the instance state, and return the
-                        // higher-level info to the user
-                        Err(Error::RuntimeFault(details.clone()))
-                    }
+                    // Run the C-style fatal handler, if it exists.
+                    self.c_fatal_handler
+                        .map(|h| unsafe { h(self as *mut Instance) });
+
+                    // If there is no C-style fatal handler, or if it (erroneously) returns,
+                    // call the Rust handler that we know will not return
+                    (self.fatal_handler)(self)
                 } else {
-                    panic!("state remains Fault after populate_fault_detail()")
+                    // leave the full fault details in the instance state, and return the
+                    // higher-level info to the user
+                    Err(Error::RuntimeFault(details.clone()))
                 }
             }
             State::Ready { .. } => {
@@ -852,26 +869,6 @@ impl Instance {
         }
         Ok(())
     }
-
-    fn populate_fault_detail(&mut self) -> Result<(), Error> {
-        if let State::Fault {
-            details:
-                FaultDetails {
-                    rip_addr,
-                    ref mut rip_addr_details,
-                    ..
-                },
-            ..
-        } = self.state
-        {
-            // We do this after returning from the signal handler because it requires `dladdr`
-            // calls, which are not signal safe
-            // FIXME after lucet-module is complete it should be possible to fill this in without
-            // consulting the process symbol table
-            *rip_addr_details = self.module.addr_details(rip_addr as *const c_void)?.clone();
-        }
-        Ok(())
-    }
 }
 
 pub enum State {
@@ -885,10 +882,14 @@ pub enum State {
         context: UContext,
     },
     Terminated {
-        details: TerminationDetails,
+        /// This is always expected to be a `Some` when a terminating instance context switches back
+        /// to the host, but is `take`n to popuate the resulting `Error`.
+        details: Option<TerminationDetails>,
     },
     Yielded {
-        val: YieldedVal,
+        /// This is always expected to be a `Some` when a yielding instance context switches back to
+        /// the host, but is `take`n to popuate the `RunResult`.
+        val: Option<YieldedVal>,
         /// Concretely, this should only ever be `Box<PhantomData<R>>` where `R` is the type
         /// the guest expects upon resumption.
         expected: Box<dyn Any>,
@@ -952,7 +953,6 @@ impl std::fmt::Display for FaultDetails {
 /// Guests are terminated either explicitly by `Vmctx::terminate()`, or implicitly by signal
 /// handlers that return `SignalBehavior::Terminate`. It usually indicates that an unrecoverable
 /// error has occurred in a hostcall, rather than in WebAssembly code.
-#[derive(Clone)]
 pub enum TerminationDetails {
     /// Returned when a signal handler terminates the instance.
     Signal,
@@ -969,12 +969,12 @@ pub enum TerminationDetails {
     /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
     BorrowError(&'static str),
     /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
-    Provided(Arc<dyn Any + 'static + Send + Sync>),
+    Provided(Box<dyn Any + 'static>),
 }
 
 impl TerminationDetails {
-    pub fn provide<A: Any + 'static + Send + Sync>(details: A) -> Self {
-        TerminationDetails::Provided(Arc::new(details))
+    pub fn provide<A: Any + 'static>(details: A) -> Self {
+        TerminationDetails::Provided(Box::new(details))
     }
     pub fn provided_details(&self) -> Option<&dyn Any> {
         match self {
@@ -1028,9 +1028,8 @@ unsafe impl Sync for TerminationDetails {}
 
 /// The value yielded by an instance through a [`Vmctx`](vmctx/struct.Vmctx.html) and returned to
 /// the host.
-#[derive(Clone)]
 pub struct YieldedVal {
-    val: Arc<dyn Any + 'static + Send + Sync>,
+    val: Box<dyn Any + 'static>,
 }
 
 impl std::fmt::Debug for YieldedVal {
@@ -1044,8 +1043,8 @@ impl std::fmt::Debug for YieldedVal {
 }
 
 impl YieldedVal {
-    pub(crate) fn new<A: Any + 'static + Send + Sync>(val: A) -> Self {
-        YieldedVal { val: Arc::new(val) }
+    pub(crate) fn new<A: Any + 'static>(val: A) -> Self {
+        YieldedVal { val: Box::new(val) }
     }
 
     /// Returns `true` if the guest yielded without a value.
@@ -1060,7 +1059,7 @@ impl YieldedVal {
 
     /// Attempt to downcast the yielded value to a concrete type, returning the original
     /// `YieldedVal` if unsuccessful.
-    pub fn downcast<A: Any + 'static + Send + Sync>(self) -> Result<Arc<A>, YieldedVal> {
+    pub fn downcast<A: Any + 'static + Send + Sync>(self) -> Result<Box<A>, YieldedVal> {
         match self.val.downcast() {
             Ok(val) => Ok(val),
             Err(val) => Err(YieldedVal { val }),

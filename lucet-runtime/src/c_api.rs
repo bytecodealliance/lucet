@@ -58,18 +58,18 @@ pub extern "C" fn lucet_error_name(e: c_int) -> *const c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn lucet_state_tag_name(tag: libc::c_int) -> *const c_char {
-    if let Some(tag) = lucet_state_tag::from_i32(tag) {
-        use self::lucet_state_tag::*;
+pub extern "C" fn lucet_result_tag_name(tag: libc::c_int) -> *const c_char {
+    if let Some(tag) = lucet_result_tag::from_i32(tag) {
+        use self::lucet_result_tag::*;
         match tag {
-            Returned => "lucet_state_tag_returned\0".as_ptr() as _,
-            Running => "lucet_state_tag_running\0".as_ptr() as _,
-            Fault => "lucet_state_tag_fault\0".as_ptr() as _,
-            Terminated => "lucet_state_tag_terminated\0".as_ptr() as _,
-            Yielded => "lucet_state_tag_yielded\0".as_ptr() as _,
+            Returned => "lucet_result_tag_returned\0".as_ptr() as _,
+            Yielded => "lucet_result_tag_yielded\0".as_ptr() as _,
+            Faulted => "lucet_result_tag_faulted\0".as_ptr() as _,
+            Terminated => "lucet_result_tag_terminated\0".as_ptr() as _,
+            Errored => "lucet_result_tag_errored\0".as_ptr() as _,
         }
     } else {
-        "!!! unknown lucet_state_tag variant!\0".as_ptr() as _
+        "!!! unknown lucet_result_tag variant!\0".as_ptr() as _
     }
 }
 
@@ -156,6 +156,7 @@ pub unsafe extern "C" fn lucet_instance_run(
     entrypoint: *const c_char,
     argc: usize,
     argv: *const lucet_val::lucet_val,
+    result_out: *mut lucet_result::lucet_result,
 ) -> lucet_error {
     assert_nonnull!(entrypoint);
     if argc != 0 && argv.is_null() {
@@ -177,12 +178,15 @@ pub unsafe extern "C" fn lucet_instance_run(
     };
 
     with_instance_ptr!(inst, {
-        inst.run(entrypoint, args.as_slice())
+        let res = inst.run(entrypoint, args.as_slice());
+        let ret = res
+            .as_ref()
             .map(|_| lucet_error::Ok)
-            .unwrap_or_else(|e| {
-                eprintln!("{}", e);
-                e.into()
-            })
+            .unwrap_or_else(|e| e.into());
+        if !result_out.is_null() {
+            std::ptr::write(result_out, res.into());
+        }
+        ret
     })
 }
 
@@ -193,6 +197,7 @@ pub unsafe extern "C" fn lucet_instance_run_func_idx(
     func_idx: u32,
     argc: usize,
     argv: *const lucet_val::lucet_val,
+    result_out: *mut lucet_result::lucet_result,
 ) -> lucet_error {
     if argc != 0 && argv.is_null() {
         return lucet_error::InvalidArgument;
@@ -206,9 +211,15 @@ pub unsafe extern "C" fn lucet_instance_run_func_idx(
             .collect()
     };
     with_instance_ptr!(inst, {
-        inst.run_func_idx(table_idx, func_idx, args.as_slice())
+        let res = inst.run_func_idx(table_idx, func_idx, args.as_slice());
+        let ret = res
+            .as_ref()
             .map(|_| lucet_error::Ok)
-            .unwrap_or_else(|e| e.into())
+            .unwrap_or_else(|e| e.into());
+        if !result_out.is_null() {
+            std::ptr::write(result_out, res.into());
+        }
+        ret
     })
 }
 
@@ -216,38 +227,19 @@ pub unsafe extern "C" fn lucet_instance_run_func_idx(
 pub unsafe extern "C" fn lucet_instance_resume(
     inst: *const lucet_instance,
     val: *mut c_void,
+    result_out: *mut lucet_result::lucet_result,
 ) -> lucet_error {
     with_instance_ptr!(inst, {
-        inst.resume_with_val(CYieldedVal { val })
+        let res = inst.resume_with_val(CYieldedVal { val });
+        let ret = res
+            .as_ref()
             .map(|_| lucet_error::Ok)
-            .unwrap_or_else(|e| e.into())
+            .unwrap_or_else(|e| e.into());
+        if !result_out.is_null() {
+            std::ptr::write(result_out, res.into());
+        }
+        ret
     })
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lucet_instance_state(
-    inst: *const lucet_instance,
-    state_out: *mut lucet_state::lucet_state,
-) -> lucet_error {
-    assert_nonnull!(state_out);
-    with_instance_ptr!(inst, {
-        state_out.write(inst.state().into());
-        lucet_error::Ok
-    })
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lucet_state_release(state: *mut lucet_state::lucet_state) {
-    use lucet_runtime_internals::c_api::lucet_state::*;
-    use std::ffi::CString;
-
-    let state = state.read();
-    if let lucet_state_tag::Fault = state.tag {
-        let addr_details = state.val.fault.rip_addr_details;
-        // free the strings
-        CString::from_raw(addr_details.file_name as *mut _);
-        CString::from_raw(addr_details.sym_name as *mut _);
-    }
 }
 
 #[no_mangle]

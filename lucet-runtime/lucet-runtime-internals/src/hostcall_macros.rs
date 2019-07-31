@@ -51,11 +51,12 @@ macro_rules! lucet_hostcalls {
                 match res {
                     Ok(res) => res,
                     Err(e) => {
-                        if let Some(details) = e.downcast_ref::<$crate::instance::TerminationDetails>() {
-                            let mut vmctx = $crate::vmctx::Vmctx::from_raw(vmctx_raw);
-                            vmctx.terminate_no_unwind(details.clone());
-                        } else {
-                            std::panic::resume_unwind(e);
+                        match e.downcast::<$crate::instance::TerminationDetails>() {
+                            Ok(details) => {
+                                let mut vmctx = $crate::vmctx::Vmctx::from_raw(vmctx_raw);
+                                vmctx.terminate_no_unwind(*details)
+                            },
+                            Err(e) => std::panic::resume_unwind(e),
                         }
                     }
                 }

@@ -175,7 +175,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             SignalBehavior::Terminate => {
                 // set the state before jumping back to the host context
                 inst.state = State::Terminated {
-                    details: TerminationDetails::Signal,
+                    details: Some(TerminationDetails::Signal),
                 };
                 true
             }
