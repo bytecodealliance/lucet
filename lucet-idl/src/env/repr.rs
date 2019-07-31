@@ -40,6 +40,21 @@ pub struct ModuleRepr {
     pub funcs: ModuleFuncsRepr,
 }
 
+impl ModuleRepr {
+    pub fn new(datatypes: ModuleDatatypesRepr, funcs: ModuleFuncsRepr) -> Self {
+        Self { datatypes, funcs }
+    }
+    pub fn from_datatypes(datatypes: ModuleDatatypesRepr) -> Self {
+        Self::new(
+            datatypes,
+            ModuleFuncsRepr {
+                names: PrimaryMap::new(),
+                funcs: PrimaryMap::new(),
+            },
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ModuleDatatypesRepr {
     pub names: PrimaryMap<DatatypeIx, String>,

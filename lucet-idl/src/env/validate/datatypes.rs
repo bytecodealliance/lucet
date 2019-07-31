@@ -1,9 +1,9 @@
+use super::names::ModNamesBuilder;
 use crate::env::atoms::AtomType;
 use crate::env::cursor::Package;
 use crate::env::repr::{
     AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
-    EnumDatatypeRepr, EnumMember, ModuleDatatypesRepr, ModuleIx, StructDatatypeRepr,
-    StructMemberRepr,
+    EnumDatatypeRepr, EnumMember, ModuleDatatypesRepr, StructDatatypeRepr, StructMemberRepr,
 };
 use crate::env::MemArea;
 use crate::error::ValidationError;
@@ -51,67 +51,32 @@ enum VariantIR {
 #[derive(Clone)]
 pub struct DatatypeModuleBuilder<'a> {
     env: Package<'a>,
-    module: ModuleIx,
-    name_decls: HashMap<String, (Location, DatatypeIx)>,
-    name_map: PrimaryMap<DatatypeIx, String>,
+    names: &'a ModNamesBuilder,
     types: PrimaryMap<DatatypeIx, DatatypeIR>,
 }
 
 impl<'a> DatatypeModuleBuilder<'a> {
-    pub fn new(env: Package<'a>, module: ModuleIx) -> Self {
+    pub fn new(env: Package<'a>, names: &'a ModNamesBuilder) -> Self {
         Self {
             env,
-            module,
-            name_decls: HashMap::new(),
-            name_map: PrimaryMap::new(),
+            names,
             types: PrimaryMap::new(),
-        }
-    }
-
-    pub fn introduce_name(
-        &mut self,
-        name: &str,
-        location: &Location,
-    ) -> Result<DatatypeIx, ValidationError> {
-        if let Some((prev_loc, _prev_ix)) = self.name_decls.get(name) {
-            Err(ValidationError::NameAlreadyExists {
-                name: name.to_owned(),
-                at_location: *location,
-                previous_location: *prev_loc,
-            })?;
-        }
-        let dix = self.name_map.push(name.to_owned());
-        self.name_decls.insert(name.to_owned(), (*location, dix));
-        Ok(dix)
-    }
-
-    fn datatype_ident_from_syntax(
-        &self,
-        syntax: &SyntaxTypeRef,
-    ) -> Result<DatatypeIdent, ValidationError> {
-        match syntax {
-            SyntaxTypeRef::Name { name, location } => self
-                .name_decls
-                .get(name)
-                .map(|(_loc, ix)| DatatypeIdent::new(self.module, *ix))
-                .ok_or_else(|| ValidationError::NameNotFound {
-                    name: name.clone(),
-                    use_location: *location,
-                }),
-            SyntaxTypeRef::Atom { atom, .. } => Ok(atom.datatype_ident()),
         }
     }
 
     pub fn introduce_struct(
         &mut self,
-        ix: DatatypeIx,
+        name: &str,
         members_syntax: &[StructMemberSyntax],
         location: &Location,
     ) -> Result<(), ValidationError> {
-        let name = self.name_map.get(ix).expect("name is introduced");
+        let ix = self
+            .names
+            .datatype_from_name(name)
+            .expect("name is introduced");
         if members_syntax.is_empty() {
             Err(ValidationError::Empty {
-                name: name.clone(),
+                name: name.to_owned(),
                 location: *location,
             })?
         }
@@ -129,7 +94,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
             }
             // Get the DatatypeIdent for the member, which ensures that it refers only to
             // defined types:
-            let type_ = self.datatype_ident_from_syntax(&mem.type_)?;
+            let type_ = self.names.datatype_ident_from_syntax(&mem.type_)?;
             // build the struct with this as the member:
             members.push(StructMemberIR {
                 type_,
@@ -148,14 +113,17 @@ impl<'a> DatatypeModuleBuilder<'a> {
 
     pub fn introduce_enum(
         &mut self,
-        ix: DatatypeIx,
+        name: &str,
         variants: &[EnumVariantSyntax],
         location: &Location,
     ) -> Result<(), ValidationError> {
-        let name = self.name_map.get(ix).expect("name is introduced");
+        let ix = self
+            .names
+            .datatype_from_name(name)
+            .expect("name is introduced");
         if variants.is_empty() {
             Err(ValidationError::Empty {
-                name: name.clone(),
+                name: name.to_owned(),
                 location: *location,
             })?
         }
@@ -188,11 +156,15 @@ impl<'a> DatatypeModuleBuilder<'a> {
 
     pub fn introduce_alias(
         &mut self,
-        ix: DatatypeIx,
+        name: &str,
         dest: &SyntaxTypeRef,
         location: &Location,
     ) -> Result<(), ValidationError> {
-        let to = self.datatype_ident_from_syntax(dest)?;
+        let ix = self
+            .names
+            .datatype_from_name(name)
+            .expect("name is introduced");
+        let to = self.names.datatype_ident_from_syntax(dest)?;
         self.define_datatype(
             ix,
             DatatypeIR {
@@ -216,7 +188,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
         let mut ordered = Vec::new();
         // Important to iterate in name order, so error messages are consistient.
         // HashMap iteration order is not stable.
-        for (ix, name) in self.name_map.iter() {
+        for (ix, name) in self.names.types.iter() {
             let decl = self
                 .types
                 .get(ix)
@@ -225,7 +197,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
             // Depth first search through datatypes will return an error if they
             // are infinite, and insert
             let mut visited = SecondaryMap::new();
-            visited.resize(self.name_map.len());
+            visited.resize(self.names.types.len());
 
             self.dfs_walk(ix, &mut visited, &mut ordered, &mut finalized)
                 .map_err(|_| ValidationError::Infinite {
@@ -240,18 +212,18 @@ impl<'a> DatatypeModuleBuilder<'a> {
         }
 
         assert_eq!(
-            self.name_map.len(),
+            self.names.types.len(),
             datatypes.len(),
             "each datatype defined"
         );
         assert_eq!(
-            self.name_map.len(),
+            datatypes.len(),
             ordered.len(),
-            "each datatype present in topological sort"
+            "is each datatype present in topological sort? lengths dont match"
         );
 
         Ok(ModuleDatatypesRepr {
-            names: self.name_map,
+            names: self.names.types.clone(),
             datatypes,
             topological_order: ordered,
         })
@@ -278,7 +250,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
                 // info for leaves first.
                 // IMPORTANT: assumes any type defined outside this module is an atom!
                 for mem in s.members.iter() {
-                    if mem.type_.module == self.module {
+                    if mem.type_.module == self.names.module {
                         self.dfs_walk(mem.type_.datatype, visited, ordered, finalized_types)?;
                     }
                 }
@@ -319,7 +291,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
                 // Iterate down the pointer to ensure this is finite, and fill in type
                 // info for pointee first.
                 // IMPORTANT: assumes any type defined outside this module is an atom!
-                if a.to.module == self.module {
+                if a.to.module == self.names.module {
                     self.dfs_walk(a.to.datatype, visited, ordered, finalized_types)?;
                 }
 
@@ -371,7 +343,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
         id: DatatypeIdent,
         finalized_types: &SecondaryMap<DatatypeIx, Option<DatatypeRepr>>,
     ) -> (usize, usize) {
-        let (size, align) = if id.module == self.module {
+        let (size, align) = if id.module == self.names.module {
             let t = finalized_types
                 .get(id.datatype)
                 .cloned()

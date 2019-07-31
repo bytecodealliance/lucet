@@ -60,6 +60,11 @@ pub enum ValidationError {
         expected: &'static str,
         location: Location,
     },
+    NameSortError {
+        name: String,
+        use_location: Location,
+        bound_location: Location,
+    },
     BindingNameAlreadyBound {
         name: String,
         at_location: Location,
@@ -98,6 +103,15 @@ impl fmt::Display for ValidationError {
                 f,
                 "Invalid syntax: expected {} at line {}",
                 expected, location.line
+            ),
+            ValidationError::NameSortError {
+                name,
+                use_location,
+                bound_location,
+            } => write!(
+                f,
+                "Name {} at line {} - bound to another sort at line {}",
+                name, use_location.line, bound_location.line
             ),
             ValidationError::BindingNameAlreadyBound {
                 name,

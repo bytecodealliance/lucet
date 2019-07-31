@@ -1,8 +1,9 @@
+use super::names::ModNamesBuilder;
 use crate::env::atoms::{AbiType, AtomType};
 use crate::env::cursor::{Datatype, Module};
 use crate::env::repr::{
-    ArgIx, BindingDirection, BindingFromRepr, BindingIx, BindingRepr, FuncRepr, ParamIx, ParamRepr,
-    RetIx,
+    ArgIx, BindingDirection, BindingFromRepr, BindingIx, BindingRepr, FuncIx, FuncRepr,
+    ModuleFuncsRepr, ParamIx, ParamRepr, RetIx,
 };
 use crate::error::ValidationError;
 use crate::parser::{BindingDirSyntax, BindingRefSyntax, BindingSyntax, FuncArgSyntax};
@@ -10,6 +11,60 @@ use crate::types::Location;
 use cranelift_entity::{EntityRef, PrimaryMap};
 use std::collections::HashMap;
 use std::ops::Deref;
+
+pub struct FunctionModuleBuilder<'a> {
+    env: Module<'a>,
+    names: &'a ModNamesBuilder,
+    funcs: PrimaryMap<FuncIx, FuncRepr>,
+}
+
+impl<'a> FunctionModuleBuilder<'a> {
+    pub fn new(env: Module<'a>, names: &'a ModNamesBuilder) -> Self {
+        Self {
+            env,
+            names,
+            funcs: PrimaryMap::new(),
+        }
+    }
+
+    pub fn introduce_func(
+        &mut self,
+        name: &str,
+        args: &[FuncArgSyntax],
+        rets: &[FuncArgSyntax],
+        bindings: &[BindingSyntax],
+        location: &Location,
+    ) -> Result<(), ValidationError> {
+        let mut validator = FuncValidator::new(location, &self.env);
+        validator.introduce_args(args)?;
+        validator.introduce_rets(rets)?;
+        validator.introduce_bindings(bindings)?;
+
+        let defined_ix = self.funcs.push(FuncRepr {
+            args: validator.args,
+            rets: validator.rets,
+            bindings: validator.bindings,
+        });
+        let declared_ix = self.names.func_from_name(name).expect("declared func");
+        assert_eq!(
+            defined_ix, declared_ix,
+            "funcs defined in different order than declared"
+        );
+        Ok(())
+    }
+
+    pub fn build(self) -> ModuleFuncsRepr {
+        assert_eq!(
+            self.names.funcs.len(),
+            self.funcs.len(),
+            "each func declared has been defined"
+        );
+        ModuleFuncsRepr {
+            names: self.names.funcs.clone(),
+            funcs: self.funcs,
+        }
+    }
+}
 
 struct FuncValidator<'a> {
     // arg name to declaration location and argument position
@@ -23,12 +78,12 @@ struct FuncValidator<'a> {
     // param position to binding syntax
     bindings: PrimaryMap<BindingIx, BindingRepr>,
     param_binding_sites: HashMap<ParamIx, Location>,
-    location: Location,
+    location: &'a Location,
     module: &'a Module<'a>,
 }
 
 impl<'a> FuncValidator<'a> {
-    fn new(location: Location, module: &'a Module<'a>) -> Self {
+    fn new(location: &'a Location, module: &'a Module<'a>) -> Self {
         Self {
             param_names: HashMap::new(),
             args: PrimaryMap::new(),
@@ -363,23 +418,4 @@ impl<'a> FuncValidator<'a> {
             }
         }
     }
-}
-
-pub fn func_repr_from_syntax(
-    args: &[FuncArgSyntax],
-    rets: &[FuncArgSyntax],
-    bindings: &[BindingSyntax],
-    location: Location,
-    module: &Module,
-) -> Result<FuncRepr, ValidationError> {
-    let mut validator = FuncValidator::new(location, module);
-    validator.introduce_args(args)?;
-    validator.introduce_rets(rets)?;
-    validator.introduce_bindings(bindings)?;
-
-    Ok(FuncRepr {
-        args: validator.args,
-        rets: validator.rets,
-        bindings: validator.bindings,
-    })
 }

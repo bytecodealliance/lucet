@@ -13,6 +13,10 @@ pub struct Package<'a> {
 }
 
 impl<'a> Package<'a> {
+    pub fn new(repr: &'a PackageRepr) -> Package<'a> {
+        Package { repr }
+    }
+
     pub fn module(&self, name: &str) -> Option<Module<'a>> {
         self.repr
             .names
