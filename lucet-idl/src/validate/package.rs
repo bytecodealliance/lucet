@@ -1,10 +1,10 @@
 #![allow(unused)]
 use super::module::module_from_declarations;
-use crate::env::prelude::std_module;
-use crate::env::repr::{ModuleIx, ModuleRepr, PackageRepr};
 use crate::error::ValidationError;
 use crate::parser::SyntaxDecl;
-use crate::types::Location;
+use crate::prelude::std_module;
+use crate::repr::{ModuleIx, ModuleRepr, PackageRepr};
+use crate::Location;
 use cranelift_entity::PrimaryMap;
 use std::collections::HashMap;
 
@@ -97,8 +97,8 @@ impl PackageBuilder {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::env::cursor::Package;
     use crate::parser::Parser;
+    use crate::Package;
 
     fn pkg_(syntax: &str) -> Result<PackageRepr, ValidationError> {
         let mut parser = Parser::new(syntax);

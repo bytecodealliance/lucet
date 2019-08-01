@@ -1,13 +1,10 @@
 use super::names::ModNamesBuilder;
-use crate::env::atoms::{AbiType, AtomType};
-use crate::env::cursor::{Datatype, Module};
-use crate::env::repr::{
+use crate::parser::{BindingDirSyntax, BindingRefSyntax, BindingSyntax, FuncArgSyntax};
+use crate::repr::{
     ArgIx, BindingDirection, BindingFromRepr, BindingIx, BindingRepr, FuncIx, FuncRepr,
     ModuleFuncsRepr, ParamIx, ParamRepr, RetIx,
 };
-use crate::error::ValidationError;
-use crate::parser::{BindingDirSyntax, BindingRefSyntax, BindingSyntax, FuncArgSyntax};
-use crate::types::Location;
+use crate::{AbiType, AtomType, Datatype, Location, Module, ValidationError};
 use cranelift_entity::{EntityRef, PrimaryMap};
 use std::collections::HashMap;
 use std::ops::Deref;

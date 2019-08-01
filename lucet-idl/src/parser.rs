@@ -1,5 +1,5 @@
 use super::lexer::{LexError, Lexer, LocatedError, LocatedToken, Token};
-use super::types::{AbiType, AtomType, Location};
+use super::{AbiType, AtomType, Location};
 use std::error::Error;
 use std::fmt;
 

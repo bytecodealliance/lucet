@@ -1,4 +1,4 @@
-use crate::types::{AtomType, Location};
+use crate::{AtomType, Location};
 use std::str::CharIndices;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

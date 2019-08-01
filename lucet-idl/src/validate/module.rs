@@ -1,10 +1,9 @@
 use super::datatypes::DatatypeModuleBuilder;
 use super::function::FunctionModuleBuilder;
 use super::names::ModNamesBuilder;
-use crate::env::cursor::Package;
-use crate::env::repr::{ModuleIx, ModuleRepr, PackageRepr};
-use crate::error::ValidationError;
 use crate::parser::SyntaxDecl;
+use crate::repr::{ModuleIx, ModuleRepr, PackageRepr};
+use crate::{Package, ValidationError};
 
 pub fn module_from_declarations(
     env: &PackageRepr,
@@ -99,11 +98,9 @@ pub fn module_from_declarations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::cursor::{BindingDirection, DatatypeVariant, ParamType};
-    use crate::env::validate::package::PackageBuilder;
-    use crate::env::MemArea;
     use crate::parser::Parser;
-    use crate::types::Location;
+    use crate::validate::package::PackageBuilder;
+    use crate::{BindingDirection, DatatypeVariant, Location, MemArea, ParamType};
     fn mod_syntax(syntax: &str) -> Result<PackageRepr, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");

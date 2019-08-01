@@ -1,7 +1,6 @@
-use crate::env::repr::{DatatypeIdent, DatatypeIx, FuncIx, ModuleIx};
-use crate::error::ValidationError;
 use crate::parser::SyntaxTypeRef;
-use crate::types::Location;
+use crate::repr::{DatatypeIdent, DatatypeIx, FuncIx, ModuleIx};
+use crate::{Location, ValidationError};
 use cranelift_entity::PrimaryMap;
 use std::collections::HashMap;
 

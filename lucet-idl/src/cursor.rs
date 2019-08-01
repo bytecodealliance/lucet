@@ -1,12 +1,12 @@
-use crate::env::atoms::{AbiType, AtomType};
-pub use crate::env::repr::BindingDirection;
-use crate::env::repr::{
+pub use crate::atoms::{AbiType, AtomType};
+use crate::parser::SyntaxTypeRef;
+pub use crate::repr::BindingDirection;
+use crate::repr::{
     AliasDatatypeRepr, BindingFromRepr, BindingIx, BindingRepr, DatatypeIdent, DatatypeIx,
     DatatypeRepr, DatatypeVariantRepr, EnumDatatypeRepr, FuncIdent, FuncIx, FuncRepr, ModuleIx,
     ModuleRepr, PackageRepr, ParamIx, ParamRepr, StructDatatypeRepr, StructMemberRepr,
 };
-use crate::env::MemArea;
-use crate::parser::SyntaxTypeRef;
+use crate::MemArea;
 
 #[derive(Debug, Clone)]
 pub struct Package<'a> {

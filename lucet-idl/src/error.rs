@@ -1,5 +1,5 @@
 use crate::parser;
-use crate::types::Location;
+use crate::Location;
 use std::error::Error;
 use std::fmt;
 use std::io;

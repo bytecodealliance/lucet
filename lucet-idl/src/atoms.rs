@@ -1,4 +1,4 @@
-use crate::env::MemArea;
+use crate::MemArea;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum AtomType {

@@ -3,55 +3,64 @@
 #[macro_use]
 extern crate failure;
 
-mod c;
+mod atoms;
+mod cursor;
+mod prelude;
+mod repr;
+mod validate;
+//mod c;
 mod config;
-mod data_layout;
 pub mod env;
 mod error;
-mod function;
 mod lexer;
-mod module;
-mod package;
 mod parser;
 mod pretty_writer;
-mod rust;
-mod types;
+//mod rust;
 
 pub use crate::config::{Backend, Config};
-pub use crate::error::IDLError;
-pub use crate::function::{BindingRef, FuncArg, FuncBinding, FuncDecl, ParamPosition};
-pub use crate::module::Module;
-pub use crate::package::Package;
-pub use crate::types::{
-    AbiType, AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, Ident,
-    Location, MemArea, Name, Named, StructDataType, StructMember,
-};
+pub use crate::cursor::*;
+pub use crate::error::{IDLError, ValidationError};
+pub use crate::repr::{BindingDirection, PackageRepr};
+pub use crate::{AbiType, AtomType};
 
-use crate::c::CGenerator;
+//use crate::c::CGenerator;
 use crate::parser::Parser;
-use crate::rust::RustGenerator;
+//use crate::rust::RustGenerator;
+use crate::validate::package_from_declarations;
 use lucet_module::bindings::Bindings;
 use std::io::Write;
 
-pub fn parse_package(input: &str) -> Result<Package, IDLError> {
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
+pub struct Location {
+    pub line: usize,
+    pub column: usize,
+}
+
+pub trait MemArea {
+    fn mem_size(&self) -> usize;
+    fn mem_align(&self) -> usize;
+}
+
+pub fn parse_package(input: &str) -> Result<PackageRepr, IDLError> {
     let mut parser = Parser::new(&input);
     let decls = parser.match_decls()?;
-    let pkg = Package::from_declarations(&decls)?;
+    let pkg = package_from_declarations(&decls)?;
     Ok(pkg)
 }
 
 pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Result<(), IDLError> {
     match config.backend {
-        Backend::CGuest => CGenerator::new(output).generate_guest(package)?,
-        Backend::RustGuest => RustGenerator::new(output).generate_guest(package)?,
-        Backend::RustHost => RustGenerator::new(output).generate_host(package)?,
-        Backend::Bindings => generate_bindings(&package.bindings(), output)?,
+        Backend::CGuest => unimplemented!(), //CGenerator::new(output).generate_guest(package)?,
+        Backend::RustGuest => unimplemented!(), //RustGenerator::new(output).generate_guest(package)?,
+        Backend::RustHost => unimplemented!(), //RustGenerator::new(output).generate_host(package)?,
+        Backend::Bindings => unimplemented!(), //generate_bindings(&package.bindings(), output)?,
     }
     Ok(())
 }
 
 pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
-    let pkg = parse_package(input)?;
+    let pkg_repr = parse_package(input)?;
+    let pkg = Package::new(&pkg_repr);
     codegen(&pkg, config, output)
 }
 

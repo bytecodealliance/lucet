@@ -1,4 +1,4 @@
-use crate::env::atoms::{AbiType, AtomType};
+use crate::atoms::{AbiType, AtomType};
 use cranelift_entity::{entity_impl, PrimaryMap};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -7,8 +7,8 @@ entity_impl!(ModuleIx);
 
 #[derive(Debug, Clone)]
 pub struct PackageRepr {
-    pub names: PrimaryMap<ModuleIx, String>,
-    pub modules: PrimaryMap<ModuleIx, ModuleRepr>,
+    pub(crate) names: PrimaryMap<ModuleIx, String>,
+    pub(crate) modules: PrimaryMap<ModuleIx, ModuleRepr>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

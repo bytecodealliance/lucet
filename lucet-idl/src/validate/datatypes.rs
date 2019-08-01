@@ -1,16 +1,12 @@
 use super::names::ModNamesBuilder;
-use crate::env::atoms::AtomType;
-use crate::env::cursor::Package;
-use crate::env::repr::{
-    AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
-    EnumDatatypeRepr, EnumMemberRepr, ModuleDatatypesRepr, StructDatatypeRepr, StructMemberRepr,
-};
-use crate::env::MemArea;
-use crate::error::ValidationError;
 use crate::parser::{
     EnumVariant as EnumVariantSyntax, StructMember as StructMemberSyntax, SyntaxTypeRef,
 };
-use crate::types::Location;
+use crate::repr::{
+    AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
+    EnumDatatypeRepr, EnumMemberRepr, ModuleDatatypesRepr, StructDatatypeRepr, StructMemberRepr,
+};
+use crate::{AtomType, Location, MemArea, Package, ValidationError};
 use cranelift_entity::{PrimaryMap, SecondaryMap};
 use std::collections::HashMap;
 

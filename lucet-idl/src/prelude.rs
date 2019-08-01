@@ -1,9 +1,9 @@
-use crate::env::atoms::AtomType;
-use crate::env::repr::{
+use crate::atoms::AtomType;
+use crate::repr::{
     DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr, ModuleDatatypesRepr,
     ModuleFuncsRepr, ModuleIx, ModuleRepr,
 };
-use crate::env::MemArea;
+use crate::MemArea;
 use cranelift_entity::{EntityRef, PrimaryMap};
 
 pub fn std_module() -> ModuleRepr {
@@ -72,9 +72,9 @@ impl AtomType {
 #[cfg(test)]
 mod test {
     use super::std_module;
-    use crate::env::atoms::AtomType;
-    use crate::env::cursor::Package;
-    use crate::env::repr::{DatatypeIdent, PackageRepr};
+    use crate::atoms::AtomType;
+    use crate::cursor::Package;
+    use crate::repr::{DatatypeIdent, PackageRepr};
     use cranelift_entity::PrimaryMap;
     #[test]
     fn atom_idents() {
