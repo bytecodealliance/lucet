@@ -359,13 +359,9 @@ mod tests {
         assert_eq!(a_bind.name(), "a");
         assert_eq!(a_bind.type_().name(), "i64");
         assert_eq!(a_bind.direction(), BindingDirection::In);
-        match a_bind.param() {
-            BindingParam::Value(v) => {
-                assert_eq!(v.name(), "a");
-                assert_eq!(v.param_type(), ParamType::Arg);
-            }
-            _ => panic!("a binding is a value"),
-        }
+        let a_val = a_bind.param().value().expect("binding is a value");
+        assert_eq!(a_val.name(), "a");
+        assert_eq!(a_val.param_type(), ParamType::Arg);
     }
 
     #[test]
@@ -387,12 +383,261 @@ mod tests {
         assert_eq!(r_bind.name(), "r");
         assert_eq!(r_bind.type_().name(), "i64");
         assert_eq!(r_bind.direction(), BindingDirection::Out);
-        match r_bind.param() {
-            BindingParam::Value(v) => {
-                assert_eq!(v.name(), "r");
-                assert_eq!(v.param_type(), ParamType::Ret);
+        let r_val = r_bind.param().value().expect("binding is a value");
+        assert_eq!(r_val.name(), "r");
+        assert_eq!(r_val.param_type(), ParamType::Ret);
+    }
+
+    #[test]
+    fn func_multiple_returns() {
+        assert_eq!(
+            mod_syntax("fn trivial(a: i32) -> r1: i32, r2: i32;")
+                .err()
+                .unwrap(),
+            ValidationError::Syntax {
+                expected: "at most one return value",
+                location: Location { line: 1, column: 0 },
             }
-            _ => panic!("r binding is a value"),
-        }
+        );
+    }
+
+    #[test]
+    fn func_duplicate_arg() {
+        assert_eq!(
+            mod_syntax("fn trivial(a: i32, a: i32);").err().unwrap(),
+            ValidationError::NameAlreadyExists {
+                name: "a".to_owned(),
+                at_location: Location {
+                    line: 1,
+                    column: 19
+                },
+                previous_location: Location {
+                    line: 1,
+                    column: 11
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_arg_value_binding() {
+        let pkg_repr = mod_syntax("fn foo(a: i32) where\na_binding: in i8 <- a;").expect("valid");
+        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let foo = m.function("foo").expect("get foo");
+
+        assert_eq!(foo.args().collect::<Vec<_>>().len(), 1);
+        assert_eq!(foo.bindings().collect::<Vec<_>>().len(), 1);
+
+        let a = foo.arg("a").expect("arg a exists");
+        assert_eq!(a.name(), "a");
+        assert_eq!(a.type_().name(), "i32");
+        assert_eq!(a.binding().direction(), BindingDirection::In);
+        assert_eq!(a.binding().name(), "a_binding");
+        a.binding()
+            .param()
+            .value()
+            .expect("binding param used as value");
+        assert_eq!(a.binding().type_().name(), "i8");
+    }
+
+    #[test]
+    fn func_one_arg_ptr_binding() {
+        let pkg_repr =
+            mod_syntax("fn foo(a: i32) where\na_binding: inout i8 <- *a;").expect("valid");
+        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let foo = m.function("foo").expect("get foo");
+
+        assert_eq!(foo.args().collect::<Vec<_>>().len(), 1);
+        assert_eq!(foo.bindings().collect::<Vec<_>>().len(), 1);
+
+        let a = foo.arg("a").expect("arg a exists");
+        assert_eq!(a.name(), "a");
+        assert_eq!(a.type_().name(), "i32");
+        assert_eq!(a.binding().direction(), BindingDirection::InOut);
+        assert_eq!(a.binding().name(), "a_binding");
+        a.binding()
+            .param()
+            .ptr()
+            .expect("binding param used as ptr");
+        assert_eq!(a.binding().type_().name(), "i8");
+    }
+
+    #[test]
+    fn func_one_arg_binding_wrong_direction() {
+        assert_eq!(
+            mod_syntax("fn foo(a: i32) where\na_binding: out i8 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "argument value must be input-only binding",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+    }
+
+    #[test]
+    fn func_one_arg_binding_wrong_type() {
+        // Cant convert int to float
+        assert_eq!(
+            mod_syntax("fn trivial(a: i32) where\na_binding: out f32 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "binding type representation to match argument type",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+        // Cant convert float to int
+        assert_eq!(
+            mod_syntax("fn trivial(a: f32) where\na_binding: out i32 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "binding type representation to match argument type",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+        // Cant represent i64 with i32
+        assert_eq!(
+            mod_syntax("fn trivial(a: i32) where\na_binding: out i64 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "binding type representation to match argument type",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+        // Cant represent ptr with float
+        assert_eq!(
+            mod_syntax("fn trivial(a: f32) where\na_binding: out i8 <- *a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "pointer bindings to be represented as an i32",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+        // Cant represent ptr with i64
+        assert_eq!(
+            mod_syntax("fn trivial(a: i64) where\na_binding: out i8 <- *a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "pointer bindings to be represented as an i32",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+    }
+
+    #[test]
+    fn func_one_ret_value_binding() {
+        let pkg_repr =
+            mod_syntax("fn foo() -> a: i32 where\na_binding: out i8 <- a;").expect("valid");
+
+        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let foo = m.function("foo").expect("get foo");
+
+        assert_eq!(foo.rets().collect::<Vec<_>>().len(), 1);
+        assert_eq!(foo.bindings().collect::<Vec<_>>().len(), 1);
+
+        let a = foo.ret("a").expect("ret a exists");
+        assert_eq!(a.name(), "a");
+        assert_eq!(a.type_().name(), "i32");
+        assert_eq!(a.binding().direction(), BindingDirection::Out);
+        assert_eq!(a.binding().name(), "a_binding");
+        a.binding()
+            .param()
+            .value()
+            .expect("binding param used as value");
+        assert_eq!(a.binding().type_().name(), "i8");
+    }
+
+    #[test]
+    fn func_one_ret_pointer_binding() {
+        assert_eq!(
+            mod_syntax("fn trivial() -> a: i32 where\na_binding: out i8 <- *a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "return value cannot be bound to pointer",
+                location: Location { line: 2, column: 0 },
+            }
+        );
+    }
+
+    #[test]
+    fn func_one_ret_wrong_direction() {
+        assert_eq!(
+            mod_syntax("fn trivial() -> a: i32 where\na_binding: in i8 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "return value must be output-only binding",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+    }
+
+    #[test]
+    fn func_two_arg_slice_binding() {
+        let pkg_repr = mod_syntax(
+            "fn foo(a_ptr: i32, a_len: i32) where\na_binding: inout i8 <- [a_ptr, a_len];",
+        )
+        .expect("valid");
+        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let foo = m.function("foo").expect("get foo");
+
+        assert_eq!(foo.args().collect::<Vec<_>>().len(), 2);
+        assert_eq!(foo.bindings().collect::<Vec<_>>().len(), 1);
+
+        let a_ptr = foo.arg("a_ptr").expect("arg a_ptr exists");
+        let a_len = foo.arg("a_len").expect("arg a_len exists");
+        assert_eq!(a_ptr.type_().name(), "i32");
+        assert_eq!(a_len.type_().name(), "i32");
+
+        assert_eq!(a_ptr.binding().name(), "a_binding");
+        assert_eq!(a_len.binding().name(), "a_binding");
+        assert_eq!(a_ptr.binding().type_().name(), "i8");
+        let (a_ptr_2, a_len_2) = a_ptr
+            .binding()
+            .param()
+            .slice()
+            .expect("binding param used as slice");
+        assert_eq!(a_ptr_2.name(), "a_ptr");
+        assert_eq!(a_len_2.name(), "a_len");
+    }
+
+    #[test]
+    fn func_buncha_bindings() {
+        let pkg_repr = mod_syntax(
+            "fn nontrivial(a: i32, b: i32, c: f32) -> d: i32 where\n\
+             a_binding: out u8 <- *a,\n\
+             b_binding: inout u16 <- *b,\n\
+             c_binding: in f32 <- c,\n\
+             d_binding: out i8 <- d;\n\
+             ",
+        )
+        .expect("valid");
+
+        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let nontrivial = m.function("nontrivial").expect("get nontrivial");
+
+        assert_eq!(nontrivial.args().collect::<Vec<_>>().len(), 3);
+        assert_eq!(nontrivial.rets().collect::<Vec<_>>().len(), 1);
+        assert_eq!(nontrivial.bindings().collect::<Vec<_>>().len(), 4);
+
+        let a = nontrivial.arg("a").expect("arg a exists");
+        let b = nontrivial.arg("b").expect("arg b exists");
+        let c = nontrivial.arg("c").expect("arg c exists");
+        let d = nontrivial.ret("d").expect("ret d exists");
+
+        let a_binding = nontrivial.binding("a_binding").expect("a_binding exists");
+        assert_eq!(a_binding.direction(), BindingDirection::Out);
+        let b_binding = nontrivial.binding("b_binding").expect("b_binding exists");
+        assert_eq!(b_binding.direction(), BindingDirection::InOut);
+        let c_binding = nontrivial.binding("c_binding").expect("c_binding exists");
+        assert_eq!(c_binding.direction(), BindingDirection::In);
+        let d_binding = nontrivial.binding("d_binding").expect("d_binding exists");
+        assert_eq!(d_binding.direction(), BindingDirection::Out);
     }
 }

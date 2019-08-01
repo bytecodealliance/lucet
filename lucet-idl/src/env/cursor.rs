@@ -559,3 +559,24 @@ pub enum BindingParam<'a> {
     Slice(FuncParam<'a>, FuncParam<'a>),
     Value(FuncParam<'a>),
 }
+
+impl<'a> BindingParam<'a> {
+    pub fn ptr(self) -> Option<FuncParam<'a>> {
+        match self {
+            BindingParam::Ptr(p) => Some(p),
+            _ => None,
+        }
+    }
+    pub fn slice(self) -> Option<(FuncParam<'a>, FuncParam<'a>)> {
+        match self {
+            BindingParam::Slice(p, l) => Some((p, l)),
+            _ => None,
+        }
+    }
+    pub fn value(self) -> Option<FuncParam<'a>> {
+        match self {
+            BindingParam::Value(v) => Some(v),
+            _ => None,
+        }
+    }
+}
