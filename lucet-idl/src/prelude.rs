@@ -74,7 +74,7 @@ mod test {
     use super::std_module;
     use crate::atoms::AtomType;
     use crate::cursor::Package;
-    use crate::repr::{DatatypeIdent, PackageRepr};
+    use crate::repr::{DatatypeIdent, Package};
     use cranelift_entity::PrimaryMap;
     #[test]
     fn atom_idents() {
@@ -84,8 +84,7 @@ mod test {
         names.push("std".to_owned());
         let mut modules = PrimaryMap::new();
         modules.push(std_module());
-        let pkg_repr = PackageRepr { names, modules };
-        let prelude = Package::new(&pkg_repr);
+        let prelude = Package { names, modules };
 
         fn lookup_atom_by_id(package: &Package, ident: DatatypeIdent) -> AtomType {
             let dt = package.datatype_by_id(ident).expect("get by id");

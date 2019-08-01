@@ -4,9 +4,10 @@ use crate::parser::{
 };
 use crate::repr::{
     AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
-    EnumDatatypeRepr, EnumMemberRepr, ModuleDatatypesRepr, StructDatatypeRepr, StructMemberRepr,
+    EnumDatatypeRepr, EnumMemberRepr, ModuleDatatypesRepr, Package, StructDatatypeRepr,
+    StructMemberRepr,
 };
-use crate::{AtomType, Location, MemArea, Package, ValidationError};
+use crate::{AtomType, Location, MemArea, ValidationError};
 use cranelift_entity::{PrimaryMap, SecondaryMap};
 use std::collections::HashMap;
 
@@ -46,13 +47,13 @@ enum VariantIR {
 
 #[derive(Clone)]
 pub struct DatatypeModuleBuilder<'a> {
-    env: Package<'a>,
+    env: &'a Package,
     names: &'a ModNamesBuilder,
     types: PrimaryMap<DatatypeIx, DatatypeIR>,
 }
 
 impl<'a> DatatypeModuleBuilder<'a> {
-    pub fn new(env: Package<'a>, names: &'a ModNamesBuilder) -> Self {
+    pub fn new(env: &'a Package, names: &'a ModNamesBuilder) -> Self {
         Self {
             env,
             names,

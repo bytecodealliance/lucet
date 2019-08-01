@@ -2,11 +2,11 @@ use super::datatypes::DatatypeModuleBuilder;
 use super::function::FunctionModuleBuilder;
 use super::names::ModNamesBuilder;
 use crate::parser::SyntaxDecl;
-use crate::repr::{ModuleIx, ModuleRepr, PackageRepr};
+use crate::repr::{ModuleIx, ModuleRepr};
 use crate::{Package, ValidationError};
 
 pub fn module_from_declarations(
-    env: &PackageRepr,
+    env: &Package,
     ix: ModuleIx,
     decls: &[SyntaxDecl],
 ) -> Result<ModuleRepr, ValidationError> {
@@ -30,8 +30,7 @@ pub fn module_from_declarations(
     }
 
     // Datatypes are defined in terms of the parent environment:
-    let data_env = Package::new(env);
-    let mut datatypes_builder = DatatypeModuleBuilder::new(data_env, &names);
+    let mut datatypes_builder = DatatypeModuleBuilder::new(env, &names);
 
     // Then, we can define each datatype
     for decl in decls.iter() {
@@ -69,7 +68,7 @@ pub fn module_from_declarations(
     funcs_env_repr
         .modules
         .push(ModuleRepr::from_datatypes(datatypes_module.clone()));
-    let funcs_env = Package::new(&funcs_env_repr).module_by_ix(ix).unwrap();
+    let funcs_env = funcs_env_repr.module_by_ix(ix).unwrap();
 
     // Now we can define each function:
     let mut funcs_builder = FunctionModuleBuilder::new(funcs_env, &names);
@@ -101,7 +100,7 @@ mod tests {
     use crate::parser::Parser;
     use crate::validate::package::PackageBuilder;
     use crate::{BindingDirection, DatatypeVariant, Location, MemArea, ParamType};
-    fn mod_syntax(syntax: &str) -> Result<PackageRepr, ValidationError> {
+    fn mod_syntax(syntax: &str) -> Result<Package, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
 
@@ -123,7 +122,7 @@ mod tests {
     #[test]
     fn struct_two_atoms() {
         let pkg_r = mod_syntax("struct foo { a: i32, b: f32 }").expect("valid");
-        let module = Package::new(&pkg_r).module("mod").unwrap();
+        let module = pkg_r.module("mod").unwrap();
         let foo = module.datatype("foo").expect("foo datatype defined");
         assert_eq!(foo.mem_size(), 8);
         assert_eq!(foo.mem_align(), 4);
@@ -230,8 +229,8 @@ mod tests {
         assert!(mod_syntax("enum foo { a, b }").is_ok());
 
         {
-            let pkg_repr = mod_syntax("enum foo { a, b }").expect("valid syntax");
-            let m = Package::new(&pkg_repr).module("mod").expect("get module");
+            let pkg = mod_syntax("enum foo { a, b }").expect("valid syntax");
+            let m = pkg.module("mod").expect("get module");
             let foo = m.datatype("foo").expect("get foo");
             match foo.variant() {
                 DatatypeVariant::Enum(e) => {
@@ -284,8 +283,8 @@ mod tests {
         assert!(mod_syntax("type foo = u8;").is_ok());
         assert!(mod_syntax("type link = u32;\nstruct list { next: link, thing: i32 }").is_ok());
 
-        let pkg_repr = mod_syntax("type foo = bar;\nenum bar { a }").expect("valid");
-        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let pkg = mod_syntax("type foo = bar;\nenum bar { a }").expect("valid");
+        let m = pkg.module("mod").expect("get module");
         let foo = m.datatype("foo").expect("get foo");
 
         match foo.variant() {
@@ -332,8 +331,8 @@ mod tests {
 
     #[test]
     fn func_trivial() {
-        let pkg_repr = mod_syntax("fn foo();").expect("valid module");
-        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let pkg = mod_syntax("fn foo();").expect("valid module");
+        let m = pkg.module("mod").expect("get module");
         let foo = m.function("foo").expect("get foo");
         assert_eq!(foo.name(), "foo");
         assert_eq!(foo.params().collect::<Vec<_>>().len(), 0);
@@ -342,8 +341,8 @@ mod tests {
 
     #[test]
     fn func_one_arg() {
-        let pkg_repr = mod_syntax("fn foo(a: i64);").expect("valid module");
-        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let pkg = mod_syntax("fn foo(a: i64);").expect("valid module");
+        let m = pkg.module("mod").expect("get module");
         let foo = m.function("foo").expect("get foo");
 
         assert_eq!(foo.args().collect::<Vec<_>>().len(), 1);
@@ -366,8 +365,8 @@ mod tests {
 
     #[test]
     fn func_one_ret() {
-        let pkg_repr = mod_syntax("fn foo() -> r: i64;").expect("valid module");
-        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let pkg = mod_syntax("fn foo() -> r: i64;").expect("valid module");
+        let m = pkg.module("mod").expect("get module");
         let foo = m.function("foo").expect("get foo");
 
         assert_eq!(foo.rets().collect::<Vec<_>>().len(), 1);
@@ -421,8 +420,8 @@ mod tests {
 
     #[test]
     fn func_one_arg_value_binding() {
-        let pkg_repr = mod_syntax("fn foo(a: i32) where\na_binding: in i8 <- a;").expect("valid");
-        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let pkg = mod_syntax("fn foo(a: i32) where\na_binding: in i8 <- a;").expect("valid");
+        let m = pkg.module("mod").expect("get module");
         let foo = m.function("foo").expect("get foo");
 
         assert_eq!(foo.args().collect::<Vec<_>>().len(), 1);
@@ -442,9 +441,8 @@ mod tests {
 
     #[test]
     fn func_one_arg_ptr_binding() {
-        let pkg_repr =
-            mod_syntax("fn foo(a: i32) where\na_binding: inout i8 <- *a;").expect("valid");
-        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let pkg = mod_syntax("fn foo(a: i32) where\na_binding: inout i8 <- *a;").expect("valid");
+        let m = pkg.module("mod").expect("get module");
         let foo = m.function("foo").expect("get foo");
 
         assert_eq!(foo.args().collect::<Vec<_>>().len(), 1);
@@ -531,10 +529,9 @@ mod tests {
 
     #[test]
     fn func_one_ret_value_binding() {
-        let pkg_repr =
-            mod_syntax("fn foo() -> a: i32 where\na_binding: out i8 <- a;").expect("valid");
+        let pkg = mod_syntax("fn foo() -> a: i32 where\na_binding: out i8 <- a;").expect("valid");
 
-        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let m = pkg.module("mod").expect("get module");
         let foo = m.function("foo").expect("get foo");
 
         assert_eq!(foo.rets().collect::<Vec<_>>().len(), 1);
@@ -580,11 +577,11 @@ mod tests {
 
     #[test]
     fn func_two_arg_slice_binding() {
-        let pkg_repr = mod_syntax(
+        let pkg = mod_syntax(
             "fn foo(a_ptr: i32, a_len: i32) where\na_binding: inout i8 <- [a_ptr, a_len];",
         )
         .expect("valid");
-        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let m = pkg.module("mod").expect("get module");
         let foo = m.function("foo").expect("get foo");
 
         assert_eq!(foo.args().collect::<Vec<_>>().len(), 2);
@@ -609,7 +606,7 @@ mod tests {
 
     #[test]
     fn func_buncha_bindings() {
-        let pkg_repr = mod_syntax(
+        let pkg = mod_syntax(
             "fn nontrivial(a: i32, b: i32, c: f32) -> d: i32 where\n\
              a_binding: out u8 <- *a,\n\
              b_binding: inout u16 <- *b,\n\
@@ -619,7 +616,7 @@ mod tests {
         )
         .expect("valid");
 
-        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let m = pkg.module("mod").expect("get module");
         let nontrivial = m.function("nontrivial").expect("get nontrivial");
 
         assert_eq!(nontrivial.args().collect::<Vec<_>>().len(), 3);

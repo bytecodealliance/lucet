@@ -6,7 +6,7 @@ pub struct ModuleIx(u32);
 entity_impl!(ModuleIx);
 
 #[derive(Debug, Clone)]
-pub struct PackageRepr {
+pub struct Package {
     pub(crate) names: PrimaryMap<ModuleIx, String>,
     pub(crate) modules: PrimaryMap<ModuleIx, ModuleRepr>,
 }

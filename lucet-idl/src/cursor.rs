@@ -1,48 +1,34 @@
 pub use crate::atoms::{AbiType, AtomType};
 use crate::parser::SyntaxTypeRef;
-pub use crate::repr::BindingDirection;
 use crate::repr::{
     AliasDatatypeRepr, BindingFromRepr, BindingIx, BindingRepr, DatatypeIdent, DatatypeIx,
     DatatypeRepr, DatatypeVariantRepr, EnumDatatypeRepr, FuncIdent, FuncIx, FuncRepr, ModuleIx,
-    ModuleRepr, PackageRepr, ParamIx, ParamRepr, StructDatatypeRepr, StructMemberRepr,
+    ModuleRepr, ParamIx, ParamRepr, StructDatatypeRepr, StructMemberRepr,
 };
+pub use crate::repr::{BindingDirection, Package};
 use crate::MemArea;
 
-#[derive(Debug, Clone)]
-pub struct Package<'a> {
-    repr: &'a PackageRepr,
-}
-
-impl<'a> Package<'a> {
-    pub fn new(repr: &'a PackageRepr) -> Package<'a> {
-        Package { repr }
-    }
-
-    pub fn module(&self, name: &str) -> Option<Module<'a>> {
-        self.repr
-            .names
+impl Package {
+    pub fn module<'a>(&'a self, name: &str) -> Option<Module<'a>> {
+        self.names
             .iter()
             .find(|(_, n)| *n == name)
             .and_then(|(ix, _)| self.module_by_ix(ix))
     }
 
-    pub fn modules(&self) -> impl Iterator<Item = Module<'a>> {
-        let pkg = self.repr;
-        self.repr.names.keys().map(move |ix| Module { pkg, ix })
+    pub fn modules<'a>(&'a self) -> impl Iterator<Item = Module<'a>> + 'a {
+        self.names.keys().map(move |ix| Module { pkg: &self, ix })
     }
 
-    pub fn module_by_ix(&self, ix: ModuleIx) -> Option<Module<'a>> {
-        if self.repr.modules.is_valid(ix) {
-            Some(Module {
-                pkg: &self.repr,
-                ix,
-            })
+    pub fn module_by_ix<'a>(&'a self, ix: ModuleIx) -> Option<Module<'a>> {
+        if self.modules.is_valid(ix) {
+            Some(Module { pkg: &self, ix })
         } else {
             None
         }
     }
 
-    pub fn datatype_by_id(&self, id: DatatypeIdent) -> Option<Datatype<'a>> {
+    pub fn datatype_by_id<'a>(&'a self, id: DatatypeIdent) -> Option<Datatype<'a>> {
         self.module_by_ix(id.module)
             .and_then(|m| m.datatype_by_ix(id.datatype))
     }
@@ -50,7 +36,7 @@ impl<'a> Package<'a> {
 
 #[derive(Debug, Clone)]
 pub struct Module<'a> {
-    pkg: &'a PackageRepr,
+    pkg: &'a Package,
     ix: ModuleIx,
 }
 
@@ -59,8 +45,8 @@ impl<'a> Module<'a> {
         self.pkg.modules.get(self.ix).expect("i exist")
     }
 
-    pub fn package(&self) -> Package<'a> {
-        Package { repr: self.pkg }
+    pub fn package(&self) -> &'a Package {
+        self.pkg
     }
 
     pub fn name(&self) -> &str {
@@ -140,7 +126,7 @@ impl<'a> Module<'a> {
 
 #[derive(Debug, Clone)]
 pub struct Datatype<'a> {
-    pkg: &'a PackageRepr,
+    pkg: &'a Package,
     id: DatatypeIdent,
 }
 
@@ -252,7 +238,7 @@ impl<'a> DatatypeVariant<'a> {
 
 #[derive(Debug, Clone)]
 pub struct StructDatatype<'a> {
-    pkg: &'a PackageRepr,
+    pkg: &'a Package,
     repr: &'a StructDatatypeRepr,
     id: DatatypeIdent,
 }
@@ -294,7 +280,7 @@ impl<'a> From<StructDatatype<'a>> for Datatype<'a> {
 
 #[derive(Debug, Clone)]
 pub struct StructMember<'a> {
-    pkg: &'a PackageRepr,
+    pkg: &'a Package,
     repr: &'a StructMemberRepr,
 }
 
@@ -315,7 +301,7 @@ impl<'a> StructMember<'a> {
 
 #[derive(Debug, Clone)]
 pub struct EnumDatatype<'a> {
-    pkg: &'a PackageRepr,
+    pkg: &'a Package,
     repr: &'a EnumDatatypeRepr,
     id: DatatypeIdent,
 }
@@ -371,7 +357,7 @@ impl<'a> EnumMember<'a> {
 
 #[derive(Debug, Clone)]
 pub struct AliasDatatype<'a> {
-    pkg: &'a PackageRepr,
+    pkg: &'a Package,
     repr: &'a AliasDatatypeRepr,
     id: DatatypeIdent,
 }
@@ -403,7 +389,7 @@ impl<'a> From<AliasDatatype<'a>> for Datatype<'a> {
 
 #[derive(Debug, Clone)]
 pub struct Function<'a> {
-    pkg: &'a PackageRepr,
+    pkg: &'a Package,
     id: FuncIdent,
 }
 
@@ -508,7 +494,8 @@ impl<'a> FuncParam<'a> {
         self.repr().type_
     }
     pub fn type_(&self) -> Datatype<'a> {
-        Package::new(self.func.pkg)
+        self.func
+            .pkg
             .datatype_by_id(AtomType::from(self.repr().type_).datatype_id())
             .expect("valid type")
     }
@@ -547,7 +534,8 @@ impl<'a> FuncBinding<'a> {
         &self.repr().name
     }
     pub fn type_(&self) -> Datatype<'a> {
-        Package::new(self.func.pkg)
+        self.func
+            .pkg
             .datatype_by_id(self.repr().type_)
             .expect("valid type")
     }

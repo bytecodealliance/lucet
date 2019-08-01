@@ -20,7 +20,6 @@ mod pretty_writer;
 pub use crate::config::{Backend, Config};
 pub use crate::cursor::*;
 pub use crate::error::{IDLError, ValidationError};
-pub use crate::repr::{BindingDirection, PackageRepr};
 pub use crate::{AbiType, AtomType};
 
 //use crate::c::CGenerator;
@@ -41,7 +40,7 @@ pub trait MemArea {
     fn mem_align(&self) -> usize;
 }
 
-pub fn parse_package(input: &str) -> Result<PackageRepr, IDLError> {
+pub fn parse_package(input: &str) -> Result<Package, IDLError> {
     let mut parser = Parser::new(&input);
     let decls = parser.match_decls()?;
     let pkg = package_from_declarations(&decls)?;
@@ -59,8 +58,7 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
 }
 
 pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
-    let pkg_repr = parse_package(input)?;
-    let pkg = Package::new(&pkg_repr);
+    let pkg = parse_package(input)?;
     codegen(&pkg, config, output)
 }
 

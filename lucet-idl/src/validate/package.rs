@@ -1,16 +1,13 @@
-#![allow(unused)]
 use super::module::module_from_declarations;
 use crate::error::ValidationError;
 use crate::parser::SyntaxDecl;
 use crate::prelude::std_module;
-use crate::repr::{ModuleIx, ModuleRepr, PackageRepr};
+use crate::repr::{ModuleIx, ModuleRepr, Package};
 use crate::Location;
 use cranelift_entity::PrimaryMap;
 use std::collections::HashMap;
 
-pub fn package_from_declarations(
-    package_decls: &[SyntaxDecl],
-) -> Result<PackageRepr, ValidationError> {
+pub fn package_from_declarations(package_decls: &[SyntaxDecl]) -> Result<Package, ValidationError> {
     let mut pkg = PackageBuilder::new();
     for decl in package_decls {
         match decl {
@@ -34,12 +31,12 @@ pub fn package_from_declarations(
 
 pub struct PackageBuilder {
     name_decls: HashMap<String, (ModuleIx, Option<Location>)>,
-    repr: PackageRepr,
+    repr: Package,
 }
 
 impl PackageBuilder {
     pub fn new() -> Self {
-        let mut repr = PackageRepr {
+        let mut repr = Package {
             names: PrimaryMap::new(),
             modules: PrimaryMap::new(),
         };
@@ -79,7 +76,7 @@ impl PackageBuilder {
         Ok(ix)
     }
 
-    pub fn repr(&self) -> &PackageRepr {
+    pub fn repr(&self) -> &Package {
         &self.repr
     }
 
@@ -89,7 +86,7 @@ impl PackageBuilder {
         assert_eq!(ix, pushed_ix);
     }
 
-    pub fn build(self) -> PackageRepr {
+    pub fn build(self) -> Package {
         self.repr
     }
 }
@@ -100,7 +97,7 @@ mod test {
     use crate::parser::Parser;
     use crate::Package;
 
-    fn pkg_(syntax: &str) -> Result<PackageRepr, ValidationError> {
+    fn pkg_(syntax: &str) -> Result<Package, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
         package_from_declarations(&decls)
@@ -108,8 +105,7 @@ mod test {
 
     #[test]
     fn one_empty_mod() {
-        let repr = pkg_("mod empty {}").expect("valid package");
-        let pkg = Package::new(&repr);
+        let pkg = pkg_("mod empty {}").expect("valid package");
         let empty = pkg.module("empty").expect("mod empty exists");
         assert_eq!(empty.name(), "empty");
         assert_eq!(empty.datatypes().collect::<Vec<_>>().len(), 0);
@@ -118,8 +114,7 @@ mod test {
 
     #[test]
     fn multiple_empty_mod() {
-        let repr = pkg_("mod empty1 {} mod empty2{}mod\nempty3{//\n}").expect("valid package");
-        let pkg = Package::new(&repr);
+        let pkg = pkg_("mod empty1 {} mod empty2{}mod\nempty3{//\n}").expect("valid package");
         let _ = pkg.module("empty1").expect("mod empty1 exists");
         let _ = pkg.module("empty2").expect("mod empty2 exists");
         let _ = pkg.module("empty3").expect("mod empty3 exists");
@@ -127,8 +122,7 @@ mod test {
 
     #[test]
     fn mod_with_a_type() {
-        let repr = pkg_("mod foo { type bar = u8; }").expect("valid package");
-        let pkg = Package::new(&repr);
+        let pkg = pkg_("mod foo { type bar = u8; }").expect("valid package");
         let foo = pkg.module("foo").expect("mod foo exists");
         let _bar = foo.datatype("bar").expect("foo::bar exists");
     }

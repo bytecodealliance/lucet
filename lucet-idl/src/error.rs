@@ -4,7 +4,6 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 
-#[allow(dead_code)]
 #[derive(Debug, Fail)]
 pub enum IDLError {
     #[fail(display = "Internal error: {}", _0)]
