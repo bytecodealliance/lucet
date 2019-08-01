@@ -15,7 +15,7 @@ lucet-module = { path = "../../lucet-module", version = "0.1.1" }
 bitflags = "1.0"
 bincode = "~1.0.1"
 byteorder = "1.3"
-cranelift-codegen = { path = "../../cranelift/cranelift-codegen", version = "0.31.0" }
+cranelift-codegen = { path = "../../cranelift/cranelift-codegen", version = "0.37.0" }
 failure = "0.1"
 lazy_static = "1.1"
 libc = "=0.2.59"
