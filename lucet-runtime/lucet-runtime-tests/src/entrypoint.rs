@@ -226,7 +226,8 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run("add_2", &[123u64.into(), 456u64.into()])
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 123u64 + 456);
         }
@@ -269,7 +270,8 @@ macro_rules! entrypoint_tests {
                         10u64.into(),
                     ],
                 )
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10);
         }
@@ -292,7 +294,8 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run("mul_2", &[123u64.into(), 456u64.into()])
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 123 * 456);
         }
@@ -310,13 +313,15 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run("add_2", &[111u64.into(), 222u64.into()])
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 111 + 222);
 
             let retval = inst
                 .run("mul_2", &[333u64.into(), 444u64.into()])
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 333 * 444);
         }
@@ -360,7 +365,8 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run("add_f32_2", &[(-6.9f32).into(), 4.2f32.into()])
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(f32::from(retval), -6.9 + 4.2);
         }
@@ -381,7 +387,8 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run("add_f64_2", &[(-6.9f64).into(), 4.2f64.into()])
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(f64::from(retval), -6.9 + 4.2);
         }
@@ -416,7 +423,8 @@ macro_rules! entrypoint_tests {
                         1.0f32.into(),
                     ],
                 )
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(
                 f32::from(retval),
@@ -454,7 +462,8 @@ macro_rules! entrypoint_tests {
                         1.0f64.into(),
                     ],
                 )
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(
                 f64::from(retval),
@@ -499,7 +508,8 @@ macro_rules! entrypoint_tests {
                         19u64.into(),
                     ],
                 )
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(
                 f64::from(retval),
@@ -616,13 +626,14 @@ macro_rules! entrypoint_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(
-                "add_4_reexport",
-                &[123u64.into(), 456u64.into(), 789u64.into(), 432u64.into()],
-            ) {
-                Ok(res) => assert_eq!(u64::from(res), 1800),
-                res => panic!("unexpected result: {:?}", res),
-            }
+            let retval = inst
+                .run(
+                    "add_4_reexport",
+                    &[123u64.into(), 456u64.into(), 789u64.into(), 432u64.into()],
+                )
+                .unwrap()
+                .unwrap_returned();
+            assert_eq!(u64::from(retval), 1800);
         }
 
         use $crate::build::test_module_c;
@@ -918,7 +929,8 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run("callback_entrypoint", &[0u64.into()])
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(u64::from(retval), 3);
         }
     };

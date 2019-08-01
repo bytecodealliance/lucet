@@ -28,6 +28,9 @@ enum lucet_error {
     lucet_error_runtime_fault,
     lucet_error_runtime_terminated,
     lucet_error_dl,
+    lucet_error_instance_not_returned,
+    lucet_error_instance_not_yielded,
+    lucet_error_start_yielded,
     lucet_error_internal,
     lucet_error_unsupported,
 };
@@ -43,11 +46,13 @@ enum lucet_state_tag {
     lucet_state_tag_running,
     lucet_state_tag_fault,
     lucet_state_tag_terminated,
+    lucet_state_tag_yielded,
 };
 
 enum lucet_terminated_reason {
     lucet_terminated_reason_signal,
     lucet_terminated_reason_ctx_not_found,
+    lucet_terminated_reason_yield_type_mismatch,
     lucet_terminated_reason_borrow_error,
     lucet_terminated_reason_provided,
 };
@@ -160,11 +165,16 @@ struct lucet_terminated {
     void *                       provided;
 };
 
+struct lucet_yielded {
+    void *val;
+};
+
 union lucet_state_val {
     struct lucet_untyped_retval returned;
     bool                        running;
     struct lucet_runtime_fault  fault;
     struct lucet_terminated     terminated;
+    struct lucet_yielded        yielded;
 };
 
 struct lucet_state {

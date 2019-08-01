@@ -195,7 +195,10 @@ macro_rules! guest_fault_tests {
         }
 
         fn run_onetwothree(inst: &mut Instance) {
-            let retval = inst.run("onetwothree", &[]).expect("instance runs");
+            let retval = inst
+                .run("onetwothree", &[])
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(libc::c_int::from(retval), 123);
         }
 

@@ -30,7 +30,12 @@ pub struct AddrDetails {
 ///
 /// Types that implement this trait are suitable for use with
 /// [`Region::new_instance()`](trait.Region.html#method.new_instance).
-pub trait Module: ModuleInternal {}
+pub trait Module: ModuleInternal {
+    /// Calculate the initial size in bytes of the module's Wasm globals.
+    fn initial_globals_size(&self) -> usize {
+        self.globals().len() * std::mem::size_of::<u64>()
+    }
+}
 
 pub trait ModuleInternal: Send + Sync {
     fn heap_spec(&self) -> Option<&HeapSpec>;

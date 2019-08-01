@@ -166,6 +166,7 @@ impl ScriptEnv {
     ) -> Result<UntypedRetVal, ScriptError> {
         let (_, ref mut inst) = self.instance_named_mut(name)?;
         inst.run(field, &args)
+            .and_then(|rr| rr.returned())
             .map_err(|e| ScriptError::RuntimeError(e))
     }
 

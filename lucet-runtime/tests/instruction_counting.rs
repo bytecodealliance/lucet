@@ -1,4 +1,4 @@
-use lucet_runtime::{DlModule, Error, Limits, MmapRegion, Region};
+use lucet_runtime::{DlModule, Error, Limits, MmapRegion, Region, RunResult};
 use lucetc::{Lucetc, LucetcOpts};
 use rayon::prelude::*;
 use std::fs::DirEntry;
@@ -55,9 +55,15 @@ pub fn check_instruction_counts() {
 
         assert_eq!(
             instruction_count,
-            inst.run("instruction_count", &[])
+            match inst
+                .run("instruction_count", &[])
                 .expect("instance still runs")
-                .as_i64() as u64,
+            {
+                RunResult::Returned(value) => value.as_i64() as u64,
+                RunResult::Yielded(_) => {
+                    panic!("instruction counting test runner doesn't support yielding");
+                }
+            },
             "instruction count for test case {} is incorrect",
             wasm_path.display()
         );
