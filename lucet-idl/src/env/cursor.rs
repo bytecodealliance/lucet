@@ -1,7 +1,9 @@
 use crate::env::atoms::{AbiType, AtomType};
+pub use crate::env::repr::BindingDirection;
 use crate::env::repr::{
-    AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
-    EnumDatatypeRepr, ModuleIx, ModuleRepr, PackageRepr, StructDatatypeRepr, StructMemberRepr,
+    AliasDatatypeRepr, BindingFromRepr, BindingIx, BindingRepr, DatatypeIdent, DatatypeIx,
+    DatatypeRepr, DatatypeVariantRepr, EnumDatatypeRepr, FuncIdent, FuncIx, FuncRepr, ModuleIx,
+    ModuleRepr, PackageRepr, ParamIx, ParamRepr, StructDatatypeRepr, StructMemberRepr,
 };
 use crate::env::MemArea;
 use crate::parser::SyntaxTypeRef;
@@ -102,10 +104,37 @@ impl<'a> Module<'a> {
     pub fn datatype_by_syntax(&self, tref: &SyntaxTypeRef) -> Option<Datatype<'a>> {
         match tref {
             SyntaxTypeRef::Name { name, .. } => self.datatype(name),
-            SyntaxTypeRef::Atom { atom, .. } => {
-                self.package().datatype_by_id(atom.datatype_ident())
-            }
+            SyntaxTypeRef::Atom { atom, .. } => self.package().datatype_by_id(atom.datatype_id()),
         }
+    }
+
+    pub fn function(&self, name: &str) -> Option<Function<'a>> {
+        self.repr()
+            .funcs
+            .names
+            .iter()
+            .find(|(_, n)| *n == name)
+            .and_then(|(ix, _)| self.function_by_ix(ix))
+    }
+
+    pub fn function_by_ix(&self, ix: FuncIx) -> Option<Function<'a>> {
+        if self.repr().funcs.funcs.is_valid(ix) {
+            Some(Function {
+                pkg: self.pkg,
+                id: FuncIdent::new(self.ix, ix),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn functions(&self) -> impl Iterator<Item = Function<'a>> {
+        let pkg = self.pkg;
+        let mix = self.ix;
+        self.repr().funcs.funcs.keys().map(move |ix| Function {
+            pkg,
+            id: FuncIdent::new(mix, ix),
+        })
     }
 }
 
@@ -345,4 +374,188 @@ impl<'a> From<AliasDatatype<'a>> for Datatype<'a> {
             id: a.id,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct Function<'a> {
+    pkg: &'a PackageRepr,
+    id: FuncIdent,
+}
+
+impl<'a> Function<'a> {
+    fn repr(&self) -> &'a FuncRepr {
+        &self.pkg.modules[self.id.module].funcs.funcs[self.id.func]
+    }
+
+    pub fn name(&self) -> &str {
+        &self.pkg.modules[self.id.module].funcs.names[self.id.func]
+    }
+
+    pub fn arg(&self, name: &str) -> Option<FuncParam<'a>> {
+        let func = self.clone();
+        self.repr()
+            .args
+            .iter()
+            .find(|(_, param)| param.name == name)
+            .map(move |(ix, _)| FuncParam {
+                func,
+                ix: ParamIx::Arg(ix),
+            })
+    }
+
+    pub fn args(&self) -> impl Iterator<Item = FuncParam<'a>> {
+        let func = self.clone();
+        self.repr().args.iter().map(move |(ix, _)| FuncParam {
+            func: func.clone(),
+            ix: ParamIx::Arg(ix),
+        })
+    }
+
+    pub fn ret(&self, name: &str) -> Option<FuncParam<'a>> {
+        let func = self.clone();
+        self.repr()
+            .rets
+            .iter()
+            .find(|(_, param)| param.name == name)
+            .map(move |(ix, _)| FuncParam {
+                func,
+                ix: ParamIx::Ret(ix),
+            })
+    }
+
+    pub fn rets(&self) -> impl Iterator<Item = FuncParam<'a>> {
+        let func = self.clone();
+        self.repr().rets.iter().map(move |(ix, _)| FuncParam {
+            func: func.clone(),
+            ix: ParamIx::Ret(ix),
+        })
+    }
+
+    pub fn param(&self, name: &str) -> Option<FuncParam<'a>> {
+        self.arg(name).or_else(|| self.ret(name))
+    }
+
+    pub fn params(&self) -> impl Iterator<Item = FuncParam<'a>> {
+        self.args().chain(self.rets())
+    }
+
+    pub fn binding(&self, name: &str) -> Option<FuncBinding<'a>> {
+        let func = self.clone();
+        self.repr()
+            .bindings
+            .iter()
+            .find(|(_, bind)| bind.name == name)
+            .map(move |(ix, _)| FuncBinding { func, ix })
+    }
+
+    pub fn bindings(&self) -> impl Iterator<Item = FuncBinding<'a>> {
+        let func = self.clone();
+        self.repr().bindings.iter().map(move |(ix, _)| FuncBinding {
+            func: func.clone(),
+            ix,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParamType {
+    Arg,
+    Ret,
+}
+
+#[derive(Debug, Clone)]
+pub struct FuncParam<'a> {
+    func: Function<'a>,
+    ix: ParamIx,
+}
+
+impl<'a> FuncParam<'a> {
+    fn repr(&self) -> &'a ParamRepr {
+        match self.ix {
+            ParamIx::Arg(ix) => &self.func.repr().args[ix],
+            ParamIx::Ret(ix) => &self.func.repr().rets[ix],
+        }
+    }
+    pub fn name(&self) -> &str {
+        &self.repr().name
+    }
+    pub fn abi_type(&self) -> AbiType {
+        self.repr().type_
+    }
+    pub fn type_(&self) -> Datatype<'a> {
+        Package::new(self.func.pkg)
+            .datatype_by_id(AtomType::from(self.repr().type_).datatype_id())
+            .expect("valid type")
+    }
+    pub fn param_type(&self) -> ParamType {
+        match self.ix {
+            ParamIx::Arg { .. } => ParamType::Arg,
+            ParamIx::Ret { .. } => ParamType::Ret,
+        }
+    }
+    pub fn binding(&self) -> FuncBinding<'a> {
+        let func = self.func.clone();
+        self.func
+            .repr()
+            .bindings
+            .iter()
+            .find(|(_ix, b)| match b.from {
+                BindingFromRepr::Ptr(ix) | BindingFromRepr::Value(ix) => ix == self.ix,
+                BindingFromRepr::Slice(ptr_ix, len_ix) => ptr_ix == self.ix || len_ix == self.ix,
+            })
+            .map(|(ix, _)| FuncBinding { func, ix })
+            .expect("must be a binding for param")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FuncBinding<'a> {
+    func: Function<'a>,
+    ix: BindingIx,
+}
+
+impl<'a> FuncBinding<'a> {
+    fn repr(&self) -> &'a BindingRepr {
+        &self.func.repr().bindings[self.ix]
+    }
+    pub fn name(&self) -> &str {
+        &self.repr().name
+    }
+    pub fn type_(&self) -> Datatype<'a> {
+        Package::new(self.func.pkg)
+            .datatype_by_id(self.repr().type_)
+            .expect("valid type")
+    }
+    pub fn direction(&self) -> BindingDirection {
+        self.repr().direction
+    }
+    pub fn param(&self) -> BindingParam<'a> {
+        match self.repr().from {
+            BindingFromRepr::Ptr(ix) => BindingParam::Ptr(FuncParam {
+                func: self.func.clone(),
+                ix,
+            }),
+            BindingFromRepr::Slice(ptr_ix, len_ix) => BindingParam::Slice(
+                FuncParam {
+                    func: self.func.clone(),
+                    ix: ptr_ix,
+                },
+                FuncParam {
+                    func: self.func.clone(),
+                    ix: len_ix,
+                },
+            ),
+            BindingFromRepr::Value(ix) => BindingParam::Value(FuncParam {
+                func: self.func.clone(),
+                ix,
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum BindingParam<'a> {
+    Ptr(FuncParam<'a>),
+    Slice(FuncParam<'a>, FuncParam<'a>),
+    Value(FuncParam<'a>),
 }

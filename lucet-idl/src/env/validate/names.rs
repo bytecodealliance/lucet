@@ -58,12 +58,12 @@ impl ModNamesBuilder {
         Ok(())
     }
 
-    pub fn datatype_ident_from_syntax(
+    pub fn datatype_id_from_syntax(
         &self,
         syntax: &SyntaxTypeRef,
     ) -> Result<DatatypeIdent, ValidationError> {
         match syntax {
-            SyntaxTypeRef::Atom { atom, .. } => Ok(atom.datatype_ident()),
+            SyntaxTypeRef::Atom { atom, .. } => Ok(atom.datatype_id()),
             SyntaxTypeRef::Name { name, location } => match self.names.get(name) {
                 Some((ModContentIx::Datatype(ix), _loc)) => {
                     Ok(DatatypeIdent::new(self.module, *ix))

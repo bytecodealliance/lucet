@@ -32,7 +32,16 @@ pub struct FuncIx(u32);
 entity_impl!(FuncIx);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FuncIdent(ModuleIx, FuncIx);
+pub struct FuncIdent {
+    pub module: ModuleIx,
+    pub func: FuncIx,
+}
+
+impl FuncIdent {
+    pub fn new(module: ModuleIx, func: FuncIx) -> Self {
+        FuncIdent { module, func }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ModuleRepr {

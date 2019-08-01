@@ -229,7 +229,7 @@ impl<'a> FuncValidator<'a> {
         }
 
         // 2. resolve type
-        let type_ = AtomType::from(arg.type_).datatype_ident();
+        let type_ = AtomType::from(arg.type_).datatype_id();
 
         // 3. no need to validate ref- we can construct it ourselves
         let from = BindingFromRepr::Value(position);

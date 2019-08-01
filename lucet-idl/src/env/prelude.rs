@@ -55,7 +55,7 @@ fn atom_datatypes() -> ModuleDatatypesRepr {
 }
 
 impl AtomType {
-    pub fn datatype_ident(&self) -> DatatypeIdent {
+    pub fn datatype_id(&self) -> DatatypeIdent {
         use AtomType::*;
         match self {
             Bool => DatatypeIdent::new(ModuleIx::new(0), DatatypeIx::new(0)),
@@ -94,16 +94,16 @@ mod test {
                 _ => panic!("expected atom datatype, got {:?}", dt),
             }
         }
-        assert_eq!(Bool, lookup_atom(&prelude, Bool.datatype_ident()));
-        assert_eq!(U8, lookup_atom(&prelude, U8.datatype_ident()));
-        assert_eq!(U16, lookup_atom(&prelude, U16.datatype_ident()));
-        assert_eq!(U32, lookup_atom(&prelude, U32.datatype_ident()));
-        assert_eq!(U64, lookup_atom(&prelude, U64.datatype_ident()));
-        assert_eq!(I8, lookup_atom(&prelude, I8.datatype_ident()));
-        assert_eq!(I16, lookup_atom(&prelude, I16.datatype_ident()));
-        assert_eq!(I32, lookup_atom(&prelude, I32.datatype_ident()));
-        assert_eq!(I64, lookup_atom(&prelude, I64.datatype_ident()));
-        assert_eq!(F32, lookup_atom(&prelude, F32.datatype_ident()));
-        assert_eq!(F64, lookup_atom(&prelude, F64.datatype_ident()));
+        assert_eq!(Bool, lookup_atom(&prelude, Bool.datatype_id()));
+        assert_eq!(U8, lookup_atom(&prelude, U8.datatype_id()));
+        assert_eq!(U16, lookup_atom(&prelude, U16.datatype_id()));
+        assert_eq!(U32, lookup_atom(&prelude, U32.datatype_id()));
+        assert_eq!(U64, lookup_atom(&prelude, U64.datatype_id()));
+        assert_eq!(I8, lookup_atom(&prelude, I8.datatype_id()));
+        assert_eq!(I16, lookup_atom(&prelude, I16.datatype_id()));
+        assert_eq!(I32, lookup_atom(&prelude, I32.datatype_id()));
+        assert_eq!(I64, lookup_atom(&prelude, I64.datatype_id()));
+        assert_eq!(F32, lookup_atom(&prelude, F32.datatype_id()));
+        assert_eq!(F64, lookup_atom(&prelude, F64.datatype_id()));
     }
 }

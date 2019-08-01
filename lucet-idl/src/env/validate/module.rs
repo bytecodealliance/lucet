@@ -99,7 +99,7 @@ pub fn module_from_declarations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::cursor::{DatatypeVariant, Module};
+    use crate::env::cursor::{BindingDirection, BindingParam, DatatypeVariant, Module, ParamType};
     use crate::env::prelude::base_package;
     use crate::env::MemArea;
     use crate::parser::Parser;
@@ -330,4 +330,69 @@ mod tests {
         );
     }
 
+    #[test]
+    fn func_trivial() {
+        let pkg_repr = mod_syntax("fn foo();").expect("valid module");
+        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let foo = m.function("foo").expect("get foo");
+        assert_eq!(foo.name(), "foo");
+        assert_eq!(foo.params().collect::<Vec<_>>().len(), 0);
+        assert_eq!(foo.bindings().collect::<Vec<_>>().len(), 0);
+    }
+
+    #[test]
+    fn func_one_arg() {
+        let pkg_repr = mod_syntax("fn foo(a: i64);").expect("valid module");
+        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let foo = m.function("foo").expect("get foo");
+
+        assert_eq!(foo.args().collect::<Vec<_>>().len(), 1);
+        let a = foo.arg("a").expect("arg a exists");
+        assert_eq!(a.name(), "a");
+        assert_eq!(a.type_().name(), "i64");
+        assert_eq!(a.binding().name(), "a");
+
+        assert_eq!(foo.rets().collect::<Vec<_>>().len(), 0);
+        assert_eq!(foo.bindings().collect::<Vec<_>>().len(), 1);
+
+        let a_bind = foo.binding("a").expect("binding a exists");
+        assert_eq!(a_bind.name(), "a");
+        assert_eq!(a_bind.type_().name(), "i64");
+        assert_eq!(a_bind.direction(), BindingDirection::In);
+        match a_bind.param() {
+            BindingParam::Value(v) => {
+                assert_eq!(v.name(), "a");
+                assert_eq!(v.param_type(), ParamType::Arg);
+            }
+            _ => panic!("a binding is a value"),
+        }
+    }
+
+    #[test]
+    fn func_one_ret() {
+        let pkg_repr = mod_syntax("fn foo() -> r: i64;").expect("valid module");
+        let m = Package::new(&pkg_repr).module("mod").expect("get module");
+        let foo = m.function("foo").expect("get foo");
+
+        assert_eq!(foo.rets().collect::<Vec<_>>().len(), 1);
+        let r = foo.ret("r").expect("ret r exists");
+        assert_eq!(r.name(), "r");
+        assert_eq!(r.type_().name(), "i64");
+        assert_eq!(r.binding().name(), "r");
+
+        assert_eq!(foo.args().collect::<Vec<_>>().len(), 0);
+        assert_eq!(foo.bindings().collect::<Vec<_>>().len(), 1);
+
+        let r_bind = foo.binding("r").expect("binding r exists");
+        assert_eq!(r_bind.name(), "r");
+        assert_eq!(r_bind.type_().name(), "i64");
+        assert_eq!(r_bind.direction(), BindingDirection::Out);
+        match r_bind.param() {
+            BindingParam::Value(v) => {
+                assert_eq!(v.name(), "r");
+                assert_eq!(v.param_type(), ParamType::Ret);
+            }
+            _ => panic!("r binding is a value"),
+        }
+    }
 }

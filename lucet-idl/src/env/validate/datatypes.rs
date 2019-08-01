@@ -94,7 +94,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
             }
             // Get the DatatypeIdent for the member, which ensures that it refers only to
             // defined types:
-            let type_ = self.names.datatype_ident_from_syntax(&mem.type_)?;
+            let type_ = self.names.datatype_id_from_syntax(&mem.type_)?;
             // build the struct with this as the member:
             members.push(StructMemberIR {
                 type_,
@@ -164,7 +164,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
             .names
             .datatype_from_name(name)
             .expect("name is introduced");
-        let to = self.names.datatype_ident_from_syntax(dest)?;
+        let to = self.names.datatype_id_from_syntax(dest)?;
         self.define_datatype(
             ix,
             DatatypeIR {
