@@ -48,6 +48,7 @@ pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
     clif_module: ClifModule<FaerieBackend>,
     opt_level: OptLevel,
+    count_instructions: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -56,6 +57,7 @@ impl<'a> Compiler<'a> {
         opt_level: OptLevel,
         bindings: &'a Bindings,
         heap_settings: HeapSettings,
+        count_instructions: bool,
     ) -> Result<Self, LucetcError> {
         let isa = Self::target_isa(opt_level);
 
@@ -106,6 +108,7 @@ impl<'a> Compiler<'a> {
             decls,
             clif_module,
             opt_level,
+            count_instructions,
         })
     }
 
@@ -117,7 +120,7 @@ impl<'a> Compiler<'a> {
         let mut func_translator = FuncTranslator::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
-            let mut func_info = FuncInfo::new(&self.decls);
+            let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();
@@ -172,7 +175,7 @@ impl<'a> Compiler<'a> {
         let mut func_translator = FuncTranslator::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
-            let mut func_info = FuncInfo::new(&self.decls);
+            let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();

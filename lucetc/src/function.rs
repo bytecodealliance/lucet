@@ -6,27 +6,31 @@ use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
+use cranelift_frontend::FunctionBuilder;
 use cranelift_wasm::{
     FuncEnvironment, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex, SignatureIndex,
-    TableIndex, WasmError, WasmResult,
+    TableIndex, VisibleTranslationState, WasmError, WasmResult,
 };
+use lucet_module::InstanceRuntimeData;
+use memoffset::offset_of;
 use std::collections::HashMap;
-
-// VMContext points directly to the heap (offset 0).
-// Directly before the heao is a pointer to the globals (offset -NATIVE_POINTER_SIZE).
-const GLOBAL_BASE_OFFSET: i32 = -1 * NATIVE_POINTER_SIZE as i32;
+use wasmparser::Operator;
 
 pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
+    count_instructions: bool,
+    scope_costs: Vec<u32>,
     vmctx_value: Option<ir::GlobalValue>,
     global_base_value: Option<ir::GlobalValue>,
     runtime_funcs: HashMap<RuntimeFunc, ir::FuncRef>,
 }
 
 impl<'a> FuncInfo<'a> {
-    pub fn new(module_decls: &'a ModuleDecls<'a>) -> Self {
+    pub fn new(module_decls: &'a ModuleDecls<'a>, count_instructions: bool) -> Self {
         Self {
             module_decls,
+            count_instructions,
+            scope_costs: vec![0],
             vmctx_value: None,
             global_base_value: None,
             runtime_funcs: HashMap::new(),
@@ -46,7 +50,9 @@ impl<'a> FuncInfo<'a> {
             let vmctx = self.get_vmctx(func);
             let global_base_value = func.create_global_value(ir::GlobalValueData::Load {
                 base: vmctx,
-                offset: GLOBAL_BASE_OFFSET.into(),
+                offset: (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
+                    + (offset_of!(InstanceRuntimeData, globals_ptr) as i32))
+                    .into(),
                 global_type: ir::types::I64,
                 readonly: false,
             });
@@ -77,6 +83,185 @@ impl<'a> FuncInfo<'a> {
                 self.runtime_funcs.insert(runtime_func, fref);
                 fref
             })
+    }
+
+    fn update_instruction_count_instrumentation(
+        &mut self,
+        op: &Operator,
+        builder: &mut FunctionBuilder,
+        reachable: bool,
+    ) -> WasmResult<()> {
+        // So the operation counting works like this:
+        // record a stack corresponding with the stack of control flow in the wasm function.
+        // for non-control-flow-affecting instructions, increment the top of the stack.
+        // for control-flow-affecting operations (If, Else, Unreachable, Call, End, Return, Block,
+        // Loop, BrIf, CallIndirect), update the wasm instruction counter and:
+        // * if the operation introduces a new scope (If, Block, Loop), push a new 0 on the
+        // stack corresponding with that frame.
+        // * if the operation does not introduce a new scope (Else, Call, CallIndirect, BrIf),
+        // reset the top of stack to 0
+        // * if the operation completes a scope (End), pop the top of the stack and reset the new
+        // top of stack to 0
+        // * this leaves no special behavior for Unreachable and Return. This is acceptable as they
+        // are always followed by an End and are either about to trap, or return from a function.
+        // * Unreachable is either the end of VM execution and we are off by one instruction, or,
+        // is about to dispatch to an exception handler, which we should account for out of band
+        // anyway (exception dispatch is much more expensive than a single wasm op)
+        // * Return corresponds to exactly one function call, so we can count it by resetting the
+        // stack to 1 at return of a function.
+
+        fn flush_counter(environ: &mut FuncInfo, builder: &mut FunctionBuilder) {
+            if environ.scope_costs.last() == Some(&0) {
+                return;
+            }
+            let instr_count_offset: ir::immediates::Offset32 =
+                (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
+                    + offset_of!(InstanceRuntimeData, instruction_count) as i32)
+                    .into();
+            let vmctx_gv = environ.get_vmctx(builder.func);
+            let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
+            let trusted_mem = ir::MemFlags::trusted();
+
+            //    Now insert a sequence of clif that is, functionally:
+            //
+            //    let instruction_count_ptr: &mut u64 = vmctx.instruction_count;
+            //    let mut instruction_count: u64 = *instruction_count_ptr;
+            //    instruction_count += <counter>;
+            //    *instruction_count_ptr = instruction_count;
+
+            let cur_instr_count =
+                builder
+                    .ins()
+                    .load(ir::types::I64, trusted_mem, addr, instr_count_offset);
+            let update_const = builder.ins().iconst(
+                ir::types::I64,
+                i64::from(*environ.scope_costs.last().unwrap()),
+            );
+            let new_instr_count = builder.ins().iadd(cur_instr_count, update_const.into());
+            builder
+                .ins()
+                .store(trusted_mem, new_instr_count, addr, instr_count_offset);
+
+            *environ.scope_costs.last_mut().unwrap() = 0;
+        };
+
+        // Only update or flush the counter when the scope is not sealed.
+        //
+        // Cranelift dutifully translates the entire wasm body, including dead code, and we can try
+        // to insert instrumentation for dead code, but Cranelift seals blocks at operations that
+        // involve control flow away from the current block. So we have to track when operations
+        // are unreachable and not instrument them, lest we cause a Cranelift panic trying to
+        // modify sealed basic blocks.
+        if reachable {
+            // Update the instruction counter, if necessary
+            let op_cost = match op {
+                // Opening a scope is a syntactic operation, and free.
+                Operator::Block { .. } |
+                // These do not add counts, see above comment about return/unreachable
+                Operator::Unreachable |
+                Operator::Return => 0,
+                // Call is quick
+                Operator::Call { .. } => 1,
+                // but indirect calls take some extra work to validate at runtime
+                Operator::CallIndirect { .. } => 2,
+                // Testing for an if involve some overhead, for now say it's also 1
+                Operator::If { .. } => 1,
+                // Else is a fallthrough or alternate case for something that's been tested as `if`, so
+                // it's already counted
+                Operator::Else => 0,
+                // Entering a loop is a syntactic operation, and free.
+                Operator::Loop { .. } => 0,
+                // Closing a scope is a syntactic operation, and free.
+                Operator::End => 0,
+                // Taking a branch is an operation
+                Operator::Br { .. } => 1,
+                // brif might be two operations?
+                Operator::BrIf { .. } => 1,
+                // brtable is kind of cpu intensive compared to other wasm ops
+                Operator::BrTable { .. } => 2,
+                // nop and drop are free
+                Operator::Nop |
+                Operator::Drop => 0,
+                // everything else, just call it one operation.
+                _ => 1,
+            };
+            self.scope_costs.last_mut().map(|x| *x += op_cost);
+
+            // apply flushing behavior if applicable
+            match op {
+                Operator::Unreachable
+                | Operator::Return
+                | Operator::CallIndirect { .. }
+                | Operator::Call { .. }
+                | Operator::Block { .. }
+                | Operator::Loop { .. }
+                | Operator::If { .. }
+                | Operator::Else
+                | Operator::Br { .. }
+                | Operator::BrIf { .. }
+                | Operator::BrTable { .. } => {
+                    flush_counter(self, builder);
+                }
+                Operator::End => {
+                    // We have to be really careful here to avoid violating a cranelift invariant:
+                    // if the next operation is `End` as well, this end will have marked the block
+                    // finished, and attempting to add instructions to update the instruction counter
+                    // will cause a panic.
+                    //
+                    // The only situation where this can occur is if the last structure in a scope is a
+                    // subscope (the body of a Loop, If, or Else), so we flush the counter entering
+                    // those structures, and guarantee the `End` for their enclosing scope will have a
+                    // counter value of 0. In other cases, we're not at risk of closing a scope leading
+                    // to closing another scope, and it's safe to flush the counter.
+                    //
+                    // An example to help:
+                    // ```
+                    // block
+                    //   i32.const 4   ; counter += 1
+                    //   i32.const -5  ; counter += 1
+                    //   i32.add       ; counter += 1
+                    //   block         ; flush counter (counter = 3 -> 0), flush here to avoid having
+                    //                 ;                                   accumulated count at the
+                    //                 ;                                   final `end`
+                    //     i32.const 4 ; counter += 1
+                    //     i32.add     ; counter += 1
+                    //   end           ; flush counter (counter = 2 -> 0)
+                    // end             ; flush counter (counter = 0 -> 0) and is a no-op
+                    // ```
+                    flush_counter(self, builder);
+                }
+                _ => { /* regular operation, do nothing */ }
+            }
+        } else {
+            // just a consistency check - the counter must be 0 when exiting a region of
+            // unreachable code. If this assertion fails it means we either counted instructions
+            // we shouldn't (because they're unreachable), or we didn't flush the counter before
+            // starting to also instrument unreachable instructions (and would have tried to
+            // overcount)
+            assert_eq!(*self.scope_costs.last().unwrap(), 0);
+        }
+
+        // finally, we might have to set up a new counter for a new scope, or fix up counts a bit.
+        //
+        // Note that nothing is required for `Else`, because it will have been preceded by an `End`
+        // to close the "then" arm of its enclosing `If`, so the counter will have already been
+        // flushed and reset to 0.
+        match op {
+            Operator::CallIndirect { .. } | Operator::Call { .. } => {
+                // add 1 to count the return from the called function
+                self.scope_costs.last_mut().map(|x| *x = 1);
+            }
+            Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
+                // opening a scope, which starts having executed zero wasm ops
+                self.scope_costs.push(0);
+            }
+            Operator::End => {
+                // close the top scope
+                self.scope_costs.pop();
+            }
+            _ => {}
+        }
+        Ok(())
     }
 }
 
@@ -301,5 +486,17 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             .unwrap();
         let inst = pos.ins().call(mem_size_func, &[vmctx]);
         Ok(*pos.func.dfg.inst_results(inst).first().unwrap())
+    }
+
+    fn before_translate_operator(
+        &mut self,
+        op: &Operator,
+        builder: &mut FunctionBuilder,
+        state: &VisibleTranslationState,
+    ) -> WasmResult<()> {
+        if self.count_instructions {
+            self.update_instruction_count_instrumentation(op, builder, state.reachable())?;
+        }
+        Ok(())
     }
 }

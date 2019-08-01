@@ -27,7 +27,7 @@ cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.37.0" 
 cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.37.0" }
 target-lexicon = "0.4.0"
 lucet-module = { path = "../lucet-module", version = "0.1.1" }
-wasmparser = "0.23"
+wasmparser = "0.32.1"
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"
@@ -42,3 +42,4 @@ bimap = "0.2"
 human-size = "0.4"
 parity-wasm = "0.38"
 minisign = "0.5.11"
+memoffset = "0.5.1"
