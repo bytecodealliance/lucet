@@ -223,6 +223,31 @@ impl<'a> DatatypeVariant<'a> {
             DatatypeVariant::Alias(a) => a.to().abi_type(),
         }
     }
+
+    pub fn atom(self) -> Option<AtomType> {
+        match self {
+            DatatypeVariant::Atom(a) => Some(a),
+            _ => None,
+        }
+    }
+    pub fn struct_(self) -> Option<StructDatatype<'a>> {
+        match self {
+            DatatypeVariant::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
+    pub fn enum_(self) -> Option<EnumDatatype<'a>> {
+        match self {
+            DatatypeVariant::Enum(e) => Some(e),
+            _ => None,
+        }
+    }
+    pub fn alias(self) -> Option<AliasDatatype<'a>> {
+        match self {
+            DatatypeVariant::Alias(a) => Some(a),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

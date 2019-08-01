@@ -1,13 +1,10 @@
-#![allow(unused)]
 use super::datatypes::DatatypeModuleBuilder;
 use super::function::FunctionModuleBuilder;
 use super::names::ModNamesBuilder;
 use crate::env::cursor::Package;
-use crate::env::repr::{DatatypeIx, FuncIx, ModuleIx, ModuleRepr, PackageRepr};
+use crate::env::repr::{ModuleIx, ModuleRepr, PackageRepr};
 use crate::error::ValidationError;
 use crate::parser::SyntaxDecl;
-use crate::types::Location;
-use std::collections::HashMap;
 
 pub fn module_from_declarations(
     env: &PackageRepr,
@@ -26,7 +23,10 @@ pub fn module_from_declarations(
             SyntaxDecl::Function { name, location, .. } => {
                 names.introduce_function(name, location)?;
             }
-            SyntaxDecl::Module { .. } => unreachable!(),
+            SyntaxDecl::Module { location, .. } => Err(ValidationError::Syntax {
+                expected: "type or function declaration",
+                location: *location,
+            })?,
         }
     }
 
@@ -99,19 +99,22 @@ pub fn module_from_declarations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::cursor::{BindingDirection, BindingParam, DatatypeVariant, Module, ParamType};
-    use crate::env::prelude::base_package;
+    use crate::env::cursor::{BindingDirection, DatatypeVariant, ParamType};
+    use crate::env::validate::package::PackageBuilder;
     use crate::env::MemArea;
     use crate::parser::Parser;
+    use crate::types::Location;
     fn mod_syntax(syntax: &str) -> Result<PackageRepr, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
 
-        let mut pkg = base_package();
-        let mod_ix = pkg.names.push("mod".to_owned());
-        let module_repr = module_from_declarations(&pkg, mod_ix, &decls)?;
-        pkg.modules.push(module_repr);
-        Ok(pkg)
+        let mut pkg_builder = PackageBuilder::new();
+        let mod_ix = pkg_builder
+            .introduce_name("mod", &Location { line: 0, column: 0 })
+            .expect("declare name ok");
+        let module_repr = module_from_declarations(pkg_builder.repr(), mod_ix, &decls)?;
+        pkg_builder.define_module(mod_ix, module_repr);
+        Ok(pkg_builder.build())
     }
 
     #[test]
@@ -627,9 +630,13 @@ mod tests {
         assert_eq!(nontrivial.bindings().collect::<Vec<_>>().len(), 4);
 
         let a = nontrivial.arg("a").expect("arg a exists");
+        assert_eq!(a.type_().name(), "i32");
         let b = nontrivial.arg("b").expect("arg b exists");
+        assert_eq!(b.type_().name(), "i32");
         let c = nontrivial.arg("c").expect("arg c exists");
+        assert_eq!(c.type_().name(), "f32");
         let d = nontrivial.ret("d").expect("ret d exists");
+        assert_eq!(d.type_().name(), "i32");
 
         let a_binding = nontrivial.binding("a_binding").expect("a_binding exists");
         assert_eq!(a_binding.direction(), BindingDirection::Out);
