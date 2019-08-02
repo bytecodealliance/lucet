@@ -278,6 +278,15 @@ impl<'a> From<StructDatatype<'a>> for Datatype<'a> {
     }
 }
 
+impl<'a> MemArea for StructDatatype<'a> {
+    fn mem_size(&self) -> usize {
+        Datatype::from(self.clone()).mem_size()
+    }
+    fn mem_align(&self) -> usize {
+        Datatype::from(self.clone()).mem_align()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct StructMember<'a> {
     pkg: &'a Package,
@@ -338,6 +347,15 @@ impl<'a> From<EnumDatatype<'a>> for Datatype<'a> {
     }
 }
 
+impl<'a> MemArea for EnumDatatype<'a> {
+    fn mem_size(&self) -> usize {
+        Datatype::from(self.clone()).mem_size()
+    }
+    fn mem_align(&self) -> usize {
+        Datatype::from(self.clone()).mem_align()
+    }
+}
+
 pub struct EnumMember<'a> {
     repr: EnumDatatype<'a>,
     index: usize,
@@ -350,7 +368,7 @@ impl<'a> EnumMember<'a> {
     pub fn name(&self) -> &str {
         &self.repr.repr.members[self.index].name
     }
-    pub fn value(&self) -> usize {
+    pub fn index(&self) -> usize {
         self.index
     }
 }
@@ -384,6 +402,15 @@ impl<'a> From<AliasDatatype<'a>> for Datatype<'a> {
             pkg: a.pkg,
             id: a.id,
         }
+    }
+}
+
+impl<'a> MemArea for AliasDatatype<'a> {
+    fn mem_size(&self) -> usize {
+        Datatype::from(self.clone()).mem_size()
+    }
+    fn mem_align(&self) -> usize {
+        Datatype::from(self.clone()).mem_align()
     }
 }
 

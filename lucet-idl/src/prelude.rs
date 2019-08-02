@@ -73,7 +73,6 @@ impl AtomType {
 mod test {
     use super::std_module;
     use crate::atoms::AtomType;
-    use crate::cursor::Package;
     use crate::repr::{DatatypeIdent, Package};
     use cranelift_entity::PrimaryMap;
     #[test]

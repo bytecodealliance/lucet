@@ -1,16 +1,9 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
-use crate::error::IDLError;
-use crate::function::FuncDecl;
-use crate::module::Module;
-use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
-use crate::types::{
-    AbiType, AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, Named,
-    StructDataType,
+use crate::{
+    AbiType, AliasDatatype, AtomType, Datatype, DatatypeVariant, EnumDatatype, Function, IDLError,
+    MemArea, Package, StructDatatype,
 };
-use std::io::prelude::*;
+use std::io::Write;
 
 /// Generator for the C backend
 pub struct CGenerator {
@@ -33,44 +26,43 @@ impl CGenerator {
     }
 
     pub fn generate_guest(&mut self, package: &Package) -> Result<(), IDLError> {
-        for (_ident, module) in package.modules.iter() {
-            for ref dt in module.datatypes() {
-                self.gen_type_header(module, dt)?;
-                match &dt.entity.variant {
-                    DataTypeVariant::Struct(s) => self.gen_struct(module, dt, s)?,
-                    DataTypeVariant::Alias(a) => self.gen_alias(module, dt, a)?,
-                    DataTypeVariant::Enum(e) => self.gen_enum(module, dt, e)?,
+        for module in package.modules() {
+            if module.name() == "std" {
+                continue;
+            }
+            for dt in module.datatypes() {
+                self.gen_type_header(&dt)?;
+                match dt.variant() {
+                    DatatypeVariant::Struct(s) => self.gen_struct(&s)?,
+                    DatatypeVariant::Alias(a) => self.gen_alias(&a)?,
+                    DatatypeVariant::Enum(e) => self.gen_enum(&e)?,
+                    DatatypeVariant::Atom(_) => unreachable!(),
                 }
             }
-            for fdecl in module.func_decls() {
-                self.gen_function(module, &fdecl)?;
+            for func in module.functions() {
+                self.gen_function(&func)?;
             }
         }
         Ok(())
     }
 
-    fn gen_type_header(&mut self, _module: &Module, dt: &Named<DataType>) -> Result<(), IDLError> {
+    fn gen_type_header(&mut self, dt: &Datatype) -> Result<(), IDLError> {
         self.w
             .eob()
-            .writeln(format!("// ---------- {} ----------", dt.name.name))
+            .writeln(format!("// ---------- {} ----------", dt.name()))
             .eob();
         Ok(())
     }
 
     // The most important thing in alias generation is to cache the size
     // and alignment rules of what it ultimately points to
-    fn gen_alias(
-        &mut self,
-        module: &Module,
-        dt: &Named<DataType>,
-        alias: &AliasDataType,
-    ) -> Result<(), IDLError> {
-        let dtname = self.type_name(dt);
+    fn gen_alias(&mut self, alias: &AliasDatatype) -> Result<(), IDLError> {
+        let own_type_name = Datatype::from(alias.clone()).c_type_name();
         self.w
             .writeln(format!(
                 "typedef {} {};",
-                self.type_ref_name(module, &alias.to),
-                dtname
+                alias.to().c_type_name(),
+                own_type_name,
             ))
             .eob();
 
@@ -78,190 +70,142 @@ impl CGenerator {
         self.w
             .writeln(format!(
                 "_Static_assert(sizeof({}) == {}, \"unexpected alias size\");",
-                dtname, dt.entity.repr_size
+                own_type_name,
+                alias.mem_size(),
             ))
             .eob();
 
         Ok(())
     }
 
-    fn gen_struct(
-        &mut self,
-        module: &Module,
-        dt: &Named<DataType>,
-        struct_: &StructDataType,
-    ) -> Result<(), IDLError> {
-        let dtname = self.type_name(dt);
-        self.w.writeln(format!("{} {{", dtname));
+    fn gen_struct(&mut self, struct_: &StructDatatype) -> Result<(), IDLError> {
+        let own_type_name = Datatype::from(struct_.clone()).c_type_name();
+        self.w.writeln(format!("{} {{", own_type_name));
         let mut w_block = self.w.new_block();
-        for member in struct_.members.iter() {
+        for member in struct_.members() {
             w_block.writeln(format!(
                 "{} {};",
-                self.type_ref_name(module, &member.type_),
-                member.name
+                member.type_().c_type_name(),
+                member.name(),
             ));
         }
         self.w.writeln("};").eob();
 
         // Skip the first member, as it will always be at the beginning of the structure
-        for (i, member) in struct_.members.iter().enumerate().skip(1) {
+        for member in struct_.members().skip(1) {
             self.w.writeln(format!(
                 "_Static_assert(offsetof({}, {}) == {}, \"unexpected offset\");",
-                dtname, member.name, member.offset
+                own_type_name,
+                member.name(),
+                member.offset()
             ));
         }
 
-        let struct_size = dt.entity.repr_size;
         self.w
             .writeln(format!(
                 "_Static_assert(sizeof({}) == {}, \"unexpected structure size\");",
-                dtname, struct_size,
+                own_type_name,
+                struct_.mem_size(),
             ))
             .eob();
-
         Ok(())
     }
 
     // Enums generate both a specific typedef, and a traditional C-style enum
     // The typedef is required to use a native type which is consistent across all architectures
-    fn gen_enum(
-        &mut self,
-        module: &Module,
-        dt: &Named<DataType>,
-        enum_: &EnumDataType,
-    ) -> Result<(), IDLError> {
-        let dtname = self.type_name(dt);
-        let type_size = dt.entity.repr_size;
-        self.w.writeln(format!("{} {{", dtname));
-        let mut pretty_writer_i1 = self.w.new_block();
-        for (i, named_member) in enum_.members.iter().enumerate() {
-            pretty_writer_i1.writeln(format!(
+    fn gen_enum(&mut self, enum_: &EnumDatatype) -> Result<(), IDLError> {
+        let own_type_name = Datatype::from(enum_.clone()).c_type_name();
+        self.w.writeln(format!("{} {{", own_type_name));
+        let mut w = self.w.new_block();
+        for variant in enum_.variants() {
+            w.writeln(format!(
                 "{}, // {}",
-                macro_for(&dt.name.name, &named_member.name),
-                i
+                macro_for(enum_.name(), variant.name()),
+                variant.index(),
             ));
         }
         self.w.writeln("};").eob();
         self.w
             .writeln(format!(
                 "_Static_assert(sizeof({}) == {}, \"unexpected enumeration size\");",
-                dtname, type_size
+                own_type_name,
+                enum_.mem_size(),
             ))
             .eob();
         Ok(())
     }
 
     /// Currently support generating ABI level definition for C guests. Bindings not supported.
-    fn gen_function(&mut self, _module: &Module, func: &Named<FuncDecl>) -> Result<(), IDLError> {
-        let func = func.entity;
-
-        let return_decl = match func.rets.len() {
-            0 => "void",
-            1 => abi_type_name(&func.rets[0].type_),
+    fn gen_function(&mut self, func: &Function) -> Result<(), IDLError> {
+        let rets = func.rets().collect::<Vec<_>>();
+        let return_decl = match rets.len() {
+            0 => "void".to_owned(),
+            1 => rets[0].type_().c_type_name(),
             _ => unreachable!("functions limited to 0 or 1 return arguments"),
         };
 
         let arg_list = func
-            .args
-            .iter()
-            .map(|a| format!("{} {}", abi_type_name(&a.type_), a.name))
+            .args()
+            .map(|a| format!("{} {}", a.type_().c_type_name(), a.name()))
             .collect::<Vec<String>>()
             .join(", ");
 
         self.w.writeln(format!(
             "extern {} {}({});",
-            return_decl, func.field_name, arg_list,
+            return_decl,
+            func.name(),
+            arg_list,
         ));
 
         Ok(())
     }
+}
 
-    // Return `true` if the type is an atom, an emum, or an alias to one of these
-    pub fn is_type_eventually_an_atom_or_enum(&self, module: &Module, type_: &DataTypeRef) -> bool {
-        let inner_type = match type_ {
-            DataTypeRef::Atom(_) => return true,
-            DataTypeRef::Defined(inner_type) => inner_type,
-        };
-        let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
-        match inner_data_type_entry.entity.variant {
-            DataTypeVariant::Struct { .. } => false,
-            DataTypeVariant::Enum { .. } => true,
-            DataTypeVariant::Alias(ref a) => self.is_type_eventually_an_atom_or_enum(module, &a.to),
-        }
-    }
+trait CTypeName {
+    fn c_type_name(&self) -> String;
+}
 
-    /// Return the type refererence, with aliases being resolved
-    pub fn unalias<'t>(&self, module: &'t Module, type_: &'t DataTypeRef) -> &'t DataTypeRef {
-        let inner_type = match type_ {
-            DataTypeRef::Atom(_) => return type_,
-            DataTypeRef::Defined(inner_type) => inner_type,
-        };
-        let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
-        if let DataTypeVariant::Alias(ref a) = inner_data_type_entry.entity.variant {
-            self.unalias(module, &a.to)
-        } else {
-            type_
+impl CTypeName for AtomType {
+    fn c_type_name(&self) -> String {
+        match self {
+            AtomType::Bool => "bool",
+            AtomType::U8 => "uint8_t",
+            AtomType::U16 => "uint16_t",
+            AtomType::U32 => "uint32_t",
+            AtomType::U64 => "uint64_t",
+            AtomType::I8 => "int8_t",
+            AtomType::I16 => "int16_t",
+            AtomType::I32 => "int32_t",
+            AtomType::I64 => "int64_t",
+            AtomType::F32 => "float",
+            AtomType::F64 => "double",
         }
-    }
-
-    fn type_name(&self, dt: &Named<DataType>) -> String {
-        match dt.entity.variant {
-            DataTypeVariant::Struct(_) => format!("struct {}", dt.name.name),
-            DataTypeVariant::Enum(_) => format!("enum {}", dt.name.name),
-            DataTypeVariant::Alias(_) => format!("{}", dt.name.name),
-        }
-    }
-
-    fn type_ref_name(&self, module: &Module, type_: &DataTypeRef) -> String {
-        match type_ {
-            DataTypeRef::Atom(a) => atom_type_name(a).to_owned(),
-            DataTypeRef::Defined(id) => {
-                let dt = &module.get_datatype(*id).expect("type_name of valid ref");
-                self.type_name(dt)
-            }
-        }
+        .to_owned()
     }
 }
 
-fn abi_type_name(abi_type: &AbiType) -> &'static str {
-    match abi_type {
-        AbiType::I32 => atom_type_name(&AtomType::I32),
-        AbiType::I64 => atom_type_name(&AtomType::I64),
-        AbiType::F32 => atom_type_name(&AtomType::F32),
-        AbiType::F64 => atom_type_name(&AtomType::F64),
+impl CTypeName for AbiType {
+    fn c_type_name(&self) -> String {
+        AtomType::from(self.clone()).c_type_name()
     }
 }
 
-fn atom_type_name(atom_type: &AtomType) -> &'static str {
-    match atom_type {
-        AtomType::Bool => "bool",
-        AtomType::U8 => "uint8_t",
-        AtomType::U16 => "uint16_t",
-        AtomType::U32 => "uint32_t",
-        AtomType::U64 => "uint64_t",
-        AtomType::I8 => "int8_t",
-        AtomType::I16 => "int16_t",
-        AtomType::I32 => "int32_t",
-        AtomType::I64 => "int64_t",
-        AtomType::F32 => "float",
-        AtomType::F64 => "double",
+impl CTypeName for Datatype<'_> {
+    fn c_type_name(&self) -> String {
+        match self.variant() {
+            DatatypeVariant::Struct(_) => format!("struct {}", self.name()),
+            DatatypeVariant::Enum(_) => format!("enum {}", self.name()),
+            DatatypeVariant::Alias(_) => self.name().to_owned(),
+            DatatypeVariant::Atom(a) => a.c_type_name(),
+        }
     }
 }
 
 fn macro_for(prefix: &str, name: &str) -> String {
+    use heck::ShoutySnakeCase;
     let mut macro_name = String::new();
     macro_name.push_str(&prefix.to_uppercase());
     macro_name.push('_');
-    let mut previous_was_uppercase = name.chars().nth(0).expect("Empty name").is_uppercase();
-    for c in name.chars() {
-        let is_uppercase = c.is_uppercase();
-        if is_uppercase != previous_was_uppercase {
-            macro_name.push('_');
-        }
-        for uc in c.to_uppercase() {
-            macro_name.push(uc);
-        }
-        previous_was_uppercase = is_uppercase;
-    }
+    macro_name.push_str(&name.to_shouty_snake_case());
     macro_name
 }

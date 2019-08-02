@@ -35,15 +35,6 @@ pub enum SyntaxDecl {
 }
 
 impl SyntaxDecl {
-    pub fn name(&self) -> &str {
-        match self {
-            SyntaxDecl::Struct { name, .. } => &name,
-            SyntaxDecl::Enum { name, .. } => &name,
-            SyntaxDecl::Alias { name, .. } => &name,
-            SyntaxDecl::Module { name, .. } => &name,
-            SyntaxDecl::Function { name, .. } => &name,
-        }
-    }
     pub fn location(&self) -> &Location {
         match self {
             SyntaxDecl::Struct { location, .. } => &location,
@@ -51,12 +42,6 @@ impl SyntaxDecl {
             SyntaxDecl::Alias { location, .. } => &location,
             SyntaxDecl::Module { location, .. } => &location,
             SyntaxDecl::Function { location, .. } => &location,
-        }
-    }
-    pub fn is_datatype(&self) -> bool {
-        match self {
-            SyntaxDecl::Struct { .. } | SyntaxDecl::Enum { .. } | SyntaxDecl::Alias { .. } => true,
-            _ => false,
         }
     }
 }

@@ -4,17 +4,17 @@
 extern crate failure;
 
 mod atoms;
-mod cursor;
-mod prelude;
-mod repr;
-mod validate;
-//mod c;
+mod c;
 mod config;
+mod cursor;
 pub mod env;
 mod error;
 mod lexer;
 mod parser;
+mod prelude;
 mod pretty_writer;
+mod repr;
+mod validate;
 //mod rust;
 
 pub use crate::config::{Backend, Config};
@@ -22,7 +22,7 @@ pub use crate::cursor::*;
 pub use crate::error::{IDLError, ValidationError};
 pub use crate::{AbiType, AtomType};
 
-//use crate::c::CGenerator;
+use crate::c::CGenerator;
 use crate::parser::Parser;
 //use crate::rust::RustGenerator;
 use crate::validate::package_from_declarations;
@@ -49,7 +49,7 @@ pub fn parse_package(input: &str) -> Result<Package, IDLError> {
 
 pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Result<(), IDLError> {
     match config.backend {
-        Backend::CGuest => unimplemented!(), //CGenerator::new(output).generate_guest(package)?,
+        Backend::CGuest => CGenerator::new(output).generate_guest(package)?,
         Backend::RustGuest => unimplemented!(), //RustGenerator::new(output).generate_guest(package)?,
         Backend::RustHost => unimplemented!(), //RustGenerator::new(output).generate_host(package)?,
         Backend::Bindings => unimplemented!(), //generate_bindings(&package.bindings(), output)?,

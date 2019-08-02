@@ -237,10 +237,10 @@ mod tests {
                     assert_eq!(e.variants().collect::<Vec<_>>().len(), 2);
                     let a = e.variant("a").expect("variant a exists");
                     assert_eq!(a.name(), "a");
-                    assert_eq!(a.value(), 0);
+                    assert_eq!(a.index(), 0);
                     let b = e.variant("b").expect("variant b exists");
                     assert_eq!(b.name(), "b");
-                    assert_eq!(b.value(), 1);
+                    assert_eq!(b.index(), 1);
                 }
                 _ => panic!("foo is an enum!"),
             }
