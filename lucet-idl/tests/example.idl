@@ -26,7 +26,11 @@ mod example {
     // functions
 
     // implicit bindings: in value, out value.
-    fn set_color(to: i32) -> r: i32;
+    fn set_counter(to: i32) -> r: i32;
+
+    // explicit bindings: in value, out value.
+    fn set_color(to_int: i32) -> r: i32
+    where to: in color <- to_int, prev: out color <- r;
 
     // binding: in pointer
     fn set_struct(struct_pointer: i32)

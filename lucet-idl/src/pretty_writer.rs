@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::cell::RefCell;
 use std::io::prelude::*;
 use std::rc::Rc;

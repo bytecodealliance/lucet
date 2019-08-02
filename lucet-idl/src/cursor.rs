@@ -493,6 +493,13 @@ impl<'a> Function<'a> {
             ix,
         })
     }
+
+    pub fn module(&self) -> Module<'a> {
+        Module {
+            pkg: self.pkg,
+            ix: self.id.module,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,7 +1,7 @@
 use crate::pretty_writer::PrettyWriter;
 use crate::{
-    AbiType, AliasDatatype, AtomType, Datatype, DatatypeVariant, EnumDatatype, Function, IDLError,
-    MemArea, Package, StructDatatype,
+    AbiType, AliasDatatype, AtomType, BindingDirection, BindingParam, Datatype, DatatypeVariant,
+    EnumDatatype, FuncBinding, Function, IDLError, MemArea, Package, StructDatatype,
 };
 use std::io::Write;
 
@@ -40,7 +40,8 @@ impl CGenerator {
                 }
             }
             for func in module.functions() {
-                self.gen_function(&func)?;
+                self.gen_abi_function(&func)?;
+                self.gen_idiomatic_function(&func)?;
             }
         }
         Ok(())
@@ -135,8 +136,7 @@ impl CGenerator {
         Ok(())
     }
 
-    /// Currently support generating ABI level definition for C guests. Bindings not supported.
-    fn gen_function(&mut self, func: &Function) -> Result<(), IDLError> {
+    fn gen_abi_function(&mut self, func: &Function) -> Result<(), IDLError> {
         let rets = func.rets().collect::<Vec<_>>();
         let return_decl = match rets.len() {
             0 => "void".to_owned(),
@@ -151,11 +151,98 @@ impl CGenerator {
             .join(", ");
 
         self.w.writeln(format!(
-            "extern {} {}({});",
+            "extern {} {}({}) {};",
             return_decl,
-            func.name(),
+            func.c_abi_func_name(),
             arg_list,
+            func.c_abi_func_attributes(),
         ));
+
+        Ok(())
+    }
+
+    fn gen_idiomatic_function(&mut self, func: &Function) -> Result<(), IDLError> {
+        let ret_bindings = func.c_ret_bindings().collect::<Vec<_>>();
+
+        let own_return_decl = match ret_bindings.len() {
+            0 => "void".to_owned(),
+            1 => ret_bindings[0].type_().c_type_name(),
+            _ => unreachable!("functions limited to 0 or 1 return arguments"),
+        };
+
+        let own_arg_list = func
+            .c_arg_bindings()
+            .map(|b| match b.param() {
+                BindingParam::Ptr(_p) => format!(
+                    "{}{}* {}",
+                    b.c_constness(),
+                    b.type_().c_type_name(),
+                    b.name()
+                ),
+                BindingParam::Slice(_ptr, _len) => format!(
+                    "{}{}* {}_ptr, size_t {}_len",
+                    b.c_constness(),
+                    b.type_().c_type_name(),
+                    b.name(),
+                    b.name(),
+                ),
+                BindingParam::Value(_v) => format!("{} {}", b.type_().c_type_name(), b.name(),),
+            })
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        self.w.writeln(format!(
+            "{} {}({}) {{",
+            own_return_decl,
+            func.c_idiomatic_func_name(),
+            own_arg_list,
+        ));
+        {
+            let arg_bindings = func
+                .c_arg_bindings()
+                .map(|b| match b.param() {
+                    BindingParam::Ptr(p) => format!("({}) {}", p.type_().c_type_name(), b.name()),
+                    BindingParam::Slice(p, l) => format!(
+                        "({}) {}_ptr, ({}) {}_len",
+                        p.type_().c_type_name(),
+                        b.name(),
+                        l.type_().c_type_name(),
+                        b.name()
+                    ),
+                    BindingParam::Value(v) => format!("({}) {}", v.type_().c_type_name(), b.name()),
+                })
+                .collect::<Vec<String>>()
+                .join(", ");
+
+            let (ret_capture, ret_statement) = match ret_bindings.len() {
+                0 => (format!(""), format!("return;")),
+                1 => {
+                    let b = &ret_bindings[0];
+                    match b.param() {
+                        BindingParam::Ptr(p) => (
+                            format!("{} {} = ", p.type_().c_type_name(), p.name()),
+                            format!("return (*{}) {};", b.type_().c_type_name(), p.name()),
+                        ),
+                        BindingParam::Value(v) => (
+                            format!("{} {} = ", v.type_().c_type_name(), v.name()),
+                            format!("return ({}) {};", b.type_().c_type_name(), v.name()),
+                        ),
+                        BindingParam::Slice { .. } => unreachable!(),
+                    }
+                }
+                _ => unreachable!(),
+            };
+
+            let mut w = self.w.new_block();
+            w.writeln(format!(
+                "{}{}({});",
+                ret_capture,
+                func.c_abi_func_name(),
+                arg_bindings,
+            ));
+            w.writeln(ret_statement);
+        }
+        self.w.eob().writeln("}");
 
         Ok(())
     }
@@ -208,4 +295,43 @@ fn macro_for(prefix: &str, name: &str) -> String {
     macro_name.push('_');
     macro_name.push_str(&name.to_shouty_snake_case());
     macro_name
+}
+
+impl Function<'_> {
+    fn c_abi_func_name(&self) -> String {
+        format!("_{}_{}", self.module().name(), self.name())
+    }
+    fn c_abi_func_attributes(&self) -> String {
+        format!(
+            "__attribute__((import_module(\"{}\"),import_name(\"{}\")))",
+            self.module().name(),
+            self.name()
+        )
+    }
+    fn c_idiomatic_func_name(&self) -> String {
+        format!("{}_{}", self.module().name(), self.name())
+    }
+
+    fn c_arg_bindings<'a>(&'a self) -> impl Iterator<Item = FuncBinding<'a>> {
+        self.bindings().filter(|b| !binding_is_ret(b))
+    }
+    fn c_ret_bindings<'a>(&'a self) -> impl Iterator<Item = FuncBinding<'a>> {
+        self.bindings().filter(|b| binding_is_ret(b))
+    }
+}
+
+fn binding_is_ret(b: &FuncBinding) -> bool {
+    b.direction() == BindingDirection::Out && b.param().value().is_some()
+}
+
+impl FuncBinding<'_> {
+    fn c_constness(&self) -> String {
+        if self.direction() == BindingDirection::In
+            && (self.param().ptr().is_some() || self.param().slice().is_some())
+        {
+            "const ".to_owned()
+        } else {
+            "".to_owned()
+        }
+    }
 }
