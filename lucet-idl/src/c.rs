@@ -27,9 +27,6 @@ impl CGenerator {
 
     pub fn generate_guest(&mut self, package: &Package) -> Result<(), IDLError> {
         for module in package.modules() {
-            if module.name() == "std" {
-                continue;
-            }
             for dt in module.datatypes() {
                 self.gen_type_header(&dt)?;
                 match dt.variant() {

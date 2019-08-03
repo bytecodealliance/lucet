@@ -7,6 +7,7 @@ use crate::repr::{
 };
 pub use crate::repr::{BindingDirection, Package};
 use crate::MemArea;
+use std::ops::Deref;
 
 impl Package {
     pub fn module<'a>(&'a self, name: &str) -> Option<Module<'a>> {
@@ -17,7 +18,10 @@ impl Package {
     }
 
     pub fn modules<'a>(&'a self) -> impl Iterator<Item = Module<'a>> + 'a {
-        self.names.keys().map(move |ix| Module { pkg: &self, ix })
+        self.names
+            .keys()
+            .map(move |ix| Module { pkg: &self, ix })
+            .filter(|m| m.name() != "std")
     }
 
     pub fn module_by_ix<'a>(&'a self, ix: ModuleIx) -> Option<Module<'a>> {
@@ -161,19 +165,16 @@ impl<'a> Datatype<'a> {
         match self.repr().variant {
             DatatypeVariantRepr::Atom(a) => DatatypeVariant::Atom(a),
             DatatypeVariantRepr::Struct(ref repr) => DatatypeVariant::Struct(StructDatatype {
-                pkg: self.pkg,
+                datatype: self.clone(),
                 repr: &repr,
-                id: self.id,
             }),
             DatatypeVariantRepr::Enum(ref repr) => DatatypeVariant::Enum(EnumDatatype {
-                pkg: self.pkg,
+                datatype: self.clone(),
                 repr: &repr,
-                id: self.id,
             }),
             DatatypeVariantRepr::Alias(ref repr) => DatatypeVariant::Alias(AliasDatatype {
-                pkg: self.pkg,
+                datatype: self.clone(),
                 repr: &repr,
-                id: self.id,
             }),
         }
     }
@@ -238,58 +239,40 @@ impl<'a> DatatypeVariant<'a> {
 
 #[derive(Debug, Clone)]
 pub struct StructDatatype<'a> {
-    pkg: &'a Package,
+    datatype: Datatype<'a>,
     repr: &'a StructDatatypeRepr,
-    id: DatatypeIdent,
 }
 
 impl<'a> StructDatatype<'a> {
-    pub fn name(&self) -> &str {
-        Datatype {
-            pkg: self.pkg,
-            id: self.id,
-        }
-        .name()
-    }
     pub fn member(&self, name: &str) -> Option<StructMember<'a>> {
-        let pkg = self.pkg;
-        self.repr
-            .members
-            .iter()
-            .find(|m| m.name == name)
-            .map(move |repr| StructMember { pkg, repr })
+        self.members().find(|m| m.name() == name)
     }
 
     pub fn members(&self) -> impl Iterator<Item = StructMember<'a>> {
-        let pkg = self.pkg;
-        self.repr
-            .members
-            .iter()
-            .map(move |repr| StructMember { pkg, repr })
+        let struct_ = self.clone();
+        self.repr.members.iter().map(move |repr| StructMember {
+            struct_: struct_.clone(),
+            repr,
+        })
+    }
+}
+
+impl<'a> Deref for StructDatatype<'a> {
+    type Target = Datatype<'a>;
+    fn deref(&self) -> &Self::Target {
+        &self.datatype
     }
 }
 
 impl<'a> From<StructDatatype<'a>> for Datatype<'a> {
     fn from(s: StructDatatype<'a>) -> Datatype<'a> {
-        Datatype {
-            pkg: s.pkg,
-            id: s.id,
-        }
-    }
-}
-
-impl<'a> MemArea for StructDatatype<'a> {
-    fn mem_size(&self) -> usize {
-        Datatype::from(self.clone()).mem_size()
-    }
-    fn mem_align(&self) -> usize {
-        Datatype::from(self.clone()).mem_align()
+        s.datatype.clone()
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct StructMember<'a> {
-    pkg: &'a Package,
+    struct_: StructDatatype<'a>,
     repr: &'a StructMemberRepr,
 }
 
@@ -302,33 +285,28 @@ impl<'a> StructMember<'a> {
     }
     pub fn type_(&self) -> Datatype<'a> {
         Datatype {
-            pkg: self.pkg,
+            pkg: self.struct_.datatype.pkg,
             id: self.repr.type_,
         }
+    }
+    pub fn struct_(&self) -> StructDatatype<'a> {
+        self.struct_.clone()
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct EnumDatatype<'a> {
-    pkg: &'a Package,
+    datatype: Datatype<'a>,
     repr: &'a EnumDatatypeRepr,
-    id: DatatypeIdent,
 }
 
 impl<'a> EnumDatatype<'a> {
-    pub fn name(&self) -> &str {
-        Datatype {
-            pkg: self.pkg,
-            id: self.id,
-        }
-        .name()
-    }
     pub fn variants(&self) -> impl Iterator<Item = EnumMember<'a>> {
-        let repr = self.clone();
+        let enum_ = self.clone();
         (0..self.repr.members.len())
             .into_iter()
             .map(move |ix| EnumMember {
-                repr: repr.clone(),
+                enum_: enum_.clone(),
                 index: ix,
             })
     }
@@ -338,35 +316,30 @@ impl<'a> EnumDatatype<'a> {
     }
 }
 
-impl<'a> From<EnumDatatype<'a>> for Datatype<'a> {
-    fn from(e: EnumDatatype<'a>) -> Datatype<'a> {
-        Datatype {
-            pkg: e.pkg,
-            id: e.id,
-        }
+impl<'a> Deref for EnumDatatype<'a> {
+    type Target = Datatype<'a>;
+    fn deref(&self) -> &Self::Target {
+        &self.datatype
     }
 }
 
-impl<'a> MemArea for EnumDatatype<'a> {
-    fn mem_size(&self) -> usize {
-        Datatype::from(self.clone()).mem_size()
-    }
-    fn mem_align(&self) -> usize {
-        Datatype::from(self.clone()).mem_align()
+impl<'a> From<EnumDatatype<'a>> for Datatype<'a> {
+    fn from(e: EnumDatatype<'a>) -> Datatype<'a> {
+        e.datatype
     }
 }
 
 pub struct EnumMember<'a> {
-    repr: EnumDatatype<'a>,
+    enum_: EnumDatatype<'a>,
     index: usize,
 }
 
 impl<'a> EnumMember<'a> {
-    pub fn parent(&self) -> EnumDatatype<'a> {
-        self.repr.clone()
+    pub fn enum_(&self) -> EnumDatatype<'a> {
+        self.enum_.clone()
     }
     pub fn name(&self) -> &str {
-        &self.repr.repr.members[self.index].name
+        &self.enum_.repr.members[self.index].name
     }
     pub fn index(&self) -> usize {
         self.index
@@ -375,22 +348,14 @@ impl<'a> EnumMember<'a> {
 
 #[derive(Debug, Clone)]
 pub struct AliasDatatype<'a> {
-    pkg: &'a Package,
+    datatype: Datatype<'a>,
     repr: &'a AliasDatatypeRepr,
-    id: DatatypeIdent,
 }
 
 impl<'a> AliasDatatype<'a> {
-    pub fn name(&self) -> &str {
-        Datatype {
-            pkg: self.pkg,
-            id: self.id,
-        }
-        .name()
-    }
     pub fn to(&self) -> Datatype<'a> {
         Datatype {
-            pkg: self.pkg,
+            pkg: self.datatype.pkg,
             id: self.repr.to,
         }
     }
@@ -398,19 +363,14 @@ impl<'a> AliasDatatype<'a> {
 
 impl<'a> From<AliasDatatype<'a>> for Datatype<'a> {
     fn from(a: AliasDatatype<'a>) -> Datatype<'a> {
-        Datatype {
-            pkg: a.pkg,
-            id: a.id,
-        }
+        a.datatype.clone()
     }
 }
 
-impl<'a> MemArea for AliasDatatype<'a> {
-    fn mem_size(&self) -> usize {
-        Datatype::from(self.clone()).mem_size()
-    }
-    fn mem_align(&self) -> usize {
-        Datatype::from(self.clone()).mem_align()
+impl<'a> Deref for AliasDatatype<'a> {
+    type Target = Datatype<'a>;
+    fn deref(&self) -> &Self::Target {
+        &self.datatype
     }
 }
 
@@ -502,10 +462,10 @@ impl<'a> Function<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParamType {
-    Arg,
-    Ret,
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ParamPosition {
+    Arg(usize),
+    Ret(usize),
 }
 
 #[derive(Debug, Clone)]
@@ -533,10 +493,10 @@ impl<'a> FuncParam<'a> {
             .datatype_by_id(AtomType::from(self.repr().type_).datatype_id())
             .expect("valid type")
     }
-    pub fn param_type(&self) -> ParamType {
+    pub fn param_position(&self) -> ParamPosition {
         match self.ix {
-            ParamIx::Arg { .. } => ParamType::Arg,
-            ParamIx::Ret { .. } => ParamType::Ret,
+            ParamIx::Arg(ix) => ParamPosition::Arg(ix.as_u32() as usize),
+            ParamIx::Ret(ix) => ParamPosition::Ret(ix.as_u32() as usize),
         }
     }
     pub fn binding(&self) -> FuncBinding<'a> {

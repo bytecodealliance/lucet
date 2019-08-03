@@ -1,11 +1,11 @@
 use super::render_tuple;
 use crate::error::IDLError;
-use crate::function::{FuncDecl, ParamPosition};
 use crate::pretty_writer::PrettyWriter;
+use crate::{Function, ParamPosition};
 use heck::SnakeCase;
 
 pub struct AbiCallBuilder<'a> {
-    decl: &'a FuncDecl,
+    func: Function<'a>,
     before: Vec<String>,
     after: Vec<String>,
     args: Vec<Option<String>>,
@@ -13,11 +13,11 @@ pub struct AbiCallBuilder<'a> {
 }
 
 impl<'a> AbiCallBuilder<'a> {
-    pub fn new(decl: &'a FuncDecl) -> Self {
-        let arg_len = decl.args.len();
-        let ret_len = decl.rets.len();
+    pub fn new(func: Function<'a>) -> Self {
+        let arg_len = func.args().collect::<Vec<_>>().len();
+        let ret_len = func.rets().collect::<Vec<_>>().len();
         AbiCallBuilder {
-            decl,
+            func,
             before: Vec::new(),
             after: Vec::new(),
             args: vec![None; arg_len],
@@ -45,7 +45,7 @@ impl<'a> AbiCallBuilder<'a> {
     }
 
     pub fn render(&self, w: &mut PrettyWriter) -> Result<(), IDLError> {
-        let name = self.decl.field_name.to_snake_case();
+        let name = self.func.name().to_snake_case();
 
         let arg_syntax = self
             .args

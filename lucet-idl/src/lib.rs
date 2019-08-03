@@ -7,15 +7,14 @@ mod atoms;
 mod c;
 mod config;
 mod cursor;
-pub mod env;
 mod error;
 mod lexer;
 mod parser;
 mod prelude;
 mod pretty_writer;
 mod repr;
+mod rust;
 mod validate;
-//mod rust;
 
 pub use crate::config::{Backend, Config};
 pub use crate::cursor::*;
@@ -24,9 +23,10 @@ pub use crate::{AbiType, AtomType};
 
 use crate::c::CGenerator;
 use crate::parser::Parser;
-//use crate::rust::RustGenerator;
+use crate::rust::RustGenerator;
 use crate::validate::package_from_declarations;
 use lucet_module::bindings::Bindings;
+use std::collections::HashMap;
 use std::io::Write;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
@@ -50,9 +50,9 @@ pub fn parse_package(input: &str) -> Result<Package, IDLError> {
 pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Result<(), IDLError> {
     match config.backend {
         Backend::CGuest => CGenerator::new(output).generate_guest(package)?,
-        Backend::RustGuest => unimplemented!(), //RustGenerator::new(output).generate_guest(package)?,
-        Backend::RustHost => unimplemented!(), //RustGenerator::new(output).generate_host(package)?,
-        Backend::Bindings => unimplemented!(), //generate_bindings(&package.bindings(), output)?,
+        Backend::RustGuest => RustGenerator::new(output).generate_guest(package)?,
+        Backend::RustHost => RustGenerator::new(output).generate_host(package)?,
+        Backend::Bindings => generate_bindings(&create_bindings(package), output)?,
     }
     Ok(())
 }
@@ -60,6 +60,18 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
 pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
     let pkg = parse_package(input)?;
     codegen(&pkg, config, output)
+}
+
+fn create_bindings(package: &Package) -> Bindings {
+    let mut bs = HashMap::new();
+    for m in package.modules() {
+        let mut mod_bs = HashMap::new();
+        for f in m.functions() {
+            mod_bs.insert(f.name().to_owned(), f.host_func_name());
+        }
+        bs.insert(m.name().to_owned(), mod_bs);
+    }
+    Bindings::new(bs)
 }
 
 fn generate_bindings(bindings: &Bindings, mut output: Box<dyn Write>) -> Result<(), IDLError> {

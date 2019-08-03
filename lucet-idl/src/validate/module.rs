@@ -99,7 +99,7 @@ mod tests {
     use super::*;
     use crate::parser::Parser;
     use crate::validate::package::PackageBuilder;
-    use crate::{BindingDirection, DatatypeVariant, Location, MemArea, ParamType};
+    use crate::{BindingDirection, DatatypeVariant, Location, MemArea, ParamPosition};
     fn mod_syntax(syntax: &str) -> Result<Package, ValidationError> {
         let mut parser = Parser::new(syntax);
         let decls = parser.match_decls().expect("parses");
@@ -360,7 +360,7 @@ mod tests {
         assert_eq!(a_bind.direction(), BindingDirection::In);
         let a_val = a_bind.param().value().expect("binding is a value");
         assert_eq!(a_val.name(), "a");
-        assert_eq!(a_val.param_type(), ParamType::Arg);
+        assert_eq!(a_val.param_position(), ParamPosition::Arg(0));
     }
 
     #[test]
@@ -384,7 +384,7 @@ mod tests {
         assert_eq!(r_bind.direction(), BindingDirection::Out);
         let r_val = r_bind.param().value().expect("binding is a value");
         assert_eq!(r_val.name(), "r");
-        assert_eq!(r_val.param_type(), ParamType::Ret);
+        assert_eq!(r_val.param_position(), ParamPosition::Ret(0));
     }
 
     #[test]
