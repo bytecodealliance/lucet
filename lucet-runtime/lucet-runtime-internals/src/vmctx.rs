@@ -358,10 +358,10 @@ impl Vmctx {
 
     fn yield_impl<A: Any + 'static, R: Any + 'static>(&self, val: A) {
         let inst = unsafe { self.instance_mut() };
-        let expected: Box<PhantomData<R>> = Box::new(PhantomData);
-        inst.state = State::Yielded {
-            val: Some(YieldedVal::new(val)),
-            expected: expected as Box<dyn Any>,
+        let expecting: Box<PhantomData<R>> = Box::new(PhantomData);
+        inst.state = State::Yielding {
+            val: YieldedVal::new(val),
+            expecting: expecting as Box<dyn Any>,
         };
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
     }
@@ -412,9 +412,7 @@ impl Instance {
     /// This is almost certainly not what you want to use to terminate from a hostcall; use panics
     /// with `TerminationDetails` instead.
     unsafe fn terminate(&mut self, details: TerminationDetails) -> ! {
-        self.state = State::Terminated {
-            details: Some(details),
-        };
+        self.state = State::Terminating { details };
         #[allow(unused_unsafe)] // The following unsafe will be incorrectly warned as unused
         HOST_CTX.with(|host_ctx| unsafe { Context::set(&*host_ctx.get()) })
     }

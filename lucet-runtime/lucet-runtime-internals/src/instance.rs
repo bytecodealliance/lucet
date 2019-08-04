@@ -1,23 +1,22 @@
 mod siginfo_ext;
 pub mod signals;
+pub mod state;
 
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
+pub use crate::instance::state::State;
 
 use crate::alloc::{Alloc, HOST_PAGE_SIZE_EXPECTED};
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
-use crate::instance::siginfo_ext::SiginfoExt;
 use crate::module::{self, FunctionHandle, FunctionPointer, Global, GlobalValue, Module, TrapCode};
 use crate::region::RegionInternal;
-use crate::sysdeps::UContext;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
-use libc::{c_void, siginfo_t, uintptr_t, SIGBUS, SIGSEGV};
+use libc::{c_void, siginfo_t, uintptr_t};
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
-use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
@@ -472,9 +471,9 @@ impl Instance {
     /// applies.
     pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
         match &self.state {
-            State::Yielded { expected, .. } => {
+            State::Yielded { expecting, .. } => {
                 // make sure the resumed value is of the right type
-                if !expected.is::<PhantomData<A>>() {
+                if !expecting.is::<PhantomData<A>>() {
                     return Err(Error::InvalidArgument(
                         "type mismatch between yielded instance expected value and resumed value",
                     ));
@@ -517,9 +516,7 @@ impl Instance {
             };
         }
 
-        self.state = State::Ready {
-            retval: UntypedRetVal::default(),
-        };
+        self.state = State::Ready;
 
         self.run_start()?;
 
@@ -669,9 +666,7 @@ impl Instance {
             embed_ctx: embed_ctx,
             module,
             ctx: Context::new(),
-            state: State::Ready {
-                retval: UntypedRetVal::default(),
-            },
+            state: State::Ready,
             alloc,
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
@@ -800,32 +795,34 @@ impl Instance {
 
         // Sandbox has jumped back to the host process, indicating it has either:
         //
-        // * returned: state should be `Running`; transition to Ready and return a RunResult
-        // * yielded: state should be `Yielded`; take the yielded value and return a RunResult
-        // * trapped: state should be `Fault`; populate details and return an error or call a hanlder as appropriate
-        // * terminated: state should be `Terminated`; take the termination details and return as an Err
-        // * function body returned: set state back to `Ready` with return value
+        // * returned: state should be `Running`; transition to `Ready` and return a RunResult
+        // * yielded: state should be `Yielding`; transition to `Yielded` and return a RunResult
+        // * trapped: state should be `Faulted`; populate details and return an error or call a handler as appropriate
+        // * terminated: state should be `Terminating`; transition to `Terminated` and return the termination details as an Err
         //
-        // The state should never be `Ready` at this point
+        // The state should never be `Ready`, `Terminated`, `Yielded`, or `Transitioning` at this point
 
-        match &mut self.state {
+        // Set transitioning state temporarily so that we can move values out of the current state
+        let st = mem::replace(&mut self.state, State::Transitioning);
+
+        match st {
             State::Running => {
                 let retval = self.ctx.get_untyped_retval();
-                self.state = State::Ready { retval };
+                self.state = State::Ready;
                 Ok(RunResult::Returned(retval))
             }
-            State::Terminated { details, .. } => {
-                Err(Error::RuntimeTerminated(details.take().ok_or_else(
-                    || lucet_format_err!("terminated state contained no details"),
-                )?))
+            State::Terminating { details, .. } => {
+                self.state = State::Terminated;
+                Err(Error::RuntimeTerminated(details))
             }
-            State::Yielded { val, .. } => {
-                Ok(RunResult::Yielded(val.take().ok_or_else(|| {
-                    lucet_format_err!("yielded state contained no value")
-                })?))
+            State::Yielding { val, expecting } => {
+                self.state = State::Yielded { expecting };
+                Ok(RunResult::Yielded(val))
             }
-            State::Fault {
-                ref mut details, ..
+            State::Faulted {
+                mut details,
+                siginfo,
+                context,
             } => {
                 // Sandbox is no longer runnable. It's unsafe to determine all error details in the signal
                 // handler, so we fill in extra details here.
@@ -835,6 +832,13 @@ impl Instance {
                 details.rip_addr_details = self
                     .module
                     .addr_details(details.rip_addr as *const c_void)?;
+
+                // fill the state back in with the updated details in case fatal handlers need it
+                self.state = State::Faulted {
+                    details: details.clone(),
+                    siginfo,
+                    context,
+                };
 
                 if details.fatal {
                     // Some errors indicate that the guest is not functioning correctly or that
@@ -851,12 +855,12 @@ impl Instance {
                 } else {
                     // leave the full fault details in the instance state, and return the
                     // higher-level info to the user
-                    Err(Error::RuntimeFault(details.clone()))
+                    Err(Error::RuntimeFault(details))
                 }
             }
-            State::Ready { .. } => {
-                panic!("instance in Ready state after returning from guest context")
-            }
+            State::Ready | State::Terminated | State::Yielded { .. } | State::Transitioning => Err(
+                lucet_format_err!("\"impossible\" state found in `swap_and_return()`: {}", st),
+            ),
         }
     }
 
@@ -869,31 +873,6 @@ impl Instance {
         }
         Ok(())
     }
-}
-
-pub enum State {
-    Ready {
-        retval: UntypedRetVal,
-    },
-    Running,
-    Fault {
-        details: FaultDetails,
-        siginfo: libc::siginfo_t,
-        context: UContext,
-    },
-    Terminated {
-        /// This is always expected to be a `Some` when a terminating instance context switches back
-        /// to the host, but is `take`n to popuate the resulting `Error`.
-        details: Option<TerminationDetails>,
-    },
-    Yielded {
-        /// This is always expected to be a `Some` when a yielding instance context switches back to
-        /// the host, but is `take`n to popuate the `RunResult`.
-        val: Option<YieldedVal>,
-        /// Concretely, this should only ever be `Box<PhantomData<R>>` where `R` is the type
-        /// the guest expects upon resumption.
-        expected: Box<dyn Any>,
-    },
 }
 
 /// Information about a runtime fault.
@@ -1080,105 +1059,6 @@ impl YieldedVal {
 #[derive(Debug)]
 pub(crate) struct EmptyYieldVal;
 
-impl std::fmt::Display for State {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            State::Ready { .. } => write!(f, "ready"),
-            State::Running => write!(f, "running"),
-            State::Fault {
-                details, siginfo, ..
-            } => {
-                write!(f, "{}", details)?;
-                write!(
-                    f,
-                    " triggered by {}: ",
-                    strsignal_wrapper(siginfo.si_signo)
-                        .into_string()
-                        .expect("strsignal returns valid UTF-8")
-                )?;
-
-                if siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS {
-                    // We know this is inside the heap guard, because by the time we get here,
-                    // `lucet_error_verify_trap_safety` will have run and validated it.
-                    write!(
-                        f,
-                        " accessed memory at {:p} (inside heap guard)",
-                        siginfo.si_addr_ext()
-                    )?;
-                }
-                Ok(())
-            }
-            State::Terminated { .. } => write!(f, "terminated"),
-            State::Yielded { .. } => write!(f, "yielded"),
-        }
-    }
-}
-
-impl State {
-    pub fn is_ready(&self) -> bool {
-        if let State::Ready { .. } = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_running(&self) -> bool {
-        if let State::Running = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_fault(&self) -> bool {
-        if let State::Fault { .. } = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_fatal(&self) -> bool {
-        if let State::Fault {
-            details: FaultDetails { fatal, .. },
-            ..
-        } = self
-        {
-            *fatal
-        } else {
-            false
-        }
-    }
-
-    pub fn is_terminated(&self) -> bool {
-        if let State::Terminated { .. } = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_yielded(&self) -> bool {
-        if let State::Yielded { .. } = self {
-            true
-        } else {
-            false
-        }
-    }
-}
-
 fn default_fatal_handler(inst: &Instance) -> ! {
     panic!("> instance {:p} had fatal error: {}", inst, inst.state);
-}
-
-// TODO: PR into `libc`
-extern "C" {
-    #[no_mangle]
-    fn strsignal(sig: libc::c_int) -> *mut libc::c_char;
-}
-
-// TODO: PR into `nix`
-fn strsignal_wrapper(sig: libc::c_int) -> CString {
-    unsafe { CStr::from_ptr(strsignal(sig)).to_owned() }
 }
