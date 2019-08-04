@@ -46,6 +46,7 @@ pub struct Options {
     pub verify: bool,
     pub pk_path: Option<PathBuf>,
     pub sk_path: Option<PathBuf>,
+    pub count_instructions: bool,
 }
 
 impl Options {
@@ -111,6 +112,7 @@ impl Options {
         let verify = m.is_present("verify");
         let sk_path = m.value_of("sk_path").map(PathBuf::from);
         let pk_path = m.value_of("pk_path").map(PathBuf::from);
+        let count_instructions = m.is_present("count_instructions");
 
         Ok(Options {
             output,
@@ -128,6 +130,7 @@ impl Options {
             verify,
             sk_path,
             pk_path,
+            count_instructions,
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -243,6 +246,12 @@ impl Options {
                      .long("--signature-sk")
                      .takes_value(true)
                      .help("Path to the secret key to sign the object file. The file can be prefixed with \"raw:\" in order to store a raw, unencrypted secret key")
+            )
+            .arg(
+                Arg::with_name("count_instructions")
+                    .long("--count-instructions")
+                    .takes_value(false)
+                    .help("Instrument the produced binary to count the number of wasm operations the translated program executes")
             )
             .get_matches();
 

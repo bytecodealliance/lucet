@@ -24,6 +24,7 @@ lucetc = { path = "../lucetc" }
 lucet-runtime-tests = { path = "lucet-runtime-tests", version = "0.1.1" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 nix = "0.13"
+rayon = "1.0"
 tempfile = "3.0"
 
 [build-dependencies]

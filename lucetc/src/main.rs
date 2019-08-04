@@ -91,6 +91,10 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.sign();
     }
 
+    if opts.count_instructions {
+        c.count_instructions(true);
+    }
+
     match opts.codegen {
         CodegenOutput::Obj => c.object_file(&opts.output)?,
         CodegenOutput::SharedObj => c.shared_object_file(&opts.output)?,
