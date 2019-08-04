@@ -31,24 +31,22 @@ impl RustGenerator {
                 .indent();
             self.generate_datatypes(&module)?;
 
+            self.w
+                .writeln("mod abi {")
+                .indent()
+                .writeln(format!("#[link(wasm_import_module=\"{}\")]", module.name()))
+                .writeln("extern \"C\" {")
+                .indent();
+            for f in module.functions() {
+                self.guest_abi_import(&f)?;
+            }
+            self.w.eob().writeln("}").eob().writeln("}");
+
             /*
             for fdecl in module.func_decls() {
                 self.guest_idiomatic_def(module, &fdecl.entity)?;
             }
 
-            self.w
-                .writeln("mod abi {")
-                ndent()
-                .writeln(format!(
-                    "#[link(wasm_import_module=\"{}\")]",
-                    module.module_name
-                ))
-                .writeln("extern \"C\" {")
-                .indent();
-            for fdecl in module.func_decls() {
-                self.guest_abi_import(module, &fdecl.entity)?;
-            }
-            self.w.eob().writeln("}").eob().writeln("}");
             */
 
             self.w.eob().writeln("}");
@@ -173,31 +171,28 @@ impl RustGenerator {
         })?;
         Ok(())
     }
-    /*
-        fn guest_abi_import(&mut self, module: &Module, func: &FuncDecl) -> Result<(), IDLError> {
-            let mut args = String::new();
-            for a in func.args.iter() {
-                args += &format!(
-                    "{}: {},",
-                    a.name.to_snake_case(),
-                    Self::abitype_name(&a.type_)
-                );
-            }
-
-            let rets = if func.rets.len() == 0 {
-                "()"
-            } else {
-                assert_eq!(func.rets.len(), 1);
-                Self::abitype_name(&func.rets[0].type_)
-            };
-
-            self.w
-                .writeln("#[no_mangle]")
-                .writeln(format!("pub fn {}({}) -> {};", func.field_name, args, rets));
-
-            Ok(())
+    fn guest_abi_import(&mut self, func: &Function) -> Result<(), IDLError> {
+        let mut arg_syntax = Vec::new();
+        for a in func.args() {
+            arg_syntax.push(format!("{}: {}", a.name(), a.type_().rust_type_name()));
         }
 
+        let ret_syntax = func
+            .rets()
+            .map(|r| r.type_().rust_type_name())
+            .rust_return_signature();
+
+        self.w.writeln("#[no_mangle]").writeln(format!(
+            "pub fn {}({}) -> {};",
+            func.rust_name(),
+            arg_syntax.join(", "),
+            ret_syntax
+        ));
+
+        Ok(())
+    }
+
+    /*
         fn guest_idiomatic_def(&mut self, module: &Module, func: &FuncDecl) -> Result<(), IDLError> {
             use guest_funcs::{AbiCallBuilder, FuncBuilder};
 
@@ -770,5 +765,25 @@ impl Function<'_> {
 impl Module<'_> {
     fn rust_name(&self) -> String {
         self.name().to_snake_case()
+    }
+}
+
+trait RustReturnSignature {
+    fn rust_return_signature(&mut self) -> String;
+}
+
+impl<I> RustReturnSignature for I
+where
+    I: Iterator<Item = String>,
+{
+    fn rust_return_signature(&mut self) -> String {
+        let mut rets = self.collect::<Vec<String>>();
+        if rets.len() == 0 {
+            "()".to_owned()
+        } else if rets.len() == 1 {
+            rets.pop().unwrap()
+        } else {
+            format!("({})", rets.join(", "))
+        }
     }
 }
