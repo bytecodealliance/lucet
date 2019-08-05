@@ -37,8 +37,8 @@ RUN rustup target add wasm32-wasi
 
 RUN cargo install cargo-audit cargo-watch rsign2
 
-RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-5/wasi-sdk_5.0_amd64.deb \
-	&& dpkg -i wasi-sdk_5.0_amd64.deb && rm -f wasi-sdk_5.0_amd64.deb
+RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-6/wasi-sdk_6.0_amd64.deb \
+	&& dpkg -i wasi-sdk_6.0_amd64.deb && rm -f wasi-sdk_6.0_amd64.deb
 
 ENV WASI_SDK=/opt/wasi-sdk
 
