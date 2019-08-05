@@ -44,10 +44,13 @@ fn compile_and_test_rust_guest() {
     compile_and_test_rust(lucet_idl::Backend::RustGuest)
 }
 
+/* DISABLED: host needs the lucet_hostcalls! macro from lucet_runtime,
+ * and we dont want to manage the dep here, lucet-idl-test can handle it
 #[test]
 fn compile_and_test_rust_host() {
     compile_and_test_rust(lucet_idl::Backend::RustHost)
 }
+*/
 
 fn compile_and_test_rust(backend: lucet_idl::Backend) {
     let mut source = String::new();

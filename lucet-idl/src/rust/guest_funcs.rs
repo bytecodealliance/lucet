@@ -1,38 +1,21 @@
 use super::render_tuple;
 use crate::error::IDLError;
 use crate::pretty_writer::PrettyWriter;
-use crate::{Function, ParamPosition};
+use crate::Function;
 use heck::SnakeCase;
 
 pub struct AbiCallBuilder<'a> {
     func: Function<'a>,
     before: Vec<String>,
     after: Vec<String>,
-    args: Vec<Option<String>>,
-    rets: Vec<Option<String>>,
 }
 
 impl<'a> AbiCallBuilder<'a> {
     pub fn new(func: Function<'a>) -> Self {
-        let arg_len = func.args().collect::<Vec<_>>().len();
-        let ret_len = func.rets().collect::<Vec<_>>().len();
         AbiCallBuilder {
             func,
             before: Vec::new(),
             after: Vec::new(),
-            args: vec![None; arg_len],
-            rets: vec![None; ret_len],
-        }
-    }
-
-    pub fn param(&mut self, position: &ParamPosition, value: String) {
-        match position {
-            ParamPosition::Arg(n) => {
-                self.args[*n] = Some(value);
-            }
-            ParamPosition::Ret(n) => {
-                self.rets[*n] = Some(value);
-            }
         }
     }
 
@@ -48,27 +31,20 @@ impl<'a> AbiCallBuilder<'a> {
         let name = self.func.name().to_snake_case();
 
         let arg_syntax = self
-            .args
-            .iter()
-            .map(|v| {
-                v.clone()
-                    .ok_or(IDLError::InternalError("unconstructed abi arg"))
-            })
-            .collect::<Result<Vec<String>, IDLError>>()?
+            .func
+            .args()
+            .map(|a| a.name().to_owned())
+            .collect::<Vec<String>>()
             .join(", ");
         let rets = self
-            .rets
-            .iter()
-            .map(|v| {
-                v.clone()
-                    .ok_or(IDLError::InternalError("unconstructed abi ret"))
-            })
-            .collect::<Result<Vec<String>, IDLError>>()?;
+            .func
+            .rets()
+            .map(|r| r.name().to_owned())
+            .collect::<Vec<String>>();
         let ret_syntax = if rets.is_empty() {
             String::new()
         } else {
-            assert_eq!(rets.len(), 1);
-            format!("let {} = ", rets[0])
+            format!("let {} = ", render_tuple(&rets))
         };
 
         w.writelns(&self.before);
