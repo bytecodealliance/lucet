@@ -1,4 +1,4 @@
-use crate::{AtomType, Location};
+use crate::Location;
 use std::str::CharIndices;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -17,7 +17,6 @@ pub enum Token<'a> {
     Equals,   // =
     LArrow,   // <-
     RArrow,   // ->
-    Atom(AtomType),
     Word(&'a str),
     Quote(&'a str), // Found between balanced "". No escaping.
 }
@@ -135,23 +134,7 @@ impl<'a> Lexer<'a> {
             }
         }
         let text = &self.source[begin..self.pos];
-        token(
-            match text {
-                "bool" => Token::Atom(AtomType::Bool),
-                "i8" => Token::Atom(AtomType::I8),
-                "i16" => Token::Atom(AtomType::I16),
-                "i32" => Token::Atom(AtomType::I32),
-                "i64" => Token::Atom(AtomType::I64),
-                "u8" => Token::Atom(AtomType::U8),
-                "u16" => Token::Atom(AtomType::U16),
-                "u32" => Token::Atom(AtomType::U32),
-                "u64" => Token::Atom(AtomType::U64),
-                "f32" => Token::Atom(AtomType::F32),
-                "f64" => Token::Atom(AtomType::F64),
-                _ => Token::Word(text),
-            },
-            loc,
-        )
+        token(Token::Word(text), loc)
     }
 
     fn scan_comment(&mut self) -> Result<(), LocatedError> {
@@ -284,22 +267,6 @@ mod tests {
         column: usize,
     ) -> Option<Result<LocatedToken<'a>, LocatedError>> {
         Some(super::error(err, Location { line, column }))
-    }
-
-    #[test]
-    fn atoms() {
-        let mut lex = Lexer::new("i8 i16 i32 i64\nu8 u16 u32 u64\nf32 f64");
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::I8), 1, 0));
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::I16), 1, 3));
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::I32), 1, 7));
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::I64), 1, 11));
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::U8), 2, 0));
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::U16), 2, 3));
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::U32), 2, 7));
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::U64), 2, 11));
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::F32), 3, 0));
-        assert_eq!(lex.next(), token(Token::Atom(AtomType::F64), 3, 4));
-        assert_eq!(lex.next(), None);
     }
 
     #[test]

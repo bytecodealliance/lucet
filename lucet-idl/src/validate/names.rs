@@ -1,8 +1,9 @@
-use crate::parser::SyntaxTypeRef;
+use crate::parser::SyntaxIdent;
 use crate::repr::{DatatypeIdent, DatatypeIx, FuncIx, ModuleIx};
-use crate::{Location, ValidationError};
+use crate::{AtomType, Location, ValidationError};
 use cranelift_entity::PrimaryMap;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 pub struct ModNamesBuilder {
     pub module: ModuleIx,
@@ -59,24 +60,25 @@ impl ModNamesBuilder {
 
     pub fn datatype_id_from_syntax(
         &self,
-        syntax: &SyntaxTypeRef,
+        syntax: &SyntaxIdent,
     ) -> Result<DatatypeIdent, ValidationError> {
-        match syntax {
-            SyntaxTypeRef::Atom { atom, .. } => Ok(atom.datatype_id()),
-            SyntaxTypeRef::Name { name, location } => match self.names.get(name) {
+        if let Ok(atom) = AtomType::try_from(syntax.name.as_str()) {
+            Ok(atom.datatype_id())
+        } else {
+            match self.names.get(syntax.name.as_str()) {
                 Some((ModContentIx::Datatype(ix), _loc)) => {
                     Ok(DatatypeIdent::new(self.module, *ix))
                 }
                 Some((_, bound_loc)) => Err(ValidationError::NameSortError {
-                    name: name.to_owned(),
-                    use_location: *location,
+                    name: syntax.name.clone(),
+                    use_location: syntax.location,
                     bound_location: *bound_loc,
                 }),
                 None => Err(ValidationError::NameNotFound {
-                    name: name.to_owned(),
-                    use_location: *location,
+                    name: syntax.name.clone(),
+                    use_location: syntax.location,
                 }),
-            },
+            }
         }
     }
 

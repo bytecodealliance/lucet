@@ -7,6 +7,7 @@ use crate::repr::{
 use crate::{AbiType, AtomType, Datatype, Location, Module, ValidationError};
 use cranelift_entity::{EntityRef, PrimaryMap};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::ops::Deref;
 
 pub struct FunctionModuleBuilder<'a> {
@@ -109,9 +110,15 @@ impl<'a> FuncValidator<'a> {
                 (arg_syntax.location.clone(), position),
             );
         }
+        let type_ = AbiType::try_from(arg_syntax.type_.name.as_str()).map_err(|_| {
+            ValidationError::Syntax {
+                expected: "abi type",
+                location: arg_syntax.type_.location,
+            }
+        })?;
         Ok(ParamRepr {
             name: arg_syntax.name.clone(),
-            type_: arg_syntax.type_.clone(),
+            type_,
         })
     }
 
@@ -181,14 +188,13 @@ impl<'a> FuncValidator<'a> {
                 .insert(binding.name.clone(), (binding.location.clone(), ix));
         }
 
-        // 2. resolve type_ SyntaxRef to a Datatype
-        let type_ = self
-            .module
-            .datatype_by_syntax(&binding.type_)
-            .ok_or_else(|| ValidationError::NameNotFound {
-                name: format!("{:?}", binding.type_), // XXX FIXME
+        // 2. resolve type_ SyntaxIdent to a Datatype
+        let type_ = self.module.datatype(&binding.type_.name).ok_or_else(|| {
+            ValidationError::NameNotFound {
+                name: binding.type_.name.to_owned(),
                 use_location: binding.location,
-            })?;
+            }
+        })?;
 
         // 3. typecheck the binding:
         let from = self.validate_binding_ref(&binding, &type_)?;
@@ -352,20 +358,8 @@ impl<'a> FuncValidator<'a> {
                         }
                         Ok(BindingFromRepr::Slice(ptr_position, len_position))
                     }
-                    (
-                        BindingRefSyntax::Name(ref _ptr_name),
-                        BindingRefSyntax::Ptr(ref len_ptr_ref),
-                    ) => match len_ptr_ref.deref() {
-                        BindingRefSyntax::Name(_len_ptr_name) => {
-                            unimplemented!("slice syntax [ptr, *len] for an output slice");
-                        }
-                        _ => Err(ValidationError::Syntax {
-                            expected: "slice binding must be of form [ptr, len] or [ptr, *len]",
-                            location: binding.location.clone(),
-                        }),
-                    },
                     _ => Err(ValidationError::Syntax {
-                        expected: "slice binding must be of form [ptr, len] or [ptr, *len]",
+                        expected: "slice binding must be of form [ptr, len]",
                         location: binding.location.clone(),
                     }),
                 }

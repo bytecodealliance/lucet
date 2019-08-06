@@ -1,5 +1,4 @@
 pub use crate::atoms::{AbiType, AtomType};
-use crate::parser::SyntaxTypeRef;
 use crate::repr::{
     AliasDatatypeRepr, BindingFromRepr, BindingIx, BindingRepr, DatatypeIdent, DatatypeIx,
     DatatypeRepr, DatatypeVariantRepr, EnumDatatypeRepr, FuncIdent, FuncIx, FuncRepr, ModuleIx,
@@ -7,6 +6,7 @@ use crate::repr::{
 };
 pub use crate::repr::{BindingDirection, Package};
 use crate::MemArea;
+use std::convert::TryFrom;
 use std::ops::Deref;
 
 impl Package {
@@ -17,11 +17,12 @@ impl Package {
             .and_then(|(ix, _)| self.module_by_ix(ix))
     }
 
+    fn all_modules<'a>(&'a self) -> impl Iterator<Item = Module<'a>> + 'a {
+        self.names.keys().map(move |ix| Module { pkg: &self, ix })
+    }
+
     pub fn modules<'a>(&'a self) -> impl Iterator<Item = Module<'a>> + 'a {
-        self.names
-            .keys()
-            .map(move |ix| Module { pkg: &self, ix })
-            .filter(|m| m.name() != "std")
+        self.all_modules().filter(|m| m.name() != "std")
     }
 
     pub fn module_by_ix<'a>(&'a self, ix: ModuleIx) -> Option<Module<'a>> {
@@ -58,12 +59,20 @@ impl<'a> Module<'a> {
     }
 
     pub fn datatype(&self, name: &str) -> Option<Datatype<'a>> {
-        self.repr()
-            .datatypes
-            .names
-            .iter()
-            .find(|(_, n)| *n == name)
-            .and_then(|(ix, _)| self.datatype_by_ix(ix))
+        if let Ok(atom) = AtomType::try_from(name) {
+            Some(
+                self.pkg
+                    .datatype_by_id(atom.datatype_id())
+                    .expect("atom from id"),
+            )
+        } else {
+            self.repr()
+                .datatypes
+                .names
+                .iter()
+                .find(|(_, n)| *n == name)
+                .and_then(|(ix, _)| self.datatype_by_ix(ix))
+        }
     }
 
     pub fn datatype_by_ix(&self, ix: DatatypeIx) -> Option<Datatype<'a>> {
@@ -88,14 +97,6 @@ impl<'a> Module<'a> {
                 pkg,
                 id: DatatypeIdent::new(mix, ix),
             })
-    }
-
-    // XXX move this to a trait that we dont export, eventaully...
-    pub fn datatype_by_syntax(&self, tref: &SyntaxTypeRef) -> Option<Datatype<'a>> {
-        match tref {
-            SyntaxTypeRef::Name { name, .. } => self.datatype(name),
-            SyntaxTypeRef::Atom { atom, .. } => self.package().datatype_by_id(atom.datatype_id()),
-        }
     }
 
     pub fn function(&self, name: &str) -> Option<Function<'a>> {

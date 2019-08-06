@@ -1,6 +1,6 @@
 use super::names::ModNamesBuilder;
 use crate::parser::{
-    EnumVariant as EnumVariantSyntax, StructMember as StructMemberSyntax, SyntaxTypeRef,
+    EnumVariant as EnumVariantSyntax, StructMember as StructMemberSyntax, SyntaxIdent,
 };
 use crate::repr::{
     AliasDatatypeRepr, DatatypeIdent, DatatypeIx, DatatypeRepr, DatatypeVariantRepr,
@@ -154,7 +154,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
     pub fn introduce_alias(
         &mut self,
         name: &str,
-        dest: &SyntaxTypeRef,
+        dest: &SyntaxIdent,
         location: &Location,
     ) -> Result<(), ValidationError> {
         let ix = self

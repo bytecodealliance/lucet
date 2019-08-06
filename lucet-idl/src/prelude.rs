@@ -17,8 +17,9 @@ pub fn std_module() -> ModuleRepr {
 }
 
 fn std_datatypes() -> ModuleDatatypesRepr {
-    fn create_atom(repr: &mut ModuleDatatypesRepr, name: &str, atom: AtomType) {
-        let ix = repr.names.push(name.to_owned());
+    fn create_atom(repr: &mut ModuleDatatypesRepr, atom: AtomType) {
+        // Display instance takes care of name:
+        let ix = repr.names.push(format!("{}", atom));
         let mem_size = atom.mem_size();
         let mem_align = atom.mem_align();
         let dix = repr.datatypes.push(DatatypeRepr {
@@ -35,17 +36,17 @@ fn std_datatypes() -> ModuleDatatypesRepr {
         datatypes: PrimaryMap::new(),
         topological_order: Vec::new(),
     };
-    create_atom(&mut repr, "bool", AtomType::Bool);
-    create_atom(&mut repr, "u8", AtomType::U8);
-    create_atom(&mut repr, "u16", AtomType::U16);
-    create_atom(&mut repr, "u32", AtomType::U32);
-    create_atom(&mut repr, "u64", AtomType::U64);
-    create_atom(&mut repr, "i8", AtomType::I8);
-    create_atom(&mut repr, "i16", AtomType::I16);
-    create_atom(&mut repr, "i32", AtomType::I32);
-    create_atom(&mut repr, "i64", AtomType::I64);
-    create_atom(&mut repr, "f32", AtomType::F32);
-    create_atom(&mut repr, "f64", AtomType::F64);
+    create_atom(&mut repr, AtomType::Bool);
+    create_atom(&mut repr, AtomType::U8);
+    create_atom(&mut repr, AtomType::U16);
+    create_atom(&mut repr, AtomType::U32);
+    create_atom(&mut repr, AtomType::U64);
+    create_atom(&mut repr, AtomType::I8);
+    create_atom(&mut repr, AtomType::I16);
+    create_atom(&mut repr, AtomType::I32);
+    create_atom(&mut repr, AtomType::I64);
+    create_atom(&mut repr, AtomType::F32);
+    create_atom(&mut repr, AtomType::F64);
 
     repr
 }

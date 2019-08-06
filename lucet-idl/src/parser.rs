@@ -1,5 +1,5 @@
 use super::lexer::{LexError, Lexer, LocatedError, LocatedToken, Token};
-use super::{AbiType, AtomType, Location};
+use super::Location;
 use std::error::Error;
 use std::fmt;
 
@@ -17,7 +17,7 @@ pub enum SyntaxDecl {
     },
     Alias {
         name: String,
-        what: SyntaxTypeRef,
+        what: SyntaxIdent,
         location: Location,
     },
     Module {
@@ -47,15 +47,15 @@ impl SyntaxDecl {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum SyntaxTypeRef {
-    Atom { atom: AtomType, location: Location },
-    Name { name: String, location: Location },
+pub struct SyntaxIdent {
+    pub name: String,
+    pub location: Location,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StructMember {
     pub name: String,
-    pub type_: SyntaxTypeRef,
+    pub type_: SyntaxIdent,
     pub location: Location,
 }
 
@@ -68,7 +68,7 @@ pub struct EnumVariant {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FuncArgSyntax {
     pub name: String,
-    pub type_: AbiType,
+    pub type_: SyntaxIdent,
     pub location: Location,
 }
 
@@ -88,7 +88,7 @@ pub enum BindingDirSyntax {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BindingSyntax {
     pub name: String,
-    pub type_: SyntaxTypeRef,
+    pub type_: SyntaxIdent,
     pub direction: BindingDirSyntax,
     pub from: BindingRefSyntax,
     pub location: Location,
@@ -211,7 +211,7 @@ impl<'a> Parser<'a> {
                     let location = self.location;
                     self.consume();
                     self.match_token(Token::Colon, "expected :")?;
-                    let member_ref = self.match_ref("expected member type")?;
+                    let member_ref = self.match_ident("expected member type")?;
                     members.push(StructMember {
                         name: member_name.to_string(),
                         type_: member_ref,
@@ -283,7 +283,7 @@ impl<'a> Parser<'a> {
                     let location = self.location;
                     self.consume();
                     self.match_token(Token::Colon, "expected :")?;
-                    let type_ = self.match_abitype()?;
+                    let type_ = self.match_ident("type name")?;
 
                     args.push(FuncArgSyntax {
                         name: name.to_string(),
@@ -319,7 +319,7 @@ impl<'a> Parser<'a> {
                     let location = self.location;
                     self.consume();
                     self.match_token(Token::Colon, "expected :")?;
-                    let type_ = self.match_abitype()?;
+                    let type_ = self.match_ident("type name")?;
                     args.push(FuncArgSyntax {
                         type_,
                         name: name.to_string(),
@@ -352,7 +352,7 @@ impl<'a> Parser<'a> {
                     self.consume();
                     self.match_token(Token::Colon, "expected :")?;
                     let direction = self.match_bind_direction()?;
-                    let type_ = self.match_ref("type value")?;
+                    let type_ = self.match_ident("type name")?;
                     self.match_token(Token::LArrow, "expected <-")?;
                     let from = self.match_binding_ref()?;
                     bindings.push(BindingSyntax {
@@ -458,7 +458,7 @@ impl<'a> Parser<'a> {
                     self.consume();
                     let name = err_ctx!(err_msg, self.match_a_word("expected type name"))?;
                     err_ctx!(err_msg, self.match_token(Token::Equals, "expected ="))?;
-                    let what = self.match_ref("type value")?;
+                    let what = self.match_ident("type value")?;
                     err_ctx!(err_msg, self.match_token(Token::Semi, "expected ;"))?;
                     return Ok(Some(SyntaxDecl::Alias {
                         name: name.to_owned(),
@@ -561,39 +561,17 @@ impl<'a> Parser<'a> {
         Ok(decls)
     }
 
-    fn match_ref(&mut self, err_msg: &str) -> Result<SyntaxTypeRef, ParseError> {
+    fn match_ident(&mut self, err_msg: &str) -> Result<SyntaxIdent, ParseError> {
         match self.token() {
-            Some(Token::Atom(atom)) => {
-                let location = self.location;
-                self.consume();
-                Ok(SyntaxTypeRef::Atom { atom, location })
-            }
             Some(Token::Word(name)) => {
                 let location = self.location;
                 self.consume();
-                Ok(SyntaxTypeRef::Name {
+                Ok(SyntaxIdent {
                     name: name.to_string(),
                     location,
                 })
             }
-            _ => err_ctx!(
-                err_msg,
-                parse_err!(self.location, "expected atom, or type name")
-            ),
-        }
-    }
-
-    fn match_abitype(&mut self) -> Result<AbiType, ParseError> {
-        match self.token() {
-            Some(Token::Atom(atom)) => match AbiType::of_atom(atom) {
-                Some(abitype) => {
-                    self.consume();
-                    Ok(abitype)
-                }
-                None => parse_err!(self.location, "expected abi type, got non-abi atom type"),
-            },
-            Some(Token::Word(w)) => parse_err!(self.location, "expected abi type, got '{}'", w),
-            _ => parse_err!(self.location, "expected abi type"),
+            _ => err_ctx!(err_msg, parse_err!(self.location, "expected identifier")),
         }
     }
 }
@@ -629,8 +607,8 @@ mod tests {
                 name: "foo".to_string(),
                 members: vec![StructMember {
                     name: "a".to_owned(),
-                    type_: SyntaxTypeRef::Atom {
-                        atom: AtomType::I32,
+                    type_: SyntaxIdent {
+                        name: "i32".to_owned(),
                         location: Location {
                             line: 1,
                             column: 15,
@@ -658,8 +636,8 @@ mod tests {
                 name: "foo".to_string(),
                 members: vec![StructMember {
                     name: "b".to_owned(),
-                    type_: SyntaxTypeRef::Atom {
-                        atom: AtomType::I32,
+                    type_: SyntaxIdent {
+                        name: "i32".to_owned(),
                         location: Location {
                             line: 1,
                             column: 15,
@@ -688,8 +666,8 @@ mod tests {
                 members: vec![
                     StructMember {
                         name: "d".to_owned(),
-                        type_: SyntaxTypeRef::Atom {
-                            atom: AtomType::F64,
+                        type_: SyntaxIdent {
+                            name: "f64".to_owned(),
                             location: Location {
                                 line: 1,
                                 column: 14,
@@ -702,8 +680,8 @@ mod tests {
                     },
                     StructMember {
                         name: "e".to_owned(),
-                        type_: SyntaxTypeRef::Atom {
-                            atom: AtomType::U8,
+                        type_: SyntaxIdent {
+                            name: "u8".to_owned(),
                             location: Location {
                                 line: 1,
                                 column: 22,
@@ -734,7 +712,7 @@ mod tests {
                 members: vec![
                     StructMember {
                         name: "a".to_owned(),
-                        type_: SyntaxTypeRef::Name {
+                        type_: SyntaxIdent {
                             name: "mod".to_owned(),
                             location: Location {
                                 line: 1,
@@ -748,7 +726,7 @@ mod tests {
                     },
                     StructMember {
                         name: "struct".to_owned(),
-                        type_: SyntaxTypeRef::Name {
+                        type_: SyntaxIdent {
                             name: "enum".to_owned(),
                             location: Location {
                                 line: 1,
@@ -985,40 +963,48 @@ mod tests {
 
     #[test]
     fn fn_return_i32() {
-        let canonical = vec![SyntaxDecl::Function {
-            name: "getch".to_owned(),
-            args: Vec::new(),
-            rets: vec![FuncArgSyntax {
-                type_: AbiType::I32,
-                name: "r".to_owned(),
-                location: Location {
-                    line: 1,
-                    column: 14,
-                },
-            }],
-            bindings: Vec::new(),
-            location: Location { line: 1, column: 0 },
-        }];
+        fn canonical(column: usize) -> Vec<SyntaxDecl> {
+            vec![SyntaxDecl::Function {
+                name: "getch".to_owned(),
+                args: Vec::new(),
+                rets: vec![FuncArgSyntax {
+                    type_: SyntaxIdent {
+                        name: "i32".to_owned(),
+                        location: Location {
+                            line: 1,
+                            column: column,
+                        },
+                    },
+                    name: "r".to_owned(),
+                    location: Location {
+                        line: 1,
+                        column: 14,
+                    },
+                }],
+                bindings: Vec::new(),
+                location: Location { line: 1, column: 0 },
+            }]
+        }
         assert_eq!(
             Parser::new("fn getch() -> r:i32;")
-                //       0    5    10
+                //       0    5    10   15
                 .match_decls()
                 .expect("valid decls"),
-            canonical
+            canonical(16)
         );
         assert_eq!(
             Parser::new("fn getch() -> r: i32,;")
                 //       0    5    10
                 .match_decls()
                 .expect("valid decls"),
-            canonical
+            canonical(17)
         );
         assert_eq!(
             Parser::new("fn getch() -> r :i32 , ;")
                 //       0    5    10
                 .match_decls()
                 .expect("valid decls"),
-            canonical
+            canonical(17)
         );
     }
 
@@ -1027,7 +1013,13 @@ mod tests {
         let canonical = SyntaxDecl::Function {
             name: "foo".to_owned(),
             args: vec![FuncArgSyntax {
-                type_: AbiType::I32,
+                type_: SyntaxIdent {
+                    name: "i32".to_owned(),
+                    location: Location {
+                        line: 1,
+                        column: 10,
+                    },
+                },
                 name: "a".to_owned(),
                 location: Location { line: 1, column: 7 },
             }],
@@ -1059,12 +1051,24 @@ mod tests {
             name: "foo".to_owned(),
             args: vec![
                 FuncArgSyntax {
-                    type_: AbiType::I32,
+                    type_: SyntaxIdent {
+                        name: "i32".to_owned(),
+                        location: Location {
+                            line: 1,
+                            column: 10,
+                        },
+                    },
                     name: "a".to_owned(),
                     location: Location { line: 1, column: 7 },
                 },
                 FuncArgSyntax {
-                    type_: AbiType::F64,
+                    type_: SyntaxIdent {
+                        name: "f64".to_owned(),
+                        location: Location {
+                            line: 1,
+                            column: 18,
+                        },
+                    },
                     name: "b".to_owned(),
                     location: Location {
                         line: 1,
@@ -1107,7 +1111,13 @@ mod tests {
                 args: Vec::new(),
                 rets: vec![
                     FuncArgSyntax {
-                        type_: AbiType::I32,
+                        type_: SyntaxIdent {
+                            name: "i32".to_owned(),
+                            location: Location {
+                                line: 1,
+                                column: 18,
+                            }
+                        },
                         name: "r1".to_owned(),
                         location: Location {
                             line: 1,
@@ -1115,7 +1125,13 @@ mod tests {
                         },
                     },
                     FuncArgSyntax {
-                        type_: AbiType::I64,
+                        type_: SyntaxIdent {
+                            name: "i64".to_owned(),
+                            location: Location {
+                                line: 1,
+                                column: 27
+                            }
+                        },
                         name: "r2".to_owned(),
                         location: Location {
                             line: 1,
@@ -1123,7 +1139,13 @@ mod tests {
                         },
                     },
                     FuncArgSyntax {
-                        type_: AbiType::F32,
+                        type_: SyntaxIdent {
+                            name: "f32".to_owned(),
+                            location: Location {
+                                line: 1,
+                                column: 36
+                            }
+                        },
                         name: "r3".to_owned(),
                         location: Location {
                             line: 1,
@@ -1153,7 +1175,13 @@ mod tests {
             SyntaxDecl::Function {
                 name: "fgetch".to_owned(),
                 args: vec![FuncArgSyntax {
-                    type_: AbiType::I32,
+                    type_: SyntaxIdent {
+                        name: "i32".to_owned(),
+                        location: Location {
+                            line: 1,
+                            column: 16
+                        }
+                    },
                     name: "fptr".to_owned(),
                     location: Location {
                         line: 1,
@@ -1161,7 +1189,13 @@ mod tests {
                     },
                 },],
                 rets: vec![FuncArgSyntax {
-                    type_: AbiType::I32,
+                    type_: SyntaxIdent {
+                        name: "i32".to_owned(),
+                        location: Location {
+                            line: 1,
+                            column: 27
+                        }
+                    },
                     name: "r".to_owned(),
                     location: Location {
                         line: 1,
@@ -1171,7 +1205,7 @@ mod tests {
                 bindings: vec![
                     BindingSyntax {
                         name: "file".to_owned(),
-                        type_: SyntaxTypeRef::Name {
+                        type_: SyntaxIdent {
                             name: "file_t".to_owned(),
                             location: Location { line: 2, column: 9 },
                         },
@@ -1183,8 +1217,8 @@ mod tests {
                     },
                     BindingSyntax {
                         name: "r".to_owned(),
-                        type_: SyntaxTypeRef::Atom {
-                            atom: AtomType::U8,
+                        type_: SyntaxIdent {
+                            name: "u8".to_owned(),
                             location: Location { line: 3, column: 7 },
                         },
                         direction: BindingDirSyntax::Out,
@@ -1193,7 +1227,7 @@ mod tests {
                     },
                     BindingSyntax {
                         name: "some_slice".to_owned(),
-                        type_: SyntaxTypeRef::Name {
+                        type_: SyntaxIdent {
                             name: "something".to_owned(),
                             location: Location {
                                 line: 4,
