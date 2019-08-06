@@ -82,9 +82,9 @@ impl<'a> DatatypeModuleBuilder<'a> {
         let mut members = Vec::new();
         for mem in members_syntax {
             // Ensure that each member name is unique:
-            if let Some(existing) = uniq_membs.insert(mem.name.clone(), mem) {
+            if let Some(existing) = uniq_membs.insert(mem.name.to_owned(), mem) {
                 Err(ValidationError::NameAlreadyExists {
-                    name: mem.name.clone(),
+                    name: mem.name.to_owned(),
                     at_location: mem.location,
                     previous_location: existing.location,
                 })?
@@ -95,7 +95,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
             // build the struct with this as the member:
             members.push(StructMemberIR {
                 type_,
-                name: mem.name.clone(),
+                name: mem.name.to_owned(),
             });
         }
         self.define_datatype(
@@ -131,14 +131,14 @@ impl<'a> DatatypeModuleBuilder<'a> {
             // Ensure that each member name is unique:
             if let Some(existing) = uniq_vars.insert(var.name.clone(), var) {
                 Err(ValidationError::NameAlreadyExists {
-                    name: var.name.clone(),
+                    name: var.name.to_owned(),
                     at_location: var.location,
                     previous_location: existing.location,
                 })?
             }
             // build the struct with this as the member:
             members.push(EnumMemberRepr {
-                name: var.name.clone(),
+                name: var.name.to_owned(),
             })
         }
         self.define_datatype(

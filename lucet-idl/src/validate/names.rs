@@ -62,20 +62,20 @@ impl ModNamesBuilder {
         &self,
         syntax: &SyntaxIdent,
     ) -> Result<DatatypeIdent, ValidationError> {
-        if let Ok(atom) = AtomType::try_from(syntax.name.as_str()) {
+        if let Ok(atom) = AtomType::try_from(syntax.name) {
             Ok(atom.datatype_id())
         } else {
-            match self.names.get(syntax.name.as_str()) {
+            match self.names.get(syntax.name) {
                 Some((ModContentIx::Datatype(ix), _loc)) => {
                     Ok(DatatypeIdent::new(self.module, *ix))
                 }
                 Some((_, bound_loc)) => Err(ValidationError::NameSortError {
-                    name: syntax.name.clone(),
+                    name: syntax.name.to_owned(),
                     use_location: syntax.location,
                     bound_location: *bound_loc,
                 }),
                 None => Err(ValidationError::NameNotFound {
-                    name: syntax.name.clone(),
+                    name: syntax.name.to_owned(),
                     use_location: syntax.location,
                 }),
             }

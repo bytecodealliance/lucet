@@ -4,37 +4,37 @@ use std::error::Error;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum SyntaxDecl {
+pub enum SyntaxDecl<'a> {
     Struct {
-        name: String,
-        members: Vec<StructMember>,
+        name: &'a str,
+        members: Vec<StructMember<'a>>,
         location: Location,
     },
     Enum {
-        name: String,
-        variants: Vec<EnumVariant>,
+        name: &'a str,
+        variants: Vec<EnumVariant<'a>>,
         location: Location,
     },
     Alias {
-        name: String,
-        what: SyntaxIdent,
+        name: &'a str,
+        what: SyntaxIdent<'a>,
         location: Location,
     },
     Module {
-        name: String,
-        decls: Vec<SyntaxDecl>,
+        name: &'a str,
+        decls: Vec<SyntaxDecl<'a>>,
         location: Location,
     },
     Function {
-        name: String,
-        args: Vec<FuncArgSyntax>,
-        rets: Vec<FuncArgSyntax>,
-        bindings: Vec<BindingSyntax>,
+        name: &'a str,
+        args: Vec<FuncArgSyntax<'a>>,
+        rets: Vec<FuncArgSyntax<'a>>,
+        bindings: Vec<BindingSyntax<'a>>,
         location: Location,
     },
 }
 
-impl SyntaxDecl {
+impl<'a> SyntaxDecl<'a> {
     pub fn location(&self) -> &Location {
         match self {
             SyntaxDecl::Struct { location, .. } => &location,
@@ -47,28 +47,28 @@ impl SyntaxDecl {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SyntaxIdent {
-    pub name: String,
+pub struct SyntaxIdent<'a> {
+    pub name: &'a str,
     pub location: Location,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct StructMember {
-    pub name: String,
-    pub type_: SyntaxIdent,
+pub struct StructMember<'a> {
+    pub name: &'a str,
+    pub type_: SyntaxIdent<'a>,
     pub location: Location,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct EnumVariant {
-    pub name: String,
+pub struct EnumVariant<'a> {
+    pub name: &'a str,
     pub location: Location,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FuncArgSyntax {
-    pub name: String,
-    pub type_: SyntaxIdent,
+pub struct FuncArgSyntax<'a> {
+    pub name: &'a str,
+    pub type_: SyntaxIdent<'a>,
     pub location: Location,
 }
 
@@ -86,19 +86,19 @@ pub enum BindingDirSyntax {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct BindingSyntax {
-    pub name: String,
-    pub type_: SyntaxIdent,
+pub struct BindingSyntax<'a> {
+    pub name: &'a str,
+    pub type_: SyntaxIdent<'a>,
     pub direction: BindingDirSyntax,
-    pub from: BindingRefSyntax,
+    pub from: BindingRefSyntax<'a>,
     pub location: Location,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum BindingRefSyntax {
-    Ptr(Box<BindingRefSyntax>),
-    Slice(Box<BindingRefSyntax>, Box<BindingRefSyntax>),
-    Name(String),
+pub enum BindingRefSyntax<'a> {
+    Ptr(Box<BindingRefSyntax<'a>>),
+    Slice(Box<BindingRefSyntax<'a>>, Box<BindingRefSyntax<'a>>),
+    Name(&'a str),
 }
 
 impl fmt::Display for ParseError {
@@ -199,7 +199,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn match_struct_body(&mut self) -> Result<Vec<StructMember>, ParseError> {
+    fn match_struct_body(&mut self) -> Result<Vec<StructMember<'a>>, ParseError> {
         let mut members = Vec::new();
         loop {
             match self.token() {
@@ -213,7 +213,7 @@ impl<'a> Parser<'a> {
                     self.match_token(Token::Colon, "expected :")?;
                     let member_ref = self.match_ident("expected member type")?;
                     members.push(StructMember {
-                        name: member_name.to_string(),
+                        name: member_name,
                         type_: member_ref,
                         location,
                     });
@@ -238,7 +238,7 @@ impl<'a> Parser<'a> {
         Ok(members)
     }
 
-    fn match_enum_body(&mut self) -> Result<Vec<EnumVariant>, ParseError> {
+    fn match_enum_body(&mut self) -> Result<Vec<EnumVariant<'a>>, ParseError> {
         let mut names = Vec::new();
         loop {
             match self.token() {
@@ -250,7 +250,7 @@ impl<'a> Parser<'a> {
                     let location = self.location;
                     self.consume();
                     names.push(EnumVariant {
-                        name: name.to_owned(),
+                        name: name,
                         location,
                     });
                     match self.token() {
@@ -271,7 +271,7 @@ impl<'a> Parser<'a> {
         Ok(names)
     }
 
-    fn match_func_args(&mut self) -> Result<Vec<FuncArgSyntax>, ParseError> {
+    fn match_func_args(&mut self) -> Result<Vec<FuncArgSyntax<'a>>, ParseError> {
         let mut args = Vec::new();
         loop {
             match self.token() {
@@ -286,7 +286,7 @@ impl<'a> Parser<'a> {
                     let type_ = self.match_ident("type name")?;
 
                     args.push(FuncArgSyntax {
-                        name: name.to_string(),
+                        name,
                         type_,
                         location,
                     });
@@ -308,7 +308,7 @@ impl<'a> Parser<'a> {
         Ok(args)
     }
 
-    fn match_func_rets(&mut self) -> Result<Vec<FuncArgSyntax>, ParseError> {
+    fn match_func_rets(&mut self) -> Result<Vec<FuncArgSyntax<'a>>, ParseError> {
         let mut args = Vec::new();
         loop {
             match self.token() {
@@ -322,7 +322,7 @@ impl<'a> Parser<'a> {
                     let type_ = self.match_ident("type name")?;
                     args.push(FuncArgSyntax {
                         type_,
-                        name: name.to_string(),
+                        name,
                         location,
                     });
                     match self.token() {
@@ -342,7 +342,7 @@ impl<'a> Parser<'a> {
         Ok(args)
     }
 
-    fn match_binding_exprs(&mut self) -> Result<Vec<BindingSyntax>, ParseError> {
+    fn match_binding_exprs(&mut self) -> Result<Vec<BindingSyntax<'a>>, ParseError> {
         let mut bindings = Vec::new();
         loop {
             match self.token() {
@@ -356,7 +356,7 @@ impl<'a> Parser<'a> {
                     self.match_token(Token::LArrow, "expected <-")?;
                     let from = self.match_binding_ref()?;
                     bindings.push(BindingSyntax {
-                        name: name.to_string(),
+                        name,
                         type_,
                         direction,
                         from,
@@ -401,7 +401,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn match_binding_ref(&mut self) -> Result<BindingRefSyntax, ParseError> {
+    fn match_binding_ref(&mut self) -> Result<BindingRefSyntax<'a>, ParseError> {
         match self.token() {
             Some(Token::Star) => {
                 self.consume();
@@ -409,7 +409,7 @@ impl<'a> Parser<'a> {
             }
             Some(Token::Word(name)) => {
                 self.consume();
-                Ok(BindingRefSyntax::Name(name.to_string()))
+                Ok(BindingRefSyntax::Name(name))
             }
             Some(Token::LBracket) => {
                 self.consume();
@@ -426,7 +426,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn match_decl(&mut self, err_msg: &str) -> Result<Option<SyntaxDecl>, ParseError> {
+    pub fn match_decl(&mut self, err_msg: &str) -> Result<Option<SyntaxDecl<'a>>, ParseError> {
         loop {
             match self.token() {
                 Some(Token::Word("struct")) => {
@@ -436,7 +436,7 @@ impl<'a> Parser<'a> {
                     err_ctx!(err_msg, self.match_token(Token::LBrace, "expected {"))?;
                     let members = err_ctx!(err_msg, self.match_struct_body())?;
                     return Ok(Some(SyntaxDecl::Struct {
-                        name: name.to_owned(),
+                        name,
                         members,
                         location,
                     }));
@@ -448,7 +448,7 @@ impl<'a> Parser<'a> {
                     err_ctx!(err_msg, self.match_token(Token::LBrace, "expected {"))?;
                     let variants = err_ctx!(err_msg, self.match_enum_body())?;
                     return Ok(Some(SyntaxDecl::Enum {
-                        name: name.to_owned(),
+                        name,
                         variants,
                         location,
                     }));
@@ -461,7 +461,7 @@ impl<'a> Parser<'a> {
                     let what = self.match_ident("type value")?;
                     err_ctx!(err_msg, self.match_token(Token::Semi, "expected ;"))?;
                     return Ok(Some(SyntaxDecl::Alias {
-                        name: name.to_owned(),
+                        name,
                         what,
                         location,
                     }));
@@ -487,7 +487,7 @@ impl<'a> Parser<'a> {
                     }
 
                     return Ok(Some(SyntaxDecl::Module {
-                        name: name.to_owned(),
+                        name,
                         decls,
                         location,
                     }));
@@ -528,7 +528,7 @@ impl<'a> Parser<'a> {
                     };
 
                     return Ok(Some(SyntaxDecl::Function {
-                        name: name.to_owned(),
+                        name,
                         args,
                         rets,
                         bindings,
@@ -549,7 +549,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn match_decls(&mut self) -> Result<Vec<SyntaxDecl>, ParseError> {
+    pub fn match_decls(&mut self) -> Result<Vec<SyntaxDecl<'a>>, ParseError> {
         let mut decls = Vec::new();
         loop {
             match self.match_decl("declaration") {
@@ -561,15 +561,12 @@ impl<'a> Parser<'a> {
         Ok(decls)
     }
 
-    fn match_ident(&mut self, err_msg: &str) -> Result<SyntaxIdent, ParseError> {
+    fn match_ident(&mut self, err_msg: &str) -> Result<SyntaxIdent<'a>, ParseError> {
         match self.token() {
             Some(Token::Word(name)) => {
                 let location = self.location;
                 self.consume();
-                Ok(SyntaxIdent {
-                    name: name.to_string(),
-                    location,
-                })
+                Ok(SyntaxIdent { name, location })
             }
             _ => err_ctx!(err_msg, parse_err!(self.location, "expected identifier")),
         }
@@ -588,7 +585,7 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Struct {
-                name: "foo".to_string(),
+                name: "foo",
                 members: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
@@ -604,11 +601,11 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Struct {
-                name: "foo".to_string(),
+                name: "foo",
                 members: vec![StructMember {
-                    name: "a".to_owned(),
+                    name: "a",
                     type_: SyntaxIdent {
-                        name: "i32".to_owned(),
+                        name: "i32",
                         location: Location {
                             line: 1,
                             column: 15,
@@ -633,11 +630,11 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Struct {
-                name: "foo".to_string(),
+                name: "foo",
                 members: vec![StructMember {
-                    name: "b".to_owned(),
+                    name: "b",
                     type_: SyntaxIdent {
-                        name: "i32".to_owned(),
+                        name: "i32",
                         location: Location {
                             line: 1,
                             column: 15,
@@ -662,12 +659,12 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Struct {
-                name: "c".to_string(),
+                name: "c",
                 members: vec![
                     StructMember {
-                        name: "d".to_owned(),
+                        name: "d",
                         type_: SyntaxIdent {
-                            name: "f64".to_owned(),
+                            name: "f64",
                             location: Location {
                                 line: 1,
                                 column: 14,
@@ -679,9 +676,9 @@ mod tests {
                         },
                     },
                     StructMember {
-                        name: "e".to_owned(),
+                        name: "e",
                         type_: SyntaxIdent {
-                            name: "u8".to_owned(),
+                            name: "u8",
                             location: Location {
                                 line: 1,
                                 column: 22,
@@ -708,12 +705,12 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Struct {
-                name: "foo".to_string(),
+                name: "foo",
                 members: vec![
                     StructMember {
-                        name: "a".to_owned(),
+                        name: "a",
                         type_: SyntaxIdent {
-                            name: "mod".to_owned(),
+                            name: "mod",
                             location: Location {
                                 line: 1,
                                 column: 15,
@@ -725,9 +722,9 @@ mod tests {
                         },
                     },
                     StructMember {
-                        name: "struct".to_owned(),
+                        name: "struct",
                         type_: SyntaxIdent {
-                            name: "enum".to_owned(),
+                            name: "enum",
                             location: Location {
                                 line: 1,
                                 column: 28,
@@ -753,7 +750,7 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Enum {
-                name: "foo".to_owned(),
+                name: "foo",
                 variants: Vec::new(),
                 location: Location { line: 1, column: 0 },
             },
@@ -769,9 +766,9 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Enum {
-                name: "foo".to_owned(),
+                name: "foo",
                 variants: vec![EnumVariant {
-                    name: "first".to_owned(),
+                    name: "first",
                     location: Location {
                         line: 1,
                         column: 10,
@@ -791,9 +788,9 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Enum {
-                name: "bar".to_owned(),
+                name: "bar",
                 variants: vec![EnumVariant {
-                    name: "first".to_owned(),
+                    name: "first",
                     location: Location {
                         line: 1,
                         column: 10,
@@ -814,31 +811,31 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Enum {
-                name: "baz".to_owned(),
+                name: "baz",
                 variants: vec![
                     EnumVariant {
-                        name: "one".to_owned(),
+                        name: "one",
                         location: Location {
                             line: 1,
                             column: 11,
                         },
                     },
                     EnumVariant {
-                        name: "two".to_owned(),
+                        name: "two",
                         location: Location {
                             line: 1,
                             column: 16,
                         },
                     },
                     EnumVariant {
-                        name: "three".to_owned(),
+                        name: "three",
                         location: Location {
                             line: 1,
                             column: 21,
                         },
                     },
                     EnumVariant {
-                        name: "four".to_owned(),
+                        name: "four",
                         location: Location { line: 2, column: 2 },
                     },
                 ],
@@ -857,7 +854,7 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Module {
-                name: "empty".to_owned(),
+                name: "empty",
                 decls: Vec::new(),
                 location: Location { line: 1, column: 0 },
             }
@@ -874,11 +871,11 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Module {
-                name: "one".to_owned(),
+                name: "one",
                 decls: vec![SyntaxDecl::Module {
-                    name: "two".to_owned(),
+                    name: "two",
                     decls: vec![SyntaxDecl::Module {
-                        name: "three".to_owned(),
+                        name: "three",
                         decls: Vec::new(),
                         location: Location {
                             line: 1,
@@ -905,10 +902,10 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Module {
-                name: "one".to_owned(),
+                name: "one",
                 decls: vec![
                     SyntaxDecl::Enum {
-                        name: "foo".to_owned(),
+                        name: "foo",
                         variants: Vec::new(),
                         location: Location {
                             line: 1,
@@ -916,7 +913,7 @@ mod tests {
                         },
                     },
                     SyntaxDecl::Struct {
-                        name: "bar".to_owned(),
+                        name: "bar",
                         members: Vec::new(),
                         location: Location {
                             line: 1,
@@ -932,7 +929,7 @@ mod tests {
     #[test]
     fn fn_trivial() {
         let canonical = vec![SyntaxDecl::Function {
-            name: "trivial".to_owned(),
+            name: "trivial",
             args: Vec::new(),
             rets: Vec::new(),
             bindings: Vec::new(),
@@ -963,19 +960,19 @@ mod tests {
 
     #[test]
     fn fn_return_i32() {
-        fn canonical(column: usize) -> Vec<SyntaxDecl> {
+        fn canonical(column: usize) -> Vec<SyntaxDecl<'static>> {
             vec![SyntaxDecl::Function {
-                name: "getch".to_owned(),
+                name: "getch",
                 args: Vec::new(),
                 rets: vec![FuncArgSyntax {
                     type_: SyntaxIdent {
-                        name: "i32".to_owned(),
+                        name: "i32",
                         location: Location {
                             line: 1,
                             column: column,
                         },
                     },
-                    name: "r".to_owned(),
+                    name: "r",
                     location: Location {
                         line: 1,
                         column: 14,
@@ -1011,16 +1008,16 @@ mod tests {
     #[test]
     fn fn_one_arg() {
         let canonical = SyntaxDecl::Function {
-            name: "foo".to_owned(),
+            name: "foo",
             args: vec![FuncArgSyntax {
                 type_: SyntaxIdent {
-                    name: "i32".to_owned(),
+                    name: "i32",
                     location: Location {
                         line: 1,
                         column: 10,
                     },
                 },
-                name: "a".to_owned(),
+                name: "a",
                 location: Location { line: 1, column: 7 },
             }],
             rets: Vec::new(),
@@ -1048,28 +1045,28 @@ mod tests {
     #[test]
     fn fn_multi_arg() {
         let canonical = SyntaxDecl::Function {
-            name: "foo".to_owned(),
+            name: "foo",
             args: vec![
                 FuncArgSyntax {
                     type_: SyntaxIdent {
-                        name: "i32".to_owned(),
+                        name: "i32",
                         location: Location {
                             line: 1,
                             column: 10,
                         },
                     },
-                    name: "a".to_owned(),
+                    name: "a",
                     location: Location { line: 1, column: 7 },
                 },
                 FuncArgSyntax {
                     type_: SyntaxIdent {
-                        name: "f64".to_owned(),
+                        name: "f64",
                         location: Location {
                             line: 1,
                             column: 18,
                         },
                     },
-                    name: "b".to_owned(),
+                    name: "b",
                     location: Location {
                         line: 1,
                         column: 15,
@@ -1107,18 +1104,18 @@ mod tests {
                 .expect("valid parse")
                 .expect("valid decl"),
             SyntaxDecl::Function {
-                name: "getch".to_owned(),
+                name: "getch",
                 args: Vec::new(),
                 rets: vec![
                     FuncArgSyntax {
                         type_: SyntaxIdent {
-                            name: "i32".to_owned(),
+                            name: "i32",
                             location: Location {
                                 line: 1,
                                 column: 18,
                             }
                         },
-                        name: "r1".to_owned(),
+                        name: "r1",
                         location: Location {
                             line: 1,
                             column: 14,
@@ -1126,13 +1123,13 @@ mod tests {
                     },
                     FuncArgSyntax {
                         type_: SyntaxIdent {
-                            name: "i64".to_owned(),
+                            name: "i64",
                             location: Location {
                                 line: 1,
                                 column: 27
                             }
                         },
-                        name: "r2".to_owned(),
+                        name: "r2",
                         location: Location {
                             line: 1,
                             column: 23,
@@ -1140,13 +1137,13 @@ mod tests {
                     },
                     FuncArgSyntax {
                         type_: SyntaxIdent {
-                            name: "f32".to_owned(),
+                            name: "f32",
                             location: Location {
                                 line: 1,
                                 column: 36
                             }
                         },
-                        name: "r3".to_owned(),
+                        name: "r3",
                         location: Location {
                             line: 1,
                             column: 32,
@@ -1173,16 +1170,16 @@ mod tests {
             .expect("valid parse")
             .expect("valid decl"),
             SyntaxDecl::Function {
-                name: "fgetch".to_owned(),
+                name: "fgetch",
                 args: vec![FuncArgSyntax {
                     type_: SyntaxIdent {
-                        name: "i32".to_owned(),
+                        name: "i32",
                         location: Location {
                             line: 1,
                             column: 16
                         }
                     },
-                    name: "fptr".to_owned(),
+                    name: "fptr",
                     location: Location {
                         line: 1,
                         column: 10,
@@ -1190,13 +1187,13 @@ mod tests {
                 },],
                 rets: vec![FuncArgSyntax {
                     type_: SyntaxIdent {
-                        name: "i32".to_owned(),
+                        name: "i32",
                         location: Location {
                             line: 1,
                             column: 27
                         }
                     },
-                    name: "r".to_owned(),
+                    name: "r",
                     location: Location {
                         line: 1,
                         column: 24,
@@ -1204,31 +1201,29 @@ mod tests {
                 }],
                 bindings: vec![
                     BindingSyntax {
-                        name: "file".to_owned(),
+                        name: "file",
                         type_: SyntaxIdent {
-                            name: "file_t".to_owned(),
+                            name: "file_t",
                             location: Location { line: 2, column: 9 },
                         },
                         direction: BindingDirSyntax::In,
-                        from: BindingRefSyntax::Ptr(Box::new(BindingRefSyntax::Name(
-                            "fptr".to_owned()
-                        ))),
+                        from: BindingRefSyntax::Ptr(Box::new(BindingRefSyntax::Name("fptr"))),
                         location: Location { line: 2, column: 0 },
                     },
                     BindingSyntax {
-                        name: "r".to_owned(),
+                        name: "r",
                         type_: SyntaxIdent {
-                            name: "u8".to_owned(),
+                            name: "u8",
                             location: Location { line: 3, column: 7 },
                         },
                         direction: BindingDirSyntax::Out,
-                        from: BindingRefSyntax::Name("r".to_owned()),
+                        from: BindingRefSyntax::Name("r"),
                         location: Location { line: 3, column: 0 },
                     },
                     BindingSyntax {
-                        name: "some_slice".to_owned(),
+                        name: "some_slice",
                         type_: SyntaxIdent {
-                            name: "something".to_owned(),
+                            name: "something",
                             location: Location {
                                 line: 4,
                                 column: 16
@@ -1236,8 +1231,8 @@ mod tests {
                         },
                         direction: BindingDirSyntax::Out,
                         from: BindingRefSyntax::Slice(
-                            Box::new(BindingRefSyntax::Name("a".to_owned())),
-                            Box::new(BindingRefSyntax::Name("b".to_owned()))
+                            Box::new(BindingRefSyntax::Name("a")),
+                            Box::new(BindingRefSyntax::Name("b"))
                         ),
                         location: Location { line: 4, column: 0 },
                     }

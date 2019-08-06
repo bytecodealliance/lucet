@@ -72,7 +72,7 @@ struct FuncValidator<'a> {
     // Ret positions index into this vector:
     rets: PrimaryMap<RetIx, ParamRepr>,
     // binding name to
-    binding_names: HashMap<String, (Location, BindingIx)>,
+    binding_names: HashMap<&'a str, (Location, BindingIx)>,
     // param position to binding syntax
     bindings: PrimaryMap<BindingIx, BindingRepr>,
     param_binding_sites: HashMap<ParamIx, Location>,
@@ -98,26 +98,23 @@ impl<'a> FuncValidator<'a> {
         arg_syntax: &FuncArgSyntax,
         position: ParamIx,
     ) -> Result<ParamRepr, ValidationError> {
-        if let Some((previous_location, _)) = self.param_names.get(&arg_syntax.name) {
+        if let Some((previous_location, _)) = self.param_names.get(arg_syntax.name) {
             Err(ValidationError::NameAlreadyExists {
-                name: arg_syntax.name.clone(),
+                name: arg_syntax.name.to_owned(),
                 at_location: arg_syntax.location,
                 previous_location: previous_location.clone(),
             })?;
         } else {
-            self.param_names.insert(
-                arg_syntax.name.clone(),
-                (arg_syntax.location.clone(), position),
-            );
+            self.param_names
+                .insert(arg_syntax.name.to_owned(), (arg_syntax.location, position));
         }
-        let type_ = AbiType::try_from(arg_syntax.type_.name.as_str()).map_err(|_| {
-            ValidationError::Syntax {
+        let type_ =
+            AbiType::try_from(arg_syntax.type_.name).map_err(|_| ValidationError::Syntax {
                 expected: "abi type",
                 location: arg_syntax.type_.location,
-            }
-        })?;
+            })?;
         Ok(ParamRepr {
-            name: arg_syntax.name.clone(),
+            name: arg_syntax.name.to_owned(),
             type_,
         })
     }
@@ -135,7 +132,7 @@ impl<'a> FuncValidator<'a> {
         if rets.len() > 1 {
             Err(ValidationError::Syntax {
                 expected: "at most one return value",
-                location: self.location.clone(),
+                location: *self.location,
             })?
         }
         for (ix, r) in rets.iter().enumerate() {
@@ -147,7 +144,10 @@ impl<'a> FuncValidator<'a> {
         Ok(())
     }
 
-    fn introduce_bindings(&mut self, bindings: &[BindingSyntax]) -> Result<(), ValidationError> {
+    fn introduce_bindings(
+        &mut self,
+        bindings: &[BindingSyntax<'a>],
+    ) -> Result<(), ValidationError> {
         for (ix, binding) in bindings.iter().enumerate() {
             let ix = BindingIx::new(ix);
             let b = self.introduce_binding(binding, ix)?;
@@ -173,19 +173,19 @@ impl<'a> FuncValidator<'a> {
 
     fn introduce_binding(
         &mut self,
-        binding: &BindingSyntax,
+        binding: &BindingSyntax<'a>,
         ix: BindingIx,
     ) -> Result<BindingRepr, ValidationError> {
         // 1. make sure binding name is unique
         if let Some((previous_location, _)) = self.binding_names.get(&binding.name) {
             Err(ValidationError::NameAlreadyExists {
-                name: binding.name.clone(),
+                name: binding.name.to_owned(),
                 at_location: binding.location,
                 previous_location: previous_location.clone(),
             })?;
         } else {
             self.binding_names
-                .insert(binding.name.clone(), (binding.location.clone(), ix));
+                .insert(binding.name, (binding.location, ix));
         }
 
         // 2. resolve type_ SyntaxIdent to a Datatype
@@ -207,7 +207,7 @@ impl<'a> FuncValidator<'a> {
         };
 
         Ok(BindingRepr {
-            name: binding.name.clone(),
+            name: binding.name.to_owned(),
             type_: type_.id(),
             direction,
             from,
@@ -222,7 +222,7 @@ impl<'a> FuncValidator<'a> {
         // 1. make sure binding name is unique. We're re-using the arg name
         // for the binding. If another binding overlapped with the arg name,
         // it is now at fault. (complicated, huh... :/)
-        if let Some((previous_location, _)) = self.binding_names.get(&arg.name) {
+        if let Some((previous_location, _)) = self.binding_names.get(arg.name.as_str()) {
             let (arg_location, _) = self.param_names.get(&arg.name).expect("arg introduced");
             Err(ValidationError::BindingNameAlreadyBound {
                 name: arg.name.clone(),
@@ -251,7 +251,7 @@ impl<'a> FuncValidator<'a> {
         })
     }
 
-    fn get_arg(&self, arg_name: &String) -> Option<(ParamIx, ParamRepr)> {
+    fn get_arg(&self, arg_name: &str) -> Option<(ParamIx, ParamRepr)> {
         let (_, position) = self.param_names.get(arg_name)?;
         match position {
             ParamIx::Arg(ix) => Some((
@@ -267,7 +267,7 @@ impl<'a> FuncValidator<'a> {
 
     fn validate_binding_arg_mapping(
         &mut self,
-        name: &String,
+        name: &str,
         location: &Location,
     ) -> Result<(ParamIx, ParamRepr), ValidationError> {
         // Check that it refers to a valid arg:
@@ -278,7 +278,7 @@ impl<'a> FuncValidator<'a> {
         // Check that the arg has only been used once:
         if let Some(use_location) = self.param_binding_sites.get(&position) {
             Err(ValidationError::BindingNameAlreadyBound {
-                name: name.clone(),
+                name: name.to_owned(),
                 at_location: location.clone(),
                 bound_location: use_location.clone(),
             })?;
