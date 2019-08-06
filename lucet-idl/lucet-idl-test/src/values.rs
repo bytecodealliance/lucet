@@ -1,7 +1,7 @@
 use heck::CamelCase;
 use lucet_idl::{
-    AliasDataType, AtomType, BindingRef, DataTypeRef, DataTypeVariant, EnumDataType, FuncBinding,
-    FuncDecl, Module, Named, StructDataType, StructMember,
+    AliasDatatype, AtomType, BindingDirection, BindingParam, Datatype, DatatypeVariant,
+    EnumDatatype, FuncBinding, Function, Module, StructDatatype, StructMember,
 };
 use proptest::prelude::*;
 
@@ -60,11 +60,17 @@ pub struct EnumVal {
 }
 
 impl EnumVal {
-    pub fn strat(enum_datatype: &Named<EnumDataType>) -> impl Strategy<Value = Self> {
-        let name = enum_datatype.name.name.clone();
-        prop::sample::select(enum_datatype.entity.members.clone()).prop_map(move |mem| EnumVal {
+    pub fn strat(enum_datatype: &EnumDatatype) -> impl Strategy<Value = Self> {
+        let name = enum_datatype.name().to_owned();
+        prop::sample::select(
+            enum_datatype
+                .variants()
+                .map(|v| v.name().to_owned())
+                .collect::<Vec<String>>(),
+        )
+        .prop_map(move |mem_name| EnumVal {
             enum_name: name.clone(),
-            member_name: mem.name,
+            member_name: mem_name.clone(),
         })
     }
     pub fn render_rustval(&self) -> String {
@@ -83,13 +89,11 @@ pub struct StructVal {
 }
 
 impl StructVal {
-    pub fn strat(struct_dt: &Named<StructDataType>, module: &Module) -> BoxedStrategy<Self> {
-        let name = struct_dt.name.name.clone();
+    pub fn strat(struct_dt: &StructDatatype) -> BoxedStrategy<Self> {
+        let name = struct_dt.name().to_owned();
         let member_strats: Vec<BoxedStrategy<StructMemberVal>> = struct_dt
-            .entity
-            .members
-            .iter()
-            .map(|m| StructMemberVal::strat(m, module))
+            .members()
+            .map(|m| StructMemberVal::strat(&m))
             .collect();
         member_strats
             .prop_map(move |members| StructVal {
@@ -115,14 +119,15 @@ impl StructVal {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructMemberVal {
     pub name: String,
-    pub value: Box<DataTypeVal>,
+    pub value: Box<DatatypeVal>,
 }
 
 impl StructMemberVal {
-    pub fn strat(struct_member: &StructMember, module: &Module) -> BoxedStrategy<Self> {
-        let name = struct_member.name.clone();
-        module
-            .datatype_strat(&struct_member.type_)
+    pub fn strat(struct_member: &StructMember) -> BoxedStrategy<Self> {
+        let name = struct_member.name().to_owned();
+        struct_member
+            .type_()
+            .strat()
             .prop_map(move |value| StructMemberVal {
                 name: name.clone(),
                 value: Box::new(value),
@@ -134,14 +139,15 @@ impl StructMemberVal {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AliasVal {
     pub name: String,
-    pub value: Box<DataTypeVal>,
+    pub value: Box<DatatypeVal>,
 }
 
 impl AliasVal {
-    pub fn strat(alias_dt: &Named<AliasDataType>, module: &Module) -> BoxedStrategy<Self> {
-        let name = alias_dt.name.name.clone();
-        module
-            .datatype_strat(&alias_dt.entity.to)
+    pub fn strat(alias_dt: &AliasDatatype) -> BoxedStrategy<Self> {
+        let name = alias_dt.name().to_owned();
+        alias_dt
+            .to()
+            .strat()
             .prop_map(move |value| AliasVal {
                 name: name.clone(),
                 value: Box::new(value),
@@ -154,57 +160,42 @@ impl AliasVal {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum DataTypeVal {
+pub enum DatatypeVal {
     Enum(EnumVal),
     Struct(StructVal),
     Alias(AliasVal),
     Atom(AtomVal),
 }
 
-impl DataTypeVal {
+impl DatatypeVal {
     pub fn render_rustval(&self) -> String {
         match self {
-            DataTypeVal::Enum(a) => a.render_rustval(),
-            DataTypeVal::Struct(a) => a.render_rustval(),
-            DataTypeVal::Alias(a) => a.render_rustval(),
-            DataTypeVal::Atom(a) => a.render_rustval(),
+            DatatypeVal::Enum(a) => a.render_rustval(),
+            DatatypeVal::Struct(a) => a.render_rustval(),
+            DatatypeVal::Alias(a) => a.render_rustval(),
+            DatatypeVal::Atom(a) => a.render_rustval(),
         }
     }
 }
 
-pub trait ModuleExt {
-    fn datatype_strat(&self, dtref: &DataTypeRef) -> BoxedStrategy<DataTypeVal>;
-    fn function_strat(&self) -> BoxedStrategy<FuncDecl>;
+pub trait DatatypeExt {
+    fn strat(&self) -> BoxedStrategy<DatatypeVal>;
 }
 
-impl ModuleExt for Module {
-    fn datatype_strat(&self, dtref: &DataTypeRef) -> BoxedStrategy<DataTypeVal> {
-        match dtref {
-            DataTypeRef::Defined(ident) => {
-                let dt = self.get_datatype(*ident).expect("ref to defined datatype");
-                match dt.entity.variant {
-                    DataTypeVariant::Struct(ref struct_dt) => {
-                        StructVal::strat(&dt.using_name(struct_dt), self)
-                            .prop_map(DataTypeVal::Struct)
-                            .boxed()
-                    }
-                    DataTypeVariant::Enum(ref enum_dt) => EnumVal::strat(&dt.using_name(enum_dt))
-                        .prop_map(DataTypeVal::Enum)
-                        .boxed(),
-                    DataTypeVariant::Alias(ref alias_dt) => {
-                        AliasVal::strat(&dt.using_name(alias_dt), self)
-                            .prop_map(DataTypeVal::Alias)
-                            .boxed()
-                    }
-                }
+impl<'a> DatatypeExt for Datatype<'a> {
+    fn strat(&self) -> BoxedStrategy<DatatypeVal> {
+        match self.variant() {
+            DatatypeVariant::Struct(ref struct_dt) => StructVal::strat(struct_dt)
+                .prop_map(DatatypeVal::Struct)
+                .boxed(),
+            DatatypeVariant::Enum(ref enum_dt) => {
+                EnumVal::strat(enum_dt).prop_map(DatatypeVal::Enum).boxed()
             }
-            DataTypeRef::Atom(a) => AtomVal::strat(&a).prop_map(DataTypeVal::Atom).boxed(),
+            DatatypeVariant::Alias(ref alias_dt) => AliasVal::strat(alias_dt)
+                .prop_map(DatatypeVal::Alias)
+                .boxed(),
+            DatatypeVariant::Atom(a) => AtomVal::strat(&a).prop_map(DatatypeVal::Atom).boxed(),
         }
-    }
-
-    fn function_strat(&self) -> BoxedStrategy<FuncDecl> {
-        let decls = self.funcs.values().cloned().collect::<Vec<FuncDecl>>();
-        prop::sample::select(decls).boxed()
     }
 }
 
@@ -217,40 +208,40 @@ pub struct BindingVal {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BindingValVariant {
-    Value(DataTypeVal),
-    Ptr(DataTypeVal),
-    Array(Vec<DataTypeVal>),
+    Value(DatatypeVal),
+    Ptr(DatatypeVal),
+    Array(Vec<DatatypeVal>),
 }
 
 impl BindingVal {
-    fn binding_strat(module: &Module, binding: &FuncBinding, mutable: bool) -> BoxedStrategy<Self> {
-        let name = binding.name.clone();
-        match binding.from {
-            BindingRef::Value(_) => module
-                .datatype_strat(&binding.type_)
+    fn binding_strat(binding: &FuncBinding, mutable: bool) -> BoxedStrategy<Self> {
+        let name = binding.name().to_owned();
+        match binding.param() {
+            BindingParam::Value(_) => binding
+                .type_()
+                .strat()
                 .prop_map(move |v| BindingVal {
                     name: name.clone(),
                     mutable,
                     variant: BindingValVariant::Value(v),
                 })
                 .boxed(),
-            BindingRef::Ptr(_) => module
-                .datatype_strat(&binding.type_)
+            BindingParam::Ptr(_) => binding
+                .type_()
+                .strat()
                 .prop_map(move |v| BindingVal {
                     name: name.clone(),
                     mutable,
                     variant: BindingValVariant::Ptr(v),
                 })
                 .boxed(),
-            BindingRef::Slice(_, _) => {
-                prop::collection::vec(module.datatype_strat(&binding.type_), 100)
-                    .prop_map(move |v| BindingVal {
-                        name: name.clone(),
-                        mutable,
-                        variant: BindingValVariant::Array(v),
-                    })
-                    .boxed()
-            }
+            BindingParam::Slice(_, _) => prop::collection::vec(binding.type_().strat(), 100)
+                .prop_map(move |v| BindingVal {
+                    name: name.clone(),
+                    mutable,
+                    variant: BindingValVariant::Array(v),
+                })
+                .boxed(),
         }
     }
     fn render_rust_binding(&self) -> String {
@@ -292,41 +283,39 @@ impl BindingVal {
 }
 
 #[derive(Debug, Clone)]
-pub struct FuncCallPredicate {
-    func: FuncDecl,
+pub struct FuncCallPredicate<'a> {
+    func: &'a Function<'a>,
     pre: Vec<BindingVal>,
     post: Vec<BindingVal>,
 }
 
-impl FuncCallPredicate {
-    pub fn strat(module: &Module, func: &FuncDecl) -> BoxedStrategy<FuncCallPredicate> {
+impl<'a> FuncCallPredicate<'a> {
+    pub fn strat(func: &Function<'a>) -> BoxedStrategy<FuncCallPredicate<'a>> {
         let mut pre_strat: Vec<BoxedStrategy<BindingVal>> = func
-            .in_bindings
-            .iter()
-            .map(|binding| BindingVal::binding_strat(module, binding, false))
+            .bindings()
+            .filter(|b| b.direction() == BindingDirection::In)
+            .map(|binding| BindingVal::binding_strat(&binding, false))
             .collect();
 
         pre_strat.append(
             &mut func
-                .inout_bindings
-                .iter()
-                .map(|binding| BindingVal::binding_strat(module, binding, true))
+                .bindings()
+                .filter(|b| b.direction() == BindingDirection::InOut)
+                .map(|binding| BindingVal::binding_strat(&binding, true))
                 .collect(),
         );
         let post_strat: Vec<BoxedStrategy<BindingVal>> = func
-            .inout_bindings
-            .iter()
-            .chain(func.out_bindings.iter())
-            .map(|binding| BindingVal::binding_strat(module, binding, false))
+            .bindings()
+            .filter(|b| b.direction() == BindingDirection::InOut)
+            .chain(
+                func.bindings()
+                    .filter(|b| b.direction() == BindingDirection::Out),
+            )
+            .map(|binding| BindingVal::binding_strat(&binding, false))
             .collect();
 
-        let func = func.clone();
         (pre_strat, post_strat)
-            .prop_map(move |(pre, post)| FuncCallPredicate {
-                pre,
-                post,
-                func: func.clone(),
-            })
+            .prop_map(move |(pre, post)| FuncCallPredicate { pre, post, func })
             .boxed()
     }
 
@@ -338,18 +327,26 @@ impl FuncCallPredicate {
             .collect();
 
         let mut arg_syntax = Vec::new();
-        for in_binding in self.func.in_bindings.iter() {
-            arg_syntax.push(match in_binding.from {
-                BindingRef::Ptr(_) => format!("&{}", in_binding.name),
-                BindingRef::Slice(_, _) => format!("&{}", in_binding.name),
-                BindingRef::Value(_) => in_binding.name.clone(),
+        for in_binding in self
+            .func
+            .bindings()
+            .filter(|b| b.direction() == BindingDirection::In)
+        {
+            arg_syntax.push(match in_binding.param() {
+                BindingParam::Ptr(_) => format!("&{}", in_binding.name()),
+                BindingParam::Slice(_, _) => format!("&{}", in_binding.name()),
+                BindingParam::Value(_) => in_binding.name().to_owned(),
             })
         }
-        for io_binding in self.func.inout_bindings.iter() {
-            arg_syntax.push(match io_binding.from {
-                BindingRef::Ptr(_) => format!("&mut {}", io_binding.name),
-                BindingRef::Slice(_, _) => format!("&mut {}", io_binding.name),
-                BindingRef::Value(_) => unreachable!("should be no such thing as an io value"),
+        for io_binding in self
+            .func
+            .bindings()
+            .filter(|b| b.direction() == BindingDirection::InOut)
+        {
+            arg_syntax.push(match io_binding.param() {
+                BindingParam::Ptr(_) => format!("&mut {}", io_binding.name()),
+                BindingParam::Slice(_, _) => format!("&mut {}", io_binding.name()),
+                BindingParam::Value(_) => unreachable!("should be no such thing as an io value"),
             })
         }
 
@@ -357,13 +354,13 @@ impl FuncCallPredicate {
             "let {} = {}({});",
             render_tuple(
                 self.func
-                    .out_bindings
-                    .iter()
-                    .map(|b| b.name.clone())
+                    .bindings()
+                    .filter(|b| b.direction() == BindingDirection::In)
+                    .map(|b| b.name().to_owned())
                     .collect::<Vec<String>>(),
                 "_"
             ),
-            self.func.field_name,
+            self.func.name(),
             arg_syntax.join(",")
         ));
         lines.append(
@@ -402,10 +399,11 @@ impl FuncCallPredicate {
         lines.push("struct TestHarness;".to_owned());
         lines.push(format!(
             "impl {} for TesHarnesst {{",
-            module.module_name.to_camel_case()
+            module.name().to_camel_case()
         ));
-        for func in module.func_decls() {
-            let func = func.entity;
+        for func in module.functions() {
+            lines.push(format!("/* FIXME: method {} */", func.name()));
+            /*
             let mut args: Vec<String> = Vec::new();
             for input in func.in_bindings.iter() {}
             let mut rets = Vec::new();
@@ -421,6 +419,7 @@ impl FuncCallPredicate {
                 lines.push("panic!(\"should not be called\")".to_owned());
             }
             lines.push("}".to_owned());
+            */
         }
         lines.push("}".to_owned());
         lines

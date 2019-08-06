@@ -52,7 +52,7 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
         Backend::CGuest => CGenerator::new(output).generate_guest(package)?,
         Backend::RustGuest => RustGenerator::new(output).generate_guest(package)?,
         Backend::RustHost => RustGenerator::new(output).generate_host(package)?,
-        Backend::Bindings => generate_bindings(&create_bindings(package), output)?,
+        Backend::Bindings => generate_bindings(&package.bindings(), output)?,
     }
     Ok(())
 }
@@ -62,16 +62,18 @@ pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), I
     codegen(&pkg, config, output)
 }
 
-fn create_bindings(package: &Package) -> Bindings {
-    let mut bs = HashMap::new();
-    for m in package.modules() {
-        let mut mod_bs = HashMap::new();
-        for f in m.functions() {
-            mod_bs.insert(f.name().to_owned(), f.host_func_name());
+impl Package {
+    pub fn bindings(&self) -> Bindings {
+        let mut bs = HashMap::new();
+        for m in self.modules() {
+            let mut mod_bs = HashMap::new();
+            for f in m.functions() {
+                mod_bs.insert(f.name().to_owned(), f.host_func_name());
+            }
+            bs.insert(m.name().to_owned(), mod_bs);
         }
-        bs.insert(m.name().to_owned(), mod_bs);
+        Bindings::new(bs)
     }
-    Bindings::new(bs)
 }
 
 fn generate_bindings(bindings: &Bindings, mut output: Box<dyn Write>) -> Result<(), IDLError> {

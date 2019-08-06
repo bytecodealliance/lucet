@@ -329,6 +329,7 @@ impl<'a> From<EnumDatatype<'a>> for Datatype<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct EnumMember<'a> {
     enum_: EnumDatatype<'a>,
     index: usize,
