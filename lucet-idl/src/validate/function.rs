@@ -336,7 +336,7 @@ impl<'a> FuncValidator<'a> {
                         if ptr_arg.type_ != AbiType::I32 {
                             Err(ValidationError::BindingTypeError {
                                 expected: "slice pointer must be i32",
-                                location: binding.location.clone(),
+                                location: binding.location,
                             })?;
                         }
                         let (len_position, len_arg) =
@@ -344,7 +344,7 @@ impl<'a> FuncValidator<'a> {
                         if len_arg.type_ != AbiType::I32 {
                             Err(ValidationError::BindingTypeError {
                                 expected: "slice len must be i32",
-                                location: binding.location.clone(),
+                                location: binding.location,
                             })?;
                         }
                         match (&ptr_position, &len_position) {
@@ -352,9 +352,15 @@ impl<'a> FuncValidator<'a> {
                             _ => {
                                 Err(ValidationError::BindingTypeError {
                                     expected: "slice bindings must be inputs",
-                                    location: binding.location.clone(),
+                                    location: binding.location,
                                 })?;
                             }
+                        }
+                        if binding.direction == BindingDirSyntax::Out {
+                            Err(ValidationError::BindingTypeError {
+                                expected: "slice bindings must be in or inout",
+                                location: binding.location,
+                            })?;
                         }
                         Ok(BindingFromRepr::Slice(ptr_position, len_position))
                     }
