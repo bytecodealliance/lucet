@@ -60,7 +60,7 @@ fn wasi_sysroot() -> PathBuf {
         Err(_) => {
             let mut path = wasi_sdk();
             path.push("share");
-            path.push("sysroot");
+            path.push("wasi-sysroot");
             path
         }
     }
