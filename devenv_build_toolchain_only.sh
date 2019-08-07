@@ -28,7 +28,7 @@ docker exec lucet tar c -pf - -C /opt lucet |
 
 docker exec lucet-toolchain mkdir /opt/wasi-sysroot
 
-docker exec lucet tar c -pf - -C /opt/wasi-sdk/share/sysroot . |
+docker exec lucet tar c -pf - -C /opt/wasi-sdk/share/wasi-sysroot . |
         docker exec -i lucet-toolchain tar x -pf - -C /opt/wasi-sysroot
 
 docker exec lucet-toolchain sh -c 'rm -f /opt/lucet/bin/wasm32-*'

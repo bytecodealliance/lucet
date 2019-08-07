@@ -15,7 +15,7 @@ fn wasi_sysroot() -> PathBuf {
         Err(_) => {
             let mut path = wasi_sdk();
             path.push("share");
-            path.push("sysroot");
+            path.push("wasi-sysroot");
             path
         }
     }
@@ -28,7 +28,7 @@ fn wasm_clang_root() -> PathBuf {
             let mut path = wasi_sdk();
             path.push("lib");
             path.push("clang");
-            path.push("8.0.0");
+            path.push("8.0.1");
             path
         }
     }

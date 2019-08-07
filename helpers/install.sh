@@ -70,7 +70,7 @@ if ! install -d "$LUCET_PREFIX" 2>/dev/null; then
 fi
 
 # Find a WASI sysroot
-for wasi_sysroot in $WASI_SYSROOT ${WASI_SDK_PREFIX}/share/sysroot /opt/wasi-sysroot; do
+for wasi_sysroot in $WASI_SYSROOT ${WASI_SDK_PREFIX}/share/wasi-sysroot /opt/wasi-sysroot; do
     if [ -e "${wasi_sysroot}/include/wasi/core.h" ]; then
         WASI_SYSROOT="$wasi_sysroot"
     fi
