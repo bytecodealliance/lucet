@@ -302,17 +302,17 @@ pub struct EnumDatatype<'a> {
 }
 
 impl<'a> EnumDatatype<'a> {
-    pub fn variants(&self) -> impl Iterator<Item = EnumMember<'a>> {
+    pub fn variants(&self) -> impl Iterator<Item = EnumVariant<'a>> {
         let enum_ = self.clone();
         (0..self.repr.members.len())
             .into_iter()
-            .map(move |ix| EnumMember {
+            .map(move |ix| EnumVariant {
                 enum_: enum_.clone(),
                 index: ix,
             })
     }
 
-    pub fn variant(&self, name: &str) -> Option<EnumMember<'a>> {
+    pub fn variant(&self, name: &str) -> Option<EnumVariant<'a>> {
         self.variants().find(|v| v.name() == name)
     }
 }
@@ -331,12 +331,12 @@ impl<'a> From<EnumDatatype<'a>> for Datatype<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct EnumMember<'a> {
+pub struct EnumVariant<'a> {
     enum_: EnumDatatype<'a>,
     index: usize,
 }
 
-impl<'a> EnumMember<'a> {
+impl<'a> EnumVariant<'a> {
     pub fn enum_(&self) -> EnumDatatype<'a> {
         self.enum_.clone()
     }
@@ -461,6 +461,15 @@ impl<'a> Function<'a> {
             pkg: self.pkg,
             ix: self.id.module,
         }
+    }
+
+    pub fn host_func_name(&self) -> String {
+        use heck::SnakeCase;
+        format!(
+            "__{}_{}",
+            self.module().name().to_snake_case(),
+            self.name().to_snake_case()
+        )
     }
 }
 

@@ -16,10 +16,17 @@ mod repr;
 mod rust;
 mod validate;
 
+pub use crate::atoms::{AbiType, AtomType};
 pub use crate::config::{Backend, Config};
-pub use crate::cursor::*;
+pub use crate::cursor::{
+    AliasDatatype, BindingDirection, BindingParam, Datatype, DatatypeVariant, EnumDatatype,
+    EnumVariant, FuncBinding, FuncParam, Function, Module, Package, ParamPosition, StructDatatype,
+    StructMember,
+};
 pub use crate::error::{IDLError, ValidationError};
-pub use crate::{AbiType, AtomType};
+pub use crate::rust::{
+    RustFunc, RustIdiomArg, RustIdiomRet, RustName, RustTupleSyntax, RustTypeName,
+};
 
 use crate::c::CGenerator;
 use crate::parser::Parser;

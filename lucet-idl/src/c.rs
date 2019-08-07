@@ -245,7 +245,7 @@ impl CGenerator {
     }
 }
 
-trait CTypeName {
+pub trait CTypeName {
     fn c_type_name(&self) -> String;
 }
 
