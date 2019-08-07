@@ -174,7 +174,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             }
             SignalBehavior::Terminate => {
                 // set the state before jumping back to the host context
-                inst.state = State::Terminated {
+                inst.state = State::Terminating {
                     details: TerminationDetails::Signal,
                 };
                 true
@@ -193,7 +193,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                     && !inst.alloc.addr_in_heap_guard(siginfo.si_addr_ext());
 
                 // record the fault and jump back to the host context
-                inst.state = State::Fault {
+                inst.state = State::Faulted {
                     details: FaultDetails {
                         fatal: unknown_fault || outside_guard,
                         trapcode: trapcode,

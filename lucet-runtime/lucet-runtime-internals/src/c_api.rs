@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 
-pub use self::lucet_state::*;
+pub use self::lucet_result::*;
 pub use self::lucet_val::*;
 
 use crate::alloc::Limits;
@@ -85,6 +85,12 @@ pub enum lucet_error {
 
 impl From<Error> for lucet_error {
     fn from(e: Error) -> lucet_error {
+        lucet_error::from(&e)
+    }
+}
+
+impl From<&Error> for lucet_error {
+    fn from(e: &Error) -> lucet_error {
         match e {
             Error::InvalidArgument(_) => lucet_error::InvalidArgument,
             Error::RegionFull(_) => lucet_error::RegionFull,
@@ -196,7 +202,7 @@ impl From<&lucet_signal_behavior> for SignalBehavior {
 
 pub type lucet_signal_handler = unsafe extern "C" fn(
     inst: *mut lucet_instance,
-    trap: lucet_state::lucet_trapcode,
+    trap: lucet_result::lucet_trapcode,
     signum: c_int,
     siginfo: *const libc::siginfo_t,
     context: *const c_void,
@@ -218,86 +224,83 @@ pub struct CYieldedVal {
 unsafe impl Send for CYieldedVal {}
 unsafe impl Sync for CYieldedVal {}
 
-pub mod lucet_state {
+pub mod lucet_result {
+    use super::lucet_error;
     use crate::c_api::{lucet_val, CTerminationDetails, CYieldedVal};
-    use crate::instance::{State, TerminationDetails};
+    use crate::error::Error;
+    use crate::instance::{RunResult, TerminationDetails};
     use crate::module::{AddrDetails, TrapCode};
-    use crate::sysdeps::UContext;
-    use libc::{c_char, c_void};
+    use libc::{c_uchar, c_void};
     use num_derive::FromPrimitive;
     use std::ffi::CString;
     use std::ptr;
 
-    impl From<&State> for lucet_state {
-        fn from(state: &State) -> lucet_state {
-            match state {
-                State::Ready { retval } => lucet_state {
-                    tag: lucet_state_tag::Returned,
-                    val: lucet_state_val {
+    impl From<Result<RunResult, Error>> for lucet_result {
+        fn from(res: Result<RunResult, Error>) -> lucet_result {
+            match res {
+                Ok(RunResult::Returned(retval)) => lucet_result {
+                    tag: lucet_result_tag::Returned,
+                    val: lucet_result_val {
                         returned: retval.into(),
                     },
                 },
-                State::Running => lucet_state {
-                    tag: lucet_state_tag::Running,
-                    val: lucet_state_val { running: true },
-                },
-                State::Fault {
-                    details,
-                    siginfo,
-                    context,
-                } => lucet_state {
-                    tag: lucet_state_tag::Fault,
-                    val: lucet_state_val {
-                        fault: lucet_runtime_fault {
-                            fatal: details.fatal,
-                            trapcode: details.trapcode.into(),
-                            rip_addr: details.rip_addr,
-                            rip_addr_details: (&details.rip_addr_details).into(),
-                            signal_info: *siginfo,
-                            context: *context,
+                Ok(RunResult::Yielded(val)) => lucet_result {
+                    tag: lucet_result_tag::Yielded,
+                    val: lucet_result_val {
+                        yielded: lucet_yielded {
+                            val: val
+                                .downcast_ref()
+                                .map(|CYieldedVal { val }| *val)
+                                .unwrap_or(ptr::null_mut()),
                         },
                     },
                 },
-                State::Terminated { details } => lucet_state {
-                    tag: lucet_state_tag::Terminated,
-                    val: lucet_state_val {
+                // TODO: test this path; currently our C API tests don't include any faulting tests
+                Err(Error::RuntimeFault(details)) => lucet_result {
+                    tag: lucet_result_tag::Faulted,
+                    val: lucet_result_val {
+                        fault: lucet_runtime_faulted {
+                            fatal: details.fatal,
+                            trapcode: details.trapcode.into(),
+                            rip_addr: details.rip_addr,
+                            rip_addr_details: details.rip_addr_details.into(),
+                        },
+                    },
+                },
+                // TODO: test this path; currently our C API tests don't include any terminating tests
+                Err(Error::RuntimeTerminated(details)) => lucet_result {
+                    tag: lucet_result_tag::Terminated,
+                    val: lucet_result_val {
                         terminated: match details {
                             TerminationDetails::Signal => lucet_terminated {
                                 reason: lucet_terminated_reason::Signal,
-                                provided: std::ptr::null_mut(),
+                                provided: ptr::null_mut(),
                             },
                             TerminationDetails::CtxNotFound => lucet_terminated {
                                 reason: lucet_terminated_reason::CtxNotFound,
-                                provided: std::ptr::null_mut(),
+                                provided: ptr::null_mut(),
                             },
                             TerminationDetails::YieldTypeMismatch => lucet_terminated {
                                 reason: lucet_terminated_reason::YieldTypeMismatch,
-                                provided: std::ptr::null_mut(),
+                                provided: ptr::null_mut(),
                             },
                             TerminationDetails::BorrowError(_) => lucet_terminated {
                                 reason: lucet_terminated_reason::BorrowError,
-                                provided: std::ptr::null_mut(),
+                                provided: ptr::null_mut(),
                             },
                             TerminationDetails::Provided(p) => lucet_terminated {
                                 reason: lucet_terminated_reason::Provided,
                                 provided: p
                                     .downcast_ref()
                                     .map(|CTerminationDetails { details }| *details)
-                                    .unwrap_or(std::ptr::null_mut()),
+                                    .unwrap_or(ptr::null_mut()),
                             },
                         },
                     },
                 },
-                State::Yielded { val, .. } => lucet_state {
-                    tag: lucet_state_tag::Yielded,
-                    val: lucet_state_val {
-                        yielded: lucet_yielded {
-                            val: val
-                                .downcast_ref()
-                                .map(|CYieldedVal { val }| *val)
-                                .unwrap_or(std::ptr::null_mut()),
-                        },
-                    },
+                Err(e) => lucet_result {
+                    tag: lucet_result_tag::Errored,
+                    val: lucet_result_val { errored: e.into() },
                 },
             }
         }
@@ -305,30 +308,29 @@ pub mod lucet_state {
 
     #[repr(C)]
     #[derive(Clone, Copy)]
-    pub struct lucet_state {
-        pub tag: lucet_state_tag,
-        pub val: lucet_state_val,
+    pub struct lucet_result {
+        pub tag: lucet_result_tag,
+        pub val: lucet_result_val,
     }
 
     #[repr(C)]
     #[derive(Clone, Copy, Debug, FromPrimitive)]
-    pub enum lucet_state_tag {
+    pub enum lucet_result_tag {
         Returned,
-        Running,
-        Fault,
-        Terminated,
         Yielded,
+        Faulted,
+        Terminated,
+        Errored,
     }
 
     #[repr(C)]
     #[derive(Clone, Copy)]
-    pub union lucet_state_val {
+    pub union lucet_result_val {
         pub returned: lucet_val::lucet_untyped_retval,
-        // no meaning to this boolean, it's just there so the type is FFI-safe
-        pub running: bool,
-        pub fault: lucet_runtime_fault,
-        pub terminated: lucet_terminated,
         pub yielded: lucet_yielded,
+        pub fault: lucet_runtime_faulted,
+        pub terminated: lucet_terminated,
+        pub errored: lucet_error,
     }
 
     #[repr(C)]
@@ -356,13 +358,11 @@ pub mod lucet_state {
 
     #[repr(C)]
     #[derive(Clone, Copy)]
-    pub struct lucet_runtime_fault {
+    pub struct lucet_runtime_faulted {
         pub fatal: bool,
         pub trapcode: lucet_trapcode,
         pub rip_addr: libc::uintptr_t,
         pub rip_addr_details: lucet_module_addr_details,
-        pub signal_info: libc::siginfo_t,
-        pub context: UContext,
     }
 
     #[repr(C)]
@@ -410,13 +410,17 @@ pub mod lucet_state {
         }
     }
 
+    const ADDR_DETAILS_NAME_LEN: usize = 256;
+
+    /// Half a kilobyte is too substantial for `Copy`, but we must have it because [unions with
+    /// non-`Copy` fields are unstable](https://github.com/rust-lang/rust/issues/32836).
     #[repr(C)]
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy)]
     pub struct lucet_module_addr_details {
         pub module_code_resolvable: bool,
         pub in_module_code: bool,
-        pub file_name: *const c_char,
-        pub sym_name: *const c_char,
+        pub file_name: [c_uchar; ADDR_DETAILS_NAME_LEN],
+        pub sym_name: [c_uchar; ADDR_DETAILS_NAME_LEN],
     }
 
     impl Default for lucet_module_addr_details {
@@ -424,45 +428,49 @@ pub mod lucet_state {
             lucet_module_addr_details {
                 module_code_resolvable: false,
                 in_module_code: false,
-                file_name: ptr::null(),
-                sym_name: ptr::null(),
+                file_name: [0; ADDR_DETAILS_NAME_LEN],
+                sym_name: [0; ADDR_DETAILS_NAME_LEN],
             }
         }
     }
 
     impl From<Option<AddrDetails>> for lucet_module_addr_details {
         fn from(details: Option<AddrDetails>) -> Self {
-            (&details).into()
-        }
-    }
+            /// Convert a string into C-compatible bytes, truncate it to length
+            /// `ADDR_DETAILS_NAME_LEN`, and make sure it has a trailing nul.
+            fn trunc_c_str_bytes(s: &str) -> Vec<u8> {
+                let s = CString::new(s);
+                let mut bytes = s.ok().map(|s| s.into_bytes_with_nul()).unwrap_or(vec![0]);
+                bytes.truncate(ADDR_DETAILS_NAME_LEN);
+                // we always have at least the 0, so this `last` can be unwrapped
+                *bytes.last_mut().unwrap() = 0;
+                bytes
+            }
 
-    impl From<&Option<AddrDetails>> for lucet_module_addr_details {
-        fn from(details: &Option<AddrDetails>) -> Self {
-            details
+            let mut ret = details
                 .as_ref()
                 .map(|details| lucet_module_addr_details {
                     module_code_resolvable: true,
                     in_module_code: details.in_module_code,
-                    file_name: details
-                        .file_name
-                        .as_ref()
-                        .and_then(|s| {
-                            CString::new(s.clone())
-                                .ok()
-                                .map(|s| s.into_raw() as *const _)
-                        })
-                        .unwrap_or(ptr::null()),
-                    sym_name: details
-                        .sym_name
-                        .as_ref()
-                        .and_then(|s| {
-                            CString::new(s.clone())
-                                .ok()
-                                .map(|s| s.into_raw() as *const _)
-                        })
-                        .unwrap_or(ptr::null()),
+                    file_name: [0; ADDR_DETAILS_NAME_LEN],
+                    sym_name: [0; ADDR_DETAILS_NAME_LEN],
                 })
-                .unwrap_or_default()
+                .unwrap_or_default();
+
+            // get truncated C-compatible bytes for each string, or "\0" if they're not present
+            let file_name_bytes = details
+                .as_ref()
+                .and_then(|details| details.file_name.as_ref().map(|s| trunc_c_str_bytes(s)))
+                .unwrap_or_else(|| vec![0]);
+            let sym_name_bytes = details
+                .and_then(|details| details.sym_name.as_ref().map(|s| trunc_c_str_bytes(s)))
+                .unwrap_or_else(|| vec![0]);
+
+            // copy the bytes into the array, making sure to copy only as many as are in the string
+            ret.file_name[0..file_name_bytes.len()].copy_from_slice(file_name_bytes.as_slice());
+            ret.sym_name[0..sym_name_bytes.len()].copy_from_slice(sym_name_bytes.as_slice());
+
+            ret
         }
     }
 }
@@ -629,8 +637,8 @@ pub mod lucet_val {
         pub as_i64: i64,
     }
 
-    impl From<&UntypedRetVal> for lucet_untyped_retval {
-        fn from(retval: &UntypedRetVal) -> lucet_untyped_retval {
+    impl From<UntypedRetVal> for lucet_untyped_retval {
+        fn from(retval: UntypedRetVal) -> lucet_untyped_retval {
             let mut v = lucet_untyped_retval {
                 fp: [0; 16],
                 gp: [0; 8],
