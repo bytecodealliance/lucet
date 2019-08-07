@@ -451,12 +451,42 @@ unsafe fn setup_guest_signal_state(ostate: &mut Option<SignalState>) {
     });
 }
 
+use crate::instance::unwind as uw;
+
 #[no_mangle]
-extern "C" fn win() {
-    use std::io::Write;
-    // ... wonder what happens if we try to call this stuff while panicked?
-    std::io::stdout().write_all(b"thank you libunwind! but our princess is in another castle!");
-    std::io::stdout().flush();
+extern "C" fn win(
+    version: c_int,
+    actions: uw::_Unwind_Action,
+    exceptionClass: u64,
+    exceptionObject: *mut uw::_Unwind_Exception,
+    context: *mut uw::_Unwind_Context,
+) -> uw::_Unwind_Reason_Code {
+    if version != 1 {
+        return uw::_URC_FATAL_PHASE1_ERROR;
+    }
+    // dbg!(version);
+    // dbg!(actions);
+    // dbg!(uw::fmt_exception_class(exceptionClass));
+    // dbg!(exceptionObject);
+    // dbg!(context);
+
+    // CURRENT_INSTANCE.with(|current_instance| {
+    //     eprintln!("instance state when panicking: {}", unsafe {
+    //         &current_instance.borrow().unwrap().as_mut().state
+    //     });
+    // });
+
+    if actions as i32 & uw::_UA_SEARCH_PHASE as i32 != 0 {
+        return uw::_URC_HANDLER_FOUND;
+    } else {
+        use std::io::Write;
+        // ... wonder what happens if we try to call this stuff while panicked?
+        std::io::stdout()
+            .write_all(b"thank you libunwind! but our princess is in another castle!")
+            .unwrap();
+        std::io::stdout().flush().unwrap();
+        uw::_Unwind_Reason_Code::_URC_FATAL_PHASE2_ERROR
+    }
 }
 
 fn setup_guest_panic_hook() -> Arc<Box<dyn Fn(&panic::PanicInfo<'_>) + Sync + Send + 'static>> {
