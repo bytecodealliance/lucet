@@ -348,6 +348,8 @@ fn link_so(
     let mut ld_iter = env_ld.split_whitespace();
     let ld_prog = ld_iter.next().expect("LD must not be empty");
     let mut cmd_ld = Command::new(ld_prog);
+    // TODO: sufficiently crossplatform?
+    cmd_ld.arg("--eh-frame-hdr");
     for flag in ld_iter {
         cmd_ld.arg(flag);
     }
