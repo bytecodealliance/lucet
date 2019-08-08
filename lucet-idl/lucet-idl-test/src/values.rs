@@ -1,7 +1,8 @@
-use heck::CamelCase;
+use heck::{CamelCase, SnakeCase};
 use lucet_idl::{
-    AliasDatatype, AtomType, BindingDirection, BindingParam, Datatype, DatatypeVariant,
-    EnumDatatype, FuncBinding, Function, Module, StructDatatype, StructMember,
+    pretty_writer::PrettyWriter, AliasDatatype, AtomType, BindingDirection, BindingParam, Datatype,
+    DatatypeVariant, EnumDatatype, FuncBinding, Function, Module, RustFunc, RustName, RustTypeName,
+    StructDatatype, StructMember,
 };
 use proptest::prelude::*;
 
@@ -283,14 +284,18 @@ impl BindingVal {
 }
 
 #[derive(Debug, Clone)]
-pub struct FuncCallPredicate<'a> {
-    func: &'a Function<'a>,
+pub struct FuncCallPredicate {
+    func_name: String,
+    func_call_args: Vec<String>,
+    func_call_rets: Vec<String>,
+    func_sig_args: Vec<String>,
+    func_sig_rets: Vec<String>,
     pre: Vec<BindingVal>,
     post: Vec<BindingVal>,
 }
 
-impl<'a> FuncCallPredicate<'a> {
-    pub fn strat(func: &Function<'a>) -> BoxedStrategy<FuncCallPredicate<'a>> {
+impl FuncCallPredicate {
+    pub fn strat(func: &Function) -> BoxedStrategy<FuncCallPredicate> {
         let mut pre_strat: Vec<BoxedStrategy<BindingVal>> = func
             .bindings()
             .filter(|b| b.direction() == BindingDirection::In)
@@ -306,16 +311,37 @@ impl<'a> FuncCallPredicate<'a> {
         );
         let post_strat: Vec<BoxedStrategy<BindingVal>> = func
             .bindings()
-            .filter(|b| b.direction() == BindingDirection::InOut)
-            .chain(
-                func.bindings()
-                    .filter(|b| b.direction() == BindingDirection::Out),
-            )
+            .filter(|b| {
+                b.direction() == BindingDirection::InOut || b.direction() == BindingDirection::Out
+            })
             .map(|binding| BindingVal::binding_strat(&binding, false))
             .collect();
 
+        let idiom_args = func.rust_idiom_args();
+        let func_name = func.rust_name();
+        let func_call_args = idiom_args.iter().map(|a| a.arg_value()).collect::<Vec<_>>();
+        let func_sig_args = idiom_args
+            .iter()
+            .map(|a| a.arg_declaration())
+            .collect::<Vec<_>>();
+
+        let idiom_rets = func.rust_idiom_rets();
+        let func_call_rets = idiom_rets.iter().map(|r| r.name()).collect::<Vec<_>>();
+        let func_sig_rets = idiom_rets
+            .iter()
+            .map(|a| a.ret_declaration())
+            .collect::<Vec<_>>();
+
         (pre_strat, post_strat)
-            .prop_map(move |(pre, post)| FuncCallPredicate { pre, post, func })
+            .prop_map(move |(pre, post)| FuncCallPredicate {
+                func_name: func_name.clone(),
+                func_call_args: func_call_args.clone(),
+                func_call_rets: func_call_rets.clone(),
+                func_sig_args: func_sig_args.clone(),
+                func_sig_rets: func_sig_rets.clone(),
+                pre,
+                post,
+            })
             .boxed()
     }
 
@@ -326,107 +352,97 @@ impl<'a> FuncCallPredicate<'a> {
             .map(|val| val.render_rust_binding())
             .collect();
 
-        let mut arg_syntax = Vec::new();
-        for in_binding in self
-            .func
-            .bindings()
-            .filter(|b| b.direction() == BindingDirection::In)
-        {
-            arg_syntax.push(match in_binding.param() {
-                BindingParam::Ptr(_) => format!("&{}", in_binding.name()),
-                BindingParam::Slice(_, _) => format!("&{}", in_binding.name()),
-                BindingParam::Value(_) => in_binding.name().to_owned(),
-            })
-        }
-        for io_binding in self
-            .func
-            .bindings()
-            .filter(|b| b.direction() == BindingDirection::InOut)
-        {
-            arg_syntax.push(match io_binding.param() {
-                BindingParam::Ptr(_) => format!("&mut {}", io_binding.name()),
-                BindingParam::Slice(_, _) => format!("&mut {}", io_binding.name()),
-                BindingParam::Value(_) => unreachable!("should be no such thing as an io value"),
-            })
-        }
-
         lines.push(format!(
-            "let {} = {}({});",
-            render_tuple(
-                self.func
-                    .bindings()
-                    .filter(|b| b.direction() == BindingDirection::In)
-                    .map(|b| b.name().to_owned())
-                    .collect::<Vec<String>>(),
-                "_"
-            ),
-            self.func.name(),
-            arg_syntax.join(",")
+            "let {} = {}({}).unwrap();",
+            render_tuple(&self.func_call_rets, "_"),
+            self.func_name,
+            self.func_call_args.join(",")
         ));
         lines.append(
             &mut self
                 .post
                 .iter()
-                .map(|val| format!("assert_eq!({}, {});", val.name, val.render_rust_ref()))
+                .map(|val| {
+                    format!(
+                        "assert_eq!({}, {});",
+                        val.name,
+                        val.render_rust_constructor()
+                    )
+                })
                 .collect(),
         );
         lines
     }
 
-    pub fn render_callee(&self) -> Vec<String> {
-        let mut lines = Vec::new();
+    pub fn render_callee(&self, w: &mut PrettyWriter) {
+        w.writeln(format!(
+            "fn {}(&mut self, {}) -> Result<{}, ()> {{",
+            self.func_name,
+            self.func_sig_args.join(", "),
+            render_tuple(&self.func_sig_rets, "()")
+        ))
+        .indent();
         // Assert preconditions hold
-        lines.append(
-            &mut self
+        w.writelns(
+            &self
                 .pre
                 .iter()
                 .map(|val| format!("assert_eq!({}, {};", val.name, val.render_rust_ref()))
-                .collect(),
+                .collect::<Vec<_>>(),
         );
         // Make postconditions hold
-        lines.append(
-            &mut self
+        w.writelns(
+            &self
                 .post
                 .iter()
                 .map(|val| format!("*{} = {};", val.name, val.render_rust_constructor()))
-                .collect(),
+                .collect::<Vec<_>>(),
         );
-        lines
-    }
-
-    pub fn render_host_trait(&self, module: &Module) -> Vec<String> {
-        let mut lines = Vec::new();
-        lines.push("struct TestHarness;".to_owned());
-        lines.push(format!(
-            "impl {} for TesHarnesst {{",
-            module.name().to_camel_case()
-        ));
-        for func in module.functions() {
-            lines.push(format!("/* FIXME: method {} */", func.name()));
-            /*
-            let mut args: Vec<String> = Vec::new();
-            for input in func.in_bindings.iter() {}
-            let mut rets = Vec::new();
-            lines.push(format!(
-                "fn {}(&mut self, {}) -> Result<{}, ()>",
-                func.field_name,
-                args.join(","),
-                render_tuple(rets, "()")
-            ));
-            if func.field_name == self.func.field_name {
-                lines.append(&mut self.render_callee());
-            } else {
-                lines.push("panic!(\"should not be called\")".to_owned());
-            }
-            lines.push("}".to_owned());
-            */
-        }
-        lines.push("}".to_owned());
-        lines
+        w.eob().writeln("}");
     }
 }
 
-fn render_tuple(vs: Vec<String>, base_case: &str) -> String {
+#[derive(Debug, Clone)]
+pub struct ModuleTestPlan {
+    pub module_name: String,
+    module_type_name: String,
+    func_predicates: Vec<FuncCallPredicate>,
+}
+
+impl ModuleTestPlan {
+    pub fn strat(module: &Module) -> BoxedStrategy<ModuleTestPlan> {
+        let module_name = module.name().to_snake_case();
+        let module_type_name = module.rust_type_name();
+        module
+            .functions()
+            .map(|f| FuncCallPredicate::strat(&f))
+            .collect::<Vec<_>>()
+            .prop_map(move |func_predicates| ModuleTestPlan {
+                module_name: module_name.clone(),
+                module_type_name: module_type_name.clone(),
+                func_predicates,
+            })
+            .boxed()
+    }
+
+    pub fn render_guest(&self, w: &mut PrettyWriter) {
+        for func in self.func_predicates.iter() {
+            w.writelns(&func.render_caller());
+        }
+    }
+
+    pub fn render_host(&self, mut w: &mut PrettyWriter) {
+        w.writeln("struct TestHarness;");
+        w.writeln(format!("impl {} for TestHarness {{", self.module_type_name,))
+            .indent();
+        for func in self.func_predicates.iter() {
+            func.render_callee(&mut w)
+        }
+        w.eob().writeln("}");
+    }
+}
+
+fn render_tuple(vs: &[String], base_case: &str) -> String {
     match vs.len() {
         0 => base_case.to_owned(),
         1 => vs[0].clone(),

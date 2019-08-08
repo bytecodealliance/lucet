@@ -27,7 +27,7 @@ impl RustGenerator {
     pub fn generate_guest(&mut self, package: &Package) -> Result<(), IDLError> {
         for module in package.modules() {
             self.w
-                .writeln(format!("mod {} {{", module.rust_name()))
+                .writeln(format!("pub mod {} {{", module.rust_name()))
                 .indent();
             self.generate_datatypes(&module)?;
 

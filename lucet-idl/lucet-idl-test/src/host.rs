@@ -1,6 +1,7 @@
+use crate::ModuleTestPlan;
 use failure::{format_err, Error};
 use fs2::FileExt;
-use lucet_idl::{self, Backend, Config, Package};
+use lucet_idl::{self, pretty_writer::PrettyWriter, Backend, Config, Package};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -16,8 +17,9 @@ pub struct HostApp {
 }
 
 impl HostApp {
-    pub fn new(package: &Package) -> Result<Self, Error> {
-        if package.modules().collect::<Vec<_>>().len() != 1 {
+    pub fn new(package: &Package, test_plan: &ModuleTestPlan) -> Result<Self, Error> {
+        let modules = package.modules().collect::<Vec<_>>();
+        if modules.len() != 1 {
             Err(format_err!(
                 "only one module per package supported at this time"
             ))?
@@ -53,13 +55,8 @@ impl HostApp {
             Box::new(idl_file),
         )?;
 
-        let harness_file = hostapp.source_file("harness.rs")?;
-        /* FIXME
-        test_harness(
-            Box::new(harness_file),
-            package.modules.get(0).expect("one module per package"),
-        )?;
-        */
+        let mut harness_writer = PrettyWriter::new(Box::new(hostapp.source_file("harness.rs")?));
+        test_plan.render_host(&mut harness_writer);
 
         Ok(hostapp)
     }

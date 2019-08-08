@@ -11,7 +11,7 @@ mod error;
 mod lexer;
 mod parser;
 mod prelude;
-mod pretty_writer;
+pub mod pretty_writer;
 mod repr;
 mod rust;
 mod validate;

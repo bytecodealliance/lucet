@@ -9,6 +9,7 @@ pub use c_guest::CGuestApp;
 pub use host::HostApp;
 pub use rust_guest::RustGuestApp;
 pub use syntax::Spec;
+pub use values::ModuleTestPlan;
 pub use workspace::Workspace;
 
 #[cfg(test)]

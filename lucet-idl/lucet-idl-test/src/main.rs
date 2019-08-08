@@ -1,8 +1,8 @@
 use clap::{App, Arg};
 use env_logger;
 use log::{debug, info};
-use lucet_idl::{parse_package, Package};
-use lucet_idl_test::{CGuestApp, HostApp, RustGuestApp, Spec, Workspace};
+use lucet_idl::{parse_package, Module, Package};
+use lucet_idl_test::{CGuestApp, HostApp, ModuleTestPlan, RustGuestApp, Spec, Workspace};
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::TestRunner;
@@ -14,10 +14,11 @@ fn main() {
     env_logger::init();
     let exe_config = ExeConfig::parse();
 
+    let mut runner = TestRunner::default();
+
     let input_idl = match exe_config.input {
         Some(path) => read_to_string(path).expect("read contents of input file"),
         None => {
-            let mut runner = TestRunner::default();
             let spec = Spec::strat(10).new_tree(&mut runner).unwrap().current();
             let rendered = spec.render_idl();
             info!("generated spec:\n{}", rendered);
@@ -28,7 +29,6 @@ fn main() {
     let pkg = parse_package(&input_idl).expect("parse generated package");
 
     debug!("parsed package: {:?}", pkg);
-
     if exe_config.generate_values {
         generate_values(&pkg);
         process::exit(0);
@@ -38,12 +38,25 @@ fn main() {
         generate_calls(&pkg);
         process::exit(0);
     }
+
+    let module = pkg
+        .modules()
+        .collect::<Vec<Module>>()
+        .pop()
+        .expect("get generated module");
+    let test_plan = ModuleTestPlan::strat(&module)
+        .new_tree(&mut runner)
+        .unwrap()
+        .current();
+
     // Workspace deleted when dropped - need to keep it alive for app to be run
     let mut guest_apps: Vec<(PathBuf, Workspace)> = Vec::new();
 
     if exe_config.build_rust_guest {
         let mut rust_guest_app = RustGuestApp::new().expect("create rust guest app");
-        let rust_guest_so = rust_guest_app.build(&pkg).expect("compile rust guest app");
+        let rust_guest_so = rust_guest_app
+            .build(&pkg, &test_plan)
+            .expect("compile rust guest app");
         guest_apps.push((rust_guest_so, rust_guest_app.into_workspace()));
     }
 
@@ -54,7 +67,7 @@ fn main() {
     }
 
     if exe_config.build_host {
-        let mut host_app = HostApp::new(&pkg).expect("create host app");
+        let mut host_app = HostApp::new(&pkg, &test_plan).expect("create host app");
         if exe_config.run_guests {
             for (guest_app_path, _ws) in guest_apps.iter() {
                 host_app.run(guest_app_path).expect("run guest app");
@@ -143,9 +156,9 @@ impl ExeConfig {
 fn generate_values(package: &Package) {
     use lucet_idl_test::values::*;
 
-    for (_, m) in package.modules.iter() {
+    for m in package.modules() {
         for dt in m.datatypes() {
-            let dt_generator = m.datatype_strat(&dt.datatype_ref());
+            let dt_generator = dt.strat();
             let mut runner = TestRunner::default();
             let value = dt_generator
                 .new_tree(&mut runner)
@@ -159,9 +172,9 @@ fn generate_values(package: &Package) {
 fn generate_calls(package: &Package) {
     use lucet_idl_test::values::*;
 
-    for (_, m) in package.modules.iter() {
-        for fdecl in m.func_decls() {
-            let func_pred_gen = FuncCallPredicate::strat(&m, &fdecl.entity);
+    for m in package.modules() {
+        for func in m.functions() {
+            let func_pred_gen = FuncCallPredicate::strat(&func);
             let mut runner = TestRunner::default();
             let value = func_pred_gen
                 .new_tree(&mut runner)
