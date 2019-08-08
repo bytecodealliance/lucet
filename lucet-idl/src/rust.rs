@@ -54,7 +54,7 @@ impl RustGenerator {
     pub fn generate_host(&mut self, package: &Package) -> Result<(), IDLError> {
         for module in package.modules() {
             self.w
-                .writeln(format!("mod {} {{", module.rust_name()))
+                .writeln(format!("pub mod {} {{", module.rust_name()))
                 .indent();
             self.generate_datatypes(&module)?;
 
@@ -68,12 +68,14 @@ impl RustGenerator {
             }
             self.w.eob().writeln("}");
 
-            self.host_ensure_linked(&module);
+            self.host_module_ensure_linked(&module);
 
             self.w
                 .eob()
                 .writeln(format!("}} // end module {}", module.rust_name()));
         }
+        self.host_package_ensure_linked(&package);
+
         Ok(())
     }
 
@@ -110,6 +112,7 @@ impl RustGenerator {
     fn gen_struct(&mut self, struct_: &StructDatatype) -> Result<(), IDLError> {
         self.w
             .writeln("#[repr(C)]")
+            .writeln("#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]")
             .writeln(format!("pub struct {} {{", struct_.rust_type_name()));
 
         let mut w = self.w.new_block();
@@ -122,6 +125,33 @@ impl RustGenerator {
         }
 
         self.w.writeln("}");
+
+        self.w
+            .writeln(format!("impl {} {{", struct_.rust_type_name()));
+        let mut w = self.w.new_block();
+
+        w.writeln("pub fn validate_bytes(repr: &[u8]) -> bool {");
+        let mut ww = w.new_block();
+        for m in struct_.members() {
+            match m.type_().anti_alias().variant() {
+                DatatypeVariant::Struct(_) | DatatypeVariant::Enum(_) => {
+                    ww.writeln(format!(
+                        "{}::validate_bytes(&repr[{}..{}]) &&",
+                        m.type_().rust_type_name(),
+                        m.offset(),
+                        m.offset() + m.type_().mem_size(),
+                    ));
+                }
+                DatatypeVariant::Atom(_) => {
+                    ww.writeln(format!("// not validating {}", m.type_().rust_type_name()));
+                }
+                DatatypeVariant::Alias(_) => unreachable!("anti-aliased datatype"),
+            }
+        }
+        ww.writeln("true"); // to catch the trailing &&
+        w.writeln("}");
+
+        self.w.writeln("}"); // end impl
 
         gen_testcase(&mut self.w, &struct_.name().to_snake_case(), |w| {
             w.writeln(format!(
@@ -146,7 +176,7 @@ impl RustGenerator {
     fn gen_enum(&mut self, enum_: &EnumDatatype) -> Result<(), IDLError> {
         self.w
             .writeln("#[repr(C)]")
-            .writeln("#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]")
+            .writeln("#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]")
             .writeln(format!("pub enum {} {{", enum_.rust_type_name()));
 
         let mut w = self.w.new_block();
@@ -155,6 +185,35 @@ impl RustGenerator {
         }
 
         self.w.writeln("}");
+
+        self.w
+            .writeln(format!("impl {} {{", enum_.rust_type_name()));
+        let mut w = self.w.new_block();
+        w.writeln("pub fn from_u32(e: u32) -> Option<Self> {");
+        let mut ww = w.new_block();
+        ww.writeln("match e {");
+        let mut www = ww.new_block();
+        for v in enum_.variants() {
+            www.writeln(format!(
+                "{} => Some({}::{}),",
+                v.index(),
+                enum_.rust_type_name(),
+                v.rust_name()
+            ));
+        }
+        www.writeln("_ => None,");
+        ww.writeln("}");
+        w.writeln("}");
+
+        w.writeln("pub fn validate_bytes(repr: &[u8]) -> bool {");
+        let mut ww = w.new_block();
+        ww.writeln(format!(
+            "((repr[0] as u32) + ((repr[1] as u32) << 8) + \
+             ((repr[2] as u32) << 16) + ((repr[3] as u32) << 24)) < {}",
+            enum_.variants().collect::<Vec<_>>().len()
+        ));
+        w.writeln("}");
+        self.w.writeln("}"); // end impl
 
         gen_testcase(&mut self.w, &enum_.name().to_snake_case(), |w| {
             w.writeln(format!(
@@ -340,13 +399,13 @@ impl RustGenerator {
             let mut args = func
                 .rust_idiom_args()
                 .iter()
-                .map(|a| a.arg_value())
+                .map(|a| a.arg_declaration())
                 .collect::<Vec<_>>();
             args.insert(0, "&mut self".to_owned());
             let rets = func
                 .rust_idiom_rets()
                 .iter()
-                .map(|a| a.name())
+                .map(|a| a.ret_declaration())
                 .rust_tuple_syntax("()");
 
             self.w.writeln(format!(
@@ -362,7 +421,7 @@ impl RustGenerator {
         Ok(())
     }
 
-    fn host_ensure_linked(&mut self, module: &Module) {
+    fn host_module_ensure_linked(&mut self, module: &Module) {
         self.w.writeln("pub fn ensure_linked() {").indent();
         self.w.writeln("unsafe {").indent();
         for func in module.functions() {
@@ -372,6 +431,15 @@ impl RustGenerator {
             ));
         }
         self.w.eob().writeln("}");
+        self.w.eob().writeln("}");
+    }
+
+    fn host_package_ensure_linked(&mut self, package: &Package) {
+        self.w.writeln("pub fn ensure_linked() {").indent();
+        for module in package.modules() {
+            self.w
+                .writeln(format!("{}::ensure_linked()", module.rust_name()));
+        }
         self.w.eob().writeln("}");
     }
 }

@@ -229,13 +229,7 @@ impl<'a> RustIdiomArg<'a> {
                         len = len.rust_name(),
                     )
                 ],
-                BindingParam::Value(val) => vec![
-                    format!("let {name}: {typename} = {value} as {typename};",
-                        name = self.name(),
-                        typename = self.type_name(),
-                        value = val.rust_name(),
-                    )
-                ],
+                BindingParam::Value(_val) => vec![cast_value_to_binding(&self.binding)],
             }
         } else {
             assert_eq!(self.binding.direction(), BindingDirection::InOut);
@@ -311,7 +305,7 @@ impl<'a> RustIdiomRet<'a> {
         match self.binding.param() {
             BindingParam::Ptr(ptr) => vec![
                 format!(
-                    "let mut {}___MEM = ::std::mem::MaybeUninit::<{}>::uninit();",
+                    "#[allow(non_snake_case)] let mut {}___MEM = ::std::mem::MaybeUninit::<{}>::uninit();",
                     ptr.rust_name(),
                     self.type_name(),
                 ),
@@ -333,19 +327,19 @@ impl<'a> RustIdiomRet<'a> {
                 self.name(),
                 ptr.rust_name()
             ),
-            BindingParam::Value(val) => format!(
-                "let {} = {}::from({});",
-                self.name(),
-                self.type_name(),
-                val.rust_name(),
-            ),
+            BindingParam::Value(_val) => cast_value_to_binding(&self.binding),
             BindingParam::Slice { .. } => unreachable!(),
         }
     }
 
     pub fn host_unpack_to_abi(&self) -> Vec<String> {
         match self.binding.param() {
-            BindingParam::Ptr(ptr) => vec![
+            BindingParam::Ptr(ptr) => {
+                let mut lines = vec![
+                format!(
+                    "let {ptr} = {ptr} as usize;",
+                     ptr = ptr.rust_name()
+                ),
                 format!(
                     "if {ptr} % {align} != 0 {{ Err(())?; /* FIXME: align failed */ }}",
                     ptr = ptr.name(),
@@ -356,14 +350,23 @@ impl<'a> RustIdiomRet<'a> {
                     name = self.name(),
                     ptr = ptr.rust_name(),
                     len =self.binding.type_().mem_size(),
-                ),
-                format!(
+                )];
+                match self.binding.type_().anti_alias().variant() {
+                    DatatypeVariant::Enum(_) | DatatypeVariant::Struct(_) => {
+                        lines.push(format!("if !{}::validate_bytes(&{}___MEM) {{ Err(())?; /* FIXME invalid representation */ }}",
+                        self.type_name(), self.name()))
+                    }
+                    DatatypeVariant::Atom(_) => {} // No representation validation required
+                    DatatypeVariant::Alias(_) => unreachable!("anti-aliased"),
+                }
+                lines.push(format!(
                     "let mut {ptr}: &mut {typename} = unsafe {{ ({name}___MEM.as_mut_ptr() as *mut {typename}).as_mut().unwrap()  }}; // convert pointer in linear memory to ref",
                     name = self.name(),
                     typename = self.type_name(),
                     ptr = ptr.rust_name(),
-                ),
-            ],
+                ));
+                lines
+            }
             BindingParam::Value(_val) => vec![],
             BindingParam::Slice { .. } => unreachable!(),
         }
@@ -392,5 +395,27 @@ impl<'a> RustIdiomRet<'a> {
 
     pub fn type_name(&self) -> String {
         self.binding.type_().rust_type_name()
+    }
+}
+
+fn cast_value_to_binding(b: &FuncBinding) -> String {
+    match b.param() {
+        BindingParam::Value(val) => match b.type_().anti_alias().variant() {
+            DatatypeVariant::Enum(_) => format!(
+                "let {} = {}::from_u32({} as u32).ok_or(())?; // FIXME throw the right error",
+                b.rust_name(),
+                b.type_().rust_type_name(),
+                val.rust_name(),
+            ),
+            DatatypeVariant::Atom(_) => format!(
+                "let {} = {} as {};",
+                b.rust_name(),
+                val.rust_name(),
+                b.type_().rust_type_name(),
+            ),
+            DatatypeVariant::Alias(_) => unreachable!("anti-aliased"),
+            DatatypeVariant::Struct(_) => unreachable!("can't represent struct as binding value"),
+        },
+        _ => panic!("can only cast BindingParam::Value to binding type"),
     }
 }

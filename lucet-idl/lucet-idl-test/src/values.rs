@@ -273,7 +273,7 @@ impl BindingVal {
             BindingValVariant::Value(v) => v.render_rustval(),
             BindingValVariant::Ptr(v) => format!("&{}", v.render_rustval()),
             BindingValVariant::Array(vs) => format!(
-                "&[{}]",
+                "vec![{}].as_slice()",
                 vs.iter()
                     .map(|v| v.render_rustval())
                     .collect::<Vec<String>>()
@@ -387,17 +387,27 @@ impl FuncCallPredicate {
             &self
                 .pre
                 .iter()
-                .map(|val| format!("assert_eq!({}, {};", val.name, val.render_rust_ref()))
+                .map(|val| format!("assert_eq!({}, {});", val.name, val.render_rust_ref()))
                 .collect::<Vec<_>>(),
         );
         // Make postconditions hold
-        w.writelns(
-            &self
-                .post
-                .iter()
-                .map(|val| format!("*{} = {};", val.name, val.render_rust_constructor()))
-                .collect::<Vec<_>>(),
-        );
+        let mut ret_vals = Vec::new();
+        for post in self.post.iter() {
+            match post.variant {
+                BindingValVariant::Value(ref val) => {
+                    ret_vals.push(val.render_rustval());
+                }
+                BindingValVariant::Ptr(ref val) => {
+                    w.writeln(format!("*{} = {};", post.name, val.render_rustval()));
+                }
+                BindingValVariant::Array(ref vals) => {
+                    for (ix, val) in vals.iter().enumerate() {
+                        w.writeln(format!("{}[{}] = {};", post.name, ix, val.render_rustval()));
+                    }
+                }
+            }
+        }
+        w.writeln(format!("Ok({})", render_tuple(&ret_vals, "()")));
         w.eob().writeln("}");
     }
 }
@@ -432,7 +442,9 @@ impl ModuleTestPlan {
     }
 
     pub fn render_host(&self, mut w: &mut PrettyWriter) {
-        w.writeln("struct TestHarness;");
+        w.writeln(format!("use crate::idl::{}::*;", self.module_name));
+        w.writeln("pub struct TestHarness;");
+        w.writeln("pub fn ctx() -> TestHarness { TestHarness }");
         w.writeln(format!("impl {} for TestHarness {{", self.module_type_name,))
             .indent();
         for func in self.func_predicates.iter() {

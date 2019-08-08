@@ -183,6 +183,17 @@ impl<'a> Datatype<'a> {
     pub fn abi_type(&self) -> Option<AbiType> {
         self.variant().abi_type()
     }
+
+    pub fn anti_alias(&self) -> Datatype<'a> {
+        match self.repr().variant {
+            DatatypeVariantRepr::Alias(ref repr) => AliasDatatype {
+                datatype: self.clone(),
+                repr: &repr,
+            }
+            .anti_alias(),
+            _ => self.clone(),
+        }
+    }
 }
 
 impl<'a> MemArea for Datatype<'a> {
@@ -359,6 +370,28 @@ impl<'a> AliasDatatype<'a> {
         Datatype {
             pkg: self.datatype.pkg,
             id: self.repr.to,
+        }
+    }
+
+    /// Find the non-alias datatype that this alias transitively refers to.
+    pub fn anti_alias(&self) -> Datatype<'a> {
+        // We can't just call this recursively because
+        // of the borrow checker, so we have to recurse in a loop :/
+        let mut referent = Datatype {
+            pkg: self.datatype.pkg,
+            id: self.repr.to,
+        };
+        loop {
+            match referent.variant() {
+                DatatypeVariant::Alias(a) => {
+                    referent.id = a.datatype.id;
+                }
+                _ => break,
+            }
+        }
+        Datatype {
+            pkg: self.datatype.pkg,
+            id: referent.id,
         }
     }
 }
