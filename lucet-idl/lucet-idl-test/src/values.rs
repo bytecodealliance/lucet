@@ -1,8 +1,8 @@
 use heck::{CamelCase, SnakeCase};
 use lucet_idl::{
     pretty_writer::PrettyWriter, AliasDatatype, AtomType, BindingDirection, BindingParam, Datatype,
-    DatatypeVariant, EnumDatatype, FuncBinding, Function, Module, RustFunc, RustName, RustTypeName,
-    StructDatatype, StructMember,
+    DatatypeVariant, EnumDatatype, Function, Module, RustFunc, RustIdiomArg, RustIdiomRet,
+    RustName, RustTypeName, StructDatatype, StructMember,
 };
 use proptest::prelude::*;
 
@@ -215,10 +215,11 @@ pub enum BindingValVariant {
 }
 
 impl BindingVal {
-    fn binding_strat(binding: &FuncBinding, mutable: bool) -> BoxedStrategy<Self> {
-        let name = binding.name().to_owned();
-        match binding.param() {
-            BindingParam::Value(_) => binding
+    fn arg_strat(arg: &RustIdiomArg) -> BoxedStrategy<Self> {
+        let mutable = arg.direction() == BindingDirection::InOut;
+        let name = arg.name();
+        match arg.param() {
+            BindingParam::Value(_) => arg
                 .type_()
                 .strat()
                 .prop_map(move |v| BindingVal {
@@ -227,7 +228,7 @@ impl BindingVal {
                     variant: BindingValVariant::Value(v),
                 })
                 .boxed(),
-            BindingParam::Ptr(_) => binding
+            BindingParam::Ptr(_) => arg
                 .type_()
                 .strat()
                 .prop_map(move |v| BindingVal {
@@ -236,7 +237,7 @@ impl BindingVal {
                     variant: BindingValVariant::Ptr(v),
                 })
                 .boxed(),
-            BindingParam::Slice(_, _) => prop::collection::vec(binding.type_().strat(), 100)
+            BindingParam::Slice(_, _) => prop::collection::vec(arg.type_().strat(), 100)
                 .prop_map(move |v| BindingVal {
                     name: name.clone(),
                     mutable,
@@ -245,6 +246,21 @@ impl BindingVal {
                 .boxed(),
         }
     }
+
+    fn ret_strat(ret: &RustIdiomRet) -> BoxedStrategy<Self> {
+        let name = ret.name();
+        // There can only be param or value bindings on returns,
+        // and both are idiomatically values.
+        ret.type_()
+            .strat()
+            .prop_map(move |v| BindingVal {
+                name: name.clone(),
+                mutable: false,
+                variant: BindingValVariant::Value(v),
+            })
+            .boxed()
+    }
+
     fn render_rust_binding(&self) -> String {
         format!(
             "let {}{} = {};",
@@ -296,42 +312,28 @@ pub struct FuncCallPredicate {
 
 impl FuncCallPredicate {
     pub fn strat(func: &Function) -> BoxedStrategy<FuncCallPredicate> {
-        let mut pre_strat: Vec<BoxedStrategy<BindingVal>> = func
-            .bindings()
-            .filter(|b| b.direction() == BindingDirection::In)
-            .map(|binding| BindingVal::binding_strat(&binding, false))
+        let args = func.rust_idiom_args();
+        let rets = func.rust_idiom_rets();
+
+        // Precondition on all arguments
+        let pre_strat: Vec<BoxedStrategy<BindingVal>> =
+            args.iter().map(|a| BindingVal::arg_strat(a)).collect();
+
+        // Postcondition on all inout arguments, and all return values
+        let post_strat: Vec<BoxedStrategy<BindingVal>> = args
+            .iter()
+            .filter(|a| a.direction() == BindingDirection::InOut)
+            .map(|a| BindingVal::arg_strat(a))
+            .chain(rets.iter().map(|r| BindingVal::ret_strat(r)))
             .collect();
 
-        pre_strat.append(
-            &mut func
-                .bindings()
-                .filter(|b| b.direction() == BindingDirection::InOut)
-                .map(|binding| BindingVal::binding_strat(&binding, true))
-                .collect(),
-        );
-        let post_strat: Vec<BoxedStrategy<BindingVal>> = func
-            .bindings()
-            .filter(|b| {
-                b.direction() == BindingDirection::InOut || b.direction() == BindingDirection::Out
-            })
-            .map(|binding| BindingVal::binding_strat(&binding, false))
-            .collect();
+        let func_call_args = args.iter().map(|a| a.arg_value()).collect::<Vec<_>>();
+        let func_sig_args = args.iter().map(|a| a.arg_declaration()).collect::<Vec<_>>();
 
-        let idiom_args = func.rust_idiom_args();
+        let func_call_rets = rets.iter().map(|r| r.name()).collect::<Vec<_>>();
+        let func_sig_rets = rets.iter().map(|a| a.ret_declaration()).collect::<Vec<_>>();
+
         let func_name = func.rust_name();
-        let func_call_args = idiom_args.iter().map(|a| a.arg_value()).collect::<Vec<_>>();
-        let func_sig_args = idiom_args
-            .iter()
-            .map(|a| a.arg_declaration())
-            .collect::<Vec<_>>();
-
-        let idiom_rets = func.rust_idiom_rets();
-        let func_call_rets = idiom_rets.iter().map(|r| r.name()).collect::<Vec<_>>();
-        let func_sig_rets = idiom_rets
-            .iter()
-            .map(|a| a.ret_declaration())
-            .collect::<Vec<_>>();
-
         (pre_strat, post_strat)
             .prop_map(move |(pre, post)| FuncCallPredicate {
                 func_name: func_name.clone(),
@@ -444,13 +446,16 @@ impl ModuleTestPlan {
     pub fn render_host(&self, mut w: &mut PrettyWriter) {
         w.writeln(format!("use crate::idl::{}::*;", self.module_name));
         w.writeln("pub struct TestHarness;");
-        w.writeln("pub fn ctx() -> TestHarness { TestHarness }");
         w.writeln(format!("impl {} for TestHarness {{", self.module_type_name,))
             .indent();
         for func in self.func_predicates.iter() {
             func.render_callee(&mut w)
         }
         w.eob().writeln("}");
+        w.writeln(format!(
+            "pub fn ctx() -> Box<dyn {}> {{ Box::new(TestHarness) }}",
+            self.module_type_name
+        ));
     }
 }
 

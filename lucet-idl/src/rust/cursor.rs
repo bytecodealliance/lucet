@@ -129,6 +129,22 @@ pub struct RustIdiomArg<'a> {
 }
 
 impl<'a> RustIdiomArg<'a> {
+    pub fn name(&self) -> String {
+        self.binding.rust_name()
+    }
+    pub fn direction(&self) -> BindingDirection {
+        self.binding.direction()
+    }
+    pub fn type_(&self) -> Datatype<'a> {
+        self.binding.type_()
+    }
+    pub fn type_name(&self) -> String {
+        self.type_().rust_type_name()
+    }
+    pub fn param(&self) -> BindingParam<'a> {
+        self.binding.param()
+    }
+
     fn mutable(&self) -> String {
         if self.binding.direction() == BindingDirection::InOut {
             "mut "
@@ -280,13 +296,6 @@ impl<'a> RustIdiomArg<'a> {
             }
         }
     }
-    pub fn name(&self) -> String {
-        self.binding.rust_name()
-    }
-
-    pub fn type_name(&self) -> String {
-        self.binding.type_().rust_type_name()
-    }
 }
 
 pub struct RustIdiomRet<'a> {
@@ -294,6 +303,22 @@ pub struct RustIdiomRet<'a> {
 }
 
 impl<'a> RustIdiomRet<'a> {
+    pub fn name(&self) -> String {
+        self.binding.rust_name()
+    }
+    pub fn direction(&self) -> BindingDirection {
+        self.binding.direction()
+    }
+    pub fn type_(&self) -> Datatype<'a> {
+        self.binding.type_()
+    }
+    pub fn type_name(&self) -> String {
+        self.type_().rust_type_name()
+    }
+    pub fn param(&self) -> BindingParam<'a> {
+        self.binding.param()
+    }
+
     pub fn ret_declaration(&self) -> String {
         match self.binding.param() {
             BindingParam::Ptr { .. } | BindingParam::Value { .. } => self.type_name(),
@@ -387,14 +412,6 @@ impl<'a> RustIdiomRet<'a> {
             ),
             BindingParam::Slice { .. } => unreachable!(),
         }
-    }
-
-    pub fn name(&self) -> String {
-        self.binding.rust_name()
-    }
-
-    pub fn type_name(&self) -> String {
-        self.binding.type_().rust_type_name()
     }
 }
 

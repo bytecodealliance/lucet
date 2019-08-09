@@ -32,6 +32,7 @@ impl RustGuestApp {
 
     fn generate_main_rs(&mut self, test_plan: &ModuleTestPlan) -> Result<(), Error> {
         let mut w = PrettyWriter::new(Box::new(File::create(self.work.source_path("main.rs"))?));
+        w.writeln("#[allow(unused)]");
         w.writeln("mod idl;");
         w.writeln(format!("use idl::{}::*;", test_plan.module_name));
 
