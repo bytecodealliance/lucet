@@ -26,7 +26,7 @@ use thiserror::Error;
 #[repr(C)]
 pub(crate) struct GpRegs {
     pub(crate) rbx: u64,
-    pub(crate) rsp: u64,
+    pub rsp: u64,
     rbp: u64,
     pub(crate) rdi: u64,
     r12: u64,

@@ -45,7 +45,7 @@ thread_local! {
     /// the swap. Meanwhile, the signal handler can run at any point during the guest function, and
     /// so it also must be able to immutably borrow the host context if it needs to swap back. The
     /// runtime borrowing constraints for a `RefCell` are therefore too strict for this variable.
-    pub(crate) static HOST_CTX: UnsafeCell<Context> = UnsafeCell::new(Context::new());
+    pub static HOST_CTX: UnsafeCell<Context> = UnsafeCell::new(Context::new());
 
     /// The currently-running `Instance`, if one exists.
     pub(crate) static CURRENT_INSTANCE: RefCell<Option<NonNull<Instance>>> = RefCell::new(None);

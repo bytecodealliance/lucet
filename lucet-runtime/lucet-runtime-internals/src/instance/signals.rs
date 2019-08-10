@@ -176,6 +176,17 @@ impl Instance {
         // run the body
         let res = f(self);
 
+        match &self.state {
+            State::Panicking { exception_obj } => {
+                eprintln!("re-raising exception!");
+                unsafe {
+                    uw::_Unwind_RaiseException(*exception_obj);
+                }
+                unreachable!()
+            }
+            st => eprintln!("state at exit: {}", st),
+        }
+
         if self.ensure_signal_handler_installed {
             decrement_lucet_signal_state();
         }
@@ -457,8 +468,8 @@ use crate::instance::unwind as uw;
 extern "C" fn win(
     version: c_int,
     actions: uw::_Unwind_Action,
-    exceptionClass: u64,
-    exceptionObject: *mut uw::_Unwind_Exception,
+    exception_class: u64,
+    exception_obj: *mut uw::_Unwind_Exception,
     context: *mut uw::_Unwind_Context,
 ) -> uw::_Unwind_Reason_Code {
     if version != 1 {
@@ -466,26 +477,46 @@ extern "C" fn win(
     }
     // dbg!(version);
     // dbg!(actions);
-    // dbg!(uw::fmt_exception_class(exceptionClass));
-    // dbg!(exceptionObject);
+    // dbg!(uw::fmt_exception_class(exception_class));
+    // dbg!(exception_obj);
     // dbg!(context);
-
-    // CURRENT_INSTANCE.with(|current_instance| {
-    //     eprintln!("instance state when panicking: {}", unsafe {
-    //         &current_instance.borrow().unwrap().as_mut().state
-    //     });
-    // });
+    // use std::io::Write;
+    // std::io::stdout().flush().unwrap();
 
     if actions as i32 & uw::_UA_SEARCH_PHASE as i32 != 0 {
-        return uw::_URC_HANDLER_FOUND;
+        uw::_URC_HANDLER_FOUND
     } else {
-        use std::io::Write;
-        // ... wonder what happens if we try to call this stuff while panicked?
-        std::io::stdout()
-            .write_all(b"thank you libunwind! but our princess is in another castle!")
-            .unwrap();
-        std::io::stdout().flush().unwrap();
-        uw::_Unwind_Reason_Code::_URC_FATAL_PHASE2_ERROR
+        CURRENT_INSTANCE.with(|current_instance| unsafe {
+            current_instance.borrow().unwrap().as_mut().state = State::Panicking {
+                exception_obj: exception_obj,
+            };
+        });
+        HOST_CTX.with(|host_ctx| unsafe {
+            // 5 == rdi, which is reserved as a scratch register to transfer data to the landing
+            // pad, per the ABI... but the register indexing doesn't appear to actually work that
+            // way here.
+            uw::_Unwind_SetGR(context, 5, host_ctx.get() as uw::_Unwind_Word);
+        });
+        unsafe {
+            // uw::_Unwind_SetGR(context, 0, 0xA);
+            // uw::_Unwind_SetGR(context, 1, 0xB);
+            // uw::_Unwind_SetGR(context, 2, 0xC);
+            // uw::_Unwind_SetGR(context, 3, 0xD);
+        }
+        unsafe {
+            uw::_Unwind_SetIP(
+                context,
+                crate::context::lucet_context_set as uw::_Unwind_Word,
+            );
+        }
+        uw::_URC_INSTALL_CONTEXT
+
+        // // ... wonder what happens if we try to call this stuff while panicked?
+        // std::io::stdout()
+        //     .write_all(b"thank you libunwind! but our princess is in another castle!")
+        //     .unwrap();
+        // std::io::stdout().flush().unwrap();
+        // uw::_Unwind_Reason_Code::_URC_FATAL_PHASE2_ERROR
     }
 }
 

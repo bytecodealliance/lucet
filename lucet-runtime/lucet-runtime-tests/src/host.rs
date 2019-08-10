@@ -322,6 +322,31 @@ macro_rules! host_tests {
                 }
 
                 #[test]
+                fn run_hostcall_print_host_rsp() {
+                    extern "C" {
+                        fn hostcall_print_host_rsp(vmctx: *mut lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                        hostcall_print_host_rsp(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    inst.run("f", &[]).unwrap();
+                }
+
+                #[test]
                 fn run_hostcall_bad_borrow() {
                     extern "C" {
                         fn hostcall_bad_borrow(vmctx: *const lucet_vmctx) -> bool;
