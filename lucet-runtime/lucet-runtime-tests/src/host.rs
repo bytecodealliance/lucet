@@ -33,6 +33,30 @@ macro_rules! host_tests {
             static ref HOSTCALL_MUTEX: Mutex<()> = Mutex::new(());
             static ref NESTED_OUTER: Mutex<()> = Mutex::new(());
             static ref NESTED_INNER: Mutex<()> = Mutex::new(());
+            static ref NESTED_REGS_OUTER: Mutex<()> = Mutex::new(());
+            static ref NESTED_REGS_INNER: Mutex<()> = Mutex::new(());
+        }
+
+        #[inline]
+        unsafe fn unwind_outer(vmctx: &mut Vmctx, mutex: &Mutex<()>, cb_idx: u32) -> u64 {
+            let lock = mutex.lock().unwrap();
+            let func = vmctx
+                .get_func_from_idx(0, cb_idx)
+                .expect("can get function by index");
+            let func = std::mem::transmute::<usize, extern "C" fn(*mut lucet_vmctx) -> u64>(
+                func.ptr.as_usize(),
+            );
+            let res = (func)(vmctx.as_raw());
+            drop(lock);
+            res
+        }
+
+        #[allow(unreachable_code)]
+        #[inline]
+        unsafe fn unwind_inner(vmctx: &mut Vmctx, mutex: &Mutex<()>) {
+            let lock = mutex.lock().unwrap();
+            lucet_hostcall_terminate!(ERROR_MESSAGE);
+            drop(lock);
         }
 
 >>>>>>> 3afa5c4... add nested hostcall unwinding test
@@ -250,6 +274,35 @@ macro_rules! host_tests {
 
             assert!(NESTED_OUTER.is_poisoned());
             assert!(NESTED_INNER.is_poisoned());
+        }
+
+        /// Like `nested_error_unwind`, but the guest code callback in between the two segments of
+        /// hostcall stack uses enough locals to require saving callee registers.
+        #[test]
+        fn nested_error_unwind_regs() {
+            let module =
+                test_module_c("host", "nested_error_unwind.c").expect("build and load module");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run("entrypoint_regs", &[]) {
+                Err(Error::RuntimeTerminated(term)) => {
+                    assert_eq!(
+                        *term
+                            .provided_details()
+                            .expect("user provided termination reason")
+                            .downcast_ref::<&'static str>()
+                            .expect("error was static str"),
+                        ERROR_MESSAGE
+                    );
+                }
+                res => panic!("unexpected result: {:?}", res),
+            }
+
+            assert!(NESTED_REGS_OUTER.is_poisoned());
+            assert!(NESTED_REGS_INNER.is_poisoned());
         }
 
         #[test]

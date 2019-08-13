@@ -4,6 +4,8 @@
         "hostcall_test_func_hostcall_error": "hostcall_test_func_hostcall_error",
         "hostcall_test_func_hostcall_error_unwind": "hostcall_test_func_hostcall_error_unwind",
         "nested_error_unwind_outer": "nested_error_unwind_outer",
-        "nested_error_unwind_inner": "nested_error_unwind_inner"
+        "nested_error_unwind_inner": "nested_error_unwind_inner",
+        "nested_error_unwind_regs_outer": "nested_error_unwind_regs_outer",
+        "nested_error_unwind_regs_inner": "nested_error_unwind_regs_inner"
     }
 }
