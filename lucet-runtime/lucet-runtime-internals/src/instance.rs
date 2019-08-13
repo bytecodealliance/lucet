@@ -220,7 +220,7 @@ pub struct Instance {
     module: Arc<dyn Module>,
 
     /// The `Context` in which the guest program runs
-    pub(crate) ctx: Context,
+    pub ctx: Context,
 
     /// Instance state and error information
     pub(crate) state: State,
@@ -233,7 +233,7 @@ pub struct Instance {
     pub lock_testpoints: Arc<LockTestpoints>,
 
     /// The memory allocated for this instance
-    alloc: Alloc,
+    pub alloc: Alloc,
 
     /// Handler run for signals that do not arise from a known WebAssembly trap, or that involve
     /// memory outside of the current instance.

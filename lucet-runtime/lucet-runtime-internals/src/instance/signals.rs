@@ -173,8 +173,11 @@ impl Instance {
             );
         }
 
-        // run the body
-        let res = f(self);
+        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            // run the body
+            f(self)
+        }))
+        .unwrap_or_else(|e| std::panic::resume_unwind(e));
 
         match &self.state {
             State::Panicking { exception_obj } => {
@@ -468,7 +471,7 @@ use crate::instance::unwind as uw;
 extern "C" fn win(
     version: c_int,
     actions: uw::_Unwind_Action,
-    exception_class: u64,
+    _exception_class: u64,
     exception_obj: *mut uw::_Unwind_Exception,
     context: *mut uw::_Unwind_Context,
 ) -> uw::_Unwind_Reason_Code {
@@ -497,12 +500,12 @@ extern "C" fn win(
             // way here.
             uw::_Unwind_SetGR(context, 5, host_ctx.get() as uw::_Unwind_Word);
         });
-        unsafe {
-            // uw::_Unwind_SetGR(context, 0, 0xA);
-            // uw::_Unwind_SetGR(context, 1, 0xB);
-            // uw::_Unwind_SetGR(context, 2, 0xC);
-            // uw::_Unwind_SetGR(context, 3, 0xD);
-        }
+        // unsafe {
+        //     uw::_Unwind_SetGR(context, 0, 0xA);
+        //     uw::_Unwind_SetGR(context, 1, 0xB);
+        //     uw::_Unwind_SetGR(context, 2, 0xC);
+        //     uw::_Unwind_SetGR(context, 3, 0xD);
+        // }
         unsafe {
             uw::_Unwind_SetIP(
                 context,

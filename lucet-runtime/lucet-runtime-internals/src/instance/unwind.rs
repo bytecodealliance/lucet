@@ -24,7 +24,7 @@ pub enum _Unwind_Reason_Code {
 pub use _Unwind_Reason_Code::*;
 
 pub type _Unwind_Exception_Class = u64;
-pub fn fmt_exception_class(class: _Unwind_Exception_Class) -> String {
+pub fn _fmt_exception_class(class: _Unwind_Exception_Class) -> String {
     let mut s = String::new();
     for shift in &[56u64, 48, 40, 32, 24, 16, 8, 0] {
         s.push((class >> shift & 0xff) as u8 as char);
