@@ -294,6 +294,7 @@ impl<'a> Compiler<'a> {
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();
+            clif_context.func.collect_debug_info();
 
             func_translator
                 .translate(
