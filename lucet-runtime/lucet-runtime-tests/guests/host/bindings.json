@@ -6,6 +6,8 @@
         "nested_error_unwind_outer": "nested_error_unwind_outer",
         "nested_error_unwind_inner": "nested_error_unwind_inner",
         "nested_error_unwind_regs_outer": "nested_error_unwind_regs_outer",
-        "nested_error_unwind_regs_inner": "nested_error_unwind_regs_inner"
+        "nested_error_unwind_regs_inner": "nested_error_unwind_regs_inner",
+        "restore_callee_saved": "hostcall_restore_callee_saved",
+        "hostcall_panic": "hostcall_panic"
     }
 }
