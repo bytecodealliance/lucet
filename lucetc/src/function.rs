@@ -248,8 +248,12 @@ impl<'a> FuncInfo<'a> {
         // flushed and reset to 0.
         match op {
             Operator::CallIndirect { .. } | Operator::Call { .. } => {
-                // add 1 to count the return from the called function
-                self.scope_costs.last_mut().map(|x| *x = 1);
+                // only track the expected return if this call was reachable - if the call is not
+                // reachable, the "called" function won't return!
+                if reachable {
+                    // add 1 to count the return from the called function
+                    self.scope_costs.last_mut().map(|x| *x = 1);
+                }
             }
             Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
                 // opening a scope, which starts having executed zero wasm ops
