@@ -35,7 +35,7 @@ core_spec_test!(break_drop, "break-drop"); // PASS
 core_spec_test!(br_if); // PASS
 core_spec_test!(br_table); // PASS
 core_spec_test!(br); // PASS
-core_spec_test!(call_indirect); // FAIL: BadSignature runtime error in AssertReturn. BUG: we check type index equality, but the same type may exist at multiple indexes.
+core_spec_test!(call_indirect); // PASS
 core_spec_test!(call); // PASS
 core_spec_test!(comments); // PASS
 core_spec_test!(const_, "const"); // PASS
@@ -57,14 +57,16 @@ core_spec_test!(float_literals); // PASS
 core_spec_test!(float_memory); // PASS
 core_spec_test!(float_misc); // PASS
 core_spec_test!(forward); // PASS
-core_spec_test!(func_ptrs); // FAIL: dlopen error, need print_i32 etc
-core_spec_test!(func); // FAIL: in BadSignature runtime error AssertReturn
+core_spec_test!(func_ptrs); // PASS
+core_spec_test!(func); // PASS
 core_spec_test!(get_local); // PASS
 core_spec_test!(globals); // FAIL: exports mutable globals, which wabt does not support
 core_spec_test!(i32_, "i32"); // PASS
 core_spec_test!(i64_, "i64"); // PASS
 core_spec_test!(if_, "if"); // PASS
-core_spec_test!(imports); // FAIL: lots of unexpected success or incorrect results, some BadSignature faults, some "symbol not found" errors indicating test harness isnt correct
+                            // currently stops at 'creation of elements for undeclared table!', which is actually due to an elem section populating an imported table.
+                            // past that, lots of unexpected success or incorrect results, some BadSignature faults, some "symbol not found" errors indicating test harness isnt correct.
+core_spec_test!(imports); // FAIL: see above comment
 core_spec_test!(inline_module, "inline-module"); // PASS
 core_spec_test!(int_exprs); // PASS
 core_spec_test!(int_literals); // PASS
@@ -72,19 +74,19 @@ core_spec_test!(labels); // PASS
 core_spec_test!(left_to_right, "left-to-right"); // PASS
 core_spec_test!(linking); // FAIL: exports mutable globals
 core_spec_test!(loop_, "loop"); // PASS
-core_spec_test!(memory_grow); // FAIL but i think its because a test asked for 4gb of memory? could increase memory limit in test harness.
+core_spec_test!(memory_grow); // PASS
 core_spec_test!(memory_redundancy); // PASS
-core_spec_test!(memory_trap); // FAIL incorrect result
-core_spec_test!(memory); // FAIL panic related to heap guard
+core_spec_test!(memory_trap); // PASS
+core_spec_test!(memory); // PASS
                          // too noisy to keep enabled:
                          // core_spec_test!(names); // FAIL hundreds of errors because we dont support unicode names yet.
 core_spec_test!(nop); // PASS
 core_spec_test!(return_, "return"); // PASS
 core_spec_test!(select); // PASS
 core_spec_test!(set_local); // PASS
-core_spec_test!(skip_stack_guard_page, "skip-stack-guard-page"); // PASS but takes over 1 minute
+core_spec_test!(skip_stack_guard_page, "skip-stack-guard-page"); // PASS but takes over 1 minute in cranelift building function-with-many-locals
 core_spec_test!(stack); // PASS
-core_spec_test!(start); // FAIL imports print functions
+core_spec_test!(start); // PASS
 core_spec_test!(store_retval); // PASS
 core_spec_test!(switch); // PASS
 core_spec_test!(tee_local); // PASS
