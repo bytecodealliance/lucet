@@ -4,7 +4,7 @@ use failure::*;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use wabt::wat2wasm;
+use wabt::{ErrorKind, wat2wasm};
 
 pub fn read_module<P: AsRef<Path>>(
     path: P,
@@ -32,8 +32,23 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     let converted = if wasm_preamble(&bytes) {
         bytes
     } else {
-        wat2wasm(bytes).map_err(|_| {
-            format_err!("Input is neither valid WASM nor WAT").context(LucetcErrorKind::Input)
+        wat2wasm(bytes).map_err(|err| {
+            use std::error::Error;
+            let mut result = err.description().to_string();
+            match unsafe { std::mem::transmute::<wabt::Error, wabt::ErrorKind>(err) } {
+                ErrorKind::Parse(msg) |
+                // this shouldn't be reachable - we're going the other way
+                ErrorKind::Deserialize(msg) |
+                // not sure how this error comes up
+                ErrorKind::ResolveNames(msg) |
+                ErrorKind::Validate(msg) => {
+                    result.push_str(":\n");
+                    result.push_str(&msg);
+                },
+                _ => { }
+            };
+            format_err!("{}", result)
+                .context(LucetcErrorKind::Input)
         })?
     };
     Ok(converted)

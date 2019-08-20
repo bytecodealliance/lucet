@@ -37,7 +37,7 @@ goblin = "0.0.24"
 failure = "0.1"
 byteorder = "1.2"
 wasmonkey = { path = "../lucet-builtins/wasmonkey", version = "0.1.7" }
-wabt = "0.7"
+wabt = "0.9.1"
 tempfile = "3.0"
 bimap = "0.2"
 human-size = "0.4"

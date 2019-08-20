@@ -19,7 +19,11 @@ fn main() {
     let opts = Options::get().unwrap();
 
     if let Err(err) = run(&opts) {
-        let mut msg = format!("{:?}", err);
+        let mut msg = format!("Error: {}.", err);
+        if let Some(cause) = err.as_fail().cause() {
+            msg.push(' ');
+            msg.push_str(&format!("{}", cause));
+        }
         if !msg.ends_with('\n') {
             msg.push('\n');
         }
