@@ -33,7 +33,9 @@ impl CGenerator {
                     DatatypeVariant::Struct(s) => self.gen_struct(&s)?,
                     DatatypeVariant::Alias(a) => self.gen_alias(&a)?,
                     DatatypeVariant::Enum(e) => self.gen_enum(&e)?,
-                    DatatypeVariant::Atom(_) => unreachable!(),
+                    DatatypeVariant::Atom(_) => {
+                        unreachable!("atoms should not be defined in package modules")
+                    }
                 }
             }
             for func in module.functions() {
