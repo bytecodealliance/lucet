@@ -110,9 +110,14 @@ impl RustGenerator {
     }
 
     fn gen_struct(&mut self, struct_: &StructDatatype) -> Result<(), IDLError> {
+        let mut derivations = vec!["Debug", "Clone", "PartialEq", "PartialOrd"];
+        if !struct_.contains_floats() {
+            derivations.push("Eq");
+            derivations.push("Ord");
+        }
         self.w
             .writeln("#[repr(C)]")
-            .writeln("#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]")
+            .writeln(format!("#[derive({})]", derivations.join(", ")))
             .writeln(format!("pub struct {} {{", struct_.rust_type_name()));
 
         let mut w = self.w.new_block();

@@ -194,6 +194,18 @@ impl<'a> Datatype<'a> {
             _ => self.clone(),
         }
     }
+
+    pub fn contains_floats(&self) -> bool {
+        match self.variant() {
+            DatatypeVariant::Struct(s) => {
+                s.members().find(|m| m.type_().contains_floats()).is_some()
+            }
+            DatatypeVariant::Alias { .. } => self.anti_alias().contains_floats(),
+            DatatypeVariant::Enum { .. } => false,
+            DatatypeVariant::Atom(AtomType::F32) | DatatypeVariant::Atom(AtomType::F64) => true,
+            DatatypeVariant::Atom(_) => false,
+        }
+    }
 }
 
 impl<'a> MemArea for Datatype<'a> {
