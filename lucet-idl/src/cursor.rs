@@ -129,7 +129,7 @@ impl<'a> Module<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Datatype<'a> {
     pkg: &'a Package,
     id: DatatypeIdent,
@@ -166,15 +166,15 @@ impl<'a> Datatype<'a> {
         match self.repr().variant {
             DatatypeVariantRepr::Atom(a) => DatatypeVariant::Atom(a),
             DatatypeVariantRepr::Struct(ref repr) => DatatypeVariant::Struct(StructDatatype {
-                datatype: self.clone(),
+                datatype: *self,
                 repr: &repr,
             }),
             DatatypeVariantRepr::Enum(ref repr) => DatatypeVariant::Enum(EnumDatatype {
-                datatype: self.clone(),
+                datatype: *self,
                 repr: &repr,
             }),
             DatatypeVariantRepr::Alias(ref repr) => DatatypeVariant::Alias(AliasDatatype {
-                datatype: self.clone(),
+                datatype: *self,
                 repr: &repr,
             }),
         }
@@ -187,11 +187,11 @@ impl<'a> Datatype<'a> {
     pub fn anti_alias(&self) -> Datatype<'a> {
         match self.repr().variant {
             DatatypeVariantRepr::Alias(ref repr) => AliasDatatype {
-                datatype: self.clone(),
+                datatype: *self,
                 repr: &repr,
             }
             .anti_alias(),
-            _ => self.clone(),
+            _ => *self,
         }
     }
 
@@ -261,7 +261,7 @@ impl<'a> DatatypeVariant<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct StructDatatype<'a> {
     datatype: Datatype<'a>,
     repr: &'a StructDatatypeRepr,
@@ -273,11 +273,11 @@ impl<'a> StructDatatype<'a> {
     }
 
     pub fn members(&self) -> impl Iterator<Item = StructMember<'a>> {
-        let struct_ = self.clone();
-        self.repr.members.iter().map(move |repr| StructMember {
-            struct_: struct_.clone(),
-            repr,
-        })
+        let struct_ = *self;
+        self.repr
+            .members
+            .iter()
+            .map(move |repr| StructMember { struct_, repr })
     }
 }
 
@@ -290,11 +290,11 @@ impl<'a> Deref for StructDatatype<'a> {
 
 impl<'a> From<StructDatatype<'a>> for Datatype<'a> {
     fn from(s: StructDatatype<'a>) -> Datatype<'a> {
-        s.datatype.clone()
+        s.datatype
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct StructMember<'a> {
     struct_: StructDatatype<'a>,
     repr: &'a StructMemberRepr,
@@ -314,11 +314,11 @@ impl<'a> StructMember<'a> {
         }
     }
     pub fn struct_(&self) -> StructDatatype<'a> {
-        self.struct_.clone()
+        self.struct_
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct EnumDatatype<'a> {
     datatype: Datatype<'a>,
     repr: &'a EnumDatatypeRepr,
@@ -326,13 +326,10 @@ pub struct EnumDatatype<'a> {
 
 impl<'a> EnumDatatype<'a> {
     pub fn variants(&self) -> impl Iterator<Item = EnumVariant<'a>> {
-        let enum_ = self.clone();
+        let enum_ = *self;
         (0..self.repr.members.len())
             .into_iter()
-            .map(move |ix| EnumVariant {
-                enum_: enum_.clone(),
-                index: ix,
-            })
+            .map(move |ix| EnumVariant { enum_, index: ix })
     }
 
     pub fn variant(&self, name: &str) -> Option<EnumVariant<'a>> {
@@ -353,7 +350,7 @@ impl<'a> From<EnumDatatype<'a>> for Datatype<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct EnumVariant<'a> {
     enum_: EnumDatatype<'a>,
     index: usize,
@@ -361,7 +358,7 @@ pub struct EnumVariant<'a> {
 
 impl<'a> EnumVariant<'a> {
     pub fn enum_(&self) -> EnumDatatype<'a> {
-        self.enum_.clone()
+        self.enum_
     }
     pub fn name(&self) -> &str {
         &self.enum_.repr.members[self.index].name
@@ -410,7 +407,7 @@ impl<'a> AliasDatatype<'a> {
 
 impl<'a> From<AliasDatatype<'a>> for Datatype<'a> {
     fn from(a: AliasDatatype<'a>) -> Datatype<'a> {
-        a.datatype.clone()
+        a.datatype
     }
 }
 
@@ -421,7 +418,7 @@ impl<'a> Deref for AliasDatatype<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Function<'a> {
     pkg: &'a Package,
     id: FuncIdent,
@@ -437,7 +434,7 @@ impl<'a> Function<'a> {
     }
 
     pub fn arg(&self, name: &str) -> Option<FuncParam<'a>> {
-        let func = self.clone();
+        let func = *self;
         self.repr()
             .args
             .iter()
@@ -449,15 +446,15 @@ impl<'a> Function<'a> {
     }
 
     pub fn args(&self) -> impl Iterator<Item = FuncParam<'a>> {
-        let func = self.clone();
+        let func = *self;
         self.repr().args.iter().map(move |(ix, _)| FuncParam {
-            func: func.clone(),
+            func,
             ix: ParamIx::Arg(ix),
         })
     }
 
     pub fn ret(&self, name: &str) -> Option<FuncParam<'a>> {
-        let func = self.clone();
+        let func = *self;
         self.repr()
             .rets
             .iter()
@@ -469,9 +466,9 @@ impl<'a> Function<'a> {
     }
 
     pub fn rets(&self) -> impl Iterator<Item = FuncParam<'a>> {
-        let func = self.clone();
+        let func = *self;
         self.repr().rets.iter().map(move |(ix, _)| FuncParam {
-            func: func.clone(),
+            func,
             ix: ParamIx::Ret(ix),
         })
     }
@@ -485,7 +482,7 @@ impl<'a> Function<'a> {
     }
 
     pub fn binding(&self, name: &str) -> Option<FuncBinding<'a>> {
-        let func = self.clone();
+        let func = *self;
         self.repr()
             .bindings
             .iter()
@@ -494,11 +491,11 @@ impl<'a> Function<'a> {
     }
 
     pub fn bindings(&self) -> impl Iterator<Item = FuncBinding<'a>> {
-        let func = self.clone();
-        self.repr().bindings.iter().map(move |(ix, _)| FuncBinding {
-            func: func.clone(),
-            ix,
-        })
+        let func = *self;
+        self.repr()
+            .bindings
+            .iter()
+            .map(move |(ix, _)| FuncBinding { func, ix })
     }
 
     pub fn module(&self) -> Module<'a> {
@@ -524,7 +521,7 @@ pub enum ParamPosition {
     Ret(usize),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct FuncParam<'a> {
     func: Function<'a>,
     ix: ParamIx,
@@ -556,7 +553,7 @@ impl<'a> FuncParam<'a> {
         }
     }
     pub fn binding(&self) -> FuncBinding<'a> {
-        let func = self.func.clone();
+        let func = self.func;
         self.func
             .repr()
             .bindings
@@ -595,28 +592,28 @@ impl<'a> FuncBinding<'a> {
     pub fn param(&self) -> BindingParam<'a> {
         match self.repr().from {
             BindingFromRepr::Ptr(ix) => BindingParam::Ptr(FuncParam {
-                func: self.func.clone(),
+                func: self.func,
                 ix,
             }),
             BindingFromRepr::Slice(ptr_ix, len_ix) => BindingParam::Slice(
                 FuncParam {
-                    func: self.func.clone(),
+                    func: self.func,
                     ix: ptr_ix,
                 },
                 FuncParam {
-                    func: self.func.clone(),
+                    func: self.func,
                     ix: len_ix,
                 },
             ),
             BindingFromRepr::Value(ix) => BindingParam::Value(FuncParam {
-                func: self.func.clone(),
+                func: self.func,
                 ix,
             }),
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum BindingParam<'a> {
     Ptr(FuncParam<'a>),
     Slice(FuncParam<'a>, FuncParam<'a>),

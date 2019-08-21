@@ -31,7 +31,7 @@ impl DatatypeIdent {
 pub struct FuncIx(u32);
 entity_impl!(FuncIx);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FuncIdent {
     pub module: ModuleIx,
     pub func: FuncIx,
