@@ -31,7 +31,7 @@ impl<'a> FunctionModuleBuilder<'a> {
         args: &[FuncArgSyntax],
         rets: &[FuncArgSyntax],
         bindings: &[BindingSyntax],
-        location: &Location,
+        location: Location,
     ) -> Result<(), ValidationError> {
         let mut validator = FuncValidator::new(location, &self.env);
         validator.introduce_args(args)?;
@@ -76,12 +76,12 @@ struct FuncValidator<'a> {
     // param position to binding syntax
     bindings: PrimaryMap<BindingIx, BindingRepr>,
     param_binding_sites: HashMap<ParamIx, Location>,
-    location: &'a Location,
+    location: Location,
     module: &'a Module<'a>,
 }
 
 impl<'a> FuncValidator<'a> {
-    fn new(location: &'a Location, module: &'a Module<'a>) -> Self {
+    fn new(location: Location, module: &'a Module<'a>) -> Self {
         Self {
             param_names: HashMap::new(),
             args: PrimaryMap::new(),
@@ -102,7 +102,7 @@ impl<'a> FuncValidator<'a> {
             Err(ValidationError::NameAlreadyExists {
                 name: arg_syntax.name.to_owned(),
                 at_location: arg_syntax.location,
-                previous_location: previous_location.clone(),
+                previous_location: *previous_location,
             })?;
         } else {
             self.param_names
@@ -132,7 +132,7 @@ impl<'a> FuncValidator<'a> {
         if rets.len() > 1 {
             Err(ValidationError::Syntax {
                 expected: "at most one return value",
-                location: *self.location,
+                location: self.location,
             })?
         }
         for (ix, r) in rets.iter().enumerate() {
@@ -181,7 +181,7 @@ impl<'a> FuncValidator<'a> {
             Err(ValidationError::NameAlreadyExists {
                 name: binding.name.to_owned(),
                 at_location: binding.location,
-                previous_location: previous_location.clone(),
+                previous_location: *previous_location,
             })?;
         } else {
             self.binding_names
@@ -226,8 +226,8 @@ impl<'a> FuncValidator<'a> {
             let (arg_location, _) = self.param_names.get(&arg.name).expect("arg introduced");
             Err(ValidationError::BindingNameAlreadyBound {
                 name: arg.name.clone(),
-                at_location: previous_location.clone(),
-                bound_location: arg_location.clone(),
+                at_location: *previous_location,
+                bound_location: *arg_location,
             })?;
         }
 
@@ -268,23 +268,22 @@ impl<'a> FuncValidator<'a> {
     fn validate_binding_arg_mapping(
         &mut self,
         name: &str,
-        location: &Location,
+        location: Location,
     ) -> Result<(ParamIx, ParamRepr), ValidationError> {
         // Check that it refers to a valid arg:
         let (position, arg) = self.get_arg(name).ok_or_else(|| ValidationError::Syntax {
             expected: "name of an argument or return value",
-            location: location.clone(),
+            location,
         })?;
         // Check that the arg has only been used once:
         if let Some(use_location) = self.param_binding_sites.get(&position) {
             Err(ValidationError::BindingNameAlreadyBound {
                 name: name.to_owned(),
-                at_location: location.clone(),
-                bound_location: use_location.clone(),
+                at_location: location,
+                bound_location: *use_location,
             })?;
         } else {
-            self.param_binding_sites
-                .insert(position.clone(), location.clone());
+            self.param_binding_sites.insert(position.clone(), location);
         }
         Ok((position, arg))
     }
@@ -299,11 +298,11 @@ impl<'a> FuncValidator<'a> {
             BindingRefSyntax::Ptr(bref) => match bref.deref() {
                 BindingRefSyntax::Name(ref name) => {
                     let (position, funcarg) =
-                        self.validate_binding_arg_mapping(name, &binding.location)?;
+                        self.validate_binding_arg_mapping(name, binding.location)?;
                     if funcarg.type_ != AbiType::I32 {
                         Err(ValidationError::BindingTypeError {
                             expected: "pointer bindings to be represented as an i32",
-                            location: binding.location.clone(),
+                            location: binding.location,
                         })?;
                     }
                     match position {
@@ -313,7 +312,7 @@ impl<'a> FuncValidator<'a> {
                         ParamIx::Ret(_) => {
                             Err(ValidationError::BindingTypeError {
                                 expected: "return value cannot be bound to pointer",
-                                location: binding.location.clone(),
+                                location: binding.location,
                             })?;
                         }
                     }
@@ -321,7 +320,7 @@ impl<'a> FuncValidator<'a> {
                 }
                 _ => Err(ValidationError::Syntax {
                     expected: "pointer binding must be of form *arg",
-                    location: binding.location.clone(),
+                    location: binding.location,
                 }),
             },
             // A slice of two names is accepted:
@@ -332,7 +331,7 @@ impl<'a> FuncValidator<'a> {
                         BindingRefSyntax::Name(ref len_name),
                     ) => {
                         let (ptr_position, ptr_arg) =
-                            self.validate_binding_arg_mapping(ptr_name, &binding.location)?;
+                            self.validate_binding_arg_mapping(ptr_name, binding.location)?;
                         if ptr_arg.type_ != AbiType::I32 {
                             Err(ValidationError::BindingTypeError {
                                 expected: "slice pointer must be i32",
@@ -340,7 +339,7 @@ impl<'a> FuncValidator<'a> {
                             })?;
                         }
                         let (len_position, len_arg) =
-                            self.validate_binding_arg_mapping(len_name, &binding.location)?;
+                            self.validate_binding_arg_mapping(len_name, binding.location)?;
                         if len_arg.type_ != AbiType::I32 {
                             Err(ValidationError::BindingTypeError {
                                 expected: "slice len must be i32",
@@ -366,14 +365,14 @@ impl<'a> FuncValidator<'a> {
                     }
                     _ => Err(ValidationError::Syntax {
                         expected: "slice binding must be of form [ptr, len]",
-                        location: binding.location.clone(),
+                        location: binding.location,
                     }),
                 }
             }
             // A bare name is accepted:
             BindingRefSyntax::Name(ref name) => {
                 let (position, funcarg) =
-                    self.validate_binding_arg_mapping(name, &binding.location)?;
+                    self.validate_binding_arg_mapping(name, binding.location)?;
 
                 // make sure funcarg.type_ is a valid representation of target type
                 match target_type.abi_type() {
@@ -381,14 +380,14 @@ impl<'a> FuncValidator<'a> {
                         if target_repr != funcarg.type_ {
                             Err(ValidationError::BindingTypeError {
                                 expected: "binding type representation to match argument type",
-                                location: binding.location.clone(),
+                                location: binding.location,
                             })?;
                         }
                     }
                     None => {
                         Err(ValidationError::BindingTypeError {
                             expected: "binding type to be representable as value (try passing by reference instead)",
-                            location: binding.location.clone(),
+                            location: binding.location,
                         })?;
                     }
                 }
@@ -398,7 +397,7 @@ impl<'a> FuncValidator<'a> {
                         if binding.direction != BindingDirSyntax::In {
                             Err(ValidationError::BindingTypeError {
                                 expected: "argument value must be input-only binding",
-                                location: binding.location.clone(),
+                                location: binding.location,
                             })?;
                         }
                     }
@@ -406,7 +405,7 @@ impl<'a> FuncValidator<'a> {
                         if binding.direction != BindingDirSyntax::Out {
                             Err(ValidationError::BindingTypeError {
                                 expected: "return value must be output-only binding",
-                                location: binding.location.clone(),
+                                location: binding.location,
                             })?;
                         }
                     }

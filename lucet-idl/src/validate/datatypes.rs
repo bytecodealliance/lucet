@@ -65,7 +65,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
         &mut self,
         name: &str,
         members_syntax: &[StructMemberSyntax],
-        location: &Location,
+        location: Location,
     ) -> Result<(), ValidationError> {
         let ix = self
             .names
@@ -74,7 +74,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
         if members_syntax.is_empty() {
             Err(ValidationError::Empty {
                 name: name.to_owned(),
-                location: *location,
+                location,
             })?
         }
 
@@ -102,7 +102,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
             ix,
             DatatypeIR {
                 variant: VariantIR::Struct(StructIR { members }),
-                location: *location,
+                location,
             },
         );
         Ok(())
@@ -112,7 +112,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
         &mut self,
         name: &str,
         variants: &[EnumVariantSyntax],
-        location: &Location,
+        location: Location,
     ) -> Result<(), ValidationError> {
         let ix = self
             .names
@@ -121,7 +121,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
         if variants.is_empty() {
             Err(ValidationError::Empty {
                 name: name.to_owned(),
-                location: *location,
+                location,
             })?
         }
 
@@ -145,7 +145,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
             ix,
             DatatypeIR {
                 variant: VariantIR::Enum(EnumIR { members }),
-                location: *location,
+                location,
             },
         );
         Ok(())
@@ -155,7 +155,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
         &mut self,
         name: &str,
         dest: &SyntaxIdent,
-        location: &Location,
+        location: Location,
     ) -> Result<(), ValidationError> {
         let ix = self
             .names
@@ -166,7 +166,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
             ix,
             DatatypeIR {
                 variant: VariantIR::Alias(AliasIR { to }),
-                location: *location,
+                location,
             },
         );
         Ok(())
@@ -200,7 +200,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
             self.dfs_walk(ix, &mut visited, &mut ordered, &mut finalized)
                 .map_err(|_| ValidationError::Infinite {
                     name: name.clone(),
-                    location: decl.location.clone(),
+                    location: decl.location,
                 })?;
         }
 

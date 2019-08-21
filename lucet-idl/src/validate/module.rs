@@ -40,21 +40,21 @@ pub fn module_from_declarations(
                 location,
                 members,
             } => {
-                datatypes_builder.introduce_struct(name, members, location)?;
+                datatypes_builder.introduce_struct(name, members, *location)?;
             }
             SyntaxDecl::Enum {
                 name,
                 location,
                 variants,
             } => {
-                datatypes_builder.introduce_enum(name, variants, location)?;
+                datatypes_builder.introduce_enum(name, variants, *location)?;
             }
             SyntaxDecl::Alias {
                 name,
                 location,
                 what,
             } => {
-                datatypes_builder.introduce_alias(name, what, location)?;
+                datatypes_builder.introduce_alias(name, what, *location)?;
             }
             _ => {}
         }
@@ -82,7 +82,7 @@ pub fn module_from_declarations(
             location,
         } = decl
         {
-            funcs_builder.introduce_func(name, args, rets, bindings, location)?;
+            funcs_builder.introduce_func(name, args, rets, bindings, *location)?;
         }
     }
 
