@@ -7,7 +7,6 @@ use crate::repr::{
 pub use crate::repr::{BindingDirection, Package};
 use crate::MemArea;
 use std::convert::TryFrom;
-use std::ops::Deref;
 
 impl Package {
     pub fn module<'a>(&'a self, name: &str) -> Option<Module<'a>> {
@@ -200,7 +199,7 @@ impl<'a> Datatype<'a> {
             DatatypeVariant::Struct(s) => {
                 s.members().find(|m| m.type_().contains_floats()).is_some()
             }
-            DatatypeVariant::Alias(a) => a.contains_floats(),
+            DatatypeVariant::Alias(a) => a.to().contains_floats(),
             DatatypeVariant::Enum { .. } => false,
             DatatypeVariant::Atom(AtomType::F32) | DatatypeVariant::Atom(AtomType::F64) => true,
             DatatypeVariant::Atom(_) => false,
@@ -211,7 +210,7 @@ impl<'a> Datatype<'a> {
             DatatypeVariant::Struct(s) => {
                 s.members().find(|m| m.type_().contains_enums()).is_some()
             }
-            DatatypeVariant::Alias(a) => a.contains_enums(),
+            DatatypeVariant::Alias(a) => a.to().contains_enums(),
             DatatypeVariant::Enum { .. } => true,
             DatatypeVariant::Atom { .. } => false,
         }
@@ -289,12 +288,9 @@ impl<'a> StructDatatype<'a> {
             .iter()
             .map(move |repr| StructMember { struct_, repr })
     }
-}
 
-impl<'a> Deref for StructDatatype<'a> {
-    type Target = Datatype<'a>;
-    fn deref(&self) -> &Self::Target {
-        &self.datatype
+    pub fn datatype(&self) -> Datatype<'a> {
+        self.datatype
     }
 }
 
@@ -345,12 +341,9 @@ impl<'a> EnumDatatype<'a> {
     pub fn variant(&self, name: &str) -> Option<EnumVariant<'a>> {
         self.variants().find(|v| v.name() == name)
     }
-}
 
-impl<'a> Deref for EnumDatatype<'a> {
-    type Target = Datatype<'a>;
-    fn deref(&self) -> &Self::Target {
-        &self.datatype
+    pub fn datatype(&self) -> Datatype<'a> {
+        self.datatype
     }
 }
 
@@ -408,18 +401,15 @@ impl<'a> AliasDatatype<'a> {
             id: referent.id,
         }
     }
+
+    pub fn datatype(&self) -> Datatype<'a> {
+        self.datatype
+    }
 }
 
 impl<'a> From<AliasDatatype<'a>> for Datatype<'a> {
     fn from(a: AliasDatatype<'a>) -> Datatype<'a> {
         a.datatype
-    }
-}
-
-impl<'a> Deref for AliasDatatype<'a> {
-    type Target = Datatype<'a>;
-    fn deref(&self) -> &Self::Target {
-        &self.datatype
     }
 }
 

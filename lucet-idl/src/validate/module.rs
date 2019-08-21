@@ -289,7 +289,7 @@ mod tests {
 
         match foo.variant() {
             DatatypeVariant::Alias(a) => {
-                assert_eq!(a.name(), "foo");
+                assert_eq!(a.datatype().name(), "foo");
                 assert_eq!(a.to().name(), "bar");
             }
             _ => panic!("foo is an alias"),

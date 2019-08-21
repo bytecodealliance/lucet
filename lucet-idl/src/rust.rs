@@ -94,35 +94,42 @@ impl RustGenerator {
     fn gen_alias(&mut self, alias: &AliasDatatype) -> Result<(), IDLError> {
         self.w.writeln(format!(
             "pub type {} = {};",
-            alias.rust_type_name(),
+            alias.datatype().rust_type_name(),
             alias.to().rust_type_name()
         ));
 
-        gen_testcase(&mut self.w, &alias.name().to_snake_case(), move |w| {
-            w.writeln(format!(
-                "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
-                alias.mem_size(),
-                alias.rust_type_name()
-            ));
-            Ok(())
-        })?;
+        gen_testcase(
+            &mut self.w,
+            &alias.datatype().name().to_snake_case(),
+            move |w| {
+                w.writeln(format!(
+                    "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
+                    alias.datatype().mem_size(),
+                    alias.datatype().rust_type_name()
+                ));
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
     fn gen_struct(&mut self, struct_: &StructDatatype) -> Result<(), IDLError> {
         let mut derivations = vec!["Debug", "Copy", "Clone", "PartialEq", "PartialOrd"];
-        if !struct_.contains_floats() {
+        if !struct_.datatype().contains_floats() {
             derivations.push("Eq");
             derivations.push("Ord");
             derivations.push("Hash");
         }
-        if !struct_.contains_enums() {
+        if !struct_.datatype().contains_enums() {
             derivations.push("Default");
         }
         self.w
             .writeln("#[repr(C)]")
             .writeln(format!("#[derive({})]", derivations.join(", ")))
-            .writeln(format!("pub struct {} {{", struct_.rust_type_name()));
+            .writeln(format!(
+                "pub struct {} {{",
+                struct_.datatype().rust_type_name()
+            ));
 
         let mut w = self.w.new_block();
         for m in struct_.members() {
@@ -136,7 +143,7 @@ impl RustGenerator {
         self.w.writeln("}");
 
         self.w
-            .writeln(format!("impl {} {{", struct_.rust_type_name()));
+            .writeln(format!("impl {} {{", struct_.datatype().rust_type_name()));
         let mut w = self.w.new_block();
 
         w.writeln("pub fn validate_bytes(repr: &[u8]) -> bool {");
@@ -162,32 +169,36 @@ impl RustGenerator {
 
         self.w.writeln("}"); // end impl
 
-        gen_testcase(&mut self.w, &struct_.name().to_snake_case(), |w| {
-            w.writeln(format!(
-                "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
-                struct_.mem_size(),
-                struct_.rust_type_name(),
-            ));
+        gen_testcase(
+            &mut self.w,
+            &struct_.datatype().name().to_snake_case(),
+            |w| {
+                w.writeln(format!(
+                    "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
+                    struct_.datatype().mem_size(),
+                    struct_.datatype().rust_type_name(),
+                ));
 
-            for m in struct_.members() {
-                w.writeln("{");
-                let mut ww = w.new_block();
-                // This is essentially an inlining of the macros in the memoffset crate.
-                ww.writeln(format!(
-                    "let base_uninit = ::std::mem::MaybeUninit::<super::{}>::uninit();",
-                    struct_.rust_type_name(),
-                ))
-                .writeln("let base_ptr = base_uninit.as_ptr();")
-                .writeln(format!(
-                    "let field_ptr = unsafe {{ &(*base_ptr).{} as *const _ }};",
-                    m.rust_name(),
-                ))
-                .writeln("let offset = (field_ptr as usize) - (base_ptr as usize);")
-                .writeln(format!("assert_eq!({}, offset);", m.offset()));
-                w.writeln("}");
-            }
-            Ok(())
-        })?;
+                for m in struct_.members() {
+                    w.writeln("{");
+                    let mut ww = w.new_block();
+                    // This is essentially an inlining of the macros in the memoffset crate.
+                    ww.writeln(format!(
+                        "let base_uninit = ::std::mem::MaybeUninit::<super::{}>::uninit();",
+                        struct_.datatype().rust_type_name(),
+                    ))
+                    .writeln("let base_ptr = base_uninit.as_ptr();")
+                    .writeln(format!(
+                        "let field_ptr = unsafe {{ &(*base_ptr).{} as *const _ }};",
+                        m.rust_name(),
+                    ))
+                    .writeln("let offset = (field_ptr as usize) - (base_ptr as usize);")
+                    .writeln(format!("assert_eq!({}, offset);", m.offset()));
+                    w.writeln("}");
+                }
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
@@ -197,7 +208,7 @@ impl RustGenerator {
         self.w
             .writeln("#[repr(u32)]")
             .writeln("#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]")
-            .writeln(format!("pub enum {} {{", enum_.rust_type_name()));
+            .writeln(format!("pub enum {} {{", enum_.datatype().rust_type_name()));
 
         let mut w = self.w.new_block();
         for v in enum_.variants() {
@@ -207,7 +218,7 @@ impl RustGenerator {
         self.w.writeln("}");
 
         self.w
-            .writeln(format!("impl {} {{", enum_.rust_type_name()));
+            .writeln(format!("impl {} {{", enum_.datatype().rust_type_name()));
         let mut w = self.w.new_block();
         w.writeln("pub fn from_u32(e: u32) -> Option<Self> {");
         let mut ww = w.new_block();
@@ -217,7 +228,7 @@ impl RustGenerator {
             www.writeln(format!(
                 "{} => Some({}::{}),",
                 v.index(),
-                enum_.rust_type_name(),
+                enum_.datatype().rust_type_name(),
                 v.rust_name()
             ));
         }
@@ -235,11 +246,11 @@ impl RustGenerator {
         w.writeln("}");
         self.w.writeln("}"); // end impl
 
-        gen_testcase(&mut self.w, &enum_.name().to_snake_case(), |w| {
+        gen_testcase(&mut self.w, &enum_.datatype().name().to_snake_case(), |w| {
             w.writeln(format!(
                 "assert_eq!({}, ::std::mem::size_of::<super::{}>());",
-                enum_.mem_size(),
-                enum_.rust_type_name(),
+                enum_.datatype().mem_size(),
+                enum_.datatype().rust_type_name(),
             ));
             Ok(())
         })?;

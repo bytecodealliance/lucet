@@ -57,7 +57,7 @@ impl CGenerator {
     // The most important thing in alias generation is to cache the size
     // and alignment rules of what it ultimately points to
     fn gen_alias(&mut self, alias: &AliasDatatype) -> Result<(), IDLError> {
-        let own_type_name = Datatype::from(alias.clone()).c_type_name();
+        let own_type_name = alias.datatype().c_type_name();
         self.w
             .writeln(format!(
                 "typedef {} {};",
@@ -71,7 +71,7 @@ impl CGenerator {
             .writeln(format!(
                 "_Static_assert(sizeof({}) == {}, \"unexpected alias size\");",
                 own_type_name,
-                alias.mem_size(),
+                alias.datatype().mem_size(),
             ))
             .eob();
 
@@ -79,7 +79,7 @@ impl CGenerator {
     }
 
     fn gen_struct(&mut self, struct_: &StructDatatype) -> Result<(), IDLError> {
-        let own_type_name = Datatype::from(struct_.clone()).c_type_name();
+        let own_type_name = struct_.datatype().c_type_name();
         self.w.writeln(format!("{} {{", own_type_name));
         let mut w_block = self.w.new_block();
         for member in struct_.members() {
@@ -105,7 +105,7 @@ impl CGenerator {
             .writeln(format!(
                 "_Static_assert(sizeof({}) == {}, \"unexpected structure size\");",
                 own_type_name,
-                struct_.mem_size(),
+                struct_.datatype().mem_size(),
             ))
             .eob();
         Ok(())
@@ -114,13 +114,13 @@ impl CGenerator {
     // Enums generate both a specific typedef, and a traditional C-style enum
     // The typedef is required to use a native type which is consistent across all architectures
     fn gen_enum(&mut self, enum_: &EnumDatatype) -> Result<(), IDLError> {
-        let own_type_name = Datatype::from(enum_.clone()).c_type_name();
+        let own_type_name = enum_.datatype().c_type_name();
         self.w.writeln(format!("{} {{", own_type_name));
         let mut w = self.w.new_block();
         for variant in enum_.variants() {
             w.writeln(format!(
                 "{}, // {}",
-                macro_for(enum_.name(), variant.name()),
+                macro_for(enum_.datatype().name(), variant.name()),
                 variant.index(),
             ));
         }
@@ -129,7 +129,7 @@ impl CGenerator {
             .writeln(format!(
                 "_Static_assert(sizeof({}) == {}, \"unexpected enumeration size\");",
                 own_type_name,
-                enum_.mem_size(),
+                enum_.datatype().mem_size(),
             ))
             .eob();
         Ok(())
