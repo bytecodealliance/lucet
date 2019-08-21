@@ -496,17 +496,11 @@ impl<'a> Parser<'a> {
 
                     err_ctx!(err_msg, self.match_token(Token::LPar, "expected ("))?;
                     let args = err_ctx!(err_msg, self.match_func_args())?;
-
-                    let rets = match self.token() {
-                        Some(Token::RArrow) => {
-                            self.consume();
-                            err_ctx!(err_msg, self.match_func_rets())?
-                        }
-                        Some(Token::Semi) | Some(Token::Word("where")) => Vec::new(),
-                        t => err_ctx!(
-                            err_msg,
-                            parse_err!(self.location, "expected where, -> or ;, got {:?}", t)
-                        )?,
+                    let rets = if let Some(Token::RArrow) = self.token() {
+                        self.consume();
+                        err_ctx!(err_msg, self.match_func_rets())?
+                    } else {
+                        Vec::new()
                     };
 
                     let bindings = match self.token() {
@@ -518,10 +512,10 @@ impl<'a> Parser<'a> {
                             self.consume();
                             err_ctx!(err_msg, self.match_binding_exprs())?
                         }
-                        x => unreachable!(
-                            "match func rets didnt leave us with semi or where: {:?}",
-                            x
-                        ),
+                        t => err_ctx!(
+                            err_msg,
+                            parse_err!(self.location, "expected where, -> or ;, got {:?}", t)
+                        )?,
                     };
 
                     return Ok(Some(SyntaxDecl::Function {
