@@ -72,36 +72,31 @@ impl AtomType {
 
 #[cfg(test)]
 mod test {
-    use super::std_module;
     use crate::atoms::AtomType;
     use crate::repr::{DatatypeIdent, Package};
-    use cranelift_entity::PrimaryMap;
+    use crate::validate::PackageBuilder;
     #[test]
     fn atom_idents() {
         use AtomType::*;
-
-        let mut names = PrimaryMap::new();
-        names.push("std".to_owned());
-        let mut modules = PrimaryMap::new();
-        modules.push(std_module());
-        let prelude = Package { names, modules };
+        let builder = PackageBuilder::new(); // Uses `super::std_module`
+        let prelude = builder.repr();
 
         fn lookup_atom_by_id(package: &Package, ident: DatatypeIdent) -> AtomType {
             let dt = package.datatype_by_id(ident).expect("get by id");
             dt.variant().atom().expect("datatype is atom")
         }
 
-        assert_eq!(Bool, lookup_atom_by_id(&prelude, Bool.datatype_id()));
-        assert_eq!(U8, lookup_atom_by_id(&prelude, U8.datatype_id()));
-        assert_eq!(U16, lookup_atom_by_id(&prelude, U16.datatype_id()));
-        assert_eq!(U32, lookup_atom_by_id(&prelude, U32.datatype_id()));
-        assert_eq!(U64, lookup_atom_by_id(&prelude, U64.datatype_id()));
-        assert_eq!(I8, lookup_atom_by_id(&prelude, I8.datatype_id()));
-        assert_eq!(I16, lookup_atom_by_id(&prelude, I16.datatype_id()));
-        assert_eq!(I32, lookup_atom_by_id(&prelude, I32.datatype_id()));
-        assert_eq!(I64, lookup_atom_by_id(&prelude, I64.datatype_id()));
-        assert_eq!(F32, lookup_atom_by_id(&prelude, F32.datatype_id()));
-        assert_eq!(F64, lookup_atom_by_id(&prelude, F64.datatype_id()));
+        assert_eq!(Bool, lookup_atom_by_id(prelude, Bool.datatype_id()));
+        assert_eq!(U8, lookup_atom_by_id(prelude, U8.datatype_id()));
+        assert_eq!(U16, lookup_atom_by_id(prelude, U16.datatype_id()));
+        assert_eq!(U32, lookup_atom_by_id(prelude, U32.datatype_id()));
+        assert_eq!(U64, lookup_atom_by_id(prelude, U64.datatype_id()));
+        assert_eq!(I8, lookup_atom_by_id(prelude, I8.datatype_id()));
+        assert_eq!(I16, lookup_atom_by_id(prelude, I16.datatype_id()));
+        assert_eq!(I32, lookup_atom_by_id(prelude, I32.datatype_id()));
+        assert_eq!(I64, lookup_atom_by_id(prelude, I64.datatype_id()));
+        assert_eq!(F32, lookup_atom_by_id(prelude, F32.datatype_id()));
+        assert_eq!(F64, lookup_atom_by_id(prelude, F64.datatype_id()));
 
         fn lookup_atom_by_name(package: &Package, name: &str) -> AtomType {
             let dt = package
@@ -112,16 +107,16 @@ mod test {
             dt.variant().atom().expect("datatype is atom")
         }
 
-        assert_eq!(Bool, lookup_atom_by_name(&prelude, "bool"));
-        assert_eq!(U8, lookup_atom_by_name(&prelude, "u8"));
-        assert_eq!(U16, lookup_atom_by_name(&prelude, "u16"));
-        assert_eq!(U32, lookup_atom_by_name(&prelude, "u32"));
-        assert_eq!(U64, lookup_atom_by_name(&prelude, "u64"));
-        assert_eq!(I8, lookup_atom_by_name(&prelude, "i8"));
-        assert_eq!(I16, lookup_atom_by_name(&prelude, "i16"));
-        assert_eq!(I32, lookup_atom_by_name(&prelude, "i32"));
-        assert_eq!(I64, lookup_atom_by_name(&prelude, "i64"));
-        assert_eq!(F32, lookup_atom_by_name(&prelude, "f32"));
-        assert_eq!(F64, lookup_atom_by_name(&prelude, "f64"));
+        assert_eq!(Bool, lookup_atom_by_name(prelude, "bool"));
+        assert_eq!(U8, lookup_atom_by_name(prelude, "u8"));
+        assert_eq!(U16, lookup_atom_by_name(prelude, "u16"));
+        assert_eq!(U32, lookup_atom_by_name(prelude, "u32"));
+        assert_eq!(U64, lookup_atom_by_name(prelude, "u64"));
+        assert_eq!(I8, lookup_atom_by_name(prelude, "i8"));
+        assert_eq!(I16, lookup_atom_by_name(prelude, "i16"));
+        assert_eq!(I32, lookup_atom_by_name(prelude, "i32"));
+        assert_eq!(I64, lookup_atom_by_name(prelude, "i64"));
+        assert_eq!(F32, lookup_atom_by_name(prelude, "f32"));
+        assert_eq!(F64, lookup_atom_by_name(prelude, "f64"));
     }
 }
