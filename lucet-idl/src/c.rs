@@ -161,13 +161,17 @@ impl CGenerator {
     }
 
     fn gen_idiomatic_function(&mut self, func: &Function) -> Result<(), IDLError> {
-        let ret_bindings = func.c_ret_bindings().collect::<Vec<_>>();
-
-        let own_return_decl = match ret_bindings.len() {
-            0 => "void".to_owned(),
-            1 => ret_bindings[0].type_().c_type_name(),
+        let mut ret_bindings = func.c_ret_bindings().collect::<Vec<_>>();
+        let ret_bindings = match ret_bindings.len() {
+            0 => None,
+            1 => Some(ret_bindings.pop().expect("only member")),
             _ => unreachable!("functions limited to 0 or 1 return arguments"),
         };
+
+        let own_return_decl = ret_bindings
+            .clone()
+            .map(|b| b.type_().c_type_name())
+            .unwrap_or("void".to_owned());
 
         let own_arg_list = func
             .c_arg_bindings()
@@ -213,24 +217,19 @@ impl CGenerator {
                 .collect::<Vec<String>>()
                 .join(", ");
 
-            let (ret_capture, ret_statement) = match ret_bindings.len() {
-                0 => (format!(""), format!("return;")),
-                1 => {
-                    let b = &ret_bindings[0];
-                    match b.param() {
-                        BindingParam::Ptr(p) => (
-                            format!("{} {} = ", p.type_().c_type_name(), p.name()),
-                            format!("return (*{}) {};", b.type_().c_type_name(), p.name()),
-                        ),
-                        BindingParam::Value(v) => (
-                            format!("{} {} = ", v.type_().c_type_name(), v.name()),
-                            format!("return ({}) {};", b.type_().c_type_name(), v.name()),
-                        ),
-                        BindingParam::Slice { .. } => unreachable!(),
-                    }
-                }
-                _ => unreachable!(),
-            };
+            let (ret_capture, ret_statement) = ret_bindings
+                .map(|b| match b.param() {
+                    BindingParam::Ptr(p) => (
+                        format!("{} {} = ", p.type_().c_type_name(), p.name()),
+                        format!("return (*{}) {};", b.type_().c_type_name(), p.name()),
+                    ),
+                    BindingParam::Value(v) => (
+                        format!("{} {} = ", v.type_().c_type_name(), v.name()),
+                        format!("return ({}) {};", b.type_().c_type_name(), v.name()),
+                    ),
+                    BindingParam::Slice { .. } => unreachable!("return slices are not supported"),
+                })
+                .unwrap_or((format!(""), format!("return;")));
 
             let mut w = self.w.new_block();
             w.writeln(format!(
@@ -324,13 +323,13 @@ fn binding_is_ret(b: &FuncBinding) -> bool {
 }
 
 impl FuncBinding<'_> {
-    fn c_constness(&self) -> String {
+    fn c_constness(&self) -> &'static str {
         if self.direction() == BindingDirection::In
             && (self.param().ptr().is_some() || self.param().slice().is_some())
         {
-            "const ".to_owned()
+            "const "
         } else {
-            "".to_owned()
+            ""
         }
     }
 }

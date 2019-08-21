@@ -149,7 +149,7 @@ impl RustGenerator {
         w.writeln("pub fn validate_bytes(repr: &[u8]) -> bool {");
         let mut ww = w.new_block();
         for m in struct_.members() {
-            match m.type_().anti_alias().variant() {
+            match m.type_().canonicalize().variant() {
                 DatatypeVariant::Struct(_) | DatatypeVariant::Enum(_) => {
                     ww.writeln(format!(
                         "{}::validate_bytes(&repr[{}..{}]) &&",

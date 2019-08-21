@@ -154,13 +154,12 @@ impl<'a> RustIdiomArg<'a> {
         self.binding.param()
     }
 
-    fn mutable(&self) -> String {
+    fn mutable(&self) -> &'static str {
         if self.binding.direction() == BindingDirection::InOut {
             "mut "
         } else {
             ""
         }
-        .to_owned()
     }
 
     pub fn arg_declaration(&self) -> String {
@@ -169,7 +168,7 @@ impl<'a> RustIdiomArg<'a> {
                 format!("{}: &{}{}", self.name(), self.mutable(), self.type_name())
             }
             BindingParam::Slice { .. } => {
-                format!("{}: &{}[{}]", self.name(), self.mutable(), self.type_name(),)
+                format!("{}: &{}[{}]", self.name(), self.mutable(), self.type_name())
             }
             BindingParam::Value { .. } => {
                 assert_eq!(self.binding.direction(), BindingDirection::In);
@@ -226,7 +225,7 @@ impl<'a> RustIdiomArg<'a> {
                         ptr = ptr.rust_name(),
                         len = self.binding.type_().mem_size(),
                     ),
-                    format!("let {name}: &{typename} = unsafe {{ ({name}___MEM.as_ptr() as *const {typename}).as_ref().unwrap()  }}; // convert pointer in linear memory to ref",
+                    format!("let {name}: &{typename} = unsafe {{ ({name}___MEM.as_ptr() as *const {typename}).as_ref().expect(\"determined to be valid ref\")  }}; // convert pointer in linear memory to ref",
                         name = self.name(),
                         typename = self.type_name(),
                     ),
@@ -248,7 +247,7 @@ impl<'a> RustIdiomArg<'a> {
                         len = len.rust_name(),
                         elem_len =self.binding.type_().mem_size(),
                     ),
-                    format!("let {}: &[{}] = unsafe {{ ::std::slice::from_raw_parts({name}___MEM.as_ptr() as *const {typename}, {len}) }};",
+                    format!("let {name}: &[{typename}] = unsafe {{ ::std::slice::from_raw_parts({name}___MEM.as_ptr() as *const {typename}, {len}) }};",
                         name = self.name(),
                         typename = self.type_name(),
                         len = len.rust_name(),
@@ -272,7 +271,7 @@ impl<'a> RustIdiomArg<'a> {
                         ptr = ptr.rust_name(),
                         len = self.binding.type_().mem_size(),
                     ),
-                    format!("let mut {name}: &mut {typename} = unsafe {{ ({name}___MEM.as_mut_ptr() as *mut {typename}).as_mut().unwrap()  }}; // convert pointer in linear memory to ref",
+                    format!("let mut {name}: &mut {typename} = unsafe {{ ({name}___MEM.as_mut_ptr() as *mut {typename}).as_mut().expect(\"determined to be valid ref\")  }}; // convert pointer in linear memory to ref",
                         name = self.name(),
                         typename = self.type_name(),
                     ),
@@ -295,7 +294,7 @@ impl<'a> RustIdiomArg<'a> {
                         elem_len = self.binding.type_().mem_size(),
                     ),
 
-                    format!("let mut {}: &mut [{}] = unsafe {{ ::std::slice::from_raw_parts_mut({name}___MEM.as_mut_ptr() as *mut {typename}, {len}) }};",
+                    format!("let mut {name}: &mut [{typename}] = unsafe {{ ::std::slice::from_raw_parts_mut({name}___MEM.as_mut_ptr() as *mut {typename}, {len}) }};",
                         name = self.name(),
                         typename = self.type_name(),
                         len = len.rust_name(),
@@ -385,7 +384,7 @@ impl<'a> RustIdiomRet<'a> {
                     ptr = ptr.rust_name(),
                     len =self.binding.type_().mem_size(),
                 )];
-                match self.binding.type_().anti_alias().variant() {
+                match self.binding.type_().canonicalize().variant() {
                     DatatypeVariant::Enum(_) | DatatypeVariant::Struct(_) => {
                         lines.push(format!("if !{}::validate_bytes(&{}___MEM) {{ Err(())?; /* FIXME invalid representation */ }}",
                         self.type_name(), self.name()))
@@ -394,7 +393,7 @@ impl<'a> RustIdiomRet<'a> {
                     DatatypeVariant::Alias(_) => unreachable!("anti-aliased"),
                 }
                 lines.push(format!(
-                    "let mut {ptr}: &mut {typename} = unsafe {{ ({name}___MEM.as_mut_ptr() as *mut {typename}).as_mut().unwrap()  }}; // convert pointer in linear memory to ref",
+                    "let mut {ptr}: &mut {typename} = unsafe {{ ({name}___MEM.as_mut_ptr() as *mut {typename}).as_mut().expect(\"determined to be valid ref\")  }}; // convert pointer in linear memory to ref",
                     name = self.name(),
                     typename = self.type_name(),
                     ptr = ptr.rust_name(),
@@ -426,7 +425,7 @@ impl<'a> RustIdiomRet<'a> {
 
 fn cast_value_to_binding(b: &FuncBinding) -> String {
     match b.param() {
-        BindingParam::Value(val) => match b.type_().anti_alias().variant() {
+        BindingParam::Value(val) => match b.type_().canonicalize().variant() {
             DatatypeVariant::Enum(_) => format!(
                 "let {} = {}::from_u32({} as u32).ok_or(())?; // FIXME throw the right error",
                 b.rust_name(),

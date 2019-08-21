@@ -183,13 +183,13 @@ impl<'a> Datatype<'a> {
         self.variant().abi_type()
     }
 
-    pub fn anti_alias(&self) -> Datatype<'a> {
+    pub fn canonicalize(&self) -> Datatype<'a> {
         match self.repr().variant {
             DatatypeVariantRepr::Alias(ref repr) => AliasDatatype {
                 datatype: *self,
                 repr: &repr,
             }
-            .anti_alias(),
+            .canonicalize(),
             _ => *self,
         }
     }
@@ -386,7 +386,7 @@ impl<'a> AliasDatatype<'a> {
     }
 
     /// Find the non-alias datatype that this alias transitively refers to.
-    pub fn anti_alias(&self) -> Datatype<'a> {
+    pub fn canonicalize(&self) -> Datatype<'a> {
         // We can't just call this recursively because
         // of the borrow checker, so we have to recurse in a loop :/
         let mut referent = Datatype {
