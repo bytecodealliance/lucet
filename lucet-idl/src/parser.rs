@@ -386,7 +386,7 @@ impl<'a> Parser<'a> {
                 self.consume();
                 Ok(BindingDirSyntax::In)
             }
-            Some(Token::Word("inout")) | Some(Token::Word("io")) => {
+            Some(Token::Word("inout")) => {
                 self.consume();
                 Ok(BindingDirSyntax::InOut)
             }
@@ -394,10 +394,7 @@ impl<'a> Parser<'a> {
                 self.consume();
                 Ok(BindingDirSyntax::Out)
             }
-            _ => parse_err!(
-                self.location,
-                "expected binding direction (in, out, inout, io)"
-            ),
+            _ => parse_err!(self.location, "expected binding direction (in, out, inout)"),
         }
     }
 
