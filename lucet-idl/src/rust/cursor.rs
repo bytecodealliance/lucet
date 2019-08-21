@@ -102,6 +102,7 @@ pub fn render_tuple(members: &[String], base_case: &str) -> String {
 pub trait RustFunc<'a> {
     fn rust_idiom_args(&self) -> Vec<RustIdiomArg<'a>>;
     fn rust_idiom_rets(&self) -> Vec<RustIdiomRet<'a>>;
+    fn host_func_name(&self) -> String;
 }
 
 impl<'a> RustFunc<'a> for Function<'a> {
@@ -121,6 +122,14 @@ impl<'a> RustFunc<'a> for Function<'a> {
             .filter(|b| b.direction() == BindingDirection::Out)
             .map(|binding| RustIdiomRet { binding })
             .collect()
+    }
+
+    fn host_func_name(&self) -> String {
+        format!(
+            "__{}_{}",
+            self.module().name().to_snake_case(),
+            self.name().to_snake_case()
+        )
     }
 }
 

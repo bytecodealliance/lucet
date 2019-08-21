@@ -499,15 +499,6 @@ impl<'a> Function<'a> {
             ix: self.id.module,
         }
     }
-
-    pub fn host_func_name(&self) -> String {
-        use heck::SnakeCase;
-        format!(
-            "__{}_{}",
-            self.module().name().to_snake_case(),
-            self.name().to_snake_case()
-        )
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
