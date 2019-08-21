@@ -110,10 +110,14 @@ impl RustGenerator {
     }
 
     fn gen_struct(&mut self, struct_: &StructDatatype) -> Result<(), IDLError> {
-        let mut derivations = vec!["Debug", "Clone", "PartialEq", "PartialOrd"];
+        let mut derivations = vec!["Debug", "Copy", "Clone", "PartialEq", "PartialOrd"];
         if !struct_.contains_floats() {
             derivations.push("Eq");
             derivations.push("Ord");
+            derivations.push("Hash");
+        }
+        if !struct_.contains_enums() {
+            derivations.push("Default");
         }
         self.w
             .writeln("#[repr(C)]")
@@ -180,8 +184,8 @@ impl RustGenerator {
     // The typedef is required to use a native type which is consistent across all architectures
     fn gen_enum(&mut self, enum_: &EnumDatatype) -> Result<(), IDLError> {
         self.w
-            .writeln("#[repr(C)]")
-            .writeln("#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]")
+            .writeln("#[repr(u32)]")
+            .writeln("#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]")
             .writeln(format!("pub enum {} {{", enum_.rust_type_name()));
 
         let mut w = self.w.new_block();

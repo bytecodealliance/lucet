@@ -200,10 +200,20 @@ impl<'a> Datatype<'a> {
             DatatypeVariant::Struct(s) => {
                 s.members().find(|m| m.type_().contains_floats()).is_some()
             }
-            DatatypeVariant::Alias { .. } => self.anti_alias().contains_floats(),
+            DatatypeVariant::Alias(a) => a.contains_floats(),
             DatatypeVariant::Enum { .. } => false,
             DatatypeVariant::Atom(AtomType::F32) | DatatypeVariant::Atom(AtomType::F64) => true,
             DatatypeVariant::Atom(_) => false,
+        }
+    }
+    pub fn contains_enums(&self) -> bool {
+        match self.variant() {
+            DatatypeVariant::Struct(s) => {
+                s.members().find(|m| m.type_().contains_enums()).is_some()
+            }
+            DatatypeVariant::Alias(a) => a.contains_enums(),
+            DatatypeVariant::Enum { .. } => true,
+            DatatypeVariant::Atom { .. } => false,
         }
     }
 }
