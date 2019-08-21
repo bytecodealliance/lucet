@@ -390,13 +390,8 @@ impl<'a> AliasDatatype<'a> {
             pkg: self.datatype.pkg,
             id: self.repr.to,
         };
-        loop {
-            match referent.variant() {
-                DatatypeVariant::Alias(a) => {
-                    referent.id = a.datatype.id;
-                }
-                _ => break,
-            }
+        while let DatatypeVariant::Alias(a) = referent.variant() {
+            referent.id = a.datatype.id;
         }
         Datatype {
             pkg: self.datatype.pkg,
