@@ -237,7 +237,7 @@ pub enum DatatypeVariant<'a> {
 impl<'a> DatatypeVariant<'a> {
     pub fn abi_type(&self) -> Option<AbiType> {
         match self {
-            DatatypeVariant::Atom(a) => Some(AbiType::from_atom(a)),
+            DatatypeVariant::Atom(a) => Some(AbiType::smallest_representation(a)),
             DatatypeVariant::Struct(_) => None,
             DatatypeVariant::Enum(_) => Some(AbiType::I32),
             DatatypeVariant::Alias(a) => a.to().abi_type(),

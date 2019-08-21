@@ -377,9 +377,9 @@ impl<'a> FuncValidator<'a> {
                 // make sure funcarg.type_ is a valid representation of target type
                 match target_type.abi_type() {
                     Some(target_repr) => {
-                        if target_repr != funcarg.type_ {
+                        if !funcarg.type_.can_represent(&target_repr) {
                             Err(ValidationError::BindingTypeError {
-                                expected: "binding type representation to match argument type",
+                                expected: "binding type which can represent argument type",
                                 location: binding.location,
                             })?;
                         }

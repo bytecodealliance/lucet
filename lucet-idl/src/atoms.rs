@@ -79,7 +79,7 @@ pub enum AbiType {
 }
 
 impl AbiType {
-    pub fn from_atom(a: &AtomType) -> Self {
+    pub fn smallest_representation(a: &AtomType) -> Self {
         match a {
             AtomType::Bool
             | AtomType::U8
@@ -94,7 +94,14 @@ impl AbiType {
         }
     }
 
-    pub fn of_atom(a: AtomType) -> Option<Self> {
+    pub fn can_represent(&self, a: &Self) -> bool {
+        match self {
+            AbiType::I64 => *a == AbiType::I32 || *a == AbiType::I64,
+            _ => a == self,
+        }
+    }
+
+    pub fn from_atom(a: AtomType) -> Option<Self> {
         match a {
             AtomType::I32 => Some(AbiType::I32),
             AtomType::I64 => Some(AbiType::I64),
@@ -133,7 +140,7 @@ impl ::std::convert::TryFrom<&str> for AbiType {
     type Error = ();
     fn try_from(name: &str) -> Result<AbiType, ()> {
         let atom = AtomType::try_from(name)?;
-        Self::of_atom(atom).ok_or(())
+        Self::from_atom(atom).ok_or(())
     }
 }
 
