@@ -477,37 +477,52 @@ mod tests {
     fn func_one_arg_binding_wrong_type() {
         // Cant convert int to float
         assert_eq!(
-            mod_syntax("fn trivial(a: i32) where\na_binding: out f32 <- a;")
+            mod_syntax("fn trivial(a: i32) where\na_binding: in f32 <- a;")
                 .err()
                 .unwrap(),
             ValidationError::BindingTypeError {
-                expected: "binding type representation to match argument type",
+                expected: "binding type which can represent argument type",
                 location: Location { line: 2, column: 0 }
             },
         );
         // Cant convert float to int
         assert_eq!(
-            mod_syntax("fn trivial(a: f32) where\na_binding: out i32 <- a;")
+            mod_syntax("fn trivial(a: f32) where\na_binding: in i32 <- a;")
                 .err()
                 .unwrap(),
             ValidationError::BindingTypeError {
-                expected: "binding type representation to match argument type",
+                expected: "binding type which can represent argument type",
                 location: Location { line: 2, column: 0 }
             },
         );
         // Cant represent i64 with i32
         assert_eq!(
-            mod_syntax("fn trivial(a: i32) where\na_binding: out i64 <- a;")
+            mod_syntax("fn trivial(a: i32) where\na_binding: in i64 <- a;")
                 .err()
                 .unwrap(),
             ValidationError::BindingTypeError {
-                expected: "binding type representation to match argument type",
+                expected: "binding type which can represent argument type",
                 location: Location { line: 2, column: 0 }
             },
         );
-        // Cant represent ptr with float
+
+        // but, can represent i32 with i64
+        mod_syntax("fn trivial(a: i64) where\na_binding: in i32 <- a;").unwrap();
+
+        // Cant represent f64 with f32
         assert_eq!(
-            mod_syntax("fn trivial(a: f32) where\na_binding: out i8 <- *a;")
+            mod_syntax("fn trivial(a: f32) where\na_binding: in f64 <- a;")
+                .err()
+                .unwrap(),
+            ValidationError::BindingTypeError {
+                expected: "binding type which can represent argument type",
+                location: Location { line: 2, column: 0 }
+            },
+        );
+
+        // Cant represent ptr with f32
+        assert_eq!(
+            mod_syntax("fn trivial(a: f32) where\na_binding: in i8 <- *a;")
                 .err()
                 .unwrap(),
             ValidationError::BindingTypeError {
