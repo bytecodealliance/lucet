@@ -170,10 +170,21 @@ impl RustGenerator {
             ));
 
             for m in struct_.members() {
-                w.writeln(format!(
-                    "assert_eq!({}, {{ let base = ::std::ptr::null::<super::{}>(); unsafe {{ (&(*base).{}) as *const _ as usize }} }});",
-                    m.offset(), struct_.rust_type_name(), m.rust_name(),
-                ));
+                w.writeln("{");
+                let mut ww = w.new_block();
+                // This is essentially an inlining of the macros in the memoffset crate.
+                ww.writeln(format!(
+                    "let base_uninit = ::std::mem::MaybeUninit::<super::{}>::uninit();",
+                    struct_.rust_type_name(),
+                ))
+                .writeln("let base_ptr = base_uninit.as_ptr();")
+                .writeln(format!(
+                    "let field_ptr = unsafe {{ &(*base_ptr).{} as *const _ }};",
+                    m.rust_name(),
+                ))
+                .writeln("let offset = (field_ptr as usize) - (base_ptr as usize);")
+                .writeln(format!("assert_eq!({}, offset);", m.offset()));
+                w.writeln("}");
             }
             Ok(())
         })?;
