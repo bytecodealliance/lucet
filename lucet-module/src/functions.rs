@@ -1,5 +1,5 @@
 use crate::traps::{TrapManifest, TrapSite};
-use cranelift_codegen::entity::entity_impl;
+use cranelift_entity::entity_impl;
 use serde::{Deserialize, Serialize};
 
 use std::slice::from_raw_parts;
