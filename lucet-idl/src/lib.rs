@@ -49,7 +49,7 @@ pub trait MemArea {
 
 pub fn parse_package(input: &str) -> Result<Package, IDLError> {
     let mut parser = Parser::new(&input);
-    let decls = parser.match_decls()?;
+    let decls = parser.match_package_decls()?;
     let pkg = package_from_declarations(&decls)?;
     Ok(pkg)
 }

@@ -136,7 +136,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
                     previous_location: existing.location,
                 })?
             }
-            // build the struct with this as the member:
+            // build the enum with this as the member:
             members.push(EnumMemberRepr {
                 name: var.name.to_owned(),
             })

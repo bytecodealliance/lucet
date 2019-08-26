@@ -1,29 +1,27 @@
 use super::module::module_from_declarations;
 use crate::error::ValidationError;
-use crate::parser::SyntaxDecl;
+use crate::parser::PackageDecl;
 use crate::prelude::std_module;
 use crate::repr::{ModuleIx, ModuleRepr, Package};
 use crate::Location;
 use cranelift_entity::PrimaryMap;
 use std::collections::HashMap;
 
-pub fn package_from_declarations(package_decls: &[SyntaxDecl]) -> Result<Package, ValidationError> {
+pub fn package_from_declarations(
+    package_decls: &[PackageDecl],
+) -> Result<Package, ValidationError> {
     let mut pkg = PackageBuilder::new();
     for decl in package_decls {
         match decl {
-            SyntaxDecl::Module {
+            PackageDecl::Module {
                 name,
                 location,
                 decls,
             } => {
-                let module_ix = pkg.introduce_name(name, location)?;
-                let module_repr = module_from_declarations(pkg.repr(), module_ix, decls)?;
+                let module_ix = pkg.introduce_name(name, *location)?;
+                let module_repr = module_from_declarations(pkg.repr(), module_ix, &decls)?;
                 pkg.define_module(module_ix, module_repr);
             }
-            _ => Err(ValidationError::Syntax {
-                expected: "module",
-                location: *decl.location(),
-            })?,
         }
     }
     Ok(pkg.build())
@@ -51,28 +49,28 @@ impl PackageBuilder {
     pub fn introduce_name(
         &mut self,
         name: &str,
-        location: &Location,
+        location: Location,
     ) -> Result<ModuleIx, ValidationError> {
         if let Some((_, prev_loc)) = self.name_decls.get(name) {
             match prev_loc {
                 Some(prev_loc) => {
                     Err(ValidationError::NameAlreadyExists {
                         name: name.to_owned(),
-                        at_location: *location,
+                        at_location: location,
                         previous_location: *prev_loc,
                     })?;
                 }
                 None => {
                     Err(ValidationError::Syntax {
                         expected: "non-reserved module name",
-                        location: *location,
+                        location: location,
                     })?;
                 }
             }
         }
         let ix = self.repr.names.push(name.to_owned());
         self.name_decls
-            .insert(name.to_owned(), (ix, Some(*location)));
+            .insert(name.to_owned(), (ix, Some(location)));
         Ok(ix)
     }
 
@@ -99,7 +97,7 @@ mod test {
 
     fn pkg_(syntax: &str) -> Result<Package, ValidationError> {
         let mut parser = Parser::new(syntax);
-        let decls = parser.match_decls().expect("parses");
+        let decls = parser.match_package_decls().expect("parses");
         package_from_declarations(&decls)
     }
 

@@ -4,7 +4,16 @@ use std::error::Error;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum SyntaxDecl<'a> {
+pub enum PackageDecl<'a> {
+    Module {
+        name: &'a str,
+        decls: Vec<ModuleDecl<'a>>,
+        location: Location,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ModuleDecl<'a> {
     Struct {
         name: &'a str,
         members: Vec<StructMember<'a>>,
@@ -20,11 +29,6 @@ pub enum SyntaxDecl<'a> {
         what: SyntaxIdent<'a>,
         location: Location,
     },
-    Module {
-        name: &'a str,
-        decls: Vec<SyntaxDecl<'a>>,
-        location: Location,
-    },
     Function {
         name: &'a str,
         args: Vec<FuncArgSyntax<'a>>,
@@ -32,18 +36,6 @@ pub enum SyntaxDecl<'a> {
         bindings: Vec<BindingSyntax<'a>>,
         location: Location,
     },
-}
-
-impl<'a> SyntaxDecl<'a> {
-    pub fn location(&self) -> &Location {
-        match self {
-            SyntaxDecl::Struct { location, .. } => &location,
-            SyntaxDecl::Enum { location, .. } => &location,
-            SyntaxDecl::Alias { location, .. } => &location,
-            SyntaxDecl::Module { location, .. } => &location,
-            SyntaxDecl::Function { location, .. } => &location,
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -196,6 +188,17 @@ impl<'a> Parser<'a> {
                 Ok(text)
             }
             t => parse_err!(self.location, "{}, got {:?}", err_msg, t),
+        }
+    }
+
+    fn match_ident(&mut self, err_msg: &str) -> Result<SyntaxIdent<'a>, ParseError> {
+        match self.token() {
+            Some(Token::Word(name)) => {
+                let location = self.location;
+                self.consume();
+                Ok(SyntaxIdent { name, location })
+            }
+            _ => err_ctx!(err_msg, parse_err!(self.location, "expected identifier")),
         }
     }
 
@@ -423,144 +426,128 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn match_decl(&mut self, err_msg: &str) -> Result<Option<SyntaxDecl<'a>>, ParseError> {
-        loop {
-            match self.token() {
-                Some(Token::Word("struct")) => {
-                    let location = self.location;
-                    self.consume();
-                    let name = err_ctx!(err_msg, self.match_a_word("expected struct name"))?;
-                    err_ctx!(err_msg, self.match_token(Token::LBrace, "expected {"))?;
-                    let members = err_ctx!(err_msg, self.match_struct_body())?;
-                    return Ok(Some(SyntaxDecl::Struct {
-                        name,
-                        members,
-                        location,
-                    }));
-                }
-                Some(Token::Word("enum")) => {
-                    let location = self.location;
-                    self.consume();
-                    let name = err_ctx!(err_msg, self.match_a_word("expected enum name"))?;
-                    err_ctx!(err_msg, self.match_token(Token::LBrace, "expected {"))?;
-                    let variants = err_ctx!(err_msg, self.match_enum_body())?;
-                    return Ok(Some(SyntaxDecl::Enum {
-                        name,
-                        variants,
-                        location,
-                    }));
-                }
-                Some(Token::Word("type")) => {
-                    let location = self.location;
-                    self.consume();
-                    let name = err_ctx!(err_msg, self.match_a_word("expected type name"))?;
-                    err_ctx!(err_msg, self.match_token(Token::Equals, "expected ="))?;
-                    let what = self.match_ident("type value")?;
-                    err_ctx!(err_msg, self.match_token(Token::Semi, "expected ;"))?;
-                    return Ok(Some(SyntaxDecl::Alias {
-                        name,
-                        what,
-                        location,
-                    }));
-                }
-                Some(Token::Word("mod")) => {
-                    let location = self.location;
-                    self.consume();
-                    let name = err_ctx!(err_msg, self.match_a_word("expected module name"))?;
-                    err_ctx!(err_msg, self.match_token(Token::LBrace, "expected {"))?;
-
-                    let mut decls = Vec::new();
-                    loop {
-                        if let Some(Token::RBrace) = self.token() {
-                            self.consume();
-                            break;
-                        } else {
-                            match self.match_decl("declaration") {
-                                Ok(Some(decl)) => decls.push(decl),
-                                Ok(None) => parse_err!(self.location, "missing close brace '}'")?,
-                                Err(e) => Err(e)?,
-                            }
-                        }
-                    }
-
-                    return Ok(Some(SyntaxDecl::Module {
-                        name,
-                        decls,
-                        location,
-                    }));
-                }
-                Some(Token::Word("fn")) => {
-                    let location = self.location;
-                    self.consume();
-                    let name = err_ctx!(err_msg, self.match_a_word("expected function name"))?;
-
-                    err_ctx!(err_msg, self.match_token(Token::LPar, "expected ("))?;
-                    let args = err_ctx!(err_msg, self.match_func_args())?;
-                    let rets = if let Some(Token::RArrow) = self.token() {
-                        self.consume();
-                        err_ctx!(err_msg, self.match_func_rets())?
-                    } else {
-                        Vec::new()
-                    };
-
-                    let bindings = match self.token() {
-                        Some(Token::Semi) => {
-                            self.consume();
-                            Vec::new()
-                        }
-                        Some(Token::Word("where")) => {
-                            self.consume();
-                            err_ctx!(err_msg, self.match_binding_exprs())?
-                        }
-                        t => err_ctx!(
-                            err_msg,
-                            parse_err!(self.location, "expected where, -> or ;, got {:?}", t)
-                        )?,
-                    };
-
-                    return Ok(Some(SyntaxDecl::Function {
-                        name,
-                        args,
-                        rets,
-                        bindings,
-                        location,
-                    }));
-                }
-                Some(_) => {
-                    return parse_err!(
-                        self.location,
-                        "in {}\nexpected keyword or attribute",
-                        err_msg
-                    )
-                }
-                None => {
-                    return Ok(None);
-                }
+    pub fn match_module_decl(&mut self) -> Result<ModuleDecl<'a>, ParseError> {
+        match self.token() {
+            Some(Token::Word("struct")) => {
+                let location = self.location;
+                self.consume();
+                let name = self.match_a_word("expected struct name")?;
+                self.match_token(Token::LBrace, "expected {")?;
+                let members = self.match_struct_body()?;
+                Ok(ModuleDecl::Struct {
+                    name,
+                    members,
+                    location,
+                })
             }
+            Some(Token::Word("enum")) => {
+                let location = self.location;
+                self.consume();
+                let name = self.match_a_word("expected enum name")?;
+                self.match_token(Token::LBrace, "expected {")?;
+                let variants = self.match_enum_body()?;
+                Ok(ModuleDecl::Enum {
+                    name,
+                    variants,
+                    location,
+                })
+            }
+            Some(Token::Word("type")) => {
+                let location = self.location;
+                self.consume();
+                let name = self.match_a_word("expected type name")?;
+                self.match_token(Token::Equals, "expected =")?;
+                let what = self.match_ident("type value")?;
+                self.match_token(Token::Semi, "expected ;")?;
+                Ok(ModuleDecl::Alias {
+                    name,
+                    what,
+                    location,
+                })
+            }
+            Some(Token::Word("fn")) => {
+                let location = self.location;
+                self.consume();
+                let name = self.match_a_word("expected function name")?;
+
+                self.match_token(Token::LPar, "expected (")?;
+                let args = self.match_func_args()?;
+                let rets = if let Some(Token::RArrow) = self.token() {
+                    self.consume();
+                    self.match_func_rets()?
+                } else {
+                    Vec::new()
+                };
+
+                let bindings = match self.token() {
+                    Some(Token::Semi) => {
+                        self.consume();
+                        Vec::new()
+                    }
+                    Some(Token::Word("where")) => {
+                        self.consume();
+                        self.match_binding_exprs()?
+                    }
+                    t => parse_err!(self.location, "expected where, -> or ;, got {:?}", t)?,
+                };
+
+                Ok(ModuleDecl::Function {
+                    name,
+                    args,
+                    rets,
+                    bindings,
+                    location,
+                })
+            }
+            Some(_) | None => parse_err!(self.location, "expected module declaration"),
         }
     }
 
-    pub fn match_decls(&mut self) -> Result<Vec<SyntaxDecl<'a>>, ParseError> {
+    pub fn match_package_decl(&mut self) -> Result<PackageDecl<'a>, ParseError> {
+        match self.token() {
+            Some(Token::Word("mod")) => {
+                let location = self.location;
+                self.consume();
+                let name = self.match_a_word("expected module name")?;
+                self.match_token(Token::LBrace, "expected {")?;
+
+                let mut decls = Vec::new();
+                loop {
+                    match self.token() {
+                        Some(Token::RBrace) => {
+                            self.consume();
+                            break;
+                        }
+                        Some(_) => {
+                            let decl = self.match_module_decl()?;
+                            decls.push(decl);
+                        }
+                        None => parse_err!(self.location, "expected module decl or }")?,
+                    }
+                }
+
+                Ok(PackageDecl::Module {
+                    name,
+                    decls,
+                    location,
+                })
+            }
+            Some(_) | None => parse_err!(self.location, "expected package declaration"),
+        }
+    }
+
+    pub fn match_package_decls(&mut self) -> Result<Vec<PackageDecl<'a>>, ParseError> {
         let mut decls = Vec::new();
         loop {
-            match self.match_decl("declaration") {
-                Ok(Some(decl)) => decls.push(decl),
-                Ok(None) => break,
-                Err(e) => Err(e)?,
+            match self.token() {
+                Some(_) => {
+                    let decl = self.match_package_decl()?;
+                    decls.push(decl);
+                }
+                None => break,
             }
         }
         Ok(decls)
-    }
-
-    fn match_ident(&mut self, err_msg: &str) -> Result<SyntaxIdent<'a>, ParseError> {
-        match self.token() {
-            Some(Token::Word(name)) => {
-                let location = self.location;
-                self.consume();
-                Ok(SyntaxIdent { name, location })
-            }
-            _ => err_ctx!(err_msg, parse_err!(self.location, "expected identifier")),
-        }
     }
 }
 
@@ -571,11 +558,8 @@ mod tests {
     fn struct_empty() {
         let mut parser = Parser::new("struct foo {}");
         assert_eq!(
-            parser
-                .match_decl("empty struct")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Struct {
+            parser.match_module_decl().expect("valid parse"),
+            ModuleDecl::Struct {
                 name: "foo",
                 members: Vec::new(),
                 location: Location { line: 1, column: 0 },
@@ -587,11 +571,8 @@ mod tests {
         let mut parser = Parser::new("struct foo {a: i32 }");
         // column ruler:              0      7    12 15
         assert_eq!(
-            parser
-                .match_decl("foo a i32")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Struct {
+            parser.match_module_decl().expect("valid parse"),
+            ModuleDecl::Struct {
                 name: "foo",
                 members: vec![StructMember {
                     name: "a",
@@ -616,11 +597,8 @@ mod tests {
         let mut parser = Parser::new("struct foo {b: i32, }");
         //                            0      7    12 15
         assert_eq!(
-            parser
-                .match_decl("foo b i32 with trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Struct {
+            parser.match_module_decl().expect("valid parse"),
+            ModuleDecl::Struct {
                 name: "foo",
                 members: vec![StructMember {
                     name: "b",
@@ -645,11 +623,8 @@ mod tests {
         let mut parser = Parser::new("struct c { d: f64, e: u8 }");
         //                            0      7   11 14   19 22
         assert_eq!(
-            parser
-                .match_decl("struct c")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Struct {
+            parser.match_module_decl().expect("valid parse"),
+            ModuleDecl::Struct {
                 name: "c",
                 members: vec![
                     StructMember {
@@ -691,11 +666,8 @@ mod tests {
         let mut parser = Parser::new("struct foo {a: mod, struct: enum }");
         // column ruler:              0      7    12 15   21      30
         assert_eq!(
-            parser
-                .match_decl("foo a i32")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Struct {
+            parser.match_module_decl().expect("valid parse"),
+            ModuleDecl::Struct {
                 name: "foo",
                 members: vec![
                     StructMember {
@@ -736,11 +708,8 @@ mod tests {
         let mut parser = Parser::new("enum foo {}");
         //                            0    5
         assert_eq!(
-            parser
-                .match_decl("empty enum")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Enum {
+            parser.match_module_decl().expect("valid parse"),
+            ModuleDecl::Enum {
                 name: "foo",
                 variants: Vec::new(),
                 location: Location { line: 1, column: 0 },
@@ -752,11 +721,8 @@ mod tests {
         let mut parser = Parser::new("enum foo {first,}");
         //                            0    5    10
         assert_eq!(
-            parser
-                .match_decl("one entry enum, trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Enum {
+            parser.match_module_decl().expect("valid parse"),
+            ModuleDecl::Enum {
                 name: "foo",
                 variants: vec![EnumVariant {
                     name: "first",
@@ -774,11 +740,8 @@ mod tests {
         let mut parser = Parser::new("enum bar {first}");
         //                            0    5    10
         assert_eq!(
-            parser
-                .match_decl("one entry enum, no trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Enum {
+            parser.match_module_decl().expect("valid parse"),
+            ModuleDecl::Enum {
                 name: "bar",
                 variants: vec![EnumVariant {
                     name: "first",
@@ -797,11 +760,8 @@ mod tests {
         let mut parser = Parser::new("enum baz { one, two, three\n, four, }");
         //                            0    5     11   16   21     0 2
         assert_eq!(
-            parser
-                .match_decl("four entry enum, trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Enum {
+            parser.match_module_decl().expect("valid parse"),
+            ModuleDecl::Enum {
                 name: "baz",
                 variants: vec![
                     EnumVariant {
@@ -840,44 +800,10 @@ mod tests {
         let mut parser = Parser::new("mod empty {}");
         //                            0    5    10
         assert_eq!(
-            parser
-                .match_decl("empty module")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Module {
+            parser.match_package_decl().expect("valid parse"),
+            PackageDecl::Module {
                 name: "empty",
                 decls: Vec::new(),
-                location: Location { line: 1, column: 0 },
-            }
-        );
-    }
-
-    #[test]
-    fn mod_nesting() {
-        let mut parser = Parser::new("mod one { mod two { mod three { } } }");
-        //                            0    5    10   15   20
-        assert_eq!(
-            parser
-                .match_decl("nested modules")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Module {
-                name: "one",
-                decls: vec![SyntaxDecl::Module {
-                    name: "two",
-                    decls: vec![SyntaxDecl::Module {
-                        name: "three",
-                        decls: Vec::new(),
-                        location: Location {
-                            line: 1,
-                            column: 20
-                        },
-                    }],
-                    location: Location {
-                        line: 1,
-                        column: 10
-                    },
-                }],
                 location: Location { line: 1, column: 0 },
             }
         );
@@ -888,14 +814,11 @@ mod tests {
         let mut parser = Parser::new("mod one { enum foo {} struct bar {} }");
         //                            0    5    10   15   20
         assert_eq!(
-            parser
-                .match_decl("module with types")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Module {
+            parser.match_package_decl().expect("valid parse"),
+            PackageDecl::Module {
                 name: "one",
                 decls: vec![
-                    SyntaxDecl::Enum {
+                    ModuleDecl::Enum {
                         name: "foo",
                         variants: Vec::new(),
                         location: Location {
@@ -903,7 +826,7 @@ mod tests {
                             column: 10
                         },
                     },
-                    SyntaxDecl::Struct {
+                    ModuleDecl::Struct {
                         name: "bar",
                         members: Vec::new(),
                         location: Location {
@@ -919,7 +842,7 @@ mod tests {
 
     #[test]
     fn fn_trivial() {
-        let canonical = vec![SyntaxDecl::Function {
+        let canonical = vec![ModuleDecl::Function {
             name: "trivial",
             args: Vec::new(),
             rets: Vec::new(),
@@ -929,21 +852,21 @@ mod tests {
         assert_eq!(
             Parser::new("fn trivial();")
                 //               0    5    10
-                .match_decls()
+                .match_module_decls()
                 .expect("valid parse"),
             canonical,
         );
         assert_eq!(
             Parser::new("fn trivial ( ) ;")
                 //               0    5    10
-                .match_decls()
+                .match_module_decls()
                 .expect("valid parse"),
             canonical,
         );
         assert_eq!(
             Parser::new("fn trivial()->;")
                 //               0    5    10
-                .match_decls()
+                .match_module_decls()
                 .expect("valid parse"),
             canonical,
         );
@@ -951,8 +874,8 @@ mod tests {
 
     #[test]
     fn fn_return_i32() {
-        fn canonical(column: usize) -> Vec<SyntaxDecl<'static>> {
-            vec![SyntaxDecl::Function {
+        fn canonical(column: usize) -> Vec<ModuleDecl<'static>> {
+            vec![ModuleDecl::Function {
                 name: "getch",
                 args: Vec::new(),
                 rets: vec![FuncArgSyntax {
@@ -976,21 +899,21 @@ mod tests {
         assert_eq!(
             Parser::new("fn getch() -> r:i32;")
                 //       0    5    10   15
-                .match_decls()
+                .match_module_decls()
                 .expect("valid decls"),
             canonical(16)
         );
         assert_eq!(
             Parser::new("fn getch() -> r: i32,;")
                 //       0    5    10
-                .match_decls()
+                .match_module_decls()
                 .expect("valid decls"),
             canonical(17)
         );
         assert_eq!(
             Parser::new("fn getch() -> r :i32 , ;")
                 //       0    5    10
-                .match_decls()
+                .match_module_decls()
                 .expect("valid decls"),
             canonical(17)
         );
@@ -998,7 +921,7 @@ mod tests {
 
     #[test]
     fn fn_one_arg() {
-        let canonical = SyntaxDecl::Function {
+        let canonical = ModuleDecl::Function {
             name: "foo",
             args: vec![FuncArgSyntax {
                 type_: SyntaxIdent {
@@ -1018,24 +941,22 @@ mod tests {
         assert_eq!(
             Parser::new("fn foo(a: i32);")
                 //       0    5    10   15   20    25
-                .match_decl("returns i32")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_module_decl()
+                .expect("valid parse"),
             canonical
         );
         assert_eq!(
             Parser::new("fn foo(a: i32,);")
                 //       0    5    10   15   20    25
-                .match_decl("returns i32")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_module_decl()
+                .expect("valid parse"),
             canonical
         );
     }
 
     #[test]
     fn fn_multi_arg() {
-        let canonical = SyntaxDecl::Function {
+        let canonical = ModuleDecl::Function {
             name: "foo",
             args: vec![
                 FuncArgSyntax {
@@ -1071,17 +992,15 @@ mod tests {
         assert_eq!(
             Parser::new("fn foo(a: i32, b: f64);")
                 //       0    5    10   15   20    25
-                .match_decl("two args")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_module_decl()
+                .expect("valid parse"),
             canonical
         );
         assert_eq!(
             Parser::new("fn foo(a: i32, b: f64, );")
                 //       0    5    10   15   20    25
-                .match_decl("two args with trailing comma")
-                .expect("valid parse")
-                .expect("valid decl"),
+                .match_module_decl()
+                .expect("valid parse"),
             canonical
         );
     }
@@ -1091,10 +1010,9 @@ mod tests {
         assert_eq!(
             Parser::new("fn getch() -> r1: i32, r2: i64, r3: f32;")
                 //       0    5    10   15   20   25   30
-                .match_decl("returns u8")
-                .expect("valid parse")
-                .expect("valid decl"),
-            SyntaxDecl::Function {
+                .match_module_decl()
+                .expect("valid parse"),
+            ModuleDecl::Function {
                 name: "getch",
                 args: Vec::new(),
                 rets: vec![
@@ -1157,10 +1075,9 @@ mod tests {
                  some_slice: out something <- [a, b];"
             )
             //   0    5    10   15   20   25   30
-            .match_decl("returns u8")
-            .expect("valid parse")
-            .expect("valid decl"),
-            SyntaxDecl::Function {
+            .match_module_decl()
+            .expect("valid parse"),
+            ModuleDecl::Function {
                 name: "fgetch",
                 args: vec![FuncArgSyntax {
                     type_: SyntaxIdent {

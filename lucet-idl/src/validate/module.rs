@@ -1,31 +1,27 @@
 use super::datatypes::DatatypeModuleBuilder;
 use super::function::FunctionModuleBuilder;
 use super::names::ModNamesBuilder;
-use crate::parser::SyntaxDecl;
+use crate::parser::ModuleDecl;
 use crate::repr::{ModuleIx, ModuleRepr};
 use crate::{Package, ValidationError};
 
 pub fn module_from_declarations(
     env: &Package,
     ix: ModuleIx,
-    decls: &[SyntaxDecl],
+    decls: &[ModuleDecl],
 ) -> Result<ModuleRepr, ValidationError> {
     // First, we need to declare names of all the declarations
     let mut names = ModNamesBuilder::new(ix);
     for decl in decls.iter() {
         match decl {
-            SyntaxDecl::Struct { name, location, .. }
-            | SyntaxDecl::Enum { name, location, .. }
-            | SyntaxDecl::Alias { name, location, .. } => {
+            ModuleDecl::Struct { name, location, .. }
+            | ModuleDecl::Enum { name, location, .. }
+            | ModuleDecl::Alias { name, location, .. } => {
                 names.introduce_datatype(name, location)?;
             }
-            SyntaxDecl::Function { name, location, .. } => {
+            ModuleDecl::Function { name, location, .. } => {
                 names.introduce_function(name, location)?;
             }
-            SyntaxDecl::Module { location, .. } => Err(ValidationError::Syntax {
-                expected: "type or function declaration",
-                location: *location,
-            })?,
         }
     }
 
@@ -35,21 +31,21 @@ pub fn module_from_declarations(
     // Then, we can define each datatype
     for decl in decls.iter() {
         match decl {
-            SyntaxDecl::Struct {
+            ModuleDecl::Struct {
                 name,
                 location,
                 members,
             } => {
                 datatypes_builder.introduce_struct(name, members, *location)?;
             }
-            SyntaxDecl::Enum {
+            ModuleDecl::Enum {
                 name,
                 location,
                 variants,
             } => {
                 datatypes_builder.introduce_enum(name, variants, *location)?;
             }
-            SyntaxDecl::Alias {
+            ModuleDecl::Alias {
                 name,
                 location,
                 what,
@@ -74,7 +70,7 @@ pub fn module_from_declarations(
     let mut funcs_builder = FunctionModuleBuilder::new(funcs_env, &names);
 
     for decl in decls {
-        if let SyntaxDecl::Function {
+        if let ModuleDecl::Function {
             name,
             args,
             rets,
@@ -102,11 +98,11 @@ mod tests {
     use crate::{BindingDirection, DatatypeVariant, Location, MemArea, ParamPosition};
     fn mod_syntax(syntax: &str) -> Result<Package, ValidationError> {
         let mut parser = Parser::new(syntax);
-        let decls = parser.match_decls().expect("parses");
+        let decls = parser.match_module_decls().expect("parses");
 
         let mut pkg_builder = PackageBuilder::new();
         let mod_ix = pkg_builder
-            .introduce_name("mod", &Location { line: 0, column: 0 })
+            .introduce_name("mod", Location { line: 0, column: 0 })
             .expect("declare name ok");
         let module_repr = module_from_declarations(pkg_builder.repr(), mod_ix, &decls)?;
         pkg_builder.define_module(mod_ix, module_repr);
