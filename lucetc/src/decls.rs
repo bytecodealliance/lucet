@@ -197,7 +197,7 @@ impl<'a> ModuleDecls<'a> {
         decl_linkage: Linkage,
         signature: ir::Signature,
     ) -> Result<UniqueFuncIndex, LucetcError> {
-        let (new_funcidx, _) = self.info.declare_func_with_sig(signature);
+        let (new_funcidx, _) = self.info.declare_func_with_sig(signature)?;
 
         self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)?;
 

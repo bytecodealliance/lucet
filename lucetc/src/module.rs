@@ -1,4 +1,5 @@
 //! Implements ModuleEnvironment for cranelift-wasm. Code derived from cranelift-wasm/environ/dummy.rs
+use crate::error::{LucetcError, LucetcErrorKind};
 use crate::pointer::NATIVE_POINTER;
 use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
@@ -7,6 +8,7 @@ use cranelift_wasm::{
     FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
     TableElementType, TableIndex, WasmResult,
 };
+use failure::ResultExt;
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -128,12 +130,14 @@ impl<'a> ModuleInfo<'a> {
     pub fn declare_func_with_sig(
         &mut self,
         sig: ir::Signature,
-    ) -> (UniqueFuncIndex, SignatureIndex) {
+    ) -> Result<(UniqueFuncIndex, SignatureIndex), LucetcError> {
         let new_sigidx = SignatureIndex::from_u32(self.signature_mapping.len() as u32);
-        self.declare_signature(sig);
+        self.declare_signature(sig)
+            .context(LucetcErrorKind::TranslatingModule)?;
         let new_funcidx = UniqueFuncIndex::from_u32(self.functions.len() as u32);
-        self.declare_func_type(new_sigidx);
-        (new_funcidx, new_sigidx)
+        self.declare_func_type(new_sigidx)
+            .context(LucetcErrorKind::TranslatingModule)?;
+        Ok((new_funcidx, new_sigidx))
     }
 }
 
@@ -142,7 +146,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         self.target_config
     }
 
-    fn declare_signature(&mut self, mut sig: ir::Signature) {
+    fn declare_signature(&mut self, mut sig: ir::Signature) -> WasmResult<()> {
         sig.params.insert(
             0,
             ir::AbiParam::special(NATIVE_POINTER, ir::ArgumentPurpose::VMContext),
@@ -160,9 +164,15 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             });
 
         self.signature_mapping.push(match_key);
+        Ok(())
     }
 
-    fn declare_func_import(&mut self, sig_index: SignatureIndex, module: &'a str, field: &'a str) {
+    fn declare_func_import(
+        &mut self,
+        sig_index: SignatureIndex,
+        module: &'a str,
+        field: &'a str,
+    ) -> WasmResult<()> {
         debug_assert_eq!(
             self.functions.len(),
             self.imported_funcs.len(),
@@ -181,9 +191,15 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             });
 
         self.function_mapping.push(unique_fn_index);
+        Ok(())
     }
 
-    fn declare_global_import(&mut self, global: Global, module: &'a str, field: &'a str) {
+    fn declare_global_import(
+        &mut self,
+        global: Global,
+        module: &'a str,
+        field: &'a str,
+    ) -> WasmResult<()> {
         debug_assert_eq!(
             self.globals.len(),
             self.imported_globals.len(),
@@ -191,9 +207,15 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         );
         self.globals.push(Exportable::new(global));
         self.imported_globals.push((module, field));
+        Ok(())
     }
 
-    fn declare_table_import(&mut self, table: Table, module: &'a str, field: &'a str) {
+    fn declare_table_import(
+        &mut self,
+        table: Table,
+        module: &'a str,
+        field: &'a str,
+    ) -> WasmResult<()> {
         debug_assert_eq!(
             self.tables.len(),
             self.imported_tables.len(),
@@ -201,9 +223,15 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         );
         self.tables.push(Exportable::new(table));
         self.imported_tables.push((module, field));
+        Ok(())
     }
 
-    fn declare_memory_import(&mut self, memory: Memory, module: &'a str, field: &'a str) {
+    fn declare_memory_import(
+        &mut self,
+        memory: Memory,
+        module: &'a str,
+        field: &'a str,
+    ) -> WasmResult<()> {
         debug_assert_eq!(
             self.memories.len(),
             self.imported_memories.len(),
@@ -213,31 +241,36 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             .insert(MemoryIndex::new(self.memories.len()), vec![]);
         self.memories.push(Exportable::new(memory));
         self.imported_memories.push((module, field));
+        Ok(())
     }
 
-    fn declare_func_type(&mut self, sig_index: SignatureIndex) {
+    fn declare_func_type(&mut self, sig_index: SignatureIndex) -> WasmResult<()> {
         self.functions.push(Exportable::new(sig_index));
         self.function_mapping
             .push(UniqueFuncIndex::from_u32(self.functions.len() as u32 - 1));
+        Ok(())
     }
 
-    fn declare_table(&mut self, table: Table) {
+    fn declare_table(&mut self, table: Table) -> WasmResult<()> {
         self.table_elems
             .insert(TableIndex::new(self.tables.len()), vec![]);
         self.tables.push(Exportable::new(table));
+        Ok(())
     }
 
-    fn declare_memory(&mut self, memory: Memory) {
+    fn declare_memory(&mut self, memory: Memory) -> WasmResult<()> {
         self.data_initializers
             .insert(MemoryIndex::new(self.memories.len()), vec![]);
         self.memories.push(Exportable::new(memory));
+        Ok(())
     }
 
-    fn declare_global(&mut self, global: Global) {
+    fn declare_global(&mut self, global: Global) -> WasmResult<()> {
         self.globals.push(Exportable::new(global));
+        Ok(())
     }
 
-    fn declare_func_export(&mut self, func_index: FuncIndex, name: &'a str) {
+    fn declare_func_export(&mut self, func_index: FuncIndex, name: &'a str) -> WasmResult<()> {
         let unique_func_index = *self
             .function_mapping
             .get(func_index)
@@ -246,30 +279,42 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             .get_mut(unique_func_index)
             .expect("export of declared function")
             .push_export(name);
+        Ok(())
     }
 
-    fn declare_table_export(&mut self, table_index: TableIndex, name: &'a str) {
+    fn declare_table_export(&mut self, table_index: TableIndex, name: &'a str) -> WasmResult<()> {
         self.tables
             .get_mut(table_index)
             .expect("export of declared table")
             .push_export(name);
+        Ok(())
     }
 
-    fn declare_memory_export(&mut self, memory_index: MemoryIndex, name: &'a str) {
+    fn declare_memory_export(
+        &mut self,
+        memory_index: MemoryIndex,
+        name: &'a str,
+    ) -> WasmResult<()> {
         self.memories
             .get_mut(memory_index)
             .expect("export of declared memory")
             .push_export(name);
+        Ok(())
     }
 
-    fn declare_global_export(&mut self, global_index: GlobalIndex, name: &'a str) {
+    fn declare_global_export(
+        &mut self,
+        global_index: GlobalIndex,
+        name: &'a str,
+    ) -> WasmResult<()> {
         self.globals
             .get_mut(global_index)
             .expect("export of declared global")
             .push_export(name);
+        Ok(())
     }
 
-    fn declare_start_func(&mut self, func_index: FuncIndex) {
+    fn declare_start_func(&mut self, func_index: FuncIndex) -> WasmResult<()> {
         let unique_func_index = *self
             .function_mapping
             .get(func_index)
@@ -279,6 +324,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             "start func can only be defined once"
         );
         self.start_func = Some(unique_func_index);
+        Ok(())
     }
 
     fn define_function_body(&mut self, body_bytes: &'a [u8], body_offset: usize) -> WasmResult<()> {
@@ -295,7 +341,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         base: Option<GlobalIndex>,
         offset: usize,
         elements: Box<[FuncIndex]>,
-    ) {
+    ) -> WasmResult<()> {
         let elements_vec: Vec<FuncIndex> = elements.into();
         let uniquified_elements = elements_vec
             .into_iter()
@@ -327,6 +373,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
                 }
             }
         }
+        Ok(())
     }
 
     fn declare_data_initialization(
@@ -335,14 +382,17 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         base: Option<GlobalIndex>,
         offset: usize,
         data: &'a [u8],
-    ) {
+    ) -> WasmResult<()> {
         let data_init = DataInitializer { base, offset, data };
         match self.data_initializers.entry(memory_index) {
-            Entry::Occupied(mut occ) => occ.get_mut().push(data_init),
+            Entry::Occupied(mut occ) => {
+                occ.get_mut().push(data_init);
+            }
             Entry::Vacant(_) => panic!(
                 "data initializer for undeclared memory {:?}: {:?}",
                 memory_index, data_init
             ),
         }
+        Ok(())
     }
 }
