@@ -62,7 +62,7 @@ pub struct EnumVal {
 
 impl EnumVal {
     pub fn strat(enum_datatype: &EnumDatatype) -> impl Strategy<Value = Self> {
-        let name = enum_datatype.name().to_owned();
+        let name = enum_datatype.datatype().name().to_owned();
         prop::sample::select(
             enum_datatype
                 .variants()
@@ -91,7 +91,7 @@ pub struct StructVal {
 
 impl StructVal {
     pub fn strat(struct_dt: &StructDatatype) -> BoxedStrategy<Self> {
-        let name = struct_dt.name().to_owned();
+        let name = struct_dt.datatype().name().to_owned();
         let member_strats: Vec<BoxedStrategy<StructMemberVal>> = struct_dt
             .members()
             .map(|m| StructMemberVal::strat(&m))
@@ -145,7 +145,7 @@ pub struct AliasVal {
 
 impl AliasVal {
     pub fn strat(alias_dt: &AliasDatatype) -> BoxedStrategy<Self> {
-        let name = alias_dt.name().to_owned();
+        let name = alias_dt.datatype().name().to_owned();
         alias_dt
             .to()
             .strat()

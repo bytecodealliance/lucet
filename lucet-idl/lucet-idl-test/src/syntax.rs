@@ -300,7 +300,7 @@ impl FunctionSyntax {
                     arg_syntax.push(format!(
                         "a_{}: {}",
                         ix,
-                        AbiType::from_atom(&atomtype).render_idl()
+                        AbiType::smallest_representation(atomtype).render_idl()
                     ));
                     binding_syntax.push(format!(
                         "b_{}: in {} <- a_{}",
@@ -353,7 +353,10 @@ impl FunctionSyntax {
 
         let mut ret_syntax = None;
         if let Some(b) = self.ret_binding {
-            ret_syntax = Some(format!("r: {}", AbiType::from_atom(&b).render_idl()));
+            ret_syntax = Some(format!(
+                "r: {}",
+                AbiType::smallest_representation(&b).render_idl()
+            ));
             let ix = self.arg_bindings.len();
             binding_syntax.push(format!("b_{}: out {} <- r", ix, b.render_idl(),));
         }
