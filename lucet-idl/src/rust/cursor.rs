@@ -200,12 +200,17 @@ impl<'a> RustIdiomArg<'a> {
                 format!("let {} = {}.as_ptr() as i32;", ptr.rust_name(), self.name()),
                 format!("let {} = {}.len() as i32;", len.rust_name(), self.name()),
             ],
-            BindingParam::Value(val) => vec![format!(
-                "let {} = {} as {};",
-                val.rust_name(),
-                self.name(),
-                val.type_().rust_type_name()
-            )],
+            BindingParam::Value(val) => match val.type_().variant() {
+                DatatypeVariant::Atom(AtomType::Bool) => {
+                    vec![format!("let {} = {} != 0;", val.rust_name(), self.name(),)]
+                }
+                _ => vec![format!(
+                    "let {} = {} as {};",
+                    val.rust_name(),
+                    self.name(),
+                    val.type_().rust_type_name()
+                )],
+            },
         }
     }
 
@@ -412,12 +417,21 @@ impl<'a> RustIdiomRet<'a> {
                 ptr.rust_name(),
                 self.name(),
             ),
-            BindingParam::Value(val) => format!(
-                "let {value}: {typename} = {arg} as {typename};",
-                value = val.rust_name(),
-                typename = val.type_().rust_type_name(),
-                arg = self.name(),
-            ),
+            BindingParam::Value(val) => match val.type_().variant() {
+                DatatypeVariant::Atom(AtomType::Bool) => format!(
+                    "let {value}: {typename} = {arg} != 0;",
+                    value = val.rust_name(),
+                    typename = val.type_().rust_type_name(),
+                    arg = self.name(),
+                ),
+
+                _ => format!(
+                    "let {value}: {typename} = {arg} as {typename};",
+                    value = val.rust_name(),
+                    typename = val.type_().rust_type_name(),
+                    arg = self.name(),
+                ),
+            },
             BindingParam::Slice { .. } => unreachable!(),
         }
     }
@@ -432,6 +446,9 @@ fn cast_value_to_binding(b: &FuncBinding) -> String {
                 b.type_().rust_type_name(),
                 val.rust_name(),
             ),
+            DatatypeVariant::Atom(AtomType::Bool) => {
+                format!("let {} = {} != 0;", b.rust_name(), val.rust_name(),)
+            }
             DatatypeVariant::Atom(_) => format!(
                 "let {} = {} as {};",
                 b.rust_name(),
