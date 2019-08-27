@@ -801,7 +801,7 @@ name = "lucet-idl"
 version = "0.1.1"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cranelift-entity 0.37.0",
+ "cranelift-entity 0.40.0",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module 0.1.1",
