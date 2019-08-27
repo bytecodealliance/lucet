@@ -154,7 +154,7 @@ impl ExeConfig {
 }
 
 fn generate_values(package: &Package) {
-    use lucet_idl_test::values::*;
+    use lucet_idl_test::DatatypeExt;
 
     for m in package.modules() {
         for dt in m.datatypes() {
@@ -170,7 +170,7 @@ fn generate_values(package: &Package) {
 }
 
 fn generate_calls(package: &Package) {
-    use lucet_idl_test::values::*;
+    use lucet_idl_test::FuncCallPredicate;
 
     for m in package.modules() {
         for func in m.functions() {
