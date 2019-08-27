@@ -503,6 +503,15 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[cfg(test)]
+    pub fn match_module_decls(&mut self) -> Result<Vec<ModuleDecl<'a>>, ParseError> {
+        let mut decls = Vec::new();
+        while self.token().is_some() {
+            decls.push(self.match_module_decl()?);
+        }
+        Ok(decls)
+    }
+
     pub fn match_package_decl(&mut self) -> Result<PackageDecl<'a>, ParseError> {
         match self.token() {
             Some(Token::Word("mod")) => {
@@ -842,31 +851,31 @@ mod tests {
 
     #[test]
     fn fn_trivial() {
-        let canonical = vec![ModuleDecl::Function {
+        let canonical = ModuleDecl::Function {
             name: "trivial",
             args: Vec::new(),
             rets: Vec::new(),
             bindings: Vec::new(),
             location: Location { line: 1, column: 0 },
-        }];
+        };
         assert_eq!(
             Parser::new("fn trivial();")
                 //               0    5    10
-                .match_module_decls()
+                .match_module_decl()
                 .expect("valid parse"),
             canonical,
         );
         assert_eq!(
             Parser::new("fn trivial ( ) ;")
                 //               0    5    10
-                .match_module_decls()
+                .match_module_decl()
                 .expect("valid parse"),
             canonical,
         );
         assert_eq!(
             Parser::new("fn trivial()->;")
                 //               0    5    10
-                .match_module_decls()
+                .match_module_decl()
                 .expect("valid parse"),
             canonical,
         );
@@ -874,8 +883,8 @@ mod tests {
 
     #[test]
     fn fn_return_i32() {
-        fn canonical(column: usize) -> Vec<ModuleDecl<'static>> {
-            vec![ModuleDecl::Function {
+        fn canonical(column: usize) -> ModuleDecl<'static> {
+            ModuleDecl::Function {
                 name: "getch",
                 args: Vec::new(),
                 rets: vec![FuncArgSyntax {
@@ -894,26 +903,26 @@ mod tests {
                 }],
                 bindings: Vec::new(),
                 location: Location { line: 1, column: 0 },
-            }]
+            }
         }
         assert_eq!(
             Parser::new("fn getch() -> r:i32;")
                 //       0    5    10   15
-                .match_module_decls()
+                .match_module_decl()
                 .expect("valid decls"),
             canonical(16)
         );
         assert_eq!(
             Parser::new("fn getch() -> r: i32,;")
                 //       0    5    10
-                .match_module_decls()
+                .match_module_decl()
                 .expect("valid decls"),
             canonical(17)
         );
         assert_eq!(
             Parser::new("fn getch() -> r :i32 , ;")
                 //       0    5    10
-                .match_module_decls()
+                .match_module_decl()
                 .expect("valid decls"),
             canonical(17)
         );
@@ -1149,4 +1158,42 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn no_mod_in_mod() {
+        let err = Parser::new("mod foo { mod bar { }}").match_package_decl();
+        assert_eq!(
+            err,
+            Err(ParseError {
+                message: "expected module declaration".to_owned(),
+                location: Location {
+                    line: 1,
+                    column: 10
+                }
+            })
+        );
+        Parser::new("mod foo { enum whatever {} mod bar { }}")
+            .match_package_decls()
+            .err()
+            .expect("error package");
+    }
+
+    #[test]
+    fn no_top_level_types() {
+        let err = Parser::new("mod foo { } enum bar {}")
+            .match_package_decls()
+            .err()
+            .expect("error package");
+        assert_eq!(
+            err,
+            ParseError {
+                message: "expected package declaration".to_owned(),
+                location: Location {
+                    line: 1,
+                    column: 12
+                }
+            }
+        );
+    }
+
 }

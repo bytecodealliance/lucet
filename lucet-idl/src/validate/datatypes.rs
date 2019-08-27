@@ -181,11 +181,9 @@ impl<'a> DatatypeModuleBuilder<'a> {
     }
 
     pub fn build(self) -> Result<ModuleDatatypesRepr, ValidationError> {
-        let mut finalized = SecondaryMap::new();
-        finalized.resize(self.names.types.len());
+        let mut finalized = FinalizedTypes::new(self.names.types.len());
+
         let mut ordered = Vec::new();
-        // Important to iterate in name order, so error messages are consistient.
-        // HashMap iteration order is not stable.
         for (ix, name) in self.names.types.iter() {
             let decl = self
                 .types
@@ -193,7 +191,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
                 .expect("all datatypes declared were defined");
 
             // Depth first search through datatypes will return an error if they
-            // are infinite, and insert
+            // are infinite, by marking all visited datatypes in this map:
             let mut visited = SecondaryMap::new();
             visited.resize(self.names.types.len());
 
@@ -204,10 +202,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
                 })?;
         }
 
-        let mut datatypes = PrimaryMap::new();
-        for dt in finalized.values() {
-            datatypes.push(dt.clone().expect("all datatypes finalized"));
-        }
+        let datatypes = finalized.build();
 
         assert_eq!(
             self.names.types.len(),
@@ -232,7 +227,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
         ix: DatatypeIx,
         visited: &mut SecondaryMap<DatatypeIx, bool>,
         ordered: &mut Vec<DatatypeIx>,
-        finalized_types: &mut SecondaryMap<DatatypeIx, Option<DatatypeRepr>>,
+        finalized_types: &mut FinalizedTypes,
     ) -> Result<(), ()> {
         // Ensure that dfs terminates:
         if visited[ix] {
@@ -253,11 +248,7 @@ impl<'a> DatatypeModuleBuilder<'a> {
                     }
                 }
                 // If finalized type information has not yet been computed, we can now compute it:
-                if finalized_types
-                    .get(ix)
-                    .expect("ix exists in types")
-                    .is_none()
-                {
+                if !finalized_types.is_defined(ix) {
                     let mut offset = 0;
                     let mut struct_align = 1;
                     let mut members: Vec<StructMemberRepr> = Vec::new();
@@ -278,11 +269,14 @@ impl<'a> DatatypeModuleBuilder<'a> {
 
                     let mem_size = align_to(offset, struct_align);
 
-                    finalized_types[ix] = Some(DatatypeRepr {
-                        variant: DatatypeVariantRepr::Struct(StructDatatypeRepr { members }),
-                        mem_size,
-                        mem_align: struct_align,
-                    });
+                    finalized_types.define(
+                        ix,
+                        DatatypeRepr {
+                            variant: DatatypeVariantRepr::Struct(StructDatatypeRepr { members }),
+                            mem_size,
+                            mem_align: struct_align,
+                        },
+                    );
                 }
             }
             VariantIR::Alias(ref a) => {
@@ -294,36 +288,36 @@ impl<'a> DatatypeModuleBuilder<'a> {
                 }
 
                 // If finalized type information has not yet been computed, we can now compute it:
-                if finalized_types
-                    .get(ix)
-                    .expect("ix exists in types")
-                    .is_none()
-                {
+                if !finalized_types.is_defined(ix) {
                     let (mem_size, mem_align) = self.datatype_size_align(a.to, finalized_types);
-                    finalized_types[ix] = Some(DatatypeRepr {
-                        variant: DatatypeVariantRepr::Alias(AliasDatatypeRepr { to: a.to.clone() }),
-                        mem_size,
-                        mem_align,
-                    });
+                    finalized_types.define(
+                        ix,
+                        DatatypeRepr {
+                            variant: DatatypeVariantRepr::Alias(AliasDatatypeRepr {
+                                to: a.to.clone(),
+                            }),
+                            mem_size,
+                            mem_align,
+                        },
+                    );
                 }
             }
             VariantIR::Enum(ref e) => {
                 // No recursion to do on the dfs.
-                if finalized_types
-                    .get(ix)
-                    .expect("ix exists in types")
-                    .is_none()
-                {
+                if !finalized_types.is_defined(ix) {
                     // x86_64 ABI says enum is 32 bits wide
                     let mem_size = AtomType::U32.mem_size();
                     let mem_align = mem_size;
-                    finalized_types[ix] = Some(DatatypeRepr {
-                        variant: DatatypeVariantRepr::Enum(EnumDatatypeRepr {
-                            members: e.members.clone(),
-                        }),
-                        mem_size,
-                        mem_align,
-                    });
+                    finalized_types.define(
+                        ix,
+                        DatatypeRepr {
+                            variant: DatatypeVariantRepr::Enum(EnumDatatypeRepr {
+                                members: e.members.clone(),
+                            }),
+                            mem_size,
+                            mem_align,
+                        },
+                    );
                 }
             }
         }
@@ -339,15 +333,12 @@ impl<'a> DatatypeModuleBuilder<'a> {
     fn datatype_size_align(
         &self,
         id: DatatypeIdent,
-        finalized_types: &SecondaryMap<DatatypeIx, Option<DatatypeRepr>>,
+        finalized_types: &FinalizedTypes,
     ) -> (usize, usize) {
         let (size, align) = if id.module == self.names.module {
-            let t = finalized_types
-                .get(id.datatype)
-                .cloned()
-                .expect("looking up identifier in this module")
-                .expect("looking up type defined in this module");
-            (t.mem_size, t.mem_align)
+            finalized_types
+                .size_align(id.datatype)
+                .expect("looking up type defined in this module")
         } else {
             let dt = self
                 .env
@@ -358,6 +349,42 @@ impl<'a> DatatypeModuleBuilder<'a> {
         assert!(size > 0);
         assert!(align > 0);
         (size, align)
+    }
+}
+
+struct FinalizedTypes {
+    types: SecondaryMap<DatatypeIx, Option<DatatypeRepr>>,
+}
+
+impl FinalizedTypes {
+    fn new(map_size: usize) -> Self {
+        let mut types = SecondaryMap::new();
+        types.resize(map_size);
+        Self { types }
+    }
+
+    fn is_defined(&self, ix: DatatypeIx) -> bool {
+        self.types.get(ix).expect("index exists in types").is_some()
+    }
+
+    fn size_align(&self, ix: DatatypeIx) -> Option<(usize, usize)> {
+        if let Some(d) = self.types.get(ix).expect("index exists in types") {
+            Some((d.mem_size, d.mem_align))
+        } else {
+            None
+        }
+    }
+
+    fn define(&mut self, ix: DatatypeIx, repr: DatatypeRepr) {
+        self.types[ix] = Some(repr)
+    }
+
+    fn build(self) -> PrimaryMap<DatatypeIx, DatatypeRepr> {
+        let mut datatypes = PrimaryMap::new();
+        for dt in self.types.values() {
+            datatypes.push(dt.clone().expect("all datatypes finalized"));
+        }
+        datatypes
     }
 }
 

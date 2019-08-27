@@ -149,40 +149,4 @@ mod test {
             }
         );
     }
-
-    #[test]
-    fn no_mod_in_mod() {
-        let err = pkg_("mod foo { mod bar { }}").err().expect("error package");
-        assert_eq!(
-            err,
-            ValidationError::Syntax {
-                expected: "type or function declaration",
-                location: Location {
-                    line: 1,
-                    column: 10
-                }
-            }
-        );
-        pkg_("mod foo { enum whatever {} mod bar { }}")
-            .err()
-            .expect("error package");
-    }
-
-    #[test]
-    fn no_top_level_types() {
-        let err = pkg_("mod foo { } enum bar {}")
-            .err()
-            .expect("error package");
-        assert_eq!(
-            err,
-            ValidationError::Syntax {
-                expected: "module",
-                location: Location {
-                    line: 1,
-                    column: 12
-                }
-            }
-        );
-    }
-
 }
