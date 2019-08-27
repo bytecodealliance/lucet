@@ -22,6 +22,13 @@ mod tests {
 
     proptest! {
         #[test]
+        fn generate_idl(spec in Spec::strat(4)) {
+            let rendered = spec.render_idl();
+            println!("{}", rendered);
+            let _ = parse_package(&rendered).unwrap();
+        }
+
+        #[test]
         fn generate_rust_guest(spec in Spec::strat(20)) {
             let rendered = spec.render_idl();
             let pkg = parse_package(&rendered).unwrap();

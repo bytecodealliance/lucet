@@ -349,7 +349,10 @@ impl<'a> Parser<'a> {
         let mut bindings = Vec::new();
         loop {
             match self.token() {
-                Some(Token::Semi) => break,
+                Some(Token::Semi) => {
+                    self.consume();
+                    break;
+                }
                 Some(Token::Word(name)) => {
                     let location = self.location;
                     self.consume();
