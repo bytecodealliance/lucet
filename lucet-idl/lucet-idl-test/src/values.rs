@@ -36,6 +36,21 @@ impl AtomVal {
             AtomType::F64 => any::<f64>().prop_map(AtomVal::F64).boxed(),
         }
     }
+    pub fn trivial(atom_type: &AtomType) -> Self {
+        match atom_type {
+            AtomType::Bool => AtomVal::Bool(false),
+            AtomType::U8 => AtomVal::U8(0),
+            AtomType::U16 => AtomVal::U16(0),
+            AtomType::U32 => AtomVal::U32(0),
+            AtomType::U64 => AtomVal::U64(0),
+            AtomType::I8 => AtomVal::I8(0),
+            AtomType::I16 => AtomVal::I16(0),
+            AtomType::I32 => AtomVal::I32(0),
+            AtomType::I64 => AtomVal::I64(0),
+            AtomType::F32 => AtomVal::F32(0.0),
+            AtomType::F64 => AtomVal::F64(0.0),
+        }
+    }
     pub fn render_rustval(&self) -> String {
         match self {
             AtomVal::Bool(v) => format!("{}", v),
@@ -73,6 +88,20 @@ impl EnumVal {
             member_name: mem_name.clone(),
         })
     }
+    pub fn trivial(enum_datatype: &EnumDatatype) -> Self {
+        let enum_name = enum_datatype.datatype().name().to_owned();
+        let member_name = enum_datatype
+            .variants()
+            .collect::<Vec<_>>()
+            .get(0)
+            .expect("at least one variant")
+            .name()
+            .to_owned();
+        EnumVal {
+            enum_name,
+            member_name,
+        }
+    }
     pub fn render_rustval(&self) -> String {
         format!(
             "{}::{}",
@@ -101,6 +130,17 @@ impl StructVal {
                 members,
             })
             .boxed()
+    }
+    pub fn trivial(struct_dt: &StructDatatype) -> Self {
+        let struct_name = struct_dt.datatype().name().to_owned();
+        let members = struct_dt
+            .members()
+            .map(|m| StructMemberVal::trivial(&m))
+            .collect();
+        StructVal {
+            struct_name,
+            members,
+        }
     }
     pub fn render_rustval(&self) -> String {
         let members = self
@@ -134,6 +174,11 @@ impl StructMemberVal {
             })
             .boxed()
     }
+    pub fn trivial(struct_member: &StructMember) -> Self {
+        let name = struct_member.name().to_owned();
+        let value = Box::new(struct_member.type_().trivial_val());
+        StructMemberVal { name, value }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -153,6 +198,11 @@ impl AliasVal {
                 value: Box::new(value),
             })
             .boxed()
+    }
+    pub fn trivial(alias_dt: &AliasDatatype) -> Self {
+        let name = alias_dt.datatype().name().to_owned();
+        let value = Box::new(alias_dt.to().trivial_val());
+        AliasVal { name, value }
     }
     pub fn render_rustval(&self) -> String {
         self.value.render_rustval()
@@ -180,21 +230,32 @@ impl DatatypeVal {
 
 pub trait DatatypeExt {
     fn strat(&self) -> BoxedStrategy<DatatypeVal>;
+    fn trivial_val(&self) -> DatatypeVal;
 }
 
 impl<'a> DatatypeExt for Datatype<'a> {
     fn strat(&self) -> BoxedStrategy<DatatypeVal> {
         match self.variant() {
-            DatatypeVariant::Struct(ref struct_dt) => StructVal::strat(struct_dt)
+            DatatypeVariant::Struct(struct_dt) => StructVal::strat(&struct_dt)
                 .prop_map(DatatypeVal::Struct)
                 .boxed(),
-            DatatypeVariant::Enum(ref enum_dt) => {
-                EnumVal::strat(enum_dt).prop_map(DatatypeVal::Enum).boxed()
+            DatatypeVariant::Enum(enum_dt) => {
+                EnumVal::strat(&enum_dt).prop_map(DatatypeVal::Enum).boxed()
             }
-            DatatypeVariant::Alias(ref alias_dt) => AliasVal::strat(alias_dt)
+            DatatypeVariant::Alias(alias_dt) => AliasVal::strat(&alias_dt)
                 .prop_map(DatatypeVal::Alias)
                 .boxed(),
             DatatypeVariant::Atom(a) => AtomVal::strat(&a).prop_map(DatatypeVal::Atom).boxed(),
+        }
+    }
+    fn trivial_val(&self) -> DatatypeVal {
+        match self.variant() {
+            DatatypeVariant::Struct(struct_dt) => {
+                DatatypeVal::Struct(StructVal::trivial(&struct_dt))
+            }
+            DatatypeVariant::Enum(enum_dt) => DatatypeVal::Enum(EnumVal::trivial(&enum_dt)),
+            DatatypeVariant::Alias(alias_dt) => DatatypeVal::Alias(AliasVal::trivial(&alias_dt)),
+            DatatypeVariant::Atom(atom_dt) => DatatypeVal::Atom(AtomVal::trivial(&atom_dt)),
         }
     }
 }
@@ -246,6 +307,20 @@ impl BindingVal {
         }
     }
 
+    pub fn arg_trivial(arg: &RustIdiomArg) -> Self {
+        let name = arg.name();
+        let mutable = arg.direction() == BindingDirection::InOut;
+        let trivial_val = arg.type_().trivial_val();
+        BindingVal {
+            name,
+            mutable,
+            variant: match arg.param() {
+                BindingParam::Value(_) => BindingValVariant::Value(trivial_val),
+                BindingParam::Ptr(_) => BindingValVariant::Ptr(trivial_val),
+                BindingParam::Slice(_, _) => BindingValVariant::Array(vec![trivial_val]),
+            },
+        }
+    }
     pub fn ret_strat(ret: &RustIdiomRet) -> BoxedStrategy<Self> {
         let name = ret.name();
         // There can only be param or value bindings on returns,
@@ -258,6 +333,15 @@ impl BindingVal {
                 variant: BindingValVariant::Value(v),
             })
             .boxed()
+    }
+    pub fn ret_trivial(ret: &RustIdiomRet) -> Self {
+        let name = ret.name();
+        let trivial_val = ret.type_().trivial_val();
+        BindingVal {
+            name,
+            mutable: false,
+            variant: BindingValVariant::Value(trivial_val),
+        }
     }
 
     pub fn render_rust_binding(&self) -> String {

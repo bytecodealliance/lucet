@@ -54,6 +54,35 @@ impl FuncCallPredicate {
             .boxed()
     }
 
+    pub fn trivial(func: &Function) -> FuncCallPredicate {
+        let args = func.rust_idiom_args();
+        let rets = func.rust_idiom_rets();
+
+        let pre = args.iter().map(|a| BindingVal::arg_trivial(a)).collect();
+        let post = args
+            .iter()
+            .filter(|a| a.direction() == BindingDirection::InOut)
+            .map(|a| BindingVal::arg_trivial(a))
+            .chain(rets.iter().map(|r| BindingVal::ret_trivial(r)))
+            .collect();
+
+        let func_call_args = args.iter().map(|a| a.arg_value()).collect::<Vec<_>>();
+        let func_sig_args = args.iter().map(|a| a.arg_declaration()).collect::<Vec<_>>();
+
+        let func_call_rets = rets.iter().map(|r| r.name()).collect::<Vec<_>>();
+        let func_sig_rets = rets.iter().map(|a| a.ret_declaration()).collect::<Vec<_>>();
+
+        FuncCallPredicate {
+            func_name: func.rust_name(),
+            func_call_args,
+            func_sig_args,
+            func_call_rets,
+            func_sig_rets,
+            pre,
+            post,
+        }
+    }
+
     pub fn render_caller(&self) -> Vec<String> {
         let mut lines: Vec<String> = self
             .pre
@@ -129,13 +158,17 @@ pub struct ModuleTestPlan {
 }
 
 impl ModuleTestPlan {
-    pub fn empty(module: &Module) -> Self {
+    pub fn trivial(module: &Module) -> Self {
         let module_name = module.name().to_snake_case();
         let module_type_name = module.rust_type_name();
+        let func_predicates = module
+            .functions()
+            .map(|f| FuncCallPredicate::trivial(&f))
+            .collect();
         ModuleTestPlan {
             module_name,
             module_type_name,
-            func_predicates: Vec::new(),
+            func_predicates,
         }
     }
 

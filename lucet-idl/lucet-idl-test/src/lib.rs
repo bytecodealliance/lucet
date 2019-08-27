@@ -26,7 +26,7 @@ mod tests {
             let rendered = spec.render_idl();
             let pkg = parse_package(&rendered).unwrap();
             let modules = pkg.modules().collect::<Vec<_>>();
-            let test_plan = ModuleTestPlan::empty(&modules.get(0).expect("just one module"));
+            let test_plan = ModuleTestPlan::trivial(&modules.get(0).expect("just one module"));
             let mut rust_guest_app = RustGuestApp::new().expect("create rust guest app");
             let _rust_guest_so = rust_guest_app.build(&pkg, &test_plan).expect("compile rust guest app");
         }
@@ -44,7 +44,7 @@ mod tests {
             let rendered = spec.render_idl();
             let pkg = parse_package(&rendered).unwrap();
             let modules = pkg.modules().collect::<Vec<_>>();
-            let test_plan = ModuleTestPlan::empty(&modules.get(0).expect("just one module"));
+            let test_plan = ModuleTestPlan::trivial(&modules.get(0).expect("just one module"));
             let mut host_app = HostApp::new(&pkg, &test_plan).expect("create host app");
             let _host_app = host_app.build().expect("compile host app");
         }
