@@ -65,13 +65,13 @@ impl<'a> FunctionModuleBuilder<'a> {
 }
 
 struct FuncValidator<'a> {
-    // arg name to declaration location and argument position
+    // arg/return name to declaration location and argument position
     param_names: HashMap<String, (Location, ParamIx)>,
     // Arg positions index into this vector:
     args: PrimaryMap<ArgIx, ParamRepr>,
     // Ret positions index into this vector:
     rets: PrimaryMap<RetIx, ParamRepr>,
-    // binding name to
+    // binding name to declaration location and binding position
     binding_names: HashMap<&'a str, (Location, BindingIx)>,
     // param position to binding syntax
     bindings: PrimaryMap<BindingIx, BindingRepr>,
@@ -234,7 +234,7 @@ impl<'a> FuncValidator<'a> {
         // 2. resolve type
         let type_ = AtomType::from(arg.type_).datatype_id();
 
-        // 3. no need to validate ref- we can construct it ourselves
+        // 3. construct the binding from-value for this position
         let from = BindingFromRepr::Value(position);
 
         // 4. direction depends on whether param is an arg or ret
@@ -295,7 +295,7 @@ impl<'a> FuncValidator<'a> {
     ) -> Result<BindingFromRepr, ValidationError> {
         match &binding.from {
             // A pointer to a name is accepted:
-            BindingRefSyntax::Ptr(bref) => match bref.deref() {
+            BindingRefSyntax::Ptr(bref) => match **bref {
                 BindingRefSyntax::Name(ref name) => {
                     let (position, funcarg) =
                         self.validate_binding_arg_mapping(name, binding.location)?;
