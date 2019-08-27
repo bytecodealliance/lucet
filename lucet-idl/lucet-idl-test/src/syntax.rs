@@ -1,7 +1,7 @@
-use lucet_idl::AtomType;
+use lucet_idl::{AbiType, AtomType};
 use proptest::prelude::*;
 
-pub trait AtomTypeExt
+pub trait ArbTypeExt
 where
     Self: Sized,
 {
@@ -9,7 +9,7 @@ where
     fn render_idl(&self) -> String;
 }
 
-impl AtomTypeExt for AtomType {
+impl ArbTypeExt for AtomType {
     fn strat() -> BoxedStrategy<AtomType> {
         prop_oneof![
             Just(AtomType::Bool),
@@ -36,6 +36,28 @@ impl AtomTypeExt for AtomType {
             U64 => "u64",
             I8 => "i8",
             I16 => "i16",
+            I32 => "i32",
+            I64 => "i64",
+            F32 => "f32",
+            F64 => "f64",
+        }
+        .to_owned()
+    }
+}
+
+impl ArbTypeExt for AbiType {
+    fn strat() -> BoxedStrategy<AbiType> {
+        prop_oneof![
+            Just(AbiType::I32),
+            Just(AbiType::I64),
+            Just(AbiType::F32),
+            Just(AbiType::F64),
+        ]
+        .boxed()
+    }
+    fn render_idl(&self) -> String {
+        use AbiType::*;
+        match self {
             I32 => "i32",
             I64 => "i64",
             F32 => "f32",
@@ -201,40 +223,151 @@ impl DatatypeSyntax {
 }
 
 #[derive(Debug, Clone)]
+pub enum FuncArgBindingSyntax {
+    InValue(AtomType),
+    InPtr(DatatypeRef),
+    OutPtr(DatatypeRef),
+    InOutPtr(DatatypeRef),
+    InSlice(DatatypeRef),
+    InOutSlice(DatatypeRef),
+}
+
+impl FuncArgBindingSyntax {
+    pub fn strat() -> BoxedStrategy<FuncArgBindingSyntax> {
+        use FuncArgBindingSyntax::*;
+        prop_oneof![
+            AtomType::strat().prop_map(InValue),
+            DatatypeRef::strat().prop_map(InPtr),
+            DatatypeRef::strat().prop_map(OutPtr),
+            DatatypeRef::strat().prop_map(InOutPtr),
+            DatatypeRef::strat().prop_map(InSlice),
+            DatatypeRef::strat().prop_map(InOutSlice),
+        ]
+        .boxed()
+    }
+
+    pub fn normalize(self, highest_definition: usize) -> Self {
+        use FuncArgBindingSyntax::*;
+        match self {
+            InValue(atomtype) => InValue(atomtype),
+            InPtr(dt) => InPtr(dt.normalize(highest_definition)),
+            OutPtr(dt) => OutPtr(dt.normalize(highest_definition)),
+            InOutPtr(dt) => InOutPtr(dt.normalize(highest_definition)),
+            InSlice(dt) => InSlice(dt.normalize(highest_definition)),
+            InOutSlice(dt) => InOutSlice(dt.normalize(highest_definition)),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct FunctionSyntax {
-    args: Vec<DatatypeRef>,
-    ret: Option<DatatypeRef>,
+    arg_bindings: Vec<FuncArgBindingSyntax>,
+    ret_binding: Option<AtomType>,
 }
 
 impl FunctionSyntax {
     pub fn strat(max_args: usize) -> impl Strategy<Value = Self> {
         (
-            prop::collection::vec(DatatypeRef::strat(), 0..max_args),
-            prop::option::of(DatatypeRef::strat()),
+            prop::collection::vec(FuncArgBindingSyntax::strat(), 0..max_args),
+            prop::option::of(AtomType::strat()),
         )
-            .prop_map(|(args, ret)| FunctionSyntax { args, ret })
+            .prop_map(|(arg_bindings, ret_binding)| FunctionSyntax {
+                arg_bindings,
+                ret_binding,
+            })
     }
 
     pub fn normalize(self, highest_definition: usize) -> Self {
-        let args = self
-            .args
+        let arg_bindings = self
+            .arg_bindings
             .into_iter()
             .map(|a| a.normalize(highest_definition))
             .collect();
-        let ret = self.ret.clone().map(|a| a.normalize(highest_definition));
-        Self { args, ret }
+        Self {
+            arg_bindings,
+            ret_binding: self.ret_binding,
+        }
     }
 
     pub fn render_idl(&self, name: usize) -> String {
-        let mut args = String::new();
-        for (ix, a) in self.args.iter().enumerate() {
-            args += &format!("a_{}: {}, ", ix, a.render_idl());
+        let mut arg_syntax: Vec<String> = Vec::new();
+        let mut binding_syntax: Vec<String> = Vec::new();
+
+        for (ix, a) in self.arg_bindings.iter().enumerate() {
+            use FuncArgBindingSyntax::*;
+            match a {
+                InValue(atomtype) => {
+                    arg_syntax.push(format!(
+                        "a_{}: {}",
+                        ix,
+                        AbiType::smallest_representation(atomtype).render_idl()
+                    ));
+                    binding_syntax.push(format!(
+                        "b_{}: in {} <- a_{}",
+                        ix,
+                        atomtype.render_idl(),
+                        ix
+                    ));
+                }
+                InPtr(dt) => {
+                    arg_syntax.push(format!("a_{}: i32", ix));
+                    binding_syntax.push(format!("b_{}: in {} <- *a_{}", ix, dt.render_idl(), ix));
+                }
+                OutPtr(dt) => {
+                    arg_syntax.push(format!("a_{}: i32", ix));
+                    binding_syntax.push(format!("b_{}: out {} <- *a_{}", ix, dt.render_idl(), ix));
+                }
+                InOutPtr(dt) => {
+                    arg_syntax.push(format!("a_{}: i32", ix));
+                    binding_syntax.push(format!(
+                        "b_{}: inout {} <- *a_{}",
+                        ix,
+                        dt.render_idl(),
+                        ix
+                    ));
+                }
+                InSlice(dt) => {
+                    arg_syntax.push(format!("a_{}_ptr: i32", ix));
+                    arg_syntax.push(format!("a_{}_len: i32", ix));
+                    binding_syntax.push(format!(
+                        "b_{}: in {} <- [a_{}_ptr, a_{}_len]",
+                        ix,
+                        dt.render_idl(),
+                        ix,
+                        ix
+                    ));
+                }
+                InOutSlice(dt) => {
+                    arg_syntax.push(format!("a_{}_ptr: i32", ix));
+                    arg_syntax.push(format!("a_{}_len: i32", ix));
+                    binding_syntax.push(format!(
+                        "b_{}: inout {} <- [a_{}_ptr, a_{}_len]",
+                        ix,
+                        dt.render_idl(),
+                        ix,
+                        ix
+                    ));
+                }
+            }
         }
-        let mut ret = String::new();
-        if let Some(ref r) = self.ret {
-            ret += &format!("-> {}", r.render_idl());
+
+        let mut ret_syntax = None;
+        if let Some(b) = self.ret_binding {
+            ret_syntax = Some(format!(
+                "r: {}",
+                AbiType::smallest_representation(&b).render_idl()
+            ));
+            let ix = self.arg_bindings.len();
+            binding_syntax.push(format!("b_{}: out {} <- r", ix, b.render_idl(),));
         }
-        format!("fn f_{}({}){};", name, args, ret)
+
+        format!(
+            "fn f_{}({}){}\nwhere {};",
+            name,
+            arg_syntax.join(", "),
+            ret_syntax.map(|r| format!("-> {}", r)).unwrap_or_default(),
+            binding_syntax.join(",\n"),
+        )
     }
 }
 

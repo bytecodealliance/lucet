@@ -1,10 +1,7 @@
 use crate::parser;
-use crate::types::Location;
-use std::error::Error;
-use std::fmt;
+use crate::Location;
 use std::io;
 
-#[allow(dead_code)]
 #[derive(Debug, Fail)]
 pub enum IDLError {
     #[fail(display = "Internal error: {}", _0)]
@@ -37,65 +34,43 @@ impl From<ValidationError> for IDLError {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Fail)]
 pub enum ValidationError {
+    #[fail(display = "Redefinition of name `{}`", name)]
     NameAlreadyExists {
         name: String,
         at_location: Location,
         previous_location: Location,
     },
+    #[fail(display = "Use of unknown name `{}`", name)]
     NameNotFound {
         name: String,
         use_location: Location,
     },
-    Empty {
-        name: String,
-        location: Location,
-    },
-    Infinite {
-        name: String,
-        location: Location,
-    },
+    #[fail(display = "Empty definition for `{}`", name)]
+    Empty { name: String, location: Location },
+    #[fail(display = "Infinite definition for `{}`", name)]
+    Infinite { name: String, location: Location },
+    #[fail(display = "Syntax error: expected {}", expected)]
     Syntax {
         expected: &'static str,
         location: Location,
     },
-}
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ValidationError::NameAlreadyExists {
-                name,
-                at_location,
-                previous_location,
-            } => write!(
-                f,
-                "Redefinition of name {} at line {} - previous definition was at line {}",
-                name, at_location.line, previous_location.line
-            ),
-            ValidationError::NameNotFound { name, use_location } => {
-                write!(f, "Name {} not found at line {}", name, use_location.line)
-            }
-            ValidationError::Empty { name, location } => {
-                write!(f, "Empty definition for {} at line {}", name, location.line)
-            }
-            ValidationError::Infinite { name, location } => write!(
-                f,
-                "Circular reference for {} at line {}",
-                name, location.line
-            ),
-            ValidationError::Syntax { expected, location } => write!(
-                f,
-                "Invalid syntax: expected {} at line {}",
-                expected, location.line
-            ),
-        }
-    }
-}
-
-impl Error for ValidationError {
-    fn description(&self) -> &str {
-        "Validation error"
-    }
+    #[fail(display = "Name `{}` bound to another sort", name)]
+    NameSortError {
+        name: String,
+        use_location: Location,
+        bound_location: Location,
+    },
+    #[fail(display = "Name `{}` already bound", name)]
+    BindingNameAlreadyBound {
+        name: String,
+        at_location: Location,
+        bound_location: Location,
+    },
+    #[fail(display = "Binding type error: expected {}", expected)]
+    BindingTypeError {
+        expected: &'static str,
+        location: Location,
+    },
 }

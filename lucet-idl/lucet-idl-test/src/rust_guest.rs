@@ -1,10 +1,10 @@
 use crate::workspace::Workspace;
+use crate::ModuleTestPlan;
 use failure::{format_err, Error};
-use lucet_idl::{self, Backend, Config, Package};
+use lucet_idl::{self, pretty_writer::PrettyWriter, Backend, Config, Package};
 use lucet_wasi;
 use lucetc::{Lucetc, LucetcOpts};
 use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -30,17 +30,17 @@ impl RustGuestApp {
         Ok(())
     }
 
-    fn generate_main_rs(&mut self) -> Result<(), Error> {
-        let mut main_file = File::create(self.work.source_path("main.rs"))?;
-        main_file.write_all(
-            b"
-#[allow(unused)]
-mod idl;
+    fn generate_main_rs(&mut self, test_plan: &ModuleTestPlan) -> Result<(), Error> {
+        let mut w = PrettyWriter::new(Box::new(File::create(self.work.source_path("main.rs"))?));
+        w.writeln("#[allow(unused)]");
+        w.writeln("mod idl;");
+        w.writeln(format!("use idl::{}::*;", test_plan.module_name));
 
-fn main() {
-    println!(\"hello, world from rust guest\");
-}",
-        )?;
+        w.writeln("fn main() {").indent();
+        w.writeln("println!(\"hello, world from rust guest\");");
+        test_plan.render_guest(&mut w);
+        w.writeln("println!(\"test complete!\");");
+        w.eob().writeln("}");
         Ok(())
     }
 
@@ -58,9 +58,13 @@ fn main() {
         Ok(())
     }
 
-    pub fn build(&mut self, package: &Package) -> Result<PathBuf, Error> {
+    pub fn build(
+        &mut self,
+        package: &Package,
+        test_plan: &ModuleTestPlan,
+    ) -> Result<PathBuf, Error> {
         self.generate_idl_rs(package)?;
-        self.generate_main_rs()?;
+        self.generate_main_rs(test_plan)?;
         self.rustc()?;
         let mut bindings = lucet_wasi::bindings();
         bindings.extend(&package.bindings())?;

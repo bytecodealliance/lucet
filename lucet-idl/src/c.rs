@@ -1,15 +1,9 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
-use crate::error::IDLError;
-use crate::module::Module;
-use crate::package::Package;
 use crate::pretty_writer::PrettyWriter;
-use crate::types::{
-    AliasDataType, AtomType, DataType, DataTypeRef, DataTypeVariant, EnumDataType, FuncDecl, Named,
-    StructDataType,
+use crate::{
+    AbiType, AliasDatatype, AtomType, BindingDirection, BindingParam, Datatype, DatatypeVariant,
+    EnumDatatype, FuncBinding, Function, IDLError, MemArea, Package, StructDatatype,
 };
-use std::io::prelude::*;
+use std::io::Write;
 
 /// Generator for the C backend
 pub struct CGenerator {
@@ -25,215 +19,317 @@ impl CGenerator {
 #include <stdint.h>
 #include <stddef.h>";
         for line in prelude.lines() {
-            w.write_line(line.as_ref()).unwrap();
+            w.write_line(line.as_ref());
         }
-        w.eob().unwrap();
+        w.eob();
         Self { w }
     }
 
     pub fn generate_guest(&mut self, package: &Package) -> Result<(), IDLError> {
-        for (_ident, module) in package.modules.iter() {
-            for ref dt in module.datatypes() {
-                self.gen_type_header(module, dt)?;
-                match &dt.entity.variant {
-                    DataTypeVariant::Struct(s) => self.gen_struct(module, dt, s)?,
-                    DataTypeVariant::Alias(a) => self.gen_alias(module, dt, a)?,
-                    DataTypeVariant::Enum(e) => self.gen_enum(module, dt, e)?,
+        for module in package.modules() {
+            for dt in module.datatypes() {
+                self.gen_type_header(&dt)?;
+                match dt.variant() {
+                    DatatypeVariant::Struct(s) => self.gen_struct(&s)?,
+                    DatatypeVariant::Alias(a) => self.gen_alias(&a)?,
+                    DatatypeVariant::Enum(e) => self.gen_enum(&e)?,
+                    DatatypeVariant::Atom(_) => {
+                        unreachable!("atoms should not be defined in package modules")
+                    }
                 }
             }
-            for fdecl in module.func_decls() {
-                self.gen_function(module, &fdecl)?;
+            for func in module.functions() {
+                self.gen_abi_function(&func)?;
+                self.gen_idiomatic_function(&func)?;
             }
         }
         Ok(())
     }
 
-    fn gen_type_header(&mut self, _module: &Module, dt: &Named<DataType>) -> Result<(), IDLError> {
+    fn gen_type_header(&mut self, dt: &Datatype) -> Result<(), IDLError> {
         self.w
-            .eob()?
-            .writeln(format!("// ---------- {} ----------", dt.name.name))?
-            .eob()?;
+            .eob()
+            .writeln(format!("// ---------- {} ----------", dt.name()))
+            .eob();
         Ok(())
     }
 
     // The most important thing in alias generation is to cache the size
     // and alignment rules of what it ultimately points to
-    fn gen_alias(
-        &mut self,
-        module: &Module,
-        dt: &Named<DataType>,
-        alias: &AliasDataType,
-    ) -> Result<(), IDLError> {
-        let dtname = self.type_name(dt);
-        self.w.writeln(format!(
-            "typedef {} {};",
-            self.type_ref_name(module, &alias.to),
-            dtname
-        ))?;
-        self.w.eob()?;
+    fn gen_alias(&mut self, alias: &AliasDatatype) -> Result<(), IDLError> {
+        let own_type_name = alias.datatype().c_type_name();
+        self.w
+            .writeln(format!(
+                "typedef {} {};",
+                alias.to().c_type_name(),
+                own_type_name,
+            ))
+            .eob();
 
         // Add an assertion to check that resolved size is the one we computed
-        self.w.writeln(format!(
-            "_Static_assert(sizeof({}) == {}, \"unexpected alias size\");",
-            dtname, dt.entity.repr_size
-        ))?;
-        self.w.eob()?;
+        self.w
+            .writeln(format!(
+                "_Static_assert(sizeof({}) == {}, \"unexpected alias size\");",
+                own_type_name,
+                alias.datatype().mem_size(),
+            ))
+            .eob();
 
         Ok(())
     }
 
-    fn gen_struct(
-        &mut self,
-        module: &Module,
-        dt: &Named<DataType>,
-        struct_: &StructDataType,
-    ) -> Result<(), IDLError> {
-        let dtname = self.type_name(dt);
-        self.w.writeln(format!("{} {{", dtname))?;
+    fn gen_struct(&mut self, struct_: &StructDatatype) -> Result<(), IDLError> {
+        let own_type_name = struct_.datatype().c_type_name();
+        self.w.writeln(format!("{} {{", own_type_name));
         let mut w_block = self.w.new_block();
-        for member in struct_.members.iter() {
+        for member in struct_.members() {
             w_block.writeln(format!(
                 "{} {};",
-                self.type_ref_name(module, &member.type_),
-                member.name
-            ))?;
+                member.type_().c_type_name(),
+                member.name(),
+            ));
         }
-        self.w.writeln("};")?;
-        self.w.eob()?;
+        self.w.writeln("};").eob();
 
         // Skip the first member, as it will always be at the beginning of the structure
-        for (i, member) in struct_.members.iter().enumerate().skip(1) {
+        for member in struct_.members().skip(1) {
             self.w.writeln(format!(
                 "_Static_assert(offsetof({}, {}) == {}, \"unexpected offset\");",
-                dtname, member.name, member.offset
-            ))?;
+                own_type_name,
+                member.name(),
+                member.offset()
+            ));
         }
 
-        let struct_size = dt.entity.repr_size;
-        self.w.writeln(format!(
-            "_Static_assert(sizeof({}) == {}, \"unexpected structure size\");",
-            dtname, struct_size,
-        ))?;
-        self.w.eob()?;
-
+        self.w
+            .writeln(format!(
+                "_Static_assert(sizeof({}) == {}, \"unexpected structure size\");",
+                own_type_name,
+                struct_.datatype().mem_size(),
+            ))
+            .eob();
         Ok(())
     }
 
     // Enums generate both a specific typedef, and a traditional C-style enum
     // The typedef is required to use a native type which is consistent across all architectures
-    fn gen_enum(
-        &mut self,
-        module: &Module,
-        dt: &Named<DataType>,
-        enum_: &EnumDataType,
-    ) -> Result<(), IDLError> {
-        let dtname = self.type_name(dt);
-        let type_size = dt.entity.repr_size;
-        self.w.writeln(format!("{} {{", dtname))?;
-        let mut pretty_writer_i1 = self.w.new_block();
-        for (i, named_member) in enum_.members.iter().enumerate() {
-            pretty_writer_i1.writeln(format!(
+    fn gen_enum(&mut self, enum_: &EnumDatatype) -> Result<(), IDLError> {
+        let own_type_name = enum_.datatype().c_type_name();
+        self.w.writeln(format!("{} {{", own_type_name));
+        let mut w = self.w.new_block();
+        for variant in enum_.variants() {
+            w.writeln(format!(
                 "{}, // {}",
-                macro_for(&dt.name.name, &named_member.name),
-                i
-            ))?;
+                macro_for(enum_.datatype().name(), variant.name()),
+                variant.index(),
+            ));
         }
-        self.w.writeln("};")?;
-        self.w.eob()?;
+        self.w.writeln("};").eob();
+        self.w
+            .writeln(format!(
+                "_Static_assert(sizeof({}) == {}, \"unexpected enumeration size\");",
+                own_type_name,
+                enum_.datatype().mem_size(),
+            ))
+            .eob();
+        Ok(())
+    }
+
+    fn gen_abi_function(&mut self, func: &Function) -> Result<(), IDLError> {
+        let rets = func.rets().collect::<Vec<_>>();
+        let return_decl = match rets.len() {
+            0 => "void".to_owned(),
+            1 => rets[0].type_().c_type_name(),
+            _ => unreachable!("functions limited to 0 or 1 return arguments"),
+        };
+
+        let arg_list = func
+            .args()
+            .map(|a| format!("{} {}", a.type_().c_type_name(), a.name()))
+            .collect::<Vec<String>>()
+            .join(", ");
+
         self.w.writeln(format!(
-            "_Static_assert(sizeof({}) == {}, \"unexpected enumeration size\");",
-            dtname, type_size
-        ))?;
-        self.w.eob()?;
+            "extern {} {}({}) {};",
+            return_decl,
+            func.c_abi_func_name(),
+            arg_list,
+            func.c_abi_func_attributes(),
+        ));
+
         Ok(())
     }
 
-    fn gen_function(
-        &mut self,
-        _module: &Module,
-        _func_decl_entry: &Named<FuncDecl>,
-    ) -> Result<(), IDLError> {
-        // UNIMPLEMENTED!!
+    fn gen_idiomatic_function(&mut self, func: &Function) -> Result<(), IDLError> {
+        let mut ret_bindings = func.c_ret_bindings().collect::<Vec<_>>();
+        let ret_bindings = match ret_bindings.len() {
+            0 => None,
+            1 => Some(ret_bindings.pop().expect("only member")),
+            _ => unreachable!("functions limited to 0 or 1 return arguments"),
+        };
+
+        let own_return_decl = ret_bindings
+            .clone()
+            .map(|b| b.type_().c_type_name())
+            .unwrap_or("void".to_owned());
+
+        let own_arg_list = func
+            .c_arg_bindings()
+            .map(|b| match b.param() {
+                BindingParam::Ptr(_p) => format!(
+                    "{}{}* {}",
+                    b.c_constness(),
+                    b.type_().c_type_name(),
+                    b.name()
+                ),
+                BindingParam::Slice(_ptr, _len) => format!(
+                    "{}{}* {}_ptr, size_t {}_len",
+                    b.c_constness(),
+                    b.type_().c_type_name(),
+                    b.name(),
+                    b.name(),
+                ),
+                BindingParam::Value(_v) => format!("{} {}", b.type_().c_type_name(), b.name(),),
+            })
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        self.w.writeln(format!(
+            "{} {}({}) {{",
+            own_return_decl,
+            func.c_idiomatic_func_name(),
+            own_arg_list,
+        ));
+        {
+            let arg_bindings = func
+                .c_arg_bindings()
+                .map(|b| match b.param() {
+                    BindingParam::Ptr(p) => format!("({}) {}", p.type_().c_type_name(), b.name()),
+                    BindingParam::Slice(p, l) => format!(
+                        "({}) {}_ptr, ({}) {}_len",
+                        p.type_().c_type_name(),
+                        b.name(),
+                        l.type_().c_type_name(),
+                        b.name()
+                    ),
+                    BindingParam::Value(v) => format!("({}) {}", v.type_().c_type_name(), b.name()),
+                })
+                .collect::<Vec<String>>()
+                .join(", ");
+
+            let (ret_capture, ret_statement) = ret_bindings
+                .map(|b| match b.param() {
+                    BindingParam::Ptr(p) => (
+                        format!("{} {} = ", p.type_().c_type_name(), p.name()),
+                        format!("return (*{}) {};", b.type_().c_type_name(), p.name()),
+                    ),
+                    BindingParam::Value(v) => (
+                        format!("{} {} = ", v.type_().c_type_name(), v.name()),
+                        format!("return ({}) {};", b.type_().c_type_name(), v.name()),
+                    ),
+                    BindingParam::Slice { .. } => unreachable!("return slices are not supported"),
+                })
+                .unwrap_or((format!(""), format!("return;")));
+
+            let mut w = self.w.new_block();
+            w.writeln(format!(
+                "{}{}({});",
+                ret_capture,
+                func.c_abi_func_name(),
+                arg_bindings,
+            ));
+            w.writeln(ret_statement);
+        }
+        self.w.eob().writeln("}");
+
         Ok(())
-    }
-
-    // Return `true` if the type is an atom, an emum, or an alias to one of these
-    pub fn is_type_eventually_an_atom_or_enum(&self, module: &Module, type_: &DataTypeRef) -> bool {
-        let inner_type = match type_ {
-            DataTypeRef::Atom(_) => return true,
-            DataTypeRef::Defined(inner_type) => inner_type,
-        };
-        let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
-        match inner_data_type_entry.entity.variant {
-            DataTypeVariant::Struct { .. } => false,
-            DataTypeVariant::Enum { .. } => true,
-            DataTypeVariant::Alias(ref a) => self.is_type_eventually_an_atom_or_enum(module, &a.to),
-        }
-    }
-
-    /// Return the type refererence, with aliases being resolved
-    pub fn unalias<'t>(&self, module: &'t Module, type_: &'t DataTypeRef) -> &'t DataTypeRef {
-        let inner_type = match type_ {
-            DataTypeRef::Atom(_) => return type_,
-            DataTypeRef::Defined(inner_type) => inner_type,
-        };
-        let inner_data_type_entry = module.get_datatype(*inner_type).expect("defined datatype");
-        if let DataTypeVariant::Alias(ref a) = inner_data_type_entry.entity.variant {
-            self.unalias(module, &a.to)
-        } else {
-            type_
-        }
-    }
-
-    fn type_name(&self, dt: &Named<DataType>) -> String {
-        match dt.entity.variant {
-            DataTypeVariant::Struct(_) => format!("struct {}", dt.name.name),
-            DataTypeVariant::Enum(_) => format!("enum {}", dt.name.name),
-            DataTypeVariant::Alias(_) => format!("{}", dt.name.name),
-        }
-    }
-
-    fn type_ref_name(&self, module: &Module, type_: &DataTypeRef) -> String {
-        match type_ {
-            DataTypeRef::Atom(a) => atom_type_name(a).to_owned(),
-            DataTypeRef::Defined(id) => {
-                let dt = &module.get_datatype(*id).expect("type_name of valid ref");
-                self.type_name(dt)
-            }
-        }
     }
 }
 
-fn atom_type_name(atom_type: &AtomType) -> &'static str {
-    match atom_type {
-        AtomType::Bool => "bool",
-        AtomType::U8 => "uint8_t",
-        AtomType::U16 => "uint16_t",
-        AtomType::U32 => "uint32_t",
-        AtomType::U64 => "uint64_t",
-        AtomType::I8 => "int8_t",
-        AtomType::I16 => "int16_t",
-        AtomType::I32 => "int32_t",
-        AtomType::I64 => "int64_t",
-        AtomType::F32 => "float",
-        AtomType::F64 => "double",
+pub trait CTypeName {
+    fn c_type_name(&self) -> String;
+}
+
+impl CTypeName for AtomType {
+    fn c_type_name(&self) -> String {
+        match self {
+            AtomType::Bool => "bool",
+            AtomType::U8 => "uint8_t",
+            AtomType::U16 => "uint16_t",
+            AtomType::U32 => "uint32_t",
+            AtomType::U64 => "uint64_t",
+            AtomType::I8 => "int8_t",
+            AtomType::I16 => "int16_t",
+            AtomType::I32 => "int32_t",
+            AtomType::I64 => "int64_t",
+            AtomType::F32 => "float",
+            AtomType::F64 => "double",
+        }
+        .to_owned()
+    }
+}
+
+impl CTypeName for AbiType {
+    fn c_type_name(&self) -> String {
+        AtomType::from(self.clone()).c_type_name()
+    }
+}
+
+impl CTypeName for Datatype<'_> {
+    fn c_type_name(&self) -> String {
+        match self.variant() {
+            DatatypeVariant::Struct(_) => format!("struct {}", self.name()),
+            DatatypeVariant::Enum(_) => format!("enum {}", self.name()),
+            DatatypeVariant::Alias(_) => self.name().to_owned(),
+            DatatypeVariant::Atom(a) => a.c_type_name(),
+        }
     }
 }
 
 fn macro_for(prefix: &str, name: &str) -> String {
+    use heck::ShoutySnakeCase;
     let mut macro_name = String::new();
     macro_name.push_str(&prefix.to_uppercase());
     macro_name.push('_');
-    let mut previous_was_uppercase = name.chars().nth(0).expect("Empty name").is_uppercase();
-    for c in name.chars() {
-        let is_uppercase = c.is_uppercase();
-        if is_uppercase != previous_was_uppercase {
-            macro_name.push('_');
-        }
-        for uc in c.to_uppercase() {
-            macro_name.push(uc);
-        }
-        previous_was_uppercase = is_uppercase;
-    }
+    macro_name.push_str(&name.to_shouty_snake_case());
     macro_name
+}
+
+impl Function<'_> {
+    fn c_abi_func_name(&self) -> String {
+        format!("_{}_{}", self.module().name(), self.name())
+    }
+    fn c_abi_func_attributes(&self) -> String {
+        format!(
+            "__attribute__((import_module(\"{}\"),import_name(\"{}\")))",
+            self.module().name(),
+            self.name()
+        )
+    }
+    fn c_idiomatic_func_name(&self) -> String {
+        format!("{}_{}", self.module().name(), self.name())
+    }
+
+    fn c_arg_bindings<'a>(&'a self) -> impl Iterator<Item = FuncBinding<'a>> {
+        self.bindings().filter(|b| !binding_is_ret(b))
+    }
+    fn c_ret_bindings<'a>(&'a self) -> impl Iterator<Item = FuncBinding<'a>> {
+        self.bindings().filter(|b| binding_is_ret(b))
+    }
+}
+
+fn binding_is_ret(b: &FuncBinding) -> bool {
+    b.direction() == BindingDirection::Out && b.param().value().is_some()
+}
+
+impl FuncBinding<'_> {
+    fn c_constness(&self) -> &'static str {
+        if self.direction() == BindingDirection::In
+            && (self.param().ptr().is_some() || self.param().slice().is_some())
+        {
+            "const "
+        } else {
+            ""
+        }
+    }
 }

@@ -1,6 +1,5 @@
-use super::error::IDLError;
+#![allow(unused)]
 use std::cell::RefCell;
-use std::convert::Into;
 use std::io::prelude::*;
 use std::rc::Rc;
 
@@ -41,8 +40,11 @@ impl PrettyWriter {
         self
     }
 
-    fn _write_all(&mut self, buf: &[u8]) -> Result<(), IDLError> {
-        self.writer.borrow_mut().write_all(buf).map_err(Into::into)
+    fn _write_all(&mut self, buf: &[u8]) {
+        self.writer
+            .borrow_mut()
+            .write_all(buf)
+            .expect("pretty_writer write_all")
     }
 
     /// Return the current indentation level
@@ -52,24 +54,24 @@ impl PrettyWriter {
     }
 
     /// Output an indentation string
-    fn write_indent(&mut self) -> Result<&mut Self, IDLError> {
+    fn write_indent(&mut self) -> &mut Self {
         let indent_bytes = &self.indent_bytes.clone();
         {
             for _ in 0..self.indent {
-                self._write_all(indent_bytes)?
+                self._write_all(indent_bytes)
             }
         }
-        Ok(self)
+        self
     }
 
     /// Output an end of line
-    pub fn eol(&mut self) -> Result<&mut Self, IDLError> {
-        self._write_all(b"\n")?;
-        Ok(self)
+    pub fn eol(&mut self) -> &mut Self {
+        self._write_all(b"\n");
+        self
     }
 
     /// Output a block separator
-    pub fn eob(&mut self) -> Result<&mut Self, IDLError> {
+    pub fn eob(&mut self) -> &mut Self {
         if self.indent > 0 {
             self.indent -= 1;
         }
@@ -77,18 +79,26 @@ impl PrettyWriter {
     }
 
     /// Write raw data
-    pub fn write(&mut self, buf: &[u8]) -> Result<&mut Self, IDLError> {
-        self._write_all(buf)?;
-        Ok(self)
+    pub fn write(&mut self, buf: &[u8]) -> &mut Self {
+        self._write_all(buf);
+        self
     }
 
     /// Indent, write raw data and terminate with an end of line
-    pub fn write_line(&mut self, buf: &[u8]) -> Result<&mut Self, IDLError> {
-        self.write_indent()?.write(buf)?.eol()
+    pub fn write_line(&mut self, buf: &[u8]) -> &mut Self {
+        self.write_indent().write(buf).eol()
     }
 
     /// Indent, write raw data and terminate with an end of line
-    pub fn writeln<S: AsRef<str>>(&mut self, buf: S) -> Result<&mut Self, IDLError> {
+    pub fn writeln<S: AsRef<str>>(&mut self, buf: S) -> &mut Self {
         self.write_line(buf.as_ref().as_bytes())
+    }
+
+    /// Indent, write raw data and terminate with an end of line
+    pub fn writelns<S: AsRef<str>>(&mut self, lines: &[S]) -> &mut Self {
+        for line in lines.iter() {
+            self.write_line(line.as_ref().as_bytes());
+        }
+        self
     }
 }
