@@ -8,6 +8,7 @@ mod c;
 mod config;
 mod cursor;
 mod error;
+pub mod interfacetypes;
 mod lexer;
 mod parser;
 mod prelude;
