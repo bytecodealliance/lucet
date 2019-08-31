@@ -10,6 +10,24 @@ pub enum SExpr<'a> {
     Quote(&'a str, Location),
 }
 
+impl<'a> SExpr<'a> {
+    pub fn location(&self) -> Location {
+        match self {
+            SExpr::Vec(_, loc) => *loc,
+            SExpr::Word(_, loc) => *loc,
+            SExpr::Ident(_, loc) => *loc,
+            SExpr::Quote(_, loc) => *loc,
+        }
+    }
+
+    pub fn is_word(&self, w: &str) -> bool {
+        match self {
+            SExpr::Word(word, _) => *word == w,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SExprParseError {
     Lex(LexError, Location),
