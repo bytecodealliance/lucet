@@ -35,6 +35,7 @@ pub(crate) struct GpRegs {
     r14: u64,
     r15: u64,
     pub(crate) rsi: u64,
+    r8: u64
 }
 
 impl GpRegs {
@@ -49,6 +50,7 @@ impl GpRegs {
             r14: 0,
             r15: 0,
             rsi: 0,
+            r8: 0,
         }
     }
 }
@@ -206,9 +208,10 @@ impl ContextHandle {
         stack: &mut [u64],
         fptr: usize,
         args: &[Val],
+        heap: *mut core::ffi::c_void,
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
-        Context::init(stack, &mut child, fptr, args)?;
+        Context::init(stack, &mut child, fptr, args, heap)?;
         Ok(child)
     }
 }
@@ -365,6 +368,7 @@ impl Context {
         child: &mut Context,
         fptr: usize,
         args: &[Val],
+        heap: *mut core::ffi::c_void,
     ) -> Result<(), Error> {
         Context::init_with_callback(
             stack,
@@ -373,6 +377,7 @@ impl Context {
             ptr::null_mut(),
             fptr,
             args,
+            heap,
         )
     }
 
@@ -391,6 +396,7 @@ impl Context {
         backstop_data: *mut Instance,
         fptr: usize,
         args: &[Val],
+        heap: *mut core::ffi::c_void,
     ) -> Result<(), Error> {
         if !stack_is_aligned(stack) {
             return Err(Error::UnalignedStack);
@@ -470,6 +476,9 @@ impl Context {
         child.gpr.rsp = &mut stack[stack.len() - stack_start] as *mut u64 as u64;
 
         child.gpr.rbp = child as *const Context as u64;
+
+        // testing out heap pinning
+        child.gpr.r15 = heap as u64;
 
         // Read the mask to be restored if we ever need to jump out of a signal handler. If this
         // isn't possible, die.

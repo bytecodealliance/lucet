@@ -253,6 +253,8 @@ impl<'a> Compiler<'a> {
         let isa_builder = cpu_features.isa_builder(target)?;
         flags_builder.enable("enable_verifier").unwrap();
         flags_builder.enable("is_pic").unwrap();
+        flags_builder.enable("enable_pinned_reg");
+        flags_builder.enable("use_pinned_reg_as_heap_base");
         flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
         if canonicalize_nans {
             flags_builder.enable("enable_nan_canonicalization").unwrap();

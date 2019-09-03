@@ -118,6 +118,7 @@ _lucet_context_swap:
     mov %r14, (6*8)(%rdi)
     mov %r15, (7*8)(%rdi)
     mov %rsi, (8*8)(%rdi)
+    mov %r8,  (9*8)(%rdi)
 
     movdqu %xmm0, (10*8 + 0*16)(%rdi)
     movdqu %xmm1, (10*8 + 1*16)(%rdi)
@@ -137,6 +138,7 @@ _lucet_context_swap:
     mov (5*8)(%rsi), %r13
     mov (6*8)(%rsi), %r14
     mov (7*8)(%rsi), %r15
+    mov (9*8)(%rsi), %r8
 
     movdqu (10*8 + 0*16)(%rsi), %xmm0
     movdqu (10*8 + 1*16)(%rsi), %xmm1
