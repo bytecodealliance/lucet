@@ -2,12 +2,12 @@ use crate::error::IDLError;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub wati: bool,
+    pub witx: bool,
     pub backend: Backend,
 }
 
 impl Config {
-    pub fn parse(wati: bool, backend_opt: &str) -> Result<Self, IDLError> {
+    pub fn parse(witx: bool, backend_opt: &str) -> Result<Self, IDLError> {
         let backend = Backend::from_str(backend_opt).ok_or_else(|| {
             IDLError::UsageError(format!(
                 "Invalid backend: {}\nValid options are: {:?}",
@@ -15,7 +15,7 @@ impl Config {
                 Backend::options()
             ))
         })?;
-        Ok(Self { wati, backend })
+        Ok(Self { witx, backend })
     }
 }
 

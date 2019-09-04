@@ -40,11 +40,11 @@ impl ExeConfig {
                     .help("output path"),
             )
             .arg(
-                Arg::with_name("wati")
-                    .long("wati")
+                Arg::with_name("witx")
+                    .long("witx")
                     .takes_value(false)
                     .required(false)
-                    .help("wati (interface-types) mode"),
+                    .help("witx (interface-types, with extensions) mode"),
             )
             .get_matches();
         let input_path = PathBuf::from(
@@ -54,7 +54,7 @@ impl ExeConfig {
         );
         let output_path = matches.value_of("output").map(PathBuf::from);
         let config = Config::parse(
-            matches.is_present("wati"),
+            matches.is_present("witx"),
             matches.value_of("backend").unwrap(),
         )?;
         Ok(ExeConfig {

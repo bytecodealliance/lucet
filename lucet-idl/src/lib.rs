@@ -66,7 +66,7 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
 }
 
 pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
-    if config.wati {
+    if config.witx {
         use crate::interfacetypes::{parse, ParseError};
         let parse_stmts = parse(input)?;
         for s in parse_stmts {
