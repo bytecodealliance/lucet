@@ -43,7 +43,7 @@ impl BuiltinType {
             SExpr::Word("u16", _loc) => Ok(BuiltinType::U16),
             SExpr::Word("u32", _loc) => Ok(BuiltinType::U32),
             SExpr::Word("u64", _loc) => Ok(BuiltinType::U64),
-            _ => Err(unimplemented!()),
+            _ => Err(parse_err!(sexpr.location(), "invalid builtin type")),
         }
     }
 }
@@ -62,14 +62,14 @@ impl<'a> TypeIdent<'a> {
         } else {
             match sexpr {
                 SExpr::Ident(i, _loc) => Ok(TypeIdent::Ident(i)),
-                SExpr::Vec(v, _loc) => {
+                SExpr::Vec(v, loc) => {
                     if v.len() == 2 && v[0].is_word("array") {
                         Ok(TypeIdent::Array(Box::new(TypeIdent::parse(&v[1])?)))
                     } else {
-                        Err(unimplemented!("expected type constructor"))
+                        Err(parse_err!(*loc, "expected type constructor"))
                     }
                 }
-                _ => Err(unimplemented!("expected type identifier")),
+                _ => Err(parse_err!(sexpr.location(), "expected type identifier")),
             }
         }
     }
@@ -84,16 +84,16 @@ pub enum DeclSyntax<'a> {
 impl<'a> DeclSyntax<'a> {
     pub fn parse(sexpr: &SExpr<'a>) -> Result<DeclSyntax<'a>, ParseError> {
         match sexpr {
-            SExpr::Vec(v, _loc) if v.len() > 1 => match v[0] {
+            SExpr::Vec(v, loc) if v.len() > 1 => match v[0] {
                 SExpr::Word("typename", loc) => {
                     Ok(DeclSyntax::Typename(TypenameSyntax::parse(&v[1..], loc)?))
                 }
                 SExpr::Word("moudletype", loc) => Ok(DeclSyntax::Moduletype(
                     ModuletypeSyntax::parse(&v[1..], loc)?,
                 )),
-                _ => Err(unimplemented!("invalid declaration")),
+                _ => Err(parse_err!(*loc, "invalid declaration")),
             },
-            _ => Err(unimplemented!("expected vec")),
+            _ => Err(parse_err!(sexpr.location(), "expected vec")),
         }
     }
 }

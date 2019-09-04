@@ -67,9 +67,15 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
 
 pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
     if config.wati {
-        use crate::interfacetypes::parse;
-        let parse_tree = parse(input)?;
-        println!("{:?}", parse_tree);
+        use crate::interfacetypes::{parse, ParseError};
+        let parse_stmts = parse(input)?;
+        for s in parse_stmts {
+            match s {
+                Ok(decl) => println!("DECL: {:?}", decl),
+                Err(ParseError::Error(e, loc)) => println!("ERR @ {:?}: {:?}", loc, e),
+                Err(ParseError::Unimplemented(e, loc)) => println!("UNIMP@ {:?}: {:?}", loc, e),
+            }
+        }
         Ok(())
     } else {
         let pkg = parse_package(input)?;
