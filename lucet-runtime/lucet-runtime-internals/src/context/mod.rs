@@ -304,6 +304,7 @@ impl Context {
     ///     &mut child,
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
+    ///     std::ptr::null_mut(),
     /// );
     /// assert!(res.is_ok());
     /// ```
@@ -327,6 +328,7 @@ impl Context {
     ///     &mut child,
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
+    ///     std::ptr::null_mut(),
     /// );
     /// assert!(res.is_ok());
     /// ```
@@ -561,6 +563,7 @@ impl Context {
     ///     &mut child,
     ///     entrypoint as usize,
     ///     &[],
+    ///     std::ptr::null_mut(),
     /// ).unwrap();
     ///
     /// unsafe { Context::swap(&mut parent, &mut child); }
