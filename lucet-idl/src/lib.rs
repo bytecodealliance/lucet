@@ -66,8 +66,15 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
 }
 
 pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
-    let pkg = parse_package(input)?;
-    codegen(&pkg, config, output)
+    if config.wati {
+        use crate::interfacetypes::parse;
+        let parse_tree = parse(input)?;
+        println!("{:?}", parse_tree);
+        Ok(())
+    } else {
+        let pkg = parse_package(input)?;
+        codegen(&pkg, config, output)
+    }
 }
 
 impl Package {

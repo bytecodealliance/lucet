@@ -28,10 +28,13 @@ impl<'a> SExpr<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Fail)]
 pub enum SExprParseError {
+    #[fail(display = "Lexical error at {:?}: {}", _1, _0)]
     Lex(LexError, Location),
+    #[fail(display = "Unexpected ')' at {:?}", _0)]
     UnexpectedCloseParen(Location),
+    #[fail(display = "Unexpected end of input")]
     UnexpectedEof,
 }
 

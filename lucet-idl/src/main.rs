@@ -39,6 +39,13 @@ impl ExeConfig {
                     .required(false)
                     .help("output path"),
             )
+            .arg(
+                Arg::with_name("wati")
+                    .long("wati")
+                    .takes_value(false)
+                    .required(false)
+                    .help("wati (interface-types) mode"),
+            )
             .get_matches();
         let input_path = PathBuf::from(
             matches
@@ -46,7 +53,10 @@ impl ExeConfig {
                 .ok_or(IDLError::UsageError("Input file required".to_owned()))?,
         );
         let output_path = matches.value_of("output").map(PathBuf::from);
-        let config = Config::parse(matches.value_of("backend").unwrap())?;
+        let config = Config::parse(
+            matches.is_present("wati"),
+            matches.value_of("backend").unwrap(),
+        )?;
         Ok(ExeConfig {
             input_path,
             output_path,

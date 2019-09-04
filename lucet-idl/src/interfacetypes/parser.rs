@@ -2,8 +2,29 @@
 #![allow(unused_variables)] // wip
 #![allow(dead_code)] // wip
 use super::sexpr::SExpr;
+use crate::Location;
 
-type ParseError = (); // TODO
+#[derive(Debug, PartialEq, Eq, Clone, Fail)]
+pub enum ParseError {
+    #[fail(display = "{} at {:?}", _0, _1)]
+    Error(String, Location),
+    #[fail(display = "Unimplemented: {} at {:?}", _0, _1)]
+    Unimplemented(String, Location),
+}
+
+macro_rules! parse_err {
+    ($loc:expr, $msg:expr) => {
+        ParseError::Error($msg.to_string(), $loc)
+    };
+    ($loc:expr, $fmt:expr, $( $arg:expr ),+ ) => {
+        ParseError::Error(format!($fmt, $( $arg ),+), $loc)
+    };
+}
+macro_rules! parse_unimp {
+    ($loc:expr, $msg:expr) => {
+        ParseError::Unimplemented($msg.to_string(), $loc)
+    };
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum BuiltinType {
@@ -61,15 +82,15 @@ pub enum DeclSyntax<'a> {
 }
 
 impl<'a> DeclSyntax<'a> {
-    fn parse(sexpr: &SExpr<'a>) -> Result<DeclSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &SExpr<'a>) -> Result<DeclSyntax<'a>, ParseError> {
         match sexpr {
             SExpr::Vec(v, _loc) if v.len() > 1 => match v[0] {
-                SExpr::Word("typename", _loc) => {
-                    Ok(DeclSyntax::Typename(TypenameSyntax::parse(&v[1..])?))
+                SExpr::Word("typename", loc) => {
+                    Ok(DeclSyntax::Typename(TypenameSyntax::parse(&v[1..], loc)?))
                 }
-                SExpr::Word("moudletype", _loc) => {
-                    Ok(DeclSyntax::Moduletype(ModuletypeSyntax::parse(&v[1..])?))
-                }
+                SExpr::Word("moudletype", loc) => Ok(DeclSyntax::Moduletype(
+                    ModuletypeSyntax::parse(&v[1..], loc)?,
+                )),
                 _ => Err(unimplemented!("invalid declaration")),
             },
             _ => Err(unimplemented!("expected vec")),
@@ -84,14 +105,14 @@ pub struct TypenameSyntax<'a> {
 }
 
 impl<'a> TypenameSyntax<'a> {
-    fn parse(sexpr: &[SExpr<'a>]) -> Result<TypenameSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<TypenameSyntax<'a>, ParseError> {
         let ident = match sexpr.get(0) {
-            Some(SExpr::Ident(i, _)) => i,
-            _ => Err(unimplemented!("expected typename identifier"))?,
+            Some(SExpr::Ident(i, loc)) => i,
+            _ => Err(parse_unimp!(loc, "expected typename identifier"))?,
         };
         let def = match sexpr.get(1) {
-            Some(SExpr::Vec(v, _)) => TypedefSyntax::parse(v)?,
-            _ => Err(panic!("expected type definition"))?,
+            Some(SExpr::Vec(v, loc)) => TypedefSyntax::parse(v, *loc)?,
+            _ => Err(parse_err!(loc, "expected type definition"))?,
         };
         Ok(TypenameSyntax { ident, def })
     }
@@ -105,18 +126,19 @@ pub enum TypedefSyntax<'a> {
 }
 
 impl<'a> TypedefSyntax<'a> {
-    fn parse(sexpr: &[SExpr<'a>]) -> Result<TypedefSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<TypedefSyntax<'a>, ParseError> {
         match sexpr.get(0) {
-            Some(SExpr::Word("enum", _)) => {
-                Ok(TypedefSyntax::Enum(EnumSyntax::parse(&sexpr[1..])?))
+            Some(SExpr::Word("enum", loc)) => {
+                Ok(TypedefSyntax::Enum(EnumSyntax::parse(&sexpr[1..], *loc)?))
             }
-            Some(SExpr::Word("flags", _)) => {
-                Ok(TypedefSyntax::Flags(FlagsSyntax::parse(&sexpr[1..])?))
+            Some(SExpr::Word("flags", loc)) => {
+                Ok(TypedefSyntax::Flags(FlagsSyntax::parse(&sexpr[1..], *loc)?))
             }
-            Some(SExpr::Word("struct", _)) => {
-                Ok(TypedefSyntax::Struct(StructSyntax::parse(&sexpr[1..])?))
-            }
-            _ => Err(panic!("invalid typedef")),
+            Some(SExpr::Word("struct", loc)) => Ok(TypedefSyntax::Struct(StructSyntax::parse(
+                &sexpr[1..],
+                *loc,
+            )?)),
+            _ => Err(parse_err!(loc, "invalid typedef")),
         }
     }
 }
@@ -128,20 +150,20 @@ pub struct EnumSyntax<'a> {
 }
 
 impl<'a> EnumSyntax<'a> {
-    fn parse(sexpr: &[SExpr<'a>]) -> Result<EnumSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<EnumSyntax<'a>, ParseError> {
         let repr = match sexpr.get(0) {
             Some(e) => BuiltinType::parse(e)?,
-            _ => Err(panic!("no enum repr"))?,
+            _ => Err(parse_err!(loc, "no enum repr"))?,
         };
         let members = match sexpr.get(1) {
-            Some(SExpr::Vec(v, _)) => v
+            Some(SExpr::Vec(v, loc)) => v
                 .iter()
                 .map(|m| match m {
                     SExpr::Ident(i, _) => Ok(*i),
-                    _ => Err(panic!("expected enum member identifier")),
+                    _ => Err(parse_err!(*loc, "expected enum member identifier")),
                 })
                 .collect::<Result<Vec<_>, ParseError>>()?,
-            _ => Err(panic!("empty enum members"))?,
+            _ => Err(parse_err!(loc, "empty enum members"))?,
         };
         Ok(EnumSyntax { repr, members })
     }
@@ -154,17 +176,17 @@ pub struct FlagsSyntax<'a> {
 }
 
 impl<'a> FlagsSyntax<'a> {
-    fn parse(sexpr: &[SExpr<'a>]) -> Result<FlagsSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<FlagsSyntax<'a>, ParseError> {
         let repr = BuiltinType::parse(
             sexpr
                 .get(0)
-                .ok_or_else(|| panic!("expected flag repr type"))?,
+                .ok_or_else(|| parse_err!(loc, "expected flag repr type"))?,
         )?;
         let flags = sexpr[1..]
             .iter()
             .map(|f| match f {
                 SExpr::Ident(i, _) => Ok(*i),
-                _ => Err(panic!("expected flag identifier")),
+                _ => Err(parse_err!(loc, "expected flag identifier")),
             })
             .collect::<Result<Vec<_>, ParseError>>()?;
         Ok(FlagsSyntax { repr, flags })
@@ -177,7 +199,10 @@ pub struct StructSyntax<'a> {
 }
 
 impl<'a> StructSyntax<'a> {
-    fn parse(sexpr: &[SExpr<'a>]) -> Result<StructSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<StructSyntax<'a>, ParseError> {
+        if sexpr.is_empty() {
+            Err(parse_err!(loc, "empty struct"))?;
+        }
         let fields = sexpr
             .iter()
             .map(|f| StructFieldSyntax::parse(f))
@@ -193,23 +218,23 @@ pub struct StructFieldSyntax<'a> {
 }
 
 impl<'a> StructFieldSyntax<'a> {
-    fn parse(sexpr: &SExpr<'a>) -> Result<StructFieldSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &SExpr<'a>) -> Result<StructFieldSyntax<'a>, ParseError> {
         match sexpr {
-            SExpr::Vec(v, _) => match v.get(0) {
+            SExpr::Vec(v, loc) => match v.get(0) {
                 Some(SExpr::Word("field", _)) => {
                     let name = match v.get(1) {
                         Some(SExpr::Ident(i, _)) => i,
-                        _ => Err(panic!("expected struct name identifier"))?,
+                        _ => Err(parse_err!(*loc, "expected struct name identifier"))?,
                     };
                     let type_ = TypeIdent::parse(
                         v.get(2)
-                            .ok_or_else(|| panic!("expected struct type identifier"))?,
+                            .ok_or_else(|| parse_err!(*loc, "expected struct type identifier"))?,
                     )?;
                     Ok(StructFieldSyntax { name, type_ })
                 }
-                _ => Err(panic!("expected struct field")),
+                _ => Err(parse_err!(*loc, "expected struct field")),
             },
-            _ => Err(panic!("expected struct field vector")),
+            _ => Err(parse_err!(sexpr.location(), "expected struct field vector")),
         }
     }
 }
@@ -221,8 +246,8 @@ pub struct ModuletypeSyntax<'a> {
 }
 
 impl<'a> ModuletypeSyntax<'a> {
-    fn parse(sexprs: &[SExpr<'a>]) -> Result<ModuletypeSyntax<'a>, ParseError> {
-        unimplemented!()
+    pub fn parse(sexprs: &[SExpr<'a>], loc: Location) -> Result<ModuletypeSyntax<'a>, ParseError> {
+        Err(parse_unimp!(loc, "moduletype syntax"))
     }
 }
 
@@ -233,7 +258,7 @@ pub struct ModuleImportSyntax<'a> {
 }
 
 impl<'a> ModuleImportSyntax<'a> {
-    fn parse(sexpr: &SExpr<'a>) -> Result<ModuleImportSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &SExpr<'a>) -> Result<ModuleImportSyntax<'a>, ParseError> {
         unimplemented!()
     }
 }
@@ -245,7 +270,7 @@ pub enum ImportTypeSyntax<'a> {
 }
 
 impl<'a> ImportTypeSyntax<'a> {
-    fn parse(sexpr: &SExpr<'a>) -> Result<ImportTypeSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &SExpr<'a>) -> Result<ImportTypeSyntax<'a>, ParseError> {
         unimplemented!()
     }
 }
@@ -257,7 +282,7 @@ pub struct FunctionTypeSyntax<'a> {
 }
 
 impl<'a> FunctionTypeSyntax<'a> {
-    fn parse(sexpr: &SExpr<'a>) -> Result<FunctionTypeSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &SExpr<'a>) -> Result<FunctionTypeSyntax<'a>, ParseError> {
         unimplemented!()
     }
 }
@@ -269,7 +294,7 @@ pub struct ParamSyntax<'a> {
 }
 
 impl<'a> ParamSyntax<'a> {
-    fn parse(sexpr: &SExpr<'a>) -> Result<ParamSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &SExpr<'a>) -> Result<ParamSyntax<'a>, ParseError> {
         unimplemented!()
     }
 }
@@ -282,7 +307,7 @@ pub struct ModuleFuncSyntax<'a> {
 }
 
 impl<'a> ModuleFuncSyntax<'a> {
-    fn parse(sexpr: &SExpr<'a>) -> Result<ModuleFuncSyntax<'a>, ParseError> {
+    pub fn parse(sexpr: &SExpr<'a>) -> Result<ModuleFuncSyntax<'a>, ParseError> {
         unimplemented!()
     }
 }

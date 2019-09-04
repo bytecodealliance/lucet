@@ -20,10 +20,13 @@ fn token(token: Token<'_>, location: Location) -> Result<LocatedToken<'_>, Locat
     Ok(LocatedToken { token, location })
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Fail)]
 pub enum LexError {
+    #[fail(display = "Invalid character '{}'", _0)]
     InvalidChar(char),
+    #[fail(display = "Empty identifier '$'")]
     EmptyIdentifier,
+    #[fail(display = "Unterminated quote")]
     UnterminatedQuote,
 }
 
