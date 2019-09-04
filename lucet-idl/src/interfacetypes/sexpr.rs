@@ -8,6 +8,8 @@ pub enum SExpr<'a> {
     Word(&'a str, Location),
     Ident(&'a str, Location),
     Quote(&'a str, Location),
+    /// Short for Annotation
+    Annot(&'a str, Location),
 }
 
 impl<'a> SExpr<'a> {
@@ -17,6 +19,7 @@ impl<'a> SExpr<'a> {
             SExpr::Word(_, loc) => *loc,
             SExpr::Ident(_, loc) => *loc,
             SExpr::Quote(_, loc) => *loc,
+            SExpr::Annot(_, loc) => *loc,
         }
     }
 
@@ -98,6 +101,10 @@ impl<'a> SExprParser<'a> {
             Some(Token::Ident(id)) => {
                 self.consume();
                 Ok(SExpr::Ident(id, location))
+            }
+            Some(Token::Annot(id)) => {
+                self.consume();
+                Ok(SExpr::Annot(id, location))
             }
             Some(Token::Quote(q)) => {
                 self.consume();

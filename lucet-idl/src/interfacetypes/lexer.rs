@@ -7,6 +7,7 @@ pub enum Token<'a> {
     RPar,           // )
     Word(&'a str),  // Bare word
     Ident(&'a str), // Starts with $
+    Annot(&'a str), // Starts with @. short for annotation.
     Quote(&'a str), // Found between balanced "". No escaping.
 }
 
@@ -26,6 +27,8 @@ pub enum LexError {
     InvalidChar(char),
     #[fail(display = "Empty identifier '$'")]
     EmptyIdentifier,
+    #[fail(display = "Empty annotation '@'")]
+    EmptyAnnotation,
     #[fail(display = "Unterminated quote")]
     UnterminatedQuote,
 }
@@ -153,6 +156,30 @@ impl<'a> Lexer<'a> {
         token(Token::Ident(text), loc)
     }
 
+    fn scan_annotation(&mut self) -> Result<LocatedToken<'a>, LocatedError> {
+        let loc = self.loc();
+        assert!(self.lookahead == Some('@'));
+        match self.next_ch() {
+            Some(ch) if ch.is_alphanumeric() || ch == '_' => {}
+            _ => Err(LocatedError {
+                error: LexError::EmptyAnnotation,
+                location: loc,
+            })?,
+        }
+        let begin = self.pos;
+
+        loop {
+            match self.next_ch() {
+                Some('_') | Some('-') => {}
+                Some(ch) if ch.is_alphanumeric() => {}
+                _ => break,
+            }
+        }
+
+        let text = &self.source[begin..self.pos];
+        token(Token::Annot(text), loc)
+    }
+
     fn scan_quote(&mut self) -> Result<LocatedToken<'a>, LocatedError> {
         let begin = self.pos;
         let loc = self.loc();
@@ -184,6 +211,7 @@ impl<'a> Lexer<'a> {
                     '(' => self.scan_char(Token::LPar),
                     ')' => self.scan_char(Token::RPar),
                     '$' => self.scan_ident(),
+                    '@' => self.scan_annotation(),
                     ';' => {
                         if self.looking_at(";;") {
                             self.rest_of_line();
