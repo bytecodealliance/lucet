@@ -35,7 +35,7 @@ pub(crate) struct GpRegs {
     r14: u64,
     r15: u64,
     pub(crate) rsi: u64,
-    r8: u64
+    r8: u64,
 }
 
 impl GpRegs {
