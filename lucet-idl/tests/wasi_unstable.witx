@@ -100,7 +100,7 @@
     (param $fd $fd_t)
     (result $error $errno_t)
     ;; The buffer where the file descriptor's attributes are stored.
-    (result $fdstat_t)
+    (result $stat $fdstat_t)
   )
 
   ;; Adjust the flags associated with a file descriptor.
@@ -375,7 +375,7 @@
   (@interface func (export "path_readlink")
     (param $fd $fd_t)
     ;; The path of the symbolic link from which to read.
-    (param $path)
+    (param $path string)
     ;; The buffer to which to write the contents of the symbolic link.
     (param $buf string)
     (result $error $errno_t)
