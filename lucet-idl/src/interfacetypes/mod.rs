@@ -15,21 +15,22 @@ pub enum InterfaceTypesError {
     SExpr(#[cause] SExprParseError),
     #[fail(display = "Invalid use statement \"{}\": {}", _1, _0)]
     UseInvalid(&'static str, String),
-    #[fail(display = "cycle of use statements: {:?}", _0)]
-    UseCycle(Vec<PathBuf>),
     #[fail(display = "in file {:?}: {}", _0, _1)]
     Parse(PathBuf, #[cause] ParseError),
     #[fail(display = "with file {:?}: {}", _0, _1)]
     Io(PathBuf, #[cause] io::Error),
 }
 
-pub fn parse_witx<P: AsRef<Path>>(input_path: P) -> Result<Vec<DeclSyntax>, InterfaceTypesError> {
-    let input_path = input_path.as_ref();
-    let input = fs::read_to_string(input_path)
-        .map_err(|e| InterfaceTypesError::Io(input_path.into(), e))?;
+pub fn parse_witx<P: AsRef<Path>>(i: P) -> Result<Vec<DeclSyntax>, InterfaceTypesError> {
+    let i_buf = PathBuf::from(i.as_ref());
+    let input_path = i_buf
+        .canonicalize()
+        .map_err(|e| InterfaceTypesError::Io(i_buf.clone(), e))?;
+    let input = fs::read_to_string(&input_path)
+        .map_err(|e| InterfaceTypesError::Io(input_path.clone(), e))?;
 
-    let toplevel = parse_toplevel(&input, input_path)?;
-    let mut resolved = vec![input_path.into()];
+    let toplevel = parse_toplevel(&input, &input_path)?;
+    let mut resolved = vec![input_path.clone()];
     let search_path = input_path
         .parent()
         .map(PathBuf::from)
@@ -56,7 +57,7 @@ fn parse_toplevel(
 fn resolve_uses(
     toplevel: Vec<TopLevelSyntax>,
     search_path: &Path,
-    resolved: &mut Vec<PathBuf>,
+    used: &mut Vec<PathBuf>,
 ) -> Result<Vec<DeclSyntax>, InterfaceTypesError> {
     let mut decls = Vec::new();
 
@@ -76,19 +77,19 @@ fn resolve_uses(
                 abs_path
                     .canonicalize()
                     .map_err(|e| InterfaceTypesError::Io(u_path, e))?;
-                if resolved.contains(&abs_path) {
-                    resolved.push(abs_path.clone());
-                    Err(InterfaceTypesError::UseCycle(resolved.clone()))?;
+
+                // Include the decls from a use declaration only once
+                // in a given toplevel. Same idea as #pragma once.
+                if !used.contains(&abs_path) {
+                    used.push(abs_path.clone());
+
+                    let source_text = fs::read_to_string(&abs_path)
+                        .map_err(|e| InterfaceTypesError::Io(abs_path.clone(), e))?;
+                    let inner_toplevels = parse_toplevel(&source_text, &abs_path)?;
+
+                    let inner_decls = resolve_uses(inner_toplevels, search_path, used)?;
+                    decls.extend(inner_decls)
                 }
-
-                let source_text = fs::read_to_string(&abs_path)
-                    .map_err(|e| InterfaceTypesError::Io(abs_path.clone(), e))?;
-                let inner_toplevels = parse_toplevel(&source_text, &abs_path)?;
-
-                resolved.push(abs_path);
-                let inner_decls = resolve_uses(inner_toplevels, search_path, resolved)?;
-                resolved.pop();
-                decls.extend(inner_decls)
             }
         }
     }
