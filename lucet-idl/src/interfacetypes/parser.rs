@@ -87,20 +87,25 @@ impl<'a> TypeIdent<'a> {
 
 #[derive(Debug, Clone)]
 pub enum DeclSyntax<'a> {
+    Use(&'a str),
     Typename(TypenameSyntax<'a>),
-    Moduletype(ModuletypeSyntax<'a>),
+    Module(ModuleSyntax<'a>),
 }
 
 impl<'a> DeclSyntax<'a> {
     pub fn parse(sexpr: &SExpr<'a>) -> Result<DeclSyntax<'a>, ParseError> {
         match sexpr {
-            SExpr::Vec(v, loc) if v.len() > 1 => match v[0] {
-                SExpr::Word("typename", loc) => {
-                    Ok(DeclSyntax::Typename(TypenameSyntax::parse(&v[1..], loc)?))
+            SExpr::Vec(v, loc) => match v.get(0) {
+                Some(SExpr::Word("use", loc)) => match v.get(1) {
+                    Some(SExpr::Quote(u, _)) => Ok(DeclSyntax::Use(u)),
+                    _ => Err(parse_err!(*loc, "invalid use declaration")),
+                },
+                Some(SExpr::Word("typename", loc)) => {
+                    Ok(DeclSyntax::Typename(TypenameSyntax::parse(&v[1..], *loc)?))
                 }
-                SExpr::Word("moduletype", loc) => Ok(DeclSyntax::Moduletype(
-                    ModuletypeSyntax::parse(&v[1..], loc)?,
-                )),
+                Some(SExpr::Word("module", loc)) => {
+                    Ok(DeclSyntax::Module(ModuleSyntax::parse(&v[1..], *loc)?))
+                }
                 _ => Err(parse_err!(*loc, "invalid declaration")),
             },
             _ => Err(parse_err!(sexpr.location(), "expected vec")),
@@ -316,13 +321,13 @@ impl<'a> UnionFieldSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ModuletypeSyntax<'a> {
+pub struct ModuleSyntax<'a> {
     pub imports: Vec<ModuleImportSyntax<'a>>,
     pub funcs: Vec<ModuleFuncSyntax<'a>>,
 }
 
-impl<'a> ModuletypeSyntax<'a> {
-    pub fn parse(sexprs: &[SExpr<'a>], loc: Location) -> Result<ModuletypeSyntax<'a>, ParseError> {
+impl<'a> ModuleSyntax<'a> {
+    pub fn parse(sexprs: &[SExpr<'a>], loc: Location) -> Result<ModuleSyntax<'a>, ParseError> {
         Err(parse_unimp!(loc, "moduletype syntax"))
     }
 }
