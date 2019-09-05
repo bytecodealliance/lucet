@@ -2,7 +2,7 @@
 ;;
 ;; Some content here is derived from [CloudABI](https://github.com/NuxiNL/cloudabi).
 
-(use "typenames.wid")
+(use "typenames.witx")
 
 (module $wasi_unstable
   ;; Linear memory to be accessed by WASI functions that need it.
