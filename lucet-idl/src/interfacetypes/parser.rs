@@ -4,7 +4,7 @@
 use super::sexpr::SExpr;
 use crate::Location;
 
-#[derive(Debug, PartialEq, Eq, Clone, Fail)]
+#[derive(Debug, Fail)]
 pub enum ParseError {
     #[fail(display = "{} at {:?}", _0, _1)]
     Error(String, Location),
@@ -41,7 +41,7 @@ pub enum BuiltinType {
 }
 
 impl BuiltinType {
-    pub fn parse<'a>(sexpr: &SExpr<'a>) -> Result<Self, ParseError> {
+    pub fn parse(sexpr: &SExpr) -> Result<Self, ParseError> {
         match sexpr {
             SExpr::Word("string", _loc) => Ok(BuiltinType::String),
             SExpr::Word("data", _loc) => Ok(BuiltinType::Data),
@@ -59,19 +59,19 @@ impl BuiltinType {
 }
 
 #[derive(Debug, Clone)]
-pub enum TypeIdent<'a> {
+pub enum TypeIdent {
     Builtin(BuiltinType),
-    Array(Box<TypeIdent<'a>>),
-    Ident(&'a str),
+    Array(Box<TypeIdent>),
+    Ident(String),
 }
 
-impl<'a> TypeIdent<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<TypeIdent<'a>, ParseError> {
+impl TypeIdent {
+    pub fn parse(sexpr: &SExpr) -> Result<TypeIdent, ParseError> {
         if let Ok(builtin) = BuiltinType::parse(sexpr) {
             Ok(TypeIdent::Builtin(builtin))
         } else {
             match sexpr {
-                SExpr::Ident(i, _loc) => Ok(TypeIdent::Ident(i)),
+                SExpr::Ident(i, _loc) => Ok(TypeIdent::Ident(i.to_string())),
                 SExpr::Vec(v, loc) => {
                     if v.len() == 2 && v[0].is_word("array") {
                         Ok(TypeIdent::Array(Box::new(TypeIdent::parse(&v[1])?)))
@@ -86,20 +86,46 @@ impl<'a> TypeIdent<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub enum DeclSyntax<'a> {
-    Use(&'a str),
-    Typename(TypenameSyntax<'a>),
-    Module(ModuleSyntax<'a>),
+pub enum TopLevelSyntax {
+    Decl(DeclSyntax),
+    Use(String),
 }
 
-impl<'a> DeclSyntax<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<DeclSyntax<'a>, ParseError> {
+impl TopLevelSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<TopLevelSyntax, ParseError> {
+        if let Ok(decl) = DeclSyntax::parse(sexpr) {
+            Ok(TopLevelSyntax::Decl(decl))
+        } else {
+            match sexpr {
+                SExpr::Vec(v, loc) => match v.get(0) {
+                    Some(SExpr::Word("use", loc)) => match v.get(1) {
+                        Some(SExpr::Quote(u, _)) => Ok(TopLevelSyntax::Use(u.to_string())),
+                        _ => Err(parse_err!(*loc, "invalid use declaration")),
+                    },
+                    _ => Err(parse_err!(
+                        sexpr.location(),
+                        "expected top level declaration"
+                    )),
+                },
+                _ => Err(parse_err!(
+                    sexpr.location(),
+                    "expected top level declaration"
+                )),
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum DeclSyntax {
+    Typename(TypenameSyntax),
+    Module(ModuleSyntax),
+}
+
+impl DeclSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<DeclSyntax, ParseError> {
         match sexpr {
             SExpr::Vec(v, loc) => match v.get(0) {
-                Some(SExpr::Word("use", loc)) => match v.get(1) {
-                    Some(SExpr::Quote(u, _)) => Ok(DeclSyntax::Use(u)),
-                    _ => Err(parse_err!(*loc, "invalid use declaration")),
-                },
                 Some(SExpr::Word("typename", loc)) => {
                     Ok(DeclSyntax::Typename(TypenameSyntax::parse(&v[1..], *loc)?))
                 }
@@ -114,15 +140,15 @@ impl<'a> DeclSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct TypenameSyntax<'a> {
-    pub ident: &'a str,
-    pub def: TypedefSyntax<'a>,
+pub struct TypenameSyntax {
+    pub ident: String,
+    pub def: TypedefSyntax,
 }
 
-impl<'a> TypenameSyntax<'a> {
-    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<TypenameSyntax<'a>, ParseError> {
+impl TypenameSyntax {
+    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<TypenameSyntax, ParseError> {
         let ident = match sexpr.get(0) {
-            Some(SExpr::Ident(i, loc)) => i,
+            Some(SExpr::Ident(i, loc)) => i.to_string(),
             _ => Err(parse_unimp!(loc, "expected typename identifier"))?,
         };
         let def = match sexpr.get(1) {
@@ -134,16 +160,16 @@ impl<'a> TypenameSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub enum TypedefSyntax<'a> {
-    Ident(TypeIdent<'a>),
-    Enum(EnumSyntax<'a>),
-    Flags(FlagsSyntax<'a>),
-    Struct(StructSyntax<'a>),
-    Union(UnionSyntax<'a>),
+pub enum TypedefSyntax {
+    Ident(TypeIdent),
+    Enum(EnumSyntax),
+    Flags(FlagsSyntax),
+    Struct(StructSyntax),
+    Union(UnionSyntax),
 }
 
-impl<'a> TypedefSyntax<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<TypedefSyntax<'a>, ParseError> {
+impl TypedefSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<TypedefSyntax, ParseError> {
         if let Ok(ident) = TypeIdent::parse(sexpr) {
             Ok(TypedefSyntax::Ident(ident))
         } else {
@@ -176,13 +202,13 @@ impl<'a> TypedefSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct EnumSyntax<'a> {
+pub struct EnumSyntax {
     pub repr: BuiltinType,
-    pub members: Vec<&'a str>,
+    pub members: Vec<String>,
 }
 
-impl<'a> EnumSyntax<'a> {
-    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<EnumSyntax<'a>, ParseError> {
+impl EnumSyntax {
+    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<EnumSyntax, ParseError> {
         let repr = match sexpr.get(0) {
             Some(e) => BuiltinType::parse(e)?,
             _ => Err(parse_err!(loc, "no enum repr"))?,
@@ -190,10 +216,10 @@ impl<'a> EnumSyntax<'a> {
         let members = sexpr[1..]
             .iter()
             .map(|m| match m {
-                SExpr::Ident(i, _) => Ok(*i),
+                SExpr::Ident(i, _) => Ok(i.to_string()),
                 s => Err(parse_err!(s.location(), "expected enum member identifier")),
             })
-            .collect::<Result<Vec<_>, ParseError>>()?;
+            .collect::<Result<Vec<String>, ParseError>>()?;
         if members.is_empty() {
             Err(parse_err!(loc, "expected at least one enum member"))?
         }
@@ -202,13 +228,13 @@ impl<'a> EnumSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct FlagsSyntax<'a> {
+pub struct FlagsSyntax {
     pub repr: BuiltinType,
-    pub flags: Vec<&'a str>,
+    pub flags: Vec<String>,
 }
 
-impl<'a> FlagsSyntax<'a> {
-    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<FlagsSyntax<'a>, ParseError> {
+impl FlagsSyntax {
+    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<FlagsSyntax, ParseError> {
         let repr = BuiltinType::parse(
             sexpr
                 .get(0)
@@ -218,7 +244,7 @@ impl<'a> FlagsSyntax<'a> {
             .iter()
             .map(|f| match f {
                 SExpr::Vec(vs, loc) => match (vs.get(0), vs.get(1)) {
-                    (Some(SExpr::Word("flag", _)), Some(SExpr::Ident(i, _))) => Ok(*i),
+                    (Some(SExpr::Word("flag", _)), Some(SExpr::Ident(i, _))) => Ok(i.to_string()),
                     _ => Err(parse_err!(*loc, "expected flag specifier")),
                 },
                 s => Err(parse_err!(s.location(), "expected flag specifier")),
@@ -229,12 +255,12 @@ impl<'a> FlagsSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct StructSyntax<'a> {
-    pub fields: Vec<StructFieldSyntax<'a>>,
+pub struct StructSyntax {
+    pub fields: Vec<StructFieldSyntax>,
 }
 
-impl<'a> StructSyntax<'a> {
-    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<StructSyntax<'a>, ParseError> {
+impl StructSyntax {
+    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<StructSyntax, ParseError> {
         if sexpr.is_empty() {
             Err(parse_err!(loc, "expected at least one struct member"))?
         }
@@ -247,18 +273,18 @@ impl<'a> StructSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct StructFieldSyntax<'a> {
-    pub name: &'a str,
-    pub type_: TypeIdent<'a>,
+pub struct StructFieldSyntax {
+    pub name: String,
+    pub type_: TypeIdent,
 }
 
-impl<'a> StructFieldSyntax<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<StructFieldSyntax<'a>, ParseError> {
+impl StructFieldSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<StructFieldSyntax, ParseError> {
         match sexpr {
             SExpr::Vec(v, loc) => match v.get(0) {
                 Some(SExpr::Word("field", _)) => {
                     let name = match v.get(1) {
-                        Some(SExpr::Ident(i, _)) => i,
+                        Some(SExpr::Ident(i, _)) => i.to_string(),
                         _ => Err(parse_err!(*loc, "expected struct name identifier"))?,
                     };
                     let type_ = TypeIdent::parse(
@@ -275,12 +301,12 @@ impl<'a> StructFieldSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnionSyntax<'a> {
-    pub fields: Vec<UnionFieldSyntax<'a>>,
+pub struct UnionSyntax {
+    pub fields: Vec<UnionFieldSyntax>,
 }
 
-impl<'a> UnionSyntax<'a> {
-    pub fn parse(sexpr: &[SExpr<'a>], loc: Location) -> Result<UnionSyntax<'a>, ParseError> {
+impl UnionSyntax {
+    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<UnionSyntax, ParseError> {
         if sexpr.is_empty() {
             Err(parse_err!(loc, "expected at least one union member"))?
         }
@@ -293,18 +319,18 @@ impl<'a> UnionSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnionFieldSyntax<'a> {
-    pub name: &'a str,
-    pub type_: TypeIdent<'a>,
+pub struct UnionFieldSyntax {
+    pub name: String,
+    pub type_: TypeIdent,
 }
 
-impl<'a> UnionFieldSyntax<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<UnionFieldSyntax<'a>, ParseError> {
+impl UnionFieldSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<UnionFieldSyntax, ParseError> {
         match sexpr {
             SExpr::Vec(v, loc) => match v.get(0) {
                 Some(SExpr::Word("field", _)) => {
                     let name = match v.get(1) {
-                        Some(SExpr::Ident(i, _)) => i,
+                        Some(SExpr::Ident(i, _)) => i.to_string(),
                         _ => Err(parse_err!(*loc, "expected union name identifier"))?,
                     };
                     let type_ = TypeIdent::parse(
@@ -321,74 +347,74 @@ impl<'a> UnionFieldSyntax<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ModuleSyntax<'a> {
-    pub imports: Vec<ModuleImportSyntax<'a>>,
-    pub funcs: Vec<ModuleFuncSyntax<'a>>,
+pub struct ModuleSyntax {
+    pub imports: Vec<ModuleImportSyntax>,
+    pub funcs: Vec<ModuleFuncSyntax>,
 }
 
-impl<'a> ModuleSyntax<'a> {
-    pub fn parse(sexprs: &[SExpr<'a>], loc: Location) -> Result<ModuleSyntax<'a>, ParseError> {
+impl ModuleSyntax {
+    pub fn parse(sexprs: &[SExpr], loc: Location) -> Result<ModuleSyntax, ParseError> {
         Err(parse_unimp!(loc, "moduletype syntax"))
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ModuleImportSyntax<'a> {
-    pub name: &'a str,
-    pub type_: ImportTypeSyntax<'a>,
+pub struct ModuleImportSyntax {
+    pub name: String,
+    pub type_: ImportTypeSyntax,
 }
 
-impl<'a> ModuleImportSyntax<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<ModuleImportSyntax<'a>, ParseError> {
+impl ModuleImportSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<ModuleImportSyntax, ParseError> {
         unimplemented!()
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum ImportTypeSyntax<'a> {
+pub enum ImportTypeSyntax {
     Memory,
-    Func(FunctionTypeSyntax<'a>),
+    Func(FunctionTypeSyntax),
 }
 
-impl<'a> ImportTypeSyntax<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<ImportTypeSyntax<'a>, ParseError> {
+impl ImportTypeSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<ImportTypeSyntax, ParseError> {
         unimplemented!()
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionTypeSyntax<'a> {
-    pub params: Vec<TypeIdent<'a>>,
-    pub results: Vec<TypeIdent<'a>>,
+pub struct FunctionTypeSyntax {
+    pub params: Vec<TypeIdent>,
+    pub results: Vec<TypeIdent>,
 }
 
-impl<'a> FunctionTypeSyntax<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<FunctionTypeSyntax<'a>, ParseError> {
+impl FunctionTypeSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<FunctionTypeSyntax, ParseError> {
         unimplemented!()
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ParamSyntax<'a> {
-    pub name: &'a str,
-    pub type_: TypeIdent<'a>,
+pub struct ParamSyntax {
+    pub name: String,
+    pub type_: TypeIdent,
 }
 
-impl<'a> ParamSyntax<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<ParamSyntax<'a>, ParseError> {
+impl ParamSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<ParamSyntax, ParseError> {
         unimplemented!()
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ModuleFuncSyntax<'a> {
-    pub export: &'a str,
-    pub params: Vec<ParamSyntax<'a>>,
-    pub results: Vec<ParamSyntax<'a>>,
+pub struct ModuleFuncSyntax {
+    pub export: String,
+    pub params: Vec<ParamSyntax>,
+    pub results: Vec<ParamSyntax>,
 }
 
-impl<'a> ModuleFuncSyntax<'a> {
-    pub fn parse(sexpr: &SExpr<'a>) -> Result<ModuleFuncSyntax<'a>, ParseError> {
+impl ModuleFuncSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<ModuleFuncSyntax, ParseError> {
         unimplemented!()
     }
 }

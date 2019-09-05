@@ -30,11 +30,13 @@ pub use crate::rust::{
 };
 
 use crate::c::CGenerator;
+use crate::interfacetypes::parse_witx;
 use crate::parser::Parser;
 use crate::rust::RustGenerator;
 use crate::validate::package_from_declarations;
 use lucet_module::bindings::Bindings;
 use std::collections::HashMap;
+use std::env;
 use std::io::Write;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
@@ -67,14 +69,10 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
 
 pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
     if config.witx {
-        use crate::interfacetypes::{parse, ParseError};
-        let parse_stmts = parse(input)?;
+        let pwd = env::current_dir()?;
+        let parse_stmts = parse_witx(input, &pwd).map_err(IDLError::InterfaceTypes)?;
         for s in parse_stmts {
-            match s {
-                Ok(decl) => println!("DECL: {:?}", decl),
-                Err(ParseError::Error(e, loc)) => println!("ERR @ {:?}: {:?}", loc, e),
-                Err(ParseError::Unimplemented(e, loc)) => println!("UNIMP@ {:?}: {:?}", loc, e),
-            }
+            println!("{:?}", s);
         }
         Ok(())
     } else {
