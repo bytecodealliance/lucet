@@ -35,7 +35,7 @@ ENV PATH=/root/.cargo/bin:$PATH
 RUN rustup component add rustfmt --toolchain 1.36.0-x86_64-unknown-linux-gnu
 RUN rustup target add wasm32-wasi
 
-RUN cargo install cargo-audit cargo-watch rsign2
+RUN cargo install --debug cargo-audit cargo-watch rsign2
 
 RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-6/wasi-sdk_6.0_amd64.deb \
 	&& dpkg -i wasi-sdk_6.0_amd64.deb && rm -f wasi-sdk_6.0_amd64.deb
