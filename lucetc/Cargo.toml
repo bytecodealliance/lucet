@@ -18,20 +18,20 @@ path = "src/main.rs"
 
 [dependencies]
 bincode = "1.1.4"
-cranelift-codegen = { path = "../cranelift/cranelift-codegen", version = "0.40.0" }
-cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.40.0" }
-cranelift-native = { path = "../cranelift/cranelift-native", version = "0.40.0" }
-cranelift-frontend = { path = "../cranelift/cranelift-frontend", version = "0.40.0" }
-cranelift-module = { path = "../cranelift/cranelift-module", version = "0.40.0" }
-cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.40.0" }
-cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.40.0" }
-target-lexicon = "0.4.0"
+cranelift-codegen = { path = "../cranelift/cranelift-codegen", version = "0.41.0" }
+cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.41.0" }
+cranelift-native = { path = "../cranelift/cranelift-native", version = "0.41.0" }
+cranelift-frontend = { path = "../cranelift/cranelift-frontend", version = "0.41.0" }
+cranelift-module = { path = "../cranelift/cranelift-module", version = "0.41.0" }
+cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.41.0" }
+cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.41.0" }
+target-lexicon = "0.8.0"
 lucet-module = { path = "../lucet-module", version = "0.1.1" }
-wasmparser = "0.36.0"
+wasmparser = "0.37.0"
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"
-faerie = "0.10.0"
+faerie = "0.11.0"
 goblin = "0.0.22"
 failure = "0.1"
 byteorder = "1.2"
