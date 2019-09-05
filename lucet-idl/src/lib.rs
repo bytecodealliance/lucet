@@ -36,8 +36,9 @@ use crate::rust::RustGenerator;
 use crate::validate::package_from_declarations;
 use lucet_module::bindings::Bindings;
 use std::collections::HashMap;
-use std::env;
+use std::fs;
 use std::io::Write;
+use std::path::Path;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 pub struct Location {
@@ -67,16 +68,16 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
     Ok(())
 }
 
-pub fn run(config: &Config, input: &str, output: Box<dyn Write>) -> Result<(), IDLError> {
+pub fn run(config: &Config, input_path: &Path, output: Box<dyn Write>) -> Result<(), IDLError> {
     if config.witx {
-        let pwd = env::current_dir()?;
-        let parse_stmts = parse_witx(input, &pwd).map_err(IDLError::InterfaceTypes)?;
+        let parse_stmts = parse_witx(input_path).map_err(IDLError::InterfaceTypes)?;
         for s in parse_stmts {
             println!("{:?}", s);
         }
         Ok(())
     } else {
-        let pkg = parse_package(input)?;
+        let input = fs::read_to_string(input_path)?;
+        let pkg = parse_package(&input)?;
         codegen(&pkg, config, output)
     }
 }

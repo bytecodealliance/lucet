@@ -5,24 +5,18 @@ use super::sexpr::SExpr;
 use crate::Location;
 
 #[derive(Debug, Fail)]
-pub enum ParseError {
-    #[fail(display = "{} at {:?}", _0, _1)]
-    Error(String, Location),
-    #[fail(display = "Unimplemented: {} at {:?}", _0, _1)]
-    Unimplemented(String, Location),
+#[fail(display = "{} at {:?}", _0, _1)]
+pub struct ParseError {
+    message: String,
+    location: Location,
 }
 
 macro_rules! parse_err {
     ($loc:expr, $msg:expr) => {
-        ParseError::Error($msg.to_string(), $loc)
+        ParseError { message: $msg.to_string(), location: $loc }
     };
     ($loc:expr, $fmt:expr, $( $arg:expr ),+ ) => {
-        ParseError::Error(format!($fmt, $( $arg ),+), $loc)
-    };
-}
-macro_rules! parse_unimp {
-    ($loc:expr, $msg:expr) => {
-        ParseError::Unimplemented($msg.to_string(), $loc)
+        ParseError { message: format!($fmt, $( $arg ),+), location: $loc }
     };
 }
 
@@ -149,7 +143,7 @@ impl TypenameSyntax {
     pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<TypenameSyntax, ParseError> {
         let ident = match sexpr.get(0) {
             Some(SExpr::Ident(i, loc)) => i.to_string(),
-            _ => Err(parse_unimp!(loc, "expected typename identifier"))?,
+            _ => Err(parse_err!(loc, "expected typename identifier"))?,
         };
         let def = match sexpr.get(1) {
             Some(expr) => TypedefSyntax::parse(expr)?,
@@ -354,7 +348,12 @@ pub struct ModuleSyntax {
 
 impl ModuleSyntax {
     pub fn parse(sexprs: &[SExpr], loc: Location) -> Result<ModuleSyntax, ParseError> {
-        Err(parse_unimp!(loc, "moduletype syntax"))
+        // XXX FIXME
+        // stand-in so i can get to more useful error message
+        Ok(ModuleSyntax {
+            imports: Vec::new(),
+            funcs: Vec::new(),
+        })
     }
 }
 

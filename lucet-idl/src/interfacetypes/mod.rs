@@ -15,28 +15,32 @@ pub enum InterfaceTypesError {
     SExpr(#[cause] SExprParseError),
     #[fail(display = "Invalid use statement \"{}\": {}", _1, _0)]
     UseInvalid(&'static str, String),
-    #[fail(display = "When resolving use \"{}\": {}", _1, _0)]
-    UseIo(#[cause] io::Error, String),
     #[fail(display = "cycle of use statements: {:?}", _0)]
     UseCycle(Vec<PathBuf>),
-    #[fail(display = "{}", _0)]
-    Parse(#[cause] ParseError),
+    #[fail(display = "in file {:?}: {}", _0, _1)]
+    Parse(PathBuf, #[cause] ParseError),
+    #[fail(display = "with file {:?}: {}", _0, _1)]
+    Io(PathBuf, #[cause] io::Error),
 }
 
-impl From<ParseError> for InterfaceTypesError {
-    fn from(e: ParseError) -> InterfaceTypesError {
-        InterfaceTypesError::Parse(e)
-    }
+pub fn parse_witx<P: AsRef<Path>>(input_path: P) -> Result<Vec<DeclSyntax>, InterfaceTypesError> {
+    let input_path = input_path.as_ref();
+    let input = fs::read_to_string(input_path)
+        .map_err(|e| InterfaceTypesError::Io(input_path.into(), e))?;
+
+    let toplevel = parse_toplevel(&input, input_path)?;
+    let mut resolved = vec![input_path.into()];
+    let search_path = input_path
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or(PathBuf::from("."));
+    resolve_uses(toplevel, &search_path, &mut resolved)
 }
 
-pub fn parse_witx<P: AsRef<Path>>(
+fn parse_toplevel(
     source_text: &str,
-    search_path: P,
-) -> Result<Vec<DeclSyntax>, InterfaceTypesError> {
-    unimplemented!()
-}
-
-fn parse_toplevel(source_text: &str) -> Result<Vec<TopLevelSyntax>, InterfaceTypesError> {
+    file_path: &Path,
+) -> Result<Vec<TopLevelSyntax>, InterfaceTypesError> {
     let mut sexpr_parser = SExprParser::new(source_text);
     let sexprs = sexpr_parser
         .match_sexprs()
@@ -44,7 +48,8 @@ fn parse_toplevel(source_text: &str) -> Result<Vec<TopLevelSyntax>, InterfaceTyp
     let top_levels = sexprs
         .iter()
         .map(|s| TopLevelSyntax::parse(s))
-        .collect::<Result<Vec<TopLevelSyntax>, ParseError>>()?;
+        .collect::<Result<Vec<TopLevelSyntax>, ParseError>>()
+        .map_err(|e| InterfaceTypesError::Parse(file_path.into(), e))?;
     Ok(top_levels)
 }
 
@@ -67,10 +72,10 @@ fn resolve_uses(
                     ))?;
                 }
                 let mut abs_path = PathBuf::from(search_path);
-                abs_path.push(u_path);
+                abs_path.push(u_path.clone());
                 abs_path
                     .canonicalize()
-                    .map_err(|e| InterfaceTypesError::UseIo(e, u.to_string()))?;
+                    .map_err(|e| InterfaceTypesError::Io(u_path, e))?;
                 if resolved.contains(&abs_path) {
                     Err(InterfaceTypesError::UseInvalid(
                         "loop of use statements",
@@ -79,8 +84,8 @@ fn resolve_uses(
                 }
 
                 let source_text = fs::read_to_string(&abs_path)
-                    .map_err(|e| InterfaceTypesError::UseIo(e, u.to_string()))?;
-                let inner_toplevels = parse_toplevel(&source_text)?;
+                    .map_err(|e| InterfaceTypesError::Io(abs_path.clone(), e))?;
+                let inner_toplevels = parse_toplevel(&source_text, &abs_path)?;
 
                 resolved.push(abs_path);
                 let inner_decls = resolve_uses(inner_toplevels, search_path, resolved)?;

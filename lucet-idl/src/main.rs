@@ -74,7 +74,7 @@ fn doit() -> Result<(), IDLError> {
         None => Box::new(io::stdout()),
     };
 
-    run(&exe_config.config, &source, output)?;
+    run(&exe_config.config, &exe_config.input_path, output)?;
 
     Ok(())
 }
