@@ -77,10 +77,8 @@ fn resolve_uses(
                     .canonicalize()
                     .map_err(|e| InterfaceTypesError::Io(u_path, e))?;
                 if resolved.contains(&abs_path) {
-                    Err(InterfaceTypesError::UseInvalid(
-                        "loop of use statements",
-                        u.to_string(),
-                    ))?;
+                    resolved.push(abs_path.clone());
+                    Err(InterfaceTypesError::UseCycle(resolved.clone()))?;
                 }
 
                 let source_text = fs::read_to_string(&abs_path)

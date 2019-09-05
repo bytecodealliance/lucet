@@ -35,6 +35,21 @@ pub enum BuiltinType {
 }
 
 impl BuiltinType {
+    pub fn starts_parsing(sexpr: &SExpr) -> bool {
+        match sexpr {
+            SExpr::Word("string", _)
+            | SExpr::Word("data", _)
+            | SExpr::Word("u8", _)
+            | SExpr::Word("u16", _)
+            | SExpr::Word("u32", _)
+            | SExpr::Word("u64", _)
+            | SExpr::Word("s8", _)
+            | SExpr::Word("s16", _)
+            | SExpr::Word("s32", _)
+            | SExpr::Word("s64", _) => true,
+            _ => false,
+        }
+    }
     pub fn parse(sexpr: &SExpr) -> Result<Self, ParseError> {
         match sexpr {
             SExpr::Word("string", _loc) => Ok(BuiltinType::String),
@@ -60,19 +75,30 @@ pub enum TypeIdent {
 }
 
 impl TypeIdent {
+    pub fn starts_parsing(sexpr: &SExpr) -> bool {
+        BuiltinType::starts_parsing(sexpr)
+            || match sexpr {
+                SExpr::Ident(_, _) => true,
+                SExpr::Vec(v, _) => match (v.get(0), v.get(1)) {
+                    (Some(SExpr::Word("array", _)), Some(_)) => true,
+                    _ => false,
+                },
+                _ => false,
+            }
+    }
     pub fn parse(sexpr: &SExpr) -> Result<TypeIdent, ParseError> {
-        if let Ok(builtin) = BuiltinType::parse(sexpr) {
+        if BuiltinType::starts_parsing(sexpr) {
+            let builtin = BuiltinType::parse(sexpr)?;
             Ok(TypeIdent::Builtin(builtin))
         } else {
             match sexpr {
                 SExpr::Ident(i, _loc) => Ok(TypeIdent::Ident(i.to_string())),
-                SExpr::Vec(v, loc) => {
-                    if v.len() == 2 && v[0].is_word("array") {
-                        Ok(TypeIdent::Array(Box::new(TypeIdent::parse(&v[1])?)))
-                    } else {
-                        Err(parse_err!(*loc, "expected type identifier"))
+                SExpr::Vec(v, loc) => match (v.get(0), v.get(1)) {
+                    (Some(SExpr::Word("array", _loc)), Some(expr)) => {
+                        Ok(TypeIdent::Array(Box::new(TypeIdent::parse(expr)?)))
                     }
-                }
+                    _ => Err(parse_err!(*loc, "expected type identifier")),
+                },
                 _ => Err(parse_err!(sexpr.location(), "expected type identifier")),
             }
         }
@@ -87,7 +113,8 @@ pub enum TopLevelSyntax {
 
 impl TopLevelSyntax {
     pub fn parse(sexpr: &SExpr) -> Result<TopLevelSyntax, ParseError> {
-        if let Ok(decl) = DeclSyntax::parse(sexpr) {
+        if DeclSyntax::starts_parsing(sexpr) {
+            let decl = DeclSyntax::parse(sexpr)?;
             Ok(TopLevelSyntax::Decl(decl))
         } else {
             match sexpr {
@@ -117,6 +144,16 @@ pub enum DeclSyntax {
 }
 
 impl DeclSyntax {
+    pub fn starts_parsing(sexpr: &SExpr) -> bool {
+        match sexpr {
+            SExpr::Vec(v, _) => match v.get(0) {
+                Some(SExpr::Word("typename", _)) => true,
+                Some(SExpr::Word("module", _)) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
     pub fn parse(sexpr: &SExpr) -> Result<DeclSyntax, ParseError> {
         match sexpr {
             SExpr::Vec(v, loc) => match v.get(0) {
@@ -164,7 +201,8 @@ pub enum TypedefSyntax {
 
 impl TypedefSyntax {
     pub fn parse(sexpr: &SExpr) -> Result<TypedefSyntax, ParseError> {
-        if let Ok(ident) = TypeIdent::parse(sexpr) {
+        if TypeIdent::starts_parsing(sexpr) {
+            let ident = TypeIdent::parse(sexpr)?;
             Ok(TypedefSyntax::Ident(ident))
         } else {
             match sexpr {

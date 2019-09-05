@@ -22,13 +22,6 @@ impl<'a> SExpr<'a> {
             SExpr::Annot(_, loc) => *loc,
         }
     }
-
-    pub fn is_word(&self, w: &str) -> bool {
-        match self {
-            SExpr::Word(word, _) => *word == w,
-            _ => false,
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Fail)]
