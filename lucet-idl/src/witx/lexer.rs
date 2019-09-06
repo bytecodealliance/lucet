@@ -1,4 +1,5 @@
-use crate::Location;
+use super::Location;
+use std::path::{Path, PathBuf};
 use std::str::CharIndices;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -11,7 +12,7 @@ pub enum Token<'a> {
     Quote(&'a str), // Found between balanced "". No escaping.
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct LocatedToken<'a> {
     pub token: Token<'a>,
     pub location: Location,
@@ -33,7 +34,7 @@ pub enum LexError {
     UnterminatedQuote,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct LocatedError {
     pub error: LexError,
     pub location: Location,
@@ -51,10 +52,11 @@ pub struct Lexer<'a> {
     line_number: usize,
     column_start: usize,
     tab_compensation: usize,
+    path: PathBuf,
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(s: &'a str) -> Lexer<'_> {
+    pub fn new<P: AsRef<Path>>(s: &'a str, path: P) -> Lexer<'_> {
         let mut lex = Lexer {
             source: s,
             chars: s.char_indices(),
@@ -63,6 +65,7 @@ impl<'a> Lexer<'a> {
             line_number: 1,
             column_start: 0,
             tab_compensation: 0,
+            path: path.as_ref().into(),
         };
         lex.next_ch();
         lex
@@ -91,6 +94,7 @@ impl<'a> Lexer<'a> {
 
     fn loc(&self) -> Location {
         Location {
+            path: self.path.clone(),
             line: self.line_number,
             column: self.pos - self.column_start + self.tab_compensation,
         }
@@ -139,7 +143,7 @@ impl<'a> Lexer<'a> {
             Some(ch) if ch.is_alphanumeric() || ch == '_' => {}
             _ => Err(LocatedError {
                 error: LexError::EmptyIdentifier,
-                location: loc,
+                location: loc.clone(),
             })?,
         }
         let begin = self.pos;
@@ -163,7 +167,7 @@ impl<'a> Lexer<'a> {
             Some(ch) if ch.is_alphanumeric() || ch == '_' => {}
             _ => Err(LocatedError {
                 error: LexError::EmptyAnnotation,
-                location: loc,
+                location: loc.clone(),
             })?,
         }
         let begin = self.pos;
@@ -188,7 +192,7 @@ impl<'a> Lexer<'a> {
             match self.next_ch() {
                 None => Err(LocatedError {
                     error: LexError::UnterminatedQuote,
-                    location: loc,
+                    location: loc.clone(),
                 })?,
                 Some('"') => {
                     self.next_ch();

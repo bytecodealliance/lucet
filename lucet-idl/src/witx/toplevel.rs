@@ -22,7 +22,7 @@ pub fn parse_witx<P: AsRef<Path>>(i: P) -> Result<Vec<DeclSyntax>, WitxError> {
 }
 
 fn parse_toplevel(source_text: &str, file_path: &Path) -> Result<Vec<TopLevelSyntax>, WitxError> {
-    let mut sexpr_parser = SExprParser::new(source_text);
+    let mut sexpr_parser = SExprParser::new(source_text, file_path);
     let sexprs = sexpr_parser.match_sexprs().map_err(WitxError::SExpr)?;
     let top_levels = sexprs
         .iter()
@@ -43,9 +43,9 @@ fn resolve_uses(
         match t {
             TopLevelSyntax::Decl(d) => decls.push(d),
             TopLevelSyntax::Use(u) => {
-                let u_path = PathBuf::from(u.clone());
+                let u_path = PathBuf::from(&u.name);
                 if u_path.is_absolute() {
-                    Err(WitxError::UseInvalid("absolute path", u.to_string()))?;
+                    Err(WitxError::UseInvalid(u.location.clone()))?;
                 }
                 let mut abs_path = PathBuf::from(search_path);
                 abs_path.push(u_path.clone());

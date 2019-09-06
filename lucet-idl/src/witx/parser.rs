@@ -1,22 +1,34 @@
-#![allow(unreachable_code)] // wip
-#![allow(unused_variables)] // wip
-#![allow(dead_code)] // wip
 use super::sexpr::SExpr;
-use crate::Location;
+use super::Location;
 
 #[derive(Debug, Fail)]
 #[fail(display = "{} at {:?}", _0, _1)]
 pub struct ParseError {
-    message: String,
-    location: Location,
+    pub message: String,
+    pub location: Location,
 }
 
 macro_rules! parse_err {
     ($loc:expr, $msg:expr) => {
-        ParseError { message: $msg.to_string(), location: $loc }
+        ParseError { message: $msg.to_string(), location: $loc.clone() }
     };
     ($loc:expr, $fmt:expr, $( $arg:expr ),+ ) => {
-        ParseError { message: format!($fmt, $( $arg ),+), location: $loc }
+        ParseError { message: format!($fmt, $( $arg ),+), location: $loc.clone() }
+    };
+}
+
+#[derive(Debug, Clone)]
+pub struct IdentSyntax {
+    pub name: String,
+    pub location: Location,
+}
+
+macro_rules! id {
+    ($s:expr, $loc: expr) => {
+        IdentSyntax {
+            name: $s.to_string(),
+            location: $loc.clone(),
+        }
     };
 }
 
@@ -71,7 +83,7 @@ impl BuiltinType {
 pub enum TypeIdentSyntax {
     Builtin(BuiltinType),
     Array(Box<TypeIdentSyntax>),
-    Ident(String),
+    Ident(IdentSyntax),
 }
 
 impl TypeIdentSyntax {
@@ -92,12 +104,12 @@ impl TypeIdentSyntax {
             Ok(TypeIdentSyntax::Builtin(builtin))
         } else {
             match sexpr {
-                SExpr::Ident(i, _loc) => Ok(TypeIdentSyntax::Ident(i.to_string())),
+                SExpr::Ident(i, loc) => Ok(TypeIdentSyntax::Ident(id!(i, loc))),
                 SExpr::Vec(v, loc) => match (v.get(0), v.get(1)) {
                     (Some(SExpr::Word("array", _loc)), Some(expr)) => Ok(TypeIdentSyntax::Array(
                         Box::new(TypeIdentSyntax::parse(expr)?),
                     )),
-                    _ => Err(parse_err!(*loc, "expected type identifier")),
+                    _ => Err(parse_err!(loc, "expected type identifier")),
                 },
                 _ => Err(parse_err!(sexpr.location(), "expected type identifier")),
             }
@@ -108,7 +120,7 @@ impl TypeIdentSyntax {
 #[derive(Debug, Clone)]
 pub enum TopLevelSyntax {
     Decl(DeclSyntax),
-    Use(String),
+    Use(IdentSyntax),
 }
 
 impl TopLevelSyntax {
@@ -118,15 +130,12 @@ impl TopLevelSyntax {
             Ok(TopLevelSyntax::Decl(decl))
         } else {
             match sexpr {
-                SExpr::Vec(v, loc) => match v.get(0) {
+                SExpr::Vec(v, vec_loc) => match v.get(0) {
                     Some(SExpr::Word("use", loc)) => match v.get(1) {
-                        Some(SExpr::Quote(u, _)) => Ok(TopLevelSyntax::Use(u.to_string())),
-                        _ => Err(parse_err!(*loc, "invalid use declaration")),
+                        Some(SExpr::Quote(u, loc)) => Ok(TopLevelSyntax::Use(id!(u, loc))),
+                        _ => Err(parse_err!(loc, "invalid use declaration")),
                     },
-                    _ => Err(parse_err!(
-                        sexpr.location(),
-                        "expected top level declaration"
-                    )),
+                    _ => Err(parse_err!(vec_loc, "expected top level declaration")),
                 },
                 _ => Err(parse_err!(
                     sexpr.location(),
@@ -158,12 +167,12 @@ impl DeclSyntax {
         match sexpr {
             SExpr::Vec(v, loc) => match v.get(0) {
                 Some(SExpr::Word("typename", loc)) => {
-                    Ok(DeclSyntax::Typename(TypenameSyntax::parse(&v[1..], *loc)?))
+                    Ok(DeclSyntax::Typename(TypenameSyntax::parse(&v[1..], loc)?))
                 }
                 Some(SExpr::Word("module", loc)) => {
-                    Ok(DeclSyntax::Module(ModuleSyntax::parse(&v[1..], *loc)?))
+                    Ok(DeclSyntax::Module(ModuleSyntax::parse(&v[1..], loc)?))
                 }
-                _ => Err(parse_err!(*loc, "invalid declaration")),
+                _ => Err(parse_err!(loc, "invalid declaration")),
             },
             _ => Err(parse_err!(sexpr.location(), "expected vec")),
         }
@@ -172,14 +181,14 @@ impl DeclSyntax {
 
 #[derive(Debug, Clone)]
 pub struct TypenameSyntax {
-    pub ident: String,
+    pub ident: IdentSyntax,
     pub def: TypedefSyntax,
 }
 
 impl TypenameSyntax {
-    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<TypenameSyntax, ParseError> {
+    pub fn parse(sexpr: &[SExpr], loc: &Location) -> Result<TypenameSyntax, ParseError> {
         let ident = match sexpr.get(0) {
-            Some(SExpr::Ident(i, loc)) => i.to_string(),
+            Some(SExpr::Ident(i, loc)) => id!(i, loc),
             _ => Err(parse_err!(loc, "expected typename identifier"))?,
         };
         let def = match sexpr.get(1) {
@@ -208,19 +217,19 @@ impl TypedefSyntax {
             match sexpr {
                 SExpr::Vec(vs, loc) => match vs.get(0) {
                     Some(SExpr::Word("enum", loc)) => {
-                        Ok(TypedefSyntax::Enum(EnumSyntax::parse(&vs[1..], *loc)?))
+                        Ok(TypedefSyntax::Enum(EnumSyntax::parse(&vs[1..], loc)?))
                     }
                     Some(SExpr::Word("flags", loc)) => {
-                        Ok(TypedefSyntax::Flags(FlagsSyntax::parse(&vs[1..], *loc)?))
+                        Ok(TypedefSyntax::Flags(FlagsSyntax::parse(&vs[1..], loc)?))
                     }
                     Some(SExpr::Word("struct", loc)) => {
-                        Ok(TypedefSyntax::Struct(StructSyntax::parse(&vs[1..], *loc)?))
+                        Ok(TypedefSyntax::Struct(StructSyntax::parse(&vs[1..], loc)?))
                     }
                     Some(SExpr::Word("union", loc)) => {
-                        Ok(TypedefSyntax::Union(UnionSyntax::parse(&vs[1..], *loc)?))
+                        Ok(TypedefSyntax::Union(UnionSyntax::parse(&vs[1..], loc)?))
                     }
                     _ => Err(parse_err!(
-                        *loc,
+                        loc,
                         "expected type identifier or type definition"
                     )),
                 },
@@ -236,11 +245,11 @@ impl TypedefSyntax {
 #[derive(Debug, Clone)]
 pub struct EnumSyntax {
     pub repr: BuiltinType,
-    pub members: Vec<String>,
+    pub members: Vec<IdentSyntax>,
 }
 
 impl EnumSyntax {
-    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<EnumSyntax, ParseError> {
+    pub fn parse(sexpr: &[SExpr], loc: &Location) -> Result<EnumSyntax, ParseError> {
         let repr = match sexpr.get(0) {
             Some(e) => BuiltinType::parse(e)?,
             _ => Err(parse_err!(loc, "no enum repr"))?,
@@ -248,10 +257,10 @@ impl EnumSyntax {
         let members = sexpr[1..]
             .iter()
             .map(|m| match m {
-                SExpr::Ident(i, _) => Ok(i.to_string()),
+                SExpr::Ident(i, loc) => Ok(id!(i, loc)),
                 s => Err(parse_err!(s.location(), "expected enum member identifier")),
             })
-            .collect::<Result<Vec<String>, ParseError>>()?;
+            .collect::<Result<Vec<IdentSyntax>, ParseError>>()?;
         if members.is_empty() {
             Err(parse_err!(loc, "expected at least one enum member"))?
         }
@@ -262,11 +271,11 @@ impl EnumSyntax {
 #[derive(Debug, Clone)]
 pub struct FlagsSyntax {
     pub repr: BuiltinType,
-    pub flags: Vec<String>,
+    pub flags: Vec<IdentSyntax>,
 }
 
 impl FlagsSyntax {
-    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<FlagsSyntax, ParseError> {
+    pub fn parse(sexpr: &[SExpr], loc: &Location) -> Result<FlagsSyntax, ParseError> {
         let repr = BuiltinType::parse(
             sexpr
                 .get(0)
@@ -276,8 +285,8 @@ impl FlagsSyntax {
             .iter()
             .map(|f| match f {
                 SExpr::Vec(vs, loc) => match (vs.get(0), vs.get(1)) {
-                    (Some(SExpr::Word("flag", _)), Some(SExpr::Ident(i, _))) => Ok(i.to_string()),
-                    _ => Err(parse_err!(*loc, "expected flag specifier")),
+                    (Some(SExpr::Word("flag", _)), Some(SExpr::Ident(i, loc))) => Ok(id!(i, loc)),
+                    _ => Err(parse_err!(loc, "expected flag specifier")),
                 },
                 s => Err(parse_err!(s.location(), "expected flag specifier")),
             })
@@ -292,7 +301,7 @@ pub struct StructSyntax {
 }
 
 impl StructSyntax {
-    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<StructSyntax, ParseError> {
+    pub fn parse(sexpr: &[SExpr], loc: &Location) -> Result<StructSyntax, ParseError> {
         if sexpr.is_empty() {
             Err(parse_err!(loc, "expected at least one struct member"))?
         }
@@ -306,7 +315,7 @@ impl StructSyntax {
 
 #[derive(Debug, Clone)]
 pub struct FieldSyntax {
-    pub name: String,
+    pub name: IdentSyntax,
     pub type_: TypeIdentSyntax,
 }
 
@@ -325,15 +334,15 @@ impl FieldSyntax {
             SExpr::Vec(v, loc) => match v.get(0) {
                 Some(SExpr::Word(c, _)) if *c == constructor => {
                     let name = match v.get(1) {
-                        Some(SExpr::Ident(i, _)) => i.to_string(),
-                        _ => Err(parse_err!(*loc, "expected {} name identifier", constructor))?,
+                        Some(SExpr::Ident(i, loc)) => id!(i, loc),
+                        _ => Err(parse_err!(loc, "expected {} name identifier", constructor))?,
                     };
                     let type_ = TypeIdentSyntax::parse(v.get(2).ok_or_else(|| {
-                        parse_err!(*loc, "expected {} type identifier", constructor)
+                        parse_err!(loc, "expected {} type identifier", constructor)
                     })?)?;
                     Ok(FieldSyntax { name, type_ })
                 }
-                _ => Err(parse_err!(*loc, "expected {}", constructor)),
+                _ => Err(parse_err!(loc, "expected {}", constructor)),
             },
             _ => Err(parse_err!(sexpr.location(), "expected {}", constructor)),
         }
@@ -346,7 +355,7 @@ pub struct UnionSyntax {
 }
 
 impl UnionSyntax {
-    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<UnionSyntax, ParseError> {
+    pub fn parse(sexpr: &[SExpr], loc: &Location) -> Result<UnionSyntax, ParseError> {
         if sexpr.is_empty() {
             Err(parse_err!(loc, "expected at least one union member"))?
         }
@@ -360,15 +369,15 @@ impl UnionSyntax {
 
 #[derive(Debug, Clone)]
 pub struct ModuleSyntax {
-    pub name: String,
+    pub name: IdentSyntax,
     pub imports: Vec<ModuleImportSyntax>,
     pub funcs: Vec<InterfaceFuncSyntax>,
 }
 
 impl ModuleSyntax {
-    pub fn parse(sexprs: &[SExpr], loc: Location) -> Result<ModuleSyntax, ParseError> {
+    pub fn parse(sexprs: &[SExpr], loc: &Location) -> Result<ModuleSyntax, ParseError> {
         let name = match sexprs.get(0) {
-            Some(SExpr::Ident(i, _)) => i.to_string(),
+            Some(SExpr::Ident(i, loc)) => id!(i, loc),
             _ => Err(parse_err!(loc, "expected module name"))?,
         };
         let mut imports = Vec::new();
@@ -394,7 +403,7 @@ impl ModuleSyntax {
 
 #[derive(Debug, Clone)]
 pub struct ModuleImportSyntax {
-    pub name: String,
+    pub name: IdentSyntax,
     pub type_: ImportTypeSyntax,
 }
 
@@ -410,15 +419,13 @@ impl ModuleImportSyntax {
     }
     pub fn parse(sexpr: &SExpr) -> Result<ModuleImportSyntax, ParseError> {
         match sexpr {
-            SExpr::Vec(vs, loc) => match (vs.get(0), vs.get(1)) {
-                (Some(SExpr::Word("import", _)), Some(SExpr::Quote(name, _))) => {
-                    let type_ = ImportTypeSyntax::parse(&vs[2..], *loc)?;
-                    Ok(ModuleImportSyntax {
-                        name: name.to_string(),
-                        type_,
-                    })
+            SExpr::Vec(vs, vec_loc) => match (vs.get(0), vs.get(1)) {
+                (Some(SExpr::Word("import", _)), Some(SExpr::Quote(name, loc))) => {
+                    let name = id!(name, loc);
+                    let type_ = ImportTypeSyntax::parse(&vs[2..], vec_loc)?;
+                    Ok(ModuleImportSyntax { name, type_ })
                 }
-                _ => Err(parse_err!(*loc, "expected module import")),
+                _ => Err(parse_err!(vec_loc, "expected module import")),
             },
             _ => Err(parse_err!(sexpr.location(), "expected module import")),
         }
@@ -431,7 +438,7 @@ pub enum ImportTypeSyntax {
 }
 
 impl ImportTypeSyntax {
-    pub fn parse(sexpr: &[SExpr], loc: Location) -> Result<ImportTypeSyntax, ParseError> {
+    pub fn parse(sexpr: &[SExpr], loc: &Location) -> Result<ImportTypeSyntax, ParseError> {
         if sexpr.len() > 1 {
             Err(parse_err!(loc, "too many elements for an import type"))?;
         }
@@ -441,10 +448,10 @@ impl ImportTypeSyntax {
                     if vs.len() == 1 {
                         Ok(ImportTypeSyntax::Memory)
                     } else {
-                        Err(parse_err!(*loc, "too many elements for memory declaration"))
+                        Err(parse_err!(loc, "too many elements for memory declaration"))
                     }
                 }
-                _ => Err(parse_err!(*loc, "expected import type")),
+                _ => Err(parse_err!(loc, "expected import type")),
             },
             _ => Err(parse_err!(loc, "expected import type")),
         }
@@ -453,7 +460,7 @@ impl ImportTypeSyntax {
 
 #[derive(Debug, Clone)]
 pub struct InterfaceFuncSyntax {
-    pub export: String,
+    pub export: IdentSyntax,
     pub params: Vec<FieldSyntax>,
     pub results: Vec<FieldSyntax>,
 }
@@ -474,19 +481,22 @@ impl InterfaceFuncSyntax {
                 (Some(SExpr::Annot("interface", _)), Some(SExpr::Word("func", _))) => {
                     let export = match vs.get(2) {
                         Some(SExpr::Vec(es, loc)) => match (es.get(0), es.get(1)) {
-                            (Some(SExpr::Word("export", _)), Some(SExpr::Quote(name, _))) => {
+                            (
+                                Some(SExpr::Word("export", _)),
+                                Some(SExpr::Quote(name, name_loc)),
+                            ) => {
                                 if es.len() == 2 {
-                                    name.to_string()
+                                    id!(name, name_loc)
                                 } else {
                                     Err(parse_err!(
-                                        *loc,
+                                        loc,
                                         "too many elements for export declaration"
                                     ))?
                                 }
                             }
-                            _ => Err(parse_err!(*loc, "expected export declaration"))?,
+                            _ => Err(parse_err!(loc, "expected export declaration"))?,
                         },
-                        _ => Err(parse_err!(*loc, "expected export declaration"))?,
+                        _ => Err(parse_err!(loc, "expected export declaration"))?,
                     };
                     let mut params = Vec::new();
                     let mut results = Vec::new();
@@ -512,7 +522,7 @@ impl InterfaceFuncSyntax {
                         results,
                     })
                 }
-                _ => Err(parse_err!(*loc, "expected interface func declaration")),
+                _ => Err(parse_err!(loc, "expected interface func declaration")),
             },
 
             _ => Err(parse_err!(
@@ -520,17 +530,5 @@ impl InterfaceFuncSyntax {
                 "expected interface func declaration"
             )),
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ParamSyntax {
-    pub name: String,
-    pub type_: TypeIdentSyntax,
-}
-
-impl ParamSyntax {
-    pub fn parse(sexpr: &SExpr) -> Result<ParamSyntax, ParseError> {
-        unimplemented!()
     }
 }
