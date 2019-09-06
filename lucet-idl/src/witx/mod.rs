@@ -5,13 +5,14 @@ mod sexpr;
 mod toplevel;
 mod validate;
 
+pub use ast::Document;
 pub use parser::{DeclSyntax, ParseError};
 pub use sexpr::SExprParseError;
 pub use toplevel::parse_witx;
 pub use validate::{validate, ValidationError};
 
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Location {
@@ -22,12 +23,19 @@ pub struct Location {
 
 #[derive(Debug, Fail)]
 pub enum WitxError {
+    #[fail(display = "with file {:?}: {}", _0, _1)]
+    Io(PathBuf, #[cause] io::Error),
     #[fail(display = "{}", _0)]
     SExpr(#[cause] SExprParseError),
     #[fail(display = "Invalid use statement at {:?}", _0)]
     UseInvalid(Location),
     #[fail(display = "in file {:?}: {}", _0, _1)]
     Parse(PathBuf, #[cause] ParseError),
-    #[fail(display = "with file {:?}: {}", _0, _1)]
-    Io(PathBuf, #[cause] io::Error),
+    #[fail(display = "{}", _0)]
+    Validation(#[cause] ValidationError),
+}
+
+pub fn load_witx<P: AsRef<Path>>(path: P) -> Result<Document, WitxError> {
+    let parsed_decls = parse_witx(path)?;
+    validate(&parsed_decls).map_err(WitxError::Validation)
 }

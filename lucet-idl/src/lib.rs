@@ -33,7 +33,7 @@ use crate::c::CGenerator;
 use crate::parser::Parser;
 use crate::rust::RustGenerator;
 use crate::validate::package_from_declarations;
-use crate::witx::parse_witx;
+use crate::witx::load_witx;
 use lucet_module::bindings::Bindings;
 use std::collections::HashMap;
 use std::fs;
@@ -70,10 +70,8 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
 
 pub fn run(config: &Config, input_path: &Path, output: Box<dyn Write>) -> Result<(), IDLError> {
     if config.witx {
-        let parse_stmts = parse_witx(input_path).map_err(IDLError::Witx)?;
-        for s in parse_stmts {
-            println!("{:?}", s);
-        }
+        let doc = load_witx(input_path).map_err(IDLError::Witx)?;
+        println!("{:?}", doc);
         Ok(())
     } else {
         let input = fs::read_to_string(input_path)?;

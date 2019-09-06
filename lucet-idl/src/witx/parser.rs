@@ -80,13 +80,13 @@ impl BuiltinType {
 }
 
 #[derive(Debug, Clone)]
-pub enum TypeIdentSyntax {
+pub enum DatatypeIdentSyntax {
     Builtin(BuiltinType),
-    Array(Box<TypeIdentSyntax>),
+    Array(Box<DatatypeIdentSyntax>),
     Ident(IdentSyntax),
 }
 
-impl TypeIdentSyntax {
+impl DatatypeIdentSyntax {
     pub fn starts_parsing(sexpr: &SExpr) -> bool {
         BuiltinType::starts_parsing(sexpr)
             || match sexpr {
@@ -98,17 +98,17 @@ impl TypeIdentSyntax {
                 _ => false,
             }
     }
-    pub fn parse(sexpr: &SExpr) -> Result<TypeIdentSyntax, ParseError> {
+    pub fn parse(sexpr: &SExpr) -> Result<DatatypeIdentSyntax, ParseError> {
         if BuiltinType::starts_parsing(sexpr) {
             let builtin = BuiltinType::parse(sexpr)?;
-            Ok(TypeIdentSyntax::Builtin(builtin))
+            Ok(DatatypeIdentSyntax::Builtin(builtin))
         } else {
             match sexpr {
-                SExpr::Ident(i, loc) => Ok(TypeIdentSyntax::Ident(id!(i, loc))),
+                SExpr::Ident(i, loc) => Ok(DatatypeIdentSyntax::Ident(id!(i, loc))),
                 SExpr::Vec(v, loc) => match (v.get(0), v.get(1)) {
-                    (Some(SExpr::Word("array", _loc)), Some(expr)) => Ok(TypeIdentSyntax::Array(
-                        Box::new(TypeIdentSyntax::parse(expr)?),
-                    )),
+                    (Some(SExpr::Word("array", _loc)), Some(expr)) => Ok(
+                        DatatypeIdentSyntax::Array(Box::new(DatatypeIdentSyntax::parse(expr)?)),
+                    ),
                     _ => Err(parse_err!(loc, "expected type identifier")),
                 },
                 _ => Err(parse_err!(sexpr.location(), "expected type identifier")),
@@ -201,7 +201,7 @@ impl TypenameSyntax {
 
 #[derive(Debug, Clone)]
 pub enum TypedefSyntax {
-    Ident(TypeIdentSyntax),
+    Ident(DatatypeIdentSyntax),
     Enum(EnumSyntax),
     Flags(FlagsSyntax),
     Struct(StructSyntax),
@@ -210,8 +210,8 @@ pub enum TypedefSyntax {
 
 impl TypedefSyntax {
     pub fn parse(sexpr: &SExpr) -> Result<TypedefSyntax, ParseError> {
-        if TypeIdentSyntax::starts_parsing(sexpr) {
-            let ident = TypeIdentSyntax::parse(sexpr)?;
+        if DatatypeIdentSyntax::starts_parsing(sexpr) {
+            let ident = DatatypeIdentSyntax::parse(sexpr)?;
             Ok(TypedefSyntax::Ident(ident))
         } else {
             match sexpr {
@@ -316,7 +316,7 @@ impl StructSyntax {
 #[derive(Debug, Clone)]
 pub struct FieldSyntax {
     pub name: IdentSyntax,
-    pub type_: TypeIdentSyntax,
+    pub type_: DatatypeIdentSyntax,
 }
 
 impl FieldSyntax {
@@ -337,7 +337,7 @@ impl FieldSyntax {
                         Some(SExpr::Ident(i, loc)) => id!(i, loc),
                         _ => Err(parse_err!(loc, "expected {} name identifier", constructor))?,
                     };
-                    let type_ = TypeIdentSyntax::parse(v.get(2).ok_or_else(|| {
+                    let type_ = DatatypeIdentSyntax::parse(v.get(2).ok_or_else(|| {
                         parse_err!(loc, "expected {} type identifier", constructor)
                     })?)?;
                     Ok(FieldSyntax { name, type_ })

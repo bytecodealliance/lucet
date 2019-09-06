@@ -8,40 +8,18 @@ pub use super::parser::BuiltinType;
 pub struct Id(String);
 
 impl Id {
+    pub fn new<S: AsRef<str>>(s: S) -> Self {
+        Id(s.as_ref().to_string())
+    }
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct QName(Vec<Id>);
-
-impl QName {
-    pub fn new() -> QName {
-        QName(vec![])
-    }
-
-    pub fn push(&mut self, id: &Id) {
-        self.0.push(id.clone());
-    }
-
-    pub fn pop(&mut self) -> Option<Id> {
-        self.0.pop()
-    }
-
-    pub fn last(&self) -> Option<&Id> {
-        self.0.last()
-    }
-
-    pub fn reverse(&mut self) {
-        self.0.reverse();
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Document {
-    definitions: Vec<Definition>,
-    entries: HashMap<QName, Entry>,
+    pub definitions: Vec<Definition>,
+    pub entries: HashMap<Id, Entry>,
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +32,15 @@ pub enum Definition {
 pub enum Entry {
     Datatype(Weak<Datatype>),
     Module(Weak<ModuleDef>),
+}
+
+impl Entry {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Entry::Datatype { .. } => "datatype",
+            Entry::Module { .. } => "module",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
