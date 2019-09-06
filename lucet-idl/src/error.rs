@@ -1,5 +1,5 @@
-use crate::interfacetypes::InterfaceTypesError;
 use crate::parser;
+use crate::witx::WitxError;
 use crate::Location;
 use std::io;
 
@@ -16,7 +16,7 @@ pub enum IDLError {
     #[fail(display = "{}", _0)]
     Io(#[cause] io::Error),
     #[fail(display = "{}", _0)]
-    InterfaceTypes(#[cause] InterfaceTypesError),
+    Witx(#[cause] WitxError),
 }
 
 impl From<io::Error> for IDLError {
@@ -37,9 +37,9 @@ impl From<ValidationError> for IDLError {
     }
 }
 
-impl From<InterfaceTypesError> for IDLError {
-    fn from(e: InterfaceTypesError) -> Self {
-        IDLError::InterfaceTypes(e)
+impl From<WitxError> for IDLError {
+    fn from(e: WitxError) -> Self {
+        IDLError::Witx(e)
     }
 }
 

@@ -12,7 +12,7 @@ use std::io;
 use std::path::PathBuf;
 
 #[derive(Debug, Fail)]
-pub enum InterfaceTypesError {
+pub enum WitxError {
     #[fail(display = "{}", _0)]
     SExpr(#[cause] SExprParseError),
     #[fail(display = "Invalid use statement \"{}\": {}", _1, _0)]

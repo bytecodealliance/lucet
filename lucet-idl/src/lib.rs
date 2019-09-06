@@ -8,7 +8,6 @@ mod c;
 mod config;
 mod cursor;
 mod error;
-pub mod interfacetypes;
 mod lexer;
 mod parser;
 mod prelude;
@@ -16,6 +15,7 @@ pub mod pretty_writer;
 mod repr;
 mod rust;
 mod validate;
+mod witx;
 
 pub use crate::atoms::{AbiType, AtomType};
 pub use crate::config::{Backend, Config};
@@ -30,10 +30,10 @@ pub use crate::rust::{
 };
 
 use crate::c::CGenerator;
-use crate::interfacetypes::parse_witx;
 use crate::parser::Parser;
 use crate::rust::RustGenerator;
 use crate::validate::package_from_declarations;
+use crate::witx::parse_witx;
 use lucet_module::bindings::Bindings;
 use std::collections::HashMap;
 use std::fs;
@@ -70,7 +70,7 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
 
 pub fn run(config: &Config, input_path: &Path, output: Box<dyn Write>) -> Result<(), IDLError> {
     if config.witx {
-        let parse_stmts = parse_witx(input_path).map_err(IDLError::InterfaceTypes)?;
+        let parse_stmts = parse_witx(input_path).map_err(IDLError::Witx)?;
         for s in parse_stmts {
             println!("{:?}", s);
         }
