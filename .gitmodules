@@ -1,9 +1,6 @@
 [submodule "cranelift"]
 	path = cranelift
 	url = https://github.com/cranestation/cranelift
-[submodule "faerie"]
-	path = faerie
-	url = https://github.com/m4b/faerie
 [submodule "lucet-spectest/spec"]
 	path = lucet-spectest/spec
 	url = https://github.com/webassembly/spec

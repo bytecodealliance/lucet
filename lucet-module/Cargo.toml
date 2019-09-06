@@ -10,11 +10,11 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.40.0" }
+cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.41.0" }
 # We only depend on the types in codegen used inside ir::Signature. TODO: make
 # a lucet-module version of those types, and make lucetc responsible for translating
 # from the cranelift-codegen::ir::Signature to a lucet-module::Signature
-cranelift-codegen = { path = "../cranelift/cranelift-codegen", version = "0.40.0" }
+cranelift-codegen = { path = "../cranelift/cranelift-codegen", version = "0.41.0" }
 failure = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
