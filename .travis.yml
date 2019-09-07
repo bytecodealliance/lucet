@@ -1,8 +1,7 @@
 dist: xenial
 
 env:
-    - UNOPTIMIZED_BUILD=true
-    - PRESERVE_CARGO_CACHE=true
+    - UNOPTIMIZED_BUILD=true PRESERVE_CARGO_CACHE=true
 
 services:
     - docker
