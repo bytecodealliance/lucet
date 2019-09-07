@@ -11,5 +11,5 @@ if docker ps -f name='lucet' --format '{{.Names}}' | grep -q '^lucet$' ; then
 	exit 1
 fi
 
-docker run --name=lucet --detach --mount type=bind,src="$(cd $(dirname ${0}); pwd -P),target=/lucet" \
+docker run --name=lucet --detach --mount type=bind,src="$(cd $(dirname ${0}); pwd -P),target=$HOST_LUCET_MOUNT_POINT" \
 	lucet:latest /bin/sleep 99999999 > /dev/null

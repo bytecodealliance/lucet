@@ -20,8 +20,20 @@ fi
 opts="-i"
 [ -t 0 ] && opts="-t $opts"
 
+if [ ! -z "$PRESERVE_CARGO_CACHE" ]; then
+  echo "restoring cargo cache"
+  docker exec lucet mkdir /lucet/target/
+  docker cp preserved_cargo_cache/ lucet:/lucet/target/
+fi
+
 if [ $# -eq 0 ]; then
 	docker exec $opts -w "$lucet_workdir" lucet /bin/bash
 else
 	docker exec $opts -w "$lucet_workdir" lucet "$@"
 fi
+
+if [ ! -z "$PRESERVE_CARGO_CACHE" ]; then
+  echo "preserving cargo cache again"
+  docker cp lucet:/lucet/target/ preserved_cargo_cache/
+fi
+

@@ -29,7 +29,7 @@ if docker image inspect lucet:latest > /dev/null; then
 fi
 
 echo "Now creating lucet:latest on top of lucet-dev:latest"
-docker run --name=lucet-dev --detach --mount type=bind,src="$(cd $(dirname ${0}); pwd),target=/lucet" \
+docker run --name=lucet-dev --detach --mount type=bind,src="$(cd $(dirname ${0}); pwd),target=$HOST_LUCET_MOUNT_POINT" \
         lucet-dev:latest /bin/sleep 99999999 > /dev/null
 
 echo "Building and installing optimized files in [$HOST_LUCET_MOUNT_POINT]"
@@ -37,6 +37,11 @@ if [ -z "$UNOPTIMIZED_BUILD" ]; then
         docker exec -t -w "$HOST_LUCET_MOUNT_POINT" lucet-dev make install
 else
         docker exec -t -w "$HOST_LUCET_MOUNT_POINT" lucet-dev make install-dev
+fi
+
+if [ ! -z "$PRESERVE_CARGO_CACHE" ]; then
+        echo "preserving cargo cache..."
+        docker cp lucet-dev:/lucet/target/ preserved_cargo_cache
 fi
 
 echo "Cleaning"
