@@ -125,98 +125,96 @@ impl<'a> SExprParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::PathBuf::PathBuf;
+    use std::path::PathBuf;
 
-    const P: PathBuf = PathBuf::from("/test");
-    macro_rules! loc {
-        ($line: expr, $col: expr) => {
-            Location {
-                path: P.clone(),
-                line: $line,
-                col: $col,
-            }
-        };
+    fn loc(line: usize, col: usize) -> Location {
+        Location {
+            path: PathBuf::from("/test"),
+            line: line,
+            column: col,
+        }
+    }
+
+    fn testparser(input: &str) -> SExprParser {
+        SExprParser::new(input, Path::new("/test"))
     }
 
     #[test]
     fn empty() {
-        let mut parser = SExprParser::new("", &P);
+        let mut parser = testparser("");
         assert_eq!(parser.match_sexprs().expect("valid parse"), Vec::new());
-        let mut parser = SExprParser::new("   ;; just a comment\n;;another", &P);
+        let mut parser = testparser("   ;; just a comment\n;;another");
         assert_eq!(parser.match_sexprs().expect("valid parse"), Vec::new());
     }
 
     #[test]
     fn atoms() {
-        let mut parser = SExprParser::new("hello\n$world\n\"a quotation\"");
+        let mut parser = testparser("hello\n$world\n\"a quotation\"");
         assert_eq!(
             parser.match_sexprs().expect("valid parse"),
             vec![
-                SExpr::Word("hello", loc!(1, 0)),
-                SExpr::Ident("world", loc!(2, 0)),
-                SExpr::Quote("a quotation", loc!(3, 0)),
+                SExpr::Word("hello", loc(1, 0)),
+                SExpr::Ident("world", loc(2, 0)),
+                SExpr::Quote("a quotation", loc(3, 0)),
             ]
         );
     }
 
     #[test]
     fn lists() {
-        let mut parser = SExprParser::new("()", P);
+        let mut parser = testparser("()");
         assert_eq!(
             parser.match_sexprs().expect("valid parse"),
-            vec![SExpr::Vec(vec![], loc!(1, 0))]
+            vec![SExpr::Vec(vec![], loc(1, 0))]
         );
 
-        let mut parser = SExprParser::new("(hello\n$world\n\"a quotation\")");
+        let mut parser = testparser("(hello\n$world\n\"a quotation\")");
         assert_eq!(
             parser.match_sexprs().expect("valid parse"),
             vec![SExpr::Vec(
                 vec![
-                    SExpr::Word("hello", loc!(1, 1)),
-                    SExpr::Ident("world", loc!(2, 0)),
-                    SExpr::Quote("a quotation", loc!(3, 0)),
+                    SExpr::Word("hello", loc(1, 1)),
+                    SExpr::Ident("world", loc(2, 0)),
+                    SExpr::Quote("a quotation", loc(3, 0)),
                 ],
-                loc!(1, 0)
+                loc(1, 0)
             )]
         );
 
-        let mut parser = SExprParser::new("((($deep)))");
+        let mut parser = testparser("((($deep)))");
         assert_eq!(
             parser.match_sexprs().expect("valid parse"),
             vec![SExpr::Vec(
                 vec![SExpr::Vec(
-                    vec![SExpr::Vec(
-                        vec![SExpr::Ident("deep", loc!(1, 3))],
-                        loc!(1, 2)
-                    )],
-                    loc!(1, 1)
+                    vec![SExpr::Vec(vec![SExpr::Ident("deep", loc(1, 3))], loc(1, 2))],
+                    loc(1, 1)
                 )],
-                loc!(1, 0)
+                loc(1, 0)
             )]
         );
     }
 
     #[test]
     fn errors() {
-        let mut parser = SExprParser::new("(");
+        let mut parser = testparser("(");
         assert_eq!(
             parser.match_sexprs().err().expect("dies"),
-            SExprParseError::UnexpectedEof,
+            SExprParseError::UnexpectedEof(PathBuf::from("/test"))
         );
-        let mut parser = SExprParser::new(")");
+        let mut parser = testparser(")");
         assert_eq!(
             parser.match_sexprs().err().expect("dies"),
-            SExprParseError::UnexpectedCloseParen(loc!(1, 0))
+            SExprParseError::UnexpectedCloseParen(loc(1, 0))
         );
-        let mut parser = SExprParser::new("())");
+        let mut parser = testparser("())");
         assert_eq!(
             parser.match_sexprs().err().expect("dies"),
-            SExprParseError::UnexpectedCloseParen(loc!(1, 2))
+            SExprParseError::UnexpectedCloseParen(loc(1, 2))
         );
-        let mut parser = SExprParser::new("$ ;; should be a lex error");
+        let mut parser = testparser("$ ;; should be a lex error");
         assert_eq!(
             parser.match_sexprs().err().expect("dies"),
-            SExprParseError::Lex(LexError::EmptyIdentifier, loc!(1, 0),),
+            SExprParseError::Lex(LexError::EmptyIdentifier, loc(1, 0),),
         );
     }
 }

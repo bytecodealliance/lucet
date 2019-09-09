@@ -246,12 +246,25 @@ impl<'a> Lexer<'a> {
 mod tests {
     use super::*;
 
+    use std::path::{Path, PathBuf};
+
+    fn testlexer(input: &str) -> Lexer {
+        Lexer::new(input, Path::new("/test"))
+    }
+
     fn token(
         token: Token<'_>,
         line: usize,
         column: usize,
     ) -> Option<Result<LocatedToken<'_>, LocatedError>> {
-        Some(super::token(token, Location { line, column }))
+        Some(super::token(
+            token,
+            Location {
+                path: PathBuf::from("/test"),
+                line,
+                column,
+            },
+        ))
     }
 
     fn error<'a>(
@@ -259,11 +272,18 @@ mod tests {
         line: usize,
         column: usize,
     ) -> Option<Result<LocatedToken<'a>, LocatedError>> {
-        Some(super::error(err, Location { line, column }))
+        Some(super::error(
+            err,
+            Location {
+                path: PathBuf::from("/test"),
+                line,
+                column,
+            },
+        ))
     }
     #[test]
     fn words_and_idents() {
-        let mut lex = Lexer::new("$gussie is a good $dog");
+        let mut lex = testlexer("$gussie is a good $dog");
         // ruler                  0    5    10   15   20
         assert_eq!(lex.next(), token(Token::Ident("gussie"), 1, 0));
         assert_eq!(lex.next(), token(Token::Word("is"), 1, 8));
@@ -273,7 +293,7 @@ mod tests {
         assert_eq!(lex.next(), None);
 
         let mut lex =
-            Lexer::new("$ok $a $_ $ _\nkebab-case\nsnake_case\n$kebab-ident\n$snake_ident");
+            testlexer("$ok $a $_ $ _\nkebab-case\nsnake_case\n$kebab-ident\n$snake_ident");
         assert_eq!(lex.next(), token(Token::Ident("ok"), 1, 0));
         assert_eq!(lex.next(), token(Token::Ident("a"), 1, 4));
         assert_eq!(lex.next(), token(Token::Ident("_"), 1, 7));
@@ -288,14 +308,14 @@ mod tests {
 
     #[test]
     fn comments() {
-        let mut lex = Lexer::new("the quick ;; brown fox\njumped\n;;over the three\nlazy;;dogs");
+        let mut lex = testlexer("the quick ;; brown fox\njumped\n;;over the three\nlazy;;dogs");
         assert_eq!(lex.next(), token(Token::Word("the"), 1, 0));
         assert_eq!(lex.next(), token(Token::Word("quick"), 1, 4));
         assert_eq!(lex.next(), token(Token::Word("jumped"), 2, 0));
         assert_eq!(lex.next(), token(Token::Word("lazy"), 4, 0));
         assert_eq!(lex.next(), None);
 
-        let mut lex = Lexer::new("line1 ;;\n$sym_2;\n\t\tl3;;;333");
+        let mut lex = testlexer("line1 ;;\n$sym_2;\n\t\tl3;;;333");
         assert_eq!(lex.next(), token(Token::Word("line1"), 1, 0));
         assert_eq!(lex.next(), token(Token::Ident("sym_2"), 2, 0));
         assert_eq!(lex.next(), error(LexError::InvalidChar(';'), 2, 6));
@@ -305,17 +325,17 @@ mod tests {
 
     #[test]
     fn quotes() {
-        let mut lex = Lexer::new("a \"bc\" d");
+        let mut lex = testlexer("a \"bc\" d");
         assert_eq!(lex.next(), token(Token::Word("a"), 1, 0));
         assert_eq!(lex.next(), token(Token::Quote("bc"), 1, 2));
         assert_eq!(lex.next(), token(Token::Word("d"), 1, 7));
 
-        let mut lex = Lexer::new("a \"b\nc\" d");
+        let mut lex = testlexer("a \"b\nc\" d");
         assert_eq!(lex.next(), token(Token::Word("a"), 1, 0));
         assert_eq!(lex.next(), token(Token::Quote("b\nc"), 1, 2));
         assert_eq!(lex.next(), token(Token::Word("d"), 2, 3));
 
-        let mut lex = Lexer::new("a \"b");
+        let mut lex = testlexer("a \"b");
         assert_eq!(lex.next(), token(Token::Word("a"), 1, 0));
         assert_eq!(lex.next(), error(LexError::UnterminatedQuote, 1, 2));
     }
