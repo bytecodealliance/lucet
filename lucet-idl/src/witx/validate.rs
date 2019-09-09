@@ -4,7 +4,8 @@
 
 use super::ast::{
     AliasDatatype, BuiltinType, Datatype, DatatypeIdent, DatatypeVariant, Definition, Document,
-    Entry, EnumDatatype, FlagsDatatype, Id, ModuleDef, StructDatatype, UnionDatatype,
+    Entry, EnumDatatype, FlagsDatatype, Id, IntRepr, ModuleDef, StructDatatype, StructMember,
+    UnionDatatype, UnionVariant,
 };
 use super::parser::{
     DatatypeIdentSyntax, DeclSyntax, EnumSyntax, FieldSyntax, FlagsSyntax, IdentSyntax,
@@ -183,13 +184,7 @@ impl DeclValidation {
         location: &Location,
     ) -> Result<EnumDatatype, ValidationError> {
         let mut enum_scope = IdentValidation::new();
-        let repr = match syntax.repr {
-            // XXX fill in valid cases, factor into reusable func
-            _ => Err(ValidationError::InvalidRepr {
-                repr: syntax.repr.clone(),
-                location: location.clone(),
-            })?,
-        };
+        let repr = validate_int_repr(&syntax.repr, location)?;
         let variants = syntax
             .members
             .iter()
@@ -209,7 +204,19 @@ impl DeclValidation {
         syntax: &FlagsSyntax,
         location: &Location,
     ) -> Result<FlagsDatatype, ValidationError> {
-        unimplemented!()
+        let mut flags_scope = IdentValidation::new();
+        let repr = validate_int_repr(&syntax.repr, location)?;
+        let flags = syntax
+            .flags
+            .iter()
+            .map(|i| flags_scope.introduce(i))
+            .collect::<Result<Vec<Id>, _>>()?;
+
+        Ok(FlagsDatatype {
+            name: name.clone(),
+            repr,
+            flags,
+        })
     }
 
     fn validate_struct(
@@ -218,7 +225,22 @@ impl DeclValidation {
         syntax: &StructSyntax,
         location: &Location,
     ) -> Result<StructDatatype, ValidationError> {
-        unimplemented!()
+        let mut member_scope = IdentValidation::new();
+        let members = syntax
+            .fields
+            .iter()
+            .map(|f| {
+                Ok(StructMember {
+                    name: member_scope.introduce(&f.name)?,
+                    type_: self.validate_datatype_ident(&f.type_)?,
+                })
+            })
+            .collect::<Result<Vec<StructMember>, _>>()?;
+
+        Ok(StructDatatype {
+            name: name.clone(),
+            members,
+        })
     }
 
     fn validate_union(
@@ -227,6 +249,34 @@ impl DeclValidation {
         syntax: &UnionSyntax,
         location: &Location,
     ) -> Result<UnionDatatype, ValidationError> {
-        unimplemented!()
+        let mut variant_scope = IdentValidation::new();
+        let variants = syntax
+            .fields
+            .iter()
+            .map(|f| {
+                Ok(UnionVariant {
+                    name: variant_scope.introduce(&f.name)?,
+                    type_: self.validate_datatype_ident(&f.type_)?,
+                })
+            })
+            .collect::<Result<Vec<UnionVariant>, _>>()?;
+
+        Ok(UnionDatatype {
+            name: name.clone(),
+            variants,
+        })
+    }
+}
+
+fn validate_int_repr(type_: &BuiltinType, location: &Location) -> Result<IntRepr, ValidationError> {
+    match type_ {
+        BuiltinType::U8 => Ok(IntRepr::I8),
+        BuiltinType::U16 => Ok(IntRepr::I16),
+        BuiltinType::U32 => Ok(IntRepr::I32),
+        BuiltinType::U64 => Ok(IntRepr::I64),
+        _ => Err(ValidationError::InvalidRepr {
+            repr: type_.clone(),
+            location: location.clone(),
+        }),
     }
 }
