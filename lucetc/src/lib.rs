@@ -18,6 +18,7 @@ mod sparsedata;
 mod stack_probe;
 mod table;
 mod traps;
+mod types;
 
 use crate::load::read_bytes;
 pub use crate::{
