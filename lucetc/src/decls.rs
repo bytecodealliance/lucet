@@ -5,6 +5,7 @@ use crate::module::{ModuleInfo, UniqueFuncIndex};
 use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
 use crate::table::TABLE_SYM;
+use crate::types::to_lucet_signature;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -21,7 +22,6 @@ use lucet_module::{
     ModuleData, Signature as LucetSignature, UniqueSignatureIndex,
 };
 use std::collections::HashMap;
-use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub struct FunctionDecl<'a> {
@@ -530,7 +530,7 @@ impl<'a> ModuleDecls<'a> {
             .signatures
             .values()
             .map(|sig| {
-                LucetSignature::try_from(sig)
+                to_lucet_signature(sig)
                     .map_err(|e| format_err!("error converting cranelift sig to wasm sig: {:?}", e))
                     .context(LucetcErrorKind::TranslatingModule)
             })
