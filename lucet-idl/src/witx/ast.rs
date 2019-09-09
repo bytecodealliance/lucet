@@ -120,20 +120,20 @@ pub struct UnionVariant {
 #[derive(Debug, Clone)]
 pub struct ModuleDef {
     pub name: Id,
-    definitions: Vec<ModuleDefinition>,
-    entries: HashMap<Id, ModuleEntry>,
+    pub definitions: Vec<ModuleDefinition>,
+    pub entries: HashMap<Id, ModuleEntry>,
 }
 
 #[derive(Debug, Clone)]
 pub enum ModuleDefinition {
     Import(Rc<ModuleImport>),
-    InterfaceFunc(Rc<InterfaceFunc>),
+    Func(Rc<InterfaceFunc>),
 }
 
 #[derive(Debug, Clone)]
 pub enum ModuleEntry {
     Import(Weak<ModuleImport>),
-    InterfaceFunc(Weak<InterfaceFunc>),
+    Func(Weak<InterfaceFunc>),
 }
 
 #[derive(Debug, Clone)]

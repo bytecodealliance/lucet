@@ -4,13 +4,14 @@
 
 use super::ast::{
     AliasDatatype, BuiltinType, Datatype, DatatypeIdent, DatatypeVariant, Definition, Document,
-    Entry, EnumDatatype, FlagsDatatype, Id, IntRepr, ModuleDef, StructDatatype, StructMember,
+    Entry, EnumDatatype, FlagsDatatype, Id, IntRepr, InterfaceFunc, InterfaceFuncParam, ModuleDef,
+    ModuleDefinition, ModuleEntry, ModuleImport, ModuleImportVariant, StructDatatype, StructMember,
     UnionDatatype, UnionVariant,
 };
 use super::parser::{
     DatatypeIdentSyntax, DeclSyntax, EnumSyntax, FieldSyntax, FlagsSyntax, IdentSyntax,
-    InterfaceFuncSyntax, ModuleImportSyntax, ModuleSyntax, StructSyntax, TypedefSyntax,
-    TypenameSyntax, UnionSyntax,
+    ImportTypeSyntax, InterfaceFuncSyntax, ModuleDeclSyntax, ModuleImportSyntax, ModuleSyntax,
+    StructSyntax, TypedefSyntax, TypenameSyntax, UnionSyntax,
 };
 use super::Location;
 use std::collections::HashMap;
@@ -45,8 +46,8 @@ pub enum ValidationError {
     },
 }
 
-pub fn validate(decls: &[DeclSyntax]) -> Result<Document, ValidationError> {
-    let mut validator = DeclValidation::new();
+pub fn validate_document(decls: &[DeclSyntax]) -> Result<Document, ValidationError> {
+    let mut validator = DocValidation::new();
     let mut definitions = Vec::new();
     for d in decls {
         definitions.push(validator.validate_decl(&d)?);
@@ -94,12 +95,12 @@ impl IdentValidation {
     }
 }
 
-struct DeclValidation {
+struct DocValidation {
     scope: IdentValidation,
     pub entries: HashMap<Id, Entry>,
 }
 
-impl DeclValidation {
+impl DocValidation {
     fn new() -> Self {
         Self {
             scope: IdentValidation::new(),
@@ -142,7 +143,21 @@ impl DeclValidation {
             }
             DeclSyntax::Module(syntax) => {
                 let name = self.scope.introduce(&syntax.name)?;
-                unimplemented!()
+                let mut module_validator = ModuleValidation::new(self);
+                let definitions = syntax
+                    .decls
+                    .iter()
+                    .map(|d| module_validator.validate_decl(&d))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let rc_module = Rc::new(ModuleDef {
+                    name: name.clone(),
+                    definitions,
+                    entries: module_validator.entries,
+                });
+                self.entries
+                    .insert(name, Entry::Module(Rc::downgrade(&rc_module)));
+                Ok(Definition::Module(rc_module))
             }
         }
     }
@@ -278,5 +293,75 @@ fn validate_int_repr(type_: &BuiltinType, location: &Location) -> Result<IntRepr
             repr: type_.clone(),
             location: location.clone(),
         }),
+    }
+}
+
+struct ModuleValidation<'a> {
+    doc: &'a DocValidation,
+    scope: IdentValidation,
+    pub entries: HashMap<Id, ModuleEntry>,
+}
+
+impl<'a> ModuleValidation<'a> {
+    fn new(doc: &'a DocValidation) -> Self {
+        Self {
+            doc,
+            scope: IdentValidation::new(),
+            entries: HashMap::new(),
+        }
+    }
+
+    fn validate_decl(
+        &mut self,
+        decl: &ModuleDeclSyntax,
+    ) -> Result<ModuleDefinition, ValidationError> {
+        match decl {
+            ModuleDeclSyntax::Import(syntax) => {
+                let name = self.scope.introduce(&syntax.name)?;
+                let variant = match syntax.type_ {
+                    ImportTypeSyntax::Memory => ModuleImportVariant::Memory,
+                };
+                let rc_import = Rc::new(ModuleImport {
+                    name: name.clone(),
+                    variant,
+                });
+                self.entries
+                    .insert(name, ModuleEntry::Import(Rc::downgrade(&rc_import)));
+                Ok(ModuleDefinition::Import(rc_import))
+            }
+            ModuleDeclSyntax::Func(syntax) => {
+                let name = self.scope.introduce(&syntax.export)?;
+                let mut argnames = IdentValidation::new();
+                let params = syntax
+                    .params
+                    .iter()
+                    .map(|f| {
+                        Ok(InterfaceFuncParam {
+                            name: argnames.introduce(&f.name)?,
+                            type_: self.doc.validate_datatype_ident(&f.type_)?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let results = syntax
+                    .results
+                    .iter()
+                    .map(|f| {
+                        Ok(InterfaceFuncParam {
+                            name: argnames.introduce(&f.name)?,
+                            type_: self.doc.validate_datatype_ident(&f.type_)?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let rc_func = Rc::new(InterfaceFunc {
+                    name: name.clone(),
+                    params,
+                    results,
+                });
+                self.entries
+                    .insert(name, ModuleEntry::Func(Rc::downgrade(&rc_func)));
+                Ok(ModuleDefinition::Func(rc_func))
+            }
+        }
     }
 }

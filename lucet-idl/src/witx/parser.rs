@@ -370,8 +370,7 @@ impl UnionSyntax {
 #[derive(Debug, Clone)]
 pub struct ModuleSyntax {
     pub name: IdentSyntax,
-    pub imports: Vec<ModuleImportSyntax>,
-    pub funcs: Vec<InterfaceFuncSyntax>,
+    pub decls: Vec<ModuleDeclSyntax>,
 }
 
 impl ModuleSyntax {
@@ -380,24 +379,29 @@ impl ModuleSyntax {
             Some(SExpr::Ident(i, loc)) => id!(i, loc),
             _ => Err(parse_err!(loc, "expected module name"))?,
         };
-        let mut imports = Vec::new();
-        let mut funcs = Vec::new();
-        for sexpr in &sexprs[1..] {
-            if ModuleImportSyntax::starts_parsing(sexpr) {
-                let import = ModuleImportSyntax::parse(sexpr)?;
-                imports.push(import);
-            } else if InterfaceFuncSyntax::starts_parsing(sexpr) {
-                let func = InterfaceFuncSyntax::parse(sexpr)?;
-                funcs.push(func);
-            } else {
-                Err(parse_err!(sexpr.location(), "expected import or function"))?;
-            }
+        let decls = sexprs[1..]
+            .iter()
+            .map(|s| ModuleDeclSyntax::parse(s))
+            .collect::<Result<Vec<ModuleDeclSyntax>, _>>()?;
+        Ok(ModuleSyntax { name, decls })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ModuleDeclSyntax {
+    Import(ModuleImportSyntax),
+    Func(InterfaceFuncSyntax),
+}
+
+impl ModuleDeclSyntax {
+    pub fn parse(sexpr: &SExpr) -> Result<ModuleDeclSyntax, ParseError> {
+        if ModuleImportSyntax::starts_parsing(sexpr) {
+            Ok(ModuleDeclSyntax::Import(ModuleImportSyntax::parse(sexpr)?))
+        } else if InterfaceFuncSyntax::starts_parsing(sexpr) {
+            Ok(ModuleDeclSyntax::Func(InterfaceFuncSyntax::parse(sexpr)?))
+        } else {
+            Err(parse_err!(sexpr.location(), "expected import or function"))
         }
-        Ok(ModuleSyntax {
-            name,
-            imports,
-            funcs,
-        })
     }
 }
 

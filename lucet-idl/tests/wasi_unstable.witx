@@ -108,7 +108,7 @@
   (@interface func (export "fd_fdstat_set_flags")
     (param $fd $fd_t)
     ;; The desired values of the file descriptor flags.
-    (param $flags $fdflags)
+    (param $flags $fdflags_t)
     (result $error $errno_t)
   )
 
@@ -170,7 +170,7 @@
     (param $fd $fd_t)
     (result $error $errno_t)
     ;; The buffer where the description is stored.
-    (result $buf $prestat_t)
+    (result $buf data)
   )
 
   ;; Return a description of the given preopened file descriptor.
@@ -331,7 +331,7 @@
     ;; The source path from which to link.
     (param $old_path string)
     ;; The working directory at which the resolution of the new path starts.
-    (param $new_fd $path)
+    (param $new_fd string)
     ;; The destination path at which to create the hard link.
     (param $new_path string)
     (result $error $errno_t)
@@ -400,7 +400,7 @@
     ;; The source path of the file or directory to rename.
     (param $old_path string)
     ;; The working directory at which the resolution of the new path starts.
-    (param $new_fd $fd)
+    (param $new_fd $fd_t)
     ;; The destination path to which to rename the file or directory.
     (param $new_path string)
     (result $error $errno_t)
