@@ -17,7 +17,7 @@ macro_rules! parse_err {
     };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IdentSyntax {
     pub name: String,
     pub location: Location,
@@ -32,7 +32,7 @@ macro_rules! id {
     };
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltinType {
     String,
     Data,
@@ -79,7 +79,7 @@ impl BuiltinType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DatatypeIdentSyntax {
     Builtin(BuiltinType),
     Array(Box<DatatypeIdentSyntax>),
@@ -117,7 +117,7 @@ impl DatatypeIdentSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TopLevelSyntax {
     Decl(DeclSyntax),
     Use(IdentSyntax),
@@ -146,7 +146,7 @@ impl TopLevelSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeclSyntax {
     Typename(TypenameSyntax),
     Module(ModuleSyntax),
@@ -179,7 +179,7 @@ impl DeclSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypenameSyntax {
     pub ident: IdentSyntax,
     pub def: TypedefSyntax,
@@ -199,7 +199,7 @@ impl TypenameSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypedefSyntax {
     Ident(DatatypeIdentSyntax),
     Enum(EnumSyntax),
@@ -242,7 +242,7 @@ impl TypedefSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnumSyntax {
     pub repr: BuiltinType,
     pub members: Vec<IdentSyntax>,
@@ -268,7 +268,7 @@ impl EnumSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlagsSyntax {
     pub repr: BuiltinType,
     pub flags: Vec<IdentSyntax>,
@@ -295,7 +295,7 @@ impl FlagsSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructSyntax {
     pub fields: Vec<FieldSyntax>,
 }
@@ -313,7 +313,7 @@ impl StructSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldSyntax {
     pub name: IdentSyntax,
     pub type_: DatatypeIdentSyntax,
@@ -349,7 +349,7 @@ impl FieldSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnionSyntax {
     pub fields: Vec<FieldSyntax>,
 }
@@ -367,7 +367,7 @@ impl UnionSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleSyntax {
     pub name: IdentSyntax,
     pub decls: Vec<ModuleDeclSyntax>,
@@ -387,7 +387,7 @@ impl ModuleSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModuleDeclSyntax {
     Import(ModuleImportSyntax),
     Func(InterfaceFuncSyntax),
@@ -405,7 +405,7 @@ impl ModuleDeclSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleImportSyntax {
     pub name: IdentSyntax,
     pub type_: ImportTypeSyntax,
@@ -436,7 +436,7 @@ impl ModuleImportSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ImportTypeSyntax {
     Memory,
 }
@@ -462,7 +462,7 @@ impl ImportTypeSyntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InterfaceFuncSyntax {
     pub export: IdentSyntax,
     pub params: Vec<FieldSyntax>,
