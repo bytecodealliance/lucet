@@ -25,7 +25,7 @@
 
   ;; declare that, actually, one of the imported functions is exported
   (export "read_2" (func $read_2))
-  ;; and delcare that the *other* read function is also exported, by a
+  ;; and declare that the *other* read function is also exported, by a
   ;; different name. This lets us check that when we merge the functions,
   ;; we also merge their export names properly.
   (export "read" (func $read))

@@ -23,7 +23,7 @@ OPTIONS:
 ```
 
 `builtins_file` is an object containing alternative implementations to
-funcitons called in the wasm code.
+functions called in the wasm code.
 
 Symbols starting with a `builtin_` prefix will be used for substitution.
 
