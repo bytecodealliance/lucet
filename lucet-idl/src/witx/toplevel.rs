@@ -1,6 +1,7 @@
 use super::parser::{DeclSyntax, ParseError, TopLevelSyntax};
 use super::sexpr::SExprParser;
 use super::WitxError;
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -35,7 +36,8 @@ fn parse_witx_with<P: AsRef<Path>>(
     let input = witxio.fgets(&input_path)?;
 
     let toplevel = parse_toplevel(&input, &input_path)?;
-    let mut resolved = vec![input_path.clone()];
+    let mut resolved = HashSet::new();
+    resolved.insert(input_path.clone());
     let search_path = input_path
         .parent()
         .map(PathBuf::from)
@@ -57,7 +59,7 @@ fn parse_toplevel(source_text: &str, file_path: &Path) -> Result<Vec<TopLevelSyn
 fn resolve_uses(
     toplevel: Vec<TopLevelSyntax>,
     search_path: &Path,
-    used: &mut Vec<PathBuf>,
+    used: &mut HashSet<PathBuf>,
     witxio: &dyn WitxIo,
 ) -> Result<Vec<DeclSyntax>, WitxError> {
     let mut decls = Vec::new();
@@ -66,15 +68,11 @@ fn resolve_uses(
         match t {
             TopLevelSyntax::Decl(d) => decls.push(d),
             TopLevelSyntax::Use(u) => {
-                let u_path = PathBuf::from(&u.name);
-                let mut abs_path = PathBuf::from(search_path);
-                abs_path.push(u_path.clone());
-                let abs_path = witxio.canonicalize(&abs_path)?;
-
+                let abs_path = witxio.canonicalize(&search_path.join(u.name))?;
                 // Include the decls from a use declaration only once
                 // in a given toplevel. Same idea as #pragma once.
                 if !used.contains(&abs_path) {
-                    used.push(abs_path.clone());
+                    used.insert(abs_path.clone());
 
                     let source_text = witxio.fgets(&abs_path)?;
                     let inner_toplevels = parse_toplevel(&source_text, &abs_path)?;

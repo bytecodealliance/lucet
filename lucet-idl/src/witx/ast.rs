@@ -25,13 +25,13 @@ pub struct Document {
 #[derive(Debug, Clone)]
 pub enum Definition {
     Datatype(Rc<Datatype>),
-    Module(Rc<ModuleDef>),
+    Module(Rc<Module>),
 }
 
 #[derive(Debug, Clone)]
 pub enum Entry {
     Datatype(Weak<Datatype>),
-    Module(Weak<ModuleDef>),
+    Module(Weak<Module>),
 }
 
 impl Entry {
@@ -118,7 +118,7 @@ pub struct UnionVariant {
 }
 
 #[derive(Debug, Clone)]
-pub struct ModuleDef {
+pub struct Module {
     pub name: Id,
     pub definitions: Vec<ModuleDefinition>,
     pub entries: HashMap<Id, ModuleEntry>,

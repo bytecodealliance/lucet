@@ -1,6 +1,6 @@
 use super::ast::{
     AliasDatatype, BuiltinType, Datatype, DatatypeIdent, DatatypeVariant, Definition, Document,
-    Entry, EnumDatatype, FlagsDatatype, Id, IntRepr, InterfaceFunc, InterfaceFuncParam, ModuleDef,
+    Entry, EnumDatatype, FlagsDatatype, Id, IntRepr, InterfaceFunc, InterfaceFuncParam, Module,
     ModuleDefinition, ModuleEntry, ModuleImport, ModuleImportVariant, StructDatatype, StructMember,
     UnionDatatype, UnionVariant,
 };
@@ -145,7 +145,7 @@ impl DocValidation {
                     .map(|d| module_validator.validate_decl(&d))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let rc_module = Rc::new(ModuleDef {
+                let rc_module = Rc::new(Module {
                     name: name.clone(),
                     definitions,
                     entries: module_validator.entries,
