@@ -28,7 +28,9 @@ pub use crate::linear_memory::{HeapSpec, LinearMemorySpec, SparseData};
 pub use crate::module::{Module, SerializedModule, LUCET_MODULE_SYM};
 pub use crate::module_data::{ModuleData, MODULE_DATA_SYM};
 pub use crate::runtime::InstanceRuntimeData;
-pub use crate::signature::{ModuleSignature, PublicKey};
+pub use crate::signature::ModuleSignature;
+#[cfg(feature = "signature_checking")]
+pub use crate::signature::PublicKey;
 pub use crate::tables::TableElement;
 pub use crate::traps::{TrapCode, TrapManifest, TrapSite};
 pub use crate::types::{Signature, ValueType};

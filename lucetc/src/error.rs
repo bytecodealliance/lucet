@@ -67,4 +67,6 @@ pub enum LucetcErrorKind {
     Signature,
     #[fail(display = "Unsupported")]
     Unsupported,
+    #[fail(display = "Module Signing disabled at compile time")]
+    NoSigningSupport,
 }

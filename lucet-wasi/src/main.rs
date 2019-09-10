@@ -5,7 +5,9 @@ extern crate clap;
 
 use clap::Arg;
 use failure::{format_err, Error};
-use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region, RunResult};
+#[cfg(feature = "signature_checking")]
+use lucet_runtime::PublicKey;
+use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, Region, RunResult};
 use lucet_wasi::{hostcalls, WasiCtxBuilder};
 use std::fs::File;
 use std::path::PathBuf;
@@ -18,6 +20,7 @@ struct Config<'a> {
     preopen_dirs: Vec<(File, &'a str)>,
     limits: Limits,
     verify: bool,
+    #[allow(dead_code)]
     pk_path: Option<PathBuf>,
 }
 
@@ -191,23 +194,37 @@ fn main() {
     run(config)
 }
 
+#[cfg(feature = "signature_checking")]
+fn get_module(config: &Config<'_>) -> Arc<DlModule> {
+    let pk = match (config.verify, config.pk_path) {
+        (false, _) => None,
+        (true, Some(pk_path)) => {
+            Some(PublicKey::from_file(pk_path).expect("public key can be loaded"))
+        }
+        (true, None) => panic!("signature verification requires a public key"),
+    };
+    let module = if let Some(pk) = pk {
+        DlModule::load_and_verify(&config.lucet_module, pk).expect("signed module can be loaded")
+    } else {
+        DlModule::load(&config.lucet_module).expect("module can be loaded")
+    };
+    return module;
+}
+
+#[cfg(not(feature = "signature_checking"))]
+fn get_module(config: &Config<'_>) -> Arc<DlModule> {
+    if config.verify {
+        panic!("Lucet not compiled with signature verification support");
+    }
+    let module = DlModule::load(&config.lucet_module).expect("module can be loaded");
+    return module;
+}
+
 fn run(config: Config<'_>) {
     lucet_wasi::hostcalls::ensure_linked();
     let exitcode = {
         // doing all of this in a block makes sure everything gets dropped before exiting
-        let pk = match (config.verify, config.pk_path) {
-            (false, _) => None,
-            (true, Some(pk_path)) => {
-                Some(PublicKey::from_file(pk_path).expect("public key can be loaded"))
-            }
-            (true, None) => panic!("signature verification requires a public key"),
-        };
-        let module = if let Some(pk) = pk {
-            DlModule::load_and_verify(&config.lucet_module, pk)
-                .expect("signed module can be loaded")
-        } else {
-            DlModule::load(&config.lucet_module).expect("module can be loaded")
-        };
+        let module = get_module(&config);
         let min_globals_size = module.initial_globals_size();
         let globals_size = ((min_globals_size + 4096 - 1) / 4096) * 4096;
 

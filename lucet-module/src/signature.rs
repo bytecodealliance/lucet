@@ -1,17 +1,24 @@
+#[cfg(feature = "signature_checking")]
 use crate::error::Error::{self, IOError, ModuleSignatureError};
 use crate::module::LUCET_MODULE_SYM;
 use crate::module_data::MODULE_DATA_SYM;
+#[cfg(feature = "signature_checking")]
 use crate::ModuleData;
 use byteorder::{ByteOrder, LittleEndian};
+#[cfg(feature = "signature_checking")]
 pub use minisign::{PublicKey, SecretKey};
+#[cfg(feature = "signature_checking")]
 use minisign::{SignatureBones, SignatureBox};
 use object::*;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
+#[cfg(feature = "signature_checking")]
+use std::io::Cursor;
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 pub struct ModuleSignature;
 
+#[cfg(feature = "signature_checking")]
 impl ModuleSignature {
     pub fn verify<P: AsRef<Path>>(
         so_path: P,
@@ -68,12 +75,14 @@ struct SymbolData {
     len: usize,
 }
 
+#[allow(dead_code)]
 struct RawModuleAndData {
     pub obj_bin: Vec<u8>,
     pub module_data_offset: usize,
     pub module_data_len: usize,
 }
 
+#[allow(dead_code)]
 impl RawModuleAndData {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, io::Error> {
         let mut obj_bin: Vec<u8> = Vec::new();

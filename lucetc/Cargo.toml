@@ -43,3 +43,6 @@ human-size = "0.4"
 parity-wasm = "0.38"
 minisign = "0.5.11"
 memoffset = "0.5.1"
+
+[features]
+signature_checking = ["lucet-module/signature_checking"]

@@ -3,9 +3,11 @@ use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, T
 use libc::c_void;
 use libloading::Library;
 use lucet_module::{
-    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, ModuleSignature,
-    PublicKey, SerializedModule, Signature, LUCET_MODULE_SYM,
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, SerializedModule,
+    Signature, LUCET_MODULE_SYM,
 };
+#[cfg(feature = "signature_checking")]
+use lucet_module::{ModuleSignature, PublicKey};
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::path::Path;
@@ -31,18 +33,24 @@ unsafe impl Sync for DlModule {}
 impl DlModule {
     /// Create a module, loading code from a shared object on the filesystem.
     pub fn load<P: AsRef<Path>>(so_path: P) -> Result<Arc<Self>, Error> {
-        Self::load_and_maybe_verify(so_path, None)
+        Self::load_and_maybe_verify(so_path, |_module_data| Ok(()))
     }
 
     /// Create a module, loading code from a shared object on the filesystem
     /// and verifying it using a public key if one has been supplied.
+    #[cfg(feature = "signature_checking")]
     pub fn load_and_verify<P: AsRef<Path>>(so_path: P, pk: PublicKey) -> Result<Arc<Self>, Error> {
-        Self::load_and_maybe_verify(so_path, Some(pk))
+        Self::load_and_maybe_verify(so_path, |module_data| {
+            // Public key has been provided, verify the module signature
+            // The TOCTOU issue is unavoidable without reimplenting `dlopen(3)`
+            ModuleSignature::verify(so_path, &pk, &module_data)
+        })
     }
 
     fn load_and_maybe_verify<P: AsRef<Path>>(
         so_path: P,
-        pk: Option<PublicKey>,
+        verifier: fn(&ModuleData) -> Result<(), Error>,
+        // pk: Option<PublicKey>,
     ) -> Result<Arc<Self>, Error> {
         // Load the dynamic library. The undefined symbols corresponding to the lucet_syscall_
         // functions will be provided by the current executable.  We trust our wasm->dylib compiler
@@ -75,12 +83,7 @@ impl DlModule {
             )
         };
         let module_data = ModuleData::deserialize(module_data_slice)?;
-
-        // If a public key has been provided, verify the module signature
-        // The TOCTOU issue is unavoidable without reimplenting `dlopen(3)`
-        if let Some(pk) = pk {
-            ModuleSignature::verify(so_path, &pk, &module_data)?;
-        }
+        verifier(&module_data)?;
 
         let fbase = if let Some(dli) =
             dladdr(serialized_module as *const SerializedModule as *const c_void)

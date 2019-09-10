@@ -1,4 +1,6 @@
+use crate::error::LucetcErrorKind::NoSigningSupport;
 use failure::*;
+#[cfg(feature = "signature_checking")]
 use lucet_module::ModuleSignature;
 pub use minisign::{KeyPair, PublicKey, SecretKey, SignatureBones, SignatureBox};
 use std::fs::File;
@@ -74,6 +76,12 @@ pub fn verify_source_code(
 }
 
 // Sign the compiled code
+#[cfg(feature = "signature_checking")]
 pub fn sign_module<P: AsRef<Path>>(path: P, sk: &SecretKey) -> Result<(), Error> {
     ModuleSignature::sign(path, sk).map_err(|e| e.into())
+}
+
+#[cfg(not(feature = "signature_checking"))]
+pub fn sign_module<P: AsRef<Path>>(_path: P, _sk: &SecretKey) -> Result<(), Error> {
+    Err(NoSigningSupport).map_err(|e| e.into())
 }

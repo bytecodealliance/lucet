@@ -9,6 +9,7 @@ pub enum Error {
     DeserializationError(#[cause] bincode::Error),
     #[fail(display = "Serialization error: {}", _0)]
     SerializationError(#[cause] bincode::Error),
+    #[cfg(feature = "signature_checking")]
     #[fail(display = "Module signature error: {}", _0)]
     ModuleSignatureError(#[cause] minisign::PError),
     #[fail(display = "I/O error: {}", _0)]
