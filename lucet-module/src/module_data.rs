@@ -7,6 +7,7 @@ use crate::{
     types::Signature,
     Error,
 };
+#[cfg(feature = "signature_checking")]
 use minisign::SignatureBones;
 use serde::{Deserialize, Serialize};
 
@@ -37,6 +38,7 @@ pub struct ModuleData<'a> {
 }
 
 impl<'a> ModuleData<'a> {
+    #[cfg(feature = "signature_checking")]
     pub fn new(
         linear_memory: Option<LinearMemorySpec<'a>>,
         globals_spec: Vec<GlobalSpec<'a>>,
@@ -46,6 +48,27 @@ impl<'a> ModuleData<'a> {
         signatures: Vec<Signature>,
     ) -> Self {
         let module_signature = vec![0u8; SignatureBones::BYTES];
+        Self {
+            linear_memory,
+            globals_spec,
+            function_info,
+            import_functions,
+            export_functions,
+            signatures,
+            module_signature,
+        }
+    }
+
+    #[cfg(not(feature = "signature_checking"))]
+    pub fn new(
+        linear_memory: Option<LinearMemorySpec<'a>>,
+        globals_spec: Vec<GlobalSpec<'a>>,
+        function_info: Vec<FunctionMetadata<'a>>,
+        import_functions: Vec<ImportFunction<'a>>,
+        export_functions: Vec<ExportFunction<'a>>,
+        signatures: Vec<Signature>,
+    ) -> Self {
+        let module_signature = vec![0u8; 0];
         Self {
             linear_memory,
             globals_spec,
@@ -113,6 +136,7 @@ impl<'a> ModuleData<'a> {
         &self.module_signature
     }
 
+    #[cfg(feature = "signature_checking")]
     pub fn patch_module_signature(
         module_data_bin: &'a [u8],
         module_signature: &[u8],
@@ -127,6 +151,7 @@ impl<'a> ModuleData<'a> {
         Ok(patched_module_data_bin)
     }
 
+    #[cfg(feature = "signature_checking")]
     pub fn clear_module_signature(module_data_bin: &'a [u8]) -> Result<Vec<u8>, Error> {
         let module_signature = vec![0u8; SignatureBones::BYTES];
         Self::patch_module_signature(module_data_bin, &module_signature)

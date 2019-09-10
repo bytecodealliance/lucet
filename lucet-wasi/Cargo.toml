@@ -21,6 +21,8 @@ edition = "2018"
 # being part of `WASI_SDK`, or found in a path defined by a
 # `CLANG_ROOT` environment variable.
 [features]
+default = ["signature_checking"]
+signature_checking = ["lucet-module/signature_checking", "lucet-runtime/signature_checking", "lucet-runtime-internals/signature_checking"]
 update-bindings = ["bindgen"]
 
 [dependencies]
