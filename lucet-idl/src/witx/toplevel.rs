@@ -30,8 +30,7 @@ fn parse_witx_with<P: AsRef<Path>>(
     i: P,
     witxio: &dyn WitxIo,
 ) -> Result<Vec<DeclSyntax>, WitxError> {
-    let i_buf = PathBuf::from(i.as_ref());
-    let input_path = witxio.canonicalize(&i_buf)?;
+    let input_path = witxio.canonicalize(&i.as_ref())?;
 
     let input = witxio.fgets(&input_path)?;
 
