@@ -34,7 +34,7 @@ log = "0.4"
 env_logger = "0.6"
 faerie = "0.11.0"
 goblin = "0.0.22"
-object = { version = "0.13.0", default-features = false, features = ["write"] }
+object = { version = "0.14.0", default-features = false, features = ["write"] }
 failure = "0.1"
 byteorder = "1.2"
 wasmonkey = { path = "../lucet-builtins/wasmonkey", version = "0.1.7" }
