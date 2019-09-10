@@ -27,10 +27,8 @@ pub enum WitxError {
     Io(PathBuf, #[cause] io::Error),
     #[fail(display = "{}", _0)]
     SExpr(#[cause] SExprParseError),
-    #[fail(display = "Invalid use statement at {:?}", _0)]
-    UseInvalid(Location),
-    #[fail(display = "in file {:?}: {}", _0, _1)]
-    Parse(PathBuf, #[cause] ParseError),
+    #[fail(display = "{}", _0)]
+    Parse(#[cause] ParseError),
     #[fail(display = "{}", _0)]
     Validation(#[cause] ValidationError),
 }

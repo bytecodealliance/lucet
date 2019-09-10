@@ -44,6 +44,8 @@ pub enum BuiltinType {
     S16,
     S32,
     S64,
+    F32,
+    F64,
 }
 
 impl BuiltinType {
@@ -58,7 +60,9 @@ impl BuiltinType {
             | SExpr::Word("s8", _)
             | SExpr::Word("s16", _)
             | SExpr::Word("s32", _)
-            | SExpr::Word("s64", _) => true,
+            | SExpr::Word("s64", _)
+            | SExpr::Word("f32", _)
+            | SExpr::Word("f64", _) => true,
             _ => false,
         }
     }
@@ -74,6 +78,8 @@ impl BuiltinType {
             SExpr::Word("s16", _loc) => Ok(BuiltinType::S16),
             SExpr::Word("s32", _loc) => Ok(BuiltinType::S32),
             SExpr::Word("s64", _loc) => Ok(BuiltinType::S64),
+            SExpr::Word("f32", _loc) => Ok(BuiltinType::F32),
+            SExpr::Word("f64", _loc) => Ok(BuiltinType::F64),
             _ => Err(parse_err!(sexpr.location(), "invalid builtin type")),
         }
     }

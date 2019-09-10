@@ -4,10 +4,6 @@ use super::WitxError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub fn parse_witx<P: AsRef<Path>>(i: P) -> Result<Vec<DeclSyntax>, WitxError> {
-    parse_witx_with(i, &Filesystem)
-}
-
 trait WitxIo {
     fn fgets(&self, path: &Path) -> Result<String, WitxError>;
     fn canonicalize(&self, path: &Path) -> Result<PathBuf, WitxError>;
@@ -23,6 +19,10 @@ impl WitxIo for Filesystem {
         path.canonicalize()
             .map_err(|e| WitxError::Io(path.to_path_buf(), e))
     }
+}
+
+pub fn parse_witx<P: AsRef<Path>>(i: P) -> Result<Vec<DeclSyntax>, WitxError> {
+    parse_witx_with(i, &Filesystem)
 }
 
 fn parse_witx_with<P: AsRef<Path>>(
@@ -50,7 +50,7 @@ fn parse_toplevel(source_text: &str, file_path: &Path) -> Result<Vec<TopLevelSyn
         .iter()
         .map(|s| TopLevelSyntax::parse(s))
         .collect::<Result<Vec<TopLevelSyntax>, ParseError>>()
-        .map_err(|e| WitxError::Parse(file_path.into(), e))?;
+        .map_err(WitxError::Parse)?;
     Ok(top_levels)
 }
 
@@ -67,9 +67,6 @@ fn resolve_uses(
             TopLevelSyntax::Decl(d) => decls.push(d),
             TopLevelSyntax::Use(u) => {
                 let u_path = PathBuf::from(&u.name);
-                if u_path.is_absolute() {
-                    Err(WitxError::UseInvalid(u.location.clone()))?;
-                }
                 let mut abs_path = PathBuf::from(search_path);
                 abs_path.push(u_path.clone());
                 let abs_path = witxio.canonicalize(&abs_path)?;
@@ -95,6 +92,7 @@ fn resolve_uses(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::witx::Location;
     use std::collections::HashMap;
 
     struct MockFs {
@@ -114,7 +112,11 @@ mod test {
             if let Some(entry) = self.map.get(path.to_str().unwrap()) {
                 Ok(entry.to_string())
             } else {
-                Err(WitxError::Io(path.to_path_buf(), panic!("idk!!!")))
+                use std::io::{Error, ErrorKind};
+                Err(WitxError::Io(
+                    path.to_path_buf(),
+                    Error::new(ErrorKind::Other, "mock fs: file not found"),
+                ))
             }
         }
         fn canonicalize(&self, path: &Path) -> Result<PathBuf, WitxError> {
@@ -132,7 +134,7 @@ mod test {
     }
 
     #[test]
-    fn one_include() {
+    fn one_use() {
         assert_eq!(
             parse_witx_with(
                 &Path::new("/a"),
@@ -141,5 +143,108 @@ mod test {
             .expect("parse"),
             Vec::new(),
         );
+    }
+
+    #[test]
+    fn multi_use() {
+        use crate::witx::parser::*;
+        assert_eq!(
+            parse_witx_with(
+                &Path::new("/a"),
+                &MockFs::new(vec![
+                    ("/a", "(use \"b\")"),
+                    ("/b", "(use \"c\")\n(typename $b_float f64)"),
+                    ("/c", "(typename $c_int u32)")
+                ])
+            )
+            .expect("parse"),
+            vec![
+                DeclSyntax::Typename(TypenameSyntax {
+                    ident: IdentSyntax {
+                        name: "c_int".to_owned(),
+                        location: Location {
+                            path: PathBuf::from("/c"),
+                            line: 1,
+                            column: 10,
+                        }
+                    },
+                    def: TypedefSyntax::Ident(DatatypeIdentSyntax::Builtin(BuiltinType::U32))
+                }),
+                DeclSyntax::Typename(TypenameSyntax {
+                    ident: IdentSyntax {
+                        name: "b_float".to_owned(),
+                        location: Location {
+                            path: PathBuf::from("/b"),
+                            line: 2,
+                            column: 10,
+                        }
+                    },
+                    def: TypedefSyntax::Ident(DatatypeIdentSyntax::Builtin(BuiltinType::F64))
+                })
+            ],
+        );
+    }
+
+    #[test]
+    fn diamond_dependency() {
+        use crate::witx::parser::*;
+        assert_eq!(
+            parse_witx_with(
+                &Path::new("/a"),
+                &MockFs::new(vec![
+                    ("/a", "(use \"b\")\n(use \"c\")"),
+                    ("/b", "(use \"d\")"),
+                    ("/c", "(use \"d\")"),
+                    ("/d", "(typename $d_char u8)")
+                ])
+            )
+            .expect("parse"),
+            vec![DeclSyntax::Typename(TypenameSyntax {
+                ident: IdentSyntax {
+                    name: "d_char".to_owned(),
+                    location: Location {
+                        path: PathBuf::from("/d"),
+                        line: 1,
+                        column: 10,
+                    }
+                },
+                def: TypedefSyntax::Ident(DatatypeIdentSyntax::Builtin(BuiltinType::U8))
+            })],
+        );
+    }
+
+    #[test]
+    fn use_not_found() {
+        match parse_witx_with(&Path::new("/a"), &MockFs::new(vec![("/a", "(use \"b\")")]))
+            .err()
+            .unwrap()
+        {
+            WitxError::Io(path, _error) => assert_eq!(path, PathBuf::from("/b")),
+            e => panic!("wrong error: {:?}", e),
+        }
+    }
+
+    #[test]
+    fn use_invalid() {
+        match parse_witx_with(
+            &Path::new("/a"),
+            &MockFs::new(vec![("/a", "(use bbbbbbb)")]),
+        )
+        .err()
+        .unwrap()
+        {
+            WitxError::Parse(e) => {
+                assert_eq!(e.message, "invalid use declaration");
+                assert_eq!(
+                    e.location,
+                    Location {
+                        path: PathBuf::from("/a"),
+                        line: 1,
+                        column: 1
+                    }
+                );
+            }
+            e => panic!("wrong error: {:?}", e),
+        }
     }
 }
