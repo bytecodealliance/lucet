@@ -13,11 +13,11 @@ struct Filesystem;
 
 impl WitxIo for Filesystem {
     fn fgets(&self, path: &Path) -> Result<String, WitxError> {
-        fs::read_to_string(path).map_err(|e| WitxError::Io(path.to_path_buf(), e))
+        fs::read_to_string(path).map_err(|e| WitxError::UseResolution(path.to_path_buf(), e))
     }
     fn canonicalize(&self, path: &Path) -> Result<PathBuf, WitxError> {
         path.canonicalize()
-            .map_err(|e| WitxError::Io(path.to_path_buf(), e))
+            .map_err(|e| WitxError::UseResolution(path.to_path_buf(), e))
     }
 }
 
@@ -113,7 +113,7 @@ mod test {
                 Ok(entry.to_string())
             } else {
                 use std::io::{Error, ErrorKind};
-                Err(WitxError::Io(
+                Err(WitxError::UseResolution(
                     path.to_path_buf(),
                     Error::new(ErrorKind::Other, "mock fs: file not found"),
                 ))
@@ -219,7 +219,7 @@ mod test {
             .err()
             .unwrap()
         {
-            WitxError::Io(path, _error) => assert_eq!(path, PathBuf::from("/b")),
+            WitxError::UseResolution(path, _error) => assert_eq!(path, PathBuf::from("/b")),
             e => panic!("wrong error: {:?}", e),
         }
     }

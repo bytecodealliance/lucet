@@ -1,6 +1,19 @@
 use super::sexpr::SExpr;
 use super::Location;
 
+///! Parser turns s-expressions into unvalidated syntax constructs.
+///! conventions:
+///! `Type::starts_parsing(s-expr) -> bool` is for look-ahead: we use
+///! this predicate to combine parsers for different `Type`s where both
+///! alternatives are accepted.
+///! `Type::parse(sexpr: &SExpr) -> Result<Self, ParseError>` takes a single
+///! s-expression and parses it into a `Self`.
+///! for parsers that take a subset of a vector s-expression, the signature
+///! `Type::parse(sexprs: &[SExpr], location: Location) -> Result<Self, ParseError>`
+///! has an additional `Location` argument, which should point to the parent SExpr::Vec.
+///! This is used for error reporting in case the slice doesn't have the number of elements
+///! expected.
+
 #[derive(Debug, Fail)]
 #[fail(display = "{} at {:?}", _0, _1)]
 pub struct ParseError {

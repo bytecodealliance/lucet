@@ -2,6 +2,17 @@ use super::Location;
 use std::path::{Path, PathBuf};
 use std::str::CharIndices;
 
+///! The lexer turns a string into a stream of located tokens.
+///! The tokens are meant for consumption by the s-expression parser.
+///!
+///! Comments in source text look like `;; rest of line ...`.
+///! Words look like `abcde_`
+///! Idents look like `$abcde_`
+///! Annotations look like `@abcde_`
+///! Quotes look like `"a b cde 123 @#$%^&*() _"`
+///!
+///! This implementation was heavily influenced by `cranelift-reader`
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Token<'a> {
     LPar,           // (

@@ -1,7 +1,3 @@
-#![allow(unused_variables)] // WIP
-#![allow(unused_imports)] // WIP
-#![allow(dead_code)] // WIP
-
 use super::ast::{
     AliasDatatype, BuiltinType, Datatype, DatatypeIdent, DatatypeVariant, Definition, Document,
     Entry, EnumDatatype, FlagsDatatype, Id, IntRepr, InterfaceFunc, InterfaceFuncParam, ModuleDef,
@@ -9,13 +5,12 @@ use super::ast::{
     UnionDatatype, UnionVariant,
 };
 use super::parser::{
-    DatatypeIdentSyntax, DeclSyntax, EnumSyntax, FieldSyntax, FlagsSyntax, IdentSyntax,
-    ImportTypeSyntax, InterfaceFuncSyntax, ModuleDeclSyntax, ModuleImportSyntax, ModuleSyntax,
-    StructSyntax, TypedefSyntax, TypenameSyntax, UnionSyntax,
+    DatatypeIdentSyntax, DeclSyntax, EnumSyntax, FlagsSyntax, IdentSyntax, ImportTypeSyntax,
+    ModuleDeclSyntax, StructSyntax, TypedefSyntax, UnionSyntax,
 };
 use super::Location;
 use std::collections::HashMap;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 #[derive(Debug, Fail)]
 pub enum ValidationError {
@@ -238,7 +233,7 @@ impl DocValidation {
         &self,
         name: &Id,
         syntax: &StructSyntax,
-        location: &Location,
+        _location: &Location,
     ) -> Result<StructDatatype, ValidationError> {
         let mut member_scope = IdentValidation::new();
         let members = syntax
@@ -262,7 +257,7 @@ impl DocValidation {
         &self,
         name: &Id,
         syntax: &UnionSyntax,
-        location: &Location,
+        _location: &Location,
     ) -> Result<UnionDatatype, ValidationError> {
         let mut variant_scope = IdentValidation::new();
         let variants = syntax

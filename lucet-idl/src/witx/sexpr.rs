@@ -3,6 +3,10 @@ use super::lexer::{Lexer, LocatedError, LocatedToken, Token};
 use super::Location;
 use std::path::{Path, PathBuf};
 
+///! The s-expression parser turns a string into a stream of SExprs.
+///! It uses the `Lexer` under the hood.
+///! This implementation was heavily influenced by `cranelift-reader`
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SExpr<'a> {
     Vec(Vec<SExpr<'a>>, Location),

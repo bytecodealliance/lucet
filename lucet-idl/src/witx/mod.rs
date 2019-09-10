@@ -1,8 +1,14 @@
+/// Types describing a validated witx document
 pub mod ast;
+/// Lexer text into tokens
 mod lexer;
+/// Witx syntax parsing from SExprs
 mod parser;
+/// SExpr parsing from tokens
 mod sexpr;
+/// Resolve toplevel `use` declarations across files
 mod toplevel;
+/// Validate declarations into ast
 mod validate;
 
 pub use ast::Document;
@@ -14,6 +20,7 @@ pub use validate::{validate_document, ValidationError};
 use std::io;
 use std::path::{Path, PathBuf};
 
+/// Location in the source text
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Location {
     pub path: PathBuf,
@@ -23,10 +30,10 @@ pub struct Location {
 
 #[derive(Debug, Fail)]
 pub enum WitxError {
-    #[fail(display = "with file {:?}: {}", _0, _1)]
-    Io(PathBuf, #[cause] io::Error),
     #[fail(display = "{}", _0)]
     SExpr(#[cause] SExprParseError),
+    #[fail(display = "when resolving use declaration for {:?}: {}", _0, _1)]
+    UseResolution(PathBuf, #[cause] io::Error),
     #[fail(display = "{}", _0)]
     Parse(#[cause] ParseError),
     #[fail(display = "{}", _0)]
