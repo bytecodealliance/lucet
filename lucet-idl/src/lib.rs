@@ -33,7 +33,7 @@ use crate::c::CGenerator;
 use crate::parser::Parser;
 use crate::rust::RustGenerator;
 use crate::validate::package_from_declarations;
-use crate::witx::load_witx;
+pub use crate::witx::load_witx;
 use lucet_module::bindings::Bindings;
 use std::collections::HashMap;
 use std::fs;
