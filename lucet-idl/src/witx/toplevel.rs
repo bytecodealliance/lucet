@@ -38,10 +38,7 @@ fn parse_witx_with<P: AsRef<Path>>(
     let toplevel = parse_toplevel(&input, &input_path)?;
     let mut resolved = HashSet::new();
     resolved.insert(input_path.clone());
-    let search_path = input_path
-        .parent()
-        .map(PathBuf::from)
-        .unwrap_or(PathBuf::from("."));
+    let search_path = input_path.parent().unwrap_or(Path::new("."));
     resolve_uses(toplevel, &search_path, &mut resolved, witxio)
 }
 
