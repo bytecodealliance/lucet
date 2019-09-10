@@ -121,12 +121,14 @@ impl<'a> Compiler<'a> {
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
             let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
-            let mut clif_context = ClifContext::new();
-            clif_context.func.name = func.name.as_externalname();
-            clif_context.func.signature = func.signature.clone();
 
-            func_translator
-                .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
+            let mut empty_func = ir::Function::new();
+            empty_func.name = func.name.as_externalname();
+            empty_func.signature = func.signature.clone();
+
+            let mut clif_context = ClifContext::new();
+            clif_context.func = func_translator
+                .translate(code, *code_offset, empty_func, &mut func_info)
                 .map_err(|e| format_err!("in {}: {:?}", func.name.symbol(), e))
                 .context(LucetcErrorKind::FunctionTranslation)?;
 
@@ -176,12 +178,14 @@ impl<'a> Compiler<'a> {
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
             let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
-            let mut clif_context = ClifContext::new();
-            clif_context.func.name = func.name.as_externalname();
-            clif_context.func.signature = func.signature.clone();
 
-            func_translator
-                .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
+            let mut empty_func = ir::Function::new();
+            empty_func.name = func.name.as_externalname();
+            empty_func.signature = func.signature.clone();
+
+            let mut clif_context = ClifContext::new();
+            clif_context.func = func_translator
+                .translate(code, *code_offset, empty_func, &mut func_info)
                 .map_err(|e| format_err!("in {}: {:?}", func.name.symbol(), e))
                 .context(LucetcErrorKind::FunctionTranslation)?;
 

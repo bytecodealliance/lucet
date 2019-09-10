@@ -118,7 +118,7 @@ impl<'a> FuncInfo<'a> {
                 (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
                     + offset_of!(InstanceRuntimeData, instruction_count) as i32)
                     .into();
-            let vmctx_gv = environ.get_vmctx(builder.func);
+            let vmctx_gv = environ.get_vmctx(&mut builder.func);
             let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
             let trusted_mem = ir::MemFlags::trusted();
 
