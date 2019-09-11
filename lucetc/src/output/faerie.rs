@@ -2,13 +2,13 @@ use crate::error::LucetcErrorKind;
 use crate::name::Name;
 use crate::output::FUNCTION_MANIFEST_SYM;
 use crate::pointer::NATIVE_POINTER_SIZE;
-use crate::stack_probe::{STACK_PROBE_BINARY, STACK_PROBE_SYM};
+use crate::stack_probe::{self, STACK_PROBE_BINARY, STACK_PROBE_SYM};
 use crate::table::{TABLE_REF_SIZE, TABLE_SYM};
 use crate::traps::{translate_trapcode, trap_sym_for_func};
 use lucet_module::{FunctionSpec, TrapSite, LUCET_MODULE_SYM, MODULE_DATA_SYM};
 
 use byteorder::{LittleEndian, WriteBytesExt};
-use cranelift_codegen::{binemit::TrapSink, ir};
+use cranelift_codegen::binemit::TrapSink;
 use cranelift_faerie::{
     traps::{FaerieTrapManifest, FaerieTrapSink},
     FaerieProduct,
@@ -75,8 +75,8 @@ impl FaerieFile {
         }
 
         obj.write_trap_tables(trap_manifest)?;
-        obj.write_function_manifest(function_manifest.as_slice())?;
-        obj.link_tables(table_manifest.as_slice())?;
+        obj.write_function_manifest(&function_manifest)?;
+        obj.link_tables(&table_manifest)?;
 
         // And now write out the actual structure tying together all the data in this module.
         obj.write_module(
@@ -102,16 +102,9 @@ impl FaerieFile {
         {
             let mut stack_probe_trap_sink =
                 FaerieTrapSink::new(STACK_PROBE_SYM, STACK_PROBE_BINARY.len() as u32);
-            stack_probe_trap_sink.trap(
-                10, /* test %rsp,0x8(%rsp) */
-                ir::SourceLoc::default(),
-                ir::TrapCode::StackOverflow,
-            );
-            stack_probe_trap_sink.trap(
-                34, /* test %rsp,0x8(%rsp) */
-                ir::SourceLoc::default(),
-                ir::TrapCode::StackOverflow,
-            );
+            stack_probe::trap_sites()
+                .iter()
+                .for_each(|t| stack_probe_trap_sink.trap(t.offset, t.srcloc, t.code));
             traps.add_sink(stack_probe_trap_sink);
         }
 
