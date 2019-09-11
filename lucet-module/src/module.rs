@@ -1,12 +1,14 @@
 use crate::functions::FunctionSpec;
 use crate::module_data::ModuleData;
 use crate::tables::TableElement;
+use crate::version_info::VersionInfo;
 
 pub const LUCET_MODULE_SYM: &str = "lucet_module";
 
 /// Module is the exposed structure that contains all the data backing a Lucet-compiled object.
 #[derive(Debug)]
 pub struct Module<'a> {
+    pub version: VersionInfo,
     pub module_data: ModuleData<'a>,
     pub tables: &'a [&'a [TableElement]],
     pub function_manifest: &'a [FunctionSpec],
@@ -18,6 +20,7 @@ pub struct Module<'a> {
 #[repr(C)]
 #[derive(Debug)]
 pub struct SerializedModule {
+    pub version: VersionInfo,
     pub module_data_ptr: u64,
     pub module_data_len: u64,
     pub tables_ptr: u64,
