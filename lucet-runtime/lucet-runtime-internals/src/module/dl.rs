@@ -4,7 +4,7 @@ use libc::c_void;
 use libloading::Library;
 use lucet_module::{
     FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, ModuleSignature,
-    PublicKey, SerializedModule, Signature, LUCET_MODULE_SYM,
+    PublicKey, SerializedModule, Signature, VersionInfo, LUCET_MODULE_SYM,
 };
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -61,6 +61,21 @@ impl DlModule {
         let serialized_module: &SerializedModule =
             unsafe { serialized_module_ptr.as_ref().unwrap() };
 
+        let version = serialized_module.version.clone();
+
+        let runtime_version =
+            VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
+
+        if !version.valid() {
+            return Err(lucet_incorrect_module!("reserved bit is not set. This module is likely too old for this lucet-runtime to load."));
+        } else if version != runtime_version {
+            return Err(lucet_incorrect_module!(
+                "version mismatch. module has version {}, while this runtime is version {}",
+                version,
+                runtime_version,
+            ));
+        }
+
         // Deserialize the slice into ModuleData, which will hold refs into the loaded
         // shared object file in `module_data_slice`. Both of these get a 'static lifetime because
         // Rust doesn't have a safe way to describe that their lifetime matches the containing
@@ -115,6 +130,7 @@ impl DlModule {
             lib,
             fbase,
             module: lucet_module::Module {
+                version,
                 module_data,
                 tables,
                 function_manifest,

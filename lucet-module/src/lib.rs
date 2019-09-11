@@ -17,6 +17,7 @@ mod signature;
 mod tables;
 mod traps;
 mod types;
+mod version_info;
 
 pub use crate::error::Error;
 pub use crate::functions::{
@@ -32,6 +33,7 @@ pub use crate::signature::{ModuleSignature, PublicKey};
 pub use crate::tables::TableElement;
 pub use crate::traps::{TrapCode, TrapManifest, TrapSite};
 pub use crate::types::{Signature, ValueType};
+pub use crate::version_info::VersionInfo;
 
 /// Owned variants of the module data types, useful for serialization and testing.
 pub mod owned {

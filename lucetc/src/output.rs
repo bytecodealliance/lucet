@@ -10,7 +10,7 @@ use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
 use failure::{format_err, Error, ResultExt};
-use lucet_module::{FunctionSpec, LUCET_MODULE_SYM, MODULE_DATA_SYM};
+use lucet_module::{FunctionSpec, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Cursor, Write};
@@ -136,9 +136,14 @@ fn write_module(
     function_manifest_len: usize,
     obj: &mut Artifact,
 ) -> Result<(), Error> {
-    let mut native_data = Cursor::new(Vec::with_capacity(NATIVE_POINTER_SIZE * 4));
+    let mut native_data = Cursor::new(Vec::with_capacity(16 + NATIVE_POINTER_SIZE * 4));
     obj.declare(LUCET_MODULE_SYM, Decl::data().global())
         .context(format!("declaring {}", LUCET_MODULE_SYM))?;
+
+    let version =
+        VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
+
+    version.write_to(&mut native_data)?;
 
     write_relocated_slice(
         obj,

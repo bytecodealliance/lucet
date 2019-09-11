@@ -1,8 +1,9 @@
 use crate::error::Error::{self, IOError, ModuleSignatureError};
-use crate::module::LUCET_MODULE_SYM;
+use crate::module::{SerializedModule, LUCET_MODULE_SYM};
 use crate::module_data::MODULE_DATA_SYM;
 use crate::ModuleData;
 use byteorder::{ByteOrder, LittleEndian};
+use memoffset::offset_of;
 pub use minisign::{PublicKey, SecretKey};
 use minisign::{SignatureBones, SignatureBox};
 use object::*;
@@ -94,8 +95,10 @@ impl RawModuleAndData {
                 format!("`{}` symbol not present", MODULE_DATA_SYM),
             ))?;
 
-        let module_data_len =
-            LittleEndian::read_u64(&obj_bin[(native_data_symbol_data.offset + 8)..]) as usize;
+        let module_data_len = LittleEndian::read_u64(
+            &obj_bin[(native_data_symbol_data.offset
+                + offset_of!(SerializedModule, module_data_len))..],
+        ) as usize;
 
         Ok(RawModuleAndData {
             obj_bin,

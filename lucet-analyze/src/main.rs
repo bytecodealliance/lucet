@@ -2,6 +2,7 @@
 
 use lucet_module::{
     FunctionSpec, Module, ModuleData, SerializedModule, TableElement, TrapManifest, TrapSite,
+    VersionInfo,
 };
 
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -102,7 +103,10 @@ impl<'a> ArtifactSummary<'a> {
                 .unwrap();
             let mut rdr = Cursor::new(buffer);
 
+            let version = VersionInfo::read_from(&mut rdr).unwrap();
+
             SerializedModule {
+                version,
                 module_data_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
                 module_data_len: rdr.read_u64::<LittleEndian>().unwrap(),
                 tables_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
@@ -211,6 +215,7 @@ fn load_module<'b, 'a: 'b>(
         )
     };
     Module {
+        version: serialized_module.version.clone(),
         module_data,
         tables,
         function_manifest,
