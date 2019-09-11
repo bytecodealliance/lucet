@@ -1,26 +1,21 @@
 use lucet_idl;
 use std::fs::File;
-use std::io::prelude::*;
+use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
 
 #[test]
 fn compile_c_guest() {
-    let mut source = String::new();
-    File::open("tests/example.idl")
-        .expect("open example.idl")
-        .read_to_string(&mut source)
-        .expect("read example.idl");
-
     let config = lucet_idl::Config {
         backend: lucet_idl::Backend::CGuest,
+        witx: false,
     };
 
     let tempdir = TempDir::new().expect("create tempdir");
 
     lucet_idl::run(
         &config,
-        &source,
+        Path::new("tests/example.idl"),
         Box::new(File::create(tempdir.path().join("example.h")).expect("create file")),
     )
     .expect("run lucet_idl");
@@ -53,13 +48,10 @@ fn compile_and_test_rust_host() {
 */
 
 fn compile_and_test_rust(backend: lucet_idl::Backend) {
-    let mut source = String::new();
-    File::open("tests/example.idl")
-        .expect("open example.idl")
-        .read_to_string(&mut source)
-        .expect("read example.idl");
-
-    let config = lucet_idl::Config { backend };
+    let config = lucet_idl::Config {
+        backend,
+        witx: false,
+    };
 
     let tempdir = TempDir::new().expect("create tempdir");
 
@@ -67,7 +59,7 @@ fn compile_and_test_rust(backend: lucet_idl::Backend) {
 
     lucet_idl::run(
         &config,
-        &source,
+        Path::new("tests/example.idl"),
         Box::new(File::create(gen_file.clone()).expect("create file")),
     )
     .expect("run lucet_idl");

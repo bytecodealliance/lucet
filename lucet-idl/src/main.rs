@@ -39,6 +39,13 @@ impl ExeConfig {
                     .required(false)
                     .help("output path"),
             )
+            .arg(
+                Arg::with_name("witx")
+                    .long("witx")
+                    .takes_value(false)
+                    .required(false)
+                    .help("witx (interface-types, with extensions) mode"),
+            )
             .get_matches();
         let input_path = PathBuf::from(
             matches
@@ -46,7 +53,10 @@ impl ExeConfig {
                 .ok_or(IDLError::UsageError("Input file required".to_owned()))?,
         );
         let output_path = matches.value_of("output").map(PathBuf::from);
-        let config = Config::parse(matches.value_of("backend").unwrap())?;
+        let config = Config::parse(
+            matches.is_present("witx"),
+            matches.value_of("backend").unwrap(),
+        )?;
         Ok(ExeConfig {
             input_path,
             output_path,
@@ -64,7 +74,7 @@ fn doit() -> Result<(), IDLError> {
         None => Box::new(io::stdout()),
     };
 
-    run(&exe_config.config, &source, output)?;
+    run(&exe_config.config, &exe_config.input_path, output)?;
 
     Ok(())
 }
