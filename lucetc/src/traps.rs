@@ -1,42 +1,4 @@
 use cranelift_codegen::ir;
-use cranelift_faerie::traps::FaerieTrapManifest;
-
-use faerie::{Artifact, Decl};
-use failure::{Error, ResultExt};
-use lucet_module::TrapSite;
-
-pub fn write_trap_tables(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> Result<(), Error> {
-    for sink in manifest.sinks.iter() {
-        let func_sym = &sink.name;
-        let trap_sym = trap_sym_for_func(func_sym);
-
-        obj.declare(&trap_sym, Decl::data())
-            .context(format!("declaring {}", &trap_sym))?;
-
-        // write the actual function-level trap table
-        let traps: Vec<TrapSite> = sink
-            .sites
-            .iter()
-            .map(|site| TrapSite {
-                offset: site.offset,
-                code: translate_trapcode(site.code),
-            })
-            .collect();
-
-        let trap_site_bytes = unsafe {
-            std::slice::from_raw_parts(
-                traps.as_ptr() as *const u8,
-                traps.len() * std::mem::size_of::<TrapSite>(),
-            )
-        };
-
-        // and write the function trap table into the object
-        obj.define(&trap_sym, trap_site_bytes.to_vec())
-            .context(format!("defining {}", &trap_sym))?;
-    }
-
-    Ok(())
-}
 
 pub(crate) fn trap_sym_for_func(sym: &str) -> String {
     return format!("lucet_trap_table_{}", sym);
@@ -49,7 +11,7 @@ pub(crate) fn trap_sym_for_func(sym: &str) -> String {
 //
 // Not all types have subtypes. Currently, only the user User type has a
 // subtype.
-fn translate_trapcode(code: ir::TrapCode) -> lucet_module::TrapCode {
+pub(crate) fn translate_trapcode(code: ir::TrapCode) -> lucet_module::TrapCode {
     match code {
         ir::TrapCode::StackOverflow => lucet_module::TrapCode::StackOverflow,
         ir::TrapCode::HeapOutOfBounds => lucet_module::TrapCode::HeapOutOfBounds,

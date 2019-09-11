@@ -3,7 +3,7 @@ use crate::error::{LucetcError, LucetcErrorKind};
 use crate::function::FuncInfo;
 use crate::heap::HeapSettings;
 use crate::module::ModuleInfo;
-use crate::output::{CraneliftFuncs, ObjectFile};
+use crate::output::{CraneliftFuncs, FaerieFile};
 use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
@@ -116,7 +116,7 @@ impl<'a> Compiler<'a> {
         self.decls.get_module_data()
     }
 
-    pub fn object_file(mut self) -> Result<ObjectFile, LucetcError> {
+    pub fn object_file(mut self) -> Result<FaerieFile, LucetcError> {
         let mut func_translator = FuncTranslator::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
@@ -160,7 +160,7 @@ impl<'a> Compiler<'a> {
             })
             .collect();
 
-        let obj = ObjectFile::new(
+        let obj = FaerieFile::new(
             self.clif_module.finish(),
             module_data_len,
             function_manifest,

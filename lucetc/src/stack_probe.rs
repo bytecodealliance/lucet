@@ -10,14 +10,9 @@
 
 use crate::decls::ModuleDecls;
 use crate::module::UniqueFuncIndex;
-use cranelift_codegen::binemit::TrapSink;
-use cranelift_codegen::ir;
 use cranelift_codegen::ir::{types, AbiParam, Signature};
 use cranelift_codegen::isa::CallConv;
-use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
-use cranelift_faerie::FaerieProduct;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
-use faerie::Decl;
 use failure::Error;
 
 /// Stack probe symbol name
@@ -56,35 +51,4 @@ pub fn declare_metadata<'a, B: ClifBackend>(
             },
         )
         .unwrap())
-}
-
-pub fn declare_and_define(product: &mut FaerieProduct) -> Result<(), Error> {
-    product.artifact.declare_with(
-        STACK_PROBE_SYM,
-        Decl::function(),
-        STACK_PROBE_BINARY.to_vec(),
-    )?;
-    add_sink(
-        product
-            .trap_manifest
-            .as_mut()
-            .expect("trap manifest is present"),
-    );
-    Ok(())
-}
-
-fn add_sink(manifest: &mut FaerieTrapManifest) {
-    let mut stack_probe_trap_sink =
-        FaerieTrapSink::new(STACK_PROBE_SYM, STACK_PROBE_BINARY.len() as u32);
-    stack_probe_trap_sink.trap(
-        10, /* test %rsp,0x8(%rsp) */
-        ir::SourceLoc::default(),
-        ir::TrapCode::StackOverflow,
-    );
-    stack_probe_trap_sink.trap(
-        34, /* test %rsp,0x8(%rsp) */
-        ir::SourceLoc::default(),
-        ir::TrapCode::StackOverflow,
-    );
-    manifest.add_sink(stack_probe_trap_sink);
 }
