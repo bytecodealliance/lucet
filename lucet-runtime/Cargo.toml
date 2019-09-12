@@ -10,7 +10,7 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-libc = "=0.2.59"
+libc = "0.2.65"
 lucet-runtime-internals = { path = "lucet-runtime-internals", version = "0.4.1" }
 lucet-module = { path = "../lucet-module", version = "0.4.1" }
 num-traits = "0.2"

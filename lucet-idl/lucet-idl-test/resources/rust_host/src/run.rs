@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 pub fn run(module_path: PathBuf) -> Result<(), Error> {
-    lucet_wasi::hostcalls::ensure_linked();
+    lucet_wasi::export_wasi_funcs();
     idl::ensure_linked();
 
     let module = DlModule::load(&module_path)?;
@@ -22,7 +22,9 @@ pub fn run(module_path: PathBuf) -> Result<(), Error> {
     )?;
 
     let ctx = WasiCtxBuilder::new()
+        .expect("create new wasi context")
         .inherit_stdio()
+        .expect("inherit stdio")
         .build()
         .expect("create empty wasi ctx");
 
