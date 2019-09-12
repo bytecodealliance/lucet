@@ -52,7 +52,7 @@ enum Config {
 
 fn main() {
     lucet_runtime::lucet_internal_ensure_linked();
-    lucet_wasi::hostcalls::ensure_linked();
+    lucet_wasi::export_wasi_funcs();
 
     match Config::from_args() {
         Config::Fuzz { num_tests } => run_many(num_tests),
@@ -364,7 +364,10 @@ fn run_with_stdout<P: AsRef<Path>>(
     tmpdir: &TempDir,
     path: P,
 ) -> Result<(__wasi_exitcode_t, Vec<u8>), Error> {
-    let ctx = WasiCtxBuilder::new().args(&["gen"]);
+    let ctx = WasiCtxBuilder::new()
+        .map_err(|_| format_err!("WasiCtxBuilder"))?
+        .args(["gen"].iter())
+        .map_err(|_| format_err!("args"))?;
 
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 

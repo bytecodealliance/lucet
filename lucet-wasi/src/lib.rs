@@ -2,12 +2,8 @@
 
 mod bindings;
 pub mod c_api;
-pub mod ctx;
-pub mod fdentry;
-pub mod host;
-pub mod hostcalls;
-pub mod memory;
-pub mod wasm32;
+pub mod wasi;
 
 pub use bindings::bindings;
-pub use ctx::{WasiCtx, WasiCtxBuilder};
+pub use wasi::host;
+pub use wasi::{export_wasi_funcs, WasiCtx, WasiCtxBuilder};

@@ -565,6 +565,17 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "filetime"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.59 (registry+https://github.com/rust-lang/crates.io-index)",
+ "redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -945,9 +956,8 @@ dependencies = [
  "lucet-runtime-internals 0.1.1",
  "lucet-wasi-sdk 0.1.1",
  "lucetc 0.1.1",
- "nix 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wasi-common 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1907,6 +1917,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasi-common"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "filetime 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.59 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nix 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wasi-common-cbindgen 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winx 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "wasi-common-cbindgen"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.15.44 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "wasmonkey"
 version = "0.1.8"
 dependencies = [
@@ -1994,6 +2030,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "winx"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "witx-frontend"
 version = "0.1.0"
 dependencies = [
@@ -2061,6 +2106,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "795bd83d3abeb9220f257e597aa0080a508b27533824adf336529648f6abf7e2"
 "checksum failure_derive 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "ea1063915fd7ef4309e222a5a07cf9c319fb9c7836b1f89b85458672dbb127e1"
 "checksum fake-simd 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
+"checksum filetime 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "6bd7380b54ced79dda72ecc35cc4fbbd1da6bba54afaa37e96fd1c2a308cd469"
 "checksum flate2 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)" = "2adaffba6388640136149e18ed080b77a78611c1e1d6de75aedcdf78df5d4682"
 "checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
 "checksum fs2 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
@@ -2192,6 +2238,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum wabt-sys 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a6265b25719e82598d104b3717375e37661d41753e2c84cde3f51050c7ed7e3c"
 "checksum wait-timeout 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9f200f5b12eb75f8c1ed65abd4b2db8a6e1b138a20de009dacee265a2498f3f6"
 "checksum walkdir 2.2.9 (registry+https://github.com/rust-lang/crates.io-index)" = "9658c94fa8b940eab2250bd5a457f9c48b748420d71293b165c8cdbe2f55f71e"
+"checksum wasi-common 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "67484e5d746269a5fc335d04680365fa7e1b36e176ead82b552fe7e9d477cc9b"
+"checksum wasi-common-cbindgen 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c47b05228924391490232632488ff30174291a0a0a3c9afb8f61269f55f68722"
 "checksum wasmparser 0.37.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7329e663dfa399d8ad1a31a9358fc777140cd741cea56d154abbc4c9f7edb137"
 "checksum which 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b57acb10231b9493c8472b20cb57317d0679a49e0bdbee44b3b803a6473af164"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
@@ -2202,4 +2250,5 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum winapi-x86_64-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 "checksum wincolor 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "96f5016b18804d24db43cebf3c77269e7569b8954a8464501c216cc5e070eaa9"
 "checksum winconsole 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3ef84b96d10db72dd980056666d7f1e7663ce93d82fa33b63e71c966f4cf5032"
+"checksum winx 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "29b6e1de2f5a4b8d951254b9e12f31f958e37eddae9341a42e9896d161fdde50"
 "checksum xfailure 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "da90eac47bf1d7871b75004b9b631d107df15f37669383b23f0b5297bc7516b6"

@@ -3,13 +3,15 @@
 #[macro_use]
 extern crate clap;
 
+mod wasi;
+
 use clap::Arg;
 use failure::{format_err, Error};
 use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region, RunResult};
-use lucet_wasi::{hostcalls, WasiCtxBuilder};
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
+use wasi::WasiCtxBuilder;
 
 struct Config<'a> {
     lucet_module: &'a str,
@@ -36,8 +38,7 @@ fn parse_humansized(desc: &str) -> Result<u64, Error> {
 fn main() {
     // No-ops, but makes sure the linker doesn't throw away parts
     // of the runtime:
-    lucet_runtime::lucet_internal_ensure_linked();
-    hostcalls::ensure_linked();
+    wasi::export_wasi_funcs();
 
     let matches = app_from_crate!()
         .arg(
@@ -192,7 +193,7 @@ fn main() {
 }
 
 fn run(config: Config<'_>) {
-    lucet_wasi::hostcalls::ensure_linked();
+    wasi::export_wasi_funcs();
     let exitcode = {
         // doing all of this in a block makes sure everything gets dropped before exiting
         let pk = match (config.verify, config.pk_path) {
@@ -225,9 +226,13 @@ fn run(config: Config<'_>) {
             .chain(config.guest_args.into_iter())
             .collect::<Vec<&str>>();
         let mut ctx = WasiCtxBuilder::new()
-            .args(&args)
+            .expect("wasi context can be built")
+            .args(args.iter())
+            .expect("arguments can be stored")
             .inherit_stdio()
-            .inherit_env();
+            .expect("stdio can be inherited")
+            .inherit_env()
+            .expect("environment can be inherited");
         for (dir, guest_path) in config.preopen_dirs {
             ctx = ctx.preopened_dir(dir, guest_path);
         }
@@ -245,7 +250,7 @@ fn run(config: Config<'_>) {
             Err(lucet_runtime::Error::RuntimeTerminated(
                 lucet_runtime::TerminationDetails::Provided(any),
             )) => *any
-                .downcast_ref::<lucet_wasi::host::__wasi_exitcode_t>()
+                .downcast_ref::<wasi::host::__wasi_exitcode_t>()
                 .expect("termination yields an exitcode"),
             Err(e) => panic!("lucet-wasi runtime error: {}", e),
         }

@@ -28,12 +28,11 @@ cast = "0.2"
 clap = "2.23"
 failure = "0.1"
 human-size = "0.4"
-libc = "=0.2.59"
+libc = "0.2.59"
 lucet-runtime = { path = "../lucet-runtime", version = "0.1.1" }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "0.1.1" }
 lucet-module = { path = "../lucet-module", version = "0.1.1" }
-nix = "0.13"
-rand = "0.6"
+wasi-common = "0.2.0"
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.1.1" }
