@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-pub use super::parser::BuiltinType;
+pub use crate::parser::BuiltinType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Id(String);

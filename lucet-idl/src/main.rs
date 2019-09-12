@@ -16,7 +16,7 @@ pub struct ExeConfig {
 impl ExeConfig {
     pub fn parse() -> Result<Self, IDLError> {
         let matches = App::new("lucet-idl")
-            .version("0.1.0")
+            .version(env!("CARGO_PKG_VERSION"))
             .about("lucet_idl code generator")
             .arg(
                 Arg::with_name("input")
@@ -39,13 +39,6 @@ impl ExeConfig {
                     .required(false)
                     .help("output path"),
             )
-            .arg(
-                Arg::with_name("witx")
-                    .long("witx")
-                    .takes_value(false)
-                    .required(false)
-                    .help("witx (interface-types, with extensions) mode"),
-            )
             .get_matches();
         let input_path = PathBuf::from(
             matches
@@ -53,10 +46,7 @@ impl ExeConfig {
                 .ok_or(IDLError::UsageError("Input file required".to_owned()))?,
         );
         let output_path = matches.value_of("output").map(PathBuf::from);
-        let config = Config::parse(
-            matches.is_present("witx"),
-            matches.value_of("backend").unwrap(),
-        )?;
+        let config = Config::parse(matches.value_of("backend").unwrap())?;
         Ok(ExeConfig {
             input_path,
             output_path,

@@ -1,4 +1,5 @@
-use super::Location;
+use crate::Location;
+use failure::Fail;
 use std::path::{Path, PathBuf};
 use std::str::CharIndices;
 
