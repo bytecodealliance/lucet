@@ -1,16 +1,33 @@
 dist: xenial
 
+# Same as version in Dockerfile(s)
+rust: 1.36.0
+
 env:
     - UNOPTIMIZED_BUILD=true
 
 services:
     - docker
 
-script:
-    - ./devenv_run.sh make indent-check test audit
-    - ./devenv_stop.sh
-    - git diff --exit-code
-    - ./devenv_build_toolchain_only.sh
+stages:
+  - lint
+  - build_and_test
+
+jobs:
+  include:
+    - stage: lint
+      language: rust
+      install:
+        - rustup component add rustfmt
+      script:
+        - make indent-check
+        - git diff --exit-code
+    - stage: build_and_test
+      script:
+        - ./devenv_run.sh make test || travis_terminate 1
+        - ./devenv_run.sh make audit || travis_terminate 1
+        - ./devenv_stop.sh
+        - ./devenv_build_toolchain_only.sh
 
 notifications:
     email: false
