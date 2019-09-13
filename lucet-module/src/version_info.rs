@@ -13,6 +13,14 @@ pub struct VersionInfo {
     minor: u16,
     patch: u16,
     reserved: u16,
+    /// `version_hash` is either all nulls or the first eight ascii characters of the git commit
+    /// hash of wherever this Version is coming from. In the case of a compiled lucet module, this
+    /// hash will come from the git commit that the lucetc producing it came from. In a runtime
+    /// context, it will be the git commit of lucet-runtime built into the embedder.
+    ///
+    /// The version hash will typically populated only in release builds, but may blank even in
+    /// that case: if building from a packagd crate, or in a build environment that does not have
+    /// "git" installed, `lucetc` and `lucet-runtime` will fall back to an empty hash.
     version_hash: [u8; 8],
 }
 
