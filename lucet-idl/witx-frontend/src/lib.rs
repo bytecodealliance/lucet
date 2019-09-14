@@ -1,5 +1,5 @@
 /// Types describing a validated witx document
-pub mod ast;
+mod ast;
 /// Lexer text into tokens
 mod lexer;
 /// Witx syntax parsing from SExprs
@@ -11,12 +11,18 @@ mod toplevel;
 /// Validate declarations into ast
 mod validate;
 
-pub use ast::Document;
+pub use ast::{
+    AliasDatatype, BuiltinType, Datatype, DatatypeIdent, DatatypeVariant, Definition, Document,
+    Entry, EnumDatatype, FlagsDatatype, Id, IntRepr, InterfaceFunc, InterfaceFuncParam, Module,
+    ModuleDefinition, ModuleEntry, ModuleImport, ModuleImportVariant, StructDatatype, StructMember,
+    UnionDatatype, UnionVariant,
+};
+pub use lexer::LexError;
 pub use parser::{DeclSyntax, ParseError};
 pub use sexpr::SExprParseError;
-pub use toplevel::parse_witx;
-pub use validate::{validate_document, ValidationError};
+pub use validate::ValidationError;
 
+use failure::Fail;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -40,7 +46,9 @@ pub enum WitxError {
     Validation(#[cause] ValidationError),
 }
 
-pub fn load_witx<P: AsRef<Path>>(path: P) -> Result<Document, WitxError> {
+pub fn load<P: AsRef<Path>>(path: P) -> Result<Document, WitxError> {
+    use toplevel::parse_witx;
+    use validate::validate_document;
     let parsed_decls = parse_witx(path)?;
     validate_document(&parsed_decls).map_err(WitxError::Validation)
 }

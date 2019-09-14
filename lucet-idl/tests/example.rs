@@ -8,7 +8,6 @@ use tempfile::TempDir;
 fn compile_c_guest() {
     let config = lucet_idl::Config {
         backend: lucet_idl::Backend::CGuest,
-        witx: false,
     };
 
     let tempdir = TempDir::new().expect("create tempdir");
@@ -48,10 +47,7 @@ fn compile_and_test_rust_host() {
 */
 
 fn compile_and_test_rust(backend: lucet_idl::Backend) {
-    let config = lucet_idl::Config {
-        backend,
-        witx: false,
-    };
+    let config = lucet_idl::Config { backend };
 
     let tempdir = TempDir::new().expect("create tempdir");
 

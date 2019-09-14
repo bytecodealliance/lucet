@@ -1,5 +1,6 @@
-use super::sexpr::SExpr;
-use super::Location;
+use crate::sexpr::SExpr;
+use crate::Location;
+use failure::Fail;
 
 ///! Parser turns s-expressions into unvalidated syntax constructs.
 ///! conventions:

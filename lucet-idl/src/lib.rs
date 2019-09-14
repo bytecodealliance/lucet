@@ -15,7 +15,6 @@ pub mod pretty_writer;
 mod repr;
 mod rust;
 mod validate;
-mod witx;
 
 pub use crate::atoms::{AbiType, AtomType};
 pub use crate::config::{Backend, Config};
@@ -33,7 +32,6 @@ use crate::c::CGenerator;
 use crate::parser::Parser;
 use crate::rust::RustGenerator;
 use crate::validate::package_from_declarations;
-pub use crate::witx::load_witx;
 use lucet_module::bindings::Bindings;
 use std::collections::HashMap;
 use std::fs;
@@ -69,15 +67,9 @@ pub fn codegen(package: &Package, config: &Config, output: Box<dyn Write>) -> Re
 }
 
 pub fn run(config: &Config, input_path: &Path, output: Box<dyn Write>) -> Result<(), IDLError> {
-    if config.witx {
-        let doc = load_witx(input_path).map_err(IDLError::Witx)?;
-        println!("{:?}", doc);
-        Ok(())
-    } else {
-        let input = fs::read_to_string(input_path)?;
-        let pkg = parse_package(&input)?;
-        codegen(&pkg, config, output)
-    }
+    let input = fs::read_to_string(input_path)?;
+    let pkg = parse_package(&input)?;
+    codegen(&pkg, config, output)
 }
 
 impl Package {

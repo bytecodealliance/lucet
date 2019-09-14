@@ -1,6 +1,6 @@
-use super::parser::{DeclSyntax, ParseError, TopLevelSyntax};
-use super::sexpr::SExprParser;
-use super::WitxError;
+use crate::parser::{DeclSyntax, ParseError, TopLevelSyntax};
+use crate::sexpr::SExprParser;
+use crate::WitxError;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};

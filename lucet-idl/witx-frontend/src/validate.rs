@@ -1,14 +1,14 @@
-use super::ast::{
+use crate::{
+    parser::{
+        DatatypeIdentSyntax, DeclSyntax, EnumSyntax, FlagsSyntax, IdentSyntax, ImportTypeSyntax,
+        ModuleDeclSyntax, StructSyntax, TypedefSyntax, UnionSyntax,
+    },
     AliasDatatype, BuiltinType, Datatype, DatatypeIdent, DatatypeVariant, Definition, Document,
-    Entry, EnumDatatype, FlagsDatatype, Id, IntRepr, InterfaceFunc, InterfaceFuncParam, Module,
-    ModuleDefinition, ModuleEntry, ModuleImport, ModuleImportVariant, StructDatatype, StructMember,
-    UnionDatatype, UnionVariant,
+    Entry, EnumDatatype, FlagsDatatype, Id, IntRepr, InterfaceFunc, InterfaceFuncParam, Location,
+    Module, ModuleDefinition, ModuleEntry, ModuleImport, ModuleImportVariant, StructDatatype,
+    StructMember, UnionDatatype, UnionVariant,
 };
-use super::parser::{
-    DatatypeIdentSyntax, DeclSyntax, EnumSyntax, FlagsSyntax, IdentSyntax, ImportTypeSyntax,
-    ModuleDeclSyntax, StructSyntax, TypedefSyntax, UnionSyntax,
-};
-use super::Location;
+use failure::Fail;
 use std::collections::HashMap;
 use std::rc::Rc;
 

@@ -1,6 +1,7 @@
-pub use super::lexer::LexError;
-use super::lexer::{Lexer, LocatedError, LocatedToken, Token};
-use super::Location;
+pub use crate::lexer::LexError;
+use crate::lexer::{Lexer, LocatedError, LocatedToken, Token};
+use crate::Location;
+use failure::Fail;
 use std::path::{Path, PathBuf};
 
 ///! The s-expression parser turns a string into a stream of SExprs.
