@@ -58,7 +58,22 @@ impl DlModule {
         // stack and heap.
         let abs_so_path = so_path.as_ref().canonicalize().map_err(Error::DlError)?;
         let lib = Library::new(abs_so_path.as_os_str()).map_err(Error::DlError)?;
+        return Self::parse_and_maybe_verify(lib, verifier);
+    }
 
+    /// Use the WASM module statically linked into the current binary
+    /// Currently Unix only as LibLoading does not support getting a handle to the running executable on windows
+    #[cfg(unix)]
+    pub fn from_current_binary() -> Result<Arc<Self>, Error> {
+        let curr = libloading::os::unix::Library::this();
+        let lib = Library::from(curr);
+        return Self::parse_and_maybe_verify(lib, |_module_data| Ok(()));
+    }
+
+    fn parse_and_maybe_verify(
+        lib: Library,
+        verifier: fn(&ModuleData) -> Result<(), Error>,
+    ) -> Result<Arc<Self>, Error> {
         let serialized_module_ptr = unsafe {
             lib.get::<*const SerializedModule>(LUCET_MODULE_SYM.as_bytes())
                 .map_err(|e| {
