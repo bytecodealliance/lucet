@@ -4,7 +4,7 @@ use failure::{bail, format_err, Error};
 use nix::unistd::dup;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{stderr, stdin, stdout};
 use std::os::unix::prelude::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::path::{Path, PathBuf};
@@ -240,5 +240,9 @@ impl WasiCtx {
 }
 
 fn dev_null() -> File {
-    File::open("/dev/null").expect("failed to open /dev/null")
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/null")
+        .expect("failed to open /dev/null")
 }
