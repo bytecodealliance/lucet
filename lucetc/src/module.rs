@@ -369,7 +369,8 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
                     self.tables.push(Exportable::new(table));
                     vac.insert(vec![table_elems]);
                 } else {
-                    panic!("creation of elements for undeclared table! only table 0 is implicitly declared") // Do we implicitly declare them all???? i sure hope not
+                    panic!("creation of elements for undeclared table! only table 0 is implicitly declared")
+                    // Do we implicitly declare them all???? i sure hope not
                 }
             }
         }
