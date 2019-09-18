@@ -292,7 +292,7 @@ macro_rules! host_tests {
 
             thread::sleep(Duration::from_millis(10));
 
-            match inst.run("main", &[]) {
+            match inst.run("main", &[0u32.into(), 0u32.into()]) {
                 Err(Error::RuntimeTerminated(details)) => match details {
                     TerminationDetails::Remote => {
                         println!("Terminated remotely!");
