@@ -1,0 +1,27 @@
+[package]
+name = "lucet-idl-test"
+version = "0.1.0"
+authors = ["Pat Hickey <phickey@fastly.com>"]
+edition = "2018"
+
+[lib]
+crate-type=["rlib"]
+
+[[bin]]
+name = "lucet-idl-test"
+path = "src/main.rs"
+
+[dependencies]
+lucet-idl = { path = "../" }
+lucetc = { path = "../../lucetc" }
+lucet-runtime = { path = "../../lucet-runtime" }
+lucet-wasi = { path = "../../lucet-wasi" }
+lucet-wasi-sdk = { path = "../../lucet-wasi-sdk" }
+proptest = "0.9.4"
+tempfile = "3.0"
+failure = "0.1"
+log = "0.4"
+env_logger = "0.6"
+fs2 = "0.4"
+clap = "2"
+heck= "0.3"

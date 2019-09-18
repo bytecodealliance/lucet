@@ -38,13 +38,18 @@ enum lucet_error lucet_instance_reset(struct lucet_instance *inst);
 enum lucet_error lucet_instance_run(struct lucet_instance * inst,
                                     const char *            entrypoint,
                                     uintptr_t               argc,
-                                    const struct lucet_val *argv);
+                                    const struct lucet_val *argv,
+                                    struct lucet_result *   result_out);
 
 enum lucet_error lucet_instance_run_func_idx(struct lucet_instance * inst,
                                              uint32_t                table_idx,
                                              uint32_t                func_idx,
                                              uintptr_t               argc,
-                                             const struct lucet_val *argv);
+                                             const struct lucet_val *argv,
+                                             struct lucet_result *   result_out);
+
+enum lucet_error
+lucet_instance_resume(struct lucet_instance *inst, void *val, struct lucet_result *result_out);
 
 enum lucet_error lucet_instance_set_fatal_handler(struct lucet_instance *inst,
                                                   lucet_fatal_handler    fatal_handler);
@@ -54,9 +59,6 @@ enum lucet_error lucet_instance_set_fatal_handler(struct lucet_instance *inst,
  */
 enum lucet_error lucet_instance_set_signal_handler(struct lucet_instance *inst,
                                                    lucet_signal_handler   signal_handler);
-
-enum lucet_error lucet_instance_state(const struct lucet_instance *inst,
-                                      struct lucet_state *         state_out);
 
 enum lucet_error lucet_mmap_region_create(uint64_t                         instance_capacity,
                                           const struct lucet_alloc_limits *limits,
@@ -79,8 +81,6 @@ double lucet_retval_f64(const struct lucet_untyped_retval *retval);
 
 union lucet_retval_gp lucet_retval_gp(const struct lucet_untyped_retval *retval);
 
-void lucet_state_release(struct lucet_state *state);
-
-const char *lucet_state_tag_name(enum lucet_state_tag tag);
+const char *lucet_result_tag_name(enum lucet_result_tag tag);
 
 #endif /* LUCET_H */

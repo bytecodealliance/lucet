@@ -11,7 +11,47 @@ use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::ptr;
 use std::sync::{Arc, Mutex, Weak};
 
-/// A [`Region`](trait.Region.html) backed by `mmap`.
+/// A [`Region`](../trait.Region.html) backed by `mmap`.
+///
+/// `MmapRegion` lays out memory for instances in a contiguous block,
+/// with an Instance's space reserved, followed by heap, stack, globals, and sigstack.
+///
+/// This results in an actual layout of an instance on an `MmapRegion`-produced `Slot` being:
+/// ```text
+/// 0x0000: +-----------------------+ <-- Instance
+/// 0x0000: |  .magic               |
+/// 0x0008: |  ...                  |
+/// 0x000X: |  ...                  |
+/// 0x0XXX: |  .alloc -> Alloc {    |
+/// 0x0XXX: |    .start    = 0x0000 |
+/// 0x0XXX: |    .heap     = 0x1000 |
+/// 0x0XXX: |    .stack    = 0xN000 |
+/// 0x0XXX: |    .globals  = 0xM000 |
+/// 0x0XXX: |    .sigstack = 0xS000 |
+/// 0x0XXX: |  }                    |
+/// 0x0XXX: |  ...                  |
+/// 0x0XXX: ~      ~padding~        ~
+/// 0x0XXX: |  ...                  |
+/// 0x0XXX: |  .globals    = 0xM000 | <-- InstanceRuntimeData
+/// 0x0XXX: |  .inst_count = 0x0000 |
+/// 0x1000: +-----------------------+ <-- Heap, and `lucet_vmctx`. One page into the allocation.
+/// 0x1XXX: |                       |
+/// 0xXXXX: ~  .......heap.......   ~ // heap size is governed by limits.heap_address_space_size
+/// 0xXXXX: |                       |
+/// 0xN000: +-----------------------| <-- Stack (at heap_start + limits.heap_address_space_size)
+/// 0xNXXX: |                       |
+/// 0xXXXX: ~  .......stack......   ~ // stack size is governed by limits.stack_size
+/// 0xXXXX: |                       |
+/// 0xXXXx: --- stack guard page ----
+/// 0xM000: +-----------------------| <-- Globals (at stack_start + limits.stack_size + PAGE_SIZE)
+/// 0xMXXX: |                       |
+/// 0xXXXX: ~  ......globals.....   ~
+/// 0xXXXX: |                       |
+/// 0xXXXX  --- global guard page ---
+/// 0xS000: +-----------------------| <-- Sigstack (at globals_start + globals_size + PAGE_SIZE)
+/// 0xSXXX: |  ......sigstack....   | // sigstack is SIGSTKSZ bytes
+/// 0xSXXX: +-----------------------|
+/// ```
 pub struct MmapRegion {
     capacity: usize,
     freelist: Mutex<Vec<Slot>>,

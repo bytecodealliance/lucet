@@ -1,20 +1,13 @@
 use failure::Error;
 use lucet_runtime_internals::module::DlModule;
 use lucetc::Lucetc;
-use std::fs::File;
-use std::io::prelude::*;
 use std::sync::Arc;
 use tempfile::TempDir;
 
 pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, Error> {
+    let native_build = Lucetc::try_from_bytes(generate_test_wat(num_locals))?;
+
     let workdir = TempDir::new().expect("create working directory");
-
-    let wasm_path = workdir.path().join("out.wasm");
-
-    let mut wasm_file = File::create(&wasm_path)?;
-    wasm_file.write_all(generate_test_wat(num_locals).as_bytes())?;
-
-    let native_build = Lucetc::new(wasm_path);
 
     let so_file = workdir.path().join("out.so");
 
@@ -42,9 +35,10 @@ fn generate_test_wat(num_locals: usize) -> String {
     // Use each local for the first time:
     for i in 1..num_locals {
         module.push_str(&format!(
-            "(set_local {} (i32.add (get_local {}) (get_local {})))\n",
+            "(set_local {} (i32.add (get_local {}) (i32.xor (get_local {}) (i32.const {}))))\n",
             i,
             i - 1,
+            i,
             i
         ));
     }
@@ -52,9 +46,10 @@ fn generate_test_wat(num_locals: usize) -> String {
     // Use each local for a second time, so they get pushed to the stack between uses:
     for i in 2..(num_locals - 1) {
         module.push_str(&format!(
-            "(set_local {} (i32.add (get_local {}) (get_local {})))\n",
+            "(set_local {} (i32.add (get_local {}) (i32.and (get_local {}) (i32.const {}))))\n",
             i,
             i - 1,
+            i,
             i
         ));
     }
@@ -83,8 +78,9 @@ fn generate_test_wat(num_locals: usize) -> String {
 #[macro_export]
 macro_rules! stack_tests {
     ( $TestRegion:path ) => {
-        use lucet_module_data::TrapCode;
-        use lucet_runtime::{DlModule, Error, InstanceHandle, Limits, Region, UntypedRetVal, Val};
+        use lucet_runtime::{
+            DlModule, Error, InstanceHandle, Limits, Region, TrapCode, UntypedRetVal, Val,
+        };
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::stack::stack_testcase;
@@ -95,7 +91,8 @@ macro_rules! stack_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            inst.run(b"localpalooza", &[recursion_depth.into()])
+            inst.run("localpalooza", &[recursion_depth.into()])
+                .and_then(|rr| rr.returned())
         }
 
         fn expect_ok(module: Arc<DlModule>, recursion_depth: i32) {
@@ -144,14 +141,22 @@ macro_rules! stack_tests {
         }
 
         #[test]
-        fn expect_ok_locals64_480() {
-            expect_ok(stack_testcase(64).expect("generate stack_testcase 64"), 480);
+        fn expect_ok_locals64_481() {
+            // We use 64 local variables, but cranelift optimizes many of them into registers
+            // rather than stack space. Four of those are callee-saved, for n > 18 local
+            // variables, we actually use n + 4 stack spaces. So we use 64 spaces at 64 - 4 = 60
+            // local variables.
+            expect_ok(
+                stack_testcase(64 - 4).expect("generate stack_testcase 64"),
+                480,
+            );
         }
 
         #[test]
         fn expect_stack_overflow_locals64_481() {
             expect_stack_overflow(
-                stack_testcase(64).expect("generate stack_testcase 64"),
+                // Same note as `expect_ok_locals64_481`
+                stack_testcase(64 - 4).expect("generate stack_testcase 64"),
                 481,
                 true,
             );

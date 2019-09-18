@@ -1,3 +1,10 @@
+#![deny(bare_trait_objects)]
+
+use lucet_module::{
+    FunctionSpec, Module, ModuleData, SerializedModule, TableElement, TrapManifest, TrapSite,
+    VersionInfo,
+};
+
 use byteorder::{LittleEndian, ReadBytesExt};
 use colored::Colorize;
 use goblin::{elf, Object};
@@ -5,51 +12,22 @@ use std::env;
 use std::fs::File;
 use std::io::Cursor;
 use std::io::Read;
-use std::mem::size_of;
+use std::mem;
 
 #[derive(Debug)]
 struct ArtifactSummary<'a> {
     buffer: &'a Vec<u8>,
     elf: &'a elf::Elf<'a>,
     symbols: StandardSymbols,
-    heap_spec: Option<HeapSpec>,
-    globals_spec: Option<GlobalsSpec>,
     data_segments: Option<DataSegments>,
-    sparse_page_data: Option<SparsePageData>,
-    trap_manifest: Option<TrapManifest>,
+    serialized_module: Option<SerializedModule>,
     exported_functions: Vec<&'a str>,
     imported_symbols: Vec<&'a str>,
 }
 
 #[derive(Debug)]
 struct StandardSymbols {
-    lucet_trap_manifest: Option<elf::sym::Sym>,
-    lucet_trap_manifest_len: Option<elf::sym::Sym>,
-    wasm_data_segments: Option<elf::sym::Sym>,
-    wasm_data_segments_len: Option<elf::sym::Sym>,
-    lucet_heap_spec: Option<elf::sym::Sym>,
-    lucet_globals_spec: Option<elf::sym::Sym>,
-    guest_sparse_page_data: Option<elf::sym::Sym>,
-}
-
-#[derive(Debug)]
-struct TrapManifest {
-    records: Vec<TrapManifestRow>,
-}
-
-#[derive(Debug)]
-struct TrapManifestRow {
-    func_name: String,
-    func_addr: u64,
-    func_len: u64,
-    trap_count: u64,
-    sites: Vec<TrapSite>,
-}
-
-#[derive(Debug)]
-struct TrapSite {
-    offset: u32,
-    trapcode: u32,
+    lucet_module: Option<elf::sym::Sym>,
 }
 
 #[derive(Debug)]
@@ -64,57 +42,28 @@ struct DataSegment {
     data: Vec<u8>,
 }
 
-#[derive(Debug)]
-struct SparsePageData {
-    pages: Vec<*const u8>,
-}
-
-#[derive(Debug)]
-struct HeapSpec {
-    reserved_size: u64,
-    guard_size: u64,
-    initial_size: u64,
-    max_size: Option<u64>,
-}
-
-#[derive(Debug)]
-struct GlobalsSpec {
-    count: u64,
-}
-
 impl<'a> ArtifactSummary<'a> {
-    fn new(buffer: &'a Vec<u8>, elf: &'a elf::Elf) -> Self {
+    fn new(buffer: &'a Vec<u8>, elf: &'a elf::Elf<'_>) -> Self {
         Self {
             buffer: buffer,
             elf: elf,
-            symbols: StandardSymbols {
-                lucet_trap_manifest: None,
-                lucet_trap_manifest_len: None,
-                wasm_data_segments: None,
-                wasm_data_segments_len: None,
-                lucet_heap_spec: None,
-                lucet_globals_spec: None,
-                guest_sparse_page_data: None,
-            },
-            heap_spec: None,
-            globals_spec: None,
+            symbols: StandardSymbols { lucet_module: None },
             data_segments: None,
-            sparse_page_data: None,
-            trap_manifest: None,
+            serialized_module: None,
             exported_functions: Vec::new(),
             imported_symbols: Vec::new(),
         }
     }
 
-    fn read_memory(&self, addr: u64, size: u64) -> Option<Vec<u8>> {
+    fn read_memory(&self, addr: u64, size: u64) -> Option<&'a [u8]> {
         for header in &self.elf.program_headers {
             if header.p_type == elf::program_header::PT_LOAD {
                 // Bounds check the entry
-                if addr >= header.p_vaddr && (addr + size) < (header.p_vaddr + header.p_memsz) {
+                if addr >= header.p_vaddr && (addr + size) <= (header.p_vaddr + header.p_memsz) {
                     let start = (addr - header.p_vaddr + header.p_offset) as usize;
                     let end = start + size as usize;
 
-                    return Some(self.buffer[start..end].to_vec());
+                    return Some(&self.buffer[start..end]);
                 }
             }
         }
@@ -123,18 +72,6 @@ impl<'a> ArtifactSummary<'a> {
     }
 
     fn gather(&mut self) {
-        // println!("Syms");
-        // for sym in eo.syms.iter() {
-        //     let name = eo.strtab
-        //         .get(sym.st_name)
-        //         .unwrap_or(Ok("(no name)"))
-        //         .expect("strtab entry");
-
-        //     println!("Sym: name={} {:?}", name, sym);
-        // }
-
-        // println!("Dyn syms");
-
         for ref sym in self.elf.syms.iter() {
             let name = self
                 .elf
@@ -143,17 +80,8 @@ impl<'a> ArtifactSummary<'a> {
                 .unwrap_or(Ok("(no name)"))
                 .expect("strtab entry");
 
-            //println!("sym: name={} {:?}", name, sym);
             match name {
-                "lucet_trap_manifest" => self.symbols.lucet_trap_manifest = Some(sym.clone()),
-                "lucet_trap_manifest_len" => {
-                    self.symbols.lucet_trap_manifest_len = Some(sym.clone())
-                }
-                "wasm_data_segments" => self.symbols.wasm_data_segments = Some(sym.clone()),
-                "wasm_data_segments_len" => self.symbols.wasm_data_segments_len = Some(sym.clone()),
-                "lucet_heap_spec" => self.symbols.lucet_heap_spec = Some(sym.clone()),
-                "lucet_globals_spec" => self.symbols.lucet_globals_spec = Some(sym.clone()),
-                "guest_sparse_page_data" => self.symbols.guest_sparse_page_data = Some(sym.clone()),
+                "lucet_module" => self.symbols.lucet_module = Some(sym.clone()),
                 _ => {
                     if sym.st_bind() == elf::sym::STB_GLOBAL {
                         if sym.is_function() {
@@ -166,202 +94,27 @@ impl<'a> ArtifactSummary<'a> {
             }
         }
 
-        self.heap_spec = self.parse_heap_spec();
-        self.globals_spec = self.parse_globals_spec();
-        self.data_segments = self.parse_data_segments();
-        self.trap_manifest = self.parse_trap_manifest();
-        self.sparse_page_data = self.parse_sparse_page_data();
-    }
-
-    fn parse_heap_spec(&self) -> Option<HeapSpec> {
-        if let Some(ref sym) = self.symbols.lucet_heap_spec {
-            let mut spec = HeapSpec {
-                reserved_size: 0,
-                guard_size: 0,
-                initial_size: 0,
-                max_size: None,
-            };
-
-            let serialized = self.read_memory(sym.st_value, sym.st_size).unwrap();
-            let mut rdr = Cursor::new(serialized);
-            spec.reserved_size = rdr.read_u64::<LittleEndian>().unwrap();
-            spec.guard_size = rdr.read_u64::<LittleEndian>().unwrap();
-            spec.initial_size = rdr.read_u64::<LittleEndian>().unwrap();
-
-            let max_size = rdr.read_u64::<LittleEndian>().unwrap();
-            let max_size_valid = rdr.read_u64::<LittleEndian>().unwrap();
-
-            if max_size_valid == 1 {
-                spec.max_size = Some(max_size);
-            } else {
-                spec.max_size = None;
-            }
-
-            Some(spec)
-        } else {
-            None
-        }
-    }
-
-    fn parse_globals_spec(&self) -> Option<GlobalsSpec> {
-        if let Some(ref sym) = self.symbols.lucet_globals_spec {
-            let mut spec = GlobalsSpec { count: 0 };
-
-            let serialized = self.read_memory(sym.st_value, sym.st_size).unwrap();
-            let mut rdr = Cursor::new(serialized);
-            spec.count = rdr.read_u64::<LittleEndian>().unwrap();
-
-            Some(spec)
-        } else {
-            None
-        }
-    }
-
-    fn parse_data_segments(&self) -> Option<DataSegments> {
-        if let Some(ref data_sym) = self.symbols.wasm_data_segments {
-            if let Some(ref data_len_sym) = self.symbols.wasm_data_segments_len {
-                let mut data_segments = DataSegments {
-                    segments: Vec::new(),
-                };
-
-                // TODO: validate that sym.st_size == 4
-                let buffer = self
-                    .read_memory(data_len_sym.st_value, data_len_sym.st_size)
-                    .unwrap();
-                let mut rdr = Cursor::new(buffer);
-                let data_len = rdr.read_u32::<LittleEndian>().unwrap();
-                // TODO: validate that data_len == data_sym.st_size
-
-                let buffer = self
-                    .read_memory(data_sym.st_value, data_sym.st_size)
-                    .unwrap();
-                let mut rdr = Cursor::new(&buffer);
-
-                while rdr.position() < data_len as u64 {
-                    let _memory_index = rdr.read_u32::<LittleEndian>();
-                    // TODO: validate that memory_index == 0
-                    let offset = rdr.read_u32::<LittleEndian>().unwrap();
-                    let len = rdr.read_u32::<LittleEndian>().unwrap();
-
-                    let pos = rdr.position() as usize;
-                    let data_slice = &buffer[pos..pos + len as usize];
-
-                    let mut data = Vec::new();
-                    data.extend_from_slice(data_slice);
-
-                    let pad = (8 - (pos + len as usize) % 8) % 8;
-                    let new_pos = pos as u64 + len as u64 + pad as u64;
-                    rdr.set_position(new_pos);
-
-                    data_segments.segments.push(DataSegment {
-                        offset: offset,
-                        len: len,
-                        data: data,
-                    });
-                }
-
-                Some(data_segments)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    fn parse_sparse_page_data(&self) -> Option<SparsePageData> {
-        if let Some(ref sparse_sym) = self.symbols.guest_sparse_page_data {
-            let mut sparse_page_data = SparsePageData { pages: Vec::new() };
+        self.serialized_module = self.symbols.lucet_module.as_ref().map(|module_sym| {
             let buffer = self
-                .read_memory(sparse_sym.st_value, sparse_sym.st_size)
+                .read_memory(
+                    module_sym.st_value,
+                    mem::size_of::<SerializedModule>() as u64,
+                )
                 .unwrap();
-            let buffer_len = buffer.len();
             let mut rdr = Cursor::new(buffer);
-            let num_pages = rdr.read_u64::<LittleEndian>().unwrap();
-            if buffer_len != size_of::<u64>() + num_pages as usize * size_of::<u64>() {
-                eprintln!("size of sparse page data doesn't match the number of pages specified");
-                None
-            } else {
-                for _ in 0..num_pages {
-                    let ptr = rdr.read_u64::<LittleEndian>().unwrap() as *const u8;
-                    sparse_page_data.pages.push(ptr);
-                }
-                Some(sparse_page_data)
+
+            let version = VersionInfo::read_from(&mut rdr).unwrap();
+
+            SerializedModule {
+                version,
+                module_data_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
+                module_data_len: rdr.read_u64::<LittleEndian>().unwrap(),
+                tables_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
+                tables_len: rdr.read_u64::<LittleEndian>().unwrap(),
+                function_manifest_ptr: rdr.read_u64::<LittleEndian>().unwrap(),
+                function_manifest_len: rdr.read_u64::<LittleEndian>().unwrap(),
             }
-        } else {
-            None
-        }
-    }
-
-    fn parse_trap_manifest(&self) -> Option<TrapManifest> {
-        let trap_manifest: elf::sym::Sym;
-        let trap_manifest_len: elf::sym::Sym;
-
-        // Make sure we have the necessary symbols first
-        if let Some(ref tm) = self.symbols.lucet_trap_manifest {
-            trap_manifest = tm.clone();
-        } else {
-            return None;
-        }
-
-        if let Some(ref tml) = self.symbols.lucet_trap_manifest_len {
-            trap_manifest_len = tml.clone();
-        } else {
-            return None;
-        }
-
-        let mut manifest = TrapManifest {
-            records: Vec::new(),
-        };
-
-        // Get the length of the manifest
-        // TODO: return error if st_size != 4
-        let serialized = self
-            .read_memory(trap_manifest_len.st_value, trap_manifest_len.st_size)
-            .unwrap();
-        let mut rdr = Cursor::new(serialized);
-        let trap_manifest_len = rdr.read_u32::<LittleEndian>().unwrap();
-
-        // Find the manifest itself
-        let serialized = self
-            .read_memory(trap_manifest.st_value, trap_manifest.st_size)
-            .unwrap();
-        let mut rdr = Cursor::new(serialized);
-
-        // Iterate through each row
-        for _ in 0..trap_manifest_len {
-            let func_start = rdr.read_u64::<LittleEndian>().unwrap();
-            let func_len = rdr.read_u64::<LittleEndian>().unwrap();
-            let traps = rdr.read_u64::<LittleEndian>().unwrap();
-            let traps_len = rdr.read_u64::<LittleEndian>().unwrap();
-            let func_name = self
-                .get_func_name_for_addr(func_start)
-                .unwrap_or("(not found)");
-
-            let mut sites = Vec::new();
-
-            // Find the table
-            let serialized_table = self.read_memory(traps, 8 * traps_len).unwrap();
-            let mut table_rdr = Cursor::new(serialized_table);
-
-            // Iterate through each site
-            for _ in 0..traps_len {
-                let offset = table_rdr.read_u32::<LittleEndian>().unwrap();
-                let trapcode = table_rdr.read_u32::<LittleEndian>().unwrap();
-
-                sites.push(TrapSite { offset, trapcode });
-            }
-
-            manifest.records.push(TrapManifestRow {
-                func_name: func_name.to_string(),
-                func_addr: func_start,
-                func_len: func_len,
-                trap_count: traps_len,
-                sites: sites,
-            });
-        }
-
-        Some(manifest)
+        });
     }
 
     fn get_func_name_for_addr(&self, addr: u64) -> Option<&str> {
@@ -397,59 +150,85 @@ fn main() {
     }
 }
 
-fn print_summary(summary: ArtifactSummary) {
-    println!("Required Symbols:");
-    println!(
-        "  {:25}: {}",
-        "lucet_trap_manifest",
-        exists_to_str(&summary.symbols.lucet_trap_manifest)
-    );
-    println!(
-        "  {:25}: {}",
-        "lucet_trap_manifest_len",
-        exists_to_str(&summary.symbols.lucet_trap_manifest_len)
-    );
-    println!(
-        "  {:25}: {}",
-        "wasm_data_segments",
-        exists_to_str(&summary.symbols.wasm_data_segments)
-    );
-    println!(
-        "  {:25}: {}",
-        "wasm_data_segments_len",
-        exists_to_str(&summary.symbols.wasm_data_segments_len)
-    );
-    println!(
-        "  {:25}: {}",
-        "guest_sparse_page_data",
-        exists_to_str(&summary.symbols.guest_sparse_page_data)
-    );
-    println!(
-        "  {:25}: {}",
-        "lucet_heap_spec",
-        exists_to_str(&summary.symbols.lucet_heap_spec)
-    );
-    println!(
-        "  {:25}: {}",
-        "lucet_globals_spec",
-        exists_to_str(&summary.symbols.lucet_globals_spec)
-    );
-
-    println!("");
-    println!("Exported Functions/Symbols:");
-    for function_name in summary.exported_functions {
-        println!("  {}", function_name);
+/// Parse a trap manifest for function `f`, if it has one.
+///
+/// `parse_trap_manifest` may very understandably be confusing. Why not use `f.traps()`? In
+/// `lucet-analyze` the module has been accessed by reading the file and following structures as
+/// they exist at rest. This means pointers are not relocated, so slices that would be valid when
+/// loaded through the platform's loader currently have pointers that are not valid for memory
+/// access.
+///
+/// In particular, trap pointers are correct with respect to 0 being the start of the file (or,
+/// buffer, after reading), which means we can (and must) rebuild a correct slice from the buffer.
+fn parse_trap_manifest<'a>(
+    summary: &'a ArtifactSummary<'a>,
+    f: &FunctionSpec,
+) -> Option<TrapManifest<'a>> {
+    if let Some(faulty_trap_manifest) = f.traps() {
+        let trap_ptr = faulty_trap_manifest.traps.as_ptr();
+        let traps_count = faulty_trap_manifest.traps.len();
+        let traps_byte_count = traps_count * std::mem::size_of::<TrapManifest<'_>>();
+        if let Some(traps_byte_slice) =
+            summary.read_memory(trap_ptr as u64, traps_byte_count as u64)
+        {
+            let real_trap_ptr = traps_byte_slice.as_ptr() as *const TrapSite;
+            Some(TrapManifest {
+                traps: unsafe { std::slice::from_raw_parts(real_trap_ptr, traps_count) },
+            })
+        } else {
+            println!(
+                "Failed to read trap bytes for function {:?}, at {:p}",
+                f, trap_ptr
+            );
+            None
+        }
+    } else {
+        None
     }
+}
 
-    println!("");
-    println!("Imported Functions/Symbols:");
-    for function_name in summary.imported_symbols {
-        println!("  {}", function_name);
+fn load_module<'b, 'a: 'b>(
+    summary: &'a ArtifactSummary<'a>,
+    serialized_module: &SerializedModule,
+    tables: &'b [&[TableElement]],
+) -> Module<'b> {
+    let module_data_bytes = summary
+        .read_memory(
+            serialized_module.module_data_ptr,
+            serialized_module.module_data_len,
+        )
+        .unwrap();
+
+    let module_data =
+        ModuleData::deserialize(module_data_bytes).expect("ModuleData can be deserialized");
+
+    let function_manifest_bytes = summary
+        .read_memory(
+            serialized_module.function_manifest_ptr,
+            serialized_module.function_manifest_len,
+        )
+        .unwrap();
+    let function_manifest = unsafe {
+        std::slice::from_raw_parts(
+            function_manifest_bytes.as_ptr() as *const FunctionSpec,
+            serialized_module.function_manifest_len as usize,
+        )
+    };
+    Module {
+        version: serialized_module.version.clone(),
+        module_data,
+        tables,
+        function_manifest,
     }
+}
 
-    println!("");
-    println!("Heap Specification:");
-    if let Some(heap_spec) = summary.heap_spec {
+fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Module<'b>) {
+    let module_data = &module.module_data;
+    let tables = module.tables;
+    let function_manifest = module.function_manifest;
+
+    println!("  Heap Specification:");
+    if let Some(heap_spec) = module_data.heap_spec() {
         println!("  {:9}: {} bytes", "Reserved", heap_spec.reserved_size);
         println!("  {:9}: {} bytes", "Guard", heap_spec.guard_size);
         println!("  {:9}: {} bytes", "Initial", heap_spec.initial_size);
@@ -459,15 +238,286 @@ fn print_summary(summary: ArtifactSummary) {
             println!("  {:9}: None", "Maximum");
         }
     } else {
+        println!("  {}", "MISSING".red().bold());
+    }
+
+    println!("");
+    println!("  Sparse Page Data:");
+    if let Some(sparse_page_data) = module_data.sparse_data() {
+        println!("  {:6}: {}", "Count", sparse_page_data.pages().len());
+        let mut allempty = true;
+        let mut anyempty = false;
+        for (i, page) in sparse_page_data.pages().iter().enumerate() {
+            match page {
+                Some(page) => {
+                    allempty = false;
+                    println!(
+                        "  Page[{}]: {:p}, size: {}",
+                        i,
+                        page.as_ptr(),
+                        if page.len() != 4096 {
+                            format!(
+                                "{} (page size, expected 4096)",
+                                format!("{}", page.len()).bold().red()
+                            )
+                            .red()
+                        } else {
+                            format!("{}", page.len()).green()
+                        }
+                    );
+                }
+                None => {
+                    anyempty = true;
+                }
+            };
+        }
+        if allempty && sparse_page_data.pages().len() > 0 {
+            println!("  (all pages empty)");
+        } else if anyempty {
+            println!("  (empty pages omitted)");
+        }
+    } else {
         println!("  {}", "MISSING!".red().bold());
     }
 
     println!("");
-    println!("Globals Specification:");
-    if let Some(globals_spec) = summary.globals_spec {
-        println!("  {:6}: {}", "Count", globals_spec.count);
+    println!("Tables:");
+    if tables.len() == 0 {
+        println!("  No tables.");
     } else {
-        println!("  {}", "MISSING!".red().bold());
+        for (i, table) in tables.iter().enumerate() {
+            println!("  Table {}: {:?}", i, table);
+        }
+    }
+
+    println!("");
+    println!("Signatures:");
+    for (i, s) in module_data.signatures().iter().enumerate() {
+        println!("  Signature {}: {}", i, s);
+    }
+
+    println!("");
+    println!("Functions:");
+    if function_manifest.len() != module_data.function_info().len() {
+        println!(
+            "    {} function manifest and function info have diverging function counts",
+            "lucetc bug:".red().bold()
+        );
+        println!(
+            "      function_manifest length   : {}",
+            function_manifest.len()
+        );
+        println!(
+            "      module data function count : {}",
+            module_data.function_info().len()
+        );
+        println!("    Will attempt to display information about functions anyway, but trap/code information may be misaligned with symbols and signatures.");
+    }
+
+    for (i, f) in function_manifest.iter().enumerate() {
+        let header_name = summary.get_func_name_for_addr(f.ptr().as_usize() as u64);
+
+        if i >= module_data.function_info().len() {
+            // This is one form of the above-mentioned bug case
+            // Half the function information is missing, so just report the issue and continue.
+            println!(
+                "  Function {} {}",
+                i,
+                "is missing the module data part of its declaration".red()
+            );
+            match header_name {
+                Some(name) => {
+                    println!("    ELF header name: {}", name);
+                }
+                None => {
+                    println!("    No corresponding ELF symbol.");
+                }
+            };
+            break;
+        }
+
+        let colorize_name = |x: Option<&str>| match x {
+            Some(name) => name.green(),
+            None => "None".red().bold(),
+        };
+
+        let fn_meta = &module_data.function_info()[i];
+        println!("  Function {} (name: {}):", i, colorize_name(fn_meta.name));
+        if fn_meta.name != header_name {
+            println!(
+                "    Name {} with name declared in ELF headers: {}",
+                "DISAGREES".red().bold(),
+                colorize_name(header_name)
+            );
+        }
+
+        println!(
+            "    Signature (index {}): {}",
+            fn_meta.signature.as_u32() as usize,
+            module_data.signatures()[fn_meta.signature.as_u32() as usize]
+        );
+
+        println!("    Start: {:#010x}", f.ptr().as_usize());
+        println!("    Code length: {} bytes", f.code_len());
+        if let Some(trap_manifest) = parse_trap_manifest(&summary, f) {
+            let trap_count = trap_manifest.traps.len();
+
+            println!("    Trap information:");
+            if trap_count > 0 {
+                println!(
+                    "      {} {} ...",
+                    trap_manifest.traps.len(),
+                    if trap_count == 1 { "trap" } else { "traps" },
+                );
+                for trap in trap_manifest.traps {
+                    println!("        $+{:#06x}: {:?}", trap.offset, trap.code);
+                }
+            } else {
+                println!("      No traps for this function");
+            }
+        }
+    }
+
+    println!("");
+    println!("Globals:");
+    if module_data.globals_spec().len() > 0 {
+        for global_spec in module_data.globals_spec().iter() {
+            println!("  {:?}", global_spec.global());
+            for name in global_spec.export_names() {
+                println!("    Exported as: {}", name);
+            }
+        }
+    } else {
+        println!("  None");
+    }
+
+    println!("");
+    println!("Exported Functions/Symbols:");
+    let mut exported_symbols = summary.exported_functions.clone();
+    for export in module_data.export_functions() {
+        match module_data.function_info()[export.fn_idx.as_u32() as usize].name {
+            Some(name) => {
+                println!("  Internal name: {}", name);
+
+                // The "internal name" is probably the first exported name for this function.
+                // Remove it from the exported_symbols list to not double-count
+                if let Some(idx) = exported_symbols.iter().position(|x| *x == name) {
+                    exported_symbols.remove(idx);
+                }
+            }
+            None => {
+                println!("  No internal name");
+            }
+        }
+
+        // Export names do not have the guest_func_ prefix that symbol names get, and as such do
+        // not need to be removed from `exported_symbols` (which is built entirely from
+        // ELF-declared exports, with namespaced names)
+        println!("    Exported as: {}", export.names.join(", "));
+    }
+
+    if exported_symbols.len() > 0 {
+        println!("");
+        println!("  Other exported symbols (from ELF headers):");
+        for export in exported_symbols {
+            println!("    {}", export);
+        }
+    }
+
+    println!("");
+    println!("Imported Functions/Symbols:");
+    let mut imported_symbols = summary.imported_symbols.clone();
+    for import in module_data.import_functions() {
+        match module_data.function_info()[import.fn_idx.as_u32() as usize].name {
+            Some(name) => {
+                println!("  Internal name: {}", name);
+            }
+            None => {
+                println!("  No internal name");
+            }
+        }
+        println!("    Imported as: {}/{}", import.module, import.name);
+
+        // Remove from the imported_symbols list to not double-count imported functions
+        if let Some(idx) = imported_symbols.iter().position(|x| x == &import.name) {
+            imported_symbols.remove(idx);
+        }
+    }
+
+    if imported_symbols.len() > 0 {
+        println!("");
+        println!("  Other imported symbols (from ELF headers):");
+        for import in &imported_symbols {
+            println!("    {}", import);
+        }
+    }
+}
+
+fn print_summary(summary: ArtifactSummary<'_>) {
+    println!("Required Symbols:");
+    println!(
+        "  {:30}: {}",
+        "lucet_module",
+        exists_to_str(&summary.symbols.lucet_module)
+    );
+    if let Some(ref serialized_module) = summary.serialized_module {
+        println!("Native module components:");
+        println!(
+            "  {:30}: {}",
+            "module_data_ptr",
+            ptr_to_str(serialized_module.module_data_ptr)
+        );
+        println!(
+            "  {:30}: {}",
+            "module_data_len", serialized_module.module_data_len
+        );
+        println!(
+            "  {:30}: {}",
+            "tables_ptr",
+            ptr_to_str(serialized_module.tables_ptr)
+        );
+        println!("  {:30}: {}", "tables_len", serialized_module.tables_len);
+        println!(
+            "  {:30}: {}",
+            "function_manifest_ptr",
+            ptr_to_str(serialized_module.function_manifest_ptr)
+        );
+        println!(
+            "  {:30}: {}",
+            "function_manifest_len", serialized_module.function_manifest_len
+        );
+
+        let tables = unsafe {
+            std::slice::from_raw_parts(
+                serialized_module.tables_ptr as *const &[TableElement],
+                serialized_module.tables_len as usize,
+            )
+        };
+        let mut reconstructed_tables = Vec::new();
+        // same situation as trap tables - these slices are valid as if the module was
+        // dlopen'd, but we jsut read it as a flat file. So read through the ELF view and use
+        // pointers to that for the real slices.
+
+        for table in tables {
+            let table_bytes = summary
+                .read_memory(
+                    table.as_ptr() as usize as u64,
+                    (table.len() * mem::size_of::<TableElement>()) as u64,
+                )
+                .unwrap();
+            reconstructed_tables.push(unsafe {
+                std::slice::from_raw_parts(
+                    table_bytes.as_ptr() as *const TableElement,
+                    table.len() as usize,
+                )
+            });
+        }
+
+        let module = load_module(&summary, serialized_module, &reconstructed_tables);
+        println!("\nModule:");
+        summarize_module(&summary, &module);
+    } else {
+        println!("The symbol `lucet_module` is {}, so lucet-analyze cannot look at most of the interesting parts.", "MISSING".red().bold());
     }
 
     println!("");
@@ -483,36 +533,13 @@ fn print_summary(summary: ArtifactSummary) {
     } else {
         println!("  {}", "MISSING!".red().bold());
     }
+}
 
-    println!("");
-    println!("Sparse page data:");
-    if let Some(sparse_page_data) = summary.sparse_page_data {
-        println!("  {:6}: {}", "Count", sparse_page_data.pages.len());
-        let mut allempty = true;
-        for (i, page) in sparse_page_data.pages.iter().enumerate() {
-            if !page.is_null() {
-                allempty = false;
-                println!("  Page[{}]: {:p}", i, *page);
-            }
-        }
-        if allempty {
-            println!("  (all pages empty)");
-        } else {
-            println!("  (empty pages omitted)");
-        }
+fn ptr_to_str(p: u64) -> colored::ColoredString {
+    if p != 0 {
+        format!("exists; address: {:#x}", p).green()
     } else {
-        println!("  {}", "MISSING!".red().bold());
-    }
-
-    println!("");
-    println!("Trap Manifest:");
-    if let Some(trap_manifest) = summary.trap_manifest {
-        for row in trap_manifest.records {
-            println!("  {:25} {} traps", row.func_name, row.trap_count);
-            println!("      {:?}", row.sites);
-        }
-    } else {
-        println!("  {}", "MISSING!".red().bold());
+        "MISSING!".red().bold()
     }
 }
 

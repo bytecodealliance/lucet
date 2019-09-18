@@ -1,0 +1,14 @@
+FROM ubuntu:disco
+
+ENV WASI_SDK=/opt/wasi-sdk
+ENV LD_LIBRARY_PATH=/opt/lucet/lib:$LD_LIBRARY_PATH
+ENV PATH=/opt/lucet/bin:$PATH
+
+RUN apt-get update && \
+	apt-get install -y --no-install-recommends \
+	ca-certificates clang curl lld && \
+	rm -rf /var/lib/apt/lists/* && \
+	update-alternatives --install /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-8 100
+
+RUN curl -sL https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-6/libclang_rt.builtins-wasm32-wasi-6.0.tar.gz | tar x -zf - -C /usr/lib/llvm-8/lib/clang/8.0.0
+

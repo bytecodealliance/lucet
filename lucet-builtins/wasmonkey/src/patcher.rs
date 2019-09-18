@@ -1,15 +1,16 @@
-use errors::*;
-use functions_ids::*;
-use functions_names::*;
-use map::*;
+use crate::errors::*;
+use crate::functions_ids::*;
+use crate::functions_names::*;
+use crate::map::*;
+use crate::sections::*;
+use crate::symbols::{self, ExtractedSymbols};
 use parity_wasm;
 use parity_wasm::elements::{
-    self, External, ImportEntry, ImportSection, Internal, Module, NameSection, Section,
+    self, External, FunctionNameSubsection, ImportEntry, ImportSection, Internal, Module,
+    NameSection, Section,
 };
-use sections::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use symbols::{self, ExtractedSymbols};
 
 pub const BUILTIN_PREFIX: &str = "builtin_";
 
@@ -32,7 +33,8 @@ impl Patcher {
         let symbols = match &config.builtins_path {
             None => ExtractedSymbols::from(vec![]),
             Some(builtins_path) => symbols::extract_symbols(&builtins_path)?,
-        }.merge_additional(&config.builtins_additional);
+        }
+        .merge_additional(&config.builtins_additional);
         let builtins_names = symbols.builtins_names();
         let (patched_module, patched_builtins_map) = patch_module(module, &builtins_names)?;
         let patcher = Patcher {
@@ -172,14 +174,20 @@ fn prepend_builtin_to_import_section(module: &mut Module, builtin: &Builtin) -> 
 
 fn prepend_builtin_to_names_section(module: &mut Module, builtin: &Builtin) -> Result<(), WError> {
     let import_name = builtin.import_name();
+    if module.names_section().is_none() {
+        let sections = module.sections_mut();
+        let function_names_subsection = FunctionNameSubsection::default();
+        let name_section = NameSection::new(None, Some(function_names_subsection), None);
+        sections.push(Section::Name(name_section));
+    }
     let names_section = module
         .names_section_mut()
         .expect("Names section not present");
-    let function_names_section = match names_section {
-        NameSection::Function(function_names_section) => function_names_section,
+    let function_names_subsection = match names_section.functions_mut() {
+        Some(function_names_subsection) => function_names_subsection,
         _ => xbail!(WError::InternalError("Unexpected names section")),
     };
-    prepend_function_name(function_names_section, import_name)?;
+    prepend_function_name(function_names_subsection, import_name)?;
     Ok(())
 }
 

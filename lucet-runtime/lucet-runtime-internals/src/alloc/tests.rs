@@ -7,7 +7,7 @@ macro_rules! alloc_tests {
         use $crate::alloc::Limits;
         use $crate::context::{Context, ContextHandle};
         use $crate::instance::InstanceInternal;
-        use $crate::module::{HeapSpec, MockModuleBuilder};
+        use $crate::module::{GlobalValue, HeapSpec, MockModuleBuilder};
         use $crate::region::Region;
         use $crate::val::Val;
 
@@ -348,15 +348,22 @@ macro_rules! alloc_tests {
                 assert_eq!(stack[LIMITS_STACK_SIZE - 1], 0xFF);
 
                 let globals = unsafe { inst.alloc_mut().globals_mut() };
-                assert_eq!(globals.len(), LIMITS_GLOBALS_SIZE / 8);
+                assert_eq!(
+                    globals.len(),
+                    LIMITS_GLOBALS_SIZE / std::mem::size_of::<GlobalValue>()
+                );
 
-                assert_eq!(globals[0], 0);
-                globals[0] = 0xFF;
-                assert_eq!(globals[0], 0xFF);
+                unsafe {
+                    assert_eq!(globals[0].i_64, 0);
+                    globals[0].i_64 = 0xFF;
+                    assert_eq!(globals[0].i_64, 0xFF);
+                }
 
-                assert_eq!(globals[globals.len() - 1], 0);
-                globals[globals.len() - 1] = 0xFF;
-                assert_eq!(globals[globals.len() - 1], 0xFF);
+                unsafe {
+                    assert_eq!(globals[globals.len() - 1].i_64, 0);
+                    globals[globals.len() - 1].i_64 = 0xFF;
+                    assert_eq!(globals[globals.len() - 1].i_64, 0xFF);
+                }
 
                 let sigstack = unsafe { inst.alloc_mut().sigstack_mut() };
                 assert_eq!(sigstack.len(), libc::SIGSTKSZ);
@@ -595,14 +602,16 @@ macro_rules! alloc_tests {
             let mut parent = ContextHandle::new();
             unsafe {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
+                let flag = std::sync::atomic::AtomicBool::new(false);
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
-                    heap_touching_child as *const extern "C" fn(),
+                    &flag,
+                    heap_touching_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
-                Context::swap(&mut parent, &child);
+                Context::swap(&mut parent, &child, &flag);
                 assert_eq!(inst.alloc().heap()[0], 123);
                 assert_eq!(inst.alloc().heap()[4095], 45);
             }
@@ -637,14 +646,16 @@ macro_rules! alloc_tests {
             let mut parent = ContextHandle::new();
             unsafe {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
+                let flag = std::sync::atomic::AtomicBool::new(false);
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
-                    stack_pattern_child as *const extern "C" fn(),
+                    &flag,
+                    stack_pattern_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
-                Context::swap(&mut parent, &child);
+                Context::swap(&mut parent, &child, &flag);
 
                 let stack_pattern = inst.alloc().heap_u64()[0] as usize;
                 assert!(stack_pattern > inst.alloc().slot().stack as usize);

@@ -1,7 +1,7 @@
-use crate::helpers::MockModuleBuilder;
-use lucet_module_data::{FunctionSpec, TrapCode, TrapSite};
+use crate::helpers::{MockExportBuilder, MockModuleBuilder};
+use lucet_module::{FunctionPointer, TrapCode, TrapSite};
 use lucet_runtime_internals::module::Module;
-use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
+use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
 
 pub fn mock_traps_module() -> Arc<dyn Module> {
@@ -9,7 +9,7 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         123
     }
 
-    extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) {
+    extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) -> () {
         extern "C" {
             // actually is defined in this file
             fn hostcall_test(vmctx: *mut lucet_vmctx);
@@ -20,29 +20,33 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         }
     }
 
-    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
+    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) -> () {
         loop {}
     }
 
-    extern "C" fn fatal(vmctx: *mut lucet_vmctx) {
-        let mut vmctx = unsafe { Vmctx::from_raw(vmctx) };
-        let heap_base = vmctx.heap_mut().as_mut_ptr();
+    extern "C" fn fatal(vmctx: *mut lucet_vmctx) -> () {
+        extern "C" {
+            fn lucet_vmctx_get_heap(vmctx: *mut lucet_vmctx) -> *mut u8;
+        }
 
-        // Using the default limits, each instance as of this writing takes up 0x200026000 bytes
-        // worth of virtual address space. We want to access a point beyond all the instances, so
-        // that memory is unmapped. We assume no more than 16 instances are mapped
-        // concurrently. This may change as the library, test configuration, linker, phase of moon,
-        // etc change, but for now it works.
         unsafe {
+            let heap_base = lucet_vmctx_get_heap(vmctx);
+
+            // Using the default limits, each instance as of this writing takes up 0x200026000 bytes
+            // worth of virtual address space. We want to access a point beyond all the instances,
+            // so that memory is unmapped. We assume no more than 16 instances are mapped
+            // concurrently. This may change as the library, test configuration, linker, phase of
+            // moon, etc change, but for now it works.
             *heap_base.offset(0x200026000 * 16) = 0;
         }
     }
 
-    extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) {
+    extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) -> () {
         use std::os::raw::c_char;
         extern "C" {
             fn guest_recoverable_get_ptr() -> *mut c_char;
         }
+
         unsafe {
             *guest_recoverable_get_ptr() = '\0' as c_char;
         }
@@ -79,36 +83,40 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         code: TrapCode::HeapOutOfBounds,
     }];
 
-    let function_manifest = &[
-        FunctionSpec::new(
-            guest_func_illegal_instr as *const extern "C" fn() as u64,
-            11,
-            ILLEGAL_INSTR_TRAPS.as_ptr() as u64,
-            ILLEGAL_INSTR_TRAPS.len() as u64,
-        ),
-        FunctionSpec::new(
-            guest_func_oob as *const extern "C" fn() as u64,
-            41,
-            OOB_TRAPS.as_ptr() as u64,
-            OOB_TRAPS.len() as u64,
-        ),
-    ];
-
     MockModuleBuilder::new()
-        .with_export_func(b"onetwothree", onetwothree as *const extern "C" fn())
+        .with_export_func(MockExportBuilder::new(
+            "onetwothree",
+            FunctionPointer::from_usize(onetwothree as usize),
+        ))
         .with_export_func(
-            b"illegal_instr",
-            guest_func_illegal_instr as *const extern "C" fn(),
+            MockExportBuilder::new(
+                "illegal_instr",
+                FunctionPointer::from_usize(guest_func_illegal_instr as usize),
+            )
+            .with_func_len(11)
+            .with_traps(ILLEGAL_INSTR_TRAPS),
         )
-        .with_export_func(b"oob", guest_func_oob as *const extern "C" fn())
-        .with_export_func(b"hostcall_main", hostcall_main as *const extern "C" fn())
-        .with_export_func(b"infinite_loop", infinite_loop as *const extern "C" fn())
-        .with_export_func(b"fatal", fatal as *const extern "C" fn())
         .with_export_func(
-            b"recoverable_fatal",
-            recoverable_fatal as *const extern "C" fn(),
+            MockExportBuilder::new("oob", FunctionPointer::from_usize(guest_func_oob as usize))
+                .with_func_len(41)
+                .with_traps(OOB_TRAPS),
         )
-        .with_function_manifest(function_manifest)
+        .with_export_func(MockExportBuilder::new(
+            "hostcall_main",
+            FunctionPointer::from_usize(hostcall_main as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            "infinite_loop",
+            FunctionPointer::from_usize(infinite_loop as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            "fatal",
+            FunctionPointer::from_usize(fatal as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            "recoverable_fatal",
+            FunctionPointer::from_usize(recoverable_fatal as usize),
+        ))
         .build()
 }
 
@@ -117,10 +125,10 @@ macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, siginfo_t, SIGSEGV};
-        use lucet_module_data::TrapCode;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            DlModule, Error, FaultDetails, Instance, Limits, Region, SignalBehavior,
+            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
+            Limits, Region, SignalBehavior, TrapCode,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -130,7 +138,9 @@ macro_rules! guest_fault_tests {
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::guest_fault::mock_traps_module;
-        use $crate::helpers::{test_ex, test_nonex, MockModuleBuilder};
+        use $crate::helpers::{
+            test_ex, test_nonex, FunctionPointer, MockExportBuilder, MockModuleBuilder,
+        };
 
         lazy_static! {
             static ref RECOVERABLE_PTR_LOCK: Mutex<()> = Mutex::new(());
@@ -175,13 +185,20 @@ macro_rules! guest_fault_tests {
 
         static HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
 
-        #[no_mangle]
-        unsafe extern "C" fn hostcall_test(vmctx: *mut lucet_vmctx) {
-            Vmctx::from_raw(vmctx).terminate(HOSTCALL_TEST_ERROR);
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn hostcall_test(
+                &mut _vmctx,
+            ) -> () {
+                lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
+            }
         }
 
         fn run_onetwothree(inst: &mut Instance) {
-            let retval = inst.run(b"onetwothree", &[]).expect("instance runs");
+            let retval = inst
+                .run("onetwothree", &[])
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(libc::c_int::from(retval), 123);
         }
 
@@ -195,7 +212,7 @@ macro_rules! guest_fault_tests {
                     .new_instance(module)
                     .expect("instance can be created");
 
-                match inst.run(b"illegal_instr", &[]) {
+                match inst.run("illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
                         assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
                     }
@@ -219,7 +236,7 @@ macro_rules! guest_fault_tests {
                     .new_instance(module)
                     .expect("instance can be created");
 
-                match inst.run(b"oob", &[]) {
+                match inst.run("oob", &[]) {
                     Err(Error::RuntimeFault(details)) => {
                         assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
                     }
@@ -243,7 +260,7 @@ macro_rules! guest_fault_tests {
                     .new_instance(module)
                     .expect("instance can be created");
 
-                match inst.run(b"hostcall_main", &[]) {
+                match inst.run("hostcall_main", &[]) {
                     Err(Error::RuntimeTerminated(term)) => {
                         assert_eq!(
                             *term
@@ -304,7 +321,7 @@ macro_rules! guest_fault_tests {
                 // returns. This will initially cause a segfault. The signal handler will recover
                 // from the segfault, map the page to read/write, and then return to the child
                 // code. The child code will then succeed, and the instance will exit successfully.
-                inst.run(b"recoverable_fatal", &[]).expect("instance runs");
+                inst.run("recoverable_fatal", &[]).expect("instance runs");
 
                 unsafe { recoverable_ptr_teardown() };
                 drop(lock);
@@ -349,7 +366,7 @@ macro_rules! guest_fault_tests {
                         // returns. This will initially cause a segfault. The signal handler will recover
                         // from the segfault, map the page to read/write, and then return to the child
                         // code. The child code will then succeed, and the instance will exit successfully.
-                        match inst.run(b"recoverable_fatal", &[]) {
+                        match inst.run("recoverable_fatal", &[]) {
                             Err(Error::RuntimeTerminated(_)) => (),
                             res => panic!("unexpected result: {:?}", res),
                         }
@@ -404,7 +421,7 @@ macro_rules! guest_fault_tests {
                 );
                 unsafe { sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds") };
 
-                match inst.run(b"illegal_instr", &[]) {
+                match inst.run("illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
                         assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
                     }
@@ -473,7 +490,7 @@ macro_rules! guest_fault_tests {
                         nix::unistd::alarm::set(1);
 
                         // run guest code that loops forever
-                        inst.run(b"infinite_loop", &[]).expect("instance runs");
+                        inst.run("infinite_loop", &[]).expect("instance runs");
                         // show that we never get here
                         std::process::exit(1);
                     }
@@ -506,8 +523,12 @@ macro_rules! guest_fault_tests {
                 *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = true;
             }
 
-            extern "C" fn sleepy_guest(_vmctx: *const lucet_vmctx) {
-                std::thread::sleep(std::time::Duration::from_millis(20));
+            lucet_hostcalls! {
+                pub unsafe extern "C" fn sleepy_guest(
+                    &mut _vmctx,
+                ) -> () {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
             }
 
             test_ex(|| {
@@ -528,7 +549,10 @@ macro_rules! guest_fault_tests {
                 // therefore testing that the host signal gets re-raised.
                 let child = std::thread::spawn(|| {
                     let module = MockModuleBuilder::new()
-                        .with_export_func(b"sleepy_guest", sleepy_guest as *const extern "C" fn())
+                        .with_export_func(MockExportBuilder::new(
+                            "sleepy_guest",
+                            FunctionPointer::from_usize(sleepy_guest as usize),
+                        ))
                         .build();
                     let region =
                         TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -536,7 +560,7 @@ macro_rules! guest_fault_tests {
                         .new_instance(module)
                         .expect("instance can be created");
 
-                    inst.run(b"sleepy_guest", &[]).expect("instance runs");
+                    inst.run("sleepy_guest", &[]).expect("instance runs");
                 });
 
                 // now trigger a segfault in the middle of running the guest
@@ -586,7 +610,7 @@ macro_rules! guest_fault_tests {
                                 .new_instance(module)
                                 .expect("instance can be created");
 
-                            inst.run(b"infinite_loop", &[]).expect("instance runs");
+                            inst.run("infinite_loop", &[]).expect("instance runs");
                             unreachable!()
                         });
 
@@ -626,7 +650,7 @@ macro_rules! guest_fault_tests {
                         // Child code should run code that will make an OOB beyond the guard page. This will
                         // cause the entire process to abort before returning from `run`
                         inst.set_fatal_handler(handler);
-                        inst.run(b"fatal", &[]).expect("instance runs");
+                        inst.run("fatal", &[]).expect("instance runs");
                         // Show that we never get here:
                         std::process::exit(1);
                     }
@@ -661,7 +685,7 @@ macro_rules! guest_fault_tests {
                         // Child code should run code that will make an OOB beyond the guard page. This will
                         // cause the entire process to abort before returning from `run`
                         inst.set_fatal_handler(fatal_handler_exit);
-                        inst.run(b"fatal", &[]).expect("instance runs");
+                        inst.run("fatal", &[]).expect("instance runs");
                         // Show that we never get here:
                         std::process::exit(1);
                     }
@@ -680,14 +704,15 @@ macro_rules! guest_fault_tests {
         #[test]
         fn sigaltstack_restores() {
             use libc::*;
+            use std::mem::MaybeUninit;
 
             test_nonex(|| {
                 // any alternate stack present before a thread runs an instance should be restored
                 // after the instance returns
+                let mut beforestack = MaybeUninit::<stack_t>::uninit();
                 let beforestack = unsafe {
-                    let mut beforestack = std::mem::uninitialized::<stack_t>();
-                    sigaltstack(std::ptr::null(), &mut beforestack as *mut stack_t);
-                    beforestack
+                    sigaltstack(std::ptr::null(), beforestack.as_mut_ptr());
+                    beforestack.assume_init()
                 };
 
                 let module = mock_traps_module();
@@ -698,10 +723,10 @@ macro_rules! guest_fault_tests {
                     .expect("instance can be created");
                 run_onetwothree(&mut inst);
 
+                let mut afterstack = MaybeUninit::<stack_t>::uninit();
                 let afterstack = unsafe {
-                    let mut afterstack = std::mem::uninitialized::<stack_t>();
-                    sigaltstack(std::ptr::null(), &mut afterstack as *mut stack_t);
-                    afterstack
+                    sigaltstack(std::ptr::null(), afterstack.as_mut_ptr());
+                    afterstack.assume_init()
                 };
 
                 assert_eq!(beforestack.ss_sp, afterstack.ss_sp);

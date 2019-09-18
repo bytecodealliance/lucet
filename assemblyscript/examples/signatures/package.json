@@ -1,13 +1,11 @@
 {
-  "scripts": {
-    "asbuild:untouched": "asc assembly/index.ts -b build/untouched.wasm",
-    "asbuild:small": "asc assembly/index.ts -b build/small.wasm -t build/small.wat -O3z --importMemory",
-    "asbuild:optimized": "asc assembly/index.ts -b build/optimized.wasm -t build/optimized.wat -O3 --importMemory",
-    "asbuild": "npm run asbuild:optimized",
-    "test": "asp"
-  },
-  "devDependencies": {
-    "as-pect": "github:jtenner/as-pect",
-    "assemblyscript": "github:AssemblyScript/assemblyscript"
-  }
+    "scripts": {
+        "asbuild:untouched": "asc assembly/index.ts -b build/untouched.wasm --runtime stub --use abort=wasi_abort",
+        "asbuild:small": "asc assembly/index.ts -b build/small.wasm -t build/small.wat -O3z --runtime stub --use abort=wasi_abort",
+        "asbuild:optimized": "asc assembly/index.ts -b build/optimized.wasm -t build/optimized.wat -O3 --runtime stub --use abort=wasi_abort",
+        "asbuild": "npm run asbuild:optimized"
+    },
+    "devDependencies": {
+        "assemblyscript": "github:AssemblyScript/assemblyscript"
+    }
 }

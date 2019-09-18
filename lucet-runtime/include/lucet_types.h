@@ -2,7 +2,7 @@
 #define LUCET_TYPES_H
 
 #ifndef _XOPEN_SOURCE
-# define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 500
 #endif
 
 #include <stdarg.h>
@@ -11,9 +11,9 @@
 #include <stdlib.h>
 
 #ifdef __APPLE__
-# include <sys/ucontext.h>
+#include <sys/ucontext.h>
 #else
-# include <ucontext.h>
+#include <ucontext.h>
 #endif
 
 enum lucet_error {
@@ -22,11 +22,15 @@ enum lucet_error {
     lucet_error_region_full,
     lucet_error_module,
     lucet_error_limits_exceeded,
+    lucet_error_no_linear_memory,
     lucet_error_symbol_not_found,
     lucet_error_func_not_found,
     lucet_error_runtime_fault,
     lucet_error_runtime_terminated,
     lucet_error_dl,
+    lucet_error_instance_not_returned,
+    lucet_error_instance_not_yielded,
+    lucet_error_start_yielded,
     lucet_error_internal,
     lucet_error_unsupported,
 };
@@ -37,32 +41,27 @@ enum lucet_signal_behavior {
     lucet_signal_behavior_terminate,
 };
 
-enum lucet_state_tag {
-    lucet_state_tag_returned,
-    lucet_state_tag_running,
-    lucet_state_tag_fault,
-    lucet_state_tag_terminated,
-};
-
 enum lucet_terminated_reason {
     lucet_terminated_reason_signal,
-    lucet_terminated_reason_get_embed_ctx,
+    lucet_terminated_reason_ctx_not_found,
+    lucet_terminated_reason_yield_type_mismatch,
+    lucet_terminated_reason_borrow_error,
     lucet_terminated_reason_provided,
 };
 
-enum lucet_trapcode_type {
-    lucet_trapcode_type_stack_overflow,
-    lucet_trapcode_type_heap_out_of_bounds,
-    lucet_trapcode_type_out_of_bounds,
-    lucet_trapcode_type_indirect_call_to_null,
-    lucet_trapcode_type_bad_signature,
-    lucet_trapcode_type_integer_overflow,
-    lucet_trapcode_type_integer_div_by_zero,
-    lucet_trapcode_type_bad_conversion_to_integer,
-    lucet_trapcode_type_interrupt,
-    lucet_trapcode_type_table_out_of_bounds,
-    lucet_trapcode_type_user,
-    lucet_trapcode_type_unknown,
+enum lucet_trapcode {
+    lucet_trapcode_stack_overflow,
+    lucet_trapcode_heap_out_of_bounds,
+    lucet_trapcode_out_of_bounds,
+    lucet_trapcode_indirect_call_to_null,
+    lucet_trapcode_bad_signature,
+    lucet_trapcode_integer_overflow,
+    lucet_trapcode_integer_div_by_zero,
+    lucet_trapcode_bad_conversion_to_integer,
+    lucet_trapcode_interrupt,
+    lucet_trapcode_table_out_of_bounds,
+    lucet_trapcode_user,
+    lucet_trapcode_unknown,
 };
 
 enum lucet_val_type {
@@ -125,13 +124,8 @@ struct lucet_alloc_limits {
     uint64_t globals_size;
 };
 
-struct lucet_trapcode {
-    enum lucet_trapcode_type code;
-    uint16_t                 tag;
-};
-
-typedef enum lucet_signal_behavior (*lucet_signal_handler)(struct lucet_instance *      inst,
-                                                           const struct lucet_trapcode *trap,
+typedef enum lucet_signal_behavior (*lucet_signal_handler)(struct lucet_instance *   inst,
+                                                           const enum lucet_trapcode trap,
                                                            int signum, const siginfo_t *siginfo,
                                                            const void *context);
 
@@ -142,20 +136,20 @@ struct lucet_untyped_retval {
     char gp[8];
 };
 
+#define LUCET_MODULE_ADDR_DETAILS_NAME_LEN 256
+
 struct lucet_module_addr_details {
-    bool        module_code_resolvable;
-    bool        in_module_code;
-    const char *file_name;
-    const char *sym_name;
+    bool module_code_resolvable;
+    bool in_module_code;
+    char file_name[LUCET_MODULE_ADDR_DETAILS_NAME_LEN];
+    char sym_name[LUCET_MODULE_ADDR_DETAILS_NAME_LEN];
 };
 
-struct lucet_runtime_fault {
+struct lucet_runtime_faulted {
     bool                             fatal;
-    struct lucet_trapcode            trapcode;
+    enum lucet_trapcode              trapcode;
     uintptr_t                        rip_addr;
     struct lucet_module_addr_details rip_addr_details;
-    siginfo_t                        signal_info;
-    ucontext_t                       context;
 };
 
 struct lucet_terminated {
@@ -163,16 +157,29 @@ struct lucet_terminated {
     void *                       provided;
 };
 
-union lucet_state_val {
-    struct lucet_untyped_retval returned;
-    bool                        running;
-    struct lucet_runtime_fault  fault;
-    struct lucet_terminated     terminated;
+struct lucet_yielded {
+    void *val;
 };
 
-struct lucet_state {
-    enum lucet_state_tag  tag;
-    union lucet_state_val val;
+union lucet_result_val {
+    struct lucet_untyped_retval  returned;
+    struct lucet_yielded         yielded;
+    struct lucet_runtime_faulted faulted;
+    struct lucet_terminated      terminated;
+    enum lucet_error             errored;
+};
+
+enum lucet_result_tag {
+    lucet_result_tag_returned,
+    lucet_result_tag_yielded,
+    lucet_result_tag_faulted,
+    lucet_result_tag_terminated,
+    lucet_result_tag_errored,
+};
+
+struct lucet_result {
+    enum lucet_result_tag  tag;
+    union lucet_result_val val;
 };
 
 union lucet_retval_gp {

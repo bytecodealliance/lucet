@@ -2,6 +2,7 @@ use crate::error::Error;
 use crate::module::Module;
 use crate::region::RegionInternal;
 use libc::{c_void, SIGSTKSZ};
+use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
 use std::sync::{Arc, Once, Weak};
 
@@ -290,18 +291,18 @@ impl Alloc {
     }
 
     /// Return the globals as a slice.
-    pub unsafe fn globals(&self) -> &[i64] {
+    pub unsafe fn globals(&self) -> &[GlobalValue] {
         std::slice::from_raw_parts(
-            self.slot().globals as *const i64,
-            self.slot().limits.globals_size / 8,
+            self.slot().globals as *const GlobalValue,
+            self.slot().limits.globals_size / std::mem::size_of::<GlobalValue>(),
         )
     }
 
     /// Return the globals as a mutable slice.
-    pub unsafe fn globals_mut(&mut self) -> &mut [i64] {
+    pub unsafe fn globals_mut(&mut self) -> &mut [GlobalValue] {
         std::slice::from_raw_parts_mut(
-            self.slot().globals as *mut i64,
-            self.slot().limits.globals_size / 8,
+            self.slot().globals as *mut GlobalValue,
+            self.slot().limits.globals_size / std::mem::size_of::<GlobalValue>(),
         )
     }
 

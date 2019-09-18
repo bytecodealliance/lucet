@@ -1,4 +1,4 @@
-use cranelift_codegen::ir::{types, AbiParam, ArgumentPurpose, Signature};
+use cranelift_codegen::ir::{types, AbiParam, Signature};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use std::collections::HashMap;
 
@@ -20,10 +20,7 @@ impl Runtime {
             (
                 "lucet_vmctx_current_memory".to_owned(),
                 Signature {
-                    params: vec![AbiParam::special(
-                        target.pointer_type(),
-                        ArgumentPurpose::VMContext,
-                    )],
+                    params: vec![],
                     returns: vec![AbiParam::new(types::I32)],
                     call_conv: target.default_call_conv,
                 },
@@ -35,7 +32,6 @@ impl Runtime {
                 "lucet_vmctx_grow_memory".to_owned(),
                 Signature {
                     params: vec![
-                        AbiParam::special(target.pointer_type(), ArgumentPurpose::VMContext),
                         AbiParam::new(types::I32), // wasm pages to grow
                     ],
                     returns: vec![AbiParam::new(types::I32)],

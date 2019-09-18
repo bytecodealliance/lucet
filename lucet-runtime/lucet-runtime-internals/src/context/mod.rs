@@ -196,7 +196,7 @@ impl ContextHandle {
         stack: &mut [u64],
         parent: &mut ContextHandle,
         flag: &AtomicBool,
-        fptr: *const extern "C" fn(),
+        fptr: usize,
         args: &[Val],
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
@@ -254,7 +254,8 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     entrypoint as *const extern "C" fn(),
+    ///     &std::sync::atomic::AtomicBool::new(false),
+    ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
     /// assert!(res.is_ok());
@@ -279,7 +280,8 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     entrypoint as *const extern "C" fn(),
+    ///     &std::sync::atomic::AtomicBool::new(false),
+    ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
     /// assert!(res.is_ok());
@@ -289,7 +291,7 @@ impl Context {
         parent: &mut Context,
         child: &mut Context,
         flag: &AtomicBool,
-        fptr: *const extern "C" fn(),
+        fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
         if !stack_is_aligned(stack) {
@@ -422,7 +424,8 @@ impl Context {
     ///     drop(xs);
     ///
     ///     let mut parent = Context::new();
-    ///     unsafe { Context::swap(&mut parent, child); }
+    ///     let flag = std::sync::atomic::AtomicBool::new(false);
+    ///     unsafe { Context::swap(&mut parent, child, &flag); }
     ///     // implicit `drop(x)` and `drop(xs)` here never get called unless we swap back
     /// }
     /// ```
@@ -438,22 +441,21 @@ impl Context {
     /// # let mut stack = vec![0u64; 1024].into_boxed_slice();
     /// let mut parent = Context::new();
     /// let mut child = Context::new();
+    /// let flag = std::sync::atomic::AtomicBool::new(false);
     /// Context::init(
     ///     &mut stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     entrypoint as *const extern "C" fn(),
+    ///     &flag,
+    ///     entrypoint as usize,
     ///     &[],
     /// ).unwrap();
     ///
-    /// unsafe { Context::swap(&mut parent, &child); }
+    /// unsafe { Context::swap(&mut parent, &child, &flag); }
     /// ```
     #[inline]
     pub unsafe fn swap(from: &mut Context, to: &Context, flag: &AtomicBool) {
-        lucet_context_swap(
-            from as *mut Context,
-            to as *const Context,
-        );
+        lucet_context_swap(from as *mut Context, to as *const Context);
     }
 
     /// Swap to another context without saving the current context.

@@ -7,6 +7,26 @@ use std::arch::x86_64::{
     _mm_storeu_pd, _mm_storeu_ps,
 };
 
+use lucet_module::ValueType;
+
+impl Val {
+    pub fn value_type(&self) -> ValueType {
+        match self {
+            // USize, ISize, and CPtr are all as fits for definitions on the target architecture
+            // (wasm) which is all 32-bit.
+            Val::USize(_) | Val::ISize(_) | Val::CPtr(_) => ValueType::I32,
+            Val::GuestPtr(_) => ValueType::I32,
+            Val::I8(_) | Val::U8(_) | Val::I16(_) | Val::U16(_) | Val::I32(_) | Val::U32(_) => {
+                ValueType::I32
+            }
+            Val::I64(_) | Val::U64(_) => ValueType::I64,
+            Val::Bool(_) => ValueType::I32,
+            Val::F32(_) => ValueType::F32,
+            Val::F64(_) => ValueType::F64,
+        }
+    }
+}
+
 /// Typed values used for passing arguments into guest functions.
 #[derive(Clone, Copy, Debug)]
 pub enum Val {
@@ -145,7 +165,7 @@ pub struct UntypedRetVal {
 }
 
 impl std::fmt::Display for UntypedRetVal {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<untyped return value>")
     }
 }
@@ -153,6 +173,21 @@ impl std::fmt::Display for UntypedRetVal {
 impl UntypedRetVal {
     pub(crate) fn new(gp: u64, fp: __m128) -> UntypedRetVal {
         UntypedRetVal { gp, fp }
+    }
+}
+
+impl From<RegVal> for UntypedRetVal {
+    fn from(reg: RegVal) -> UntypedRetVal {
+        match reg {
+            RegVal::GpReg(r) => UntypedRetVal::new(r, unsafe { _mm_setzero_ps() }),
+            RegVal::FpReg(r) => UntypedRetVal::new(0, r),
+        }
+    }
+}
+
+impl<T: Into<Val>> From<T> for UntypedRetVal {
+    fn from(v: T) -> UntypedRetVal {
+        val_to_reg(&v.into()).into()
     }
 }
 

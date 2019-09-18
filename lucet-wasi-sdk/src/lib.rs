@@ -1,3 +1,5 @@
+#![deny(bare_trait_objects)]
+
 use failure::{Error, Fail};
 use std::env;
 use std::io::Write;
@@ -58,7 +60,7 @@ fn wasi_sysroot() -> PathBuf {
         Err(_) => {
             let mut path = wasi_sdk();
             path.push("share");
-            path.push("sysroot");
+            path.push("wasi-sysroot");
             path
         }
     }
@@ -86,8 +88,8 @@ pub trait CompileOpts {
     fn cflag<S: AsRef<str>>(&mut self, cflag: S);
     fn with_cflag<S: AsRef<str>>(self, cflag: S) -> Self;
 
-    fn include<S: AsRef<str>>(&mut self, include: S);
-    fn with_include<S: AsRef<str>>(self, include: S) -> Self;
+    fn include<S: AsRef<Path>>(&mut self, include: S);
+    fn with_include<S: AsRef<Path>>(self, include: S) -> Self;
 }
 
 impl CompileOpts for Compile {
@@ -100,11 +102,12 @@ impl CompileOpts for Compile {
         self
     }
 
-    fn include<S: AsRef<str>>(&mut self, include: S) {
-        self.cflags.push(format!("-I{}", include.as_ref()));
+    fn include<S: AsRef<Path>>(&mut self, include: S) {
+        self.cflags
+            .push(format!("-I{}", include.as_ref().display()));
     }
 
-    fn with_include<S: AsRef<str>>(mut self, include: S) -> Self {
+    fn with_include<S: AsRef<Path>>(mut self, include: S) -> Self {
         self.include(include);
         self
     }
@@ -149,6 +152,9 @@ impl Compile {
         cmd.arg(output.as_ref());
         for cflag in self.cflags.iter() {
             cmd.arg(cflag);
+        }
+        if self.print_output {
+            println!("running: {:?}", cmd);
         }
         let run = cmd.output().expect("clang executable exists");
         CompileError::check(run, self.print_output)
@@ -208,6 +214,9 @@ impl Link {
         for ldflag in self.ldflags.iter() {
             cmd.arg(format!("-Wl,{}", ldflag));
         }
+        if self.print_output {
+            println!("running: {:?}", cmd);
+        }
         let run = cmd.output().expect("clang executable exists");
         CompileError::check(run, self.print_output)
     }
@@ -266,19 +275,19 @@ impl<'t> LinkOpt<'t> {
 }
 
 pub trait LinkOpts {
-    fn link_opt(&mut self, link_opt: LinkOpt);
-    fn with_link_opt(self, link_opt: LinkOpt) -> Self;
+    fn link_opt(&mut self, link_opt: LinkOpt<'_>);
+    fn with_link_opt(self, link_opt: LinkOpt<'_>) -> Self;
 
     fn export<S: AsRef<str>>(&mut self, export: S);
     fn with_export<S: AsRef<str>>(self, export: S) -> Self;
 }
 
 impl<T: AsLink> LinkOpts for T {
-    fn link_opt(&mut self, link_opt: LinkOpt) {
+    fn link_opt(&mut self, link_opt: LinkOpt<'_>) {
         self.as_link().ldflags.extend(link_opt.as_ldflags());
     }
 
-    fn with_link_opt(mut self, link_opt: LinkOpt) -> Self {
+    fn with_link_opt(mut self, link_opt: LinkOpt<'_>) -> Self {
         self.link_opt(link_opt);
         self
     }
@@ -303,13 +312,13 @@ impl<T: AsLink> CompileOpts for T {
         self
     }
 
-    fn include<S: AsRef<str>>(&mut self, include: S) {
+    fn include<S: AsRef<Path>>(&mut self, include: S) {
         self.as_link()
             .cflags
-            .push(format!("-I{}", include.as_ref()));
+            .push(format!("-I{}", include.as_ref().display()));
     }
 
-    fn with_include<S: AsRef<str>>(mut self, include: S) -> Self {
+    fn with_include<S: AsRef<Path>>(mut self, include: S) -> Self {
         self.include(include);
         self
     }
@@ -336,8 +345,12 @@ impl Lucetc {
         }
     }
 
-    pub fn print_output(mut self, print: bool) -> Self {
+    pub fn print_output(&mut self, print: bool) {
         self.link.print_output = print;
+    }
+
+    pub fn with_print_output(mut self, print: bool) -> Self {
+        self.print_output(print);
         self
     }
 
@@ -362,98 +375,8 @@ impl lucetc::AsLucetc for Lucetc {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-    #[test]
-    fn wasi_sdk_installed() {
-        let clang = wasm_clang();
-        assert!(clang.exists(), "clang executable exists");
-    }
-
-    fn test_file(name: &str) -> PathBuf {
-        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        p.push("test");
-        p.push(name);
-        assert!(p.exists(), "test file does not exist");
-        p
-    }
-
-    #[test]
-    fn compile_a() {
-        let tmp = TempDir::new().expect("create temporary directory");
-
-        let compiler = Compile::new(test_file("a.c"));
-
-        let objfile = tmp.path().join("a.o");
-
-        compiler.compile(objfile.clone()).expect("compile a.c");
-
-        assert!(objfile.exists(), "object file created");
-
-        let mut linker = Link::new(&[objfile]);
-        linker.cflag("-nostartfiles");
-        linker.link_opt(LinkOpt::NoDefaultEntryPoint);
-
-        let wasmfile = tmp.path().join("a.wasm");
-
-        linker.link(wasmfile.clone()).expect("link a.wasm");
-
-        assert!(wasmfile.exists(), "wasm file created");
-    }
-
-    #[test]
-    fn compile_b() {
-        let tmp = TempDir::new().expect("create temporary directory");
-
-        let compiler = Compile::new(test_file("b.c"));
-
-        let objfile = tmp.path().join("b.o");
-
-        compiler.compile(objfile.clone()).expect("compile b.c");
-
-        assert!(objfile.exists(), "object file created");
-
-        let mut linker = Link::new(&[objfile]);
-        linker.cflag("-nostartfiles");
-        linker.link_opt(LinkOpt::NoDefaultEntryPoint);
-        linker.link_opt(LinkOpt::AllowUndefinedAll);
-
-        let wasmfile = tmp.path().join("b.wasm");
-
-        linker.link(wasmfile.clone()).expect("link b.wasm");
-
-        assert!(wasmfile.exists(), "wasm file created");
-    }
-
-    #[test]
-    fn compile_a_and_b() {
-        let tmp = TempDir::new().expect("create temporary directory");
-
-        let mut linker = Link::new(&[test_file("a.c"), test_file("b.c")]);
-        linker.cflag("-nostartfiles");
-        linker.link_opt(LinkOpt::NoDefaultEntryPoint);
-
-        let wasmfile = tmp.path().join("ab.wasm");
-
-        linker.link(wasmfile.clone()).expect("link ab.wasm");
-
-        assert!(wasmfile.exists(), "wasm file created");
-    }
-
-    #[test]
-    fn compile_to_lucet() {
-        let tmp = TempDir::new().expect("create temporary directory");
-
-        let mut lucetc = Lucetc::new(&[test_file("a.c"), test_file("b.c")]);
-        lucetc.cflag("-nostartfiles");
-        lucetc.link_opt(LinkOpt::NoDefaultEntryPoint);
-
-        let so_file = tmp.path().join("ab.so");
-
-        lucetc.build(&so_file).expect("compile ab.so");
-
-        assert!(so_file.exists(), "so file created");
-    }
+#[test]
+fn wasi_sdk_installed() {
+    let clang = wasm_clang();
+    assert!(clang.exists(), "clang executable exists");
 }

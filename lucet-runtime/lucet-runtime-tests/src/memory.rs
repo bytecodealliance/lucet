@@ -16,7 +16,10 @@ macro_rules! memory_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            let retval = inst.run(b"main", &[]).expect("instance runs");
+            let retval = inst
+                .run("main", &[])
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(u32::from(retval), 4);
         }
 
@@ -29,7 +32,7 @@ macro_rules! memory_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            inst.run(b"main", &[]).expect("instance runs");
+            inst.run("main", &[]).expect("instance runs");
 
             let heap = inst.heap_u32();
             // guest puts the result of the grow_memory(1) call in heap[0]; based on the current settings,

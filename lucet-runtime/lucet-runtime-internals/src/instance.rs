@@ -1,27 +1,24 @@
 mod siginfo_ext;
 pub mod signals;
+pub mod state;
 
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
+pub use crate::instance::state::State;
 
 use crate::alloc::{Alloc, HOST_PAGE_SIZE_EXPECTED};
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
-use crate::instance::siginfo_ext::SiginfoExt;
-use crate::module::{self, Global, Module};
+use crate::module::{self, FunctionHandle, FunctionPointer, Global, GlobalValue, Module, TrapCode};
 use crate::region::RegionInternal;
-use crate::sysdeps::UContext;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
-use libc::{
-    c_void, pthread_kill, pthread_self, pthread_t, siginfo_t, uintptr_t, SIGALRM, SIGBUS, SIGSEGV,
-};
-use lucet_module_data::TrapCode;
-
+use libc::{c_void, pthread_kill, pthread_self, pthread_t, siginfo_t, uintptr_t, SIGALRM};
+use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
 use std::any::Any;
-use std::cell::{RefCell, UnsafeCell};
-use std::ffi::{CStr, CString};
+use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
+use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
@@ -174,10 +171,41 @@ impl Drop for InstanceHandle {
 /// WebAssembly heap.
 ///
 /// `Instance`s are never created by runtime users directly, but rather are acquired from
-/// [`Region`](trait.Region.html)s and often accessed through
-/// [`InstanceHandle`](struct.InstanceHandle.html) smart pointers. This guarantees that instances
+/// [`Region`](../region/trait.Region.html)s and often accessed through
+/// [`InstanceHandle`](../instance/struct.InstanceHandle.html) smart pointers. This guarantees that instances
 /// and their fields are never moved in memory, otherwise raw pointers in the metadata could be
 /// unsafely invalidated.
+///
+/// An instance occupies one 4096-byte page in memory, with a layout like:
+/// ```text
+/// 0xXXXXX000:
+///   Instance {
+///     .magic
+///     .embed_ctx
+///      ... etc ...
+///   }
+///
+///   // unused space
+///
+///   InstanceInternals {
+///     .globals
+///     .instruction_counter
+///   } // last address *inside* `InstanceInternals` is 0xXXXXXFFF
+/// 0xXXXXY000: // start of next page, VMContext points here
+///   Heap {
+///     ..
+///   }
+/// ```
+///
+/// This layout allows modules to tightly couple to a handful of fields related to the instance,
+/// rather than possibly requiring compiler-side changes (and recompiles) whenever `Instance`
+/// changes.
+///
+/// It also obligates `Instance` to be immediately followed by the heap, but otherwise leaves the
+/// locations of the stack, globals, and any other data, to be implementation-defined by the
+/// `Region` that actually creates `Slot`s onto which `Instance` are mapped.
+/// For information about the layout of all instance-related memory, see the documentation of
+/// [MmapRegion](../region/mmap/struct.MmapRegion.html).
 #[repr(C)]
 #[repr(align(4096))]
 pub struct Instance {
@@ -192,13 +220,13 @@ pub struct Instance {
     module: Arc<dyn Module>,
 
     /// The `Context` in which the guest program runs
-    ctx: Context,
+    pub(crate) ctx: Context,
 
     /// Instance state and error information
     pub(crate) state: State,
 
     /// Small mutexed state used for remote kill switch functionality
-    kill_state: Arc<KillState>,
+    pub(crate) kill_state: Arc<KillState>,
 
     /// The memory allocated for this instance
     alloc: Alloc,
@@ -222,7 +250,10 @@ pub struct Instance {
     >,
 
     /// Pointer to the function used as the entrypoint (for use in backtraces)
-    entrypoint: *const extern "C" fn(),
+    entrypoint: Option<FunctionPointer>,
+
+    /// The value passed back to the guest when resuming a yielded instance.
+    pub(crate) resumed_val: Option<Box<dyn Any + 'static>>,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -242,6 +273,114 @@ impl Drop for Instance {
         // Reset magic to indicate this instance
         // is no longer valid
         self.magic = 0;
+    }
+}
+
+/// The result of running or resuming an [`Instance`](struct.Instance.html).
+#[derive(Debug)]
+pub enum RunResult {
+    /// An instance returned with a value.
+    ///
+    /// The actual type of the contained value depends on the return type of the guest function that
+    /// was called. For guest functions with no return value, it is undefined behavior to do
+    /// anything with this value.
+    Returned(UntypedRetVal),
+    /// An instance yielded, potentially with a value.
+    ///
+    /// This arises when a hostcall invokes one of the
+    /// [`Vmctx::yield_*()`](vmctx/struct.Vmctx.html#method.yield_) family of methods. Depending on which
+    /// variant is used, the `YieldedVal` may contain a value passed from the guest context to the
+    /// host.
+    ///
+    /// An instance that has yielded may only be resumed
+    /// ([with](struct.Instance.html#method.resume_with_val) or
+    /// [without](struct.Instance.html#method.resume) a value to returned to the guest),
+    /// [reset](struct.Instance.html#method.reset), or dropped. Attempting to run an instance from a
+    /// new entrypoint after it has yielded but without first resetting will result in an error.
+    Yielded(YieldedVal),
+}
+
+impl RunResult {
+    /// Try to get a return value from a run result, returning `Error::InstanceNotReturned` if the
+    /// instance instead yielded.
+    pub fn returned(self) -> Result<UntypedRetVal, Error> {
+        match self {
+            RunResult::Returned(rv) => Ok(rv),
+            RunResult::Yielded(_) => Err(Error::InstanceNotReturned),
+        }
+    }
+
+    /// Try to get a reference to a return value from a run result, returning
+    /// `Error::InstanceNotReturned` if the instance instead yielded.
+    pub fn returned_ref(&self) -> Result<&UntypedRetVal, Error> {
+        match self {
+            RunResult::Returned(rv) => Ok(rv),
+            RunResult::Yielded(_) => Err(Error::InstanceNotReturned),
+        }
+    }
+
+    /// Returns `true` if the instance returned a value.
+    pub fn is_returned(&self) -> bool {
+        self.returned_ref().is_ok()
+    }
+
+    /// Unwraps a run result into a return value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the instance instead yielded, with a panic message including the passed message.
+    pub fn expect_returned(self, msg: &str) -> UntypedRetVal {
+        self.returned().expect(msg)
+    }
+
+    /// Unwraps a run result into a returned value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the instance instead yielded.
+    pub fn unwrap_returned(self) -> UntypedRetVal {
+        self.returned().unwrap()
+    }
+
+    /// Try to get a yielded value from a run result, returning `Error::InstanceNotYielded` if the
+    /// instance instead returned.
+    pub fn yielded(self) -> Result<YieldedVal, Error> {
+        match self {
+            RunResult::Returned(_) => Err(Error::InstanceNotYielded),
+            RunResult::Yielded(yv) => Ok(yv),
+        }
+    }
+
+    /// Try to get a reference to a yielded value from a run result, returning
+    /// `Error::InstanceNotYielded` if the instance instead returned.
+    pub fn yielded_ref(&self) -> Result<&YieldedVal, Error> {
+        match self {
+            RunResult::Returned(_) => Err(Error::InstanceNotYielded),
+            RunResult::Yielded(yv) => Ok(yv),
+        }
+    }
+
+    /// Returns `true` if the instance yielded.
+    pub fn is_yielded(&self) -> bool {
+        self.yielded_ref().is_ok()
+    }
+
+    /// Unwraps a run result into a yielded value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the instance instead returned, with a panic message including the passed message.
+    pub fn expect_yielded(self, msg: &str) -> YieldedVal {
+        self.yielded().expect(msg)
+    }
+
+    /// Unwraps a run result into a yielded value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the instance instead returned.
+    pub fn unwrap_yielded(self) -> YieldedVal {
+        self.yielded().unwrap()
     }
 }
 
@@ -293,11 +432,11 @@ impl Instance {
     /// # use lucet_runtime_internals::instance::InstanceHandle;
     /// # let instance: InstanceHandle = unimplemented!();
     /// // regular execution yields `Ok(UntypedRetVal)`
-    /// let retval = instance.run(b"factorial", &[5u64.into()]).unwrap();
+    /// let retval = instance.run("factorial", &[5u64.into()]).unwrap().unwrap_returned();
     /// assert_eq!(u64::from(retval), 120u64);
     ///
     /// // runtime faults yield `Err(Error)`
-    /// let result = instance.run(b"faulting_function", &[]);
+    /// let result = instance.run("faulting_function", &[]);
     /// assert!(result.is_err());
     /// ```
     ///
@@ -317,7 +456,7 @@ impl Instance {
     ///
     /// For the moment, we do not mark this as `unsafe` in the Rust type system, but that may change
     /// in the future.
-    pub fn run(&mut self, entrypoint: &[u8], args: &[Val]) -> Result<UntypedRetVal, Error> {
+    pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<RunResult, Error> {
         let func = self.module.get_export_func(entrypoint)?;
         self.run_func(func, &args)
     }
@@ -325,15 +464,63 @@ impl Instance {
     /// Run a function with arguments in the guest context from the [WebAssembly function
     /// table](https://webassembly.github.io/spec/core/syntax/modules.html#tables).
     ///
+    /// # Safety
+    ///
     /// The same safety caveats of [`Instance::run()`](struct.Instance.html#method.run) apply.
     pub fn run_func_idx(
         &mut self,
         table_idx: u32,
         func_idx: u32,
         args: &[Val],
-    ) -> Result<UntypedRetVal, Error> {
+    ) -> Result<RunResult, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
         self.run_func(func, &args)
+    }
+
+    /// Resume execution of an instance that has yielded without providing a value to the guest.
+    ///
+    /// This should only be used when the guest yielded with
+    /// [`Vmctx::yield_()`](vmctx/struct.Vmctx.html#method.yield_) or
+    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val). Otherwise, this call will
+    /// fail with `Error::InvalidArgument`.
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub fn resume(&mut self) -> Result<RunResult, Error> {
+        self.resume_with_val(EmptyYieldVal)
+    }
+
+    /// Resume execution of an instance that has yielded, providing a value to the guest.
+    ///
+    /// The type of the provided value must match the type expected by
+    /// [`Vmctx::yield_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_expecting_val) or
+    /// [`Vmctx::yield_val_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_val_expecting_val).
+    ///
+    /// The provided value will be dynamically typechecked against the type the guest expects to
+    /// receive, and if that check fails, this call will fail with `Error::InvalidArgument`.
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
+        match &self.state {
+            State::Yielded { expecting, .. } => {
+                // make sure the resumed value is of the right type
+                if !expecting.is::<PhantomData<A>>() {
+                    return Err(Error::InvalidArgument(
+                        "type mismatch between yielded instance expected value and resumed value",
+                    ));
+                }
+            }
+            _ => return Err(Error::InvalidArgument("can only resume a yielded instance")),
+        }
+
+        self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static>);
+
+        self.swap_and_return()
     }
 
     /// Reset the instance's heap and global variables to their initial state.
@@ -361,13 +548,11 @@ impl Instance {
                         i
                     )));
                 }
-                Global::Def { def } => def.init_val(),
+                Global::Def(def) => def.init_val(),
             };
         }
 
-        self.state = State::Ready {
-            retval: UntypedRetVal::default(),
-        };
+        self.state = State::Ready;
 
         self.run_start()?;
 
@@ -411,12 +596,12 @@ impl Instance {
     }
 
     /// Return the WebAssembly globals as a slice of `i64`s.
-    pub fn globals(&self) -> &[i64] {
+    pub fn globals(&self) -> &[GlobalValue] {
         unsafe { self.alloc.globals() }
     }
 
     /// Return the WebAssembly globals as a mutable slice of `i64`s.
-    pub fn globals_mut(&mut self) -> &mut [i64] {
+    pub fn globals_mut(&mut self) -> &mut [GlobalValue] {
         unsafe { self.alloc.globals_mut() }
     }
 
@@ -432,13 +617,13 @@ impl Instance {
     }
 
     /// Get a reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx<T: Any>(&self) -> Option<&T> {
-        self.embed_ctx.get::<T>()
+    pub fn get_embed_ctx<T: Any>(&self) -> Option<Result<Ref<'_, T>, BorrowError>> {
+        self.embed_ctx.try_get::<T>()
     }
 
     /// Get a mutable reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<&mut T> {
-        self.embed_ctx.get_mut::<T>()
+    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<Result<RefMut<'_, T>, BorrowMutError>> {
+        self.embed_ctx.try_get_mut::<T>()
     }
 
     /// Insert a context value.
@@ -512,6 +697,16 @@ impl Instance {
             state: Arc::downgrade(&self.kill_state),
         }
     }
+
+    #[inline]
+    pub fn get_instruction_count(&self) -> u64 {
+        self.get_instance_implicits().instruction_count
+    }
+
+    #[inline]
+    pub fn set_instruction_count(&mut self, instruction_count: u64) {
+        self.get_instance_implicits_mut().instruction_count = instruction_count;
+    }
 }
 
 // Private API
@@ -523,9 +718,7 @@ impl Instance {
             embed_ctx: embed_ctx,
             module,
             ctx: Context::new(),
-            state: State::Ready {
-                retval: UntypedRetVal::default(),
-            },
+            state: State::Ready,
             kill_state: Arc::new(KillState {
                 should_terminate: AtomicBool::new(false),
                 ctx_switch_done: AtomicBool::new(false),
@@ -535,10 +728,12 @@ impl Instance {
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
             signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
-            entrypoint: ptr::null(),
+            entrypoint: None,
+            resumed_val: None,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
+        inst.set_instruction_count(0);
 
         assert_eq!(mem::size_of::<Instance>(), HOST_PAGE_SIZE_EXPECTED);
         let unpadded_size = offset_of!(Instance, _padding);
@@ -550,40 +745,72 @@ impl Instance {
     // so that it is 8 bytes before the heap.
     // For this reason, the alignment of the structure is set to 4096, and we define accessors that
     // read/write the globals pointer as bytes [4096-8..4096] of that structure represented as raw bytes.
+    // InstanceRuntimeData is placed such that it ends at the end of the page this `Instance` starts
+    // on. So we can access it by *self + PAGE_SIZE - size_of::<InstanceRuntimeData>
     #[inline]
-    pub fn get_globals_ptr(&self) -> *const i64 {
+    fn get_instance_implicits(&self) -> &InstanceRuntimeData {
         unsafe {
-            *((self as *const _ as *const u8)
-                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>()) as isize)
-                as *const *const i64)
+            let implicits_ptr = (self as *const _ as *const u8)
+                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<InstanceRuntimeData>()) as isize)
+                as *const InstanceRuntimeData;
+            mem::transmute::<*const InstanceRuntimeData, &InstanceRuntimeData>(implicits_ptr)
         }
     }
 
     #[inline]
-    pub fn set_globals_ptr(&mut self, globals_ptr: *const i64) {
+    fn get_instance_implicits_mut(&mut self) -> &mut InstanceRuntimeData {
         unsafe {
-            *((self as *mut _ as *mut u8)
-                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>()) as isize)
-                as *mut *const i64) = globals_ptr;
+            let implicits_ptr = (self as *mut _ as *mut u8)
+                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<InstanceRuntimeData>()) as isize)
+                as *mut InstanceRuntimeData;
+            mem::transmute::<*mut InstanceRuntimeData, &mut InstanceRuntimeData>(implicits_ptr)
         }
+    }
+
+    #[allow(dead_code)]
+    #[inline]
+    fn get_globals_ptr(&self) -> *mut i64 {
+        self.get_instance_implicits().globals_ptr
+    }
+
+    #[inline]
+    fn set_globals_ptr(&mut self, globals_ptr: *mut i64) {
+        self.get_instance_implicits_mut().globals_ptr = globals_ptr
     }
 
     /// Run a function in guest context at the given entrypoint.
-    fn run_func(
-        &mut self,
-        func: *const extern "C" fn(),
-        args: &[Val],
-    ) -> Result<UntypedRetVal, Error> {
-        lucet_ensure!(
-            self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal()),
-            "instance must be ready or non-fatally faulted"
-        );
-        if func.is_null() {
+    fn run_func(&mut self, func: FunctionHandle, args: &[Val]) -> Result<RunResult, Error> {
+        if !(self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal())) {
+            return Err(Error::InvalidArgument(
+                "instance must be ready or non-fatally faulted",
+            ));
+        }
+        if func.ptr.as_usize() == 0 {
             return Err(Error::InvalidArgument(
                 "entrypoint function cannot be null; this is probably a malformed module",
             ));
         }
-        self.entrypoint = func;
+
+        let sig = self.module.get_signature(func.id);
+
+        // in typechecking these values, we can only really check that arguments are correct.
+        // in the future we might want to make return value use more type safe as well.
+
+        if sig.params.len() != args.len() {
+            return Err(Error::InvalidArgument(
+                "entrypoint function signature mismatch (number of arguments is incorrect)",
+            ));
+        }
+
+        for (param_ty, arg) in sig.params.iter().zip(args.iter()) {
+            if param_ty != &arg.value_type() {
+                return Err(Error::InvalidArgument(
+                    "entrypoint function signature mismatch",
+                ));
+            }
+        }
+
+        self.entrypoint = Some(func.ptr);
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
@@ -594,14 +821,25 @@ impl Instance {
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
                 &self.kill_state.ctx_switch_done,
-                func,
+                func.ptr.as_usize(),
                 &args_with_vmctx,
             )
         })?;
 
-        self.state = State::Running {
-            tid: unsafe { pthread_self() },
-        };
+        self.swap_and_return()
+    }
+
+    /// The core routine for context switching into a guest, and extracting a result.
+    ///
+    /// This must only be called for an instance in a ready, non-fatally faulted, or yielded
+    /// state. The public wrappers around this function should make sure the state is appropriate.
+    fn swap_and_return(&mut self) -> Result<RunResult, Error> {
+        debug_assert!(
+            self.state.is_ready()
+                || (self.state.is_fault() && !self.state.is_fatal())
+                || self.state.is_yielded()
+        );
+        self.state = State::Running;
 
         {
             let mut kill_state = self.kill_state.thread_id.lock().unwrap();
@@ -641,96 +879,88 @@ impl Instance {
 
         // Sandbox has jumped back to the host process, indicating it has either:
         //
-        // * trapped, or called hostcall_error: state tag changed to something other than `Running`
-        // * function body returned: set state back to `Ready` with return value
+        // * returned: state should be `Running`; transition to `Ready` and return a RunResult
+        // * yielded: state should be `Yielding`; transition to `Yielded` and return a RunResult
+        // * trapped: state should be `Faulted`; populate details and return an error or call a handler as appropriate
+        // * terminated: state should be `Terminating`; transition to `Terminated` and return the termination details as an Err
+        //
+        // The state should never be `Ready`, `Terminated`, `Yielded`, or `Transitioning` at this point
 
         {
             let mut kill_state = self.kill_state.thread_id.lock().unwrap();
             *kill_state = None;
         }
 
-        match &self.state {
-            State::Running { .. } => {
+        let st = mem::replace(&mut self.state, State::Transitioning);
+
+        match st {
+            State::Running => {
                 let retval = self.ctx.get_untyped_retval();
-                self.state = State::Ready { retval };
-                Ok(retval)
+                self.state = State::Ready;
+                Ok(RunResult::Returned(retval))
             }
-            State::Terminated { details, .. } => Err(Error::RuntimeTerminated(details.clone())),
-            State::Fault { .. } => {
+            State::Terminating { details, .. } => {
+                self.state = State::Terminated;
+                Err(Error::RuntimeTerminated(details))
+            }
+            State::Yielding { val, expecting } => {
+                self.state = State::Yielded { expecting };
+                Ok(RunResult::Yielded(val))
+            }
+            State::Faulted {
+                mut details,
+                siginfo,
+                context,
+            } => {
                 // Sandbox is no longer runnable. It's unsafe to determine all error details in the signal
                 // handler, so we fill in extra details here.
-                self.populate_fault_detail()?;
-                if let State::Fault { ref details, .. } = self.state {
-                    if details.fatal {
-                        // Some errors indicate that the guest is not functioning correctly or that
-                        // the loaded code violated some assumption, so bail out via the fatal
-                        // handler.
+                //
+                // FIXME after lucet-module is complete it should be possible to fill this in without
+                // consulting the process symbol table
+                details.rip_addr_details = self
+                    .module
+                    .addr_details(details.rip_addr as *const c_void)?;
 
-                        // Run the C-style fatal handler, if it exists.
-                        self.c_fatal_handler
-                            .map(|h| unsafe { h(self as *mut Instance) });
+                // fill the state back in with the updated details in case fatal handlers need it
+                self.state = State::Faulted {
+                    details: details.clone(),
+                    siginfo,
+                    context,
+                };
 
-                        // If there is no C-style fatal handler, or if it (erroneously) returns,
-                        // call the Rust handler that we know will not return
-                        (self.fatal_handler)(self)
-                    } else {
-                        // leave the full fault details in the instance state, and return the
-                        // higher-level info to the user
-                        Err(Error::RuntimeFault(details.clone()))
-                    }
+                if details.fatal {
+                    // Some errors indicate that the guest is not functioning correctly or that
+                    // the loaded code violated some assumption, so bail out via the fatal
+                    // handler.
+
+                    // Run the C-style fatal handler, if it exists.
+                    self.c_fatal_handler
+                        .map(|h| unsafe { h(self as *mut Instance) });
+
+                    // If there is no C-style fatal handler, or if it (erroneously) returns,
+                    // call the Rust handler that we know will not return
+                    (self.fatal_handler)(self)
                 } else {
-                    panic!("state remains Fault after populate_fault_detail()")
+                    // leave the full fault details in the instance state, and return the
+                    // higher-level info to the user
+                    Err(Error::RuntimeFault(details))
                 }
             }
-            State::Ready { .. } => {
-                panic!("instance in Ready state after returning from guest context")
-            }
+            State::Ready | State::Terminated | State::Yielded { .. } | State::Transitioning => Err(
+                lucet_format_err!("\"impossible\" state found in `swap_and_return()`: {}", st),
+            ),
         }
     }
 
     fn run_start(&mut self) -> Result<(), Error> {
         if let Some(start) = self.module.get_start_func()? {
-            self.run_func(start, &[])?;
+            let res = self.run_func(start, &[])?;
+            if res.is_yielded() {
+                return Err(Error::StartYielded);
+            }
         }
         Ok(())
     }
-
-    fn populate_fault_detail(&mut self) -> Result<(), Error> {
-        if let State::Fault {
-            details:
-                FaultDetails {
-                    rip_addr,
-                    ref mut rip_addr_details,
-                    ..
-                },
-            ..
-        } = self.state
-        {
-            // We do this after returning from the signal handler because it requires `dladdr`
-            // calls, which are not signal safe
-            // FIXME after lucet-module is complete it should be possible to fill this in without
-            // consulting the process symbol table
-            *rip_addr_details = self.module.addr_details(rip_addr as *const c_void)?.clone();
-        }
-        Ok(())
-    }
-}
-
-pub enum State {
-    Ready {
-        retval: UntypedRetVal,
-    },
-    Running {
-        tid: pthread_t,
-    },
-    Fault {
-        details: FaultDetails,
-        siginfo: libc::siginfo_t,
-        context: UContext,
-    },
-    Terminated {
-        details: TerminationDetails,
-    },
 }
 
 /// Information about a runtime fault.
@@ -750,7 +980,7 @@ pub struct FaultDetails {
 }
 
 impl std::fmt::Display for FaultDetails {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.fatal {
             write!(f, "fault FATAL ")?;
         } else {
@@ -790,19 +1020,29 @@ impl std::fmt::Display for FaultDetails {
 /// Guests are terminated either explicitly by `Vmctx::terminate()`, or implicitly by signal
 /// handlers that return `SignalBehavior::Terminate`. It usually indicates that an unrecoverable
 /// error has occurred in a hostcall, rather than in WebAssembly code.
-#[derive(Clone)]
 pub enum TerminationDetails {
+    /// Returned when a signal handler terminates the instance.
     Signal,
-    GetEmbedCtx,
-    /// Calls to `Vmctx::terminate()` may attach an arbitrary pointer for extra debugging
-    /// information.
-    Provided(Arc<dyn Any>),
+    /// Returned when `get_embed_ctx` or `get_embed_ctx_mut` are used with a type that is not present.
+    CtxNotFound,
+    /// Returned when the type of the value passed to `Instance::resume_with_val()` does not match
+    /// the type expected by `Vmctx::yield_expecting_val()` or `Vmctx::yield_val_expecting_val`, or
+    /// if `Instance::resume()` was called when a value was expected.
+    ///
+    /// **Note**: If you see this termination value, please report it as a Lucet bug. The types of
+    /// resumed values are dynamically checked by `Instance::resume()` and
+    /// `Instance::resume_with_val()`, so this should never arise.
+    YieldTypeMismatch,
+    /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
+    BorrowError(&'static str),
+    /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
+    Provided(Box<dyn Any + 'static>),
     Remote,
 }
 
 impl TerminationDetails {
-    pub fn provide<A: Any>(details: A) -> Self {
-        TerminationDetails::Provided(Arc::new(details))
+    pub fn provide<A: Any + 'static>(details: A) -> Self {
+        TerminationDetails::Provided(Box::new(details))
     }
     pub fn provided_details(&self) -> Option<&dyn Any> {
         match self {
@@ -825,123 +1065,99 @@ fn termination_details_any_typing() {
     );
 }
 
+impl PartialEq for TerminationDetails {
+    fn eq(&self, rhs: &TerminationDetails) -> bool {
+        use TerminationDetails::*;
+        match (self, rhs) {
+            (Signal, Signal) => true,
+            (BorrowError(msg1), BorrowError(msg2)) => msg1 == msg2,
+            (CtxNotFound, CtxNotFound) => true,
+            // can't compare `Any`
+            _ => false,
+        }
+    }
+}
+
 impl std::fmt::Debug for TerminationDetails {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "TerminationDetails::{}",
-            match self {
-                TerminationDetails::Signal => "Signal",
-                TerminationDetails::GetEmbedCtx => "GetEmbedCtx",
-                TerminationDetails::Provided(_) => "Provided(Any)",
-                TerminationDetails::Remote => "Remote",
-            }
-        )
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TerminationDetails::")?;
+        match self {
+            TerminationDetails::Signal => write!(f, "Signal"),
+            TerminationDetails::BorrowError(msg) => write!(f, "BorrowError({})", msg),
+            TerminationDetails::CtxNotFound => write!(f, "CtxNotFound"),
+            TerminationDetails::YieldTypeMismatch => write!(f, "YieldTypeMismatch"),
+            TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
+            TerminationDetails::Remote => write!(f, "Remote"),
+        }
     }
 }
 
 unsafe impl Send for TerminationDetails {}
 unsafe impl Sync for TerminationDetails {}
 
-impl std::fmt::Display for State {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            State::Ready { .. } => write!(f, "ready"),
-            State::Running { .. } => write!(f, "running"),
-            State::Fault {
-                details, siginfo, ..
-            } => {
-                write!(f, "{}", details)?;
-                write!(
-                    f,
-                    " triggered by {}: ",
-                    strsignal_wrapper(siginfo.si_signo)
-                        .into_string()
-                        .expect("strsignal returns valid UTF-8")
-                )?;
+/// The value yielded by an instance through a [`Vmctx`](vmctx/struct.Vmctx.html) and returned to
+/// the host.
+pub struct YieldedVal {
+    val: Box<dyn Any + 'static>,
+}
 
-                if siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS {
-                    // We know this is inside the heap guard, because by the time we get here,
-                    // `lucet_error_verify_trap_safety` will have run and validated it.
-                    write!(
-                        f,
-                        " accessed memory at {:p} (inside heap guard)",
-                        siginfo.si_addr()
-                    )?;
-                }
-                Ok(())
-            }
-            State::Terminated { .. } => write!(f, "terminated"),
+impl std::fmt::Debug for YieldedVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_none() {
+            write!(f, "YieldedVal {{ val: None }}")
+        } else {
+            write!(f, "YieldedVal {{ val: Some }}")
         }
     }
 }
 
-impl State {
-    pub fn is_ready(&self) -> bool {
-        if let State::Ready { .. } = self {
-            true
-        } else {
-            false
+impl YieldedVal {
+    pub(crate) fn new<A: Any + 'static>(val: A) -> Self {
+        YieldedVal { val: Box::new(val) }
+    }
+
+    /// Returns `true` if the guest yielded without a value.
+    pub fn is_none(&self) -> bool {
+        self.val.is::<EmptyYieldVal>()
+    }
+
+    /// Returns `true` if the guest yielded with a value.
+    pub fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+
+    /// Attempt to downcast the yielded value to a concrete type, returning the original
+    /// `YieldedVal` if unsuccessful.
+    pub fn downcast<A: Any + 'static + Send + Sync>(self) -> Result<Box<A>, YieldedVal> {
+        match self.val.downcast() {
+            Ok(val) => Ok(val),
+            Err(val) => Err(YieldedVal { val }),
         }
     }
 
-    pub fn is_running(&self) -> bool {
-        if let State::Running { .. } = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_fault(&self) -> bool {
-        if let State::Fault { .. } = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_fatal(&self) -> bool {
-        if let State::Fault {
-            details: FaultDetails { fatal, .. },
-            ..
-        } = self
-        {
-            *fatal
-        } else {
-            false
-        }
-    }
-
-    pub fn is_terminated(&self) -> bool {
-        if let State::Terminated { .. } = self {
-            true
-        } else {
-            false
-        }
+    /// Returns a reference to the yielded value if it is present and of type `A`, or `None` if it
+    /// isn't.
+    pub fn downcast_ref<A: Any + 'static + Send + Sync>(&self) -> Option<&A> {
+        self.val.downcast_ref()
     }
 }
+
+/// A marker value to indicate a yield or resume with no value.
+///
+/// This exists to unify the implementations of the various operators, and should only ever be
+/// created by internal code.
+#[derive(Debug)]
+pub(crate) struct EmptyYieldVal;
 
 fn default_fatal_handler(inst: &Instance) -> ! {
     panic!("> instance {:p} had fatal error: {}", inst, inst.state);
 }
 
-// TODO: PR into `libc`
-extern "C" {
-    #[no_mangle]
-    fn strsignal(sig: libc::c_int) -> *mut libc::c_char;
-}
-
-// TODO: PR into `nix`
-fn strsignal_wrapper(sig: libc::c_int) -> CString {
-    unsafe { CStr::from_ptr(strsignal(sig)).to_owned() }
-}
-
 /// Instance state related to remote kill switch functionality.
 ///
 ///n
-struct KillState {
-    ctx_switch_done: AtomicBool,
+pub(crate) struct KillState {
+    pub(crate) ctx_switch_done: AtomicBool,
     should_terminate: AtomicBool,
     thread_id: Mutex<Option<pthread_t>>,
 }

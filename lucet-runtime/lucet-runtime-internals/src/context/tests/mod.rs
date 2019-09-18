@@ -32,10 +32,12 @@ fn init_rejects_unaligned() {
 
     // now we have the unaligned stack, let's make sure it blows up right
     let mut parent = ContextHandle::new();
+    let flag = std::sync::atomic::AtomicBool::new(false);
     let res = ContextHandle::create_and_init(
         &mut stack_unaligned,
         &mut parent,
-        dummy as *const extern "C" fn(),
+        &flag,
+        dummy as usize,
         &[],
     );
 

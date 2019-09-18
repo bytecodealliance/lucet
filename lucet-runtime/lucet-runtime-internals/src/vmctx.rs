@@ -9,15 +9,42 @@ use crate::alloc::instance_heap_offset;
 use crate::context::Context;
 use crate::error::Error;
 use crate::instance::{
-    Instance, InstanceHandle, InstanceInternal, State, TerminationDetails, CURRENT_INSTANCE,
-    HOST_CTX,
+    EmptyYieldVal, Instance, InstanceInternal, State, TerminationDetails, YieldedVal,
+    CURRENT_INSTANCE, HOST_CTX,
 };
+use lucet_module::{FunctionHandle, GlobalValue};
 use std::any::Any;
+use std::borrow::{Borrow, BorrowMut};
+use std::cell::{Ref, RefCell, RefMut};
+use std::marker::PhantomData;
 
 /// An opaque handle to a running instance's context.
 #[derive(Debug)]
 pub struct Vmctx {
     vmctx: *mut lucet_vmctx,
+    /// A view of the underlying instance's heap.
+    ///
+    /// This must never be dropped automatically, as the view does not own the heap. Rather, this is
+    /// a value used to implement dynamic borrowing of the heap contents that are owned and managed
+    /// by the instance and its `Alloc`.
+    heap_view: RefCell<Box<[u8]>>,
+    /// A view of the underlying instance's globals.
+    ///
+    /// This must never be dropped automatically, as the view does not own the globals. Rather, this
+    /// is a value used to implement dynamic borrowing of the globals that are owned and managed by
+    /// the instance and its `Alloc`.
+    globals_view: RefCell<Box<[GlobalValue]>>,
+}
+
+impl Drop for Vmctx {
+    fn drop(&mut self) {
+        let heap_view = self.heap_view.replace(Box::new([]));
+        let globals_view = self.globals_view.replace(Box::new([]));
+        // as described in the definition of `Vmctx`, we cannot allow the boxed views of the heap
+        // and globals to be dropped
+        Box::leak(heap_view);
+        Box::leak(globals_view);
+    }
 }
 
 pub trait VmctxInternal {
@@ -33,6 +60,25 @@ pub trait VmctxInternal {
     /// you could not use orthogonal `&mut` refs that come from `Vmctx`, like the heap or
     /// terminating the instance.
     unsafe fn instance_mut(&self) -> &mut Instance;
+
+    /// Try to take and return the value passed to `Instance::resume_with_val()`.
+    ///
+    /// If there is no resumed value, or if the dynamic type check of the value fails, this returns
+    /// `None`.
+    fn try_take_resumed_val<R: Any + 'static>(&self) -> Option<R>;
+
+    /// Suspend the instance, returning a value in
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
+    ///
+    /// After suspending, the instance may be resumed by calling
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
+    /// host with a value of type `R`. If resumed with a value of some other type, this returns
+    /// `None`.
+    ///
+    /// The dynamic type checks used by the other yield methods should make this explicit option
+    /// type redundant, however this interface is used to avoid exposing a panic to the C API.
+    fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> Option<R>;
 }
 
 impl VmctxInternal for Vmctx {
@@ -43,16 +89,42 @@ impl VmctxInternal for Vmctx {
     unsafe fn instance_mut(&self) -> &mut Instance {
         instance_from_vmctx(self.vmctx)
     }
+
+    fn try_take_resumed_val<R: Any + 'static>(&self) -> Option<R> {
+        let inst = unsafe { self.instance_mut() };
+        if let Some(val) = inst.resumed_val.take() {
+            match val.downcast() {
+                Ok(val) => Some(*val),
+                Err(val) => {
+                    inst.resumed_val = Some(val);
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    }
+
+    fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> Option<R> {
+        self.yield_impl::<A, R>(val);
+        self.try_take_resumed_val()
+    }
 }
 
 impl Vmctx {
-    /// Create a `Vmctx` from the compiler-inserted `vmctx` argument in a guest
-    /// function.
+    /// Create a `Vmctx` from the compiler-inserted `vmctx` argument in a guest function.
+    ///
+    /// This is almost certainly not what you want to use to get a `Vmctx`; instead use the `&mut
+    /// Vmctx` argument to a `lucet_hostcalls!`-wrapped function.
     pub unsafe fn from_raw(vmctx: *mut lucet_vmctx) -> Vmctx {
-        let res = Vmctx { vmctx };
-        // we don't actually need the instance for this call, but asking for it here causes an
-        // earlier failure if the pointer isn't valid
-        assert!(res.instance().valid_magic());
+        let inst = instance_from_vmctx(vmctx);
+        assert!(inst.valid_magic());
+
+        let res = Vmctx {
+            vmctx,
+            heap_view: RefCell::new(Box::<[u8]>::from_raw(inst.heap_mut())),
+            globals_view: RefCell::new(Box::<[GlobalValue]>::from_raw(inst.globals_mut())),
+        };
         res
     }
 
@@ -62,13 +134,55 @@ impl Vmctx {
     }
 
     /// Return the WebAssembly heap as a slice of bytes.
-    pub fn heap(&self) -> &[u8] {
-        self.instance().heap()
+    ///
+    /// If the heap is already mutably borrowed by `heap_mut()`, the instance will
+    /// terminate with `TerminationDetails::BorrowError`.
+    pub fn heap(&self) -> Ref<'_, [u8]> {
+        unsafe {
+            self.reconstitute_heap_view_if_needed();
+        }
+        let r = self
+            .heap_view
+            .try_borrow()
+            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("heap")));
+        Ref::map(r, |b| b.borrow())
     }
 
     /// Return the WebAssembly heap as a mutable slice of bytes.
-    pub fn heap_mut(&mut self) -> &mut [u8] {
-        unsafe { self.instance_mut().heap_mut() }
+    ///
+    /// If the heap is already borrowed by `heap()` or `heap_mut()`, the instance will terminate
+    /// with `TerminationDetails::BorrowError`.
+    pub fn heap_mut(&self) -> RefMut<'_, [u8]> {
+        unsafe {
+            self.reconstitute_heap_view_if_needed();
+        }
+        let r = self
+            .heap_view
+            .try_borrow_mut()
+            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("heap_mut")));
+        RefMut::map(r, |b| b.borrow_mut())
+    }
+
+    /// Check whether the heap has grown, and replace the heap view if it has.
+    ///
+    /// This handles the case where `Vmctx::grow_memory()` and `Vmctx::heap()` are called in
+    /// sequence. Since `Vmctx::grow_memory()` takes `&mut self`, heap references cannot live across
+    /// it.
+    ///
+    /// TODO: There is still an unsound case, though, when a heap reference is held across a call
+    /// back into the guest via `Vmctx::get_func_from_idx()`. That guest code may grow the heap as
+    /// well, causing any outstanding heap references to become invalid. We will address this when
+    /// we rework the interface for calling back into the guest.
+    unsafe fn reconstitute_heap_view_if_needed(&self) {
+        let inst = self.instance_mut();
+        if inst.heap_mut().len() != self.heap_view.borrow().len() {
+            let old_heap_view = self
+                .heap_view
+                .replace(Box::<[u8]>::from_raw(inst.heap_mut()));
+            // as described in the definition of `Vmctx`, we cannot allow the boxed view of the heap
+            // to be dropped
+            Box::leak(old_heap_view);
+        }
     }
 
     /// Check whether a given range in the host address space overlaps with the memory that backs
@@ -82,24 +196,43 @@ impl Vmctx {
         self.instance().contains_embed_ctx::<T>()
     }
 
-    /// Get a reference to a context value of a particular type. If it does not exist,
-    /// the context will terminate.
-    pub fn get_embed_ctx<T: Any>(&self) -> &T {
-        unsafe { self.instance_mut().get_embed_ctx_or_term() }
-    }
-
-    /// Get a mutable reference to a context value of a particular type> If it does not exist,
-    /// the context will terminate.
-    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> &mut T {
-        unsafe { self.instance_mut().get_embed_ctx_mut_or_term() }
-    }
-
-    /// Terminate this guest and return to the host context.
+    /// Get a reference to a context value of a particular type.
     ///
-    /// This will return an `Error::RuntimeTerminated` value to the caller of `Instance::run()`.
-    pub fn terminate<I: Any>(&mut self, info: I) -> ! {
-        let details = TerminationDetails::provide(info);
-        unsafe { self.instance_mut().terminate(details) }
+    /// If a context of that type does not exist, the instance will terminate with
+    /// `TerminationDetails::CtxNotFound`.
+    ///
+    /// If the context is already mutably borrowed by `get_embed_ctx_mut`, the instance will
+    /// terminate with `TerminationDetails::BorrowError`.
+    pub fn get_embed_ctx<T: Any>(&self) -> Ref<'_, T> {
+        match self.instance().embed_ctx.try_get::<T>() {
+            Some(Ok(t)) => t,
+            Some(Err(_)) => panic!(TerminationDetails::BorrowError("get_embed_ctx")),
+            None => panic!(TerminationDetails::CtxNotFound),
+        }
+    }
+
+    /// Get a mutable reference to a context value of a particular type.
+    ///
+    /// If a context of that type does not exist, the instance will terminate with
+    /// `TerminationDetails::CtxNotFound`.
+    ///
+    /// If the context is already borrowed by some other use of `get_embed_ctx` or
+    /// `get_embed_ctx_mut`, the instance will terminate with `TerminationDetails::BorrowError`.
+    pub fn get_embed_ctx_mut<T: Any>(&self) -> RefMut<'_, T> {
+        match unsafe { self.instance_mut().embed_ctx.try_get_mut::<T>() } {
+            Some(Ok(t)) => t,
+            Some(Err(_)) => panic!(TerminationDetails::BorrowError("get_embed_ctx_mut")),
+            None => panic!(TerminationDetails::CtxNotFound),
+        }
+    }
+
+    /// Terminate this guest and return to the host context without unwinding.
+    ///
+    /// This is almost certainly not what you want to use to terminate an instance from a hostcall,
+    /// as any resources currently in scope will not be dropped. Instead, use
+    /// `lucet_hostcall_terminate!` which unwinds to the enclosing hostcall body.
+    pub unsafe fn terminate_no_unwind(&mut self, details: TerminationDetails) -> ! {
+        self.instance_mut().terminate(details)
     }
 
     /// Grow the guest memory by the given number of WebAssembly pages.
@@ -110,13 +243,27 @@ impl Vmctx {
     }
 
     /// Return the WebAssembly globals as a slice of `i64`s.
-    pub fn globals(&self) -> &[i64] {
-        self.instance().globals()
+    ///
+    /// If the globals are already mutably borrowed by `globals_mut()`, the instance will terminate
+    /// with `TerminationDetails::BorrowError`.
+    pub fn globals(&self) -> Ref<'_, [GlobalValue]> {
+        let r = self
+            .globals_view
+            .try_borrow()
+            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("globals")));
+        Ref::map(r, |b| b.borrow())
     }
 
     /// Return the WebAssembly globals as a mutable slice of `i64`s.
-    pub fn globals_mut(&mut self) -> &mut [i64] {
-        unsafe { self.instance_mut().globals_mut() }
+    ///
+    /// If the globals are already borrowed by `globals()` or `globals_mut()`, the instance will
+    /// terminate with `TerminationDetails::BorrowError`.
+    pub fn globals_mut(&self) -> RefMut<'_, [GlobalValue]> {
+        let r = self
+            .globals_view
+            .try_borrow_mut()
+            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("globals_mut")));
+        RefMut::map(r, |b| b.borrow_mut())
     }
 
     /// Get a function pointer by WebAssembly table and function index.
@@ -130,44 +277,108 @@ impl Vmctx {
     /// from its own context.
     ///
     /// ```no_run
+    /// use lucet_runtime_internals::{lucet_hostcalls, lucet_hostcall_terminate};
     /// use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
-    /// #[no_mangle]
-    /// extern "C" fn hostcall_call_binop(
-    ///     vmctx: *mut lucet_vmctx,
-    ///     binop_table_idx: u32,
-    ///     binop_func_idx: u32,
-    ///     operand1: u32,
-    ///     operand2: u32,
-    /// ) -> u32 {
-    ///     let mut ctx = unsafe { Vmctx::from_raw(vmctx) };
-    ///     if let Ok(binop) = ctx.get_func_from_idx(binop_table_idx, binop_func_idx) {
-    ///         let typed_binop = binop as *const extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32;
-    ///         unsafe { (*typed_binop)(vmctx, operand1, operand2) }
-    ///     } else {
-    ///         ctx.terminate("invalid function index")
+    ///
+    /// lucet_hostcalls! {
+    ///     #[no_mangle]
+    ///     pub unsafe extern "C" fn hostcall_call_binop(
+    ///         &mut vmctx,
+    ///         binop_table_idx: u32,
+    ///         binop_func_idx: u32,
+    ///         operand1: u32,
+    ///         operand2: u32,
+    ///     ) -> u32 {
+    ///         if let Ok(binop) = vmctx.get_func_from_idx(binop_table_idx, binop_func_idx) {
+    ///             let typed_binop = std::mem::transmute::<
+    ///                 usize,
+    ///                 extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32
+    ///             >(binop.ptr.as_usize());
+    ///             unsafe { (typed_binop)(vmctx.as_raw(), operand1, operand2) }
+    ///         } else {
+    ///             lucet_hostcall_terminate!("invalid function index")
+    ///         }
     ///     }
     /// }
     pub fn get_func_from_idx(
         &self,
         table_idx: u32,
         func_idx: u32,
-    ) -> Result<*const extern "C" fn(), Error> {
+    ) -> Result<FunctionHandle, Error> {
         self.instance()
             .module()
             .get_func_from_idx(table_idx, func_idx)
     }
-}
 
-/// Terminating an instance requires mutating the state field, and then jumping back to the
-/// host context. The mutable borrow may conflict with a mutable borrow of the embed_ctx if
-/// this is performed via a method call. We use a macro so we can convince the borrow checker that
-/// this is safe at each use site.
-macro_rules! inst_terminate {
-    ($self:ident, $details:expr) => {{
-        $self.state = State::Terminated { details: $details };
-        #[allow(unused_unsafe)] // The following unsafe will be incorrectly warned as unused
-        HOST_CTX.with(|host_ctx| unsafe { Context::set(&*host_ctx.get()) })
-    }};
+    /// Suspend the instance, returning an empty
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
+    ///
+    /// After suspending, the instance may be resumed by the host using
+    /// [`Instance::resume()`](../struct.Instance.html#method.resume).
+    ///
+    /// (The reason for the trailing underscore in the name is that Rust reserves `yield` as a
+    /// keyword for future use.)
+    pub fn yield_(&self) {
+        self.yield_val_expecting_val::<EmptyYieldVal, EmptyYieldVal>(EmptyYieldVal);
+    }
+
+    /// Suspend the instance, returning an empty
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
+    ///
+    /// After suspending, the instance may be resumed by calling
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
+    /// host with a value of type `R`.
+    pub fn yield_expecting_val<R: Any + 'static>(&self) -> R {
+        self.yield_val_expecting_val::<EmptyYieldVal, R>(EmptyYieldVal)
+    }
+
+    /// Suspend the instance, returning a value in
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
+    ///
+    /// After suspending, the instance may be resumed by the host using
+    /// [`Instance::resume()`](../struct.Instance.html#method.resume).
+    pub fn yield_val<A: Any + 'static>(&self, val: A) {
+        self.yield_val_expecting_val::<A, EmptyYieldVal>(val);
+    }
+
+    /// Suspend the instance, returning a value in
+    /// [`RunResult::Yielded`](../enum.RunResult.html#variant.Yielded) to where the instance was run
+    /// or resumed.
+    ///
+    /// After suspending, the instance may be resumed by calling
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
+    /// host with a value of type `R`.
+    pub fn yield_val_expecting_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> R {
+        self.yield_impl::<A, R>(val);
+        self.take_resumed_val()
+    }
+
+    fn yield_impl<A: Any + 'static, R: Any + 'static>(&self, val: A) {
+        let inst = unsafe { self.instance_mut() };
+        let expecting: Box<PhantomData<R>> = Box::new(PhantomData);
+        inst.state = State::Yielding {
+            val: YieldedVal::new(val),
+            expecting: expecting as Box<dyn Any>,
+        };
+        HOST_CTX.with(|host_ctx| unsafe {
+            Context::swap(
+                &mut inst.ctx,
+                &mut *host_ctx.get(),
+                &inst.kill_state.ctx_switch_done,
+            )
+        });
+    }
+
+    /// Take and return the value passed to
+    /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val), terminating
+    /// the instance if there is no value present, or the dynamic type check of the value fails.
+    fn take_resumed_val<R: Any + 'static>(&self) -> R {
+        self.try_take_resumed_val()
+            .unwrap_or_else(|| panic!(TerminationDetails::YieldTypeMismatch))
+    }
 }
 
 /// Get an `Instance` from the `vmctx` pointer.
@@ -202,43 +413,13 @@ pub unsafe fn instance_from_vmctx<'a>(vmctx: *mut lucet_vmctx) -> &'a mut Instan
 }
 
 impl Instance {
-    /// Helper function specific to Vmctx::get_embed_ctx. From the vmctx interface,
-    /// there is no way to recover if the expected embedder ctx is not set, so we terminate
-    /// the instance.
-    fn get_embed_ctx_or_term<T: Any>(&mut self) -> &T {
-        match self.embed_ctx.get::<T>() {
-            Some(t) => t,
-            None => inst_terminate!(self, TerminationDetails::GetEmbedCtx),
-        }
-    }
-
-    /// Helper function specific to Vmctx::get_embed_ctx_mut. See above.
-    fn get_embed_ctx_mut_or_term<T: Any>(&mut self) -> &mut T {
-        match self.embed_ctx.get_mut::<T>() {
-            Some(t) => t,
-            None => inst_terminate!(self, TerminationDetails::GetEmbedCtx),
-        }
-    }
-
-    /// Terminate the guest and swap back to the host context.
+    /// Terminate the guest and swap back to the host context without unwinding.
     ///
-    /// Only safe to call from within the guest context.
+    /// This is almost certainly not what you want to use to terminate from a hostcall; use panics
+    /// with `TerminationDetails` instead.
     unsafe fn terminate(&mut self, details: TerminationDetails) -> ! {
-        inst_terminate!(self, details)
+        self.state = State::Terminating { details };
+        #[allow(unused_unsafe)] // The following unsafe will be incorrectly warned as unused
+        HOST_CTX.with(|host_ctx| unsafe { Context::set(&*host_ctx.get()) })
     }
-}
-
-/// Unsafely get a `Vmctx` from an `InstanceHandle`, and fake a current instance TLS variable.
-///
-/// This is provided for compatibility with the Terrarium memory management test suite, but should
-/// absolutely not be used in newer code.
-#[deprecated]
-pub unsafe fn vmctx_from_mock_instance(inst: &InstanceHandle) -> Vmctx {
-    CURRENT_INSTANCE.with(|current_instance| {
-        let mut current_instance = current_instance.borrow_mut();
-        *current_instance = Some(std::ptr::NonNull::new_unchecked(
-            inst.alloc().slot().start as *mut Instance,
-        ));
-    });
-    Vmctx::from_raw(inst.alloc().slot().heap as *mut lucet_vmctx)
 }

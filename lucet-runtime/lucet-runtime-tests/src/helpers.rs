@@ -1,7 +1,7 @@
 // re-export types that should only be used for testing
-pub use lucet_runtime_internals::module::{HeapSpec, MockModuleBuilder};
-#[allow(deprecated)]
-pub use lucet_runtime_internals::vmctx::vmctx_from_mock_instance;
+pub use lucet_runtime_internals::module::{
+    FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder,
+};
 
 use lazy_static::lazy_static;
 use std::sync::RwLock;

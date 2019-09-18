@@ -1,10 +1,12 @@
 [package]
 name = "lucet-spectest"
-version = "0.1.0"
+version = "0.1.1"
 description = "Test harness to run WebAssembly spec tests (.wast) against the Lucet toolchain"
+homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
-authors = ["Pat Hickey <phickey@fastly.com>"]
 license = "Apache-2.0 WITH LLVM-exception"
+authors = ["Lucet team <lucet@fastly.com>"]
+categories = ["wasm"]
 edition = "2018"
 
 [lib]
@@ -15,9 +17,9 @@ name = "spec-test"
 path = "src/main.rs"
 
 [dependencies]
-lucetc = { path = "../lucetc" }
-lucet-module-data = { path = "../lucet-module-data" }
-lucet-runtime = { path = "../lucet-runtime" }
+lucetc = { path = "../lucetc", version = "0.1.1" }
+lucet-module = { path = "../lucet-module", version = "0.1.1" }
+lucet-runtime = { path = "../lucet-runtime", version = "0.1.1" }
 wabt = "0.7"
 serde = "1.0"
 serde_json = "1.0"

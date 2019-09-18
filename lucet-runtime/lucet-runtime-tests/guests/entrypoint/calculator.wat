@@ -1,4 +1,5 @@
 (module
+  (func $add_4 (export "add_4_reexport") (import "env" "add_4_hostcall") (param i64 i64 i64 i64) (result i64))
   (memory 1)
   (func $add_2 (export "add_2") (param i64 i64) (result i64)
     (i64.add (get_local 0) (get_local 1))

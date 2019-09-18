@@ -1,20 +1,30 @@
 use crate::decls::{ModuleDecls, TableDecl};
 use crate::error::{LucetcError, LucetcErrorKind};
+use crate::module::UniqueFuncIndex;
+use crate::name::Name;
 use crate::pointer::NATIVE_POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
-use cranelift_wasm::{FuncIndex, TableElementType, TableIndex};
-use failure::{format_err, ResultExt};
+use cranelift_wasm::{TableElementType, TableIndex};
+use faerie::{Artifact, Link};
+use failure::{format_err, Error, ResultExt};
 use std::io::Cursor;
+
+/// This symbol will be used to reference the `tables` field in `Module` - a sequence of tables.
+/// At the moment it will either be one or no tables, but in the future may grow.
+pub const TABLE_SYM: &str = "lucet_tables";
+/// This is functionally the size of `&[TableEntry]`, but defined here because it may not
+/// necessarily have the same field ordering.
+pub const TABLE_REF_SIZE: usize = NATIVE_POINTER_SIZE * 2;
 
 #[derive(Debug, Clone)]
 enum Elem {
-    Func(FuncIndex),
+    Func(UniqueFuncIndex),
     Empty,
 }
 
-fn table_elements(decl: &TableDecl) -> Result<Vec<Elem>, LucetcError> {
+fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, LucetcError> {
     match decl.table.ty {
         TableElementType::Func => Ok(()),
         _ => Err(format_err!("table with non-function elements: {:?}", decl))
@@ -43,10 +53,25 @@ fn table_elements(decl: &TableDecl) -> Result<Vec<Elem>, LucetcError> {
     Ok(elems)
 }
 
+pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
+    for (idx, table) in tables.iter().enumerate() {
+        obj.link(Link {
+            from: TABLE_SYM,
+            to: table.symbol(),
+            at: (TABLE_REF_SIZE * idx) as u64,
+        })
+        .context(LucetcErrorKind::Table)?;
+    }
+    Ok(())
+}
+
 pub fn write_table_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls,
-) -> Result<(), LucetcError> {
+    decls: &ModuleDecls<'_>,
+) -> Result<Vec<Name>, LucetcError> {
+    let mut tables_vec = Cursor::new(Vec::new());
+    let mut table_names: Vec<Name> = Vec::new();
+
     if let Ok(table_decl) = decls.get_table(TableIndex::new(0)) {
         // Indirect calls are performed by looking up the callee function and type in a table that
         // is present in the same object file.
@@ -104,19 +129,30 @@ pub fn write_table_data<B: ClifBackend>(
             .define_data(table_id, &table_ctx)
             .context(LucetcErrorKind::Table)?;
 
-        {
-            // Define the length of the table as a u64:
-            let mut len_data = Cursor::new(Vec::with_capacity(8));
-            len_data
-                .write_u64::<LittleEndian>(elements.len() as u64)
-                .unwrap();
-            let mut table_len_ctx = DataContext::new();
-            table_len_ctx.define(len_data.into_inner().into_boxed_slice());
-            let table_len_id = table_decl.len_name.as_dataid().expect("tables are data");
-            clif_module
-                .define_data(table_len_id, &table_len_ctx)
-                .context(LucetcErrorKind::Table)?;
-        }
+        // have to link TABLE_SYM, table_id,
+        // add space for the TABLE_SYM pointer
+        tables_vec.write_u64::<LittleEndian>(0).unwrap();
+
+        // Define the length of the table as a u64:
+        tables_vec
+            .write_u64::<LittleEndian>(elements.len() as u64)
+            .unwrap();
+        table_names.push(table_decl.contents_name.clone())
     }
-    Ok(())
+
+    let inner = tables_vec.into_inner();
+
+    let mut table_data_ctx = DataContext::new();
+    table_data_ctx.define(inner.into_boxed_slice());
+
+    clif_module
+        .define_data(
+            decls
+                .get_tables_list_name()
+                .as_dataid()
+                .expect("lucet_tables is declared as data"),
+            &table_data_ctx,
+        )
+        .context(LucetcErrorKind::Table)?;
+    Ok(table_names)
 }

@@ -7,6 +7,16 @@ use std::path::Path;
 use tempfile::TempDir;
 
 #[test]
+fn double_import() {
+    let ctx = WasiCtxBuilder::new();
+
+    let (exitcode, stdout) = run_with_stdout("duplicate_import.wat", ctx).unwrap();
+
+    assert_eq!(stdout, "duplicate import works!\n");
+    assert_eq!(exitcode, 0);
+}
+
+#[test]
 fn hello() {
     let ctx = WasiCtxBuilder::new().args(&["hello"]);
 
@@ -361,5 +371,35 @@ fn pseudoquine() {
 fn poll() {
     let ctx = WasiCtxBuilder::new().args(&["poll"]).build().unwrap();
     let exitcode = run("poll.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+}
+
+#[test]
+fn stat() {
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    std::fs::create_dir(&preopen_host_path).unwrap();
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+    let ctx = WasiCtxBuilder::new()
+        .args(&["stat"])
+        .preopened_dir(preopen_dir, "/sandbox")
+        .build()
+        .expect("can build WasiCtx");
+    let exitcode = run("stat.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+}
+
+#[test]
+fn fs() {
+    let tmpdir = TempDir::new().unwrap();
+    let preopen_host_path = tmpdir.path().join("preopen");
+    std::fs::create_dir(&preopen_host_path).unwrap();
+    let preopen_dir = File::open(&preopen_host_path).unwrap();
+    let ctx = WasiCtxBuilder::new()
+        .args(&["stat"])
+        .preopened_dir(preopen_dir, "/sandbox")
+        .build()
+        .expect("can build WasiCtx");
+    let exitcode = run("fs.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 }

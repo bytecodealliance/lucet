@@ -1,24 +1,55 @@
+mod example {
+    // Primitive types:
+    // `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`.
 
-// Primitive types:
-// `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`.
+    // Enumerations
 
-// Enumerations
+    enum color {
+        red,
+        blue,
+        green,
+    }
 
-enum color {
-    red, blue, green
+    // Aliases
+
+    type colour = color;
+    type col = colour;
+
+    // Structures
+
+    struct st {
+        a: i8,
+        b: i32,
+        c: color,
+    }
+
+    // functions
+
+    // implicit bindings: in value, out value.
+    fn set_counter(to: i32) -> r: i32;
+
+    // explicit bindings: in value, out value.
+    fn set_color(to_int: i32) -> r: i32
+    where to: in color <- to_int, prev: out color <- r;
+
+    // binding: in pointer
+    fn set_struct(struct_pointer: i32)
+    where st: in st <- *struct_pointer;
+
+    // binding: out pointer
+    fn get_color_to_ptr(color_ptr: i32)
+    where color: out color <- *color_ptr;
+
+    // binding: inout pointer
+    fn swap_color_by_ptr(color_ptr: i32)
+    where color: inout color <- *color_ptr;
+
+    // binding: in slice
+    fn debug_str(ptr: i32, len: i32) -> r: i32
+    where str: in u8 <- [ptr, len];
+
+    // binding: inout slice
+    fn inout_str(ptr: i32, len: i32) -> r: i32
+    where str: inout u8 <- [ptr, len];
+
 }
-
-// Aliases
-
-type colour = color
-type col = colour
-
-// Structures
-
-struct st {
-    a: i8,
-    b: **i32,
-    c: color,
-    self: *st
-}
-

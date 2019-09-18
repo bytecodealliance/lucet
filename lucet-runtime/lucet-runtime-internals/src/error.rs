@@ -40,7 +40,7 @@ pub enum Error {
     /// An instance terminated, potentially with extra information about the termination.
     ///
     /// This condition can arise from a hostcall explicitly calling
-    /// [`Vmctx::terminate()`](struct.Vmctx.html#method.terminate), or via a custom signal handler
+    /// [`Vmctx::terminate()`](vmctx/struct.Vmctx.html#method.terminate), or via a custom signal handler
     /// that returns [`SignalBehavior::Terminate`](enum.SignalBehavior.html#variant.Terminate).
     #[fail(display = "Runtime terminated")]
     RuntimeTerminated(TerminationDetails),
@@ -48,6 +48,15 @@ pub enum Error {
     /// IO errors arising during dynamic loading with [`DlModule`](struct.DlModule.html).
     #[fail(display = "Dynamic loading error: {}", _0)]
     DlError(#[cause] std::io::Error),
+
+    #[fail(display = "Instance not returned")]
+    InstanceNotReturned,
+
+    #[fail(display = "Instance not yielded")]
+    InstanceNotYielded,
+
+    #[fail(display = "Start function yielded")]
+    StartYielded,
 
     /// A catch-all for internal errors that are likely unrecoverable by the runtime user.
     ///
@@ -85,8 +94,8 @@ impl From<std::ffi::IntoStringError> for Error {
     }
 }
 
-impl From<lucet_module_data::Error> for Error {
-    fn from(e: lucet_module_data::Error) -> Error {
+impl From<lucet_module::Error> for Error {
+    fn from(e: lucet_module::Error) -> Error {
         Error::ModuleError(ModuleError::ModuleDataError(e))
     }
 }
@@ -100,7 +109,7 @@ pub enum ModuleError {
 
     /// An error occurred with the module data section, likely during deserialization.
     #[fail(display = "Module data error: {}", _0)]
-    ModuleDataError(#[cause] lucet_module_data::Error),
+    ModuleDataError(#[cause] lucet_module::Error),
 }
 
 #[macro_export]

@@ -24,6 +24,7 @@ npm install
 npm run asbuild:optimized
 
 lucetc -o example \
+  --reserved-size=64MB \
   --bindings /opt/lucet/share/assemblyscript/modules/wasa/bindings.json \
   build/optimized.wasm
 ```
@@ -31,7 +32,7 @@ lucetc -o example \
 ## Running the example using lucet-wasi
 
 ```sh
-lucet-wasi --entrypoint main --dir /lucet:/lucet example help
+lucet-wasi --entrypoint main --dir .:. example help
 ```
 
 Unlike C and Rust applications, AssemblyScript requires an entry point to be explicitly defined.
@@ -43,7 +44,7 @@ Since files are going to be read and written to, a descriptor to a pre-opened di
 
 This is the purpose of the `--dir` command-line option. Without this, the webassembly module cannot access the filesystem at all.
 
-Here, the `/lucet` virtual directory, as seen by the application, maps to the `/lucet` directory in the container.
+Here, the current virtual directory (`.`), as seen by the application, maps to the current directory in the container.
 
 ## What the example does
 
@@ -54,7 +55,7 @@ The main code is in `assembly/index.ts`.
 Key pair creation:
 
 ```sh
-lucet-wasi --entrypoint main --dir /lucet:/lucet example keypair
+lucet-wasi --entrypoint main --dir .:. example keypair
 ```
 
 ```text
@@ -63,7 +64,7 @@ Key pair created and saved into [keypair.bin]
 Public key: [94b8eb14373eb245c1daaacb2c24e2cb554bdd723009423aae5a8ca5fa99fa16]
 ```
 
-A new file `keypair.bin` is created on the local filesystem, at the root of the first mount point (`/lucet`).
+A new file `keypair.bin` is created on the local filesystem, at the root of the first mount point (the current directory).
 
 An environment variable called `KEYPAIR_FILE`, can be used in order to change the file name and location.
 
@@ -72,20 +73,22 @@ The WASA wrapper automatically sets the minimum required WASI capabilities in or
 File signature:
 
 ```sh
-lucet-wasi --entrypoint main --dir /lucet:/lucet example sign LICENSE
+lucet-wasi --entrypoint main --dir .:. example sign README.md
 ```
 
 ```text
 Signature for that file: [deedf3910d5b166ca17e0e307312a422cb50efcbcc90754cf0e2d528a9159c4ad3ac973e3cd9b2c2986fb2e467a0506bc9a5ceb9c7d6d30e360fb4d1cef3c50d]
 ```
 
-This command reads the `/lucet/LICENSE` file, as well as the key pair, and computes a signature of the file's content that can be verified using the public key.
+This command reads the `README.md` file, as well as the key pair, and computes a signature of the file's content that can be verified using the public key.
 
 Signature verification:
 
 ```sh
-lucet-wasi --entrypoint main --dir /lucet:/lucet example verify LICENSE 94b8eb14373eb245c1daaacb2c24e2cb554bdd723009423aae5a8ca5fa99fa16 deedf3910d5b166ca17e0e307312a422cb50efcbcc90754cf0e2d528a9159c4ad3ac973e3cd9b2c2986fb2e467a0506bc9a5ceb9c7d6d30e360fb4d1cef3c50d
+lucet-wasi --entrypoint main --dir .:. example verify README.md <public key> <signature>
 ```
+
+`<public key>` and `<signature>` must be replaced with output from the previous commands.
 
 ```text
 This is a valid signature for that file

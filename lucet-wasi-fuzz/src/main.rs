@@ -1,10 +1,13 @@
+#![deny(bare_trait_objects)]
+
 use failure::{bail, ensure, format_err, Error};
 use libc::c_ulong;
+use lucet_module::bindings::Bindings;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::host::__wasi_exitcode_t;
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
-use lucetc::{Bindings, Lucetc, LucetcOpts};
+use lucetc::{Lucetc, LucetcOpts};
 use rand::prelude::random;
 use rayon::prelude::*;
 use regex::Regex;
@@ -49,6 +52,7 @@ enum Config {
 
 fn main() {
     lucet_runtime::lucet_internal_ensure_linked();
+    lucet_wasi::hostcalls::ensure_linked();
 
     match Config::from_args() {
         Config::Fuzz { num_tests } => run_many(num_tests),
@@ -95,7 +99,7 @@ fn run_creduce_driver(seed: Seed) {
         .unwrap();
     assert!(st.success());
 
-    let st = Command::new("clang")
+    let st = Command::new(host_clang())
         .arg("-I/usr/include/csmith")
         .arg("-m32")
         .arg("-E")
@@ -191,7 +195,10 @@ fn run_one_seed(seed: Seed) {
             println!("lucet-wasi: {}", String::from_utf8_lossy(&actual));
             exit(1);
         }
-        Ok(TestResult::Errored { error }) | Err(error) => println!("test errored: {}", error),
+        Ok(TestResult::Errored { error }) | Err(error) => {
+            println!("test errored: {}", error);
+            exit(1);
+        }
     }
 }
 
@@ -277,8 +284,8 @@ fn run_both<P: AsRef<Path>>(
 fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<Vec<u8>>, Error> {
     let gen_path = tmpdir.path().join("gen");
 
-    let res = Command::new("clang")
-        .arg("-m32")
+    let mut cmd = Command::new(host_clang());
+    cmd.arg("-m32")
         .arg("-std=c11")
         .arg("-Werror=format")
         .arg("-Werror=uninitialized")
@@ -286,8 +293,12 @@ fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<
         .arg("-I/usr/include/csmith")
         .arg(gen_c_path.as_ref())
         .arg("-o")
-        .arg(&gen_path)
-        .output()?;
+        .arg(&gen_path);
+    if let Ok(flags) = std::env::var("HOST_CLANG_FLAGS") {
+        cmd.args(flags.split_whitespace());
+    }
+    let res = cmd.output()?;
+
     ensure!(res.status.success(), "native C compilation failed");
 
     if String::from_utf8_lossy(&res.stderr).contains("too few arguments in call") {
@@ -382,7 +393,7 @@ fn run<P: AsRef<Path>>(
         .with_embed_ctx(ctx)
         .build()?;
 
-    match inst.run(b"_start", &[]) {
+    match inst.run("_start", &[]) {
         // normal termination implies 0 exit code
         Ok(_) => Ok(0),
         Err(lucet_runtime::Error::RuntimeTerminated(
@@ -418,4 +429,11 @@ fn wasi_test<P: AsRef<Path>>(tmpdir: &TempDir, c_file: P) -> Result<Arc<dyn Modu
     let dlmodule = DlModule::load(so_file)?;
 
     Ok(dlmodule as Arc<dyn Module>)
+}
+
+fn host_clang() -> PathBuf {
+    match std::env::var("HOST_CLANG") {
+        Ok(clang) => PathBuf::from(clang),
+        Err(_) => PathBuf::from("clang"),
+    }
 }

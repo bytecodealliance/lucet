@@ -51,18 +51,18 @@ macro_rules! test_body {
 macro_rules! init_and_swap {
     ( $stack:ident, $fn:ident, [ $( $args:expr ),* ] ) => {
         unsafe {
-            let flag = AtomicBool::new(false);
+            let flag = std::sync::atomic::AtomicBool::new(false);
             let child = Box::into_raw(Box::new(ContextHandle::create_and_init(
                 &mut *$stack,
                 parent_regs.as_mut().unwrap(),
                 &flag,
-                $fn as *const extern "C" fn(),
+                $fn as usize,
                 &[$( $args ),*],
             ).unwrap()));
 
             child_regs = child;
 
-            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap());
+            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap(), &flag);
         }
     }
 }
@@ -111,8 +111,13 @@ fn call_child_twice() {
         arg0_val = 9;
         arg1_val = 10;
 
+        let flag = std::sync::atomic::AtomicBool::new(false);
         unsafe {
-            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap());
+            Context::swap(
+                parent_regs.as_mut().unwrap(),
+                child_regs.as_ref().unwrap(),
+                &flag,
+            );
         }
 
         assert_eq!(

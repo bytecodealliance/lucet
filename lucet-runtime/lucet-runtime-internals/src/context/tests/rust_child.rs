@@ -47,15 +47,21 @@ macro_rules! test_body {
 macro_rules! init_and_swap {
     ( $stack:ident, $fn:ident, [ $( $args:expr ),* ] ) => {
         unsafe {
+            let flag = std::sync::atomic::AtomicBool::new(false);
             let child = ContextHandle::create_and_init(
                 &mut *$stack,
                 PARENT.as_mut().unwrap(),
-                $fn as *const extern "C" fn(),
+                &flag,
+                $fn as usize,
                 &[$( $args ),*],
             ).unwrap();
             CHILD = Some(child);
 
-            Context::swap(PARENT.as_mut().unwrap(), CHILD.as_ref().unwrap());
+            Context::swap(
+                PARENT.as_mut().unwrap(),
+                CHILD.as_ref().unwrap(),
+                &flag,
+            );
         }
     }
 }
@@ -72,7 +78,8 @@ extern "C" fn arg_printing_child(arg0: *mut c_void, arg1: *mut c_void) {
     )
     .unwrap();
 
-    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap()) };
+    let flag = std::sync::atomic::AtomicBool::new(false);
+    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap(), &flag) };
 
     // Read the arguments again
     let arg0_val = unsafe { *(arg0 as *mut c_int) };
@@ -86,7 +93,8 @@ extern "C" fn arg_printing_child(arg0: *mut c_void, arg1: *mut c_void) {
     )
     .unwrap();
 
-    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap()) };
+    let flag = std::sync::atomic::AtomicBool::new(false);
+    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap(), &flag) };
 }
 
 #[test]
@@ -119,8 +127,9 @@ fn call_child_twice() {
         arg0_val = 9;
         arg1_val = 10;
 
+        let flag = std::sync::atomic::AtomicBool::new(false);
         unsafe {
-            Context::swap(PARENT.as_mut().unwrap(), CHILD.as_ref().unwrap());
+            Context::swap(PARENT.as_mut().unwrap(), CHILD.as_ref().unwrap(), &flag);
         }
 
         assert_output_eq!(

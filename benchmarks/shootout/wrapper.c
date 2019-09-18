@@ -62,7 +62,8 @@ static void setup_wrapper(const char *name, void *global_ctx_, void **ctx_p)
     (void) global_ctx_;
     ASSERT_OK(lucet_instance_run(
         lucet_ctx.inst, name, 2,
-        (struct lucet_val[]){ LUCET_VAL_GUEST_PTR(0), LUCET_VAL_GUEST_PTR(lucet_ctx.ctx_p) }));
+        (struct lucet_val[]){ LUCET_VAL_GUEST_PTR(0), LUCET_VAL_GUEST_PTR(lucet_ctx.ctx_p) },
+        NULL));
     *ctx_p = (void *) (uintptr_t) * (guest_ptr_t *) &lucet_ctx.heap[lucet_ctx.ctx_p];
 }
 
@@ -84,7 +85,8 @@ static void setup_wrapper(const char *name, void *global_ctx_, void **ctx_p)
 static void body_wrapper(const char *name, void *ctx)
 {
     lucet_instance_run(lucet_ctx.inst, name, 1,
-                       (struct lucet_val[]){ LUCET_VAL_GUEST_PTR((guest_ptr_t)(uintptr_t) ctx) });
+                       (struct lucet_val[]){ LUCET_VAL_GUEST_PTR((guest_ptr_t)(uintptr_t) ctx) },
+                       NULL);
 }
 
 #define BODY(NAME) \
@@ -93,7 +95,8 @@ static void body_wrapper(const char *name, void *ctx)
 static void teardown_wrapper(const char *name, void *ctx)
 {
     lucet_instance_run(lucet_ctx.inst, name, 1,
-                       (struct lucet_val[]){ LUCET_VAL_GUEST_PTR((guest_ptr_t)(uintptr_t) ctx) });
+                       (struct lucet_val[]){ LUCET_VAL_GUEST_PTR((guest_ptr_t)(uintptr_t) ctx) },
+                       NULL);
 }
 
 #define TEARDOWN(NAME)                            \
@@ -164,11 +167,11 @@ TEARDOWN_NOWRAP(nestedloop)
 
 SETUP(random2)
 BODY(random2)
-TEARDOWN(random2)
+TEARDOWN_NOWRAP(random2)
 
 SETUP(random)
 BODY(random)
-TEARDOWN(random)
+TEARDOWN_NOWRAP(random)
 
 SETUP(ratelimit)
 BODY(ratelimit)

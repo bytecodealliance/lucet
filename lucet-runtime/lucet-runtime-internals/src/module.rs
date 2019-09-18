@@ -1,22 +1,17 @@
 mod dl;
-mod globals;
 mod mock;
 mod sparse_page_data;
 
 pub use crate::module::dl::DlModule;
-pub use crate::module::mock::MockModuleBuilder;
-pub use lucet_module_data::{FunctionSpec, Global, GlobalSpec, HeapSpec, TrapCode, TrapManifest};
+pub use crate::module::mock::{MockExportBuilder, MockModuleBuilder};
+pub use lucet_module::{
+    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Global, GlobalSpec, GlobalValue,
+    HeapSpec, Signature, TableElement, TrapCode, TrapManifest, ValueType,
+};
 
 use crate::alloc::Limits;
 use crate::error::Error;
 use libc::c_void;
-
-#[repr(C)]
-#[derive(Clone, Debug)]
-pub struct TableElement {
-    ty: u64,
-    rf: u64,
-}
 
 /// Details about a program address.
 ///
@@ -35,7 +30,12 @@ pub struct AddrDetails {
 ///
 /// Types that implement this trait are suitable for use with
 /// [`Region::new_instance()`](trait.Region.html#method.new_instance).
-pub trait Module: ModuleInternal {}
+pub trait Module: ModuleInternal {
+    /// Calculate the initial size in bytes of the module's Wasm globals.
+    fn initial_globals_size(&self) -> usize {
+        self.globals().len() * std::mem::size_of::<u64>()
+    }
+}
 
 pub trait ModuleInternal: Send + Sync {
     fn heap_spec(&self) -> Option<&HeapSpec>;
@@ -44,7 +44,7 @@ pub trait ModuleInternal: Send + Sync {
     ///
     /// The indices into the returned slice correspond to the WebAssembly indices of the globals
     /// (<https://webassembly.github.io/spec/core/syntax/modules.html#syntax-globalidx>)
-    fn globals(&self) -> &[GlobalSpec];
+    fn globals(&self) -> &[GlobalSpec<'_>];
 
     fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]>;
 
@@ -54,19 +54,29 @@ pub trait ModuleInternal: Send + Sync {
     /// Get the table elements from the module.
     fn table_elements(&self) -> Result<&[TableElement], Error>;
 
-    fn get_export_func(&self, sym: &[u8]) -> Result<*const extern "C" fn(), Error>;
+    fn get_export_func(&self, sym: &str) -> Result<FunctionHandle, Error>;
 
-    fn get_func_from_idx(
-        &self,
-        table_id: u32,
-        func_id: u32,
-    ) -> Result<*const extern "C" fn(), Error>;
+    fn get_func_from_idx(&self, table_id: u32, func_id: u32) -> Result<FunctionHandle, Error>;
 
-    fn get_start_func(&self) -> Result<Option<*const extern "C" fn()>, Error>;
+    fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error>;
 
     fn function_manifest(&self) -> &[FunctionSpec];
 
     fn addr_details(&self, addr: *const c_void) -> Result<Option<AddrDetails>, Error>;
+
+    fn get_signature(&self, fn_id: FunctionIndex) -> &Signature;
+
+    fn function_handle_from_ptr(&self, ptr: FunctionPointer) -> FunctionHandle {
+        let id = self
+            .function_manifest()
+            .iter()
+            .enumerate()
+            .find(|(_, fn_spec)| fn_spec.ptr() == ptr)
+            .map(|(fn_id, _)| FunctionIndex::from_u32(fn_id as u32))
+            .expect("valid function pointer");
+
+        FunctionHandle { ptr, id }
+    }
 
     /// Look up an instruction pointer in the trap manifest.
     ///

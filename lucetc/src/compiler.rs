@@ -1,4 +1,3 @@
-use crate::bindings::Bindings;
 use crate::decls::ModuleDecls;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::function::FuncInfo;
@@ -19,27 +18,28 @@ use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
 use cranelift_wasm::{translate_module, FuncTranslator, WasmError};
 use failure::{format_err, Fail, ResultExt};
-use lucet_module_data::{FunctionSpec, ModuleData};
+use lucet_module::bindings::Bindings;
+use lucet_module::{FunctionSpec, ModuleData, MODULE_DATA_SYM};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
-    Default,
-    Best,
-    Fastest,
+    None,
+    Standard,
+    Fast,
 }
 
 impl Default for OptLevel {
     fn default() -> OptLevel {
-        OptLevel::Default
+        OptLevel::Standard
     }
 }
 
 impl OptLevel {
     pub fn to_flag(&self) -> &str {
         match self {
-            OptLevel::Default => "default",
-            OptLevel::Best => "best",
-            OptLevel::Fastest => "fastest",
+            OptLevel::None => "fastest",
+            OptLevel::Standard => "default",
+            OptLevel::Fast => "best",
         }
     }
 }
@@ -48,14 +48,16 @@ pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
     clif_module: ClifModule<FaerieBackend>,
     opt_level: OptLevel,
+    count_instructions: bool,
 }
 
 impl<'a> Compiler<'a> {
     pub fn new(
         wasm_binary: &'a [u8],
         opt_level: OptLevel,
-        bindings: &Bindings,
+        bindings: &'a Bindings,
         heap_settings: HeapSettings,
+        count_instructions: bool,
     ) -> Result<Self, LucetcError> {
         let isa = Self::target_isa(opt_level);
 
@@ -72,6 +74,7 @@ impl<'a> Compiler<'a> {
         }
 
         translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
+            WasmError::User(_) => e.context(LucetcErrorKind::Input),
             WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation), // This will trigger once cranelift-wasm upgrades to a validating wasm parser.
             WasmError::Unsupported { .. } => e.context(LucetcErrorKind::Unsupported),
             WasmError::ImplLimitExceeded { .. } => e.context(LucetcErrorKind::TranslatingModule),
@@ -79,7 +82,7 @@ impl<'a> Compiler<'a> {
 
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
-            _ => (FaerieBuilder::default_libcall_names())(libcall),
+            _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
         let mut clif_module: ClifModule<FaerieBackend> = ClifModule::new(
@@ -105,10 +108,11 @@ impl<'a> Compiler<'a> {
             decls,
             clif_module,
             opt_level,
+            count_instructions,
         })
     }
 
-    pub fn module_data(&self) -> ModuleData {
+    pub fn module_data(&self) -> Result<ModuleData<'_>, LucetcError> {
         self.decls.get_module_data()
     }
 
@@ -116,7 +120,7 @@ impl<'a> Compiler<'a> {
         let mut func_translator = FuncTranslator::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
-            let mut func_info = FuncInfo::new(&self.decls);
+            let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();
@@ -132,25 +136,35 @@ impl<'a> Compiler<'a> {
                 .context(LucetcErrorKind::FunctionDefinition)?;
         }
 
-        write_module_data(&mut self.clif_module, &self.decls)?;
+        stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
+
+        let module_data_len = write_module_data(&mut self.clif_module, &self.decls)?;
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
-        write_table_data(&mut self.clif_module, &self.decls)?;
+        let table_names = write_table_data(&mut self.clif_module, &self.decls)?;
 
         let function_manifest: Vec<(String, FunctionSpec)> = self
             .clif_module
             .declared_functions()
-            .filter_map(|f| {
-                f.compiled.as_ref().map(|compiled| {
-                    (
-                        f.decl.name.to_owned(), // this copy is only necessary because `clif_module` is moved in `finish, below`
-                        FunctionSpec::new(0, compiled.code_length(), 0, 0),
-                    )
-                })
+            .map(|f| {
+                (
+                    f.decl.name.to_owned(), // this copy is only necessary because `clif_module` is moved in `finish, below`
+                    FunctionSpec::new(
+                        0,
+                        f.compiled.as_ref().map(|c| c.code_length()).unwrap_or(0),
+                        0,
+                        0,
+                    ),
+                )
             })
             .collect();
 
-        let obj = ObjectFile::new(self.clif_module.finish(), function_manifest)
-            .context(LucetcErrorKind::Output)?;
+        let obj = ObjectFile::new(
+            self.clif_module.finish(),
+            module_data_len,
+            function_manifest,
+            table_names,
+        )
+        .context(LucetcErrorKind::Output)?;
         Ok(obj)
     }
 
@@ -161,7 +175,7 @@ impl<'a> Compiler<'a> {
         let mut func_translator = FuncTranslator::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
-            let mut func_info = FuncInfo::new(&self.decls);
+            let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();
@@ -189,48 +203,33 @@ impl<'a> Compiler<'a> {
 
 fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls,
-) -> Result<(), LucetcError> {
-    use byteorder::{LittleEndian, WriteBytesExt};
+    decls: &ModuleDecls<'_>,
+) -> Result<usize, LucetcError> {
     use cranelift_module::{DataContext, Linkage};
 
     let module_data_serialized: Vec<u8> = decls
-        .get_module_data()
+        .get_module_data()?
         .serialize()
         .context(LucetcErrorKind::ModuleData)?;
-    {
-        let mut serialized_len: Vec<u8> = Vec::new();
-        serialized_len
-            .write_u32::<LittleEndian>(module_data_serialized.len() as u32)
-            .unwrap();
-        let mut data_len_ctx = DataContext::new();
-        data_len_ctx.define(serialized_len.into_boxed_slice());
 
-        let data_len_decl = clif_module
-            .declare_data("lucet_module_data_len", Linkage::Export, false)
-            .context(LucetcErrorKind::ModuleData)?;
-        clif_module
-            .define_data(data_len_decl, &data_len_ctx)
-            .context(LucetcErrorKind::ModuleData)?;
-    }
+    let module_data_len = module_data_serialized.len();
 
-    {
-        let mut module_data_ctx = DataContext::new();
-        module_data_ctx.define(module_data_serialized.into_boxed_slice());
+    let mut module_data_ctx = DataContext::new();
+    module_data_ctx.define(module_data_serialized.into_boxed_slice());
 
-        let module_data_decl = clif_module
-            .declare_data("lucet_module_data", Linkage::Export, true)
-            .context(LucetcErrorKind::ModuleData)?;
-        clif_module
-            .define_data(module_data_decl, &module_data_ctx)
-            .context(LucetcErrorKind::ModuleData)?;
-    }
-    Ok(())
+    let module_data_decl = clif_module
+        .declare_data(MODULE_DATA_SYM, Linkage::Local, true, None)
+        .context(LucetcErrorKind::ModuleData)?;
+    clif_module
+        .define_data(module_data_decl, &module_data_ctx)
+        .context(LucetcErrorKind::ModuleData)?;
+
+    Ok(module_data_len)
 }
 
 fn write_startfunc_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls,
+    decls: &ModuleDecls<'_>,
 ) -> Result<(), LucetcError> {
     use cranelift_module::{DataContext, Linkage};
 
@@ -238,7 +237,7 @@ fn write_startfunc_data<B: ClifBackend>(
 
     if let Some(func_ix) = decls.get_start_func() {
         let name = clif_module
-            .declare_data("guest_start", Linkage::Export, false)
+            .declare_data("guest_start", Linkage::Export, false, None)
             .context(error_kind.clone())?;
         let mut ctx = DataContext::new();
         ctx.define_zeroinit(8);

@@ -1,8 +1,13 @@
+# Lucet version 0.1.1
+
 [workspace]
 members = [
   "lucet-analyze",
   "lucet-idl",
-  "lucet-module-data",
+  "lucet-idl/witx-frontend",
+  "lucet-idl/lucet-idl-test",
+  "lucet-idl/lucet-idl-test/resources/rust_host",
+  "lucet-module",
   "lucet-runtime",
   "lucet-runtime/lucet-runtime-internals",
   "lucet-runtime/lucet-runtime-tests",
@@ -18,6 +23,3 @@ exclude = ["cranelift"]
 
 [profile.test]
 rpath = true
-
-[replace]
-"faerie:0.10.0" = { path = "faerie" }

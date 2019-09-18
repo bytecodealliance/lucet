@@ -1,5 +1,6 @@
 use crate::build::test_module_wasm;
-use crate::helpers::MockModuleBuilder;
+use crate::helpers::{MockExportBuilder, MockModuleBuilder};
+use lucet_module::{lucet_signature, FunctionPointer};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use std::sync::Arc;
@@ -11,6 +12,16 @@ pub fn wat_calculator_module() -> Arc<dyn Module> {
 pub fn mock_calculator_module() -> Arc<dyn Module> {
     extern "C" fn add_2(_vmctx: *mut lucet_vmctx, arg0: u64, arg1: u64) -> u64 {
         arg0 + arg1
+    }
+
+    extern "C" fn add_4_hostcall(
+        _vmctx: *mut lucet_vmctx,
+        arg0: u64,
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+    ) -> u64 {
+        arg0 + arg1 + arg2 + arg3
     }
 
     extern "C" fn add_10(
@@ -119,14 +130,61 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
     }
 
     MockModuleBuilder::new()
-        .with_export_func(b"add_2", add_2 as *const extern "C" fn())
-        .with_export_func(b"add_10", add_10 as *const extern "C" fn())
-        .with_export_func(b"mul_2", mul_2 as *const extern "C" fn())
-        .with_export_func(b"add_f32_2", add_f32_2 as *const extern "C" fn())
-        .with_export_func(b"add_f64_2", add_f64_2 as *const extern "C" fn())
-        .with_export_func(b"add_f32_10", add_f32_10 as *const extern "C" fn())
-        .with_export_func(b"add_f64_10", add_f64_10 as *const extern "C" fn())
-        .with_export_func(b"add_mixed_20", add_mixed_20 as *const extern "C" fn())
+        .with_export_func(
+            MockExportBuilder::new("add_2", FunctionPointer::from_usize(add_2 as usize))
+                .with_sig(lucet_signature!((I64, I64) -> I64)),
+        )
+        .with_exported_import_func(
+            "add_4_reexport",
+            FunctionPointer::from_usize(add_4_hostcall as usize),
+            lucet_signature!((I64, I64, I64, I64) -> I64),
+        )
+        .with_export_func(
+            MockExportBuilder::new("add_10", FunctionPointer::from_usize(add_10 as usize))
+                .with_sig(lucet_signature!(
+                    (I64, I64, I64, I64, I64, I64, I64, I64, I64, I64) -> I64)),
+        )
+        .with_export_func(
+            MockExportBuilder::new("mul_2", FunctionPointer::from_usize(mul_2 as usize))
+                .with_sig(lucet_signature!((I64, I64) -> I64)),
+        )
+        .with_export_func(
+            MockExportBuilder::new("add_f32_2", FunctionPointer::from_usize(add_f32_2 as usize))
+                .with_sig(lucet_signature!((F32, F32) -> F32)),
+        )
+        .with_export_func(
+            MockExportBuilder::new("add_f64_2", FunctionPointer::from_usize(add_f64_2 as usize))
+                .with_sig(lucet_signature!((F64, F64) -> F64)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(
+                "add_f32_10",
+                FunctionPointer::from_usize(add_f32_10 as usize),
+            )
+            .with_sig(lucet_signature!(
+                    (F32, F32, F32, F32, F32, F32, F32, F32, F32, F32) -> F32)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(
+                "add_f64_10",
+                FunctionPointer::from_usize(add_f64_10 as usize),
+            )
+            .with_sig(lucet_signature!(
+                    (F64, F64, F64, F64, F64, F64, F64, F64, F64, F64) -> F64)),
+        )
+        .with_export_func(
+            MockExportBuilder::new(
+                "add_mixed_20",
+                FunctionPointer::from_usize(add_mixed_20 as usize),
+            )
+            .with_sig(lucet_signature!(
+                    (
+                        F64, I32, F32, F64, I32, F32,
+                        F64, I32, F32, F64, I32, F32,
+                        F64, I32, F32, F64, I64, F32,
+                        F64, I64
+                    ) -> F64)),
+        )
         .build()
 }
 
@@ -135,13 +193,20 @@ macro_rules! entrypoint_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-        use lucet_runtime::{DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::{
+            lucet_hostcalls, DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE,
+        };
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::entrypoint::{mock_calculator_module, wat_calculator_module};
 
-        #[no_mangle]
-        extern "C" fn black_box(_vmctx: *mut lucet_vmctx, _val: *mut c_void) {}
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn black_box(
+                &mut _vmctx,
+                _val: *mut c_void,
+            ) -> () {}
+        }
 
         #[test]
         fn mock_calc_add_2() {
@@ -160,8 +225,9 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"add_2", &[123u64.into(), 456u64.into()])
-                .expect("instance runs");
+                .run("add_2", &[123u64.into(), 456u64.into()])
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 123u64 + 456);
         }
@@ -190,7 +256,7 @@ macro_rules! entrypoint_tests {
             // order is correct.
             let retval = inst
                 .run(
-                    b"add_10",
+                    "add_10",
                     &[
                         1u64.into(),
                         2u64.into(),
@@ -204,7 +270,8 @@ macro_rules! entrypoint_tests {
                         10u64.into(),
                     ],
                 )
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10);
         }
@@ -226,8 +293,9 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"mul_2", &[123u64.into(), 456u64.into()])
-                .expect("instance runs");
+                .run("mul_2", &[123u64.into(), 456u64.into()])
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 123 * 456);
         }
@@ -244,14 +312,16 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"add_2", &[111u64.into(), 222u64.into()])
-                .expect("instance runs");
+                .run("add_2", &[111u64.into(), 222u64.into()])
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 111 + 222);
 
             let retval = inst
-                .run(b"mul_2", &[333u64.into(), 444u64.into()])
-                .expect("instance runs");
+                .run("mul_2", &[333u64.into(), 444u64.into()])
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(u64::from(retval), 333 * 444);
         }
@@ -272,7 +342,7 @@ macro_rules! entrypoint_tests {
                 .new_instance(module)
                 .expect("instance can be created");
 
-            match inst.run(b"invalid", &[123u64.into(), 456u64.into()]) {
+            match inst.run("invalid", &[123u64.into(), 456u64.into()]) {
                 Err(Error::SymbolNotFound(sym)) => assert_eq!(sym, "invalid"),
                 res => panic!("unexpected result: {:?}", res),
             }
@@ -294,8 +364,9 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"add_f32_2", &[(-6.9f32).into(), 4.2f32.into()])
-                .expect("instance runs");
+                .run("add_f32_2", &[(-6.9f32).into(), 4.2f32.into()])
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(f32::from(retval), -6.9 + 4.2);
         }
@@ -315,8 +386,9 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"add_f64_2", &[(-6.9f64).into(), 4.2f64.into()])
-                .expect("instance runs");
+                .run("add_f64_2", &[(-6.9f64).into(), 4.2f64.into()])
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(f64::from(retval), -6.9 + 4.2);
         }
@@ -337,7 +409,7 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run(
-                    b"add_f32_10",
+                    "add_f32_10",
                     &[
                         0.1f32.into(),
                         0.2f32.into(),
@@ -351,7 +423,8 @@ macro_rules! entrypoint_tests {
                         1.0f32.into(),
                     ],
                 )
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(
                 f32::from(retval),
@@ -375,7 +448,7 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run(
-                    b"add_f64_10",
+                    "add_f64_10",
                     &[
                         0.1f64.into(),
                         0.2f64.into(),
@@ -389,7 +462,8 @@ macro_rules! entrypoint_tests {
                         1.0f64.into(),
                     ],
                 )
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(
                 f64::from(retval),
@@ -410,7 +484,7 @@ macro_rules! entrypoint_tests {
 
             let retval = inst
                 .run(
-                    b"add_mixed_20",
+                    "add_mixed_20",
                     &[
                         (-1.1f64).into(),
                         1u8.into(),
@@ -434,7 +508,8 @@ macro_rules! entrypoint_tests {
                         19u64.into(),
                     ],
                 )
-                .expect("instance runs");
+                .expect("instance runs")
+                .unwrap_returned();
 
             assert_eq!(
                 f64::from(retval),
@@ -459,6 +534,106 @@ macro_rules! entrypoint_tests {
                     + 18.1f64
                     + 19u64 as f64
             );
+        }
+
+        #[test]
+        fn mock_typecheck_entrypoint_wrong_args() {
+            typecheck_entrypoint_wrong_args(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_typecheck_entrypoint_wrong_args() {
+            typecheck_entrypoint_wrong_args(wat_calculator_module())
+        }
+
+        fn typecheck_entrypoint_wrong_args(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run("add_2", &[123.0f64.into(), 456.0f64.into()]) {
+                Err(Error::InvalidArgument(err)) => {
+                    assert_eq!(err, "entrypoint function signature mismatch")
+                }
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
+        #[test]
+        fn mock_typecheck_entrypoint_too_few_args() {
+            typecheck_entrypoint_too_few_args(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_typecheck_entrypoint_too_few_args() {
+            typecheck_entrypoint_too_few_args(wat_calculator_module())
+        }
+
+        fn typecheck_entrypoint_too_few_args(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run("add_2", &[123u64.into()]) {
+                Err(Error::InvalidArgument(err)) => assert_eq!(
+                    err,
+                    "entrypoint function signature mismatch (number of arguments is incorrect)"
+                ),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
+        #[test]
+        fn mock_typecheck_entrypoint_too_many_args() {
+            typecheck_entrypoint_too_many_args(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_typecheck_entrypoint_too_many_args() {
+            typecheck_entrypoint_too_many_args(wat_calculator_module())
+        }
+
+        fn typecheck_entrypoint_too_many_args(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            match inst.run("add_2", &[123u64.into(), 456u64.into(), 789u64.into()]) {
+                Err(Error::InvalidArgument(err)) => assert_eq!(
+                    err,
+                    "entrypoint function signature mismatch (number of arguments is incorrect)"
+                ),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        }
+
+        #[test]
+        fn mock_imported_entrypoint() {
+            imported_entrypoint(mock_calculator_module())
+        }
+
+        #[test]
+        fn wat_imported_entrypoint() {
+            imported_entrypoint(wat_calculator_module())
+        }
+
+        fn imported_entrypoint(module: Arc<dyn Module>) {
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            let retval = inst
+                .run(
+                    "add_4_reexport",
+                    &[123u64.into(), 456u64.into(), 789u64.into(), 432u64.into()],
+                )
+                .unwrap()
+                .unwrap_returned();
+            assert_eq!(u64::from(retval), 1800);
         }
 
         use $crate::build::test_module_c;
@@ -487,7 +662,7 @@ macro_rules! entrypoint_tests {
             // This function will call `malloc` for the given size, then `memset` the entire region to the
             // init_as argument. The pointer to the allocated region gets stored in loc_outval.
             inst.run(
-                b"create_and_memset",
+                "create_and_memset",
                 &[
                     // int init_as
                     TEST_REGION_INIT_VAL.into(),
@@ -538,7 +713,7 @@ macro_rules! entrypoint_tests {
 
             // Create a region and initialize it, just like above
             inst.run(
-                b"create_and_memset",
+                "create_and_memset",
                 &[
                     // int init_as
                     TEST_REGION_INIT_VAL.into(),
@@ -568,7 +743,7 @@ macro_rules! entrypoint_tests {
             }
 
             // Then increment the first location in the region
-            inst.run(b"increment_ptr", &[Val::GuestPtr(loc_region_1)])
+            inst.run("increment_ptr", &[Val::GuestPtr(loc_region_1)])
                 .expect("instance runs");
 
             let heap = inst.heap();
@@ -613,7 +788,7 @@ macro_rules! entrypoint_tests {
 
             // same as above
             inst.run(
-                b"create_and_memset",
+                "create_and_memset",
                 &[
                     // int init_as
                     TEST_REGION_INIT_VAL.into(),
@@ -633,7 +808,7 @@ macro_rules! entrypoint_tests {
 
             // Create a second region
             inst.run(
-                b"create_and_memset",
+                "create_and_memset",
                 &[
                     // int init_as
                     TEST_REGION2_INIT_VAL.into(),
@@ -691,7 +866,7 @@ macro_rules! entrypoint_tests {
 
             // Run the setup routine
             inst.run(
-                b"ctype_setup",
+                "ctype_setup",
                 &[
                     std::ptr::null::<c_void>().into(),
                     Val::GuestPtr(loc_ctxstar),
@@ -707,18 +882,39 @@ macro_rules! entrypoint_tests {
             assert!(ctxstar > 0);
 
             // Run the body routine
-            inst.run(b"ctype_body", &[Val::GuestPtr(ctxstar)])
+            inst.run("ctype_body", &[Val::GuestPtr(ctxstar)])
                 .expect("instance runs");
         }
 
-        #[no_mangle]
-        extern "C" fn callback_hostcall(vmctx: *mut lucet_vmctx, cb_idx: u32, x: u64) -> u64 {
-            let vmctx = unsafe { Vmctx::from_raw(vmctx) };
-            let func = vmctx
-                .get_func_from_idx(0, cb_idx)
-                .expect("can get function by index");
-            let func = func as *const extern "C" fn(*mut lucet_vmctx, u64) -> u64;
-            unsafe { (*func)(vmctx.as_raw(), x) + 1 }
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn callback_hostcall(
+                &mut vmctx,
+                cb_idx: u32,
+                x: u64,
+            ) -> u64 {
+                let func = vmctx
+                    .get_func_from_idx(0, cb_idx)
+                    .expect("can get function by index");
+                let func = std::mem::transmute::<
+                    usize,
+                    extern "C" fn(*mut lucet_vmctx, u64) -> u64
+                >(func.ptr.as_usize());
+                (func)(vmctx.as_raw(), x) + 1
+            }
+        }
+
+        lucet_hostcalls! {
+            #[no_mangle]
+            pub unsafe extern "C" fn add_4_hostcall(
+                &mut vmctx,
+                x: u64,
+                y: u64,
+                z: u64,
+                w: u64,
+            ) -> u64 {
+                x + y + z + w
+            }
         }
 
         #[test]
@@ -732,8 +928,9 @@ macro_rules! entrypoint_tests {
                 .expect("instance can be created");
 
             let retval = inst
-                .run(b"callback_entrypoint", &[0u64.into()])
-                .expect("instance runs");
+                .run("callback_entrypoint", &[0u64.into()])
+                .expect("instance runs")
+                .unwrap_returned();
             assert_eq!(u64::from(retval), 3);
         }
     };

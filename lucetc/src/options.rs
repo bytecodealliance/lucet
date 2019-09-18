@@ -38,12 +38,19 @@ pub struct Options {
     pub builtins_path: Option<PathBuf>,
     pub min_reserved_size: Option<u64>,
     pub max_reserved_size: Option<u64>,
+    pub reserved_size: Option<u64>,
     pub guard_size: Option<u64>,
     pub opt_level: OptLevel,
+    pub keygen: bool,
+    pub sign: bool,
+    pub verify: bool,
+    pub pk_path: Option<PathBuf>,
+    pub sk_path: Option<PathBuf>,
+    pub count_instructions: bool,
 }
 
 impl Options {
-    pub fn from_args(m: &ArgMatches) -> Result<Self, Error> {
+    pub fn from_args(m: &ArgMatches<'_>) -> Result<Self, Error> {
         let input: Vec<PathBuf> = m
             .values_of("input")
             .unwrap_or_default()
@@ -80,6 +87,12 @@ impl Options {
             None
         };
 
+        let reserved_size = if let Some(reserved_str) = m.value_of("reserved_size") {
+            Some(parse_humansized(reserved_str)?)
+        } else {
+            None
+        };
+
         let guard_size = if let Some(guard_str) = m.value_of("guard_size") {
             Some(parse_humansized(guard_str)?)
         } else {
@@ -87,12 +100,19 @@ impl Options {
         };
 
         let opt_level = match m.value_of("opt_level") {
-            None => OptLevel::Default,
-            Some("default") => OptLevel::Default,
-            Some("best") => OptLevel::Best,
-            Some("fastest") => OptLevel::Fastest,
+            None => OptLevel::default(),
+            Some("0") => OptLevel::None,
+            Some("1") => OptLevel::Standard,
+            Some("2") | Some("fast") => OptLevel::Fast,
             Some(_) => panic!("unknown value for opt-level"),
         };
+
+        let keygen = m.is_present("keygen");
+        let sign = m.is_present("sign");
+        let verify = m.is_present("verify");
+        let sk_path = m.value_of("sk_path").map(PathBuf::from);
+        let pk_path = m.value_of("pk_path").map(PathBuf::from);
+        let count_instructions = m.is_present("count_instructions");
 
         Ok(Options {
             output,
@@ -102,8 +122,15 @@ impl Options {
             builtins_path,
             min_reserved_size,
             max_reserved_size,
+            reserved_size,
             guard_size,
             opt_level,
+            keygen,
+            sign,
+            verify,
+            sk_path,
+            pk_path,
+            count_instructions,
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -155,6 +182,13 @@ impl Options {
                     .help("maximum size of usable linear memory region. must be multiple of 4k. default: 4 GiB"),
             )
             .arg(
+                Arg::with_name("reserved_size")
+                    .long("--reserved-size")
+                    .takes_value(true)
+                    .multiple(false)
+                    .help("exact size of usable linear memory region, overriding --{min,max}-reserved-size. must be multiple of 4k"),
+            )
+            .arg(
                 Arg::with_name("guard_size")
                     .long("--guard-size")
                     .takes_value(true)
@@ -173,15 +207,51 @@ impl Options {
             .arg(
                 Arg::with_name("input")
                     .multiple(false)
-                    .required(true)
+                    .required(false)
                     .help("input file"),
             )
             .arg(
                 Arg::with_name("opt_level")
                     .long("--opt-level")
                     .takes_value(true)
-                    .possible_values(&["default", "fastest", "best"])
-                    .help("optimization level (default: 'default')"),
+                    .possible_values(&["0", "1", "2", "fast"])
+                    .help("optimization level (default: '1')"),
+            )
+            .arg(
+                Arg::with_name("keygen")
+                    .long("--signature-keygen")
+                    .takes_value(false)
+                    .help("Create a new key pair")
+            )
+            .arg(
+                Arg::with_name("verify")
+                     .long("--signature-verify")
+                     .takes_value(false)
+                     .help("Verify the signature of the source file")
+            )
+            .arg(
+                Arg::with_name("sign")
+                     .long("--signature-create")
+                     .takes_value(false)
+                     .help("Sign the object file")
+            )
+            .arg(
+                Arg::with_name("pk_path")
+                     .long("--signature-pk")
+                     .takes_value(true)
+                     .help("Path to the public key to verify the source code signature")
+            )
+            .arg(
+                Arg::with_name("sk_path")
+                     .long("--signature-sk")
+                     .takes_value(true)
+                     .help("Path to the secret key to sign the object file. The file can be prefixed with \"raw:\" in order to store a raw, unencrypted secret key")
+            )
+            .arg(
+                Arg::with_name("count_instructions")
+                    .long("--count-instructions")
+                    .takes_value(false)
+                    .help("Instrument the produced binary to count the number of wasm operations the translated program executes")
             )
             .get_matches();
 

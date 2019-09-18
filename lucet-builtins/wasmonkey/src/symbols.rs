@@ -1,8 +1,8 @@
-use errors::*;
+use crate::errors::*;
+use crate::patcher::BUILTIN_PREFIX;
 use goblin::elf::Elf;
 use goblin::mach::{self, Mach, MachO};
 use goblin::Object;
-use patcher::BUILTIN_PREFIX;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -25,7 +25,8 @@ impl From<Vec<ExtractedSymbol>> for ExtractedSymbols {
 
 impl ExtractedSymbols {
     pub fn builtins_names(&self) -> Vec<&str> {
-        let builtins_names: Vec<&str> = self.symbols
+        let builtins_names: Vec<&str> = self
+            .symbols
             .iter()
             .filter(|symbol| symbol.name.starts_with(BUILTIN_PREFIX))
             .map(|symbol| &symbol.name[BUILTIN_PREFIX.len()..])
@@ -35,7 +36,7 @@ impl ExtractedSymbols {
 
     pub fn merge_additional(mut self, additional_names: &[String]) -> Self {
         let mut additional_symbols: Vec<_> = additional_names
-            .into_iter()
+            .iter()
             .map(|name| ExtractedSymbol {
                 name: name.to_string(),
             })
@@ -46,14 +47,16 @@ impl ExtractedSymbols {
     }
 }
 
-fn parse_elf(elf: &Elf) -> Result<ExtractedSymbols, WError> {
+fn parse_elf(elf: &Elf<'_>) -> Result<ExtractedSymbols, WError> {
     let mut symbols = vec![];
 
-    for symbol in elf.dynsyms
+    for symbol in elf
+        .dynsyms
         .iter()
         .filter(|symbol| symbol.st_info == 0x12 || symbol.st_info == 0x22)
     {
-        let name = elf.dynstrtab
+        let name = elf
+            .dynstrtab
             .get(symbol.st_name)
             .ok_or(WError::ParseError)?
             .map_err(|_| WError::ParseError)?
@@ -64,7 +67,7 @@ fn parse_elf(elf: &Elf) -> Result<ExtractedSymbols, WError> {
     Ok(symbols.into())
 }
 
-fn parse_macho(macho: &MachO) -> Result<ExtractedSymbols, WError> {
+fn parse_macho(macho: &MachO<'_>) -> Result<ExtractedSymbols, WError> {
     let mut symbols = vec![];
 
     // Start by finding the boundaries of the text section
@@ -102,8 +105,7 @@ fn parse_macho(macho: &MachO) -> Result<ExtractedSymbols, WError> {
                     n_value,
                     ..
                 },
-            )) if name.len() > 1 && name.starts_with('_') =>
-            {
+            )) if name.len() > 1 && name.starts_with('_') => {
                 let extracted_symbol = ExtractedSymbol {
                     name: name[1..].to_string(),
                 };

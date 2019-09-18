@@ -1,11 +1,16 @@
 [package]
 name = "lucet-wasi-sdk"
-version = "0.1.0"
-authors = ["Pat Hickey <phickey@fastly.com>"]
-edition = "2018"
+version = "0.1.1"
+description = "A Rust interface to the wasi-sdk compiler and linker"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
 license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Lucet team <lucet@fastly.com>"]
+edition = "2018"
 
 [dependencies]
 failure = "0.1"
-lucetc = { path = "../lucetc" }
+lucetc = { path = "../lucetc", version = "0.1.1" }
+lucet-module = { path = "../lucet-module", version = "0.1.1" }
 tempfile = "3.0"
