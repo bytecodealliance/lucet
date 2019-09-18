@@ -330,7 +330,7 @@ impl Context {
         let stack_start = 3 // the bootstrap ret addr, then guest func ret addr, then the backstop ret addr
         + spilled_args.len() // then any args to guest func that don't fit in registers
         + spilled_args.len() % 2 // padding to keep the stack 16-byte aligned when we spill an odd number of spilled arguments
-        + 5; // then the backstop args and terminator
+        + 6; // then the backstop args and terminator
 
         // stack-saved arguments start 3 below the top of the stack
         // (TODO: a diagram would be great here)
