@@ -25,72 +25,6 @@ macro_rules! host_tests {
             assert!(module.is_err());
         }
 
-        const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
-
-<<<<<<< HEAD
-=======
-        lazy_static! {
-            static ref HOSTCALL_MUTEX: Mutex<()> = Mutex::new(());
-            static ref NESTED_OUTER: Mutex<()> = Mutex::new(());
-            static ref NESTED_INNER: Mutex<()> = Mutex::new(());
-            static ref NESTED_REGS_OUTER: Mutex<()> = Mutex::new(());
-            static ref NESTED_REGS_INNER: Mutex<()> = Mutex::new(());
-        }
-
-        #[inline]
-        unsafe fn unwind_outer(vmctx: &mut Vmctx, mutex: &Mutex<()>, cb_idx: u32) -> u64 {
-            let lock = mutex.lock().unwrap();
-            let func = vmctx
-                .get_func_from_idx(0, cb_idx)
-                .expect("can get function by index");
-            let func = std::mem::transmute::<usize, extern "C" fn(*mut lucet_vmctx) -> u64>(
-                func.ptr.as_usize(),
-            );
-            let res = (func)(vmctx.as_raw());
-            drop(lock);
-            res
-        }
-
-        #[allow(unreachable_code)]
-        #[inline]
-        unsafe fn unwind_inner(vmctx: &mut Vmctx, mutex: &Mutex<()>) {
-            let lock = mutex.lock().unwrap();
-            lucet_hostcall_terminate!(ERROR_MESSAGE);
-            drop(lock);
-        }
-
->>>>>>> 3afa5c4... add nested hostcall unwinding test
-        #[lucet_hostcall]
-        #[no_mangle]
-        pub fn hostcall_test_func_hostcall_error(_vmctx: &Vmctx) {
-            lucet_hostcall_terminate!(ERROR_MESSAGE);
-        }
-
-        #[lucet_hostcall]
-        #[no_mangle]
-        pub fn hostcall_test_func_hello(vmctx: &Vmctx, hello_ptr: u32, hello_len: u32) {
-            let heap = vmctx.heap();
-            let hello = heap.as_ptr() as usize + hello_ptr as usize;
-            if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
-                lucet_hostcall_terminate!("heap access");
-            }
-            let hello =
-                unsafe { std::slice::from_raw_parts(hello as *const u8, hello_len as usize) };
-            if hello.starts_with(b"hello") {
-                *vmctx.get_embed_ctx_mut::<bool>() = true;
-            }
-        }
-
-        #[lucet_hostcall]
-        #[allow(unreachable_code)]
-        #[no_mangle]
-        pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &Vmctx) {
-            let lock = vmctx.get_embed_ctx::<Arc<Mutex<()>>>();
-            let _mutex_guard = lock.lock().unwrap();
-            lucet_hostcall_terminate!(ERROR_MESSAGE);
-            drop(_mutex_guard);
-        }
-
         #[lucet_hostcall]
         #[no_mangle]
         pub fn hostcall_bad_borrow(vmctx: &Vmctx) -> bool {
@@ -219,7 +153,6 @@ macro_rules! host_tests {
 
         $(
             mod $region_id {
-
                 use lazy_static::lazy_static;
                 use libc::c_void;
                 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
@@ -232,109 +165,80 @@ macro_rules! host_tests {
                 use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder};
                 use $TestRegion as TestRegion;
 
+                const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
+
                 lazy_static! {
                     static ref HOSTCALL_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+                    static ref NESTED_OUTER: Mutex<()> = Mutex::new(());
+                    static ref NESTED_INNER: Mutex<()> = Mutex::new(());
+                    static ref NESTED_REGS_OUTER: Mutex<()> = Mutex::new(());
+                    static ref NESTED_REGS_INNER: Mutex<()> = Mutex::new(());
                 }
+
+                #[inline]
+                unsafe fn unwind_outer(vmctx: &mut Vmctx, mutex: &Mutex<()>, cb_idx: u32) -> u64 {
+                    let lock = mutex.lock().unwrap();
+                    let func = vmctx
+                        .get_func_from_idx(0, cb_idx)
+                        .expect("can get function by index");
+                    let func = std::mem::transmute::<usize, extern "C" fn(*const lucet_vmctx) -> u64>(
+                        func.ptr.as_usize(),
+                    );
+                    let res = (func)(vmctx.as_raw());
+                    drop(lock);
+                    res
+                }
+
+                #[allow(unreachable_code)]
+                #[inline]
+                unsafe fn unwind_inner(vmctx: &mut Vmctx, mutex: &Mutex<()>) {
+                    let lock = mutex.lock().unwrap();
+                    lucet_hostcall_terminate!(ERROR_MESSAGE);
+                    drop(lock);
+                }
+
+                /*
+                #[lucet_hostcall]
+                #[no_mangle]
+                pub fn hostcall_test_func_hostcall_error(_vmctx: &Vmctx) {
+                    lucet_hostcall_terminate!(ERROR_MESSAGE);
+                }
+
+                #[lucet_hostcall]
+                #[no_mangle]
+                pub fn hostcall_test_func_hello(vmctx: &Vmctx, hello_ptr: u32, hello_len: u32) {
+                    let heap = vmctx.heap();
+                    let hello = heap.as_ptr() as usize + hello_ptr as usize;
+                    if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
+                        lucet_hostcall_terminate!("heap access");
+                    }
+                    let hello =
+                        unsafe { std::slice::from_raw_parts(hello as *const u8, hello_len as usize) };
+                    if hello.starts_with(b"hello") {
+                        *vmctx.get_embed_ctx_mut::<bool>() = true;
+                    }
+                }
+
+                #[lucet_hostcall]
+                #[allow(unreachable_code)]
+                #[no_mangle]
+                pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &Vmctx) {
+                    let lock = vmctx.get_embed_ctx::<Arc<Mutex<()>>>();
+                    let _mutex_guard = lock.lock().unwrap();
+                    lucet_hostcall_terminate!(ERROR_MESSAGE);
+                    drop(_mutex_guard);
+                }
+                */
 
                 #[test]
                 fn load_module() {
                     let _module = test_module_c("host", "trivial.c").expect("build and load module");
                 }
 
-<<<<<<< HEAD
                 #[test]
                 fn load_nonexistent_module() {
                     let module = DlModule::load("/non/existient/file");
                     assert!(module.is_err());
-=======
-        /// Check that if two segments of hostcall stack are present when terminating, that they
-        /// both get properly unwound.
-        #[test]
-        fn nested_error_unwind() {
-            let module =
-                test_module_c("host", "nested_error_unwind.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("entrypoint", &[]) {
-                Err(Error::RuntimeTerminated(term)) => {
-                    assert_eq!(
-                        *term
-                            .provided_details()
-                            .expect("user provided termination reason")
-                            .downcast_ref::<&'static str>()
-                            .expect("error was static str"),
-                        ERROR_MESSAGE
-                    );
-                }
-                res => panic!("unexpected result: {:?}", res),
-            }
-
-            assert!(NESTED_OUTER.is_poisoned());
-            assert!(NESTED_INNER.is_poisoned());
-        }
-
-        /// Like `nested_error_unwind`, but the guest code callback in between the two segments of
-        /// hostcall stack uses enough locals to require saving callee registers.
-        #[test]
-        fn nested_error_unwind_regs() {
-            let module =
-                test_module_c("host", "nested_error_unwind.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("entrypoint_regs", &[]) {
-                Err(Error::RuntimeTerminated(term)) => {
-                    assert_eq!(
-                        *term
-                            .provided_details()
-                            .expect("user provided termination reason")
-                            .downcast_ref::<&'static str>()
-                            .expect("error was static str"),
-                        ERROR_MESSAGE
-                    );
-                }
-                res => panic!("unexpected result: {:?}", res),
-            }
-
-            assert!(NESTED_REGS_OUTER.is_poisoned());
-            assert!(NESTED_REGS_INNER.is_poisoned());
-        }
-
-        /// Ensures that callee-saved registers are properly restored following a `catch_unwind`
-        /// that catches a panic. Currently disabled because it relies on UB until
-        /// `#[unwind(allowed)]` is stabilized.
-        #[ignore]
-        #[test]
-        fn restore_callee_saved() {
-            let module =
-                test_module_c("host", "nested_error_unwind.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-            assert_eq!(
-                u64::from(inst.run("entrypoint_restore", &[]).unwrap()),
-                6148914668330025056
-            );
-        }
-
-        #[test]
-        fn run_fpe() {
-            let module = test_module_c("host", "fpe.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("trigger_div_error", &[0u32.into()]) {
-                Err(Error::RuntimeFault(details)) => {
-                    assert_eq!(details.trapcode, Some(TrapCode::IntegerDivByZero));
->>>>>>> 3afa5c4... add nested hostcall unwinding test
                 }
 
                 #[test]
@@ -383,14 +287,14 @@ macro_rules! host_tests {
                         .expect("instance can be created");
 
                     match inst.run("main", &[0u32.into(), 0i32.into()]) {
-                        Err(Error::RuntimeTerminated(term)) => {
+                    Err(Error::RuntimeTerminated(term)) => {
                             assert_eq!(
                                 *term
                                     .provided_details()
                                     .expect("user provided termination reason")
                                     .downcast_ref::<&'static str>()
                                     .expect("error was static str"),
-                                super::ERROR_MESSAGE
+                                ERROR_MESSAGE
                             );
                         }
                         res => panic!("unexpected result: {:?}", res),
@@ -417,13 +321,89 @@ macro_rules! host_tests {
                                     .expect("user provided termination reason")
                                     .downcast_ref::<&'static str>()
                                     .expect("error was static str"),
-                                super::ERROR_MESSAGE
+                                ERROR_MESSAGE
                             );
                         }
                         res => panic!("unexpected result: {:?}", res),
                     }
 
                     assert!(HOSTCALL_MUTEX.is_poisoned());
+                }
+
+                /// Check that if two segments of hostcall stack are present when terminating, that they
+                /// both get properly unwound.
+                #[test]
+                fn nested_error_unwind() {
+                    let module =
+                        test_module_c("host", "nested_error_unwind.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("entrypoint", &[]) {
+                        Err(Error::RuntimeTerminated(term)) => {
+                            assert_eq!(
+                                *term
+                                    .provided_details()
+                                    .expect("user provided termination reason")
+                                    .downcast_ref::<&'static str>()
+                                    .expect("error was static str"),
+                                ERROR_MESSAGE
+                            );
+                        }
+                        res => panic!("unexpected result: {:?}", res),
+                    }
+
+                    assert!(NESTED_OUTER.is_poisoned());
+                    assert!(NESTED_INNER.is_poisoned());
+                }
+
+                /// Like `nested_error_unwind`, but the guest code callback in between the two segments of
+                /// hostcall stack uses enough locals to require saving callee registers.
+                #[test]
+                fn nested_error_unwind_regs() {
+                    let module =
+                        test_module_c("host", "nested_error_unwind.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("entrypoint_regs", &[]) {
+                        Err(Error::RuntimeTerminated(term)) => {
+                            assert_eq!(
+                                *term
+                                    .provided_details()
+                                    .expect("user provided termination reason")
+                                    .downcast_ref::<&'static str>()
+                                    .expect("error was static str"),
+                                ERROR_MESSAGE
+                            );
+                        }
+                        res => panic!("unexpected result: {:?}", res),
+                    }
+
+                    assert!(NESTED_REGS_OUTER.is_poisoned());
+                    assert!(NESTED_REGS_INNER.is_poisoned());
+                }
+
+                /// Ensures that callee-saved registers are properly restored following a `catch_unwind`
+                /// that catches a panic. Currently disabled because it relies on UB until
+                /// `#[unwind(allowed)]` is stabilized.
+                #[ignore]
+                #[test]
+                fn restore_callee_saved() {
+                    let module =
+                        test_module_c("host", "nested_error_unwind.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+                    assert_eq!(
+                        u64::from(inst.run("entrypoint_restore", &[]).unwrap().unwrap_returned()),
+                        6148914668330025056
+                    );
                 }
 
                 #[test]
@@ -461,7 +441,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");

@@ -180,7 +180,7 @@ impl Instance {
             Ok(res) => res,
             Err(e) => match e.downcast::<TerminationDetails>() {
                 Ok(details) => {
-                    self.state = State::Terminated { details: *details };
+                    self.state = State::Terminating { details: *details };
                     Ok(())
                 }
                 Err(e) => {
