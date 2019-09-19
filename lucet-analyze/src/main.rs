@@ -487,15 +487,21 @@ fn print_summary(summary: ArtifactSummary<'_>) {
             "function_manifest_len", serialized_module.function_manifest_len
         );
 
+        let tables_bytes = summary
+            .read_memory(
+                serialized_module.tables_ptr,
+                serialized_module.tables_len * mem::size_of::<&[TableElement]>() as u64,
+            )
+            .unwrap();
         let tables = unsafe {
             std::slice::from_raw_parts(
-                serialized_module.tables_ptr as *const &[TableElement],
+                tables_bytes.as_ptr() as *const &[TableElement],
                 serialized_module.tables_len as usize,
             )
         };
         let mut reconstructed_tables = Vec::new();
         // same situation as trap tables - these slices are valid as if the module was
-        // dlopen'd, but we jsut read it as a flat file. So read through the ELF view and use
+        // dlopen'd, but we just read it as a flat file. So read through the ELF view and use
         // pointers to that for the real slices.
 
         for table in tables {
