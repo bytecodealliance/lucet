@@ -62,8 +62,10 @@ _lucet_context_bootstrap:
 .align 16
 lucet_context_backstop:
 _lucet_context_backstop:
-    mov -16(%rbp), %rdi  /* parent context to arg 1 */
-    mov -8(%rbp), %rsi  /* own context to arg 2 */
+    // Note that `rbp` here really has no relation to any stack!
+    // it happens to be an available pointer we can hang the contexts to swap off of.
+    mov (%rbp), %rdi  /* parent context to arg 1 */
+    mov 8(%rbp), %rsi  /* own context to arg 2 */
     mov %rax, (8*8 + 8*16 + 8*0)(%rdi) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
     mov %rdx, (8*8 + 8*16 + 8*1)(%rdi)
     movdqu %xmm0, (8*8 + 8*16 + 8*2)(%rdi) /* floating-point return value */
