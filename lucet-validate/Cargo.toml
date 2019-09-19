@@ -1,0 +1,23 @@
+[package]
+name = "lucet-validate"
+version = "0.1.0"
+description = "Parse and validate webassembly files against witx interface"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Pat Hickey <phickey@fastly.com>"]
+edition = "2018"
+
+[lib]
+crate-type=["rlib"]
+
+[[bin]]
+name = "lucet-validate"
+path = "src/main.rs"
+
+[dependencies]
+clap = "2"
+failure = "0.1"
+witx = "0.1"
+wasmparser = "0.37"

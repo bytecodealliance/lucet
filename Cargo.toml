@@ -12,6 +12,7 @@ members = [
   "lucet-runtime/lucet-runtime-internals",
   "lucet-runtime/lucet-runtime-tests",
   "lucet-spectest",
+  "lucet-validate",
   "lucet-wasi",
   "lucet-wasi-fuzz",
   "lucet-wasi-sdk",
