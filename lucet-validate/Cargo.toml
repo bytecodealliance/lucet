@@ -20,4 +20,5 @@ path = "src/main.rs"
 clap = "2"
 failure = "0.1"
 witx = "0.1"
-wasmparser = "0.37"
+cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.43.1" }
+wasmparser = { git = "https://github.com/pchickey/wasmparser.rs", branch = "pch/correct_section_content_api" }
