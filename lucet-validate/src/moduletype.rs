@@ -59,7 +59,7 @@ impl ModuleType {
         })
     }
 
-    pub fn parse(module_contents: &[u8]) -> Result<Self, Error> {
+    pub fn parse_wasm(module_contents: &[u8]) -> Result<Self, Error> {
         let mut module = ModuleType {
             types: PrimaryMap::new(),
             funcs: PrimaryMap::new(),

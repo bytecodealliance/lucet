@@ -23,7 +23,7 @@ impl From<wasmparser::BinaryReaderError> for Error {
 pub fn validate(interface: &witx::Document, module_contents: &[u8]) -> Result<(), Error> {
     wasmparser::validate(module_contents, None)?;
 
-    let moduletype = ModuleType::parse(module_contents)?;
+    let moduletype = ModuleType::parse_wasm(module_contents)?;
 
     for import in moduletype.imports() {
         println!(
