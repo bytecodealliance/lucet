@@ -19,7 +19,7 @@ fn compile_hello_all(c: &mut Criterion) {
                 criterion::BatchSize::SmallInput,
             )
         },
-        &[OptLevel::None, OptLevel::Standard, OptLevel::Fast],
+        &[OptLevel::None, OptLevel::Speed, OptLevel::SpeedAndSize],
     )
     .sample_size(10);
 

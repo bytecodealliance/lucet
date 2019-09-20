@@ -10,7 +10,7 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.41.0" }
+cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.43.1" }
 failure = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

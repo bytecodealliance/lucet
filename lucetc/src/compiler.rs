@@ -24,22 +24,22 @@ use lucet_module::{FunctionSpec, ModuleData, MODULE_DATA_SYM};
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
     None,
-    Standard,
-    Fast,
+    Speed,
+    SpeedAndSize,
 }
 
 impl Default for OptLevel {
     fn default() -> OptLevel {
-        OptLevel::Standard
+        OptLevel::SpeedAndSize
     }
 }
 
 impl OptLevel {
     pub fn to_flag(&self) -> &str {
         match self {
-            OptLevel::None => "fastest",
-            OptLevel::Standard => "default",
-            OptLevel::Fast => "best",
+            OptLevel::None => "none",
+            OptLevel::Speed => "speed",
+            OptLevel::SpeedAndSize => "speed_and_size",
         }
     }
 }
@@ -64,14 +64,18 @@ impl<'a> Compiler<'a> {
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
-        // As of cranelift-wasm 0.29, which uses wasmparser 0.23, the parser used inside
+        // As of cranelift-wasm 0.43 which uses wasmparser 0.40, the parser used inside
         // cranelift-wasm does not validate. We need to run the validating parser on the binary
         // first. The InvalidWebAssembly error below will never trigger.
-        use wasmparser::validate;
-        if !validate(wasm_binary, None) {
-            Err(format_err!("wasmparser validation rejected module"))
-                .context(LucetcErrorKind::Validation)?;
-        }
+        wasmparser::validate(wasm_binary, None)
+            .map_err(|e| {
+                format_err!(
+                    "invalid WebAssembly module, at offset {}: {}",
+                    e.offset,
+                    e.message
+                )
+            })
+            .context(LucetcErrorKind::Validation)?;
 
         translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
             WasmError::User(_) => e.context(LucetcErrorKind::Input),
