@@ -1,10 +1,13 @@
 mod moduletype;
+mod types;
+mod witx_moduletype;
 
 use failure::Fail;
 use wasmparser;
 use witx;
 
-pub use self::moduletype::{FuncSignature, ImportFunc, ModuleType};
+pub use self::moduletype::ModuleType;
+pub use self::types::{AtomType, FuncSignature, ImportFunc};
 
 #[derive(Debug, Fail)]
 pub enum Error {

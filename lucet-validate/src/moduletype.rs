@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{Error, FuncSignature, ImportFunc};
 use cranelift_entity::{entity_impl, PrimaryMap};
 use std::collections::HashMap;
 pub use wasmparser::Type;
@@ -12,12 +12,6 @@ entity_impl!(TypeIndex);
 struct FuncIndex(u32);
 entity_impl!(FuncIndex);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FuncSignature {
-    pub params: Vec<Type>,
-    pub returns: Vec<Type>,
-}
-
 #[derive(Clone)]
 struct Func {
     pub ty: TypeIndex,
@@ -29,13 +23,6 @@ pub struct ModuleType {
     types: PrimaryMap<TypeIndex, FuncSignature>,
     funcs: PrimaryMap<FuncIndex, Func>,
     exports: HashMap<String, FuncIndex>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ImportFunc {
-    pub module: String,
-    pub field: String,
-    pub ty: FuncSignature,
 }
 
 impl ModuleType {
@@ -80,7 +67,7 @@ impl ModuleType {
                             } => {
                                 module.types.push(FuncSignature {
                                     params: params.to_vec(),
-                                    returns: returns.to_vec(),
+                                    results: returns.to_vec(),
                                 });
                             }
                             _ => Err(Error::Unsupported("type section entry".to_string()))?,
