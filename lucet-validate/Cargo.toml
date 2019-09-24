@@ -22,3 +22,9 @@ failure = "0.1"
 witx = { git = "https://github.com/webassembly/wasi", branch = "pch/witx_better_api" }
 cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.43.1" }
 wasmparser = "0.39.1"
+
+
+[dev-dependencies]
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.1.1" }
+tempfile = "3.0"
+

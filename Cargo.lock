@@ -945,6 +945,8 @@ dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cranelift-entity 0.43.1",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lucet-wasi-sdk 0.1.1",
+ "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasmparser 0.39.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "witx 0.1.0 (git+https://github.com/webassembly/wasi?branch=pch/witx_better_api)",
 ]
