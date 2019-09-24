@@ -945,7 +945,7 @@ dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cranelift-entity 0.43.1",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasmparser 0.39.1 (git+https://github.com/pchickey/wasmparser.rs?branch=pch/correct_section_content_api)",
+ "wasmparser 0.39.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "witx 0.1.0 (git+https://github.com/webassembly/wasi?branch=pch/witx_better_api)",
 ]
 
@@ -1949,11 +1949,6 @@ dependencies = [
 [[package]]
 name = "wasmparser"
 version = "0.39.1"
-source = "git+https://github.com/pchickey/wasmparser.rs?branch=pch/correct_section_content_api#a4fc03884f52c78e65c898ef22094dfe5e166e6d"
-
-[[package]]
-name = "wasmparser"
-version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -2231,7 +2226,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum wabt-sys 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a6265b25719e82598d104b3717375e37661d41753e2c84cde3f51050c7ed7e3c"
 "checksum wait-timeout 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9f200f5b12eb75f8c1ed65abd4b2db8a6e1b138a20de009dacee265a2498f3f6"
 "checksum walkdir 2.2.9 (registry+https://github.com/rust-lang/crates.io-index)" = "9658c94fa8b940eab2250bd5a457f9c48b748420d71293b165c8cdbe2f55f71e"
-"checksum wasmparser 0.39.1 (git+https://github.com/pchickey/wasmparser.rs?branch=pch/correct_section_content_api)" = "<none>"
 "checksum wasmparser 0.39.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a026c1436af49d5537c7561c7474f81f7a754e36445fe52e6e88795a9747291c"
 "checksum which 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b57acb10231b9493c8472b20cb57317d0679a49e0bdbee44b3b803a6473af164"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
