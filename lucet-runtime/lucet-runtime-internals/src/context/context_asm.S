@@ -85,7 +85,7 @@ _lucet_context_backstop:
     // if we got 0 from the `lock xchg`, some terminator beat us in trying to
     // stop this instance, so it's not safe to start swapping contexts.
     //
-    // so, just hang out for a bit and wait for the teminator to do its thing
+    // so, just hang out for a bit and wait for the terminator to do its thing
 _hang:
     jz _hang
 

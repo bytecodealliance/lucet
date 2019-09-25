@@ -124,7 +124,7 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
 macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
-        use libc::{c_void, siginfo_t, SIGSEGV};
+        use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
@@ -465,9 +465,17 @@ macro_rules! guest_fault_tests {
                     .new_instance(module)
                     .expect("instance can be created");
 
-                inst.set_fatal_handler(fatal_handler_exit);
+                let guest_thread_id = unsafe { pthread_self() };
 
-                nix::unistd::alarm::set(1);
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
+
+                    unsafe {
+                        pthread_kill(guest_thread_id, SIGALRM);
+                    }
+                });
+
+                inst.set_fatal_handler(fatal_handler_exit);
 
                 // run guest code that loops forever. this will recieve SIGALRM in one second.
                 let res = inst.run("infinite_loop", &[]);
