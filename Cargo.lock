@@ -943,7 +943,7 @@ name = "lucet-validate"
 version = "0.1.0"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cranelift-entity 0.43.1",
+ "cranelift-entity 0.44.0",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-wasi-sdk 0.1.1",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",

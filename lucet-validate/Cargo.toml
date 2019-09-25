@@ -21,7 +21,7 @@ clap = "2"
 failure = "0.1"
 witx = { git = "https://github.com/webassembly/wasi", branch = "pch/wasi_crate" }
 wasi = { git = "https://github.com/webassembly/wasi", branch = "pch/wasi_crate" }
-cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.43.1" }
+cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.44.0" }
 wasmparser = "0.39.1"
 
 
