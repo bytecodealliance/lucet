@@ -710,6 +710,8 @@ impl Instance {
     }
 }
 
+#[no_mangle]
+extern "C" fn BREAK_HERE() {}
 // Private API
 impl Instance {
     fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: CtxMap) -> Self {
@@ -865,6 +867,7 @@ impl Instance {
             // lucet_context_activate takes the guest code address in `rsi`,
             // replacing the guest return address with itself so it can run
             // and mark the instance as active.
+            BREAK_HERE();
             unsafe {
                 let top_of_stack = i.ctx.gpr.rsp as *mut u64;
                 // move the guest code address to rsi

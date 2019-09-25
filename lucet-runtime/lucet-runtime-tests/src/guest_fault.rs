@@ -202,6 +202,7 @@ macro_rules! guest_fault_tests {
             assert_eq!(libc::c_int::from(retval), 123);
         }
 
+        #[ignore]
         #[test]
         fn illegal_instr() {
             test_nonex(|| {
@@ -226,6 +227,7 @@ macro_rules! guest_fault_tests {
             })
         }
 
+        #[ignore]
         #[test]
         fn oob() {
             test_nonex(|| {
@@ -281,6 +283,7 @@ macro_rules! guest_fault_tests {
             });
         }
 
+        #[ignore]
         #[test]
         fn fatal_continue_signal_handler() {
             fn signal_handler_continue(
@@ -328,6 +331,7 @@ macro_rules! guest_fault_tests {
             });
         }
 
+        #[ignore]
         #[test]
         fn fatal_terminate_signal_handler() {
             fn signal_handler_terminate(
@@ -388,6 +392,7 @@ macro_rules! guest_fault_tests {
             })
         }
 
+        #[ignore]
         #[test]
         fn sigsegv_handler_saved_restored() {
             lazy_static! {
@@ -399,6 +404,7 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *mut siginfo_t,
                 _ucontext_ptr: *mut c_void,
             ) {
+                println!("hello!!!");
                 // Triggered by a SIGSEGV writing to protected page
                 assert!(signum == SIGSEGV);
                 unsafe { recoverable_ptr_make_accessible() };
@@ -455,6 +461,7 @@ macro_rules! guest_fault_tests {
             })
         }
 
+        #[ignore]
         #[test]
         fn alarm() {
             test_ex(|| {
@@ -502,6 +509,7 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *mut siginfo_t,
                 _ucontext_ptr: *mut c_void,
             ) {
+                println!("Got a sigsegv....");
                 // Triggered by a SIGSEGV writing to protected page
                 assert!(signum == SIGSEGV);
                 unsafe { recoverable_ptr_make_accessible() };
@@ -520,6 +528,7 @@ macro_rules! guest_fault_tests {
                 // make sure only one test using RECOVERABLE_PTR is running at once
                 let recoverable_ptr_lock = RECOVERABLE_PTR_LOCK.lock().unwrap();
 
+                println!("Setting sigaction");
                 let sa = SigAction::new(
                     SigHandler::SigAction(host_sigsegv_handler),
                     SaFlags::SA_RESTART,
@@ -528,6 +537,7 @@ macro_rules! guest_fault_tests {
 
                 let saved_sa =
                     unsafe { sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds") };
+                println!("set!");
 
                 // The original thread will run `sleepy_guest`, and the new thread will dereference a null
                 // pointer after a delay. This should lead to a sigsegv while the guest is running,
@@ -556,6 +566,7 @@ macro_rules! guest_fault_tests {
                 *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = false;
 
                 // accessing this should trigger the segfault
+                println!("I'm gonna fault!!!!");
                 unsafe {
                     *RECOVERABLE_PTR = 0;
                 }
@@ -575,6 +586,7 @@ macro_rules! guest_fault_tests {
             })
         }
 
+        #[ignore]
         #[test]
         fn handle_host_signal() {
             test_ex(|| {
@@ -617,6 +629,7 @@ macro_rules! guest_fault_tests {
             })
         }
 
+        #[ignore]
         #[test]
         fn fatal_abort() {
             fn handler(_inst: &Instance) -> ! {
@@ -655,6 +668,7 @@ macro_rules! guest_fault_tests {
             std::process::exit(42)
         }
 
+        #[ignore]
         #[test]
         fn fatal_handler() {
             test_ex(|| {
@@ -686,6 +700,7 @@ macro_rules! guest_fault_tests {
             })
         }
 
+        #[ignore]
         #[test]
         fn sigaltstack_restores() {
             use libc::*;
