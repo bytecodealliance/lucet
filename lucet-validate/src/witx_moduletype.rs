@@ -1,9 +1,5 @@
-#![allow(unused)] // WIP
-
 use crate::{AtomType, FuncSignature};
-use witx::{
-    BuiltinType, Datatype, DatatypeIdent, DatatypeVariant, Document, IntRepr, InterfaceFunc,
-};
+use witx::{BuiltinType, Datatype, DatatypeIdent, DatatypeVariant, IntRepr, InterfaceFunc};
 
 pub trait HasFuncSignature {
     fn func_signature(&self) -> FuncSignature;

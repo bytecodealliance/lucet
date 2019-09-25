@@ -14,8 +14,21 @@ pub fn main() {
     let _ = include_str!("../Cargo.toml");
 
     let matches = app_from_crate!()
-        .arg(Arg::with_name("interface").takes_value(true).required(true))
         .arg(Arg::with_name("module").takes_value(true).required(true))
+        .arg(
+            Arg::with_name("witx")
+                .takes_value(true)
+                .required(false)
+                .long("witx")
+                .help("validate against interface in this witx file"),
+        )
+        .arg(
+            Arg::with_name("wasi")
+                .takes_value(false)
+                .required(false)
+                .long("wasi")
+                .help("validate against wasi interface"),
+        )
         .arg(
             Arg::with_name("verbose")
                 .short("v")
@@ -24,18 +37,27 @@ pub fn main() {
         )
         .get_matches();
 
-    let interface_path = PathBuf::from(
-        matches
-            .value_of("interface")
-            .expect("interface arg required"),
-    );
-    let input_path = PathBuf::from(matches.value_of("module").expect("module arg required"));
+    let module_path = matches
+        .value_of("module")
+        .map(Path::new)
+        .expect("module arg required");
 
-    match run(&interface_path, &input_path) {
+    match run(
+        &module_path,
+        matches.value_of("witx"),
+        matches.is_present("wasi"),
+    ) {
         Ok(()) => {}
         Err(e) => {
             if matches.is_present("verbose") {
-                println!("{:?}", e);
+                match e {
+                    Error::Witx(e) => {
+                        println!("{}", e.report());
+                    }
+                    _ => {
+                        println!("{:?}", e);
+                    }
+                }
             } else {
                 println!("{}", e);
             }
@@ -44,13 +66,20 @@ pub fn main() {
     }
 }
 
-fn run(interface: &Path, module: &Path) -> Result<(), Error> {
-    let interface_doc = witx::load(interface)?;
+fn run(module_path: &Path, witx_path: Option<&str>, wasi_spec: bool) -> Result<(), Error> {
+    let interface_doc = match (witx_path, wasi_spec) {
+        (Some(witx_path), false) => witx::load(Path::new(witx_path))?,
+        (None, true) => wasi::unstable::preview0(),
+        (Some(_), true) => Err(Error::Usage(
+            "Cannot validate against both witx and wasi spec",
+        ))?,
+        (None, false) => Err(Error::Usage("must provide at least one spec"))?,
+    };
 
     let mut module_contents = Vec::new();
-    let mut file = File::open(module).map_err(|e| Error::Io(module.into(), e))?;
+    let mut file = File::open(module_path).map_err(|e| Error::Io(module_path.into(), e))?;
     file.read_to_end(&mut module_contents)
-        .map_err(|e| Error::Io(module.into(), e))?;
+        .map_err(|e| Error::Io(module_path.into(), e))?;
 
     lucet_validate::validate(&interface_doc, &module_contents)?;
 
@@ -59,6 +88,8 @@ fn run(interface: &Path, module: &Path) -> Result<(), Error> {
 
 #[derive(Debug, Fail)]
 enum Error {
+    #[fail(display = "Usage error: {}", _0)]
+    Usage(&'static str),
     #[fail(display = "{}", _0)]
     Witx(#[cause] witx::WitxError),
     #[fail(display = "With file {:?}: {}", _0, _1)]

@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod wasi_sdk_tests {
-    use lucet_validate::ModuleType;
+    use lucet_validate::{self, ModuleType};
     use std::path::PathBuf;
+    use wasi;
 
     fn wasi_sdk_test_source_file(name: &str) -> PathBuf {
         let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -40,6 +41,13 @@ mod wasi_sdk_tests {
     #[test]
     fn moduletype_of_compiled() {
         let main_wasm = compile_to_wasm("main_returns.c");
-        let moduletype = ModuleType::parse_wasm(&main_wasm).expect("main_returns has module type");
+        let _moduletype = ModuleType::parse_wasm(&main_wasm).expect("main_returns has module type");
+    }
+
+    #[test]
+    fn validate_compiled() {
+        let main_wasm = compile_to_wasm("main_returns.c");
+        let wasi_spec = wasi::unstable::preview0();
+        lucet_validate::validate(&wasi_spec, &main_wasm).expect("validates");
     }
 }
