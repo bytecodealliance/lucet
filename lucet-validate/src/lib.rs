@@ -15,6 +15,8 @@ pub enum Error {
     WasmValidation(&'static str, usize),
     #[fail(display = "Unsupported: {}", _0)]
     Unsupported(String),
+    #[fail(display = "Uncategorized error: {}", _0)]
+    Uncategorized(String),
 }
 
 impl From<wasmparser::BinaryReaderError> for Error {
@@ -23,7 +25,11 @@ impl From<wasmparser::BinaryReaderError> for Error {
     }
 }
 
-pub fn validate(interface: &witx::Document, module_contents: &[u8]) -> Result<(), Error> {
+pub fn validate(
+    witx_doc: &witx::Document,
+    module_contents: &[u8],
+    wasi_exe: bool,
+) -> Result<(), Error> {
     wasmparser::validate(module_contents, None)?;
 
     let moduletype = ModuleType::parse_wasm(module_contents)?;
@@ -35,11 +41,26 @@ pub fn validate(interface: &witx::Document, module_contents: &[u8]) -> Result<()
         );
     }
 
-    if let Some(startfunc) = moduletype.export("_start") {
-        println!("wasi start func has type {:?}", startfunc);
-    } else {
-        println!("no wasi start func");
+    if wasi_exe {
+        check_wasi_start_func(&moduletype)?;
     }
 
     Ok(())
+}
+
+pub fn check_wasi_start_func(moduletype: &ModuleType) -> Result<(), Error> {
+    if let Some(startfunc) = moduletype.export("_start") {
+        if !(startfunc.params.is_empty() && startfunc.results.is_empty()) {
+            Err(Error::Uncategorized(format!(
+                "bad type signature on _start: {:?}",
+                startfunc
+            )))
+        } else {
+            Ok(())
+        }
+    } else {
+        Err(Error::Uncategorized(
+            "missing WASI executable start function (\"_start\")".to_string(),
+        ))
+    }
 }
