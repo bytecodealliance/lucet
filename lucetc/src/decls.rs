@@ -342,6 +342,11 @@ impl<'a> ModuleDecls<'a> {
                         .context(LucetcErrorKind::TranslatingModule)
                     }
                 }
+                GlobalInit::V128Const(_) => Err(format_err!(
+                    "invalid declaration of global {}: v128const type",
+                    ix.as_u32()
+                ))
+                .context(LucetcErrorKind::Unsupported),
             }?;
 
             globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));
