@@ -60,7 +60,6 @@ macro_rules! init_and_swap {
             Context::swap(
                 PARENT.as_mut().unwrap(),
                 CHILD.as_ref().unwrap(),
-                &flag,
             );
         }
     }
@@ -78,8 +77,7 @@ extern "C" fn arg_printing_child(arg0: *mut c_void, arg1: *mut c_void) {
     )
     .unwrap();
 
-    let flag = std::sync::atomic::AtomicBool::new(false);
-    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap(), &flag) };
+    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap()) };
 
     // Read the arguments again
     let arg0_val = unsafe { *(arg0 as *mut c_int) };
@@ -93,8 +91,7 @@ extern "C" fn arg_printing_child(arg0: *mut c_void, arg1: *mut c_void) {
     )
     .unwrap();
 
-    let flag = std::sync::atomic::AtomicBool::new(false);
-    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap(), &flag) };
+    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap()) };
 }
 
 #[test]
@@ -127,9 +124,8 @@ fn call_child_twice() {
         arg0_val = 9;
         arg1_val = 10;
 
-        let flag = std::sync::atomic::AtomicBool::new(false);
         unsafe {
-            Context::swap(PARENT.as_mut().unwrap(), CHILD.as_ref().unwrap(), &flag);
+            Context::swap(PARENT.as_mut().unwrap(), CHILD.as_ref().unwrap());
         }
 
         assert_output_eq!(

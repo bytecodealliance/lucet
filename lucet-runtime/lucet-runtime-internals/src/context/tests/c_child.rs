@@ -62,7 +62,7 @@ macro_rules! init_and_swap {
 
             child_regs = child;
 
-            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap(), &flag);
+            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap());
         }
     }
 }
@@ -111,13 +111,8 @@ fn call_child_twice() {
         arg0_val = 9;
         arg1_val = 10;
 
-        let flag = std::sync::atomic::AtomicBool::new(false);
         unsafe {
-            Context::swap(
-                parent_regs.as_mut().unwrap(),
-                child_regs.as_ref().unwrap(),
-                &flag,
-            );
+            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap());
         }
 
         assert_eq!(

@@ -7,9 +7,9 @@ use std::slice;
 #[test]
 fn context_offsets_correct() {
     assert_eq!(offset_of!(Context, gpr), 0);
-    assert_eq!(offset_of!(Context, fpr), 8 * 8);
-    assert_eq!(offset_of!(Context, retvals_gp), 8 * 8 + 8 * 16);
-    assert_eq!(offset_of!(Context, retval_fp), 8 * 8 + 8 * 16 + 8 * 2);
+    assert_eq!(offset_of!(Context, fpr), 10 * 8);
+    assert_eq!(offset_of!(Context, retvals_gp), 10 * 8 + 8 * 16);
+    assert_eq!(offset_of!(Context, retval_fp), 10 * 8 + 8 * 16 + 8 * 2);
 }
 
 #[test]

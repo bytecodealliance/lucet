@@ -23,6 +23,7 @@ use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Condvar;
 use std::sync::{Arc, Mutex, Weak};
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
@@ -720,8 +721,8 @@ impl Instance {
             ctx: Context::new(),
             state: State::Ready,
             kill_state: Arc::new(KillState {
-                should_terminate: AtomicBool::new(false),
-                ctx_switch_done: AtomicBool::new(false),
+                terminable: AtomicBool::new(false),
+                tid_change_notifier: Condvar::new(),
                 thread_id: Mutex::new(None),
             }),
             alloc,
@@ -820,7 +821,7 @@ impl Instance {
                 unsafe { self.alloc.stack_u64_mut() },
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
-                &self.kill_state.ctx_switch_done,
+                &self.kill_state.terminable,
                 func.ptr.as_usize(),
                 &args_with_vmctx,
             )
@@ -858,17 +859,27 @@ impl Instance {
         });
 
         self.with_signals_on(|i| {
+            // set up the guest to set itself as terminable, then continue to
+            // whatever guest code we want to run
+            //
+            // lucet_context_activate takes the guest code address in `rsi`,
+            // replacing the guest return address with itself so it can run
+            // and mark the instance as active.
+            unsafe {
+                let top_of_stack = i.ctx.gpr.rsp as *mut u64;
+                // move the guest code address to rsi
+                i.ctx.gpr.rsi = *top_of_stack;
+                // replace it with the activation thunk
+                *top_of_stack = crate::context::lucet_context_activate as u64;
+                // and store a pointer to indicate we're active
+                i.ctx.gpr.rdi = &i.kill_state.terminable as *const AtomicBool as u64;
+            }
+
             HOST_CTX.with(|host_ctx| {
                 // Save the current context into `host_ctx`, and jump to the guest context. The
                 // lucet context is linked to host_ctx, so it will return here after it finishes,
                 // successfully or otherwise.
-                unsafe {
-                    Context::swap(
-                        &mut *host_ctx.get(),
-                        &mut i.ctx,
-                        &i.kill_state.ctx_switch_done,
-                    )
-                };
+                unsafe { Context::swap(&mut *host_ctx.get(), &mut i.ctx) };
                 Ok(())
             })
         })?;
@@ -1157,8 +1168,8 @@ fn default_fatal_handler(inst: &Instance) -> ! {
 ///
 ///n
 pub(crate) struct KillState {
-    pub(crate) ctx_switch_done: AtomicBool,
-    should_terminate: AtomicBool,
+    pub(crate) terminable: AtomicBool,
+    tid_change_notifier: Condvar,
     thread_id: Mutex<Option<pthread_t>>,
 }
 
@@ -1172,19 +1183,27 @@ pub struct KillSwitch {
 impl KillSwitch {
     pub fn terminate(&self) {
         if let Some(state) = self.state.upgrade() {
-            state.should_terminate.store(true, Ordering::SeqCst);
+            // Attempt to take the flag indicating the instance may terminate
+            let terminable = state.terminable.swap(false, Ordering::SeqCst);
 
-            if !state.ctx_switch_done.load(Ordering::SeqCst) {
-                println!("KillSwitch::terminate - context switch isn't done yet");
-                return;
-            } else {
-                println!("KillSwitch::terminate - context switch IS done!");
-            }
+            if terminable {
+                // we got it! we can kill the instance now.
+                let mut curr_tid = state.thread_id.lock().unwrap();
+                if let Some(thread_id) = *curr_tid {
+                    unsafe {
+                        pthread_kill(thread_id, SIGALRM);
+                    }
 
-            if let Some(thread_id) = *state.thread_id.lock().unwrap() {
-                unsafe {
-                    pthread_kill(thread_id, SIGALRM);
+                    // wait for the SIGALRM handler to deschedule the instance
+                    while curr_tid.is_some() {
+                        curr_tid = state.tid_change_notifier.wait(curr_tid).unwrap();
+                    }
+                } else {
+                    panic!("logic error: instance is terminable but not actually running.");
                 }
+            } else {
+                println!("KillSwitch::terminate - instance is not in a terminable state");
+                return;
             }
         }
     }

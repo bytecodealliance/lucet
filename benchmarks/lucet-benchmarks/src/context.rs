@@ -43,7 +43,7 @@ fn context_swap_return(c: &mut Criterion) {
                 (stack, parent, child)
             },
             |(stack, mut parent, child)| unsafe {
-                Context::swap(&mut parent, &child, &AtomicBool::new(false));
+                Context::swap(&mut parent, &child);
                 stack
             },
             criterion::BatchSize::PerIteration,
@@ -68,7 +68,7 @@ fn context_init_swap_return(c: &mut Criterion) {
                     &[],
                 )
                 .unwrap();
-                unsafe { Context::swap(&mut parent, &child, &AtomicBool::new(false)) };
+                unsafe { Context::swap(&mut parent, &child) };
                 stack
             },
             criterion::BatchSize::PerIteration,
@@ -362,7 +362,7 @@ fn context_init_swap_return_many_args(c: &mut Criterion) {
                     &args,
                 )
                 .unwrap();
-                unsafe { Context::swap(&mut parent, &child, &AtomicBool::new(false)) };
+                unsafe { Context::swap(&mut parent, &child) };
                 stack
             },
             criterion::BatchSize::PerIteration,

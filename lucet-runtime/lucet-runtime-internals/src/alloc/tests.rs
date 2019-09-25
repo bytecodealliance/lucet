@@ -611,7 +611,7 @@ macro_rules! alloc_tests {
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
-                Context::swap(&mut parent, &child, &flag);
+                Context::swap(&mut parent, &child);
                 assert_eq!(inst.alloc().heap()[0], 123);
                 assert_eq!(inst.alloc().heap()[4095], 45);
             }
@@ -655,7 +655,7 @@ macro_rules! alloc_tests {
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
-                Context::swap(&mut parent, &child, &flag);
+                Context::swap(&mut parent, &child);
 
                 let stack_pattern = inst.alloc().heap_u64()[0] as usize;
                 assert!(stack_pattern > inst.alloc().slot().stack as usize);

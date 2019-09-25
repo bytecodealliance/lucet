@@ -17,6 +17,7 @@ use std::any::Any;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Ref, RefCell, RefMut};
 use std::marker::PhantomData;
+use std::sync::atomic::Ordering;
 
 /// An opaque handle to a running instance's context.
 #[derive(Debug)]
@@ -363,13 +364,17 @@ impl Vmctx {
             val: YieldedVal::new(val),
             expecting: expecting as Box<dyn Any>,
         };
-        HOST_CTX.with(|host_ctx| unsafe {
-            Context::swap(
-                &mut inst.ctx,
-                &mut *host_ctx.get(),
-                &inst.kill_state.ctx_switch_done,
-            )
-        });
+
+        let terminable = inst.kill_state.terminable.swap(false, Ordering::SeqCst);
+
+        if !terminable {
+            // Something else has indicated it will terminate the instance,
+            // so it's not safe to begin a context swap. Spin here and await
+            // our imminent demise.
+            loop {}
+        }
+
+        HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
     }
 
     /// Take and return the value passed to

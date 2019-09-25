@@ -39,16 +39,22 @@
 .align 16
 lucet_context_bootstrap:
 _lucet_context_bootstrap:
-        /* Set flag indicating that the context switch is done */
-        movb $1, (%rdx)
-        
-	/* Move each of the context-saved registers into the corresponding call
-	 * argument register. See lucet_register enum for docs  */
-	mov %r12, %rsi
-	mov %r13, %rdx
-	mov %r14, %rcx
-	mov %r15, %r8
-	mov %rbx, %r9
+  // Set flag indicating that the context switch is done.
+  //
+  // This can be naively performed since if any terminator tried to fire
+  // before setting this, and at this point it is safe for a terminator
+  // to fire.
+  movb $1, -8(%rbp)
+
+	// Move each of the argument values into the corresponding call
+	// argument register.
+  pop %r9
+  pop %r8
+  pop %rcx
+  pop %rdx
+  pop %rsi
+  pop %rdi
+
 	/* the next thing on the stack is the guest function - return to it */
 	ret
 #ifdef __ELF__
@@ -67,12 +73,22 @@ lucet_context_backstop:
 _lucet_context_backstop:
     mov -24(%rbp), %rdi  /* parent context to arg 1 */
     mov -16(%rbp), %rsi  /* own context to arg 2 */
-    mov %rax, (8*8 + 8*16 + 8*0)(%rdi) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
-    mov %rdx, (8*8 + 8*16 + 8*1)(%rdi)
-    movdqu %xmm0, (8*8 + 8*16 + 8*2)(%rdi) /* floating-point return value */
-    mov -8(%rbp), %rdx  /* safety flag pointer to arg 3 (rdx is still in use until this point) */
-    movb $0, (%rdx) /* flip the context switch safety flag back off */
-        
+    mov %rax, (10*8 + 8*16 + 8*0)(%rdi) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
+    mov %rdx, (10*8 + 8*16 + 8*1)(%rdi)
+    movdqu %xmm0, (10*8 + 8*16 + 8*2)(%rdi) /* floating-point return value */
+
+    mov $0, %cl
+    // there may be standing executors that will try to execute this instance, take the 'terminable' flag so they will fail
+    lock xchgb -8(%rbp), %cl
+    test %cl, %cl
+
+    // if we got 0 from the `lock xchg`, some terminator beat us in trying to
+    // stop this instance, so it's not safe to start swapping contexts.
+    //
+    // so, just hang out for a bit and wait for the teminator to do its thing
+_hang:
+    jz _hang
+
 #ifdef __ELF__
     jmp lucet_context_swap@PLT
 #else
@@ -101,15 +117,16 @@ _lucet_context_swap:
     mov %r13, (5*8)(%rdi)
     mov %r14, (6*8)(%rdi)
     mov %r15, (7*8)(%rdi)
+    mov %rsi, (8*8)(%rdi)
 
-    movdqu %xmm0, (8*8 + 0*16)(%rdi)
-    movdqu %xmm1, (8*8 + 1*16)(%rdi)
-    movdqu %xmm2, (8*8 + 2*16)(%rdi)
-    movdqu %xmm3, (8*8 + 3*16)(%rdi)
-    movdqu %xmm4, (8*8 + 4*16)(%rdi)
-    movdqu %xmm5, (8*8 + 5*16)(%rdi)
-    movdqu %xmm6, (8*8 + 6*16)(%rdi)
-    movdqu %xmm7, (8*8 + 7*16)(%rdi)
+    movdqu %xmm0, (10*8 + 0*16)(%rdi)
+    movdqu %xmm1, (10*8 + 1*16)(%rdi)
+    movdqu %xmm2, (10*8 + 2*16)(%rdi)
+    movdqu %xmm3, (10*8 + 3*16)(%rdi)
+    movdqu %xmm4, (10*8 + 4*16)(%rdi)
+    movdqu %xmm5, (10*8 + 5*16)(%rdi)
+    movdqu %xmm6, (10*8 + 6*16)(%rdi)
+    movdqu %xmm7, (10*8 + 7*16)(%rdi)
 
     // load everything from offsets from rsi (2nd arg)
     mov (0*8)(%rsi), %rbx
@@ -121,14 +138,17 @@ _lucet_context_swap:
     mov (6*8)(%rsi), %r14
     mov (7*8)(%rsi), %r15
 
-    movdqu (8*8 + 0*16)(%rsi), %xmm0
-    movdqu (8*8 + 1*16)(%rsi), %xmm1
-    movdqu (8*8 + 2*16)(%rsi), %xmm2
-    movdqu (8*8 + 3*16)(%rsi), %xmm3
-    movdqu (8*8 + 4*16)(%rsi), %xmm4
-    movdqu (8*8 + 5*16)(%rsi), %xmm5
-    movdqu (8*8 + 6*16)(%rsi), %xmm6
-    movdqu (8*8 + 7*16)(%rsi), %xmm7
+    movdqu (10*8 + 0*16)(%rsi), %xmm0
+    movdqu (10*8 + 1*16)(%rsi), %xmm1
+    movdqu (10*8 + 2*16)(%rsi), %xmm2
+    movdqu (10*8 + 3*16)(%rsi), %xmm3
+    movdqu (10*8 + 4*16)(%rsi), %xmm4
+    movdqu (10*8 + 5*16)(%rsi), %xmm5
+    movdqu (10*8 + 6*16)(%rsi), %xmm6
+    movdqu (10*8 + 7*16)(%rsi), %xmm7
+
+    // restore rsi when we're done with the context pointer
+    mov (8*8)(%rsi), %rsi
 
     ret
 #ifdef __ELF__
@@ -153,21 +173,41 @@ _lucet_context_set:
     mov (5*8)(%rdi), %r13
     mov (6*8)(%rdi), %r14
     mov (7*8)(%rdi), %r15
+    mov (8*8)(%rdi), %rsi
 
-    movdqu (8*8 + 0*16)(%rdi), %xmm0
-    movdqu (8*8 + 1*16)(%rdi), %xmm1
-    movdqu (8*8 + 2*16)(%rdi), %xmm2
-    movdqu (8*8 + 3*16)(%rdi), %xmm3
-    movdqu (8*8 + 4*16)(%rdi), %xmm4
-    movdqu (8*8 + 5*16)(%rdi), %xmm5
-    movdqu (8*8 + 6*16)(%rdi), %xmm6
-    movdqu (8*8 + 7*16)(%rdi), %xmm7
+    movdqu (10*8 + 0*16)(%rdi), %xmm0
+    movdqu (10*8 + 1*16)(%rdi), %xmm1
+    movdqu (10*8 + 2*16)(%rdi), %xmm2
+    movdqu (10*8 + 3*16)(%rdi), %xmm3
+    movdqu (10*8 + 4*16)(%rdi), %xmm4
+    movdqu (10*8 + 5*16)(%rdi), %xmm5
+    movdqu (10*8 + 6*16)(%rdi), %xmm6
+    movdqu (10*8 + 7*16)(%rdi), %xmm7
 
     // load rdi from itself last
     mov (3*8)(%rdi), %rdi
     ret
 #ifdef __ELF__
 .size lucet_context_set,.-lucet_context_set
+#endif
+
+.text
+.globl lucet_context_activate
+#ifdef __ELF__
+.type lucet_context_activate,@function
+#else
+.globl _lucet_context_activate
+#endif
+.align 16
+// lucet_context_activate is essentially a function with two aruments:
+// in rdi, the address of this guest's "running" flag.
+// in rsi, the address of the guest code to resume at.
+lucet_context_activate:
+_lucet_context_activate:
+    movb $1, (%rdi)
+    jmp *%rsi
+#ifdef __ELF__
+.size lucet_context_activate,.-lucet_context_activate
 #endif
 
 /* Mark that we don't need executable stack. */

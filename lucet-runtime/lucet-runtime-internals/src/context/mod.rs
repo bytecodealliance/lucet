@@ -11,7 +11,6 @@ use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::mem;
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 use xfailure::xbail;
 
 /// Callee-saved general-purpose registers in the AMD64 ABI.
@@ -27,15 +26,16 @@ use xfailure::xbail;
 /// <https://doc.rust-lang.org/nomicon/other-reprs.html#reprpacked>. Since the members are all
 /// `u64`, this should be fine?
 #[repr(C)]
-struct GpRegs {
+pub(crate) struct GpRegs {
     rbx: u64,
-    rsp: u64,
+    pub(crate) rsp: u64,
     rbp: u64,
-    rdi: u64,
+    pub(crate) rdi: u64,
     r12: u64,
     r13: u64,
     r14: u64,
     r15: u64,
+    pub(crate) rsi: u64,
 }
 
 impl GpRegs {
@@ -49,6 +49,7 @@ impl GpRegs {
             r13: 0,
             r14: 0,
             r15: 0,
+            rsi: 0,
         }
     }
 }
@@ -112,7 +113,7 @@ impl FpRegs {
 /// that pointer becomes invalid, and the behavior of returning from that context becomes undefined.
 #[repr(C, align(64))]
 pub struct Context {
-    gpr: GpRegs,
+    pub(crate) gpr: GpRegs,
     fpr: FpRegs,
     retvals_gp: [u64; 2],
     retval_fp: __m128,
@@ -300,6 +301,7 @@ impl Context {
 
         let mut gp_args_ix = 0;
         let mut fp_args_ix = 0;
+        let mut gp_regs_values = [0u64; 6];
 
         let mut spilled_args = vec![];
 
@@ -309,7 +311,7 @@ impl Context {
                     if gp_args_ix >= 6 {
                         spilled_args.push(arg);
                     } else {
-                        child.bootstrap_gp_ix_arg(gp_args_ix, v);
+                        gp_regs_values[gp_args_ix] = v;
                         gp_args_ix += 1;
                     }
                 }
@@ -346,7 +348,12 @@ impl Context {
 
         // Prepare the stack for a swap context that lands in the bootstrap function swap will ret
         // into the bootstrap function
-        stack[sp + 0 - stack_start] = lucet_context_bootstrap as u64;
+        stack[sp + 0 - stack_start - 6] = lucet_context_bootstrap as u64;
+
+        // add all general purpose arguments for the guest to be bootstrapped
+        for (i, arg) in gp_regs_values.iter().enumerate() {
+            stack[sp + 0 - stack_start - i] = *arg;
+        }
 
         // The bootstrap function returns into the guest function, fptr
         stack[sp + 1 - stack_start] = fptr as u64;
@@ -367,7 +374,7 @@ impl Context {
 
         // RSP, RBP, and sigset still remain to be initialized.
         // Stack pointer: this has the return address of the first function to be run on the swap.
-        child.gpr.rsp = &mut stack[sp - stack_start] as *mut u64 as u64;
+        child.gpr.rsp = &mut stack[sp - stack_start - 6] as *mut u64 as u64;
         // Frame pointer: this is only used by the backstop code. It uses it to locate the ctx and
         // parent arguments set above.
         child.gpr.rbp = &mut stack[sp - 2] as *mut u64 as u64;
@@ -424,8 +431,7 @@ impl Context {
     ///     drop(xs);
     ///
     ///     let mut parent = Context::new();
-    ///     let flag = std::sync::atomic::AtomicBool::new(false);
-    ///     unsafe { Context::swap(&mut parent, child, &flag); }
+    ///     unsafe { Context::swap(&mut parent, child); }
     ///     // implicit `drop(x)` and `drop(xs)` here never get called unless we swap back
     /// }
     /// ```
@@ -451,10 +457,10 @@ impl Context {
     ///     &[],
     /// ).unwrap();
     ///
-    /// unsafe { Context::swap(&mut parent, &child, &flag); }
+    /// unsafe { Context::swap(&mut parent, &child); }
     /// ```
     #[inline]
-    pub unsafe fn swap(from: &mut Context, to: &Context, flag: &AtomicBool) {
+    pub unsafe fn swap(from: &mut Context, to: &Context) {
         lucet_context_swap(from as *mut Context, to as *const Context);
     }
 
@@ -561,31 +567,6 @@ impl Context {
         UntypedRetVal::new(gp, fp)
     }
 
-    /// Put one of the first 6 general-purpose arguments into a `Context` register.
-    ///
-    /// Although these registers are callee-saved registers rather than argument registers, they get
-    /// moved into argument registers by `lucet_context_bootstrap`.
-    ///
-    /// - `ix`: ABI general-purpose argument number
-    /// - `arg`: argument value
-    fn bootstrap_gp_ix_arg(&mut self, ix: usize, arg: u64) {
-        match ix {
-            // rdi lives across bootstrap
-            0 => self.gpr.rdi = arg,
-            // bootstraps into rsi
-            1 => self.gpr.r12 = arg,
-            // bootstraps into rdx
-            2 => self.gpr.r13 = arg,
-            // bootstraps into rcx
-            3 => self.gpr.r14 = arg,
-            // bootstraps into r8
-            4 => self.gpr.r15 = arg,
-            // bootstraps into r9
-            5 => self.gpr.rbx = arg,
-            _ => panic!("unexpected gp register index {}", ix),
-        }
-    }
-
     /// Put one of the first 8 floating-point arguments into a `Context` register.
     ///
     /// - `ix`: ABI floating-point argument number
@@ -642,4 +623,10 @@ extern "C" {
     ///
     /// Never returns because the current context is discarded.
     fn lucet_context_set(to: *const Context) -> !;
+
+    /// Enables termination for the instance, after performing a context switch.
+    ///
+    /// Takes the guest return address as an argument as a consequence of implementation details,
+    /// see `Instance::swap_and_return` for more.
+    pub(crate) fn lucet_context_activate();
 }
