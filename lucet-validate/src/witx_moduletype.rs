@@ -1,23 +1,52 @@
 use crate::{AtomType, FuncSignature};
+use failure::Fail;
 use witx::{BuiltinType, Datatype, DatatypeIdent, DatatypeVariant, IntRepr, InterfaceFunc};
 
+#[derive(Debug, Fail)]
+pub enum SignatureError {
+    #[fail(display = "invalid result type: {}", _0)]
+    InvalidResultType(String),
+}
+
 pub trait HasFuncSignature {
-    fn func_signature(&self) -> FuncSignature;
+    fn func_signature(&self) -> Result<FuncSignature, SignatureError>;
 }
 
 impl HasFuncSignature for InterfaceFunc {
-    fn func_signature(&self) -> FuncSignature {
-        let params = self
+    fn func_signature(&self) -> Result<FuncSignature, SignatureError> {
+        let mut params = self
             .params
             .iter()
             .flat_map(|p| p.type_.module_types())
-            .collect();
-        let results = self
+            .collect::<Vec<AtomType>>();
+
+        let first_result = self.results.iter().next().map(|p| {
+            let mut ts = p.type_.module_types();
+            if ts.len() > 1 {
+                Err(SignatureError::InvalidResultType(format!(
+                    "in {}: result {}: {:?} represented as module types {:?}",
+                    self.name.as_str(),
+                    p.name.as_str(),
+                    p.type_,
+                    ts
+                )))
+            } else {
+                Ok(ts.pop().unwrap())
+            }
+        });
+        let results = if let Some(r) = first_result {
+            vec![r?.clone()]
+        } else {
+            vec![]
+        };
+
+        let subsequent_results = self
             .results
             .iter()
-            .flat_map(|p| p.type_.module_types())
-            .collect();
-        FuncSignature { params, results }
+            .skip(1)
+            .flat_map(|p| p.type_.module_types());
+        params.extend(subsequent_results);
+        Ok(FuncSignature { params, results })
     }
 }
 
@@ -60,8 +89,8 @@ impl ModuleTypeParams for Datatype {
 impl ModuleTypeParams for IntRepr {
     fn module_types(&self) -> Vec<AtomType> {
         match self {
-            IntRepr::I8 | IntRepr::I16 | IntRepr::I32 => vec![AtomType::I32],
-            IntRepr::I64 => vec![AtomType::I64],
+            IntRepr::U8 | IntRepr::U16 | IntRepr::U32 => vec![AtomType::I32],
+            IntRepr::U64 => vec![AtomType::I64],
         }
     }
 }

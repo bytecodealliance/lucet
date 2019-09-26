@@ -3,11 +3,13 @@ mod types;
 mod witx_moduletype;
 
 use failure::Fail;
+use std::rc::Rc;
 use wasmparser;
-use witx;
+use witx::{Document, Id, Module};
 
 pub use self::moduletype::ModuleType;
 pub use self::types::{AtomType, FuncSignature, ImportFunc};
+pub use self::witx_moduletype::{HasFuncSignature, ModuleTypeParams, SignatureError};
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -15,30 +17,46 @@ pub enum Error {
     WasmValidation(&'static str, usize),
     #[fail(display = "Unsupported: {}", _0)]
     Unsupported(String),
+    #[fail(display = "{}", _0)]
+    Signature(SignatureError),
     #[fail(display = "Uncategorized error: {}", _0)]
     Uncategorized(String),
 }
 
+impl From<SignatureError> for Error {
+    fn from(e: SignatureError) -> Error {
+        Error::Signature(e)
+    }
+}
 impl From<wasmparser::BinaryReaderError> for Error {
     fn from(e: wasmparser::BinaryReaderError) -> Error {
         Error::WasmValidation(e.message, e.offset)
     }
 }
 
-pub fn validate(
-    witx_doc: &witx::Document,
-    module_contents: &[u8],
-    wasi_exe: bool,
-) -> Result<(), Error> {
+pub fn validate(witx_doc: &Document, module_contents: &[u8], wasi_exe: bool) -> Result<(), Error> {
     wasmparser::validate(module_contents, None)?;
 
     let moduletype = ModuleType::parse_wasm(module_contents)?;
 
     for import in moduletype.imports() {
-        println!(
-            "import {}::{} has type {:?}",
-            import.module, import.field, import.ty
-        );
+        let func = witx_module(witx_doc, &import.module)?
+            .func(&Id::new(&import.field))
+            .ok_or_else(|| {
+                Error::Uncategorized(format!(
+                    "func {}::{} not found",
+                    import.module, import.field
+                ))
+            })?;
+        if func.func_signature()? != import.ty {
+            Err(Error::Uncategorized(format!(
+                "type mismatch in {}::{}: module has {:?}, spec has {:?}",
+                import.module,
+                import.field,
+                import.ty,
+                func.func_signature(),
+            )))?;
+        }
     }
 
     if wasi_exe {
@@ -46,6 +64,14 @@ pub fn validate(
     }
 
     Ok(())
+}
+
+pub fn witx_module(doc: &Document, module: &str) -> Result<Rc<Module>, Error> {
+    match module {
+        "wasi_unstable" => doc.module(&Id::new("wasi_unstable_preview0")),
+        _ => doc.module(&Id::new(module)),
+    }
+    .ok_or_else(|| Error::Uncategorized(format!("module {} not found", module)))
 }
 
 pub fn check_wasi_start_func(moduletype: &ModuleType) -> Result<(), Error> {
