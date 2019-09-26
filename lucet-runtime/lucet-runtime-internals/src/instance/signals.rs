@@ -180,31 +180,48 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 true
             }
             SignalBehavior::Default => {
-                // safety: pointer is checked for null at the top of the function, and the
-                // manpage guarantees that a siginfo_t will be passed as the second argument
-                let siginfo = unsafe { *siginfo_ptr };
-                let rip_addr = rip as usize;
-                // If the trap table lookup returned unknown, it is a fatal error
-                let unknown_fault = trapcode.is_none();
+                /*
+                 * /!\ WARNING: LOAD-BEARING THUNK /!\
+                 *
+                 * This thunk, in debug builds, introduces multiple copies of UContext in the local
+                 * stack frame. This also includes a local `State`, which is quite large as well.
+                 * In total, this thunk accounts for roughly 5kb of stack use, where default signal
+                 * stack sizes are typically 8kb total.
+                 *
+                 * In code paths that do not pass through this (such as immediately reraising as a
+                 * host signal), the code in this thunk would force an exhaustion of more than half
+                 * the stack, significantly increasing the likelihood the Lucet signal handler may
+                 * overflow some other thread with a minimal stack size.
+                 */
+                let mut thunk = || {
+                    // safety: pointer is checked for null at the top of the function, and the
+                    // manpage guarantees that a siginfo_t will be passed as the second argument
+                    let siginfo = unsafe { *siginfo_ptr };
+                    let rip_addr = rip as usize;
+                    // If the trap table lookup returned unknown, it is a fatal error
+                    let unknown_fault = trapcode.is_none();
 
-                // If the trap was a segv or bus fault and the addressed memory was outside the
-                // guard pages, it is also a fatal error
-                let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
-                    && !inst.alloc.addr_in_guard_page(siginfo.si_addr_ext());
+                    // If the trap was a segv or bus fault and the addressed memory was outside the
+                    // guard pages, it is also a fatal error
+                    let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
+                        && !inst.alloc.addr_in_guard_page(siginfo.si_addr_ext());
 
-                // record the fault and jump back to the host context
-                inst.state = State::Faulted {
-                    details: FaultDetails {
-                        fatal: unknown_fault || outside_guard,
-                        trapcode: trapcode,
-                        rip_addr,
-                        // Details set to `None` here: have to wait until `verify_trap_safety` to
-                        // fill in these details, because access may not be signal safe.
-                        rip_addr_details: None,
-                    },
-                    siginfo,
-                    context: ctx.into(),
+                    // record the fault and jump back to the host context
+                    inst.state = State::Faulted {
+                        details: FaultDetails {
+                            fatal: unknown_fault || outside_guard,
+                            trapcode: trapcode,
+                            rip_addr,
+                            // Details set to `None` here: have to wait until `verify_trap_safety` to
+                            // fill in these details, because access may not be signal safe.
+                            rip_addr_details: None,
+                        },
+                        siginfo,
+                        context: ctx.into(),
+                    };
                 };
+
+                thunk();
                 true
             }
         }
