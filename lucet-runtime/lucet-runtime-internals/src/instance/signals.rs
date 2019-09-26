@@ -188,6 +188,20 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 true
             }
             SignalBehavior::Default => {
+                /*
+                 * /!\ WARNING: LOAD-BEARING THUNK /!\
+                 *
+                 * This thunk, in debug builds, introduces multiple copies of UContext in the local
+                 * stack frame. This also includes a local `State`, which is quite large as well.
+                 * In total, this thunk accounts for roughly 5kb of stack use, where default signal
+                 * stack sizes are typically 8kb total.
+                 *
+                 * In code paths that do not pass through this (such as immediately reraising as a
+                 * host signal), the code in this thunk would force an exhaustion of more than half
+                 * the stack, significantly increasing the likelihood the Lucet signal handler may
+                 * overflow some other thread with a minimal stack size.
+                 */
+                let mut thunk = || {
                 // safety: pointer is checked for null at the top of the function, and the
                 // manpage guarantees that a siginfo_t will be passed as the second argument
                 let siginfo = unsafe { *siginfo_ptr };
@@ -213,6 +227,9 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                     siginfo,
                     context: ctx.into(),
                 };
+                };
+
+                thunk();
                 true
             }
         }
