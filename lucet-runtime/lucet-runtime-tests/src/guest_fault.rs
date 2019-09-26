@@ -254,33 +254,6 @@ macro_rules! guest_fault_tests {
 
         #[test]
         fn hostcall_error() {
-            test_nonex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                match inst.run("hostcall_main", &[]) {
-                    Err(Error::RuntimeTerminated(term)) => {
-                        assert_eq!(
-                            *term
-                                .provided_details()
-                                .expect("user terminated in hostcall")
-                                .downcast_ref::<&'static str>()
-                                .expect("error was str"),
-                            HOSTCALL_TEST_ERROR,
-                        );
-                    }
-                    res => panic!("unexpected result: {:?}", res),
-                }
-
-                // after a fault, can reset and run a normal function
-                inst.reset().expect("instance resets");
-
-                run_onetwothree(&mut inst);
-            });
         }
 
         #[ignore]
