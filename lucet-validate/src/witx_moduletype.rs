@@ -17,25 +17,13 @@ impl HasFuncSignature for InterfaceFunc {
         let mut params = self
             .params
             .iter()
-            .flat_map(|p| p.type_.module_types())
+            .flat_map(|p| p.type_.param_by_value_type())
             .collect::<Vec<AtomType>>();
 
-        let first_result = self.results.iter().next().map(|p| {
-            let mut ts = p.type_.module_types();
-            if ts.len() > 1 {
-                Err(SignatureError::InvalidResultType(format!(
-                    "in {}: result {}: {:?} represented as module types {:?}",
-                    self.name.as_str(),
-                    p.name.as_str(),
-                    p.type_,
-                    ts
-                )))
-            } else {
-                Ok(ts.pop().unwrap())
-            }
-        });
-        let results = if let Some(r) = first_result {
-            vec![r?.clone()]
+        let results = if let Some(first_result) = self.results.iter().next() {
+            vec![first_result.type_.result_type().ok_or_else(|| {
+                SignatureError::InvalidResultType(format!("no result type for {:?}", first_result))
+            })?]
         } else {
             vec![]
         };
@@ -44,20 +32,29 @@ impl HasFuncSignature for InterfaceFunc {
             .results
             .iter()
             .skip(1)
-            .flat_map(|p| p.type_.module_types());
+            .flat_map(|p| p.type_.param_by_reference_type());
         params.extend(subsequent_results);
         Ok(FuncSignature { params, results })
     }
 }
 
 pub trait ModuleTypeParams {
-    fn module_types(&self) -> Vec<AtomType>;
+    fn param_by_value_type(&self) -> Vec<AtomType>;
+    fn param_by_reference_type(&self) -> Vec<AtomType>;
+    fn result_type(&self) -> Option<AtomType> {
+        let mut param_types = self.param_by_value_type();
+        match param_types.len() {
+            1 => Some(param_types.pop().unwrap()),
+            _ => None,
+        }
+    }
 }
 
 impl ModuleTypeParams for DatatypeIdent {
-    fn module_types(&self) -> Vec<AtomType> {
+    fn param_by_value_type(&self) -> Vec<AtomType> {
+        use DatatypeIdent::*;
         match self {
-            DatatypeIdent::Builtin(builtin_type) => match builtin_type {
+            Builtin(builtin_type) => match builtin_type {
                 BuiltinType::String | BuiltinType::Data => vec![AtomType::I32, AtomType::I32],
                 BuiltinType::U8
                 | BuiltinType::U16
@@ -69,28 +66,48 @@ impl ModuleTypeParams for DatatypeIdent {
                 BuiltinType::F32 => vec![AtomType::F32],
                 BuiltinType::F64 => vec![AtomType::F64],
             },
-            DatatypeIdent::Array(_) => vec![AtomType::I32, AtomType::I32],
-            DatatypeIdent::Pointer(_) | DatatypeIdent::ConstPointer(_) => vec![AtomType::I32],
-            DatatypeIdent::Ident(datatype) => datatype.module_types(),
+            Array(_) => vec![AtomType::I32, AtomType::I32],
+            Pointer(_) | ConstPointer(_) => vec![AtomType::I32],
+            Ident(datatype) => datatype.param_by_value_type(),
+        }
+    }
+    fn param_by_reference_type(&self) -> Vec<AtomType> {
+        use DatatypeIdent::*;
+        match self {
+            Builtin(builtin) => match builtin {
+                BuiltinType::String | BuiltinType::Data => self.param_by_value_type(),
+                _ => vec![AtomType::I32],
+            },
+            Array(_) | Pointer(_) | ConstPointer(_) => self.param_by_value_type(),
+            Ident(datatype) => datatype.param_by_reference_type(),
         }
     }
 }
 impl ModuleTypeParams for Datatype {
-    fn module_types(&self) -> Vec<AtomType> {
+    fn param_by_value_type(&self) -> Vec<AtomType> {
         match &self.variant {
-            DatatypeVariant::Alias(a) => a.to.module_types(),
-            DatatypeVariant::Enum(e) => e.repr.module_types(),
-            DatatypeVariant::Flags(f) => f.repr.module_types(),
+            DatatypeVariant::Alias(a) => a.to.param_by_value_type(),
+            DatatypeVariant::Enum(e) => e.repr.param_by_value_type(),
+            DatatypeVariant::Flags(f) => f.repr.param_by_value_type(),
             DatatypeVariant::Struct(_) | DatatypeVariant::Union(_) => vec![AtomType::I32],
+        }
+    }
+    fn param_by_reference_type(&self) -> Vec<AtomType> {
+        match &self.variant {
+            DatatypeVariant::Alias(a) => a.to.param_by_reference_type(),
+            _ => vec![AtomType::I32],
         }
     }
 }
 
 impl ModuleTypeParams for IntRepr {
-    fn module_types(&self) -> Vec<AtomType> {
+    fn param_by_value_type(&self) -> Vec<AtomType> {
         match self {
             IntRepr::U8 | IntRepr::U16 | IntRepr::U32 => vec![AtomType::I32],
             IntRepr::U64 => vec![AtomType::I64],
         }
+    }
+    fn param_by_reference_type(&self) -> Vec<AtomType> {
+        vec![AtomType::I32]
     }
 }

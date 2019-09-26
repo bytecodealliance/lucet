@@ -947,8 +947,9 @@ dependencies = [
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-wasi-sdk 0.1.1",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wabt 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasmparser 0.39.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "witx 0.1.0",
+ "witx 0.2.0",
 ]
 
 [[package]]
@@ -2021,7 +2022,7 @@ dependencies = [
 
 [[package]]
 name = "witx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",

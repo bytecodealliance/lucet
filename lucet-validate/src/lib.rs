@@ -48,13 +48,11 @@ pub fn validate(witx_doc: &Document, module_contents: &[u8], wasi_exe: bool) -> 
                     import.module, import.field
                 ))
             })?;
-        if func.func_signature()? != import.ty {
+        let sig = func.func_signature()?;
+        if sig != import.ty {
             Err(Error::Uncategorized(format!(
                 "type mismatch in {}::{}: module has {:?}, spec has {:?}",
-                import.module,
-                import.field,
-                import.ty,
-                func.func_signature(),
+                import.module, import.field, import.ty, sig,
             )))?;
         }
     }
