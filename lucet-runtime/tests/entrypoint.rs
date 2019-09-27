@@ -1,3 +1,5 @@
+#![feature(unwind_attributes)]
+
 use lucet_runtime_tests::entrypoint_tests;
 
 cfg_if::cfg_if! {

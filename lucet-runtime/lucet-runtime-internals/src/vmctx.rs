@@ -295,6 +295,7 @@ impl Vmctx {
     /// [ongoing](https://github.com/bytecodealliance/lucet/pull/254).
     ///
     /// ```no_run
+    /// # #![feature(unwind_attributes)]
     /// use lucet_runtime_macros::lucet_hostcall;
     /// use lucet_runtime_internals::lucet_hostcall_terminate;
     /// use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};

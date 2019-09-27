@@ -406,6 +406,22 @@ macro_rules! host_tests {
                     );
                 }
 
+                /// Ensures that callee-saved registers are properly restored following a `catch_unwind`
+                /// that catches a panic.
+                #[test]
+                fn restore_callee_saved() {
+                    let module =
+                        test_module_c("host", "nested_error_unwind.c").expect("build and load module");
+                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+                    assert_eq!(
+                        u64::from(inst.run("entrypoint_restore", &[]).unwrap()),
+                        6148914668330025056
+                    );
+                }
+
                 #[test]
                 fn run_fpe() {
                     let module = test_module_c("host", "fpe.c").expect("build and load module");

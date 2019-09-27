@@ -21,6 +21,10 @@
 ///     // body
 /// }
 /// ```
+///
+/// **Note:** This macro currently uses the unstable `#![feature(unwind_attributes)]`, which must be
+/// enabled in any crate where the macro is used. In the long term, we hope to move back to stable
+/// once [unwinding across FFI](https://github.com/rust-lang/rfcs/pull/2753) is defined.
 #[macro_export]
 #[deprecated(since = "0.5.0", note = "Use the #[lucet_hostcall] attribute instead")]
 macro_rules! lucet_hostcalls {
@@ -40,6 +44,7 @@ macro_rules! lucet_hostcalls {
             #[allow(unused_unsafe)]
             #[$crate::lucet_hostcall]
             $(#[$attr])*
+            #[unwind(allowed)]
             pub unsafe extern "C" fn $name(
                 $vmctx: &lucet_runtime::vmctx::Vmctx,
                 $( $arg: $arg_ty ),*
