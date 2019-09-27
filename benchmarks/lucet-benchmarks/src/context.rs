@@ -347,14 +347,14 @@ fn context_init_swap_return_many_args(c: &mut Criterion) {
     });
 }
 
-/// Time the call to sigprocmask as used in `Context::init()`.
-fn context_sigprocmask(c: &mut Criterion) {
+/// Time the call to pthread_sigmask as used in `Context::init()`.
+fn context_pthread_sigmask(c: &mut Criterion) {
     use nix::sys::signal;
-    c.bench_function("context_sigprocmask", |b| {
+    c.bench_function("context_pthread_sigmask", |b| {
         b.iter_batched(
             || signal::SigSet::empty(),
             |mut sigset| {
-                signal::sigprocmask(signal::SigmaskHow::SIG_SETMASK, None, Some(&mut sigset))
+                signal::pthread_sigmask(signal::SigmaskHow::SIG_SETMASK, None, Some(&mut sigset))
                     .unwrap()
             },
             criterion::BatchSize::PerIteration,
@@ -367,5 +367,5 @@ pub fn context_benches(c: &mut Criterion) {
     context_swap_return(c);
     context_init_swap_return(c);
     context_init_swap_return_many_args(c);
-    context_sigprocmask(c);
+    context_pthread_sigmask(c);
 }

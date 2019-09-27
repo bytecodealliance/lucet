@@ -443,14 +443,14 @@ impl Context {
         // the parent and child contexts to `Context::swap` with.
         child.gpr.rbp = &mut stack[stack.len() - backstop_args] as *mut u64 as u64;
 
-        // Read the sigprocmask to be restored if we ever need to jump out of a signal handler. If
-        // this isn't possible, die.
-        signal::sigprocmask(
+        // Read the mask to be restored if we ever need to jump out of a signal handler. If this
+        // isn't possible, die.
+        signal::pthread_sigmask(
             signal::SigmaskHow::SIG_SETMASK,
             None,
             Some(&mut child.sigset),
         )
-        .expect("sigprocmask could not be retrieved");
+        .expect("pthread_sigmask could not be retrieved");
 
         Ok(())
     }
@@ -593,7 +593,7 @@ impl Context {
     /// `!` as a type like that is currently experimental.
     #[inline]
     pub unsafe fn set_from_signal(to: &Context) -> Result<(), nix::Error> {
-        signal::sigprocmask(signal::SigmaskHow::SIG_SETMASK, Some(&to.sigset), None)?;
+        signal::pthread_sigmask(signal::SigmaskHow::SIG_SETMASK, Some(&to.sigset), None)?;
         Context::set(to)
     }
 
