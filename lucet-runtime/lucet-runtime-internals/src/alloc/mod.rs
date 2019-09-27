@@ -113,7 +113,8 @@ impl Drop for Alloc {
 }
 
 impl Alloc {
-    pub fn addr_in_heap_guard(&self, addr: *const c_void) -> bool {
+    pub fn addr_in_guard_page(&self, addr: *const c_void) -> bool {
+        let addr = addr as usize;
         let heap = self.slot().heap as usize;
         let guard_start = heap + self.heap_accessible_size;
         let guard_end = heap + self.slot().limits.heap_address_space_size;
@@ -121,7 +122,16 @@ impl Alloc {
         //     "addr = {:p}, guard_start = {:p}, guard_end = {:p}",
         //     addr, guard_start as *mut c_void, guard_end as *mut c_void
         // );
-        (addr as usize >= guard_start) && ((addr as usize) < guard_end)
+        let stack_guard_end = self.slot().stack as usize;
+        let stack_guard_start = stack_guard_end - host_page_size();
+        // eprintln!(
+        //     "addr = {:p}, stack_guard_start = {:p}, stack_guard_end = {:p}",
+        //     addr, stack_guard_start as *mut c_void, stack_guard_end as *mut c_void
+        // );
+        let in_heap_guard = (addr >= guard_start) && (addr < guard_end);
+        let in_stack_guard = (addr >= stack_guard_start) && (addr < stack_guard_end);
+
+        in_heap_guard || in_stack_guard
     }
 
     pub fn expand_heap(&mut self, expand_bytes: u32, module: &dyn Module) -> Result<u32, Error> {

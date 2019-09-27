@@ -44,7 +44,7 @@ _lucet_context_bootstrap:
   // This can be naively performed since if any terminator tried to fire
   // before setting this, and at this point it is safe for a terminator
   // to fire.
-  movb $1, -8(%rbp)
+  movb $1, 16(%rbp)
 
 	// Move each of the argument values into the corresponding call
 	// argument register.
@@ -71,15 +71,17 @@ _lucet_context_bootstrap:
 .align 16
 lucet_context_backstop:
 _lucet_context_backstop:
-    mov -24(%rbp), %rdi  /* parent context to arg 1 */
-    mov -16(%rbp), %rsi  /* own context to arg 2 */
+    // Note that `rbp` here really has no relation to any stack!
+    // it happens to be an available pointer we can hang the contexts to swap off of.
+    mov (%rbp), %rdi  /* parent context to arg 1 */
+    mov 8(%rbp), %rsi  /* own context to arg 2 */
     mov %rax, (10*8 + 8*16 + 8*0)(%rdi) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
     mov %rdx, (10*8 + 8*16 + 8*1)(%rdi)
     movdqu %xmm0, (10*8 + 8*16 + 8*2)(%rdi) /* floating-point return value */
 
     mov $0, %cl
     // there may be standing executors that will try to execute this instance, take the 'terminable' flag so they will fail
-    lock xchgb -8(%rbp), %cl
+    lock xchgb 16(%rbp), %cl
     test %cl, %cl
 
     // if we got 0 from the `lock xchg`, some terminator beat us in trying to

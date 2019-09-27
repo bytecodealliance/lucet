@@ -39,10 +39,10 @@ use std::sync::{Arc, Mutex, Weak};
 /// 0xXXXX: ~  .......heap.......   ~ // heap size is governed by limits.heap_address_space_size
 /// 0xXXXX: |                       |
 /// 0xN000: +-----------------------| <-- Stack (at heap_start + limits.heap_address_space_size)
+/// 0xNXXX: --- stack guard page ----
 /// 0xNXXX: |                       |
 /// 0xXXXX: ~  .......stack......   ~ // stack size is governed by limits.stack_size
 /// 0xXXXX: |                       |
-/// 0xXXXx: --- stack guard page ----
 /// 0xM000: +-----------------------| <-- Globals (at stack_start + limits.stack_size + PAGE_SIZE)
 /// 0xMXXX: |                       |
 /// 0xXXXX: ~  ......globals.....   ~
@@ -317,8 +317,8 @@ impl MmapRegion {
 
         // lay out the other sections in memory
         let heap = mem as usize + instance_heap_offset();
-        let stack = heap + region.limits.heap_address_space_size;
-        let globals = stack + region.limits.stack_size + host_page_size();
+        let stack = heap + region.limits.heap_address_space_size + host_page_size();
+        let globals = stack + region.limits.stack_size;
         let sigstack = globals + host_page_size();
 
         Ok(Slot {

@@ -69,7 +69,7 @@ impl ScriptEnv {
         let bindings = bindings::spec_test_bindings();
         let compiler = Compiler::new(
             module,
-            OptLevel::Fast,
+            OptLevel::default(),
             &bindings,
             HeapSettings::default(),
             true,

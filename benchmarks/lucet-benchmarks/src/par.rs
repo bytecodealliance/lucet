@@ -6,6 +6,9 @@ use rayon::prelude::*;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+/// Common definiton of OptLevel
+const BENCHMARK_OPT_LEVEL: OptLevel = OptLevel::SpeedAndSize;
+
 /// Parallel instantiation.
 ///
 /// This measures how well the region handles concurrent instantiations from multiple
@@ -42,7 +45,7 @@ fn par_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
     let workdir = TempDir::new().expect("create working directory");
 
     let so_file = workdir.path().join("out.so");
-    compile_hello(&so_file, OptLevel::Fast);
+    compile_hello(&so_file, BENCHMARK_OPT_LEVEL);
 
     let module = DlModule::load(&so_file).unwrap();
 

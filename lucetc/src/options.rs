@@ -100,10 +100,10 @@ impl Options {
         };
 
         let opt_level = match m.value_of("opt_level") {
-            None => OptLevel::default(),
+            None => OptLevel::SpeedAndSize,
             Some("0") => OptLevel::None,
-            Some("1") => OptLevel::Standard,
-            Some("2") | Some("fast") => OptLevel::Fast,
+            Some("1") => OptLevel::Speed,
+            Some("2") => OptLevel::SpeedAndSize,
             Some(_) => panic!("unknown value for opt-level"),
         };
 
@@ -214,8 +214,8 @@ impl Options {
                 Arg::with_name("opt_level")
                     .long("--opt-level")
                     .takes_value(true)
-                    .possible_values(&["0", "1", "2", "fast"])
-                    .help("optimization level (default: '1')"),
+                    .possible_values(&["0", "1", "2", "none", "speed", "speed_and_size"])
+                    .help("optimization level (default: 'speed_and_size'). 0 is alias to 'none', 1 to 'speed', 2 to 'speed_and_size'"),
             )
             .arg(
                 Arg::with_name("keygen")
