@@ -1,3 +1,4 @@
+#![feature(unwind_attributes)]
 #![deny(bare_trait_objects)]
 
 pub mod error;
