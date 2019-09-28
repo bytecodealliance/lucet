@@ -1,6 +1,5 @@
 mod moduletype;
 mod types;
-mod witx_moduletype;
 
 use failure::Fail;
 use std::rc::Rc;
@@ -8,8 +7,8 @@ use wasmparser;
 use witx::{Document, Id, Module};
 
 pub use self::moduletype::ModuleType;
-pub use self::types::{AtomType, FuncSignature, ImportFunc};
-pub use self::witx_moduletype::{HasFuncSignature, ModuleTypeParams, SignatureError};
+pub use self::types::{FuncSignature, ImportFunc};
+pub use witx::AtomType;
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -17,17 +16,10 @@ pub enum Error {
     WasmValidation(&'static str, usize),
     #[fail(display = "Unsupported: {}", _0)]
     Unsupported(String),
-    #[fail(display = "{}", _0)]
-    Signature(SignatureError),
     #[fail(display = "Uncategorized error: {}", _0)]
     Uncategorized(String),
 }
 
-impl From<SignatureError> for Error {
-    fn from(e: SignatureError) -> Error {
-        Error::Signature(e)
-    }
-}
 impl From<wasmparser::BinaryReaderError> for Error {
     fn from(e: wasmparser::BinaryReaderError) -> Error {
         Error::WasmValidation(e.message, e.offset)
@@ -48,11 +40,11 @@ pub fn validate(witx_doc: &Document, module_contents: &[u8], wasi_exe: bool) -> 
                     import.module, import.field
                 ))
             })?;
-        let sig = func.func_signature()?;
-        if sig != import.ty {
+        let spec_type = FuncSignature::from(func.module_type());
+        if spec_type != import.ty {
             Err(Error::Uncategorized(format!(
                 "type mismatch in {}::{}: module has {:?}, spec has {:?}",
-                import.module, import.field, import.ty, sig,
+                import.module, import.field, import.ty, spec_type,
             )))?;
         }
     }
@@ -74,7 +66,7 @@ pub fn witx_module(doc: &Document, module: &str) -> Result<Rc<Module>, Error> {
 
 pub fn check_wasi_start_func(moduletype: &ModuleType) -> Result<(), Error> {
     if let Some(startfunc) = moduletype.export("_start") {
-        if !(startfunc.params.is_empty() && startfunc.results.is_empty()) {
+        if !(startfunc.args.is_empty() && startfunc.ret.is_none()) {
             Err(Error::Uncategorized(format!(
                 "bad type signature on _start: {:?}",
                 startfunc

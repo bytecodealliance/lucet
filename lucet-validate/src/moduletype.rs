@@ -1,8 +1,9 @@
-use crate::{Error, FuncSignature, ImportFunc};
+use crate::{AtomType, Error, FuncSignature, ImportFunc};
 use cranelift_entity::{entity_impl, PrimaryMap};
 use std::collections::HashMap;
-pub use wasmparser::Type;
-use wasmparser::{ExternalKind, FuncType, ImportSectionEntryType, ModuleReader, SectionContent};
+use wasmparser::{
+    ExternalKind, FuncType, ImportSectionEntryType, ModuleReader, SectionContent, Type as WType,
+};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 struct TypeIndex(u32);
@@ -61,14 +62,23 @@ impl ModuleType {
                     for entry in types {
                         match entry? {
                             FuncType {
-                                form: wasmparser::Type::Func,
+                                form: WType::Func,
                                 params,
                                 returns,
                             } => {
-                                module.types.push(FuncSignature {
-                                    params: params.to_vec(),
-                                    results: returns.to_vec(),
-                                });
+                                let ret = match returns.len() {
+                                    0 => None,
+                                    1 => Some(wasmparser_to_atomtype(&returns[0])?),
+                                    _ => Err(Error::Unsupported(format!(
+                                        "more than 1 return value: {:?}",
+                                        returns,
+                                    )))?,
+                                };
+                                let args = params
+                                    .iter()
+                                    .map(|a| wasmparser_to_atomtype(a))
+                                    .collect::<Result<Vec<_>, _>>()?;
+                                module.types.push(FuncSignature { args, ret });
                             }
                             _ => Err(Error::Unsupported("type section entry".to_string()))?,
                         }
@@ -133,5 +143,15 @@ impl ModuleType {
         }
 
         Ok(module)
+    }
+}
+
+fn wasmparser_to_atomtype(a: &WType) -> Result<AtomType, Error> {
+    match a {
+        WType::I32 => Ok(AtomType::I32),
+        WType::I64 => Ok(AtomType::I64),
+        WType::F32 => Ok(AtomType::F32),
+        WType::F64 => Ok(AtomType::F64),
+        _ => Err(Error::Unsupported(format!("wasmparser type {:?}", a))),
     }
 }

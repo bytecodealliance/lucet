@@ -1,9 +1,19 @@
-pub use wasmparser::Type as AtomType;
+use crate::AtomType;
+use witx::ModuleFuncType;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FuncSignature {
-    pub params: Vec<AtomType>,
-    pub results: Vec<AtomType>,
+    pub args: Vec<AtomType>,
+    pub ret: Option<AtomType>,
+}
+
+impl From<ModuleFuncType> for FuncSignature {
+    fn from(m: ModuleFuncType) -> FuncSignature {
+        FuncSignature {
+            args: m.args.iter().map(|a| a.repr()).collect(),
+            ret: m.ret.map(|r| r.repr()),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
