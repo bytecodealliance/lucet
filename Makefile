@@ -30,7 +30,8 @@ test: indent-check
             -p lucet-idl \
             -p lucet-wasi-sdk \
             -p lucet-wasi \
-            -p lucet-benchmarks
+            -p lucet-benchmarks \
+            -p lucet-validate
     # run a single seed through the fuzzer to stave off bitrot
 	cargo run -p lucet-wasi-fuzz -- test-seed 410757864950
 	helpers/lucet-toolchain-tests/signature.sh
@@ -73,4 +74,5 @@ watch:
             -p lucet-idl \
             -p lucet-wasi-sdk \
             -p lucet-wasi \
-            -p lucet-benchmarks"
+            -p lucet-benchmarks \
+            -p lucet-validate"
