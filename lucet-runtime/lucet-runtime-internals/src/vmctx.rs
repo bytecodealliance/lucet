@@ -422,7 +422,7 @@ impl Instance {
     ///
     /// This is almost certainly not what you want to use to terminate from a hostcall; use panics
     /// with `TerminationDetails` instead.
-    unsafe fn terminate(&mut self, details: TerminationDetails) -> ! {
+    pub(crate) unsafe fn terminate(&mut self, details: TerminationDetails) -> ! {
         self.state = State::Terminating { details };
         #[allow(unused_unsafe)] // The following unsafe will be incorrectly warned as unused
         HOST_CTX.with(|host_ctx| unsafe { Context::set(&*host_ctx.get()) })

@@ -23,8 +23,7 @@ use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Condvar;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
 
@@ -693,6 +692,53 @@ impl Instance {
         self.c_fatal_handler = Some(handler);
     }
 
+    pub fn begin_hostcall(&mut self) {
+        // Lock the current execution domain, so we can update to `Hostcall`.
+        let mut current_domain = self.kill_state.execution_domain();
+        match *current_domain {
+            Domain::Guest => {
+                // Guest is the expected domain until this point. Switch to the Hostcall
+                // domain so we know to not interrupt this instance.
+                *current_domain = Domain::Hostcall;
+            }
+            Domain::Hostcall => {
+                panic!(
+                    "Invalid state: Instance marked as in a hostcall while entering a hostcall."
+                );
+            }
+            Domain::Terminated => {
+                panic!("Invalid state: Instance marked as terminated while in guest code. This should be an error.");
+            }
+        }
+    }
+
+    pub fn end_hostcall(&mut self) {
+        let mut current_domain = self.kill_state.execution_domain();
+        match *current_domain {
+            Domain::Guest => {
+                panic!("Invalid state: Instance marked as in guest code while exiting a hostcall.");
+            }
+            Domain::Hostcall => {
+                *current_domain = Domain::Guest;
+            }
+            Domain::Terminated => {
+                // The instance was stopped in the hostcall we were executing.
+                //
+                // We must disable signalling before dropping the `current_domain` MutexGuard to
+                // prevent a signal being delivered during the context switch from `terminate`.
+                let terminable = self.kill_state.terminable.swap(false, Ordering::SeqCst);
+                if terminable {
+                    std::mem::drop(current_domain);
+                    unsafe {
+                        self.terminate(TerminationDetails::Remote);
+                    }
+                } else {
+                    panic!("Exiting a hostcall while the instance thinks it has been terminated, but isn't even active. This is a bug.");
+                }
+            }
+        }
+    }
+
     pub fn kill_switch(&self) -> KillSwitch {
         KillSwitch {
             state: Arc::downgrade(&self.kill_state),
@@ -723,6 +769,7 @@ impl Instance {
             kill_state: Arc::new(KillState {
                 terminable: AtomicBool::new(false),
                 tid_change_notifier: Condvar::new(),
+                execution_domain: Mutex::new(Domain::Guest),
                 thread_id: Mutex::new(None),
             }),
             alloc,
@@ -1170,7 +1217,20 @@ fn default_fatal_handler(inst: &Instance) -> ! {
 pub(crate) struct KillState {
     pub(crate) terminable: AtomicBool,
     tid_change_notifier: Condvar,
+    execution_domain: Mutex<Domain>,
     thread_id: Mutex<Option<pthread_t>>,
+}
+
+impl KillState {
+    pub fn execution_domain(&self) -> MutexGuard<Domain> {
+        self.execution_domain.lock().unwrap()
+    }
+}
+
+pub enum Domain {
+    Guest,
+    Hostcall,
+    Terminated,
 }
 
 pub struct KillSwitch {
@@ -1187,20 +1247,43 @@ impl KillSwitch {
             let terminable = state.terminable.swap(false, Ordering::SeqCst);
 
             if terminable {
-                // we got it! we can kill the instance now.
-                let mut curr_tid = state.thread_id.lock().unwrap();
-                if let Some(thread_id) = *curr_tid {
-                    unsafe {
-                        pthread_kill(thread_id, SIGALRM);
-                    }
+                // we got it! we can signal the instance.
 
-                    // wait for the SIGALRM handler to deschedule the instance
-                    while curr_tid.is_some() {
-                        curr_tid = state.tid_change_notifier.wait(curr_tid).unwrap();
+                // Now check what domain the instance is in. We can signal in guest code, but want
+                // to avoid signalling in host code lest we interrupt some function operating on
+                // guest/host shared memory, and invalidate invariants. For example, interrupting
+                // in the middle of a resize operation on a `Vec` could be extremely dangerous.
+                let mut execution_domain = state.execution_domain.lock().unwrap();
+
+                match *execution_domain {
+                    Domain::Guest => {
+                        let mut curr_tid = state.thread_id.lock().unwrap();
+                        // we're in guest code, so we can just send a signal.
+                        if let Some(thread_id) = *curr_tid {
+                            unsafe {
+                                pthread_kill(thread_id, SIGALRM);
+                            }
+
+                            // wait for the SIGALRM handler to deschedule the instance
+                            while curr_tid.is_some() {
+                                curr_tid = state.tid_change_notifier.wait(curr_tid).unwrap();
+                            }
+                        } else {
+                            panic!("logic error: instance is terminable but not actually running.");
+                        }
                     }
-                } else {
-                    panic!("logic error: instance is terminable but not actually running.");
+                    Domain::Hostcall => {
+                        // the guest is in a hostcall, so the only thing we can do is indicate it
+                        // should terminate and wait.
+                        *execution_domain = Domain::Terminated;
+                    }
+                    Domain::Terminated => {
+                        // Something else (another KillSwitch?) has already signalled this instance
+                        // to exit when it has completed its hostcall. Nothing to do here.
+                    }
                 }
+                // we must hold the lock on this bool at least until we set the "timed_out" flag.
+                mem::drop(execution_domain);
             } else {
                 println!("KillSwitch::terminate - instance is not in a terminable state");
                 return;
