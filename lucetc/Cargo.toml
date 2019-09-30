@@ -32,7 +32,7 @@ clap="2.32"
 log = "0.4"
 env_logger = "0.6"
 faerie = "0.11.0"
-goblin = "0.0.22"
+goblin = "0.0.24"
 failure = "0.1"
 byteorder = "1.2"
 wasmonkey = { path = "../lucet-builtins/wasmonkey", version = "0.1.7" }
