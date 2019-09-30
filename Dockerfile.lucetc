@@ -1,0 +1,34 @@
+
+FROM ubuntu:16.04 AS builder
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends \
+	build-essential \
+	curl \
+	cmake \
+	ninja-build \
+	ca-certificates \
+	software-properties-common \
+	libssl-dev \
+	pkg-config \
+	&& rm -rf /var/lib/apt/lists/*
+
+RUN curl https://sh.rustup.rs -sSf | \
+    sh -s -- --default-toolchain nightly-2019-09-25 -y && \
+        /root/.cargo/bin/rustup update nightly
+ENV PATH=/root/.cargo/bin:$PATH
+
+COPY . /lucet
+WORKDIR /lucet
+RUN cargo build --release -p lucetc
+
+FROM ubuntu:16.04
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends \
+	binutils \
+	&& rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /lucet/target/release/lucetc /usr/local/bin/lucetc
+RUN mkdir /usr/local/share/lucetc
+COPY --from=builder /lucet/lucet-wasi/bindings.json /usr/local/share/lucetc/lucet-wasi.bindings.json
+
+CMD /usr/local/bin/lucetc --help
