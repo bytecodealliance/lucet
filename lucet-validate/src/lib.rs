@@ -40,7 +40,7 @@ pub fn validate(witx_doc: &Document, module_contents: &[u8], wasi_exe: bool) -> 
                     import.module, import.field
                 ))
             })?;
-        let spec_type = FuncSignature::from(func.module_type());
+        let spec_type = FuncSignature::from(func.core_type());
         if spec_type != import.ty {
             Err(Error::Uncategorized(format!(
                 "type mismatch in {}::{}: module has {:?}, spec has {:?}",

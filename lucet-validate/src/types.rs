@@ -1,5 +1,5 @@
 use crate::AtomType;
-use witx::ModuleFuncType;
+use witx::CoreFuncType;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FuncSignature {
@@ -7,8 +7,8 @@ pub struct FuncSignature {
     pub ret: Option<AtomType>,
 }
 
-impl From<ModuleFuncType> for FuncSignature {
-    fn from(m: ModuleFuncType) -> FuncSignature {
+impl From<CoreFuncType> for FuncSignature {
+    fn from(m: CoreFuncType) -> FuncSignature {
         FuncSignature {
             args: m.args.iter().map(|a| a.repr()).collect(),
             ret: m.ret.map(|r| r.repr()),
