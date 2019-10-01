@@ -942,6 +942,7 @@ impl Instance {
             self.kill_state.tid_change_notifier.notify_all();
         }
 
+        // Set transitioning state temporarily so that we can move values out of the current state
         let st = mem::replace(&mut self.state, State::Transitioning);
 
         match st {
