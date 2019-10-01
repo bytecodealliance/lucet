@@ -723,17 +723,9 @@ impl Instance {
             }
             Domain::Terminated => {
                 // The instance was stopped in the hostcall we were executing.
-                //
-                // We must disable signalling before dropping the `current_domain` MutexGuard to
-                // prevent a signal being delivered during the context switch from `terminate`.
-                let terminable = self.kill_state.terminable.swap(false, Ordering::SeqCst);
-                if terminable {
-                    std::mem::drop(current_domain);
-                    unsafe {
-                        self.terminate(TerminationDetails::Remote);
-                    }
-                } else {
-                    panic!("Exiting a hostcall while the instance thinks it has been terminated, but isn't even active. This is a bug.");
+                std::mem::drop(current_domain);
+                unsafe {
+                    self.terminate(TerminationDetails::Remote);
                 }
             }
         }
