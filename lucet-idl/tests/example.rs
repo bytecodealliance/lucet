@@ -1,8 +1,18 @@
 use lucet_idl;
+use std::env;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
+
+/// Get the base path of the installed WASI SDK.
+///
+/// This logic is adapted from `lucet-wasi-sdk` so that we do not incur its additional dependencies.
+fn wasi_sdk_clang() -> PathBuf {
+    PathBuf::from(&env::var("WASI_SDK").unwrap_or("/opt/wasi-sdk".to_owned()))
+        .join("bin")
+        .join("clang")
+}
 
 #[test]
 fn compile_c_guest() {
@@ -19,7 +29,7 @@ fn compile_c_guest() {
     )
     .expect("run lucet_idl");
 
-    let cmd_cc = Command::new("/opt/wasi-sdk/bin/clang")
+    let cmd_cc = Command::new(wasi_sdk_clang())
         .arg("--target=wasm32-wasi")
         .arg("--std=c99")
         .arg("-Wl,--allow-undefined")
