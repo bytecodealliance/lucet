@@ -36,6 +36,7 @@ pub struct Options {
     pub codegen: CodegenOutput,
     pub binding_files: Vec<PathBuf>,
     pub witx_specs: Vec<PathBuf>,
+    pub wasi_exe: bool,
     pub builtins_path: Option<PathBuf>,
     pub min_reserved_size: Option<u64>,
     pub max_reserved_size: Option<u64>,
@@ -67,10 +68,11 @@ impl Options {
             .collect();
 
         let witx_specs: Vec<PathBuf> = m
-            .values_of("witx")
+            .values_of("witx_specs")
             .unwrap_or_default()
             .map(PathBuf::from)
             .collect();
+        let wasi_exe = m.is_present("wasi_exe");
 
         let codegen = match m.value_of("emit") {
             None => CodegenOutput::SharedObj,
@@ -127,6 +129,7 @@ impl Options {
             codegen,
             binding_files,
             witx_specs,
+            wasi_exe,
             builtins_path,
             min_reserved_size,
             max_reserved_size,
@@ -173,12 +176,19 @@ impl Options {
                     .help("path to bindings json file"),
             )
             .arg(
-                Arg::with_name("witx")
+                Arg::with_name("witx_specs")
                     .long("--witx")
                     .takes_value(true)
                     .multiple(true)
                     .number_of_values(1)
                     .help("path to witx spec to validate against"),
+            )
+            .arg(
+                Arg::with_name("wasi_exe")
+                    .long("--wasi_exe")
+                    .takes_value(false)
+                    .multiple(false)
+                    .help("validate as a wasi executable"),
             )
             .arg(
                 Arg::with_name("min_reserved_size")

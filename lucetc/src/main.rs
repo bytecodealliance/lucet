@@ -4,6 +4,7 @@ use crate::options::{CodegenOutput, Options};
 use failure::{format_err, Error, ResultExt};
 use log::info;
 use lucet_module::bindings::Bindings;
+use lucet_validate::Validator;
 use lucetc::{
     signature::{self, PublicKey},
     Lucetc, LucetcOpts,
@@ -11,7 +12,6 @@ use lucetc::{
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
-use witx;
 
 fn main() {
     env_logger::init();
@@ -58,8 +58,8 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     match opts.witx_specs.len() {
         0 => {}
         1 => {
-            let spec = witx::load(&opts.witx_specs[0])?;
-            c.witx_spec(spec);
+            let validator = Validator::load(&opts.witx_specs[0])?.with_wasi_exe(opts.wasi_exe);
+            c.validator(validator);
         }
         _ => Err(format_err!("multiple witx specs not yet supported"))?,
     }

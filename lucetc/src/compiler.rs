@@ -20,7 +20,7 @@ use cranelift_wasm::{translate_module, FuncTranslator, WasmError};
 use failure::{format_err, Fail, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::{FunctionSpec, ModuleData, MODULE_DATA_SYM};
-use lucet_validate::{self, Document};
+use lucet_validate::Validator;
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
@@ -59,15 +59,15 @@ impl<'a> Compiler<'a> {
         bindings: &'a Bindings,
         heap_settings: HeapSettings,
         count_instructions: bool,
-        spec: &Option<Document>,
+        validator: &Option<Validator>,
     ) -> Result<Self, LucetcError> {
         let isa = Self::target_isa(opt_level);
 
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
-        if let Some(spec) = spec {
-            lucet_validate::validate(spec, wasm_binary, true)
+        if let Some(v) = validator {
+            v.validate(wasm_binary)
                 .context(LucetcErrorKind::Validation)?;
         } else {
             // As of cranelift-wasm 0.43 which uses wasmparser 0.40, the parser used inside

@@ -2,7 +2,7 @@
 extern crate clap;
 use clap::Arg;
 use failure::Fail;
-use lucet_validate;
+use lucet_validate::{self, Validator};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -72,14 +72,13 @@ pub fn main() {
 }
 
 fn run(module_path: &Path, witx_path: &Path, wasi_exe: bool) -> Result<(), Error> {
-    let witx_doc = witx::load(witx_path)?;
-
     let mut module_contents = Vec::new();
     let mut file = File::open(module_path).map_err(|e| Error::Io(module_path.into(), e))?;
     file.read_to_end(&mut module_contents)
         .map_err(|e| Error::Io(module_path.into(), e))?;
 
-    lucet_validate::validate(&witx_doc, &module_contents, wasi_exe)?;
+    let validator = Validator::load(witx_path)?.with_wasi_exe(wasi_exe);
+    validator.validate(&module_contents)?;
 
     Ok(())
 }
