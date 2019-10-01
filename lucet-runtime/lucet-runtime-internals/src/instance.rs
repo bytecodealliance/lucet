@@ -1204,14 +1204,46 @@ fn default_fatal_handler(inst: &Instance) -> ! {
     panic!("> instance {:p} had fatal error: {}", inst, inst.state);
 }
 
-/// Instance state related to remote kill switch functionality.
+/// All instance state a remote kill switch needs to determine if and how to signal that execution
+/// should stop.
 ///
-///n
+/// Some definitions for reference in this struct's documentation:
+/// * "stopped" means "stop executing at some point before reaching the end of the entrypoint
+/// wasm function".
+/// * "critical section" means what it typically means - an uninterruptable region of code. The
+/// detail here is that currently "critical section" and "hostcall" are interchangeable, but in
+/// the future this may change. Hostcalls may one day be able to opt out of criticalness, or
+/// perhaps guest code may include critical sections.
+///
+/// "Stopped" is a particularly loose word here because it ecompasses the worst case: trying to
+/// stop a guest that is currently in a critical section. Because the signal will only be checked
+/// when exiting the critical section, the latency is bounded by whatever embedder guarantees are
+/// made. In fact, it is possible for a kill signal to be successfully sent and still never
+/// impactful, if a hostcall itself invokes `lucet_hostcall_terminate!`.
 pub(crate) struct KillState {
+    /// Can the instance be terminated? This must be `true` only when the instance can be stopped.
+    /// This may be false while the instance can safely be stopped, such as immediately after
+    /// completing a host->guest context swap. Regions such as this should be minimized, but are
+    /// not a problem of correctness.
+    ///
+    /// Typically, this is true while in any guest code, or hostcalls made from guest code.
     pub(crate) terminable: AtomicBool,
-    tid_change_notifier: Condvar,
+    /// The kind of code is currently executing in the instance this `KillState` describes.
+    ///
+    /// This allows a `KillSwitch` to determine what the appropriate signalling mechanism is in
+    /// `terminate`. Locks on `execution_domain` prohibit modification while signalling, ensuring
+    /// both that:
+    /// * we don't enter a hostcall while someone may decide it is safe to signal, and
+    /// * no one may try to signal in a hostcall-safe manner after exiting a hostcall, where it
+    ///   may never again be checked by the guest.
     execution_domain: Mutex<Domain>,
+    /// The current `thread_id` the associated instance is running on. This is the TID where
+    /// `SIGALRM` will be sent if the instance is killed via `KillSwitch::terminate` and a signal
+    /// is an appropriate mechanism.
     thread_id: Mutex<Option<pthread_t>>,
+    /// `tid_change_notifier` allows functions that may cause a change in `thread_id` to wait,
+    /// without spinning, for the signal to be processed.
+    tid_change_notifier: Condvar,
 }
 
 impl KillState {
@@ -1230,11 +1262,32 @@ pub struct KillSwitch {
     state: Weak<KillState>,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum KillSuccess {
+    Signalled,
+    Pending,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum KillError {
+    NotTerminable,
+}
+
+type KillResult = Result<KillSuccess, KillError>;
+
 /// An object that can be used to terminate an instance's execution from a separate thread.
-///
-///
 impl KillSwitch {
-    pub fn terminate(&self) {
+    /// Signal the instance associated with this `KillSwitch` to stop, is possible.
+    ///
+    /// The returned `Result` only describes the behavior taken by this function, not necessarily
+    /// what caused the associated instance to stop.
+    ///
+    /// As an example, if a `KillSwitch` fires, sending a SIGALRM to an instance at the same
+    /// moment it begins handling a SIGSEGV which is determined to be fatal, the instance may
+    /// stop with `State::Faulted` before actually _handling_ the SIGALRM we'd send here. So the
+    /// host code will see `State::Faulted` as an instance state, where `KillSwitch::terminate`
+    /// would return `Ok(KillSuccess::Signalled)`.
+    pub fn terminate(&self) -> KillResult {
         if let Some(state) = self.state.upgrade() {
             // Attempt to take the flag indicating the instance may terminate
             let terminable = state.terminable.swap(false, Ordering::SeqCst);
@@ -1246,9 +1299,12 @@ impl KillSwitch {
                 // to avoid signalling in host code lest we interrupt some function operating on
                 // guest/host shared memory, and invalidate invariants. For example, interrupting
                 // in the middle of a resize operation on a `Vec` could be extremely dangerous.
+                //
+                // Hold this lock through all signalling logic to prevent the instance from
+                // switching domains (and invalidating safety of whichever mechanism we choose here)
                 let mut execution_domain = state.execution_domain.lock().unwrap();
 
-                match *execution_domain {
+                let result = match *execution_domain {
                     Domain::Guest => {
                         let mut curr_tid = state.thread_id.lock().unwrap();
                         // we're in guest code, so we can just send a signal.
@@ -1258,9 +1314,13 @@ impl KillSwitch {
                             }
 
                             // wait for the SIGALRM handler to deschedule the instance
+                            //
+                            // this should never actually loop, which would indicate the instance
+                            // was moved to another thread, or we got spuriously notified.
                             while curr_tid.is_some() {
                                 curr_tid = state.tid_change_notifier.wait(curr_tid).unwrap();
                             }
+                            Ok(KillSuccess::Signalled)
                         } else {
                             panic!("logic error: instance is terminable but not actually running.");
                         }
@@ -1269,18 +1329,24 @@ impl KillSwitch {
                         // the guest is in a hostcall, so the only thing we can do is indicate it
                         // should terminate and wait.
                         *execution_domain = Domain::Terminated;
+                        Ok(KillSuccess::Pending)
                     }
                     Domain::Terminated => {
                         // Something else (another KillSwitch?) has already signalled this instance
                         // to exit when it has completed its hostcall. Nothing to do here.
+                        Err(KillError::NotTerminable)
                     }
-                }
+                };
                 // we must hold the lock on this bool at least until we set the "timed_out" flag.
                 mem::drop(execution_domain);
+                result
             } else {
-                println!("KillSwitch::terminate - instance is not in a terminable state");
-                return;
+                Err(KillError::NotTerminable)
             }
+        } else {
+            // The underlying kill state we need to check has been dropped. This means the instance
+            // exited, or was otherwise terminated and discarded, so we can't terminate it here.
+            Err(KillError::NotTerminable)
         }
     }
 }

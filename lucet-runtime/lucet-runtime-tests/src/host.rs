@@ -269,43 +269,6 @@ macro_rules! host_tests {
             }
         }
 
-        #[test]
-        fn run_kill_switch() {
-            let module = test_module_c("host", "inf_loop.c").expect("build and load module");
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            use std::time::Duration;
-            let kill_switch = inst.kill_switch();
-
-            use std::thread;
-            thread::spawn(move || {
-                kill_switch.terminate(); // fails too soon
-                thread::sleep(Duration::from_millis(100));
-                kill_switch.terminate(); // works
-                thread::sleep(Duration::from_millis(100));
-                kill_switch.terminate(); // fails too late
-            });
-
-            thread::sleep(Duration::from_millis(10));
-
-            match inst.run("main", &[0u32.into(), 0u32.into()]) {
-                Err(Error::RuntimeTerminated(details)) => match details {
-                    TerminationDetails::Remote => {
-                        println!("Terminated remotely!");
-                        thread::sleep(Duration::from_millis(1000));
-                    }
-                    _ => panic!(),
-                },
-                res => {
-                    panic!("unexpected result: {:?}", res);
-                }
-            }
-        }
-
         fn run_hostcall_bad_borrow() {
             extern "C" {
                 fn hostcall_bad_borrow(vmctx: *mut lucet_vmctx) -> bool;

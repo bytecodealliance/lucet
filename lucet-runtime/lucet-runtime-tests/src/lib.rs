@@ -8,3 +8,4 @@ pub mod memory;
 pub mod stack;
 pub mod start;
 pub mod strcmp;
+pub mod timeout;
