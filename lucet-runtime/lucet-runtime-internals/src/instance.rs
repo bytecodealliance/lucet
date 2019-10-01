@@ -937,8 +937,9 @@ impl Instance {
         // The state should never be `Ready`, `Terminated`, `Yielded`, or `Transitioning` at this point
 
         {
-            let mut kill_state = self.kill_state.thread_id.lock().unwrap();
-            *kill_state = None;
+            let mut inst_tid = self.kill_state.thread_id.lock().unwrap();
+            *inst_tid = None;
+            self.kill_state.tid_change_notifier.notify_all();
         }
 
         let st = mem::replace(&mut self.state, State::Transitioning);
