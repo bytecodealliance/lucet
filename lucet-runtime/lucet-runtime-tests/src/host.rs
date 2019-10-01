@@ -269,6 +269,7 @@ macro_rules! host_tests {
             }
         }
 
+        #[test]
         fn run_hostcall_bad_borrow() {
             extern "C" {
                 fn hostcall_bad_borrow(vmctx: *mut lucet_vmctx) -> bool;
