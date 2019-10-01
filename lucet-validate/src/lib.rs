@@ -4,11 +4,11 @@ mod types;
 use failure::Fail;
 use std::rc::Rc;
 use wasmparser;
-use witx::{Document, Id, Module};
+use witx::{Id, Module};
 
 pub use self::moduletype::ModuleType;
 pub use self::types::{FuncSignature, ImportFunc};
-pub use witx::AtomType;
+pub use witx::{AtomType, Document};
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -56,7 +56,7 @@ pub fn validate(witx_doc: &Document, module_contents: &[u8], wasi_exe: bool) -> 
     Ok(())
 }
 
-pub fn witx_module(doc: &Document, module: &str) -> Result<Rc<Module>, Error> {
+fn witx_module(doc: &Document, module: &str) -> Result<Rc<Module>, Error> {
     match module {
         "wasi_unstable" => doc.module(&Id::new("wasi_unstable_preview0")),
         _ => doc.module(&Id::new(module)),
@@ -64,7 +64,7 @@ pub fn witx_module(doc: &Document, module: &str) -> Result<Rc<Module>, Error> {
     .ok_or_else(|| Error::Uncategorized(format!("module {} not found", module)))
 }
 
-pub fn check_wasi_start_func(moduletype: &ModuleType) -> Result<(), Error> {
+fn check_wasi_start_func(moduletype: &ModuleType) -> Result<(), Error> {
     if let Some(startfunc) = moduletype.export("_start") {
         if !(startfunc.args.is_empty() && startfunc.ret.is_none()) {
             Err(Error::Uncategorized(format!(

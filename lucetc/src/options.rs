@@ -35,6 +35,7 @@ pub struct Options {
     pub input: Vec<PathBuf>,
     pub codegen: CodegenOutput,
     pub binding_files: Vec<PathBuf>,
+    pub witx_specs: Vec<PathBuf>,
     pub builtins_path: Option<PathBuf>,
     pub min_reserved_size: Option<u64>,
     pub max_reserved_size: Option<u64>,
@@ -61,6 +62,12 @@ impl Options {
 
         let binding_files: Vec<PathBuf> = m
             .values_of("bindings")
+            .unwrap_or_default()
+            .map(PathBuf::from)
+            .collect();
+
+        let witx_specs: Vec<PathBuf> = m
+            .values_of("witx")
             .unwrap_or_default()
             .map(PathBuf::from)
             .collect();
@@ -119,6 +126,7 @@ impl Options {
             input,
             codegen,
             binding_files,
+            witx_specs,
             builtins_path,
             min_reserved_size,
             max_reserved_size,
@@ -163,6 +171,14 @@ impl Options {
                     .multiple(true)
                     .number_of_values(1)
                     .help("path to bindings json file"),
+            )
+            .arg(
+                Arg::with_name("witx")
+                    .long("--witx")
+                    .takes_value(true)
+                    .multiple(true)
+                    .number_of_values(1)
+                    .help("path to witx spec to validate against"),
             )
             .arg(
                 Arg::with_name("min_reserved_size")

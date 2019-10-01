@@ -11,6 +11,7 @@ use lucetc::{
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
+use witx;
 
 fn main() {
     env_logger::init();
@@ -53,6 +54,15 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     let mut c = Lucetc::new(PathBuf::from(input))
         .with_bindings(bindings)
         .with_opt_level(opts.opt_level);
+
+    match opts.witx_specs.len() {
+        0 => {}
+        1 => {
+            let spec = witx::load(&opts.witx_specs[0])?;
+            c.witx_spec(spec);
+        }
+        _ => Err(format_err!("multiple witx specs not yet supported"))?,
+    }
 
     if let Some(ref builtins) = opts.builtins_path {
         c.builtins(builtins);

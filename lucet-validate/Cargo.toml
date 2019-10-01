@@ -1,6 +1,6 @@
 [package]
 name = "lucet-validate"
-version = "0.1.0"
+version = "0.1.1"
 description = "Parse and validate webassembly files against witx interface"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
