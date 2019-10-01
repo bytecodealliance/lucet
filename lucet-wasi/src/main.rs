@@ -252,6 +252,9 @@ fn run(config: Config<'_>) {
             let kill_switch = inst.kill_switch();
             thread::spawn(move || {
                 thread::sleep(timeout);
+                // We may hit this line exactly when the guest exits, so sometimes `terminate` can
+                // fail. That's still acceptable, so just ignore the result.
+                #[allow(unused_must_use)]
                 kill_switch.terminate();
             });
         }
