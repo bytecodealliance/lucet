@@ -173,6 +173,7 @@ macro_rules! host_tests {
                     static ref NESTED_INNER: Mutex<()> = Mutex::new(());
                     static ref NESTED_REGS_OUTER: Mutex<()> = Mutex::new(());
                     static ref NESTED_REGS_INNER: Mutex<()> = Mutex::new(());
+                    static ref FAULT_UNWIND: Mutex<()> = Mutex::new(());
                 }
 
                 #[inline]
@@ -420,6 +421,19 @@ macro_rules! host_tests {
                         u64::from(inst.run("entrypoint_restore", &[]).unwrap()),
                         6148914668330025056
                     );
+                }
+
+                /// Ensures that hostcall stack frames get unwound when a fault occurs in guest code.
+                #[test]
+                fn fault_unwind() {
+                    let module = test_module_c("host", "fault_unwind.c").expect("build and load module");
+                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+                    inst.run("entrypoint", &[]).unwrap_err();
+                    inst.reset().unwrap();
+                    assert!(FAULT_UNWIND.is_poisoned());
                 }
 
                 #[test]

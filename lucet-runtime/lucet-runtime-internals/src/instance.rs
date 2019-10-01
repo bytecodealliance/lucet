@@ -592,6 +592,12 @@ impl Instance {
     ///
     /// [run_start]: struct.Instance.html#method.run
     pub fn reset(&mut self) -> Result<(), Error> {
+        // temporary heuristic for whether this should happen upon a reset; in the long term we only
+        // want to force an unwind if there are hostcall frames present, which we'll need to track
+        // via the instance
+        if self.ctx.gpr.rsp != 0 {
+            self.force_unwind().unwrap();
+        }
         self.alloc.reset_heap(self.module.as_ref())?;
         let globals = unsafe { self.alloc.globals_mut() };
         let mod_globals = self.module.globals();
@@ -1194,6 +1200,39 @@ impl Instance {
         });
 
         res
+    }
+
+    fn force_unwind(&mut self) -> Result<(), Error> {
+        #[unwind(allowed)]
+        extern "C" fn initiate_unwind() {
+            panic!(TerminationDetails::ForcedUnwind);
+        }
+
+        // extremely unsafe, doesn't handle any stack exhaustion edge cases yet
+        let stack_offset = self.ctx.gpr.rsp as usize - dbg!(self.alloc.slot().stack) as usize;
+        let stack_index = stack_offset / 8;
+        assert!(stack_offset % 8 == 0);
+
+        let stack = unsafe { self.alloc.stack_u64_mut() };
+        if stack_index % 2 == 1 {
+            stack[stack_index - 1] = initiate_unwind as u64;
+            self.ctx.gpr.rsp -= 8;
+        } else {
+            // stack[stack_index - 1] = 0xFAFAFAFAFAFAFAFA;
+            stack[stack_index - 2] = 0;
+            stack[stack_index - 1] = initiate_unwind as u64;
+            // stack[stack_index - 1] = 0;
+            // stack[stack_index - 2] = initiate_unwind as u64;
+            self.ctx.gpr.rsp -= 16;
+        }
+
+        match self.swap_and_return() {
+            Ok(_) => panic!("forced unwinding shouldn't return normally"),
+            Err(Error::RuntimeTerminated(TerminationDetails::ForcedUnwind)) => (),
+            Err(e) => panic!("unexpected error: {}", e),
+        }
+
+        Ok(())
     }
 }
 

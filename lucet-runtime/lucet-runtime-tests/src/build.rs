@@ -50,6 +50,9 @@ where
 
     let dlmodule = DlModule::load(so_file)?;
 
+    // temporary, so that gdb doesn't barf due to the .so being deleted too early
+    workdir.into_path();
+
     Ok(dlmodule)
 }
 

@@ -1,5 +1,6 @@
 {
     "env": {
+        "fault_unwind": "hostcall_fault_unwind",
         "hostcall_test_func_hello": "hostcall_test_func_hello",
         "hostcall_test_func_hostcall_error": "hostcall_test_func_hostcall_error",
         "hostcall_test_func_hostcall_error_unwind": "hostcall_test_func_hostcall_error_unwind",

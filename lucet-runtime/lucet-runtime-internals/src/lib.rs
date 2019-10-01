@@ -2,6 +2,7 @@
 //! WebAssembly modules in lightweight sandboxes. It is intended to work with modules compiled by
 //! [`lucetc`](https://github.com/fastly/lucet/tree/master/lucetc).
 
+#![feature(unwind_attributes)]
 #![deny(bare_trait_objects)]
 
 #[macro_use]
