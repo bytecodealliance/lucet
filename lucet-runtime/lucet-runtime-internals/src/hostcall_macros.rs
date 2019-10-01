@@ -45,8 +45,8 @@ macro_rules! lucet_hostcalls {
                 ) -> $ret_ty {
                     $($body)*
                 }
-                // not sure why this is necessary!! the import is definitely used, but this
-                // produces a warning if not present.
+                // don't warn if this macro happens to expand in a context where `VmctxInternal`
+                // was already imported
                 #[allow(unused_imports)]
                 use lucet_runtime_internals::vmctx::VmctxInternal;
 
