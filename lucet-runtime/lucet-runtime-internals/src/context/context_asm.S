@@ -44,7 +44,8 @@ _lucet_context_bootstrap:
   // This can be naively performed since if any terminator tried to fire
   // before setting this, and at this point it is safe for a terminator
   // to fire.
-  movb $1, 16(%rbp)
+  mov 16(%rbp), %rcx
+  movb $1, (%rcx)
 
 	// Move each of the argument values into the corresponding call
 	// argument register.
@@ -80,8 +81,9 @@ _lucet_context_backstop:
     movdqu %xmm0, (10*8 + 8*16 + 8*2)(%rdi) /* floating-point return value */
 
     mov $0, %cl
+    mov 16(%rbp), %rax
     // there may be standing executors that will try to execute this instance, take the 'terminable' flag so they will fail
-    lock xchgb 16(%rbp), %cl
+    lock xchgb (%rax), %cl
     test %cl, %cl
 
     // if we got 0 from the `lock xchg`, some terminator beat us in trying to
