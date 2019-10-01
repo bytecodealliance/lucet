@@ -13,7 +13,7 @@ pub fn mock_timeout_module() -> Arc<dyn Module> {
         loop {}
     }
 
-    extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () { }
+    extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () {}
 
     extern "C" fn run_slow_hostcall(vmctx: *mut lucet_vmctx) -> bool {
         extern "C" {
@@ -48,23 +48,21 @@ macro_rules! timeout_tests {
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
-            KillError, KillSuccess, Limits, Region, RunResult, SignalBehavior,
-            TerminationDetails, TrapCode,
+            KillError, KillSuccess, Limits, Region, RunResult, SignalBehavior, TerminationDetails,
+            TrapCode,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
         use nix::sys::wait::{waitpid, WaitStatus};
         use nix::unistd::{fork, ForkResult};
-        use std::thread;
-        use std::time::Duration;
         use std::ptr;
         use std::sync::{Arc, Mutex};
+        use std::thread;
+        use std::time::Duration;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
+        use $crate::helpers::{FunctionPointer, MockExportBuilder, MockModuleBuilder};
         use $crate::timeout::mock_timeout_module;
-        use $crate::helpers::{
-            FunctionPointer, MockExportBuilder, MockModuleBuilder,
-        };
 
         lucet_hostcalls! {
             #[no_mangle]
@@ -88,8 +86,7 @@ macro_rules! timeout_tests {
         #[test]
         fn timeout_in_guest() {
             let module = mock_timeout_module();
-            let region =
-                TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
@@ -117,8 +114,7 @@ macro_rules! timeout_tests {
         #[test]
         fn timeout_before_guest() {
             let module = mock_timeout_module();
-            let region =
-                TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
@@ -133,14 +129,13 @@ macro_rules! timeout_tests {
         #[test]
         fn timeout_after_guest() {
             let module = mock_timeout_module();
-            let region =
-                TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
 
             match inst.run("do_nothing", &[]) {
-                Ok(_) => { }
+                Ok(_) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
 
@@ -156,8 +151,7 @@ macro_rules! timeout_tests {
         #[test]
         fn timeout_after_guest_fault() {
             let module = test_module_c("timeout", "fault.c").expect("build and load module");
-            let region =
-                TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
@@ -181,8 +175,7 @@ macro_rules! timeout_tests {
         #[test]
         fn timeout_in_hostcall() {
             let module = mock_timeout_module();
-            let region =
-                TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
@@ -195,7 +188,7 @@ macro_rules! timeout_tests {
             });
 
             match inst.run("run_slow_hostcall", &[]) {
-                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {},
+                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
 
@@ -228,7 +221,7 @@ macro_rules! timeout_tests {
 
             match inst.run("main", &[0u32.into(), 0u32.into()]) {
                 // the result we're expecting - the guest has been terminated!
-                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {},
+                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => {
                     panic!("unexpected result: {:?}", res);
                 }
@@ -240,8 +233,7 @@ macro_rules! timeout_tests {
         #[test]
         fn double_timeout() {
             let module = mock_timeout_module();
-            let region =
-                TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
@@ -256,7 +248,10 @@ macro_rules! timeout_tests {
 
             thread::spawn(move || {
                 thread::sleep(Duration::from_millis(200));
-                assert_eq!(second_kill_switch.terminate(), Err(KillError::NotTerminable));
+                assert_eq!(
+                    second_kill_switch.terminate(),
+                    Err(KillError::NotTerminable)
+                );
             });
 
             match inst.run("infinite_loop", &[]) {
