@@ -39,12 +39,10 @@
 .align 16
 lucet_context_bootstrap:
 _lucet_context_bootstrap:
-  // Set flag indicating that the context switch is done.
-  //
-  // This can be naively performed since if any terminator tried to fire
-  // before setting this, and at this point it is safe for a terminator
-  // to fire.
+  // load the pointer to the instance's "terminable" flag.
   mov 16(%rbp), %rcx
+  // Set flag indicating that the context switch is done.
+  // x86 mov is atomic, so we don't need a lock prefix here (which would be invalid anyway)
   movb $1, (%rcx)
 
 	// Move each of the argument values into the corresponding call
@@ -80,14 +78,18 @@ _lucet_context_backstop:
     mov %rdx, (10*8 + 8*16 + 8*1)(%rdi)
     movdqu %xmm0, (10*8 + 8*16 + 8*2)(%rdi) /* floating-point return value */
 
-    mov $0, %cl
+    // rax has been stored above already, so we can reuse it now to load the 
+    // pointer to the `terminable` flag.
     mov 16(%rbp), %rax
-    // there may be standing executors that will try to execute this instance, take the 'terminable' flag so they will fail
-    lock xchgb (%rax), %cl
+    mov $0, %cl
+    // there may be standing executors that will try to execute this instance,
+    // take the `terminable` flag so they will fail.
+    // x86 xchg has an implicit "lock" semantic, so we don't need the prefix here.
+    xchgb (%rax), %cl
     test %cl, %cl
 
-    // if we got 0 from the `lock xchg`, some terminator beat us in trying to
-    // stop this instance, so it's not safe to start swapping contexts.
+    // if we got 0 from the `xchg`, some terminator beat us in trying to
+    // stop this instance, and it's not safe to start swapping contexts.
     //
     // so, just hang out for a bit and wait for the terminator to do its thing
 _hang:
@@ -203,7 +205,7 @@ _lucet_context_set:
 .globl _lucet_context_activate
 #endif
 .align 16
-// lucet_context_activate is essentially a function with two aruments:
+// lucet_context_activate is essentially a function with two arguments:
 // in rdi, the address of this guest's "running" flag.
 // in rsi, the address of the guest code to resume at.
 lucet_context_activate:

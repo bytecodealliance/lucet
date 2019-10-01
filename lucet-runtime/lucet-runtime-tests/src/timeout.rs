@@ -227,7 +227,7 @@ macro_rules! timeout_tests {
                 }
             };
 
-            t.join();
+            t.join().unwrap();
         }
 
         #[test]

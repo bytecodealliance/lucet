@@ -13,6 +13,7 @@ use nix::sys::signal::{
 };
 use std::mem::MaybeUninit;
 use std::panic;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 lazy_static! {
@@ -183,10 +184,10 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             SignalBehavior::Terminate => {
                 // set the state before jumping back to the host context
                 //
-                // we must take the terminable flag so that no KillSwitch accidentally signals a
+                // we must clear the terminable flag so that no KillSwitch accidentally signals a
                 // host thread.
-                use std::sync::atomic::Ordering;
-                let terminable = inst.kill_state.terminable.swap(false, Ordering::SeqCst);
+                inst.kill_state.terminable.store(false, Ordering::SeqCst);
+
                 inst.state = State::Terminating {
                     details: TerminationDetails::Signal,
                 };
@@ -208,8 +209,9 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                  * overflow some other thread with a minimal stack size.
                  */
                 let mut thunk = || {
-                    use std::sync::atomic::Ordering;
-                    let terminable = inst.kill_state.terminable.swap(false, Ordering::SeqCst);
+                    // we must clear the terminable flag so that no KillSwitch accidentally signals
+                    // a host thread.
+                    inst.kill_state.terminable.store(false, Ordering::SeqCst);
 
                     // safety: pointer is checked for null at the top of the function, and the
                     // manpage guarantees that a siginfo_t will be passed as the second argument
