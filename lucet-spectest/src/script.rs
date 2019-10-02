@@ -73,6 +73,7 @@ impl ScriptEnv {
             &bindings,
             HeapSettings::default(),
             true,
+            &None,
         )
         .map_err(program_error)?;
 

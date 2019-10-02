@@ -68,8 +68,8 @@ impl Validator {
         })
     }
 
-    pub fn load(source_path: &Path) -> Result<Self, WitxError> {
-        let witx = witx::load(source_path)?;
+    pub fn load<P: AsRef<Path>>(source_path: P) -> Result<Self, WitxError> {
+        let witx = witx::load(source_path.as_ref())?;
         Ok(Self {
             witx,
             wasi_exe: false,

@@ -1001,6 +1001,7 @@ version = "0.1.1"
 dependencies = [
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module 0.1.1",
+ "lucet-validate 0.1.1",
  "lucetc 0.1.1",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
