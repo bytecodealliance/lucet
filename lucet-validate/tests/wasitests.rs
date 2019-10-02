@@ -1,10 +1,9 @@
 #[cfg(test)]
 mod lucet_wasi_tests {
-    use lucet_validate;
+    use lucet_validate::Validator;
     use std::fs;
     use std::path::Path;
     use wabt;
-    use witx;
 
     fn c_to_wasm(c_path: &Path) -> Vec<u8> {
         use lucet_wasi_sdk::Link;
@@ -38,7 +37,7 @@ mod lucet_wasi_tests {
 
     #[test]
     fn validate_lucet_wasi_test_guests() {
-        let wasi_spec = witx::load("../wasi/phases/unstable/witx/wasi_unstable_preview0.witx")
+        let validator = Validator::load("../wasi/phases/unstable/witx/wasi_unstable_preview0.witx")
             .expect("load wasi_unstable_preview0");
 
         for entry in
@@ -53,7 +52,8 @@ mod lucet_wasi_tests {
                 Some("wat") => wat_to_wasm(&entry_path),
                 _ => panic!("unsupported extension: {:?}", entry_path),
             };
-            lucet_validate::validate(&wasi_spec, &entry_wasm, true)
+            validator
+                .validate(&entry_wasm)
                 .expect(&format!("validate {:?}", entry_path));
         }
     }
