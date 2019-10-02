@@ -28,7 +28,7 @@ cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.44.0" }
 target-lexicon = "0.8.0"
 lucet-module = { path = "../lucet-module", version = "0.1.1" }
 lucet-validate = { path = "../lucet-validate", version = "0.1.1" }
-witx = { path = "../wasi/tools/witx", version = "0.2.0" }
+witx = { path = "../wasi/tools/witx", version = "0.3.0" }
 wasmparser = "0.39.1"
 clap="2.32"
 log = "0.4"

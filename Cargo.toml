@@ -4,7 +4,6 @@
 members = [
   "lucet-analyze",
   "lucet-idl",
-  "lucet-idl/witx-frontend",
   "lucet-idl/lucet-idl-test",
   "lucet-idl/lucet-idl-test/resources/rust_host",
   "lucet-module",
