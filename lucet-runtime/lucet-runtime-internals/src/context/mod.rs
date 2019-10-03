@@ -729,4 +729,8 @@ extern "C" {
     /// For more information, see `Instance::swap_and_return`, `Instance::with_activation_routine`,
     /// `enter_guest_region`, and `lucet_context_activate`'s assembly implementation.
     pub(crate) fn lucet_context_activate();
+
+    /// Just a stub to have a single address we can unwind through, for stack alignment when we
+    /// need to add a new call frame to an existing guest
+    pub(crate) fn unwind_stub();
 }

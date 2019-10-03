@@ -1219,8 +1219,8 @@ impl Instance {
             self.ctx.gpr.rsp -= 8;
         } else {
             // stack[stack_index - 1] = 0xFAFAFAFAFAFAFAFA;
-            stack[stack_index - 2] = 0;
-            stack[stack_index - 1] = initiate_unwind as u64;
+            stack[stack_index - 1] = crate::context::unwind_stub as u64;
+            stack[stack_index - 2] = initiate_unwind as u64;
             // stack[stack_index - 1] = 0;
             // stack[stack_index - 2] = initiate_unwind as u64;
             self.ctx.gpr.rsp -= 16;

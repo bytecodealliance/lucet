@@ -55,6 +55,20 @@ _lucet_context_bootstrap:
 #endif
 
 .text
+.globl unwind_stub
+.align 16
+.cfi_startproc
+  // load bearing nop so we can just put `unwind_stub` in places and have the unwinding mechanism understand we mean we are _in_ this function
+  nop
+unwind_stub:
+_unwind_stub:
+  ret
+.cfi_endproc
+#ifdef __ELF__
+.size unwind_stub,.-unwind_stub
+#endif
+
+.text
 .globl libunwind_backstop_shim
 .align 16
 // unsure if `simple` is necessary here. GAS docs suggest this may omit some initial CFI instructions, and i want this to be as barren as possible for now.
