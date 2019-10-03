@@ -70,7 +70,7 @@ impl<'a> Compiler<'a> {
             v.validate(wasm_binary)
                 .context(LucetcErrorKind::Validation)?;
         } else {
-            // As of cranelift-wasm 0.43 which uses wasmparser 0.40, the parser used inside
+            // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside
             // cranelift-wasm does not validate. We need to run the validating parser on the binary
             // first. The InvalidWebAssembly error below will never trigger.
             wasmparser::validate(wasm_binary, None)

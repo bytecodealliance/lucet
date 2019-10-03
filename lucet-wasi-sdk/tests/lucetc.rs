@@ -10,6 +10,9 @@ mod lucetc_tests {
     use std::io::Read;
     use std::path::PathBuf;
 
+    /// Compile C -> WebAssembly using wasi-sdk's clang. Does not use the wasi-sdk
+    /// libc, and does not produce a wasi executable, just a wasm module with the given set of
+    /// export functions.
     fn module_from_c(cfiles: &[&str], exports: &[&str]) -> Result<Vec<u8>, Error> {
         let cfiles: Vec<PathBuf> = cfiles
             .iter()
@@ -132,8 +135,8 @@ mod lucetc_tests {
     #[test]
     fn hello() {
         let m = {
-            // This is like module_from_c, except missing the bits that have it leave out the wasi
-            // stdlib and tentry points:
+            // Unlike in module_from_c, use wasi-sdk to compile a C file to a wasi executable,
+            // linking in wasi-libc and exposing the wasi _start entry point only:
             let tempdir = tempfile::Builder::new()
                 .prefix("wasi-sdk-test")
                 .tempdir()
@@ -158,6 +161,7 @@ mod lucetc_tests {
         let v = Validator::load("../wasi/phases/unstable/witx/wasi_unstable_preview0.witx")
             .expect("wasi spec validation")
             .with_wasi_exe(true);
+        // Compiler will only unwrap if the Validator defined above accepts the module
         let c =
             Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile empty");
         let mdata = c.module_data().unwrap();

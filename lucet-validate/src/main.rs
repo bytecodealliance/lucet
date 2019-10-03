@@ -52,7 +52,11 @@ pub fn main() {
         Path::new(matches.value_of("witx").expect("witx path required")),
         matches.is_present("wasi-exe"),
     ) {
-        Ok(()) => {}
+        Ok(()) => {
+            if matches.is_present("verbose") {
+                println!("validated successfully")
+            }
+        }
         Err(e) => {
             if matches.is_present("verbose") {
                 match e {
