@@ -116,6 +116,21 @@ pub fn run_with_stdout<P: AsRef<Path>>(
     Ok((exitcode, stdout))
 }
 
+pub fn run_with_null_stdin<P: AsRef<Path>>(
+    path: P,
+    ctx: WasiCtxBuilder,
+) -> Result<__wasi_exitcode_t, Error> {
+    let (pipe_out, pipe_in) = nix::unistd::pipe()?;
+
+    let ctx = unsafe { ctx.raw_fd(0, pipe_out) }.build()?;
+
+    let exitcode = run(path, ctx)?;
+
+    nix::unistd::close(pipe_in)?;
+
+    Ok(exitcode)
+}
+
 /// Call this if you're having trouble with `__wasi_*` symbols not being exported.
 ///
 /// This is pretty hackish; we will hopefully be able to avoid this altogether once [this
