@@ -1,6 +1,6 @@
 mod test_helpers;
 
-use crate::test_helpers::{run, run_with_stdout, LUCET_WASI_ROOT};
+use crate::test_helpers::{run, run_with_null_stdin, run_with_stdout, LUCET_WASI_ROOT};
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
 use std::fs::File;
 use std::path::Path;
@@ -369,12 +369,8 @@ fn pseudoquine() {
 
 #[test]
 fn poll() {
-    let ctx = WasiCtxBuilder::new()
-        .inherit_stdio()
-        .args(&["poll"])
-        .build()
-        .unwrap();
-    let exitcode = run("poll.c", ctx).unwrap();
+    let ctx = WasiCtxBuilder::new().args(&["poll"]);
+    let exitcode = run_with_null_stdin("poll.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 }
 

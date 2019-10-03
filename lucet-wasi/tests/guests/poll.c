@@ -17,7 +17,7 @@ int main(void)
     assert(fds[0].revents == POLLOUT);
     assert(fds[1].revents == POLLOUT);
 
-    fds[0] = (struct pollfd){ .fd = 1, .events = POLLIN, .revents = 0 };
+    fds[0] = (struct pollfd){ .fd = 0, .events = POLLIN, .revents = 0 };
     time(&before);
     ret = poll(fds, 1, 2000);
     time(&now);
