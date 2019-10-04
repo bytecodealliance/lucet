@@ -31,6 +31,7 @@ pub use crate::{
 };
 use failure::{format_err, Error, ResultExt};
 pub use lucet_module::bindings::Bindings;
+pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -47,6 +48,7 @@ pub struct Lucetc {
     opt_level: OptLevel,
     heap: HeapSettings,
     builtins_paths: Vec<PathBuf>,
+    validator: Option<Validator>,
     sk: Option<SecretKey>,
     pk: Option<PublicKey>,
     sign: bool,
@@ -73,6 +75,9 @@ pub trait LucetcOpts {
 
     fn builtins<P: AsRef<Path>>(&mut self, builtins_path: P);
     fn with_builtins<P: AsRef<Path>>(self, builtins_path: P) -> Self;
+
+    fn validator(&mut self, validator: Validator);
+    fn with_validator(self, validator: Validator) -> Self;
 
     fn min_reserved_size(&mut self, min_reserved_size: u64);
     fn with_min_reserved_size(self, min_reserved_size: u64) -> Self;
@@ -131,6 +136,15 @@ impl<T: AsLucetc> LucetcOpts for T {
 
     fn with_builtins<P: AsRef<Path>>(mut self, builtins_path: P) -> Self {
         self.builtins(builtins_path);
+        self
+    }
+
+    fn validator(&mut self, validator: Validator) {
+        self.as_lucetc().validator = Some(validator);
+    }
+
+    fn with_validator(mut self, validator: Validator) -> Self {
+        self.validator(validator);
         self
     }
 
@@ -226,6 +240,7 @@ impl Lucetc {
             opt_level: OptLevel::default(),
             heap: HeapSettings::default(),
             builtins_paths: vec![],
+            validator: None,
             pk: None,
             sk: None,
             sign: false,
@@ -242,6 +257,7 @@ impl Lucetc {
             opt_level: OptLevel::default(),
             heap: HeapSettings::default(),
             builtins_paths: vec![],
+            validator: None,
             pk: None,
             sk: None,
             sign: false,
@@ -287,6 +303,7 @@ impl Lucetc {
             &bindings,
             self.heap.clone(),
             self.count_instructions,
+            &self.validator,
         )?;
         let obj = compiler.object_file()?;
 
@@ -303,6 +320,7 @@ impl Lucetc {
             &bindings,
             self.heap.clone(),
             self.count_instructions,
+            &self.validator,
         )?;
 
         compiler

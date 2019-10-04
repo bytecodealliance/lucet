@@ -4,6 +4,7 @@ use crate::options::{CodegenOutput, Options};
 use failure::{format_err, Error, ResultExt};
 use log::info;
 use lucet_module::bindings::Bindings;
+use lucet_validate::Validator;
 use lucetc::{
     signature::{self, PublicKey},
     Lucetc, LucetcOpts,
@@ -53,6 +54,15 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     let mut c = Lucetc::new(PathBuf::from(input))
         .with_bindings(bindings)
         .with_opt_level(opts.opt_level);
+
+    match opts.witx_specs.len() {
+        0 => {}
+        1 => {
+            let validator = Validator::load(&opts.witx_specs[0])?.with_wasi_exe(opts.wasi_exe);
+            c.validator(validator);
+        }
+        _ => Err(format_err!("multiple witx specs not yet supported"))?,
+    }
 
     if let Some(ref builtins) = opts.builtins_path {
         c.builtins(builtins);

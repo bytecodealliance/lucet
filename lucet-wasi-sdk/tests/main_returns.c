@@ -1,5 +1,0 @@
-
-void main(void)
-{
-    return;
-}

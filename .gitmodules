@@ -7,3 +7,6 @@
 [submodule "sightglass"]
 	path = sightglass
 	url = https://github.com/fastly/sightglass
+[submodule "wasi"]
+	path = wasi
+	url = https://github.com/webassembly/wasi

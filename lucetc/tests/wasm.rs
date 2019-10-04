@@ -2,7 +2,7 @@ use lucet_module::bindings::Bindings;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-fn load_wat_module(name: &str) -> Vec<u8> {
+pub fn load_wat_module(name: &str) -> Vec<u8> {
     use std::fs::File;
     use std::io::Read;
     use wabt::wat2wasm;
@@ -13,7 +13,7 @@ fn load_wat_module(name: &str) -> Vec<u8> {
     wat2wasm(contents).expect("convert module to wasm binary format")
 }
 
-fn test_bindings() -> Bindings {
+pub fn test_bindings() -> Bindings {
     let imports: HashMap<String, String> = [
         ("icalltarget".into(), "icalltarget".into()), // icall_import
         ("inc".into(), "inc".into()),                 // import
@@ -42,7 +42,7 @@ mod module_data {
         let m = load_wat_module("exported_import");
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false)
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
             .expect("compiling exported_import");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
@@ -62,7 +62,7 @@ mod module_data {
         let m = load_wat_module("multiple_import");
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false)
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
             .expect("compiling multiple_import");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
@@ -78,8 +78,8 @@ mod module_data {
         let m = load_wat_module("globals_export");
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c =
-            Compiler::new(&m, OptLevel::default(), &b, h, false).expect("compiling globals_export");
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
+            .expect("compiling globals_export");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.globals_spec().len(), 1);
@@ -95,7 +95,8 @@ mod module_data {
         let m = load_wat_module("fibonacci");
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false).expect("compiling fibonacci");
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
+            .expect("compiling fibonacci");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -109,7 +110,8 @@ mod module_data {
         let m = load_wat_module("arith");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false).expect("compiling arith");
+        let c =
+            Compiler::new(&m, OptLevel::default(), &b, h, false, &None).expect("compiling arith");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -126,7 +128,7 @@ mod module_data {
         ))
         .unwrap();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false)
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
             .expect("compile duplicate_imports");
         let mdata = c.module_data().unwrap();
 
@@ -153,7 +155,7 @@ mod module_data {
         ))
         .unwrap();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false).expect("compile icall");
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None).expect("compile icall");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.import_functions().len(), 1);
@@ -189,7 +191,7 @@ mod module_data {
         let m = load_wat_module("icall");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false).expect("compile icall");
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None).expect("compile icall");
         let _module_data = c.module_data().unwrap();
 
         /*  TODO can't express these with module data
@@ -214,7 +216,8 @@ mod module_data {
         let m = load_wat_module("icall_sparse");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false).expect("compile icall_sparse");
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
+            .expect("compile icall_sparse");
         let _module_data = c.module_data().unwrap();
 
         /*  TODO can't express these with module data
@@ -253,8 +256,8 @@ mod module_data {
         let b = Bindings::empty();
         let h = HeapSettings::default();
 
-        let c =
-            Compiler::new(&m, OptLevel::default(), &b, h, false).expect("compile globals_import");
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
+            .expect("compile globals_import");
         let module_data = c.module_data().unwrap();
         let gspec = module_data.globals_spec();
 
@@ -275,7 +278,7 @@ mod module_data {
         let m = load_wat_module("heap_spec_import");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h.clone(), false)
+        let c = Compiler::new(&m, OptLevel::default(), &b, h.clone(), false, &None)
             .expect("compiling heap_spec_import");
 
         assert_eq!(
@@ -298,7 +301,7 @@ mod module_data {
         let m = load_wat_module("heap_spec_definition");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h.clone(), false)
+        let c = Compiler::new(&m, OptLevel::default(), &b, h.clone(), false, &None)
             .expect("compiling heap_spec_definition");
 
         assert_eq!(
@@ -320,8 +323,8 @@ mod module_data {
         let m = load_wat_module("heap_spec_none");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c =
-            Compiler::new(&m, OptLevel::default(), &b, h, false).expect("compiling heap_spec_none");
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
+            .expect("compiling heap_spec_none");
         assert_eq!(c.module_data().unwrap().heap_spec(), None,);
     }
 
@@ -330,7 +333,7 @@ mod module_data {
         let m = load_wat_module("oversize_data_segment");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false);
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None);
         assert!(
             c.is_err(),
             "compilation error because data initializers are oversized"
@@ -353,7 +356,7 @@ mod module_data {
 
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false);
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None);
         assert!(
             c.is_err(),
             "compilation error because wasm module is invalid"
@@ -366,8 +369,8 @@ mod module_data {
         let m = load_wat_module("start_section");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let _c =
-            Compiler::new(&m, OptLevel::default(), &b, h, false).expect("compile start_section");
+        let _c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
+            .expect("compile start_section");
         /*
         assert!(
             p.module().start_section().is_some(),
@@ -385,7 +388,7 @@ mod compile {
         let m = load_wat_module(file);
         let b = super::test_bindings();
         let h = HeapSettings::default();
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false)
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &None)
             .expect(&format!("compile {}", file));
         let _obj = c.object_file().expect(&format!("codegen {}", file));
     }
@@ -417,4 +420,135 @@ mod compile {
     compile_test!(grow_memory);
     compile_test!(unreachable_code);
     compile_test!(start_section);
+}
+
+mod validate {
+
+    use super::load_wat_module;
+    use lucet_validate::Validator;
+    use lucetc::{Compiler, HeapSettings, OptLevel};
+
+    #[test]
+    fn validate_arith() {
+        let m = load_wat_module("arith");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+
+        // Empty witx: arith module has no imports
+        let v = Validator::parse("")
+            .expect("empty witx validates")
+            .with_wasi_exe(false);
+
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile");
+        let _obj = c.object_file().expect("codegen");
+    }
+
+    #[test]
+    fn validate_import() {
+        let m = load_wat_module("import");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+
+        let witx = "
+            (module $env
+              (@interface func (export \"inc\")
+                (result $r s32)))";
+        let v = Validator::parse(witx)
+            .expect("witx validates")
+            .with_wasi_exe(false);
+
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile");
+        let _obj = c.object_file().expect("codegen");
+    }
+
+    #[test]
+    fn validate_icall_import() {
+        let m = load_wat_module("icall_import");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+
+        let witx = "
+            (module $env
+              (@interface func (export \"icalltarget\")
+                (param $a1 u32)
+                (param $a2 u32)
+                (result $r s32)))";
+        let v = Validator::parse(witx)
+            .expect("witx validates")
+            .with_wasi_exe(false);
+
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile");
+        let _obj = c.object_file().expect("codegen");
+    }
+
+    #[test]
+    fn validate_exported_import() {
+        let m = load_wat_module("exported_import");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+
+        let witx = "
+            (module $env
+              (@interface func (export \"imported_main\"))
+              (@interface func (export \"inc\")))";
+        let v = Validator::parse(witx)
+            .expect("witx validates")
+            .with_wasi_exe(false);
+
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile");
+        let _obj = c.object_file().expect("codegen");
+    }
+
+    #[test]
+    fn validate_multiple_import() {
+        let m = load_wat_module("multiple_import");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+
+        let witx = "
+            (module $env
+              (@interface func (export \"imported_main\"))
+              (@interface func (export \"inc\")))";
+        let v = Validator::parse(witx)
+            .expect("witx validates")
+            .with_wasi_exe(false);
+
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile");
+        let _obj = c.object_file().expect("codegen");
+    }
+
+    #[test]
+    fn validate_import_many() {
+        let m = load_wat_module("import_many");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+
+        let witx = "
+            (module $env
+              (@interface func (export \"imp_0\") (result $r u32))
+              (@interface func (export \"imp_1\") (result $r u32))
+              (@interface func (export \"imp_2\") (result $r u32))
+              (@interface func (export \"imp_3\") (result $r u32)))";
+        let v = Validator::parse(witx)
+            .expect("witx validates")
+            .with_wasi_exe(false);
+
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile");
+        let _obj = c.object_file().expect("codegen");
+    }
+
+    #[test]
+    fn validate_wasi_exe() {
+        let m = load_wat_module("wasi_exe");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+
+        let witx = "";
+        let v = Validator::parse(witx)
+            .expect("witx validates")
+            .with_wasi_exe(true);
+
+        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile");
+        let _obj = c.object_file().expect("codegen");
+    }
 }

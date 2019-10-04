@@ -4,7 +4,6 @@
 members = [
   "lucet-analyze",
   "lucet-idl",
-  "lucet-idl/witx-frontend",
   "lucet-idl/lucet-idl-test",
   "lucet-idl/lucet-idl-test/resources/rust_host",
   "lucet-module",
@@ -12,6 +11,7 @@ members = [
   "lucet-runtime/lucet-runtime-internals",
   "lucet-runtime/lucet-runtime-tests",
   "lucet-spectest",
+  "lucet-validate",
   "lucet-wasi",
   "lucet-wasi-fuzz",
   "lucet-wasi-sdk",

@@ -1,6 +1,6 @@
 (module
   (type (func (param i32 i32 i32 i32) (result i32)))
-  (type (func (result i32)))
+  (type (func))
 
   ;; import fd_read, this is fine.
   (func $read (import "wasi_unstable" "fd_read") (type 0))
@@ -21,7 +21,7 @@
   (data (i32.const 64) "\00\00\00\00\18\00\00\00")
 
   (func $_setup (type 1)
-    (call $write (i32.const 1) (i32.const 64) (i32.const 1) (i32.const 0)))
+    (drop (call $write (i32.const 1) (i32.const 64) (i32.const 1) (i32.const 0))))
 
   ;; declare that, actually, one of the imported functions is exported
   (export "read_2" (func $read_2))

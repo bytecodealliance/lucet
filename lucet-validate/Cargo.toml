@@ -1,0 +1,30 @@
+[package]
+name = "lucet-validate"
+version = "0.1.1"
+description = "Parse and validate webassembly files against witx interface"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Pat Hickey <phickey@fastly.com>"]
+edition = "2018"
+
+[lib]
+crate-type=["rlib"]
+
+[[bin]]
+name = "lucet-validate"
+path = "src/main.rs"
+
+[dependencies]
+clap = "2"
+failure = "0.1"
+witx = { path = "../wasi/tools/witx", version = "0.3.0" }
+cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.44.0" }
+wasmparser = "0.39.1"
+
+
+[dev-dependencies]
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.1.1" }
+tempfile = "3.0"
+wabt = "0.7"
