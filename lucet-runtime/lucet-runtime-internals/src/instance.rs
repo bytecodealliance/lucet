@@ -1202,29 +1202,55 @@ impl Instance {
         res
     }
 
+    fn push(&mut self, value: u64) {
+        let stack_offset = self.ctx.gpr.rsp as usize - self.alloc.slot().stack as usize;
+        let stack_index = stack_offset / 8;
+        assert!(stack_offset % 8 == 0);
+
+        let stack = unsafe { self.alloc.stack_u64_mut() };
+
+        // check for at least one free stack slot
+        if stack.len() - stack_index >= 1 {
+            self.ctx.gpr.rsp -= 8;
+            stack[stack_index - 1] = value;
+        } else {
+            panic!("caused a guest stack overflow!");
+        }
+    }
+
     fn force_unwind(&mut self) -> Result<(), Error> {
         #[unwind(allowed)]
         extern "C" fn initiate_unwind() {
             panic!(TerminationDetails::ForcedUnwind);
         }
 
+        // The logic for this conditional can be a bit unintuitive: we _require_ that the stack
+        // is aligned to 8 bytes, but not 16 bytes, when pushing `initiate_unwind`.
+        //
+        // A diagram of the required layout may help:
+        // `XXXXX0`: ------------------ <-- call frame start -- SysV ABI requires 16-byte alignment
+        // `XXXXX8`: | return address |
+        // `XXXX..`: | ..locals etc.. |
+        // `XXXX..`: | ..as needed... |
+        //
+        // By the time we've gotten here, we have already pushed "return address", the address of
+        // wherever in the guest we want to start unwinding. If it leaves the stack 16-byte
+        // aligned, it's 8 bytes off from the diagram above, and we would have the call frame for
+        // `initiate_unwind` in violation of the SysV ABI. Functionally, this means that
+        // compiler-generated xmm accesses will fault due to being misaligned.
+        //
+        // So, instead, push a new return address to construct a new call frame at the right
+        // offset. `unwind_stub` has CFA directives so the unwinder can connect from
+        // `initiate_unwind` to guest/host frames to unwind. The unwinder, thankfully, has no
+        // preferences about stack alignment of frames being unwound.
+        //
         // extremely unsafe, doesn't handle any stack exhaustion edge cases yet
-        let stack_offset = self.ctx.gpr.rsp as usize - dbg!(self.alloc.slot().stack) as usize;
-        let stack_index = stack_offset / 8;
-        assert!(stack_offset % 8 == 0);
-
-        let stack = unsafe { self.alloc.stack_u64_mut() };
-        if stack_index % 2 == 1 {
-            stack[stack_index - 1] = initiate_unwind as u64;
-            self.ctx.gpr.rsp -= 8;
-        } else {
-            // stack[stack_index - 1] = 0xFAFAFAFAFAFAFAFA;
-            stack[stack_index - 1] = crate::context::unwind_stub as u64;
-            stack[stack_index - 2] = initiate_unwind as u64;
-            // stack[stack_index - 1] = 0;
-            // stack[stack_index - 2] = initiate_unwind as u64;
-            self.ctx.gpr.rsp -= 16;
+        if self.ctx.gpr.rsp % 16 == 0 {
+            self.push(crate::context::unwind_stub as u64);
         }
+
+        assert!(self.ctx.gpr.rsp % 16 == 8);
+        self.push(initiate_unwind as u64);
 
         match self.swap_and_return() {
             Ok(_) => panic!("forced unwinding shouldn't return normally"),
