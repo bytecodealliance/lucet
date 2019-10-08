@@ -72,6 +72,10 @@ pub trait RegionInternal: Send + Sync {
     fn get_limits(&self) -> &Limits;
 
     fn as_dyn_internal(&self) -> &dyn RegionInternal;
+
+    fn enable_stack_redzone(&self, slot: &Slot);
+
+    fn disable_stack_redzone(&self, slot: &Slot);
 }
 
 /// A trait for regions that are created with a fixed capacity and limits.

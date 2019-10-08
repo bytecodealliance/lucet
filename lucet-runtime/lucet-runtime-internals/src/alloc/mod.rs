@@ -58,6 +58,8 @@ pub struct Slot {
     pub limits: Limits,
 
     pub region: Weak<dyn RegionInternal>,
+
+    pub(crate) redzone_stack_enabled: bool,
 }
 
 // raw pointers require unsafe impl
@@ -67,6 +69,14 @@ unsafe impl Sync for Slot {}
 impl Slot {
     pub fn stack_top(&self) -> *mut c_void {
         (self.stack as usize + self.limits.stack_size) as *mut c_void
+    }
+
+    pub fn stack_redzone_start(&self) -> *mut c_void {
+        (self.stack as usize - self.stack_redzone_size()) as *mut c_void
+    }
+
+    pub fn stack_redzone_size(&self) -> usize {
+        host_page_size()
     }
 }
 
@@ -167,6 +177,24 @@ impl AddrLocation {
 }
 
 impl Alloc {
+    pub(crate) fn enable_stack_redzone(&mut self) {
+        let slot = self
+            .slot
+            .as_mut()
+            .expect("alloc has a Slot when toggling stack redzone");
+        slot.redzone_stack_enabled = true;
+        self.region.enable_stack_redzone(slot)
+    }
+
+    pub(crate) fn disable_stack_redzone(&mut self) {
+        let slot = self
+            .slot
+            .as_mut()
+            .expect("alloc has a Slot when toggling stack redzone");
+        slot.redzone_stack_enabled = false;
+        self.region.disable_stack_redzone(slot)
+    }
+
     /// Where in an `Alloc` does a particular address fall?
     pub fn addr_location(&self, addr: *const c_void) -> AddrLocation {
         let addr = addr as usize;
@@ -351,13 +379,41 @@ impl Alloc {
         std::slice::from_raw_parts_mut(self.slot().heap as *mut u64, self.heap_accessible_size / 8)
     }
 
+    pub(crate) fn stack_start(&self) -> *mut u8 {
+        let mut stack_start = self.slot().stack as usize;
+
+        if self
+            .slot
+            .as_ref()
+            .expect("alloc has a slot when we want to access its stack")
+            .redzone_stack_enabled
+        {
+            stack_start -= host_page_size();
+        }
+
+        stack_start as *mut u8
+    }
+
+    pub(crate) fn stack_size(&self) -> usize {
+        let mut stack_size = self.slot().limits.stack_size;
+        if self
+            .slot
+            .as_ref()
+            .expect("alloc has a slot when we want to access its stack")
+            .redzone_stack_enabled
+        {
+            stack_size += host_page_size();
+        }
+        stack_size
+    }
+
     /// Return the stack as a mutable byte slice.
     ///
     /// Since the stack grows down, `alloc.stack_mut()[0]` is the top of the stack, and
     /// `alloc.stack_mut()[alloc.limits.stack_size - 1]` is the last byte at the bottom of the
     /// stack.
     pub unsafe fn stack_mut(&mut self) -> &mut [u8] {
-        std::slice::from_raw_parts_mut(self.slot().stack as *mut u8, self.slot().limits.stack_size)
+        std::slice::from_raw_parts_mut(self.stack_start(), self.stack_size())
     }
 
     /// Return the stack as a mutable slice of 64-bit words.
@@ -366,18 +422,12 @@ impl Alloc {
     /// `alloc.stack_mut()[alloc.limits.stack_size - 1]` is the last word at the bottom of the
     /// stack.
     pub unsafe fn stack_u64_mut(&mut self) -> &mut [u64] {
-        assert!(
-            self.slot().stack as usize % 8 == 0,
-            "stack is 8-byte aligned"
-        );
-        assert!(
-            self.slot().limits.stack_size % 8 == 0,
-            "stack size is multiple of 8-bytes"
-        );
-        std::slice::from_raw_parts_mut(
-            self.slot().stack as *mut u64,
-            self.slot().limits.stack_size / 8,
-        )
+        let stack_start = self.stack_start();
+        let stack_size = self.stack_size();
+
+        assert!(stack_start as usize % 8 == 0, "stack is 8-byte aligned");
+        assert!(stack_size % 8 == 0, "stack size is multiple of 8-bytes");
+        std::slice::from_raw_parts_mut(stack_start as *mut u64, stack_size / 8)
     }
 
     /// Return the globals as a slice.

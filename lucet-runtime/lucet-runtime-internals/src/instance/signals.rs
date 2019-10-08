@@ -378,24 +378,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 // `Context::swap()` here because then we'd swap back to the signal handler instead of
                 // the point in the guest that caused the fault
                 ctx.save_to_context(&mut inst.ctx);
-
-                // set up the faulting instruction pointer as the return address for `initiate_unwind`;
-                // extremely unsafe, doesn't handle any edge cases yet
-                //
-                // TODO(Andy) can we avoid pushing onto the guest stack until knowing we want to force
-                // an unwind? maybe a "last address" field on ctx. This can be populated on context
-                // swap out (return address of lucet_context_swap) as well as here in the signal
-                // handler.
-                //
-                // TODO(Andy) if the last address is obtained through the signal handler, for a signal
-                // received exactly when we have just executed a `call` to a guest function, we
-                // actually want to not push it (or push it +1?) lest we try to unwind with a return
-                // address == start of function, where the system unwinder will unwind for the function
-                // at address-1, (probably) fail to find the function, and `abort()`.
-                //
-                // if `rip` == the start of some guest function, we can probably just discard it and
-                // use the return address instead.
-                inst.push(rip as u64);
+                inst.ctx.stop_addr = Some(rip as u64);
             }
         }
 

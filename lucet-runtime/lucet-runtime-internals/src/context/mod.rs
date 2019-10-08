@@ -122,6 +122,8 @@ pub struct Context {
     // TODO ACF 2019-10-23: make Instance into a generic parameter?
     backstop_callback: *const unsafe extern "C" fn(*mut Instance),
     callback_data: *mut Instance,
+    sigset: signal::SigSet,
+    pub(crate) stop_addr: Option<u64>,
 }
 
 impl Context {
@@ -135,6 +137,8 @@ impl Context {
             parent_ctx: ptr::null_mut(),
             backstop_callback: Context::default_backstop_callback as *const _,
             callback_data: ptr::null_mut(),
+            sigset: signal::SigSet::empty(),
+            stop_addr: None,
         }
     }
 

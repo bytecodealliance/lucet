@@ -1214,63 +1214,119 @@ impl Instance {
         res
     }
 
-    fn push(&mut self, value: u64) {
-        let stack_offset = self.ctx.gpr.rsp as usize - self.alloc.slot().stack as usize;
+    fn push(&mut self, value: u64) -> Result<(), ()> {
+        let stack_offset = self.ctx.gpr.rsp as usize - self.alloc.stack_start() as usize;
         let stack_index = stack_offset / 8;
         assert!(stack_offset % 8 == 0);
 
         let stack = unsafe { self.alloc.stack_u64_mut() };
 
         // check for at least one free stack slot
-        if stack.len() - stack_index >= 1 {
+        if stack_index >= 1 {
             self.ctx.gpr.rsp -= 8;
             stack[stack_index - 1] = value;
+            Ok(())
         } else {
-            panic!("caused a guest stack overflow!");
+            Err(())
         }
     }
 
+    fn with_redzone_stack<T, F: FnOnce(&mut Self) -> T>(&mut self, f: F) -> T {
+        self.alloc.enable_stack_redzone();
+
+        let res = f(self);
+
+        self.alloc.disable_stack_redzone();
+
+        res
+    }
+
+    // Force a guest to unwind the stack from the specified guest address
     fn force_unwind(&mut self) -> Result<(), Error> {
-        #[unwind(allowed)]
-        extern "C" fn initiate_unwind() {
-            panic!(TerminationDetails::ForcedUnwind);
-        }
+        // if we should unwind by returning into the guest to cause a fault, do so with the redzone
+        // available in case the guest was at or close to overflowing.
+        self.with_redzone_stack(|inst| {
+            #[unwind(allowed)]
+            extern "C" fn initiate_unwind() {
+                panic!(TerminationDetails::ForcedUnwind);
+            }
 
-        // The logic for this conditional can be a bit unintuitive: we _require_ that the stack
-        // is aligned to 8 bytes, but not 16 bytes, when pushing `initiate_unwind`.
-        //
-        // A diagram of the required layout may help:
-        // `XXXXX0`: ------------------ <-- call frame start -- SysV ABI requires 16-byte alignment
-        // `XXXXX8`: | return address |
-        // `XXXX..`: | ..locals etc.. |
-        // `XXXX..`: | ..as needed... |
-        //
-        // By the time we've gotten here, we have already pushed "return address", the address of
-        // wherever in the guest we want to start unwinding. If it leaves the stack 16-byte
-        // aligned, it's 8 bytes off from the diagram above, and we would have the call frame for
-        // `initiate_unwind` in violation of the SysV ABI. Functionally, this means that
-        // compiler-generated xmm accesses will fault due to being misaligned.
-        //
-        // So, instead, push a new return address to construct a new call frame at the right
-        // offset. `unwind_stub` has CFA directives so the unwinder can connect from
-        // `initiate_unwind` to guest/host frames to unwind. The unwinder, thankfully, has no
-        // preferences about stack alignment of frames being unwound.
-        //
-        // extremely unsafe, doesn't handle any stack exhaustion edge cases yet
-        if self.ctx.gpr.rsp % 16 == 0 {
-            self.push(crate::context::unwind_stub as u64);
-        }
+            let guest_addr = inst
+                .ctx
+                .stop_addr
+                .expect("guest that stopped in guest code has an address it stopped at");
 
-        assert!(self.ctx.gpr.rsp % 16 == 8);
-        self.push(initiate_unwind as u64);
+            // set up the faulting instruction pointer as the return address for `initiate_unwind`;
+            // extremely unsafe, doesn't handle any edge cases yet
+            //
+            // TODO(Andy) if the last address is obtained through the signal handler, for a signal
+            // received exactly when we have just executed a `call` to a guest function, we
+            // actually want to not push it (or push it +1?) lest we try to unwind with a return
+            // address == start of function, where the system unwinder will unwind for the function
+            // at address-1, (probably) fail to find the function, and `abort()`.
+            //
+            // if `rip` == the start of some guest function, we can probably just discard it and
+            // use the return address instead.
+            inst.push(guest_addr as u64)
+                .expect("stack has available space");
 
-        match self.swap_and_return() {
-            Ok(_) => panic!("forced unwinding shouldn't return normally"),
-            Err(Error::RuntimeTerminated(TerminationDetails::ForcedUnwind)) => (),
-            Err(e) => panic!("unexpected error: {}", e),
-        }
+            // The logic for this conditional can be a bit unintuitive: we _require_ that the stack
+            // is aligned to 8 bytes, but not 16 bytes, when pushing `initiate_unwind`.
+            //
+            // A diagram of the required layout may help:
+            // `XXXXX0`: ------------------ <-- call frame start -- SysV ABI requires 16-byte alignment
+            // `XXXXX8`: | return address |
+            // `XXXX..`: | ..locals etc.. |
+            // `XXXX..`: | ..as needed... |
+            //
+            // Now ensure we _have_ an ABI-conformant call fame like above, by handling the case that
+            // could lead to an unaligned stack - the guest stack pointer currently being unaligned.
+            // Among other errors, a misaligned stack will result in compiler-generated xmm accesses to
+            // fault.
+            //
+            // Eg, we would have a stack like:
+            // `XXXXX8`: ------------------ <-- guest stack end, call frame start
+            // `XXXXX0`: |   unwind_stub  |
+            // `XXXX..`: | ..locals etc.. |
+            // `XXXX..`: | ..as needed... |
+            //
+            // So, instead, push a new return address to construct a new call frame at the right
+            // offset. `unwind_stub` has CFA directives so the unwinder can connect from
+            // `initiate_unwind` to guest/host frames to unwind. The unwinder, thankfully, has no
+            // preferences about alignment of frames being unwound.
+            //
+            // And we end up with a guest stack like this:
+            // `XXXXX8`: ------------------ <-- guest stack end
+            // `XXXXX0`: | guest ret addr | <-- guest return address to unwind through
+            // `XXXXX0`: ------------------ <-- call frame start -- SysV ABI requires 16-byte alignment
+            // `XXXXX8`: |   unwind_stub  |
+            // `XXXX..`: | ..locals etc.. |
+            // `XXXX..`: | ..as needed... |
+            if inst.ctx.gpr.rsp % 16 == 0 {
+                // extremely unsafe, doesn't handle any stack exhaustion edge cases yet
+                inst.push(crate::context::unwind_stub as u64)
+                    .expect("stack has available space");
+            }
 
-        Ok(())
+            assert!(inst.ctx.gpr.rsp % 16 == 8);
+            // extremely unsafe, doesn't handle any stack exhaustion edge cases yet
+            inst.push(initiate_unwind as u64)
+                .expect("stack has available space");
+
+            inst.state = State::Ready;
+
+            match inst.swap_and_return() {
+                Ok(_) => panic!("forced unwinding shouldn't return normally"),
+                Err(Error::RuntimeTerminated(TerminationDetails::ForcedUnwind)) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+            }
+
+            // we've unwound the stack, so we know there are no longer any host frames.
+            inst.hostcall_count = 0;
+            inst.ctx.stop_addr = None;
+
+            Ok(())
+        })
     }
 }
 

@@ -1,6 +1,7 @@
 {
     "env": {
-        "fault_unwind": "hostcall_fault_unwind",
+        "bad_access_unwind": "hostcall_bad_access_unwind",
+        "stack_overflow_unwind": "hostcall_stack_overflow_unwind",
         "hostcall_test_func_hello": "hostcall_test_func_hello",
         "hostcall_test_func_hostcall_error": "hostcall_test_func_hostcall_error",
         "hostcall_test_func_hostcall_error_unwind": "hostcall_test_func_hostcall_error_unwind",
