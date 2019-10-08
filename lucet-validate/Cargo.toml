@@ -23,8 +23,22 @@ witx = { path = "../wasi/tools/witx", version = "0.3.0" }
 cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.44.0" }
 wasmparser = "0.39.1"
 
-
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.1.1" }
 tempfile = "3.0"
 wabt = "0.7"
+
+[package.metadata.deb]
+name = "fst-lucet-validate"
+maintainer = "Lucet team <lucet@fastly.com>"
+depends = "$auto"
+priority = "optional"
+assets = [
+    ["target/release/lucet-validate", "/opt/fst-lucet-validate/bin/lucet-validate", "755"],
+    ["target/release/liblucet_validate.rlib", "/opt/fst-lucet-validate/lib/", "644"],
+    ["LICENSE", "/opt/fst-lucet-validate/share/doc/lucet-validate/", "644"],
+    ["../wasi/phases/unstable/witx/typenames.witx",
+     "/opt/fst-lucet-validate/share/wasi/unstable/typenames.witx", "644"],
+    ["../wasi/phases/unstable/witx/wasi_unstable_preview0.witx",
+     "/opt/fst-lucet-validate/share/wasi/unstable/wasi_unstable_preview0.witx", "644"],
+]
