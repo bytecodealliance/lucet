@@ -153,7 +153,7 @@ fn main() {
 /// Parse a trap manifest for function `f`, if it has one.
 ///
 /// `parse_trap_manifest` may very understandably be confusing. Why not use `f.traps()`? In
-/// `lucet-analyze` the module has been accessed by reading the file and following structures as
+/// `lucet-objdump` the module has been accessed by reading the file and following structures as
 /// they exist at rest. This means pointers are not relocated, so slices that would be valid when
 /// loaded through the platform's loader currently have pointers that are not valid for memory
 /// access.
@@ -523,7 +523,7 @@ fn print_summary(summary: ArtifactSummary<'_>) {
         println!("\nModule:");
         summarize_module(&summary, &module);
     } else {
-        println!("The symbol `lucet_module` is {}, so lucet-analyze cannot look at most of the interesting parts.", "MISSING".red().bold());
+        println!("The symbol `lucet_module` is {}, so lucet-objdump cannot look at most of the interesting parts.", "MISSING".red().bold());
     }
 
     println!("");
