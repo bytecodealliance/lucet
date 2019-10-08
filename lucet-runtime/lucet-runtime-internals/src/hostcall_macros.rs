@@ -57,7 +57,13 @@ macro_rules! lucet_hostcalls {
                     $($body)*
                 }
                 // let res = std::panic::catch_unwind(move || {
-                    hostcall_impl(&mut $crate::vmctx::Vmctx::from_raw(vmctx_raw), $( $arg ),*)
+                    #[allow(unused_imports)]
+                    use lucet_runtime_internals::vmctx::VmctxInternal;
+                    $crate::vmctx::Vmctx::from_raw(vmctx_raw).instance_mut().begin_hostcall();
+                    let res = hostcall_impl(&mut $crate::vmctx::Vmctx::from_raw(vmctx_raw), $( $arg ),*);
+
+                    $crate::vmctx::Vmctx::from_raw(vmctx_raw).instance_mut().end_hostcall();
+                    res
                 // });
                 // match res {
                 //     Ok(res) => res,
@@ -70,6 +76,8 @@ macro_rules! lucet_hostcalls {
                 //         }
                 //     }
                 // }
+                //
+                // res
             }
         )*
     }

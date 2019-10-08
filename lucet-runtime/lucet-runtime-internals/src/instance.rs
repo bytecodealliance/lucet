@@ -264,6 +264,8 @@ pub struct Instance {
     /// The value passed back to the guest when resuming a yielded instance.
     pub(crate) resumed_val: Option<Box<dyn Any + 'static>>,
 
+    hostcall_count: u64,
+
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
     /// It is also used to compute the size of the structure up to that point, i.e. without padding.
@@ -592,10 +594,7 @@ impl Instance {
     ///
     /// [run_start]: struct.Instance.html#method.run
     pub fn reset(&mut self) -> Result<(), Error> {
-        // temporary heuristic for whether this should happen upon a reset; in the long term we only
-        // want to force an unwind if there are hostcall frames present, which we'll need to track
-        // via the instance
-        if self.ctx.gpr.rsp != 0 {
+        if self.hostcall_count > 0 {
             self.force_unwind().unwrap();
         }
         self.alloc.reset_heap(self.module.as_ref())?;
@@ -845,6 +844,14 @@ impl Instance {
         res
     }
 
+    pub fn begin_hostcall(&mut self) {
+        self.hostcall_count += 1;
+    }
+
+    pub fn end_hostcall(&mut self) {
+        self.hostcall_count -= 1;
+    }
+
     #[inline]
     pub fn get_instruction_count(&self) -> Option<u64> {
         if self.module.is_instruction_count_instrumented() {
@@ -889,6 +896,7 @@ impl Instance {
             ensure_sigstack_installed: true,
             entrypoint: None,
             resumed_val: None,
+            hostcall_count: 0,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
@@ -981,6 +989,10 @@ impl Instance {
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
+
+        // when preparing a new context for the guest to run, we must have cleaned up any existing
+        // host call frames on the stack.
+        assert_eq!(self.hostcall_count, 0);
 
         let self_ptr = self as *mut _;
         Context::init_with_callback(
