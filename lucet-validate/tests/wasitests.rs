@@ -50,7 +50,10 @@ mod lucet_wasi_tests {
             {
                 Some("c") => c_to_wasm(&entry_path),
                 Some("wat") => wat_to_wasm(&entry_path),
-                _ => panic!("unsupported extension: {:?}", entry_path),
+                _ => {
+                    eprintln!("unsupported extension: {:?}", entry_path);
+                    continue;
+                }
             };
             validator
                 .validate(&entry_wasm)
