@@ -44,3 +44,18 @@ human-size = "0.4"
 parity-wasm = "0.38"
 minisign = "0.5.11"
 memoffset = "0.5.1"
+
+[package.metadata.deb]
+name = "fst-lucetc"
+maintainer = "Lucet team <lucet@fastly.com>"
+depends = "$auto"
+priority = "optional"
+assets = [
+    ["target/release/lucetc", "/opt/fst-lucetc/bin/lucetc", "755"],
+    ["target/release/liblucetc.rlib", "/opt/fst-lucetc/lib/", "644"],
+    ["LICENSE", "/opt/fst-lucetc/share/doc/lucetc/", "644"],
+    ["../wasi/phases/unstable/witx/typenames.witx",
+     "/opt/fst-lucetc/share/wasi/unstable/typenames.witx", "644"],
+    ["../wasi/phases/unstable/witx/wasi_unstable_preview0.witx",
+     "/opt/fst-lucetc/share/wasi/unstable/wasi_unstable_preview0.witx", "644"],
+]
