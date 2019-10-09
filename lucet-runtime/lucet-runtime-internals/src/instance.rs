@@ -1,7 +1,10 @@
+pub mod execution;
 mod siginfo_ext;
 pub mod signals;
 pub mod state;
 
+pub use crate::instance::execution::{KillError, KillSwitch, KillSuccess};
+use crate::instance::execution::KillState;
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 pub use crate::instance::state::State;
 
@@ -13,7 +16,7 @@ use crate::module::{self, FunctionHandle, FunctionPointer, Global, GlobalValue, 
 use crate::region::RegionInternal;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
-use libc::{c_void, pthread_kill, pthread_self, pthread_t, siginfo_t, uintptr_t, SIGALRM};
+use libc::{c_void, pthread_self, siginfo_t, uintptr_t};
 use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
 use std::any::Any;
@@ -22,8 +25,8 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
 
@@ -692,49 +695,15 @@ impl Instance {
         self.c_fatal_handler = Some(handler);
     }
 
-    pub fn begin_hostcall(&mut self) {
-        // Lock the current execution domain, so we can update to `Hostcall`.
-        let mut current_domain = self.kill_state.execution_domain();
-        match *current_domain {
-            Domain::Guest => {
-                // Guest is the expected domain until this point. Switch to the Hostcall
-                // domain so we know to not interrupt this instance.
-                *current_domain = Domain::Hostcall;
-            }
-            Domain::Hostcall => {
-                panic!(
-                    "Invalid state: Instance marked as in a hostcall while entering a hostcall."
-                );
-            }
-            Domain::Terminated => {
-                panic!("Invalid state: Instance marked as terminated while in guest code. This should be an error.");
-            }
-        }
-    }
-
-    pub fn end_hostcall(&mut self) {
-        let mut current_domain = self.kill_state.execution_domain();
-        match *current_domain {
-            Domain::Guest => {
-                panic!("Invalid state: Instance marked as in guest code while exiting a hostcall.");
-            }
-            Domain::Hostcall => {
-                *current_domain = Domain::Guest;
-            }
-            Domain::Terminated => {
-                // The instance was stopped in the hostcall we were executing.
-                std::mem::drop(current_domain);
-                unsafe {
-                    self.terminate(TerminationDetails::Remote);
-                }
-            }
-        }
-    }
-
     pub fn kill_switch(&self) -> KillSwitch {
-        KillSwitch {
-            state: Arc::downgrade(&self.kill_state),
-        }
+        KillSwitch::new(Arc::downgrade(&self.kill_state))
+    }
+
+    pub fn uninterruptable<T, F: FnOnce() -> T>(&self, f: F) -> T {
+        self.kill_state.begin_hostcall();
+        let res = f();
+        self.kill_state.end_hostcall();
+        res
     }
 
     #[inline]
@@ -758,12 +727,7 @@ impl Instance {
             module,
             ctx: Context::new(),
             state: State::Ready,
-            kill_state: Arc::new(KillState {
-                terminable: AtomicBool::new(false),
-                tid_change_notifier: Condvar::new(),
-                execution_domain: Mutex::new(Domain::Guest),
-                thread_id: Mutex::new(None),
-            }),
+            kill_state: Arc::new(KillState::new()),
             alloc,
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
@@ -881,10 +845,7 @@ impl Instance {
         );
         self.state = State::Running;
 
-        {
-            let mut kill_state = self.kill_state.thread_id.lock().unwrap();
-            *kill_state = Some(unsafe { pthread_self() });
-        }
+        self.kill_state.schedule(unsafe { pthread_self() });
 
         // there should never be another instance running on this thread when we enter this function
         CURRENT_INSTANCE.with(|current_instance| {
@@ -936,11 +897,7 @@ impl Instance {
         //
         // The state should never be `Ready`, `Terminated`, `Yielded`, or `Transitioning` at this point
 
-        {
-            let mut inst_tid = self.kill_state.thread_id.lock().unwrap();
-            *inst_tid = None;
-            self.kill_state.tid_change_notifier.notify_all();
-        }
+        self.kill_state.deschedule();
 
         // Set transitioning state temporarily so that we can move values out of the current state
         let st = mem::replace(&mut self.state, State::Transitioning);
@@ -1203,151 +1160,4 @@ pub(crate) struct EmptyYieldVal;
 
 fn default_fatal_handler(inst: &Instance) -> ! {
     panic!("> instance {:p} had fatal error: {}", inst, inst.state);
-}
-
-/// All instance state a remote kill switch needs to determine if and how to signal that execution
-/// should stop.
-///
-/// Some definitions for reference in this struct's documentation:
-/// * "stopped" means "stop executing at some point before reaching the end of the entrypoint
-/// wasm function".
-/// * "critical section" means what it typically means - an uninterruptable region of code. The
-/// detail here is that currently "critical section" and "hostcall" are interchangeable, but in
-/// the future this may change. Hostcalls may one day be able to opt out of criticalness, or
-/// perhaps guest code may include critical sections.
-///
-/// "Stopped" is a particularly loose word here because it ecompasses the worst case: trying to
-/// stop a guest that is currently in a critical section. Because the signal will only be checked
-/// when exiting the critical section, the latency is bounded by whatever embedder guarantees are
-/// made. In fact, it is possible for a kill signal to be successfully sent and still never
-/// impactful, if a hostcall itself invokes `lucet_hostcall_terminate!`.
-pub(crate) struct KillState {
-    /// Can the instance be terminated? This must be `true` only when the instance can be stopped.
-    /// This may be false while the instance can safely be stopped, such as immediately after
-    /// completing a host->guest context swap. Regions such as this should be minimized, but are
-    /// not a problem of correctness.
-    ///
-    /// Typically, this is true while in any guest code, or hostcalls made from guest code.
-    pub(crate) terminable: AtomicBool,
-    /// The kind of code is currently executing in the instance this `KillState` describes.
-    ///
-    /// This allows a `KillSwitch` to determine what the appropriate signalling mechanism is in
-    /// `terminate`. Locks on `execution_domain` prohibit modification while signalling, ensuring
-    /// both that:
-    /// * we don't enter a hostcall while someone may decide it is safe to signal, and
-    /// * no one may try to signal in a hostcall-safe manner after exiting a hostcall, where it
-    ///   may never again be checked by the guest.
-    execution_domain: Mutex<Domain>,
-    /// The current `thread_id` the associated instance is running on. This is the TID where
-    /// `SIGALRM` will be sent if the instance is killed via `KillSwitch::terminate` and a signal
-    /// is an appropriate mechanism.
-    thread_id: Mutex<Option<pthread_t>>,
-    /// `tid_change_notifier` allows functions that may cause a change in `thread_id` to wait,
-    /// without spinning, for the signal to be processed.
-    tid_change_notifier: Condvar,
-}
-
-impl KillState {
-    pub fn execution_domain(&self) -> MutexGuard<Domain> {
-        self.execution_domain.lock().unwrap()
-    }
-}
-
-pub enum Domain {
-    Guest,
-    Hostcall,
-    Terminated,
-}
-
-pub struct KillSwitch {
-    state: Weak<KillState>,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum KillSuccess {
-    Signalled,
-    Pending,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum KillError {
-    NotTerminable,
-}
-
-type KillResult = Result<KillSuccess, KillError>;
-
-/// An object that can be used to terminate an instance's execution from a separate thread.
-impl KillSwitch {
-    /// Signal the instance associated with this `KillSwitch` to stop, is possible.
-    ///
-    /// The returned `Result` only describes the behavior taken by this function, not necessarily
-    /// what caused the associated instance to stop.
-    ///
-    /// As an example, if a `KillSwitch` fires, sending a SIGALRM to an instance at the same
-    /// moment it begins handling a SIGSEGV which is determined to be fatal, the instance may
-    /// stop with `State::Faulted` before actually _handling_ the SIGALRM we'd send here. So the
-    /// host code will see `State::Faulted` as an instance state, where `KillSwitch::terminate`
-    /// would return `Ok(KillSuccess::Signalled)`.
-    pub fn terminate(&self) -> KillResult {
-        if let Some(state) = self.state.upgrade() {
-            // Attempt to take the flag indicating the instance may terminate
-            let terminable = state.terminable.swap(false, Ordering::SeqCst);
-
-            if terminable {
-                // we got it! we can signal the instance.
-
-                // Now check what domain the instance is in. We can signal in guest code, but want
-                // to avoid signalling in host code lest we interrupt some function operating on
-                // guest/host shared memory, and invalidate invariants. For example, interrupting
-                // in the middle of a resize operation on a `Vec` could be extremely dangerous.
-                //
-                // Hold this lock through all signalling logic to prevent the instance from
-                // switching domains (and invalidating safety of whichever mechanism we choose here)
-                let mut execution_domain = state.execution_domain.lock().unwrap();
-
-                let result = match *execution_domain {
-                    Domain::Guest => {
-                        let mut curr_tid = state.thread_id.lock().unwrap();
-                        // we're in guest code, so we can just send a signal.
-                        if let Some(thread_id) = *curr_tid {
-                            unsafe {
-                                pthread_kill(thread_id, SIGALRM);
-                            }
-
-                            // wait for the SIGALRM handler to deschedule the instance
-                            //
-                            // this should never actually loop, which would indicate the instance
-                            // was moved to another thread, or we got spuriously notified.
-                            while curr_tid.is_some() {
-                                curr_tid = state.tid_change_notifier.wait(curr_tid).unwrap();
-                            }
-                            Ok(KillSuccess::Signalled)
-                        } else {
-                            panic!("logic error: instance is terminable but not actually running.");
-                        }
-                    }
-                    Domain::Hostcall => {
-                        // the guest is in a hostcall, so the only thing we can do is indicate it
-                        // should terminate and wait.
-                        *execution_domain = Domain::Terminated;
-                        Ok(KillSuccess::Pending)
-                    }
-                    Domain::Terminated => {
-                        // Something else (another KillSwitch?) has already signalled this instance
-                        // to exit when it has completed its hostcall. Nothing to do here.
-                        Err(KillError::NotTerminable)
-                    }
-                };
-                // we must hold the lock on this bool at least until we set the "timed_out" flag.
-                mem::drop(execution_domain);
-                result
-            } else {
-                Err(KillError::NotTerminable)
-            }
-        } else {
-            // The underlying kill state we need to check has been dropped. This means the instance
-            // exited, or was otherwise terminated and discarded, so we can't terminate it here.
-            Err(KillError::NotTerminable)
-        }
-    }
 }

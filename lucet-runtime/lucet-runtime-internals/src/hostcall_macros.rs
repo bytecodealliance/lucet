@@ -50,27 +50,23 @@ macro_rules! lucet_hostcalls {
                 #[allow(unused_imports)]
                 use lucet_runtime_internals::vmctx::VmctxInternal;
 
-                $crate::vmctx::Vmctx::from_raw(vmctx_raw).instance_mut().begin_hostcall();
-
-                let res = std::panic::catch_unwind(move || {
-                    hostcall_impl(&mut $crate::vmctx::Vmctx::from_raw(vmctx_raw), $( $arg ),*)
-                });
-                let res = match res {
-                    Ok(res) => res,
-                    Err(e) => {
-                        match e.downcast::<$crate::instance::TerminationDetails>() {
-                            Ok(details) => {
-                                let mut vmctx = $crate::vmctx::Vmctx::from_raw(vmctx_raw);
-                                vmctx.terminate_no_unwind(*details)
-                            },
-                            Err(e) => std::panic::resume_unwind(e),
+                $crate::vmctx::Vmctx::from_raw(vmctx_raw).instance_mut().uninterruptable(|| {
+                    let res = std::panic::catch_unwind(move || {
+                        hostcall_impl(&mut $crate::vmctx::Vmctx::from_raw(vmctx_raw), $( $arg ),*)
+                    });
+                    match res {
+                        Ok(res) => res,
+                        Err(e) => {
+                            match e.downcast::<$crate::instance::TerminationDetails>() {
+                                Ok(details) => {
+                                    let mut vmctx = $crate::vmctx::Vmctx::from_raw(vmctx_raw);
+                                    vmctx.terminate_no_unwind(*details)
+                                },
+                                Err(e) => std::panic::resume_unwind(e),
+                            }
                         }
                     }
-                };
-
-                $crate::vmctx::Vmctx::from_raw(vmctx_raw).instance_mut().end_hostcall();
-
-                res
+                })
             }
         )*
     }
