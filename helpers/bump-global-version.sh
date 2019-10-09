@@ -19,7 +19,7 @@ version_bump() {
     echo
     echo "Setting the global Lucet version number to: [$VERSION]"
     find lucetc lucet-* benchmarks/lucet-* -type f -maxdepth 1 -name 'Cargo.toml' -print | while read -r file; do
-        sed -i '.previous' "s/^ *version *=.*/version = \"${VERSION}\"/" "$file" && rm -f "${file}.previous"
+        sed -i'.previous' "s/^ *version *=.*/version = \"${VERSION}\"/" "$file" && rm -f "${file}.previous"
     done
     echo "Done."
 }
