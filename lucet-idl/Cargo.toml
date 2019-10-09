@@ -1,6 +1,6 @@
 [package]
 name = "lucet-idl"
-version = "0.1.1"
+version = "0.2.0"
 description = "Describe interfaces between WebAssembly guest programs and lucet-runtime hosts"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
