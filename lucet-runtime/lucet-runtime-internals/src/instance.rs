@@ -1271,20 +1271,21 @@ impl Instance {
                     Ok(_) => lucet_bail!("resume with forced unwind returned normally"),
                 }
             }
-            State::Faulted { .. } => {
+            State::Faulted { context, .. } => {
+                #[unwind(allowed)]
+                extern "C" fn initiate_unwind() {
+                    panic!(TerminationDetails::ForcedUnwind);
+                }
+
+                // set up the guest context as it was when the fault was raised
+                context.as_ptr().save_to_context(&mut self.ctx);
+
+                // get the instruction pointer when the fault was raised
+                let guest_addr = context.as_ptr().get_ip();
+
                 // if we should unwind by returning into the guest to cause a fault, do so with the redzone
                 // available in case the guest was at or close to overflowing.
                 self.with_redzone_stack(|inst| {
-                    #[unwind(allowed)]
-                    extern "C" fn initiate_unwind() {
-                        panic!(TerminationDetails::ForcedUnwind);
-                    }
-
-                    let guest_addr = inst
-                        .ctx
-                        .stop_addr
-                        .expect("guest that stopped in guest code has an address it stopped at");
-
                     // set up the faulting instruction pointer as the return address for `initiate_unwind`;
                     // extremely unsafe, doesn't handle any edge cases yet
                     //
@@ -1342,8 +1343,6 @@ impl Instance {
                     inst.push(initiate_unwind as u64)
                         .expect("stack has available space");
 
-                    inst.state = State::Ready;
-
                     match inst.swap_and_return() {
                         Ok(_) => panic!("forced unwinding shouldn't return normally"),
                         Err(Error::RuntimeTerminated(TerminationDetails::ForcedUnwind)) => (),
@@ -1351,13 +1350,12 @@ impl Instance {
                     }
 
                     // we've unwound the stack, so we know there are no longer any host frames.
-                    // inst.hostcall_count = 0;
-                    inst.ctx.stop_addr = None;
+                    debug_assert_eq!(inst.hostcall_count, 0);
 
                     Ok(())
                 })
             }
-            st => panic!("should never do forced unwinding in this state: {}", st),
+            st => lucet_bail!("should never do forced unwinding in this state: {}", st),
         }
     }
 }
