@@ -19,6 +19,11 @@ docker build -t lucet-dev:latest .
 
 docker tag lucet-dev:latest lucet:latest
 
+if [ ! -z "$DEVENV_SKIP_LUCET_BUILD" ]; then
+    echo "Done"
+    exit 0
+fi
+
 if docker image inspect lucet:latest > /dev/null; then
         if [ -z "$DEVENV_FORCE_REBUILD" ]; then
                 echo "A lucet image is already present"
