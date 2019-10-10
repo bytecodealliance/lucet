@@ -4,7 +4,7 @@ dist: xenial
 rust: 1.36.0
 
 env:
-    - UNOPTIMIZED_BUILD=true
+    - UNOPTIMIZED_BUILD=true DEVENV_SKIP_LUCET_BUILD=true
 
 services:
     - docker
