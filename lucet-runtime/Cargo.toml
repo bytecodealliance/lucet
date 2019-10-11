@@ -20,9 +20,9 @@ num-derive = "0.2"
 byteorder = "1.2"
 failure = "0.1"
 lazy_static = "1.1"
-lucetc = { path = "../lucetc" }
+lucetc = { path = "../lucetc", version = "0.2.0" }
 lucet-runtime-tests = { path = "lucet-runtime-tests", version = "0.2.0" }
-lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.2.0" }
 nix = "0.13"
 rayon = "1.0"
 tempfile = "3.0"
