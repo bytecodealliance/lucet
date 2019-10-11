@@ -1,0 +1,29 @@
+name: Mac OS CI
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Test
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@master
+      with:
+        submodules: true
+
+    - name: Install Rust (macos)
+      run: |
+        curl https://sh.rustup.rs | sh -s -- -y
+        rustup update
+        echo "##[add-path]$HOME/.cargo/bin"
+
+    - name: Install wasi-sdk (macos)
+      run: |
+        curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-7/wasi-sdk-7.0-macos.tar.gz
+        tar xf wasi-sdk-7.0-macos.tar.gz
+        sudo mv wasi-sdk-7.0/opt /opt
+
+    - name: Test Lucet
+      run: make test-except-fuzz
+
+    - name: Ensure testing did not change sources
+      run: git diff --exit-code
