@@ -47,6 +47,7 @@ enum lucet_terminated_reason {
     lucet_terminated_reason_yield_type_mismatch,
     lucet_terminated_reason_borrow_error,
     lucet_terminated_reason_provided,
+    lucet_terminated_reason_remote,
 };
 
 enum lucet_trapcode {

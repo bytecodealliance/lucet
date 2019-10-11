@@ -22,6 +22,13 @@ pub fn mock_timeout_module() -> Arc<dyn Module> {
         unsafe { slow_hostcall(vmctx) }
     }
 
+    extern "C" fn run_yielding_hostcall(vmctx: *mut lucet_vmctx) -> () {
+        extern "C" {
+            fn yielding_hostcall(vmctx: *mut lucet_vmctx) -> ();
+        }
+        unsafe { yielding_hostcall(vmctx) }
+    }
+
     MockModuleBuilder::new()
         .with_export_func(MockExportBuilder::new(
             "infinite_loop",
@@ -39,6 +46,10 @@ pub fn mock_timeout_module() -> Arc<dyn Module> {
             "run_slow_hostcall",
             FunctionPointer::from_usize(run_slow_hostcall as usize),
         ))
+        .with_export_func(MockExportBuilder::new(
+            "run_yielding_hostcall",
+            FunctionPointer::from_usize(run_yielding_hostcall as usize),
+        ))
         .build()
 }
 
@@ -49,7 +60,7 @@ macro_rules! timeout_tests {
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
             KillError, KillSuccess, Limits, Region, RunResult, SignalBehavior, TerminationDetails,
-            TrapCode,
+            TrapCode, YieldedVal,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -72,6 +83,13 @@ macro_rules! timeout_tests {
                 // make a window of time so we can timeout in a hostcall
                 thread::sleep(Duration::from_millis(200));
                 true
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn yielding_hostcall(
+                &mut vmctx,
+            ) -> () {
+                vmctx.yield_();
             }
         }
 
@@ -188,6 +206,42 @@ macro_rules! timeout_tests {
             });
 
             match inst.run("run_slow_hostcall", &[]) {
+                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+                res => panic!("unexpected result: {:?}", res),
+            }
+
+            // after a timeout, can reset and run a normal function
+            inst.reset().expect("instance resets");
+
+            run_onetwothree(&mut inst);
+        }
+
+        #[test]
+        fn timeout_while_yielded() {
+            let module = mock_timeout_module();
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            let kill_switch = inst.kill_switch();
+
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(100));
+                assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Pending));
+            });
+
+            match inst.run("run_yielding_hostcall", &[]) {
+                Ok(RunResult::Yielded(EmptyYieldVal)) => {}
+                res => panic!("unexpected result: {:?}", res),
+            }
+
+            println!("waiting......");
+
+            // wait for the timeout to expire
+            thread::sleep(Duration::from_millis(200));
+
+            match inst.resume() {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => panic!("unexpected result: {:?}", res),
             }

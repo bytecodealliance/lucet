@@ -699,10 +699,18 @@ impl Instance {
         KillSwitch::new(Arc::downgrade(&self.kill_state))
     }
 
-    pub fn uninterruptable<T, F: FnOnce() -> T>(&self, f: F) -> T {
+    pub fn uninterruptable<T, F: FnOnce() -> T>(&mut self, f: F) -> T {
         self.kill_state.begin_hostcall();
         let res = f();
-        self.kill_state.end_hostcall();
+        let stop_reason = self.kill_state.end_hostcall();
+
+        if let Some(termination_details) = stop_reason {
+            // TODO: once we have unwinding, panic here instead so we unwind host frames
+            unsafe {
+                self.terminate(termination_details);
+            }
+        }
+
         res
     }
 

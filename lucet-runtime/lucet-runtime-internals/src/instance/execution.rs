@@ -5,6 +5,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, Weak};
 use std::mem;
 
+use crate::instance::TerminationDetails;
+
 /// All instance state a remote kill switch needs to determine if and how to signal that execution
 /// should stop.
 ///
@@ -16,7 +18,7 @@ use std::mem;
 /// the future this may change. Hostcalls may one day be able to opt out of criticalness, or
 /// perhaps guest code may include critical sections.
 ///
-/// "Stopped" is a particularly loose word here because it ecompasses the worst case: trying to
+/// "Stopped" is a particularly loose word here because it encompasses the worst case: trying to
 /// stop a guest that is currently in a critical section. Because the signal will only be checked
 /// when exiting the critical section, the latency is bounded by whatever embedder guarantees are
 /// made. In fact, it is possible for a kill signal to be successfully sent and still never
@@ -77,7 +79,7 @@ impl KillState {
         }
     }
 
-    pub fn end_hostcall(&self) {
+    pub fn end_hostcall(&self) -> Option<TerminationDetails> {
         let mut current_domain = self.execution_domain.lock().unwrap();
         match *current_domain {
             Domain::Guest => {
@@ -85,17 +87,13 @@ impl KillState {
             }
             Domain::Hostcall => {
                 *current_domain = Domain::Guest;
+                None
             }
             Domain::Terminated => {
                 // The instance was stopped in the hostcall we were executing.
-                // TODO: figure out how to pull off the terminate here. panic?
-                // also:
-                // assert!(!self.terminable.load(Ordering::SeqCst))
+                debug_assert!(!self.terminable.load(Ordering::SeqCst));
                 std::mem::drop(current_domain);
-//                unsafe {
-                    // self.terminate(TerminationDetails::Remote);
-//                }
-                panic!("oh no");
+                Some(TerminationDetails::Remote)
             }
         }
     }
@@ -140,7 +138,7 @@ impl KillSwitch {
         KillSwitch { state }
     }
 
-    /// Signal the instance associated with this `KillSwitch` to stop, is possible.
+    /// Signal the instance associated with this `KillSwitch` to stop, if possible.
     ///
     /// The returned `Result` only describes the behavior taken by this function, not necessarily
     /// what caused the associated instance to stop.
