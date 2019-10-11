@@ -61,17 +61,17 @@ impl DlModule {
         let serialized_module: &SerializedModule =
             unsafe { serialized_module_ptr.as_ref().unwrap() };
 
-        let version = serialized_module.version.clone();
+        let module_version = serialized_module.version.clone();
 
         let runtime_version =
             VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
 
-        if !version.valid() {
+        if !module_version.valid() {
             return Err(lucet_incorrect_module!("reserved bit is not set. This module is likely too old for this lucet-runtime to load."));
-        } else if version != runtime_version {
+        } else if !runtime_version.compatible_with(&module_version) {
             return Err(lucet_incorrect_module!(
                 "version mismatch. module has version {}, while this runtime is version {}",
-                version,
+                module_version,
                 runtime_version,
             ));
         }
@@ -130,7 +130,7 @@ impl DlModule {
             lib,
             fbase,
             module: lucet_module::Module {
-                version,
+                version: module_version,
                 module_data,
                 tables,
                 function_manifest,
