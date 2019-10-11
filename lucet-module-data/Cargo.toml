@@ -1,7 +1,7 @@
 [package]
 name = "lucet-module-data"
-version = "0.1.1"
-description = "A structured interface for Lucet module data and metadata"
+version = "0.1.2"
+description = "DEPRECATED: This package is now available as `lucet-module`."
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
 license = "Apache-2.0 WITH LLVM-exception"

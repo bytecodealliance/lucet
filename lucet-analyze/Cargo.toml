@@ -1,7 +1,7 @@
 [package]
 name = "lucet-analyze"
-version = "0.1.1"
-description = "Analyze object files emitted by the Lucet compiler"
+version = "0.1.2"
+description = "DEPRECATED: This package is now available as `lucet-objdump`."
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
 license = "Apache-2.0 WITH LLVM-exception"
