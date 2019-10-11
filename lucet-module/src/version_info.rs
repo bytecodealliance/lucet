@@ -19,7 +19,7 @@ pub struct VersionInfo {
     /// context, it will be the git commit of lucet-runtime built into the embedder.
     ///
     /// The version hash will typically populated only in release builds, but may blank even in
-    /// that case: if building from a packagd crate, or in a build environment that does not have
+    /// that case: if building from a packaged crate, or in a build environment that does not have
     /// "git" installed, `lucetc` and `lucet-runtime` will fall back to an empty hash.
     version_hash: [u8; 8],
 }
@@ -39,6 +39,31 @@ impl fmt::Display for VersionInfo {
 }
 
 impl VersionInfo {
+    pub fn new(major: u16, minor: u16, patch: u16, version_hash: [u8; 8]) -> VersionInfo {
+        VersionInfo {
+            major, minor, patch, reserved: 0x8000, version_hash
+        }
+    }
+
+    /// A more permissive version check than for version equality. This check will allow a more
+    /// precise `other`
+    pub fn compatible_with(&self, other: &VersionInfo) -> bool {
+        if !(self.valid() || other.valid()) {
+            return false;
+        }
+
+        if self.major == other.major && self.minor == other.minor && self.patch == other.patch {
+            if self.version_hash == [0u8; 8] {
+                // we aren't bound to a specific git commit, so anything goes.
+                true
+            } else {
+                self.version_hash == other.version_hash
+            }
+        } else {
+            false
+        }
+    }
+
     pub fn write_to<W: WriteBytesExt>(&self, w: &mut W) -> io::Result<()> {
         w.write_u16::<LittleEndian>(self.major)?;
         w.write_u16::<LittleEndian>(self.minor)?;
@@ -89,12 +114,11 @@ impl VersionInfo {
         // 0x8000_0000_0000_0000. By setting `reserved` to `0x8000`, we set what would be the
         // highest bit in `module_data_ptr` in an old `lucet-runtime` and guarantee a segmentation
         // fault when loading these newer modules with version information.
-        VersionInfo {
-            major: env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
-            minor: env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
-            patch: env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
-            reserved: 0x8000u16,
+        VersionInfo::new(
+            env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
+            env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
+            env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
             version_hash,
-        }
+        )
     }
 }
