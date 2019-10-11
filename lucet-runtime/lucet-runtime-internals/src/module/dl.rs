@@ -68,7 +68,7 @@ impl DlModule {
 
         if !version.valid() {
             return Err(lucet_incorrect_module!("reserved bit is not set. This module is likely too old for this lucet-runtime to load."));
-        } else if version != runtime_version {
+        } else if false && version != runtime_version {
             return Err(lucet_incorrect_module!(
                 "version mismatch. module has version {}, while this runtime is version {}",
                 version,
