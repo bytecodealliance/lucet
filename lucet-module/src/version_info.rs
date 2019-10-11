@@ -45,8 +45,8 @@ impl VersionInfo {
         }
     }
 
-    /// A more permissive version check than for version equality. This check will allow a more
-    /// precise `other`
+    /// A more permissive version check than for version equality. This check will allow an `other`
+    /// version that is more specific than `self`, but matches for data that is available.
     pub fn compatible_with(&self, other: &VersionInfo) -> bool {
         if !(self.valid() || other.valid()) {
             return false;
