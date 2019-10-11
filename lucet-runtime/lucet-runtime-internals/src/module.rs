@@ -11,6 +11,7 @@ pub use lucet_module::{
 
 use crate::alloc::Limits;
 use crate::error::Error;
+use backtrace::Backtrace;
 use libc::c_void;
 
 /// Details about a program address.
@@ -68,6 +69,8 @@ pub trait ModuleInternal: Send + Sync {
     fn function_manifest(&self) -> &[FunctionSpec];
 
     fn addr_details(&self, addr: *const c_void) -> Result<Option<AddrDetails>, Error>;
+
+    fn resolve_and_trim(&self, full_bt: &Backtrace) -> Backtrace;
 
     fn get_signature(&self, fn_id: FunctionIndex) -> &Signature;
 

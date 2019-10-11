@@ -956,6 +956,7 @@ name = "lucet-runtime-internals"
 version = "0.7.0-dev"
 dependencies = [
  "anyhow",
+ "backtrace",
  "bincode",
  "bitflags 1.2.1",
  "byteorder",

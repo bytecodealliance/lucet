@@ -5,6 +5,7 @@ use crate::instance::{
     HOST_CTX,
 };
 use crate::sysdeps::UContextPtr;
+use backtrace::Backtrace;
 use lazy_static::lazy_static;
 use libc::{c_int, c_void, siginfo_t, SIGBUS, SIGSEGV};
 use lucet_module::TrapCode;
@@ -276,7 +277,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         let trapcode = inst.module.lookup_trapcode(rip);
 
         let behavior = (inst.signal_handler)(inst, &trapcode, signum, siginfo_ptr, ucontext_ptr);
-        match behavior {
+        let switch_to_host = match behavior {
             SignalBehavior::Continue => {
                 // return to the guest context without making any modifications to the instance
                 false
@@ -328,9 +329,11 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                             // Details set to `None` here: have to wait until `verify_trap_safety` to
                             // fill in these details, because access may not be signal safe.
                             rip_addr_details: None,
+                            backtrace: None,
                         },
                         siginfo,
                         context: ctx.into(),
+                        full_backtrace: Backtrace::new_unresolved(),
                     };
                 };
 
@@ -373,12 +376,6 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 inst.lock_testpoints
                     .signal_handler_after_disabling_termination
                     .check();
-
-                // use the ucontext to fill in the fields of the guest context; we can't use
-                // `Context::swap()` here because then we'd swap back to the signal handler instead of
-                // the point in the guest that caused the fault
-                ctx.save_to_context(&mut inst.ctx);
-                inst.ctx.stop_addr = Some(rip as u64);
             }
         }
 
