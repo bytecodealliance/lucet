@@ -110,9 +110,9 @@ impl Options {
 
         let opt_level = match m.value_of("opt_level") {
             None => OptLevel::SpeedAndSize,
-            Some("0") => OptLevel::None,
-            Some("1") => OptLevel::Speed,
-            Some("2") => OptLevel::SpeedAndSize,
+            Some("0") | Some("none") => OptLevel::None,
+            Some("1") | Some("speed") => OptLevel::Speed,
+            Some("2") | Some("speed_and_size") => OptLevel::SpeedAndSize,
             Some(_) => panic!("unknown value for opt-level"),
         };
 
