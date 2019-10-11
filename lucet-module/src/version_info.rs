@@ -41,7 +41,11 @@ impl fmt::Display for VersionInfo {
 impl VersionInfo {
     pub fn new(major: u16, minor: u16, patch: u16, version_hash: [u8; 8]) -> VersionInfo {
         VersionInfo {
-            major, minor, patch, reserved: 0x8000, version_hash
+            major,
+            minor,
+            patch,
+            reserved: 0x8000,
+            version_hash,
         }
     }
 

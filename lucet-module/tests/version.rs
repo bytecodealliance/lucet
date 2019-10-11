@@ -2,19 +2,9 @@ use lucet_module::VersionInfo;
 
 #[test]
 fn version_equality() {
-    let precise = VersionInfo::new(
-         0,
-         1,
-         2,
-         [0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61]
-    );
+    let precise = VersionInfo::new(0, 1, 2, [0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61]);
 
-    let imprecise = VersionInfo::new(
-         0,
-         1,
-         2,
-         [0, 0, 0, 0, 0, 0, 0, 0]
-    );
+    let imprecise = VersionInfo::new(0, 1, 2, [0, 0, 0, 0, 0, 0, 0, 0]);
 
     // first, these are two different versions.
     assert_ne!(precise, imprecise);
