@@ -838,6 +838,22 @@ impl Instance {
             )
         })?;
 
+        // set up the guest to set itself as terminable, then continue to
+        // whatever guest code we want to run
+        //
+        // lucet_context_activate takes the guest code address in `rsi`,
+        // replacing the guest return address with itself so it can run
+        // and mark the instance as active.
+        unsafe {
+            let top_of_stack = self.ctx.gpr.rsp as *mut u64;
+            // move the guest code address to rsi
+            self.ctx.gpr.rsi = *top_of_stack;
+            // replace it with the activation thunk
+            *top_of_stack = crate::context::lucet_context_activate as u64;
+            // and store a pointer to indicate we're active
+            self.ctx.gpr.rdi = &self.kill_state.terminable as *const AtomicBool as u64;
+        }
+
         self.swap_and_return()
     }
 
@@ -867,22 +883,6 @@ impl Instance {
         });
 
         self.with_signals_on(|i| {
-            // set up the guest to set itself as terminable, then continue to
-            // whatever guest code we want to run
-            //
-            // lucet_context_activate takes the guest code address in `rsi`,
-            // replacing the guest return address with itself so it can run
-            // and mark the instance as active.
-            unsafe {
-                let top_of_stack = i.ctx.gpr.rsp as *mut u64;
-                // move the guest code address to rsi
-                i.ctx.gpr.rsi = *top_of_stack;
-                // replace it with the activation thunk
-                *top_of_stack = crate::context::lucet_context_activate as u64;
-                // and store a pointer to indicate we're active
-                i.ctx.gpr.rdi = &i.kill_state.terminable as *const AtomicBool as u64;
-            }
-
             HOST_CTX.with(|host_ctx| {
                 // Save the current context into `host_ctx`, and jump to the guest context. The
                 // lucet context is linked to host_ctx, so it will return here after it finishes,
