@@ -25,7 +25,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
@@ -832,7 +831,7 @@ impl Instance {
                 unsafe { self.alloc.stack_u64_mut() },
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
-                &self.kill_state.terminable,
+                self.kill_state.terminable_ptr(),
                 func.ptr.as_usize(),
                 &args_with_vmctx,
             )
@@ -851,7 +850,7 @@ impl Instance {
             // replace it with the activation thunk
             *top_of_stack = crate::context::lucet_context_activate as u64;
             // and store a pointer to indicate we're active
-            self.ctx.gpr.rdi = &self.kill_state.terminable as *const AtomicBool as u64;
+            self.ctx.gpr.rdi = self.kill_state.terminable_ptr() as u64;
         }
 
         self.swap_and_return()

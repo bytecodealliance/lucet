@@ -13,7 +13,6 @@ use nix::sys::signal::{
 };
 use std::mem::MaybeUninit;
 use std::panic;
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 lazy_static! {
@@ -173,7 +172,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             //
             // TODO: once we have a notion of logging in `lucet-runtime`, this should be a logged
             // error.
-            debug_assert!(!inst.kill_state.terminable.load(Ordering::SeqCst));
+            debug_assert!(!inst.kill_state.is_terminable());
 
             inst.state = State::Terminating {
                 details: TerminationDetails::Remote,
@@ -184,18 +183,13 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         let trapcode = inst.module.lookup_trapcode(rip);
 
         let behavior = (inst.signal_handler)(inst, &trapcode, signum, siginfo_ptr, ucontext_ptr);
-        match behavior {
+        let switch_to_host = match behavior {
             SignalBehavior::Continue => {
                 // return to the guest context without making any modifications to the instance
                 false
             }
             SignalBehavior::Terminate => {
                 // set the state before jumping back to the host context
-                //
-                // we must clear the terminable flag so that no KillSwitch accidentally signals a
-                // host thread.
-                inst.kill_state.terminable.store(false, Ordering::SeqCst);
-
                 inst.state = State::Terminating {
                     details: TerminationDetails::Signal,
                 };
@@ -217,10 +211,6 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                  * overflow some other thread with a minimal stack size.
                  */
                 let mut thunk = || {
-                    // we must clear the terminable flag so that no KillSwitch accidentally signals
-                    // a host thread.
-                    inst.kill_state.terminable.store(false, Ordering::SeqCst);
-
                     // safety: pointer is checked for null at the top of the function, and the
                     // manpage guarantees that a siginfo_t will be passed as the second argument
                     let siginfo = unsafe { *siginfo_ptr };
@@ -251,7 +241,14 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 thunk();
                 true
             }
+        };
+
+        if switch_to_host {
+            // we must disable termination so no KillSwitch may fire in host code.
+            inst.kill_state.disable_termination();
         }
+
+        switch_to_host
     });
 
     if switch_to_host {

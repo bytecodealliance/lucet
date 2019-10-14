@@ -30,7 +30,7 @@ pub(crate) struct KillState {
     /// not a problem of correctness.
     ///
     /// Typically, this is true while in any guest code, or hostcalls made from guest code.
-    pub(crate) terminable: AtomicBool,
+    terminable: AtomicBool,
     /// The kind of code is currently executing in the instance this `KillState` describes.
     ///
     /// This allows a `KillSwitch` to determine what the appropriate signalling mechanism is in
@@ -57,6 +57,18 @@ impl KillState {
             execution_domain: Mutex::new(Domain::Guest),
             thread_id: Mutex::new(None),
         }
+    }
+
+    pub fn is_terminable(&self) -> bool {
+        self.terminable.load(Ordering::SeqCst)
+    }
+
+    pub fn disable_termination(&self) {
+        self.terminable.store(false, Ordering::SeqCst);
+    }
+
+    pub fn terminable_ptr(&self) -> *const AtomicBool {
+        &self.terminable as *const AtomicBool
     }
 
     pub fn begin_hostcall(&self) {

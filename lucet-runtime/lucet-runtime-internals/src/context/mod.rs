@@ -196,7 +196,7 @@ impl ContextHandle {
     pub fn create_and_init(
         stack: &mut [u64],
         parent: &mut ContextHandle,
-        flag: &AtomicBool,
+        flag: *const AtomicBool,
         fptr: usize,
         args: &[Val],
     ) -> Result<ContextHandle, Error> {
@@ -369,7 +369,7 @@ impl Context {
         stack: &mut [u64],
         parent: &mut Context,
         child: &mut Context,
-        flag: &AtomicBool,
+        flag: *const AtomicBool,
         fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
@@ -408,7 +408,7 @@ impl Context {
         let mut stack_builder = CallStackBuilder::new(stack);
 
         // store a pointer to the context swap completion flag, to signal the guest has activated
-        stack_builder.push(flag as *const AtomicBool as u64);
+        stack_builder.push(flag as u64);
 
         // store arguments we'll pass to `lucet_context_swap` on the stack, above where the guest
         // might scribble over them.
@@ -533,7 +533,7 @@ impl Context {
     ///     &mut stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     &flag,
+    ///     &flag as *const AtomicBool,
     ///     entrypoint as usize,
     ///     &[],
     /// ).unwrap();

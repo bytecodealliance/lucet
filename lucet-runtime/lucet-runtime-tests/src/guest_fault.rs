@@ -456,42 +456,6 @@ macro_rules! guest_fault_tests {
         }
 
         #[test]
-        fn alarm() {
-            test_ex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                let guest_thread_id = unsafe { pthread_self() };
-
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(1000));
-
-                    unsafe {
-                        pthread_kill(guest_thread_id, SIGALRM);
-                    }
-                });
-
-                inst.set_fatal_handler(fatal_handler_exit);
-
-                // run guest code that loops forever. this will recieve SIGALRM in one second.
-                let res = inst.run("infinite_loop", &[]);
-
-                match res {
-                    Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {
-                        // this is what we're looking for! so we're good.
-                    }
-                    e => {
-                        panic!("Unexpected run result: {:?}", e);
-                    }
-                }
-            })
-        }
-
-        #[test]
         fn sigsegv_handler_during_guest() {
             lazy_static! {
                 static ref HOST_SIGSEGV_TRIGGERED: Mutex<bool> = Mutex::new(false);
