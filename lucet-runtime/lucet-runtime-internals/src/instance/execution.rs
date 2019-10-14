@@ -1,9 +1,9 @@
-//! The `execution` module contains state for an instance's execution, and 
+//! The `execution` module contains state for an instance's execution, and
 
 use libc::{pthread_kill, pthread_t, SIGALRM};
+use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, Weak};
-use std::mem;
 
 use crate::instance::{Instance, TerminationDetails};
 

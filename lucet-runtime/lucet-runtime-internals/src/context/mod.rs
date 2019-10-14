@@ -3,8 +3,8 @@
 #[cfg(test)]
 mod tests;
 
-use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 use crate::instance::Instance;
+use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 use failure::Fail;
 use nix;
 use nix::sys::signal;
