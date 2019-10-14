@@ -21,7 +21,10 @@ install-dev: build-dev
 	@helpers/install.sh --unoptimized
 
 .PHONY: test
-test: indent-check
+test: indent-check test-except-fuzz test-fuzz
+
+.PHONY: test-except-fuzz
+test-except-fuzz:
 	cargo test --no-fail-fast \
             -p lucet-runtime-internals \
             -p lucet-runtime \
@@ -30,11 +33,15 @@ test: indent-check
             -p lucet-idl \
             -p lucet-wasi-sdk \
             -p lucet-wasi \
+            -p lucet-wasi-fuzz \
             -p lucet-benchmarks \
-            -p lucet-validate
-    # run a single seed through the fuzzer to stave off bitrot
-	cargo run -p lucet-wasi-fuzz -- test-seed 410757864950
+            -p lucet-validate \
 	helpers/lucet-toolchain-tests/signature.sh
+
+# run a single seed through the fuzzer to stave off bitrot
+.PHONY: test-fuzz
+test-fuzz:
+	cargo run -p lucet-wasi-fuzz -- test-seed 410757864950
 
 .PHONY: fuzz
 fuzz:

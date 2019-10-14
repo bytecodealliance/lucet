@@ -1,6 +1,6 @@
 #![deny(bare_trait_objects)]
 
-use failure::{bail, ensure, format_err, Error};
+use failure::{bail, format_err, Error};
 use libc::c_ulong;
 use lucet_module::bindings::Bindings;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
@@ -299,7 +299,12 @@ fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<
     }
     let res = cmd.output()?;
 
-    ensure!(res.status.success(), "native C compilation failed");
+    if !res.status.success() {
+        bail!(
+            "native C compilation failed: {}",
+            String::from_utf8_lossy(&res.stderr)
+        );
+    }
 
     if String::from_utf8_lossy(&res.stderr).contains("too few arguments in call") {
         bail!("saw \"too few arguments in call\" warning");

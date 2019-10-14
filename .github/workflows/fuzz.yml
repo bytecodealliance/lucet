@@ -1,0 +1,48 @@
+name: Fuzz
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  fuzz:
+    name: Fuzz lucet-wasi
+
+    runs-on: ubuntu-16.04
+    steps:
+    - uses: actions/checkout@master
+      with:
+        submodules: true
+
+    - name: Install Rust (rustup)
+      run: rustup update
+
+    - name: Install wasi-sdk (ubuntu)
+      run: |
+        curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-7/wasi-sdk_7.0_amd64.deb
+        sudo dpkg -i wasi-sdk_7.0_amd64.deb
+
+    - name: Install native clang, csmith tools
+      run: |
+        sudo apt-get install -y --no-install-recommends \
+          software-properties-common \
+          clang-6.0 \
+          gcc-multilib \
+          csmith \
+          libcsmith-dev \
+          creduce
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
+
+    - name: Build Binaryen tools
+      run: |
+        curl -sS -L "https://github.com/WebAssembly/binaryen/archive/version_${BINARYEN_VERSION}.tar.gz" | tar xzf -
+        mkdir -p binaryen-build
+        cd binaryen-build && cmake "../binaryen-version_${BINARYEN_VERSION}" && make wasm-opt wasm-reduce
+        echo "##[add-path]$PWD/binaryen-build/bin"
+      env:
+        BINARYEN_VERSION: 86
+
+    - name: Test lucet-wasi-fuzz with known seed
+      run: make test-fuzz
+
+    - name: Fuzz
+      run: make fuzz

@@ -1,0 +1,14 @@
+name: 'Test Lucet'
+description: 'run tests using standardized lucet development environment'
+runs:
+  using: 'docker'
+  image: '../../../Dockerfile'
+  # The Dockerfile does not specify an entrypoint.
+  entrypoint: "/bin/sh"
+  args:
+      # Next arg is a command for sh to execute.
+    - '-c'
+      # rustup expects $HOME to be set to /root during `docker run` because thats what
+      # it was set to during container creation. Actions clears $HOME so we set it here.
+      # The test target of the Makefile is our standard CI.
+    - 'export HOME=/root; make test'
