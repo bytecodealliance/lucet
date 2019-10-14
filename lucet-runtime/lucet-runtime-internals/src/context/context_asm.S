@@ -39,12 +39,6 @@
 .align 16
 lucet_context_bootstrap:
 _lucet_context_bootstrap:
-  // load the pointer to the instance's "terminable" flag.
-  mov 16(%rbp), %rcx
-  // Set flag indicating that the context switch is done.
-  // x86 mov is atomic, so we don't need a lock prefix here (which would be invalid anyway)
-  movb $1, (%rcx)
-
 	// Move each of the argument values into the corresponding call
 	// argument register.
   pop %r9
@@ -72,28 +66,21 @@ lucet_context_backstop:
 _lucet_context_backstop:
     // Note that `rbp` here really has no relation to any stack!
     // it happens to be an available pointer we can hang the contexts to swap off of.
-    mov (%rbp), %rdi  /* parent context to arg 1 */
-    mov 8(%rbp), %rsi  /* own context to arg 2 */
+    mov (%rbp), %rdi // load the parent context to forward values in return value registers
     mov %rax, (10*8 + 8*16 + 8*0)(%rdi) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
     mov %rdx, (10*8 + 8*16 + 8*1)(%rdi)
     movdqu %xmm0, (10*8 + 8*16 + 8*2)(%rdi) /* floating-point return value */
 
-    // rax has been stored above already, so we can reuse it now to load the 
-    // pointer to the `terminable` flag.
-    mov 16(%rbp), %rax
-    mov $0, %cl
-    // there may be standing executors that will try to execute this instance,
-    // take the `terminable` flag so they will fail.
-    // x86 xchg has an implicit "lock" semantic, so we don't need the prefix here.
-    xchgb (%rax), %cl
-    test %cl, %cl
+    // load instance pointer, arg 1
+    mov 16(%rbp), %rdi
+#ifdef __ELF__
+    call instance_kill_state_exit_guest_region@PLT
+#else
+    call instance_kill_state_exit_guest_region
+#endif
 
-    // if we got 0 from the `xchg`, some terminator beat us in trying to
-    // stop this instance, and it's not safe to start swapping contexts.
-    //
-    // so, just hang out for a bit and wait for the terminator to do its thing
-_hang:
-    jz _hang
+    mov (%rbp), %rdi  /* parent context to arg 1 */
+    mov 8(%rbp), %rsi  /* own context to arg 2 */
 
 #ifdef __ELF__
     jmp lucet_context_swap@PLT

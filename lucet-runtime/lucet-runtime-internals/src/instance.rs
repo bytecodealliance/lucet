@@ -826,12 +826,14 @@ impl Instance {
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
 
+        let inst_ptr = self as *const Instance;
+
         HOST_CTX.with(|host_ctx| {
             Context::init(
                 unsafe { self.alloc.stack_u64_mut() },
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
-                self.kill_state.terminable_ptr(),
+                inst_ptr,
                 func.ptr.as_usize(),
                 &args_with_vmctx,
             )

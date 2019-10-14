@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, Weak};
 use std::mem;
 
-use crate::instance::TerminationDetails;
+use crate::instance::{Instance, TerminationDetails};
 
 /// All instance state a remote kill switch needs to determine if and how to signal that execution
 /// should stop.
@@ -47,6 +47,22 @@ pub(crate) struct KillState {
     /// `tid_change_notifier` allows functions that may cause a change in `thread_id` to wait,
     /// without spinning, for the signal to be processed.
     tid_change_notifier: Condvar,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn instance_kill_state_exit_guest_region(inst: *mut Instance) {
+    let terminable = (*inst).kill_state.terminable.swap(false, Ordering::SeqCst);
+    if !terminable {
+        // Something else has taken the terminable flag, so it's not safe to actually exit a
+        // guest context yet. Because this is called when exiting a guest context, the
+        // termination mechanism will be a signal, delivered at some point (hopefully soon!).
+        // Further, because the termination mechanism will be a signal, we are constrained to
+        // only signal-safe behavior.
+        //
+        // For now, hang indefinitely, waiting for the sigalrm to arrive.
+
+        loop {}
+    }
 }
 
 impl KillState {

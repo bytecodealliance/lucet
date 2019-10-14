@@ -4,13 +4,13 @@
 mod tests;
 
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
+use crate::instance::Instance;
 use failure::Fail;
 use nix;
 use nix::sys::signal;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::mem;
 use std::ptr::NonNull;
-use std::sync::atomic::AtomicBool;
 use xfailure::xbail;
 
 /// Callee-saved general-purpose registers in the AMD64 ABI.
@@ -196,12 +196,12 @@ impl ContextHandle {
     pub fn create_and_init(
         stack: &mut [u64],
         parent: &mut ContextHandle,
-        flag: *const AtomicBool,
+        inst: *const Instance,
         fptr: usize,
         args: &[Val],
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
-        Context::init(stack, parent, &mut child, flag, fptr, args)?;
+        Context::init(stack, parent, &mut child, inst, fptr, args)?;
         Ok(child)
     }
 }
@@ -369,7 +369,7 @@ impl Context {
         stack: &mut [u64],
         parent: &mut Context,
         child: &mut Context,
-        flag: *const AtomicBool,
+        inst: *const Instance,
         fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
@@ -408,7 +408,7 @@ impl Context {
         let mut stack_builder = CallStackBuilder::new(stack);
 
         // store a pointer to the context swap completion flag, to signal the guest has activated
-        stack_builder.push(flag as u64);
+        stack_builder.push(inst as u64);
 
         // store arguments we'll pass to `lucet_context_swap` on the stack, above where the guest
         // might scribble over them.
