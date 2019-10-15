@@ -629,7 +629,15 @@ macro_rules! alloc_tests {
                     std::slice::from_raw_parts_mut(heap, CONTEXT_TEST_INITIAL_SIZE as usize / 8)
                 };
                 let mut onthestack = [0u8; STACK_PATTERN_LENGTH];
+                // While not used, this array is load-bearing! A function that executes after the
+                // guest completes, `instance_kill_state_exit_guest_region`, may end up using
+                // sufficient stack space to trample over values in this function's call frame.
+                //
+                // Padding it out with a duplicate pattern makes enough space for `onthestack` to
+                // not be clobbered.
+                let mut ignored = [0u8; STACK_PATTERN_LENGTH];
                 for i in 0..STACK_PATTERN_LENGTH {
+                    ignored[i] = (i % 256) as u8;
                     onthestack[i] = (i % 256) as u8;
                 }
                 heap[0] = onthestack.as_ptr() as u64;
