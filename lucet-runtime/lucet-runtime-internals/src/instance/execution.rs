@@ -23,46 +23,53 @@
 //! be appropriate, while the domain switches to `Hostcall` and is no longer appropriate for
 //! signalling, would be an error.
 //!
+//! ## Instance Lifecycle and `KillState`
+//!
 //! And now we can enumerate interleavings of execution and timeout, to see the expected state at
 //! possible points of interest in an instance's lifecycle:
 //!
-//! Here's a summary of how these ideas line up with points in an instance's lifcycle:
-//!
-//! `Instance created`
-//!   - `terminable: false`, `execution_domain: Guest`
-//! `Instance::run called`
-//!   - `terminable: true`, `execution_domain: Guest`
-//! `Instance::run executing`
-//!   - `terminable: true, or false`, `execution_domain: Guest, Hostcall, or Terminated`
-//!   `execution_domain` will only be `Guest` when executing guest code, only be `Hostcall` when
+//! * `Instance created`
+//!   - terminable: `false`
+//!   - execution_domain: `Guest`
+//! * `Instance::run called`
+//!   - terminable: `true`
+//!   - execution_domain: `Guest`
+//! * `Instance::run executing`
+//!   - terminable: `true, or false`
+//!   - execution_domain: `Guest, Hostcall, or Terminated`
+//!   - `execution_domain` will only be `Guest` when executing guest code, only be `Hostcall` when
 //!   executing a hostcall, but may also be `Terminated` while in a hostcall to indicate that it
 //!   should exit when the hostcall completes.
-//!
-//!   `terminable` will be false if and only if `execution_domain` is `Terminated`.
-//! `Instance::run returns`
-//!   - `terminable: false`, `execution_domain: Guest, Hostcall, or Terminated`
-//!   `execution_domain` will be `Guest` when the initial guest function returns, `Hostcall` when
+//!   - `terminable` will be false if and only if `execution_domain` is `Terminated`.
+//! * `Instance::run returns`
+//!   - terminable: `false`
+//!   - execution_domain: `Guest, Hostcall, or Terminated`
+//!   - `execution_domain` will be `Guest` when the initial guest function returns, `Hostcall` when
 //!   terminated by `lucet_hostcall_terminate!`, and `Terminated` when exiting due to a termination
 //!   request.
-//! `Guest function exeucting`
-//!   - `terminable: true`, `execution_domain: Guest`
-//! `Guest function returns`
-//!   - `terminable: true`, `execution_domain: Guest`
-//! `Hostcall called`
-//!   - `terminable: true`, `execution_domain: Hostcall`
-//! `Hostcall executing`
-//!   - `terminable: true`, `execution_domain: Hostcall, or Terminated`
-//!   `execution_domain` will typically be `Hostcall`, but may be `Terminated` if termination of
+//! * `Guest function exeucting`
+//!   - terminable: `true`
+//!   - execution_domain: `Guest`
+//! * `Guest function returns`
+//!   - terminable: `true`
+//!   - execution_domain: `Guest`
+//! * `Hostcall called`
+//!   - terminable: `true`
+//!   - execution_domain: `Hostcall`
+//! * `Hostcall executing`
+//!   - terminable: `true`
+//!   - execution_domain: `Hostcall, or Terminated`
+//!   - `execution_domain` will typically be `Hostcall`, but may be `Terminated` if termination of
 //!   the instance is requested during the hostcall.
-//!
-//!   `terminable` will be false if and only if `execution_domain` is `Terminated`.
-//! `Hostcall yields`
-//!   This is a specific point in "Hostcall executing" and has no further semantics.
-//! `Hostcall resumes`
-//!   This is a specific point in "Hostcall executing" and has no further semantics.
-//! `Hostcall returns`
-//!   - `terminable: true`, `execution_domain: Guest`
-//!   `execution_domain` may be `Terminated` before returning, in which case `terminable` will be
+//!   - `terminable` will be false if and only if `execution_domain` is `Terminated`.
+//! * `Hostcall yields`
+//!   - This is a specific point in "Hostcall executing" and has no further semantics.
+//! * `Hostcall resumes`
+//!   - This is a specific point in "Hostcall executing" and has no further semantics.
+//! * `Hostcall returns`
+//!   - terminable: `true`
+//!   - execution_domain: `Guest`
+//!   - `execution_domain` may be `Terminated` before returning, in which case `terminable` will be
 //!   false, but the hostcall would then exit. If a hostcall successfully returns to its caller it
 //!   was not terminated, so the only state an instance will have after returning from a hostcall
 //!   will be that it's executing terminable guest code.
@@ -89,7 +96,9 @@ use crate::instance::TerminationDetails;
 /// stop a guest that is currently in a critical section. Because the signal will only be checked
 /// when exiting the critical section, the latency is bounded by whatever embedder guarantees are
 /// made. In fact, it is possible for a kill signal to be successfully sent and still never
-/// impactful, if a hostcall itself invokes `lucet_hostcall_terminate!`.
+/// impactful, if a hostcall itself invokes `lucet_hostcall_terminate!`. In this circumstance, the
+/// hostcall would terminate the instance if it returned, but `lucet_hostcall_terminate!` will
+/// terminate the guest before the termination request would even be checked.
 pub struct KillState {
     /// Can the instance be terminated? This must be `true` only when the instance can be stopped.
     /// This may be false while the instance can safely be stopped, such as immediately after

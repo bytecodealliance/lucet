@@ -838,12 +838,19 @@ impl Instance {
             )
         })?;
 
-        // set up the guest to set itself as terminable, then continue to
-        // whatever guest code we want to run
+        // Set up the guest to set itself as terminable, then continue to
+        // whatever guest code we want to run.
         //
-        // lucet_context_activate takes the guest code address in `rsi`,
-        // replacing the guest return address with itself so it can run
-        // and mark the instance as active.
+        // `lucet_context_activate` takes two arguments:
+        // rsi: address of guest code to execute
+        // rdi: pointer to a bool that indicates the guest can be terminated
+        //
+        // The appropriate value for `rsi` is the top of the guest stack, which
+        // we would otherwise return to and start executing immediately. For
+        // `rdi`, we want to pass a pointer to the instance's `terminable` flag.
+        //
+        // once we've set up arguments, swap out the guest return address with
+        // `lucet_context_activate` so we start execution there.
         unsafe {
             let top_of_stack = self.ctx.gpr.rsp as *mut u64;
             // move the guest code address to rsi
