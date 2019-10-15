@@ -257,65 +257,62 @@ impl KillSwitch {
     /// host code will see `State::Faulted` as an instance state, where `KillSwitch::terminate`
     /// would return `Ok(KillSuccess::Signalled)`.
     pub fn terminate(&self) -> KillResult {
-        if let Some(state) = self.state.upgrade() {
-            // Attempt to take the flag indicating the instance may terminate
-            let terminable = state.terminable.swap(false, Ordering::SeqCst);
+        // Get the underlying kill state. If this fails, it means the instance exited and was
+        // discarded, so we can't terminate.
+        let state = self.state.upgrade().ok_or(KillError::NotTerminable)?;
 
-            if terminable {
-                // we got it! we can signal the instance.
+        // Attempt to take the flag indicating the instance may terminate
+        let terminable = state.terminable.swap(false, Ordering::SeqCst);
+        if !terminable {
+            return Err(KillError::NotTerminable);
+        }
 
-                // Now check what domain the instance is in. We can signal in guest code, but want
-                // to avoid signalling in host code lest we interrupt some function operating on
-                // guest/host shared memory, and invalidate invariants. For example, interrupting
-                // in the middle of a resize operation on a `Vec` could be extremely dangerous.
-                //
-                // Hold this lock through all signalling logic to prevent the instance from
-                // switching domains (and invalidating safety of whichever mechanism we choose here)
-                let mut execution_domain = state.execution_domain.lock().unwrap();
+        // we got it! we can signal the instance.
 
-                let result = match *execution_domain {
-                    Domain::Guest => {
-                        let mut curr_tid = state.thread_id.lock().unwrap();
-                        // we're in guest code, so we can just send a signal.
-                        if let Some(thread_id) = *curr_tid {
-                            unsafe {
-                                pthread_kill(thread_id, SIGALRM);
-                            }
+        // Now check what domain the instance is in. We can signal in guest code, but want
+        // to avoid signalling in host code lest we interrupt some function operating on
+        // guest/host shared memory, and invalidate invariants. For example, interrupting
+        // in the middle of a resize operation on a `Vec` could be extremely dangerous.
+        //
+        // Hold this lock through all signalling logic to prevent the instance from
+        // switching domains (and invalidating safety of whichever mechanism we choose here)
+        let mut execution_domain = state.execution_domain.lock().unwrap();
 
-                            // wait for the SIGALRM handler to deschedule the instance
-                            //
-                            // this should never actually loop, which would indicate the instance
-                            // was moved to another thread, or we got spuriously notified.
-                            while curr_tid.is_some() {
-                                curr_tid = state.tid_change_notifier.wait(curr_tid).unwrap();
-                            }
-                            Ok(KillSuccess::Signalled)
-                        } else {
-                            panic!("logic error: instance is terminable but not actually running.");
-                        }
+        let result = match *execution_domain {
+            Domain::Guest => {
+                let mut curr_tid = state.thread_id.lock().unwrap();
+                // we're in guest code, so we can just send a signal.
+                if let Some(thread_id) = *curr_tid {
+                    unsafe {
+                        pthread_kill(thread_id, SIGALRM);
                     }
-                    Domain::Hostcall => {
-                        // the guest is in a hostcall, so the only thing we can do is indicate it
-                        // should terminate and wait.
-                        *execution_domain = Domain::Terminated;
-                        Ok(KillSuccess::Pending)
+
+                    // wait for the SIGALRM handler to deschedule the instance
+                    //
+                    // this should never actually loop, which would indicate the instance
+                    // was moved to another thread, or we got spuriously notified.
+                    while curr_tid.is_some() {
+                        curr_tid = state.tid_change_notifier.wait(curr_tid).unwrap();
                     }
-                    Domain::Terminated => {
-                        // Something else (another KillSwitch?) has already signalled this instance
-                        // to exit when it has completed its hostcall. Nothing to do here.
-                        Err(KillError::NotTerminable)
-                    }
-                };
-                // we must hold the lock on this bool at least until we set the "timed_out" flag.
-                mem::drop(execution_domain);
-                result
-            } else {
+                    Ok(KillSuccess::Signalled)
+                } else {
+                    panic!("logic error: instance is terminable but not actually running.");
+                }
+            }
+            Domain::Hostcall => {
+                // the guest is in a hostcall, so the only thing we can do is indicate it
+                // should terminate and wait.
+                *execution_domain = Domain::Terminated;
+                Ok(KillSuccess::Pending)
+            }
+            Domain::Terminated => {
+                // Something else (another KillSwitch?) has already signalled this instance
+                // to exit when it has completed its hostcall. Nothing to do here.
                 Err(KillError::NotTerminable)
             }
-        } else {
-            // The underlying kill state we need to check has been dropped. This means the instance
-            // exited, or was otherwise terminated and discarded, so we can't terminate it here.
-            Err(KillError::NotTerminable)
-        }
+        };
+        // we must hold the lock on this bool at least until we set the "timed_out" flag.
+        mem::drop(execution_domain);
+        result
     }
 }
