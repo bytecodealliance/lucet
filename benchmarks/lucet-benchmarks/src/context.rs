@@ -1,6 +1,5 @@
 use criterion::Criterion;
 use lucet_runtime_internals::context::{Context, ContextHandle};
-use std::sync::atomic::AtomicBool;
 
 /// Time the initialization of a context.
 fn context_init(c: &mut Criterion) {
@@ -14,7 +13,7 @@ fn context_init(c: &mut Criterion) {
             ContextHandle::create_and_init(
                 &mut *stack,
                 &mut parent,
-                &AtomicBool::new(false),
+                std::ptr::null(),
                 f as usize,
                 &[],
             )
@@ -35,7 +34,7 @@ fn context_swap_return(c: &mut Criterion) {
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
                     &mut parent,
-                    &AtomicBool::new(false),
+                    std::ptr::null(),
                     f as usize,
                     &[],
                 )
@@ -63,7 +62,7 @@ fn context_init_swap_return(c: &mut Criterion) {
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
                     &mut parent,
-                    &AtomicBool::new(false),
+                    std::ptr::null(),
                     f as usize,
                     &[],
                 )
@@ -357,7 +356,7 @@ fn context_init_swap_return_many_args(c: &mut Criterion) {
                 let child = ContextHandle::create_and_init(
                     &mut *stack,
                     &mut parent,
-                    &AtomicBool::new(false),
+                    std::ptr::null(),
                     f as usize,
                     &args,
                 )

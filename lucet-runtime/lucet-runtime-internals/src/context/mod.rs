@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::instance::Instance;
+use crate::instance::execution::KillState;
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 use failure::Fail;
 use nix;
@@ -196,12 +196,12 @@ impl ContextHandle {
     pub fn create_and_init(
         stack: &mut [u64],
         parent: &mut ContextHandle,
-        inst: *const Instance,
+        kill_state: *const KillState,
         fptr: usize,
         args: &[Val],
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
-        Context::init(stack, parent, &mut child, inst, fptr, args)?;
+        Context::init(stack, parent, &mut child, kill_state, fptr, args)?;
         Ok(child)
     }
 }
@@ -298,7 +298,7 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     &std::sync::atomic::AtomicBool::new(false),
+    ///     std::ptr::null(),
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
@@ -324,7 +324,7 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     &std::sync::atomic::AtomicBool::new(false),
+    ///     std::ptr::null(),
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
@@ -369,7 +369,7 @@ impl Context {
         stack: &mut [u64],
         parent: &mut Context,
         child: &mut Context,
-        inst: *const Instance,
+        kill_state: *const KillState,
         fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
@@ -408,7 +408,7 @@ impl Context {
         let mut stack_builder = CallStackBuilder::new(stack);
 
         // store a pointer to the context swap completion flag, to signal the guest has activated
-        stack_builder.push(inst as u64);
+        stack_builder.push(kill_state as u64);
 
         // store arguments we'll pass to `lucet_context_swap` on the stack, above where the guest
         // might scribble over them.
@@ -528,12 +528,11 @@ impl Context {
     /// # let mut stack = vec![0u64; 1024].into_boxed_slice();
     /// let mut parent = Context::new();
     /// let mut child = Context::new();
-    /// let flag = std::sync::atomic::AtomicBool::new(false);
     /// Context::init(
     ///     &mut stack,
     ///     &mut parent,
     ///     &mut child,
-    ///     &flag as *const AtomicBool,
+    ///     std::ptr::null(),
     ///     entrypoint as usize,
     ///     &[],
     /// ).unwrap();

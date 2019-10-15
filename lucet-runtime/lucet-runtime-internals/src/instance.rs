@@ -3,8 +3,7 @@ mod siginfo_ext;
 pub mod signals;
 pub mod state;
 
-use crate::instance::execution::KillState;
-pub use crate::instance::execution::{KillError, KillSuccess, KillSwitch};
+pub use crate::instance::execution::{KillError, KillState, KillSuccess, KillSwitch};
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 pub use crate::instance::state::State;
 
@@ -826,14 +825,14 @@ impl Instance {
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
 
-        let inst_ptr = self as *const Instance;
+        let kill_state_ptr: *const KillState = &*self.kill_state;
 
         HOST_CTX.with(|host_ctx| {
             Context::init(
                 unsafe { self.alloc.stack_u64_mut() },
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
-                inst_ptr,
+                kill_state_ptr,
                 func.ptr.as_usize(),
                 &args_with_vmctx,
             )

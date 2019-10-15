@@ -48,7 +48,7 @@ macro_rules! lucet_hostcalls {
                 // don't warn if this macro happens to expand in a context where `VmctxInternal`
                 // was already imported
                 #[allow(unused_imports)]
-                use lucet_runtime_internals::vmctx::VmctxInternal;
+                use $crate::vmctx::VmctxInternal;
 
                 $crate::vmctx::Vmctx::from_raw(vmctx_raw).instance_mut().uninterruptable(|| {
                     let res = std::panic::catch_unwind(move || {

@@ -72,7 +72,7 @@ use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, Weak};
 
-use crate::instance::{Instance, TerminationDetails};
+use crate::instance::TerminationDetails;
 
 /// All instance state a remote kill switch needs to determine if and how to signal that execution
 /// should stop.
@@ -90,7 +90,7 @@ use crate::instance::{Instance, TerminationDetails};
 /// when exiting the critical section, the latency is bounded by whatever embedder guarantees are
 /// made. In fact, it is possible for a kill signal to be successfully sent and still never
 /// impactful, if a hostcall itself invokes `lucet_hostcall_terminate!`.
-pub(crate) struct KillState {
+pub struct KillState {
     /// Can the instance be terminated? This must be `true` only when the instance can be stopped.
     /// This may be false while the instance can safely be stopped, such as immediately after
     /// completing a host->guest context swap. Regions such as this should be minimized, but are
@@ -117,8 +117,8 @@ pub(crate) struct KillState {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn instance_kill_state_exit_guest_region(inst: *mut Instance) {
-    let terminable = (*inst).kill_state.terminable.swap(false, Ordering::SeqCst);
+pub unsafe extern "C" fn instance_kill_state_exit_guest_region(kill_state: *mut KillState) {
+    let terminable = (*kill_state).terminable.swap(false, Ordering::SeqCst);
     if !terminable {
         // Something else has taken the terminable flag, so it's not safe to actually exit a
         // guest context yet. Because this is called when exiting a guest context, the
@@ -144,6 +144,10 @@ impl KillState {
 
     pub fn is_terminable(&self) -> bool {
         self.terminable.load(Ordering::SeqCst)
+    }
+
+    pub fn enable_termination(&self) {
+        self.terminable.store(true, Ordering::SeqCst);
     }
 
     pub fn disable_termination(&self) {

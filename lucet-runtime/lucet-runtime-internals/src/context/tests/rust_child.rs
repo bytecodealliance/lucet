@@ -47,11 +47,12 @@ macro_rules! test_body {
 macro_rules! init_and_swap {
     ( $stack:ident, $fn:ident, [ $( $args:expr ),* ] ) => {
         unsafe {
-            let flag = std::sync::atomic::AtomicBool::new(false);
+            let kill_state = $crate::instance::KillState::new();
+            kill_state.enable_termination();
             let child = ContextHandle::create_and_init(
                 &mut *$stack,
                 PARENT.as_mut().unwrap(),
-                &flag,
+                &kill_state as *const $crate::instance::KillState,
                 $fn as usize,
                 &[$( $args ),*],
             ).unwrap();
