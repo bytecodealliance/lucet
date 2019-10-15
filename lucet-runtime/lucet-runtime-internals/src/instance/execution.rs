@@ -1,4 +1,71 @@
-//! The `execution` module contains state for an instance's execution, and
+//! The `execution` module contains state for an instance's execution, and exposes functions
+//! building that state into something appropriate for safe use externally.
+//!
+//! So far as state tracked in this module is concerned, there are two key items: "terminability"
+//! and "execution domain".
+//!
+//! ## Terminability
+//! This specifically answers the question if "is it safe to initiate termination of this instance
+//! right now?". An instance becomes terminable when it begins executing, and stops being
+//! terminable when it is terminated, or when it stops executing. Termination does not directly map
+//! to the idea of guest code currently executing on a processor, because termination can occur
+//! during host code, or while a guest has yielded exeuction. As a result, termination can only be
+//! treated as a best-effort to deschedule a guest, and is typically quick when it occurs during
+//! guest code execution, or immediately upon resuming execution of guest code (exiting host code,
+//! or resuming a yielded instance).
+//!
+//! ## Execution Domain
+//! Execution domains allow us to distinguish what an appropriate mechanism to signal termination
+//! is. This means that changing of an execution domain must be atomic - it would be an error to
+//! read the current execution domain, continue with that domain to determine temination, and
+//! simultaneously for execution to continue possibly into a different execution domain. For
+//! example, beginning termination directly at the start of a hostcall, where sending `SIGALRM` may
+//! be appropriate, while the domain switches to `Hostcall` and is no longer appropriate for
+//! signalling, would be an error.
+//!
+//! And now we can enumerate interleavings of execution and timeout, to see the expected state at
+//! possible points of interest in an instance's lifecycle:
+//!
+//! Here's a summary of how these ideas line up with points in an instance's lifcycle:
+//!
+//! `Instance created`
+//!   - `terminable: false`, `execution_domain: Guest`
+//! `Instance::run called`
+//!   - `terminable: true`, `execution_domain: Guest`
+//! `Instance::run executing`
+//!   - `terminable: true, or false`, `execution_domain: Guest, Hostcall, or Terminated`
+//!   `execution_domain` will only be `Guest` when executing guest code, only be `Hostcall` when
+//!   executing a hostcall, but may also be `Terminated` while in a hostcall to indicate that it
+//!   should exit when the hostcall completes.
+//!
+//!   `terminable` will be false if and only if `execution_domain` is `Terminated`.
+//! `Instance::run returns`
+//!   - `terminable: false`, `execution_domain: Guest, Hostcall, or Terminated`
+//!   `execution_domain` will be `Guest` when the initial guest function returns, `Hostcall` when
+//!   terminated by `lucet_hostcall_terminate!`, and `Terminated` when exiting due to a termination
+//!   request.
+//! `Guest function exeucting`
+//!   - `terminable: true`, `execution_domain: Guest`
+//! `Guest function returns`
+//!   - `terminable: true`, `execution_domain: Guest`
+//! `Hostcall called`
+//!   - `terminable: true`, `execution_domain: Hostcall`
+//! `Hostcall executing`
+//!   - `terminable: true`, `execution_domain: Hostcall, or Terminated`
+//!   `execution_domain` will typically be `Hostcall`, but may be `Terminated` if termination of
+//!   the instance is requested during the hostcall.
+//!
+//!   `terminable` will be false if and only if `execution_domain` is `Terminated`.
+//! `Hostcall yields`
+//!   This is a specific point in "Hostcall executing" and has no further semantics.
+//! `Hostcall resumes`
+//!   This is a specific point in "Hostcall executing" and has no further semantics.
+//! `Hostcall returns`
+//!   - `terminable: true`, `execution_domain: Guest`
+//!   `execution_domain` may be `Terminated` before returning, in which case `terminable` will be
+//!   false, but the hostcall would then exit. If a hostcall successfully returns to its caller it
+//!   was not terminated, so the only state an instance will have after returning from a hostcall
+//!   will be that it's executing terminable guest code.
 
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
