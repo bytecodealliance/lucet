@@ -4,7 +4,7 @@ use failure::*;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use wabt::{ErrorKind, wat2wasm};
+use wabt::{wat2wasm, ErrorKind};
 
 pub fn read_module<P: AsRef<Path>>(
     path: P,
@@ -47,8 +47,7 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
                 },
                 _ => { }
             };
-            format_err!("{}", result)
-                .context(LucetcErrorKind::Input)
+            format_err!("{}", result).context(LucetcErrorKind::Input)
         })?
     };
     Ok(converted)
