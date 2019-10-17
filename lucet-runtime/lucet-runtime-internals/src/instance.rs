@@ -697,6 +697,10 @@ impl Instance {
         KillSwitch::new(Arc::downgrade(&self.kill_state))
     }
 
+    // This needs to be public as it's used in the expansion of `lucet_hostcalls`, available for
+    // external use. But you *really* shouldn't have to call this yourself, so we're going to keep
+    // it out of rustdoc.
+    #[doc(hidden)]
     pub fn uninterruptable<T, F: FnOnce() -> T>(&mut self, f: F) -> T {
         self.kill_state.begin_hostcall();
         let res = f();
