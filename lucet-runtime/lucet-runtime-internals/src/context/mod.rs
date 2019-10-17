@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod tests;
 
+use crate::instance::execution::KillState;
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 use failure::Fail;
 use nix;
@@ -25,15 +26,16 @@ use xfailure::xbail;
 /// <https://doc.rust-lang.org/nomicon/other-reprs.html#reprpacked>. Since the members are all
 /// `u64`, this should be fine?
 #[repr(C)]
-struct GpRegs {
+pub(crate) struct GpRegs {
     rbx: u64,
-    rsp: u64,
+    pub(crate) rsp: u64,
     rbp: u64,
-    rdi: u64,
+    pub(crate) rdi: u64,
     r12: u64,
     r13: u64,
     r14: u64,
     r15: u64,
+    pub(crate) rsi: u64,
 }
 
 impl GpRegs {
@@ -47,6 +49,7 @@ impl GpRegs {
             r13: 0,
             r14: 0,
             r15: 0,
+            rsi: 0,
         }
     }
 }
@@ -110,7 +113,7 @@ impl FpRegs {
 /// that pointer becomes invalid, and the behavior of returning from that context becomes undefined.
 #[repr(C, align(64))]
 pub struct Context {
-    gpr: GpRegs,
+    pub(crate) gpr: GpRegs,
     fpr: FpRegs,
     retvals_gp: [u64; 2],
     retval_fp: __m128,
@@ -193,11 +196,12 @@ impl ContextHandle {
     pub fn create_and_init(
         stack: &mut [u64],
         parent: &mut ContextHandle,
+        kill_state: *const KillState,
         fptr: usize,
         args: &[Val],
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
-        Context::init(stack, parent, &mut child, fptr, args)?;
+        Context::init(stack, parent, &mut child, kill_state, fptr, args)?;
         Ok(child)
     }
 }
@@ -294,6 +298,7 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
+    ///     std::ptr::null(),
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
@@ -319,6 +324,7 @@ impl Context {
     ///     &mut *stack,
     ///     &mut parent,
     ///     &mut child,
+    ///     std::ptr::null(),
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
@@ -363,6 +369,7 @@ impl Context {
         stack: &mut [u64],
         parent: &mut Context,
         child: &mut Context,
+        kill_state: *const KillState,
         fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
@@ -372,6 +379,7 @@ impl Context {
 
         let mut gp_args_ix = 0;
         let mut fp_args_ix = 0;
+        let mut gp_regs_values = [0u64; 6];
 
         let mut spilled_args = vec![];
 
@@ -381,7 +389,7 @@ impl Context {
                     if gp_args_ix >= 6 {
                         spilled_args.push(val_to_stack(arg));
                     } else {
-                        child.bootstrap_gp_ix_arg(gp_args_ix, v);
+                        gp_regs_values[gp_args_ix] = v;
                         gp_args_ix += 1;
                     }
                 }
@@ -399,12 +407,15 @@ impl Context {
         // set up an initial call stack for guests to bootstrap into and execute
         let mut stack_builder = CallStackBuilder::new(stack);
 
+        // store a pointer to the context swap completion flag, to signal the guest has activated
+        stack_builder.push(kill_state as u64);
+
         // store arguments we'll pass to `lucet_context_swap` on the stack, above where the guest
         // might scribble over them.
         stack_builder.push(parent as *mut Context as u64);
         stack_builder.push(child as *mut Context as u64);
 
-        // we'll pass a pointer to them via `rbp` in the guest's Context we switch to.
+        // we'll pass a pointer to these values via `rbp` in the guest's Context we switch to.
         let backstop_args = stack_builder.offset();
 
         // we actually don't want to put an explicit pointer to these arguments anywhere. we'll
@@ -429,6 +440,12 @@ impl Context {
         // completes it returns to begin the next function up.
         stack_builder.push(lucet_context_backstop as u64);
         stack_builder.push(fptr as u64);
+
+        // add all general purpose arguments for the guest to be bootstrapped
+        for arg in gp_regs_values.iter() {
+            stack_builder.push(*arg);
+        }
+
         stack_builder.push(lucet_context_bootstrap as u64);
 
         let (stack, stack_start) = stack_builder.into_inner();
@@ -515,6 +532,7 @@ impl Context {
     ///     &mut stack,
     ///     &mut parent,
     ///     &mut child,
+    ///     std::ptr::null(),
     ///     entrypoint as usize,
     ///     &[],
     /// ).unwrap();
@@ -629,31 +647,6 @@ impl Context {
         UntypedRetVal::new(gp, fp)
     }
 
-    /// Put one of the first 6 general-purpose arguments into a `Context` register.
-    ///
-    /// Although these registers are callee-saved registers rather than argument registers, they get
-    /// moved into argument registers by `lucet_context_bootstrap`.
-    ///
-    /// - `ix`: ABI general-purpose argument number
-    /// - `arg`: argument value
-    fn bootstrap_gp_ix_arg(&mut self, ix: usize, arg: u64) {
-        match ix {
-            // rdi lives across bootstrap
-            0 => self.gpr.rdi = arg,
-            // bootstraps into rsi
-            1 => self.gpr.r12 = arg,
-            // bootstraps into rdx
-            2 => self.gpr.r13 = arg,
-            // bootstraps into rcx
-            3 => self.gpr.r14 = arg,
-            // bootstraps into r8
-            4 => self.gpr.r15 = arg,
-            // bootstraps into r9
-            5 => self.gpr.rbx = arg,
-            _ => panic!("unexpected gp register index {}", ix),
-        }
-    }
-
     /// Put one of the first 8 floating-point arguments into a `Context` register.
     ///
     /// - `ix`: ABI floating-point argument number
@@ -710,4 +703,10 @@ extern "C" {
     ///
     /// Never returns because the current context is discarded.
     fn lucet_context_set(to: *const Context) -> !;
+
+    /// Enables termination for the instance, after performing a context switch.
+    ///
+    /// Takes the guest return address as an argument as a consequence of implementation details,
+    /// see `Instance::swap_and_return` for more.
+    pub(crate) fn lucet_context_activate();
 }

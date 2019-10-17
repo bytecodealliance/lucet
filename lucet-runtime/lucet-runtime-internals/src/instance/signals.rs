@@ -128,7 +128,8 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
     if !(signal == Signal::SIGBUS
         || signal == Signal::SIGSEGV
         || signal == Signal::SIGILL
-        || signal == Signal::SIGFPE)
+        || signal == Signal::SIGFPE
+        || signal == Signal::SIGALRM)
     {
         panic!("unexpected signal in guest signal handler: {:?}", signal);
     }
@@ -164,10 +165,25 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 .as_mut()
         };
 
+        if signal == Signal::SIGALRM {
+            // if have gotten a SIGALRM, the killswitch that sent this signal must have also
+            // disabled the `terminable` flag. If this assert fails, the SIGALRM came from some
+            // other source, or we have a bug that allows SIGALRM to be sent when they should not.
+            //
+            // TODO: once we have a notion of logging in `lucet-runtime`, this should be a logged
+            // error.
+            debug_assert!(!inst.kill_state.is_terminable());
+
+            inst.state = State::Terminating {
+                details: TerminationDetails::Remote,
+            };
+            return true;
+        }
+
         let trapcode = inst.module.lookup_trapcode(rip);
 
         let behavior = (inst.signal_handler)(inst, &trapcode, signum, siginfo_ptr, ucontext_ptr);
-        match behavior {
+        let switch_to_host = match behavior {
             SignalBehavior::Continue => {
                 // return to the guest context without making any modifications to the instance
                 false
@@ -177,6 +193,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 inst.state = State::Terminating {
                     details: TerminationDetails::Signal,
                 };
+
                 true
             }
             SignalBehavior::Default => {
@@ -224,7 +241,14 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 thunk();
                 true
             }
+        };
+
+        if switch_to_host {
+            // we must disable termination so no KillSwitch may fire in host code.
+            inst.kill_state.disable_termination();
         }
+
+        switch_to_host
     });
 
     if switch_to_host {
@@ -242,6 +266,7 @@ struct SignalState {
     saved_sigfpe: SigAction,
     saved_sigill: SigAction,
     saved_sigsegv: SigAction,
+    saved_sigalrm: SigAction,
     saved_panic_hook: Option<Arc<Box<dyn Fn(&panic::PanicInfo<'_>) + Sync + Send + 'static>>>,
 }
 
@@ -254,6 +279,7 @@ unsafe fn setup_guest_signal_state(ostate: &mut Option<SignalState>) {
     masked_signals.add(Signal::SIGFPE);
     masked_signals.add(Signal::SIGILL);
     masked_signals.add(Signal::SIGSEGV);
+    masked_signals.add(Signal::SIGALRM);
 
     // setup signal handlers
     let sa = SigAction::new(
@@ -265,6 +291,7 @@ unsafe fn setup_guest_signal_state(ostate: &mut Option<SignalState>) {
     let saved_sigfpe = sigaction(Signal::SIGFPE, &sa).expect("sigaction succeeds");
     let saved_sigill = sigaction(Signal::SIGILL, &sa).expect("sigaction succeeds");
     let saved_sigsegv = sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds");
+    let saved_sigalrm = sigaction(Signal::SIGALRM, &sa).expect("sigaction succeeds");
 
     let saved_panic_hook = Some(setup_guest_panic_hook());
 
@@ -274,6 +301,7 @@ unsafe fn setup_guest_signal_state(ostate: &mut Option<SignalState>) {
         saved_sigfpe,
         saved_sigill,
         saved_sigsegv,
+        saved_sigalrm,
         saved_panic_hook,
     });
 }
@@ -303,6 +331,7 @@ unsafe fn restore_host_signal_state(state: &mut SignalState) {
     sigaction(Signal::SIGFPE, &state.saved_sigfpe).expect("sigaction succeeds");
     sigaction(Signal::SIGILL, &state.saved_sigill).expect("sigaction succeeds");
     sigaction(Signal::SIGSEGV, &state.saved_sigsegv).expect("sigaction succeeds");
+    sigaction(Signal::SIGALRM, &state.saved_sigalrm).expect("sigaction succeeds");
 
     // restore panic hook
     drop(panic::take_hook());
@@ -327,6 +356,7 @@ unsafe fn reraise_host_signal_in_handler(
                 Signal::SIGFPE => state.saved_sigfpe.clone(),
                 Signal::SIGILL => state.saved_sigill.clone(),
                 Signal::SIGSEGV => state.saved_sigsegv.clone(),
+                Signal::SIGALRM => state.saved_sigalrm.clone(),
                 sig => panic!(
                     "unexpected signal in reraise_host_signal_in_handler: {:?}",
                     sig

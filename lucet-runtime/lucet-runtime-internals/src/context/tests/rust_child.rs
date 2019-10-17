@@ -47,15 +47,21 @@ macro_rules! test_body {
 macro_rules! init_and_swap {
     ( $stack:ident, $fn:ident, [ $( $args:expr ),* ] ) => {
         unsafe {
+            let kill_state = $crate::instance::KillState::new();
+            kill_state.enable_termination();
             let child = ContextHandle::create_and_init(
                 &mut *$stack,
                 PARENT.as_mut().unwrap(),
+                &kill_state as *const $crate::instance::KillState,
                 $fn as usize,
                 &[$( $args ),*],
             ).unwrap();
             CHILD = Some(child);
 
-            Context::swap(PARENT.as_mut().unwrap(), CHILD.as_ref().unwrap());
+            Context::swap(
+                PARENT.as_mut().unwrap(),
+                CHILD.as_ref().unwrap(),
+            );
         }
     }
 }

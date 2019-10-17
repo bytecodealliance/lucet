@@ -346,8 +346,8 @@ pub use lucet_module::{PublicKey, TrapCode};
 pub use lucet_runtime_internals::alloc::Limits;
 pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::{
-    FaultDetails, Instance, InstanceHandle, RunResult, SignalBehavior, TerminationDetails,
-    YieldedVal,
+    FaultDetails, Instance, InstanceHandle, KillError, KillSuccess, RunResult, SignalBehavior,
+    TerminationDetails, YieldedVal,
 };
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;

@@ -1,7 +1,9 @@
+pub mod execution;
 mod siginfo_ext;
 pub mod signals;
 pub mod state;
 
+pub use crate::instance::execution::{KillError, KillState, KillSuccess, KillSwitch};
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 pub use crate::instance::state::State;
 
@@ -13,7 +15,7 @@ use crate::module::{self, FunctionHandle, FunctionPointer, Global, GlobalValue, 
 use crate::region::RegionInternal;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
-use libc::{c_void, siginfo_t, uintptr_t};
+use libc::{c_void, pthread_self, siginfo_t, uintptr_t};
 use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
 use std::any::Any;
@@ -223,6 +225,9 @@ pub struct Instance {
 
     /// Instance state and error information
     pub(crate) state: State,
+
+    /// Small mutexed state used for remote kill switch functionality
+    pub(crate) kill_state: Arc<KillState>,
 
     /// The memory allocated for this instance
     alloc: Alloc,
@@ -688,6 +693,29 @@ impl Instance {
         self.c_fatal_handler = Some(handler);
     }
 
+    pub fn kill_switch(&self) -> KillSwitch {
+        KillSwitch::new(Arc::downgrade(&self.kill_state))
+    }
+
+    // This needs to be public as it's used in the expansion of `lucet_hostcalls`, available for
+    // external use. But you *really* shouldn't have to call this yourself, so we're going to keep
+    // it out of rustdoc.
+    #[doc(hidden)]
+    pub fn uninterruptable<T, F: FnOnce() -> T>(&mut self, f: F) -> T {
+        self.kill_state.begin_hostcall();
+        let res = f();
+        let stop_reason = self.kill_state.end_hostcall();
+
+        if let Some(termination_details) = stop_reason {
+            // TODO: once we have unwinding, panic here instead so we unwind host frames
+            unsafe {
+                self.terminate(termination_details);
+            }
+        }
+
+        res
+    }
+
     #[inline]
     pub fn get_instruction_count(&self) -> u64 {
         self.get_instance_implicits().instruction_count
@@ -709,6 +737,7 @@ impl Instance {
             module,
             ctx: Context::new(),
             state: State::Ready,
+            kill_state: Arc::new(KillState::new()),
             alloc,
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
@@ -800,15 +829,41 @@ impl Instance {
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
 
+        let kill_state_ptr: *const KillState = &*self.kill_state;
+
         HOST_CTX.with(|host_ctx| {
             Context::init(
                 unsafe { self.alloc.stack_u64_mut() },
                 unsafe { &mut *host_ctx.get() },
                 &mut self.ctx,
+                kill_state_ptr,
                 func.ptr.as_usize(),
                 &args_with_vmctx,
             )
         })?;
+
+        // Set up the guest to set itself as terminable, then continue to
+        // whatever guest code we want to run.
+        //
+        // `lucet_context_activate` takes two arguments:
+        // rsi: address of guest code to execute
+        // rdi: pointer to a bool that indicates the guest can be terminated
+        //
+        // The appropriate value for `rsi` is the top of the guest stack, which
+        // we would otherwise return to and start executing immediately. For
+        // `rdi`, we want to pass a pointer to the instance's `terminable` flag.
+        //
+        // once we've set up arguments, swap out the guest return address with
+        // `lucet_context_activate` so we start execution there.
+        unsafe {
+            let top_of_stack = self.ctx.gpr.rsp as *mut u64;
+            // move the guest code address to rsi
+            self.ctx.gpr.rsi = *top_of_stack;
+            // replace it with the activation thunk
+            *top_of_stack = crate::context::lucet_context_activate as u64;
+            // and store a pointer to indicate we're active
+            self.ctx.gpr.rdi = self.kill_state.terminable_ptr() as u64;
+        }
 
         self.swap_and_return()
     }
@@ -824,6 +879,8 @@ impl Instance {
                 || self.state.is_yielded()
         );
         self.state = State::Running;
+
+        self.kill_state.schedule(unsafe { pthread_self() });
 
         // there should never be another instance running on this thread when we enter this function
         CURRENT_INSTANCE.with(|current_instance| {
@@ -858,6 +915,8 @@ impl Instance {
         // * terminated: state should be `Terminating`; transition to `Terminated` and return the termination details as an Err
         //
         // The state should never be `Ready`, `Terminated`, `Yielded`, or `Transitioning` at this point
+
+        self.kill_state.deschedule();
 
         // Set transitioning state temporarily so that we can move values out of the current state
         let st = mem::replace(&mut self.state, State::Transitioning);
@@ -1006,6 +1065,7 @@ pub enum TerminationDetails {
     BorrowError(&'static str),
     /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
     Provided(Box<dyn Any + 'static>),
+    Remote,
 }
 
 impl TerminationDetails {
@@ -1055,6 +1115,7 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::CtxNotFound => write!(f, "CtxNotFound"),
             TerminationDetails::YieldTypeMismatch => write!(f, "YieldTypeMismatch"),
             TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
+            TerminationDetails::Remote => write!(f, "Remote"),
         }
     }
 }

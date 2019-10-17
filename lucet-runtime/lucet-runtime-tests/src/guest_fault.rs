@@ -124,11 +124,11 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
 macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
-        use libc::{c_void, siginfo_t, SIGSEGV};
+        use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
-            Limits, Region, SignalBehavior, TrapCode,
+            Limits, Region, SignalBehavior, TerminationDetails, TrapCode,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -452,57 +452,6 @@ macro_rules! guest_fault_tests {
                 }
 
                 drop(recoverable_ptr_lock);
-            })
-        }
-
-        #[test]
-        fn alarm() {
-            extern "C" fn timeout_handler(signum: libc::c_int) {
-                assert!(signum == libc::SIGALRM);
-                std::process::exit(3);
-            }
-            test_ex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                inst.set_fatal_handler(fatal_handler_exit);
-
-                match fork().expect("can fork") {
-                    ForkResult::Child => {
-                        // set up alarm handler and pend an alarm in 1 second
-                        unsafe {
-                            // child process doesn't have any contention for installed signal handlers, so
-                            // we don't need to grab the lock exclusively here
-                            sigaction(
-                                Signal::SIGALRM,
-                                &SigAction::new(
-                                    SigHandler::Handler(timeout_handler),
-                                    SaFlags::empty(),
-                                    SigSet::empty(),
-                                ),
-                            )
-                            .expect("sigaction succeeds");
-                        }
-                        nix::unistd::alarm::set(1);
-
-                        // run guest code that loops forever
-                        inst.run("infinite_loop", &[]).expect("instance runs");
-                        // show that we never get here
-                        std::process::exit(1);
-                    }
-                    ForkResult::Parent { child } => {
-                        match waitpid(Some(child), None).expect("can wait on child") {
-                            WaitStatus::Exited(_, code) => {
-                                assert_eq!(code, 3);
-                            }
-                            ws => panic!("unexpected wait status: {:?}", ws),
-                        }
-                    }
-                }
             })
         }
 

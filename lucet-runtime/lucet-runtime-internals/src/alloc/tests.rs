@@ -6,7 +6,7 @@ macro_rules! alloc_tests {
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
         use $crate::context::{Context, ContextHandle};
-        use $crate::instance::InstanceInternal;
+        use $crate::instance::{InstanceInternal, KillState};
         use $crate::module::{GlobalValue, HeapSpec, MockModuleBuilder};
         use $crate::region::Region;
         use $crate::val::Val;
@@ -602,9 +602,12 @@ macro_rules! alloc_tests {
             let mut parent = ContextHandle::new();
             unsafe {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
+                let kill_state = KillState::new();
+                kill_state.enable_termination();
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
+                    &kill_state as *const KillState,
                     heap_touching_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
@@ -626,7 +629,15 @@ macro_rules! alloc_tests {
                     std::slice::from_raw_parts_mut(heap, CONTEXT_TEST_INITIAL_SIZE as usize / 8)
                 };
                 let mut onthestack = [0u8; STACK_PATTERN_LENGTH];
+                // While not used, this array is load-bearing! A function that executes after the
+                // guest completes, `instance_kill_state_exit_guest_region`, may end up using
+                // sufficient stack space to trample over values in this function's call frame.
+                //
+                // Padding it out with a duplicate pattern makes enough space for `onthestack` to
+                // not be clobbered.
+                let mut ignored = [0u8; STACK_PATTERN_LENGTH];
                 for i in 0..STACK_PATTERN_LENGTH {
+                    ignored[i] = (i % 256) as u8;
                     onthestack[i] = (i % 256) as u8;
                 }
                 heap[0] = onthestack.as_ptr() as u64;
@@ -644,9 +655,12 @@ macro_rules! alloc_tests {
             let mut parent = ContextHandle::new();
             unsafe {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
+                let kill_state = KillState::new();
+                kill_state.enable_termination();
                 let child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
                     &mut parent,
+                    &kill_state as *const KillState,
                     stack_pattern_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )

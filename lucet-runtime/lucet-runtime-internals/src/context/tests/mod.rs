@@ -1,15 +1,16 @@
 mod c_child;
 mod rust_child;
 use crate::context::{Context, ContextHandle, Error};
+use crate::instance::execution::KillState;
 use memoffset::offset_of;
 use std::slice;
 
 #[test]
 fn context_offsets_correct() {
     assert_eq!(offset_of!(Context, gpr), 0);
-    assert_eq!(offset_of!(Context, fpr), 8 * 8);
-    assert_eq!(offset_of!(Context, retvals_gp), 8 * 8 + 8 * 16);
-    assert_eq!(offset_of!(Context, retval_fp), 8 * 8 + 8 * 16 + 8 * 2);
+    assert_eq!(offset_of!(Context, fpr), 10 * 8);
+    assert_eq!(offset_of!(Context, retvals_gp), 10 * 8 + 8 * 16);
+    assert_eq!(offset_of!(Context, retval_fp), 10 * 8 + 8 * 16 + 8 * 2);
 }
 
 #[test]
@@ -32,8 +33,15 @@ fn init_rejects_unaligned() {
 
     // now we have the unaligned stack, let's make sure it blows up right
     let mut parent = ContextHandle::new();
-    let res =
-        ContextHandle::create_and_init(&mut stack_unaligned, &mut parent, dummy as usize, &[]);
+    let kill_state = KillState::new();
+    kill_state.enable_termination();
+    let res = ContextHandle::create_and_init(
+        &mut stack_unaligned,
+        &mut parent,
+        &kill_state as *const KillState,
+        dummy as usize,
+        &[],
+    );
 
     if let Err(Error::UnalignedStack) = res {
         assert!(true);

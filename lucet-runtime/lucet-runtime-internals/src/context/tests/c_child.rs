@@ -51,9 +51,12 @@ macro_rules! test_body {
 macro_rules! init_and_swap {
     ( $stack:ident, $fn:ident, [ $( $args:expr ),* ] ) => {
         unsafe {
+            let kill_state = $crate::instance::KillState::new();
+            kill_state.enable_termination();
             let child = Box::into_raw(Box::new(ContextHandle::create_and_init(
                 &mut *$stack,
                 parent_regs.as_mut().unwrap(),
+                &kill_state as *const $crate::instance::KillState,
                 $fn as usize,
                 &[$( $args ),*],
             ).unwrap()));

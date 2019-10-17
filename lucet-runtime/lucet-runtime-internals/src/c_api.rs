@@ -295,6 +295,10 @@ pub mod lucet_result {
                                     .map(|CTerminationDetails { details }| *details)
                                     .unwrap_or(ptr::null_mut()),
                             },
+                            TerminationDetails::Remote => lucet_terminated {
+                                reason: lucet_terminated_reason::Remote,
+                                provided: std::ptr::null_mut(),
+                            },
                         },
                     },
                 },
@@ -348,6 +352,7 @@ pub mod lucet_result {
         YieldTypeMismatch,
         BorrowError,
         Provided,
+        Remote,
     }
 
     #[repr(C)]

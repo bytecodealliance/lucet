@@ -5,7 +5,6 @@ use lucet_runtime_internals::c_api::*;
 use lucet_runtime_internals::instance::{
     instance_handle_from_raw, instance_handle_to_raw, InstanceInternal,
 };
-use lucet_runtime_internals::vmctx::VmctxInternal;
 use lucet_runtime_internals::WASM_PAGE_SIZE;
 use lucet_runtime_internals::{
     assert_nonnull, lucet_hostcall_terminate, lucet_hostcalls, with_ffi_arcs,
