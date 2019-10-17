@@ -250,12 +250,11 @@ fn run(config: Config<'_>) {
 
         if let Some(timeout) = config.timeout {
             let kill_switch = inst.kill_switch();
-            #[allow(unused_must_use)]
             thread::spawn(move || {
                 thread::sleep(timeout);
                 // We may hit this line exactly when the guest exits, so sometimes `terminate` can
                 // fail. That's still acceptable, so just ignore the result.
-                kill_switch.terminate();
+                kill_switch.terminate().ok();
             });
         }
 
