@@ -5,11 +5,11 @@
 //! and "execution domain".
 //!
 //! ## Terminability
-//! This specifically answers the question if "is it safe to initiate termination of this instance
+//! This specifically answers the question "is it safe to initiate termination of this instance
 //! right now?". An instance becomes terminable when it begins executing, and stops being
 //! terminable when it is terminated, or when it stops executing. Termination does not directly map
 //! to the idea of guest code currently executing on a processor, because termination can occur
-//! during host code, or while a guest has yielded exeuction. As a result, termination can only be
+//! during host code, or while a guest has yielded execution. As a result, termination can only be
 //! treated as a best-effort to deschedule a guest, and is typically quick when it occurs during
 //! guest code execution, or immediately upon resuming execution of guest code (exiting host code,
 //! or resuming a yielded instance).
@@ -47,7 +47,7 @@
 //!   - `execution_domain` will be `Guest` when the initial guest function returns, `Hostcall` when
 //!   terminated by `lucet_hostcall_terminate!`, and `Terminated` when exiting due to a termination
 //!   request.
-//! * `Guest function exeucting`
+//! * `Guest function executing`
 //!   - terminable: `true`
 //!   - execution_domain: `Guest`
 //! * `Guest function returns`
@@ -311,7 +311,8 @@ impl KillSwitch {
                 Err(KillError::NotTerminable)
             }
         };
-        // we must hold the lock on this bool at least until we set the "timed_out" flag.
+        // explicitly drop the lock to be clear about how long we want to hold this lock, which is
+        // until all signalling is complete.
         mem::drop(execution_domain);
         result
     }
