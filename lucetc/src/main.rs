@@ -1,6 +1,6 @@
 mod options;
 
-use crate::options::{CodegenOutput, Options};
+use crate::options::{CodegenOutput, ErrorStyle, Options};
 use failure::{format_err, Error, ResultExt};
 use log::info;
 use lucet_module::bindings::Bindings;
@@ -9,9 +9,23 @@ use lucetc::{
     signature::{self, PublicKey},
     Lucetc, LucetcOpts,
 };
-use std::io::{self, Write};
+use serde::Serialize;
+use serde_json;
 use std::path::PathBuf;
 use std::process;
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SerializedLucetcError {
+    error: String,
+}
+
+impl From<Error> for SerializedLucetcError {
+    fn from(e: Error) -> Self {
+        SerializedLucetcError {
+            error: format!("{}", e),
+        }
+    }
+}
 
 fn main() {
     env_logger::init();
@@ -19,15 +33,14 @@ fn main() {
     let opts = Options::get().unwrap();
 
     if let Err(err) = run(&opts) {
-        let mut msg = format!("Error: {}.", err);
-        if let Some(cause) = err.as_fail().cause() {
-            msg.push(' ');
-            msg.push_str(&format!("{}", cause));
+        match opts.error_style {
+            ErrorStyle::Human => eprintln!("Error: {}\n", err),
+            ErrorStyle::Json => {
+                let s: SerializedLucetcError = err.into();
+                let json = serde_json::to_string(&s).unwrap();
+                eprintln!("{}", json);
+            }
         }
-        if !msg.ends_with('\n') {
-            msg.push('\n');
-        }
-        io::stderr().write_all(msg.as_bytes()).unwrap();
         process::exit(1);
     }
 }
