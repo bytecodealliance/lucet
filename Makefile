@@ -35,7 +35,7 @@ test-except-fuzz:
             -p lucet-wasi \
             -p lucet-wasi-fuzz \
             -p lucet-benchmarks \
-            -p lucet-validate \
+            -p lucet-validate
 	helpers/lucet-toolchain-tests/signature.sh
 
 # run a single seed through the fuzzer to stave off bitrot
