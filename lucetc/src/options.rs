@@ -10,6 +10,18 @@ pub enum CodegenOutput {
     SharedObj,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ErrorStyle {
+    Human,
+    Json,
+}
+
+impl Default for ErrorStyle {
+    fn default() -> Self {
+        ErrorStyle::Human
+    }
+}
+
 fn parse_humansized(desc: &str) -> Result<u64, Error> {
     use human_size::{Byte, ParsingError, Size, SpecificSize};
     match desc.parse::<Size>() {
@@ -49,6 +61,7 @@ pub struct Options {
     pub pk_path: Option<PathBuf>,
     pub sk_path: Option<PathBuf>,
     pub count_instructions: bool,
+    pub error_style: ErrorStyle,
 }
 
 impl Options {
@@ -123,6 +136,13 @@ impl Options {
         let pk_path = m.value_of("pk_path").map(PathBuf::from);
         let count_instructions = m.is_present("count_instructions");
 
+        let error_style = match m.value_of("error_style") {
+            None => ErrorStyle::default(),
+            Some("human") => ErrorStyle::Human,
+            Some("json") => ErrorStyle::Json,
+            Some(_) => panic!("unknown value for error-style"),
+        };
+
         Ok(Options {
             output,
             input,
@@ -142,6 +162,7 @@ impl Options {
             sk_path,
             pk_path,
             count_instructions,
+            error_style,
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -278,6 +299,13 @@ impl Options {
                     .long("--count-instructions")
                     .takes_value(false)
                     .help("Instrument the produced binary to count the number of wasm operations the translated program executes")
+            )
+            .arg(
+                Arg::with_name("error_style")
+                    .long("error-style")
+                    .takes_value(true)
+                    .possible_values(&["human", "json"])
+                    .help("Style of error reporting (default: human)"),
             )
             .get_matches();
 
