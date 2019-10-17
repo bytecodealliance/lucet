@@ -623,7 +623,7 @@ impl Instance {
     }
 
     /// Get a mutable reference to a context value of a particular type, if it exists.
-    pub fn get_embed_ctx_mut<T: Any>(&mut self) -> Option<Result<RefMut<'_, T>, BorrowMutError>> {
+    pub fn get_embed_ctx_mut<T: Any>(&self) -> Option<Result<RefMut<'_, T>, BorrowMutError>> {
         self.embed_ctx.try_get_mut::<T>()
     }
 
@@ -1156,7 +1156,7 @@ impl YieldedVal {
 
     /// Attempt to downcast the yielded value to a concrete type, returning the original
     /// `YieldedVal` if unsuccessful.
-    pub fn downcast<A: Any + 'static + Send + Sync>(self) -> Result<Box<A>, YieldedVal> {
+    pub fn downcast<A: Any + 'static>(self) -> Result<Box<A>, YieldedVal> {
         match self.val.downcast() {
             Ok(val) => Ok(val),
             Err(val) => Err(YieldedVal { val }),
@@ -1165,7 +1165,7 @@ impl YieldedVal {
 
     /// Returns a reference to the yielded value if it is present and of type `A`, or `None` if it
     /// isn't.
-    pub fn downcast_ref<A: Any + 'static + Send + Sync>(&self) -> Option<&A> {
+    pub fn downcast_ref<A: Any + 'static>(&self) -> Option<&A> {
         self.val.downcast_ref()
     }
 }
