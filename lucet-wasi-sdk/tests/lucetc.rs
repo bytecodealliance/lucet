@@ -48,8 +48,8 @@ mod lucetc_tests {
             Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile empty");
         let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());
-        // clang creates 3 globals, which are not exported.:
-        assert_eq!(mdata.globals_spec().len(), 3);
+        // clang creates just 1 global:
+        assert_eq!(mdata.globals_spec().len(), 1);
         assert!(mdata.globals_spec()[0].is_internal());
 
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
