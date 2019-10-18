@@ -1,6 +1,6 @@
 [package]
 name = "lucet-runtime"
-version = "0.2.1"
+version = "0.2.2"
 description = "Pure Rust runtime for Lucet WebAssembly toolchain"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 libc = "=0.2.59"
-lucet-runtime-internals = { path = "lucet-runtime-internals", version = "0.2.1" }
+lucet-runtime-internals = { path = "lucet-runtime-internals", version = "0.2.2" }
 lucet-module = { path = "../lucet-module", version = "0.2.1" }
 num-traits = "0.2"
 num-derive = "0.2"
