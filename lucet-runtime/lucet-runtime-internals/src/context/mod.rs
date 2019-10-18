@@ -407,7 +407,12 @@ impl Context {
         // set up an initial call stack for guests to bootstrap into and execute
         let mut stack_builder = CallStackBuilder::new(stack);
 
-        // store a pointer to the context swap completion flag, to signal the guest has activated
+        // pass this crate's `exit_guest_region` function pointer, so we can allow
+        // `exit_guest_function` to be name mangled. Mangling is beneficial as it allows multiple
+        // crates to depend on `lucet-runtime-internals` without linker conflicts.
+        stack_builder.push(crate::instance::execution::exit_guest_region as u64);
+
+        // store a pointer to kill state, which the guest interacts with to safely exit
         stack_builder.push(kill_state as u64);
 
         // store arguments we'll pass to `lucet_context_swap` on the stack, above where the guest

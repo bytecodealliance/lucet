@@ -73,11 +73,8 @@ _lucet_context_backstop:
 
     // load instance pointer, arg 1
     mov 16(%rbp), %rdi
-#ifdef __ELF__
-    call instance_kill_state_exit_guest_region@PLT
-#else
-    call instance_kill_state_exit_guest_region
-#endif
+    // call `lucet_runtime_internals::instance::execution::exit_guest_region`
+    call *24(%rbp)
 
     mov (%rbp), %rdi  /* parent context to arg 1 */
     mov 8(%rbp), %rsi  /* own context to arg 2 */

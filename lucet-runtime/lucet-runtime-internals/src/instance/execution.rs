@@ -125,8 +125,7 @@ pub struct KillState {
     tid_change_notifier: Condvar,
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn instance_kill_state_exit_guest_region(kill_state: *mut KillState) {
+pub unsafe extern "C" fn exit_guest_region(kill_state: *mut KillState) {
     let terminable = (*kill_state).terminable.swap(false, Ordering::SeqCst);
     if !terminable {
         // Something else has taken the terminable flag, so it's not safe to actually exit a
