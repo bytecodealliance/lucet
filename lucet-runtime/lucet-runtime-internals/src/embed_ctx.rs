@@ -30,8 +30,8 @@ impl CtxMap {
         })
     }
 
-    pub fn try_get_mut<T: Any>(&mut self) -> Option<Result<RefMut<'_, T>, BorrowMutError>> {
-        self.map.get_mut(&TypeId::of::<T>()).map(|x| {
+    pub fn try_get_mut<T: Any>(&self) -> Option<Result<RefMut<'_, T>, BorrowMutError>> {
+        self.map.get(&TypeId::of::<T>()).map(|x| {
             x.try_borrow_mut().map(|r| {
                 RefMut::map(r, |b| {
                     b.downcast_mut::<T>()
