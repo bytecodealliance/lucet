@@ -136,7 +136,11 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
             _ => Err(SpecTestErrorKind::UnsupportedCommand)?,
         },
 
-        CommandKind::AssertExhaustion { ref action } => match action {
+        // TODO: verify the exhaustion message is what we expected
+        CommandKind::AssertExhaustion {
+            ref action,
+            message: _,
+        } => match action {
             Action::Invoke {
                 ref module,
                 ref field,
@@ -258,6 +262,10 @@ fn check_retval(expected: &[Value], got: UntypedRetVal) -> Result<(), SpecTestEr
                         .context(SpecTestErrorKind::IncorrectResult)?
                 }
             }
+            Value::V128(_) => {
+                Err(format_err!("got unsupported SIMD V128 value"))
+                    .context(SpecTestErrorKind::UnsupportedCommand)?;
+            }
         },
         n => Err(format_err!("{} expected return values not supported", n))
             .context(SpecTestErrorKind::UnsupportedCommand)?,
@@ -273,6 +281,7 @@ fn translate_args(args: &[Value]) -> Vec<Val> {
             Value::I64(ref i) => Val::U64(*i as u64),
             Value::F32(ref f) => Val::F32(*f),
             Value::F64(ref f) => Val::F64(*f),
+            Value::V128(_) => panic!("unsupported SIMD argument size: v128"),
         };
         out.push(v);
     }
