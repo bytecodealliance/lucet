@@ -129,7 +129,7 @@ impl State {
         }
     }
 
-    pub fn is_fault(&self) -> bool {
+    pub fn is_faulted(&self) -> bool {
         if let State::Faulted { .. } = self {
             true
         } else {

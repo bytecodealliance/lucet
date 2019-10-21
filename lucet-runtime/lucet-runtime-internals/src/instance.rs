@@ -697,6 +697,22 @@ impl Instance {
         KillSwitch::new(Arc::downgrade(&self.kill_state))
     }
 
+    pub fn is_ready(&self) -> bool {
+        self.state.is_ready()
+    }
+
+    pub fn is_yielded(&self) -> bool {
+        self.state.is_yielded()
+    }
+
+    pub fn is_faulted(&self) -> bool {
+        self.state.is_faulted()
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        self.state.is_terminated()
+    }
+
     // This needs to be public as it's used in the expansion of `lucet_hostcalls`, available for
     // external use. But you *really* shouldn't have to call this yourself, so we're going to keep
     // it out of rustdoc.
@@ -794,7 +810,7 @@ impl Instance {
 
     /// Run a function in guest context at the given entrypoint.
     fn run_func(&mut self, func: FunctionHandle, args: &[Val]) -> Result<RunResult, Error> {
-        if !(self.state.is_ready() || (self.state.is_fault() && !self.state.is_fatal())) {
+        if !(self.state.is_ready() || (self.state.is_faulted() && !self.state.is_fatal())) {
             return Err(Error::InvalidArgument(
                 "instance must be ready or non-fatally faulted",
             ));
@@ -875,7 +891,7 @@ impl Instance {
     fn swap_and_return(&mut self) -> Result<RunResult, Error> {
         debug_assert!(
             self.state.is_ready()
-                || (self.state.is_fault() && !self.state.is_fatal())
+                || (self.state.is_faulted() && !self.state.is_fatal())
                 || self.state.is_yielded()
         );
         self.state = State::Running;
