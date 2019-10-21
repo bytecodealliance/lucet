@@ -36,8 +36,8 @@ fn main() {
         match opts.error_style {
             ErrorStyle::Human => eprintln!("Error: {}\n", err),
             ErrorStyle::Json => {
-                let s: SerializedLucetcError = err.into();
-                let json = serde_json::to_string(&s).unwrap();
+                let errs: Vec<SerializedLucetcError> = vec![err.into()];
+                let json = serde_json::to_string(&errs).unwrap();
                 eprintln!("{}", json);
             }
         }
