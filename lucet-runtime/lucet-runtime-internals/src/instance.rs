@@ -911,6 +911,11 @@ impl Instance {
 
         self.with_signals_on(|i| {
             HOST_CTX.with(|host_ctx| {
+                unsafe {
+                    let new_host_ctx = &mut *host_ctx.get() as *const _ as u64;
+                    let stack = i.alloc.stack_u64_mut();
+                    stack[stack.len() - 3] = new_host_ctx;
+                };
                 // Save the current context into `host_ctx`, and jump to the guest context. The
                 // lucet context is linked to host_ctx, so it will return here after it finishes,
                 // successfully or otherwise.
