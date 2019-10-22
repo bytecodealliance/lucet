@@ -609,5 +609,53 @@ macro_rules! host_tests {
                 Ok(_) => panic!("unexpected success"),
             }
         }
+
+        /// This test shows that we can send an `InstanceHandle` to another thread while a guest is
+        /// yielded, and it resumes successfully.
+        #[test]
+        fn switch_threads_resume() {
+            extern "C" {
+                fn hostcall_yields_5(vmctx: *mut lucet_vmctx);
+            }
+
+            unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                hostcall_yields_5(vmctx);
+                42
+            }
+
+            let module = MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "f",
+                    FunctionPointer::from_usize(f as usize),
+                ))
+                .build();
+
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            // make sure we yield with 5 on the original thread
+            assert_eq!(
+                *inst
+                    .run("f", &[])
+                    .unwrap()
+                    .unwrap_yielded()
+                    .downcast::<u64>()
+                    .unwrap(),
+                5u64
+            );
+
+            let res = std::thread::spawn(move || {
+                // but then move the instance to another thread and resume it from there
+                inst.resume()
+                    .expect("instance resumes")
+                    .returned()
+                    .expect("returns 42")
+            })
+            .join()
+            .unwrap();
+            assert_eq!(u64::from(res), 42u64);
+        }
     };
 }
