@@ -79,7 +79,7 @@ use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, Weak};
 
-use crate::instance::TerminationDetails;
+use crate::instance::{Instance, TerminationDetails};
 
 /// All instance state a remote kill switch needs to determine if and how to signal that execution
 /// should stop.
@@ -125,8 +125,11 @@ pub struct KillState {
     tid_change_notifier: Condvar,
 }
 
-pub unsafe extern "C" fn exit_guest_region(kill_state: *mut KillState) {
-    let terminable = (*kill_state).terminable.swap(false, Ordering::SeqCst);
+pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
+    let terminable = (*instance)
+        .kill_state
+        .terminable
+        .swap(false, Ordering::SeqCst);
     if !terminable {
         // Something else has taken the terminable flag, so it's not safe to actually exit a
         // guest context yet. Because this is called when exiting a guest context, the

@@ -47,12 +47,8 @@ macro_rules! test_body {
 macro_rules! init_and_swap {
     ( $stack:ident, $fn:ident, [ $( $args:expr ),* ] ) => {
         unsafe {
-            let kill_state = $crate::instance::KillState::new();
-            kill_state.enable_termination();
             let child = ContextHandle::create_and_init(
                 &mut *$stack,
-                PARENT.as_mut().unwrap(),
-                &kill_state as *const $crate::instance::KillState,
                 $fn as usize,
                 &[$( $args ),*],
             ).unwrap();
@@ -60,7 +56,7 @@ macro_rules! init_and_swap {
 
             Context::swap(
                 PARENT.as_mut().unwrap(),
-                CHILD.as_ref().unwrap(),
+                CHILD.as_mut().unwrap(),
             );
         }
     }
@@ -78,7 +74,7 @@ extern "C" fn arg_printing_child(arg0: *mut c_void, arg1: *mut c_void) {
     )
     .unwrap();
 
-    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap()) };
+    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_mut().unwrap()) };
 
     // Read the arguments again
     let arg0_val = unsafe { *(arg0 as *mut c_int) };
@@ -92,7 +88,7 @@ extern "C" fn arg_printing_child(arg0: *mut c_void, arg1: *mut c_void) {
     )
     .unwrap();
 
-    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_ref().unwrap()) };
+    unsafe { Context::swap(CHILD.as_mut().unwrap(), PARENT.as_mut().unwrap()) };
 }
 
 #[test]
@@ -126,7 +122,7 @@ fn call_child_twice() {
         arg1_val = 10;
 
         unsafe {
-            Context::swap(PARENT.as_mut().unwrap(), CHILD.as_ref().unwrap());
+            Context::swap(PARENT.as_mut().unwrap(), CHILD.as_mut().unwrap());
         }
 
         assert_output_eq!(
@@ -263,7 +259,7 @@ macro_rules! child_n_args {
                 write!(out, $prefix).unwrap();
                 $(
                     write!(out, " {}", $arg).unwrap();
-                );*
+                )*
                 write!(out, "\n").unwrap();
             }
 
@@ -363,7 +359,7 @@ macro_rules! child_n_fp_args {
                 write!(out, $prefix).unwrap();
                 $(
                     write!(out, " {:.1}", $arg).unwrap();
-                );*
+                )*
                 write!(out, "\n").unwrap();
             }
 

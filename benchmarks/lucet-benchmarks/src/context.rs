@@ -9,15 +9,7 @@ fn context_init(c: &mut Criterion) {
 
     c.bench_function("context_init", move |b| {
         b.iter(|| {
-            let mut parent = ContextHandle::new();
-            ContextHandle::create_and_init(
-                &mut *stack,
-                &mut parent,
-                std::ptr::null(),
-                f as usize,
-                &[],
-            )
-            .unwrap();
+            ContextHandle::create_and_init(&mut *stack, f as usize, &[]).unwrap();
         })
     });
 }
@@ -30,19 +22,12 @@ fn context_swap_return(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let mut stack = vec![0u64; 1024].into_boxed_slice();
-                let mut parent = ContextHandle::new();
-                let child = ContextHandle::create_and_init(
-                    &mut *stack,
-                    &mut parent,
-                    std::ptr::null(),
-                    f as usize,
-                    &[],
-                )
-                .unwrap();
-                (stack, parent, child)
+                let child = ContextHandle::create_and_init(&mut *stack, f as usize, &[]).unwrap();
+                (stack, child)
             },
-            |(stack, mut parent, child)| unsafe {
-                Context::swap(&mut parent, &child);
+            |(stack, mut child)| unsafe {
+                let mut parent = ContextHandle::new();
+                Context::swap(&mut parent, &mut child);
                 stack
             },
             criterion::BatchSize::PerIteration,
@@ -59,15 +44,9 @@ fn context_init_swap_return(c: &mut Criterion) {
             || vec![0u64; 1024].into_boxed_slice(),
             |mut stack| {
                 let mut parent = ContextHandle::new();
-                let child = ContextHandle::create_and_init(
-                    &mut *stack,
-                    &mut parent,
-                    std::ptr::null(),
-                    f as usize,
-                    &[],
-                )
-                .unwrap();
-                unsafe { Context::swap(&mut parent, &child) };
+                let mut child =
+                    ContextHandle::create_and_init(&mut *stack, f as usize, &[]).unwrap();
+                unsafe { Context::swap(&mut parent, &mut child) };
                 stack
             },
             criterion::BatchSize::PerIteration,
@@ -353,15 +332,9 @@ fn context_init_swap_return_many_args(c: &mut Criterion) {
             || vec![0u64; 1024].into_boxed_slice(),
             |mut stack| {
                 let mut parent = ContextHandle::new();
-                let child = ContextHandle::create_and_init(
-                    &mut *stack,
-                    &mut parent,
-                    std::ptr::null(),
-                    f as usize,
-                    &args,
-                )
-                .unwrap();
-                unsafe { Context::swap(&mut parent, &child) };
+                let mut child =
+                    ContextHandle::create_and_init(&mut *stack, f as usize, &args).unwrap();
+                unsafe { Context::swap(&mut parent, &mut child) };
                 stack
             },
             criterion::BatchSize::PerIteration,

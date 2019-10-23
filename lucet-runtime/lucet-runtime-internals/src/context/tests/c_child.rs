@@ -51,19 +51,15 @@ macro_rules! test_body {
 macro_rules! init_and_swap {
     ( $stack:ident, $fn:ident, [ $( $args:expr ),* ] ) => {
         unsafe {
-            let kill_state = $crate::instance::KillState::new();
-            kill_state.enable_termination();
             let child = Box::into_raw(Box::new(ContextHandle::create_and_init(
                 &mut *$stack,
-                parent_regs.as_mut().unwrap(),
-                &kill_state as *const $crate::instance::KillState,
                 $fn as usize,
                 &[$( $args ),*],
             ).unwrap()));
 
             child_regs = child;
 
-            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap());
+            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_mut().unwrap());
         }
     }
 }
@@ -113,7 +109,7 @@ fn call_child_twice() {
         arg1_val = 10;
 
         unsafe {
-            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap());
+            Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_mut().unwrap());
         }
 
         assert_eq!(

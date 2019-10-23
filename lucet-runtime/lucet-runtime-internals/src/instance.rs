@@ -747,6 +747,7 @@ impl Instance {
 impl Instance {
     fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: CtxMap) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
+
         let mut inst = Instance {
             magic: LUCET_INSTANCE_MAGIC,
             embed_ctx: embed_ctx,
@@ -845,18 +846,15 @@ impl Instance {
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
 
-        let kill_state_ptr: *const KillState = &*self.kill_state;
-
-        HOST_CTX.with(|host_ctx| {
-            Context::init(
-                unsafe { self.alloc.stack_u64_mut() },
-                unsafe { &mut *host_ctx.get() },
-                &mut self.ctx,
-                kill_state_ptr,
-                func.ptr.as_usize(),
-                &args_with_vmctx,
-            )
-        })?;
+        let self_ptr = self as *mut _;
+        Context::init_with_callback(
+            unsafe { self.alloc.stack_u64_mut() },
+            &mut self.ctx,
+            execution::exit_guest_region,
+            self_ptr,
+            func.ptr.as_usize(),
+            &args_with_vmctx,
+        )?;
 
         // Set up the guest to set itself as terminable, then continue to
         // whatever guest code we want to run.

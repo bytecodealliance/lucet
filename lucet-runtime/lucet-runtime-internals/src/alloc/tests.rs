@@ -6,7 +6,7 @@ macro_rules! alloc_tests {
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
         use $crate::context::{Context, ContextHandle};
-        use $crate::instance::{InstanceInternal, KillState};
+        use $crate::instance::InstanceInternal;
         use $crate::module::{GlobalValue, HeapSpec, MockModuleBuilder};
         use $crate::region::Region;
         use $crate::val::Val;
@@ -602,17 +602,13 @@ macro_rules! alloc_tests {
             let mut parent = ContextHandle::new();
             unsafe {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
-                let kill_state = KillState::new();
-                kill_state.enable_termination();
-                let child = ContextHandle::create_and_init(
+                let mut child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
-                    &mut parent,
-                    &kill_state as *const KillState,
                     heap_touching_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
-                Context::swap(&mut parent, &child);
+                Context::swap(&mut parent, &mut child);
                 assert_eq!(inst.alloc().heap()[0], 123);
                 assert_eq!(inst.alloc().heap()[4095], 45);
             }
@@ -655,17 +651,13 @@ macro_rules! alloc_tests {
             let mut parent = ContextHandle::new();
             unsafe {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
-                let kill_state = KillState::new();
-                kill_state.enable_termination();
-                let child = ContextHandle::create_and_init(
+                let mut child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
-                    &mut parent,
-                    &kill_state as *const KillState,
                     stack_pattern_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
-                Context::swap(&mut parent, &child);
+                Context::swap(&mut parent, &mut child);
 
                 let stack_pattern = inst.alloc().heap_u64()[0] as usize;
                 assert!(stack_pattern > inst.alloc().slot().stack as usize);

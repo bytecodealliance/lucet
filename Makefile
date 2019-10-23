@@ -34,8 +34,8 @@ test-except-fuzz:
             -p lucet-wasi-sdk \
             -p lucet-wasi \
             -p lucet-wasi-fuzz \
-            -p lucet-benchmarks \
             -p lucet-validate
+	cargo test --benches -p lucet-benchmarks -- --test # run the benchmarks in debug mode
 	helpers/lucet-toolchain-tests/signature.sh
 
 # run a single seed through the fuzzer to stave off bitrot

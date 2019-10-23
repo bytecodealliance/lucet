@@ -24,6 +24,7 @@ const SPARSE_HEAP_SIZES_KB: &'static [usize] = &[0, 256, 512, 1024, 2 * 1024, 4 
 /// To minimize the effects of filesystem cache on the `DlModule::load()`, this runs `sync` between
 /// each iteration.
 fn hello_load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
+    lucet_wasi::hostcalls::ensure_linked();
     fn body<R: RegionCreate + 'static>(so_file: &Path) -> InstanceHandle {
         let module = DlModule::load(so_file).unwrap();
         let region = R::create(1, &Limits::default()).unwrap();
