@@ -53,15 +53,21 @@ macro_rules! init_and_swap {
         unsafe {
             let kill_state = $crate::instance::KillState::new();
             kill_state.enable_termination();
+            let mut guest_data = $crate::instance::GuestData::default();
+            guest_data.kill_state = &kill_state as *const $crate::instance::KillState;
             let child = Box::into_raw(Box::new(ContextHandle::create_and_init(
                 &mut *$stack,
-                parent_regs.as_mut().unwrap(),
-                &kill_state as *const $crate::instance::KillState,
+                &mut guest_data,
                 $fn as usize,
                 &[$( $args ),*],
             ).unwrap()));
 
             child_regs = child;
+
+            let parent_ctx: &mut Context = parent_regs.as_mut().unwrap();
+            guest_data.parent_ctx = parent_ctx as *mut Context;
+            let child_ctx: &mut Context = child_regs.as_mut().unwrap();
+            guest_data.child_ctx = child_ctx as *mut Context;
 
             Context::swap(parent_regs.as_mut().unwrap(), child_regs.as_ref().unwrap());
         }

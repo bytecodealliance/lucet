@@ -6,7 +6,7 @@ macro_rules! alloc_tests {
         use $TestRegion as TestRegion;
         use $crate::alloc::Limits;
         use $crate::context::{Context, ContextHandle};
-        use $crate::instance::{InstanceInternal, KillState};
+        use $crate::instance::{GuestData, InstanceInternal, KillState};
         use $crate::module::{GlobalValue, HeapSpec, MockModuleBuilder};
         use $crate::region::Region;
         use $crate::val::Val;
@@ -604,14 +604,19 @@ macro_rules! alloc_tests {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
                 let kill_state = KillState::new();
                 kill_state.enable_termination();
-                let child = ContextHandle::create_and_init(
+                let mut guest_data = GuestData::default();
+                guest_data.kill_state = &kill_state as *const KillState;
+                let mut child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
-                    &mut parent,
-                    &kill_state as *const KillState,
+                    &mut guest_data,
                     heap_touching_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
+                let child_ref: &mut Context = &mut *child;
+                guest_data.child_ctx = child_ref as *mut Context;
+                let parent_ref: &mut Context = &mut *parent;
+                guest_data.parent_ctx = parent_ref as *mut Context;
                 Context::swap(&mut parent, &child);
                 assert_eq!(inst.alloc().heap()[0], 123);
                 assert_eq!(inst.alloc().heap()[4095], 45);
@@ -657,14 +662,19 @@ macro_rules! alloc_tests {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
                 let kill_state = KillState::new();
                 kill_state.enable_termination();
-                let child = ContextHandle::create_and_init(
+                let mut guest_data = GuestData::default();
+                guest_data.kill_state = &kill_state as *const KillState;
+                let mut child = ContextHandle::create_and_init(
                     inst.alloc_mut().stack_u64_mut(),
-                    &mut parent,
-                    &kill_state as *const KillState,
+                    &mut guest_data,
                     stack_pattern_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
                 .expect("context init succeeds");
+                let child_ref: &mut Context = &mut *child;
+                guest_data.child_ctx = child_ref as *mut Context;
+                let parent_ref: &mut Context = &mut *parent;
+                guest_data.parent_ctx = parent_ref as *mut Context;
                 Context::swap(&mut parent, &child);
 
                 let stack_pattern = inst.alloc().heap_u64()[0] as usize;

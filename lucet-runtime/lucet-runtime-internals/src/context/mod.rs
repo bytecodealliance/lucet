@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::instance::execution::KillState;
+use crate::instance::GuestData;
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 use failure::Fail;
 use nix;
@@ -195,13 +195,12 @@ impl ContextHandle {
 
     pub fn create_and_init(
         stack: &mut [u64],
-        parent: &mut ContextHandle,
-        kill_state: *const KillState,
+        guest_data: &mut GuestData,
         fptr: usize,
         args: &[Val],
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
-        Context::init(stack, parent, &mut child, kill_state, fptr, args)?;
+        Context::init(stack, &mut child, guest_data, fptr, args)?;
         Ok(child)
     }
 }
@@ -287,18 +286,18 @@ impl Context {
     ///
     /// ```no_run
     /// # use lucet_runtime_internals::context::Context;
+    /// # use lucet_runtime_internals::instance::GuestData;
     /// # use lucet_runtime_internals::val::Val;
     /// extern "C" { fn entrypoint(x: u64, y: f32); }
     /// // allocating an even number of `u64`s seems to reliably yield
     /// // properly aligned stacks, but TODO do better
     /// let mut stack = vec![0u64; 1024].into_boxed_slice();
-    /// let mut parent = Context::new();
+    /// let mut guest_data = GuestData::default();
     /// let mut child = Context::new();
     /// let res = Context::init(
     ///     &mut *stack,
-    ///     &mut parent,
     ///     &mut child,
-    ///     std::ptr::null(),
+    ///     &mut guest_data,
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
@@ -313,18 +312,18 @@ impl Context {
     ///
     /// ```no_run
     /// # use lucet_runtime_internals::context::{Context, ContextHandle};
+    /// # use lucet_runtime_internals::instance::GuestData;
     /// # use lucet_runtime_internals::val::Val;
     /// extern "C" fn entrypoint(x: u64, y: f32) { }
     /// // allocating an even number of `u64`s seems to reliably yield
     /// // properly aligned stacks, but TODO do better
     /// let mut stack = vec![0u64; 1024].into_boxed_slice();
-    /// let mut parent = ContextHandle::new();
+    /// let mut guest_data = GuestData::default();
     /// let mut child = Context::new();
     /// let res = Context::init(
     ///     &mut *stack,
-    ///     &mut parent,
     ///     &mut child,
-    ///     std::ptr::null(),
+    ///     &mut guest_data,
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
     /// );
@@ -367,9 +366,8 @@ impl Context {
     /// and prepare a context for `fptr`.
     pub fn init(
         stack: &mut [u64],
-        parent: &mut Context,
         child: &mut Context,
-        kill_state: *const KillState,
+        guest_data: &GuestData,
         fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
@@ -406,22 +404,6 @@ impl Context {
 
         // set up an initial call stack for guests to bootstrap into and execute
         let mut stack_builder = CallStackBuilder::new(stack);
-
-        // pass this crate's `exit_guest_region` function pointer, so we can allow
-        // `exit_guest_function` to be name mangled. Mangling is beneficial as it allows multiple
-        // crates to depend on `lucet-runtime-internals` without linker conflicts.
-        stack_builder.push(crate::instance::execution::exit_guest_region as u64);
-
-        // store a pointer to kill state, which the guest interacts with to safely exit
-        stack_builder.push(kill_state as u64);
-
-        // store arguments we'll pass to `lucet_context_swap` on the stack, above where the guest
-        // might scribble over them.
-        stack_builder.push(parent as *mut Context as u64);
-        stack_builder.push(child as *mut Context as u64);
-
-        // we'll pass a pointer to these values via `rbp` in the guest's Context we switch to.
-        let backstop_args = stack_builder.offset();
 
         // we actually don't want to put an explicit pointer to these arguments anywhere. we'll
         // line up the rest of the stack such that these are in argument position when we jump to
@@ -461,9 +443,7 @@ impl Context {
         // the address of the first function to run on `swap`: `lucet_context_bootstrap`.
         child.gpr.rsp = &mut stack[stack.len() - stack_start] as *mut u64 as u64;
 
-        // This value in rbp is only used in `lucet_context_backstop`, where we use it to locate
-        // the parent and child contexts to `Context::swap` with.
-        child.gpr.rbp = &mut stack[stack.len() - backstop_args] as *mut u64 as u64;
+        child.gpr.rbp = guest_data as *const GuestData as u64;
 
         // Read the mask to be restored if we ever need to jump out of a signal handler. If this
         // isn't possible, die.
@@ -529,15 +509,16 @@ impl Context {
     ///
     /// ```no_run
     /// # use lucet_runtime_internals::context::Context;
+    /// # use lucet_runtime_internals::instance::GuestData;
     /// # extern "C" fn entrypoint() {}
     /// # let mut stack = vec![0u64; 1024].into_boxed_slice();
+    /// let mut guest_data = GuestData::default();
     /// let mut parent = Context::new();
     /// let mut child = Context::new();
     /// Context::init(
     ///     &mut stack,
-    ///     &mut parent,
     ///     &mut child,
-    ///     std::ptr::null(),
+    ///     &mut guest_data,
     ///     entrypoint as usize,
     ///     &[],
     /// ).unwrap();
