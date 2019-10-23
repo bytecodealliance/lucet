@@ -60,29 +60,6 @@ pub struct InstanceHandle {
     needs_inst_drop: bool,
 }
 
-/// `GuestData` contains host data that must be shared with guests. These are necesary to implement
-/// operations that interact with the host context, such as context switching and some parts of
-/// instance termination.
-#[repr(C)]
-pub struct GuestData {
-    pub child_ctx: *mut Context,
-    pub parent_ctx: *mut Context,
-    pub kill_state: *const KillState,
-    pub exit_guest_region: *const extern "C" fn(*mut execution::KillState),
-}
-
-impl Default for GuestData {
-    fn default() -> Self {
-        GuestData {
-            child_ctx: std::ptr::null_mut(),
-            parent_ctx: std::ptr::null_mut(),
-            kill_state: std::ptr::null(),
-            exit_guest_region: execution::exit_guest_region
-                as *const extern "C" fn(*mut execution::KillState),
-        }
-    }
-}
-
 // raw pointer lint
 unsafe impl Send for InstanceHandle {}
 
@@ -278,10 +255,6 @@ pub struct Instance {
 
     /// The value passed back to the guest when resuming a yielded instance.
     pub(crate) resumed_val: Option<Box<dyn Any + 'static>>,
-
-    /// Information shared with the guest to implement guest primitives like
-    /// `lucet_context_backstop`.
-    guest_data: GuestData,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -788,7 +761,6 @@ impl Instance {
             signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
             entrypoint: None,
             resumed_val: None,
-            guest_data: GuestData::default(),
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
@@ -874,19 +846,15 @@ impl Instance {
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
 
-        HOST_CTX.with(|host_ctx| {
-            self.guest_data.child_ctx = &mut self.ctx as *mut Context;
-            self.guest_data.kill_state = &*self.kill_state;
-            self.guest_data.parent_ctx = unsafe { &mut *host_ctx.get() };
-
-            Context::init(
-                unsafe { self.alloc.stack_u64_mut() },
-                &mut self.ctx,
-                &self.guest_data,
-                func.ptr.as_usize(),
-                &args_with_vmctx,
-            )
-        })?;
+        let self_ptr = self as *mut _;
+        Context::init_with_callback(
+            unsafe { self.alloc.stack_u64_mut() },
+            &mut self.ctx,
+            execution::exit_guest_region,
+            self_ptr,
+            func.ptr.as_usize(),
+            &args_with_vmctx,
+        )?;
 
         // Set up the guest to set itself as terminable, then continue to
         // whatever guest code we want to run.
@@ -941,7 +909,6 @@ impl Instance {
 
         self.with_signals_on(|i| {
             HOST_CTX.with(|host_ctx| {
-                i.guest_data.parent_ctx = host_ctx.get();
                 // Save the current context into `host_ctx`, and jump to the guest context. The
                 // lucet context is linked to host_ctx, so it will return here after it finishes,
                 // successfully or otherwise.

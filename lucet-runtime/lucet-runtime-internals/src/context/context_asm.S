@@ -65,19 +65,29 @@ _lucet_context_bootstrap:
 lucet_context_backstop:
 _lucet_context_backstop:
     // Note that `rbp` here really has no relation to any stack!
-    // it happens to be an available pointer we can hang the contexts to swap off of.
-    mov (%rbp), %rdi // load the parent context to forward values in return value registers
-    mov %rax, (10*8 + 8*16 + 8*0)(%rdi) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
-    mov %rdx, (10*8 + 8*16 + 8*1)(%rdi)
-    movdqu %xmm0, (10*8 + 8*16 + 8*2)(%rdi) /* floating-point return value */
+    // Instead, it's a pointer to the guest context.
+    mov (10*8 + 8*16 + 8*2 + 16)(%rbp), %rdi // load the parent context to forward values in return value registers
+    mov %rax, (10*8 + 8*16 + 8*0)(%rbp) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
+    mov %rdx, (10*8 + 8*16 + 8*1)(%rbp)
+    movdqu %xmm0, (10*8 + 8*16 + 8*2)(%rbp) /* floating-point return value */
 
-    // load instance pointer, arg 1
-    mov 16(%rbp), %rdi
-    // call `lucet_runtime_internals::instance::execution::exit_guest_region`
-    call *24(%rbp)
+    // load `backstop_callback`, but skip calling it if it's null
+    mov (10*8 + 8*16 + 8*2 + 16 + 8)(%rbp), %rsi
+    test %rsi, %rsi
+#ifdef __ELF__
+    jz no_backstop_callback@PLT
+#else
+    jz no_backstop_callback
+#endif
 
-    mov (%rbp), %rdi  /* parent context to arg 1 */
-    mov 8(%rbp), %rsi  /* own context to arg 2 */
+    // load `backstop_data`, arg 1
+    mov (10*8 + 8*16 + 8*2 + 16 + 8 + 8)(%rbp), %rdi
+    // call `backstop_callback`
+    call *%rsi
+
+no_backstop_callback:
+    mov %rbp, %rdi // load the guest context to the "from" argument
+    mov (10*8 + 8*16 + 8*2 + 16)(%rbp), %rsi // load the parent context to the "to" argument
 
 #ifdef __ELF__
     jmp lucet_context_swap@PLT

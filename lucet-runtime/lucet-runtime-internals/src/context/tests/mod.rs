@@ -1,7 +1,6 @@
 mod c_child;
 mod rust_child;
 use crate::context::{Context, ContextHandle, Error};
-use crate::instance::GuestData;
 use memoffset::offset_of;
 use std::slice;
 
@@ -32,9 +31,7 @@ fn init_rejects_unaligned() {
     let mut stack_unaligned = unsafe { slice::from_raw_parts_mut(ptr, len) };
 
     // now we have the unaligned stack, let's make sure it blows up right
-    let mut guest_data = GuestData::default();
-    let res =
-        ContextHandle::create_and_init(&mut stack_unaligned, &mut guest_data, dummy as usize, &[]);
+    let res = ContextHandle::create_and_init(&mut stack_unaligned, dummy as usize, &[]);
 
     if let Err(Error::UnalignedStack) = res {
         assert!(true);
