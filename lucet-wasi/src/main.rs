@@ -3,17 +3,15 @@
 #[macro_use]
 extern crate clap;
 
-mod wasi;
-
 use clap::Arg;
 use failure::{format_err, Error};
 use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region, RunResult};
+use lucet_wasi::{self, WasiCtxBuilder, __wasi_exitcode_t};
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use wasi::WasiCtxBuilder;
 
 struct Config<'a> {
     lucet_module: &'a str,
@@ -41,7 +39,7 @@ fn parse_humansized(desc: &str) -> Result<u64, Error> {
 fn main() {
     // No-ops, but makes sure the linker doesn't throw away parts
     // of the runtime:
-    wasi::export_wasi_funcs();
+    lucet_wasi::export_wasi_funcs();
 
     let matches = app_from_crate!()
         .arg(
@@ -204,7 +202,6 @@ fn main() {
 }
 
 fn run(config: Config<'_>) {
-    wasi::export_wasi_funcs();
     let exitcode = {
         // doing all of this in a block makes sure everything gets dropped before exiting
         let pk = match (config.verify, config.pk_path) {
@@ -271,7 +268,7 @@ fn run(config: Config<'_>) {
             Err(lucet_runtime::Error::RuntimeTerminated(
                 lucet_runtime::TerminationDetails::Provided(any),
             )) => *any
-                .downcast_ref::<wasi::host::__wasi_exitcode_t>()
+                .downcast_ref::<__wasi_exitcode_t>()
                 .expect("termination yields an exitcode"),
             Err(lucet_runtime::Error::RuntimeTerminated(
                 lucet_runtime::TerminationDetails::Remote,

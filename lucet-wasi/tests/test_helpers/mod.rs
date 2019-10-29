@@ -1,7 +1,6 @@
 use failure::{bail, Error};
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
-use lucet_wasi::host::__wasi_exitcode_t;
-use lucet_wasi::{self, WasiCtx, WasiCtxBuilder};
+use lucet_wasi::{self, WasiCtx, WasiCtxBuilder, __wasi_exitcode_t};
 use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
 use std::fs::File;
