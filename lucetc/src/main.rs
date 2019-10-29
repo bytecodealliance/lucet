@@ -22,7 +22,11 @@ pub struct SerializedLucetcError {
 impl From<Error> for SerializedLucetcError {
     fn from(e: Error) -> Self {
         SerializedLucetcError {
-            error: format!("{}", e),
+            error: if let Some(cause) = e.as_fail().cause() {
+                format!("{}: {}", e, cause)
+            } else {
+                format!("{}", e)
+            },
         }
     }
 }
@@ -34,7 +38,12 @@ fn main() {
 
     if let Err(err) = run(&opts) {
         match opts.error_style {
-            ErrorStyle::Human => eprintln!("Error: {}\n", err),
+            ErrorStyle::Human => {
+                eprintln!("Error: {}\n", err);
+                if let Some(cause) = err.as_fail().cause() {
+                    eprintln!("{}", cause);
+                }
+            }
             ErrorStyle::Json => {
                 let errs: Vec<SerializedLucetcError> = vec![err.into()];
                 let json = serde_json::to_string(&errs).unwrap();
