@@ -15,3 +15,6 @@ pub use wasi::{export_wasi_funcs, WasiCtx, WasiCtxBuilder};
 // `u32` in our code that uses the exitcode.
 #[allow(non_camel_case_types)]
 pub type __wasi_exitcode_t = u32;
+
+// Re-export wasi-common's error type
+pub use wasi_common::Error;
