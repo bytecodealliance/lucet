@@ -22,7 +22,7 @@ mod types;
 
 use crate::load::read_bytes;
 pub use crate::{
-    compiler::{Compiler, CpuFeatures, OptLevel, SpecificFeatures, TargetCpu},
+    compiler::{Compiler, CpuFeatures, OptLevel, SpecificFeature, TargetCpu},
     error::{LucetcError, LucetcErrorKind},
     heap::HeapSettings,
     load::read_module,
@@ -314,7 +314,7 @@ impl Lucetc {
         let compiler = Compiler::new(
             &module_contents,
             self.opt_level,
-            self.cpu_features,
+            self.cpu_features.clone(),
             &bindings,
             self.heap.clone(),
             self.count_instructions,
@@ -332,7 +332,7 @@ impl Lucetc {
         let compiler = Compiler::new(
             &module_contents,
             self.opt_level,
-            self.cpu_features,
+            self.cpu_features.clone(),
             &bindings,
             self.heap.clone(),
             self.count_instructions,

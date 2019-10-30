@@ -1,6 +1,7 @@
 use crate::error::{LucetcError, LucetcErrorKind};
 use cranelift_codegen::{isa, settings::Configurable};
 use failure::{format_err, ResultExt};
+use std::collections::HashMap;
 use target_lexicon::Triple;
 
 /// x86 CPU families used as shorthand for different CPU feature configurations.
@@ -8,8 +9,10 @@ use target_lexicon::Triple;
 /// Matches the definitions from `cranelift-codegen`'s x86 settings definition.
 #[derive(Debug, Clone, Copy)]
 pub enum TargetCpu {
+    Native,
     Baseline,
     Nehalem,
+    Sandybridge,
     Haswell,
     Broadwell,
     Skylake,
@@ -18,89 +21,49 @@ pub enum TargetCpu {
     Znver1,
 }
 
-/// A manual specification of the CPU features to use during codegen.
-#[derive(Debug, Clone, Copy)]
-pub struct SpecificFeatures {
-    pub has_sse3: bool,
-    pub has_ssse3: bool,
-    pub has_sse41: bool,
-    pub has_sse42: bool,
-    pub has_popcnt: bool,
-    pub has_avx: bool,
-    pub has_bmi1: bool,
-    pub has_bmi2: bool,
-    pub has_lzcnt: bool,
-}
-
-impl SpecificFeatures {
-    /// Return a `CpuFeatures` with all optional features disabled.
-    pub fn all_disabled() -> Self {
-        Self {
-            has_sse3: false,
-            has_ssse3: false,
-            has_sse41: false,
-            has_sse42: false,
-            has_popcnt: false,
-            has_avx: false,
-            has_bmi1: false,
-            has_bmi2: false,
-            has_lzcnt: false,
-        }
-    }
-}
-
-impl From<TargetCpu> for SpecificFeatures {
-    fn from(cpu: TargetCpu) -> Self {
+impl TargetCpu {
+    fn features(&self) -> Vec<SpecificFeature> {
+        use SpecificFeature::*;
         use TargetCpu::*;
-        match cpu {
-            Baseline => Self::all_disabled(),
-            Nehalem => Self {
-                has_sse3: true,
-                has_ssse3: true,
-                has_sse41: true,
-                has_sse42: true,
-                has_popcnt: true,
-                ..Baseline.into()
-            },
-            Haswell => Self {
-                // Note: this is not part of the Cranelift profile for Haswell, which only uses
-                // CPUID detection to enable AVX. If we want to bypass CPUID when compiling, we need
-                // to set it manually, and Haswell is the first of the CPUs with profiles to have
-                // AVX.
-                has_avx: true,
-                has_bmi1: true,
-                has_bmi2: true,
-                has_lzcnt: true,
-                ..Nehalem.into()
-            },
-            Broadwell => Haswell.into(),
-            Skylake => Broadwell.into(),
-            Cannonlake => Skylake.into(),
-            Icelake => Cannonlake.into(),
-            Znver1 => Self {
-                has_sse3: true,
-                has_ssse3: true,
-                has_sse41: true,
-                has_sse42: true,
-                has_popcnt: true,
-                // Note: similarly to the Haswell AVX flag, we don't want to rely on CPUID detection
-                // here, but Ryzen does support AVX.
-                has_avx: true,
-                has_bmi1: true,
-                has_bmi2: true,
-                has_lzcnt: true,
-            },
+        match self {
+            Native | Baseline => vec![],
+            Nehalem => vec![SSE3, SSSE3, SSE41, SSE42, Popcnt],
+            // Note: this is not part of the Cranelift profile for Haswell, and there is no Sandy
+            // Bridge profile. Instead, Cranelift only uses CPUID detection to enable AVX. If we
+            // want to bypass CPUID when compiling, we need to set AVX manually, and Sandy Bridge is
+            // the first family of Intel CPUs with AVX.
+            Sandybridge => [Nehalem.features().as_slice(), &[AVX]].concat(),
+            Haswell => [Sandybridge.features().as_slice(), &[BMI1, BMI2, Lzcnt]].concat(),
+            Broadwell => Haswell.features(),
+            Skylake => Broadwell.features(),
+            Cannonlake => Skylake.features(),
+            Icelake => Cannonlake.features(),
+            Znver1 => vec![SSE3, SSSE3, SSE41, SSE42, Popcnt, AVX, BMI1, BMI2, Lzcnt],
         }
     }
 }
 
-/// x86-specific CPU features that affect code generation.
-#[derive(Debug, Clone, Copy)]
-pub enum CpuFeatures {
-    /// Detect and use the CPU features available on the host at compile-time.
-    DetectCpuid,
-    /// Use specific CPU features rather than relying on CPUID detection.
-    Specify(SpecificFeatures),
+/// Individual CPU features that may be used during codegen.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SpecificFeature {
+    SSE3,
+    SSSE3,
+    SSE41,
+    SSE42,
+    Popcnt,
+    AVX,
+    BMI1,
+    BMI2,
+    Lzcnt,
+}
+
+/// An x86-specific configuration of CPU features that affect code generation.
+#[derive(Debug, Clone)]
+pub struct CpuFeatures {
+    /// Base CPU profile to use
+    cpu: TargetCpu,
+    /// Specific CPU features to add or remove from the profile
+    specific_features: HashMap<SpecificFeature, bool>,
 }
 
 impl Default for CpuFeatures {
@@ -110,50 +73,70 @@ impl Default for CpuFeatures {
 }
 
 impl CpuFeatures {
+    pub fn new(cpu: TargetCpu, specific_features: HashMap<SpecificFeature, bool>) -> Self {
+        Self {
+            cpu,
+            specific_features,
+        }
+    }
+
     /// Return a `CpuFeatures` that uses the CPUID instruction to determine which features to enable.
     pub fn detect_cpuid() -> Self {
-        CpuFeatures::DetectCpuid
+        CpuFeatures {
+            cpu: TargetCpu::Native,
+            specific_features: HashMap::new(),
+        }
     }
 
     /// Return a `CpuFeatures` with no optional features enabled.
-    pub fn all_disabled() -> Self {
-        CpuFeatures::Specify(SpecificFeatures::all_disabled())
+    pub fn baseline() -> Self {
+        CpuFeatures {
+            cpu: TargetCpu::Baseline,
+            specific_features: HashMap::new(),
+        }
+    }
+
+    pub fn set(&mut self, sf: SpecificFeature, enabled: bool) {
+        self.specific_features.insert(sf, enabled);
     }
 
     /// Return a `cranelift_codegen::isa::Builder` configured with these CPU features.
     pub fn isa_builder(&self) -> Result<isa::Builder, LucetcError> {
-        match self {
-            CpuFeatures::DetectCpuid => cranelift_native::builder()
+        use SpecificFeature::*;
+        use TargetCpu::*;
+
+        let mut isa_builder = if let Native = self.cpu {
+            cranelift_native::builder()
                 .map_err(|_| format_err!("host machine is not a supported target"))
-                .context(LucetcErrorKind::Unsupported)
-                .map_err(|e| e.into()),
-            CpuFeatures::Specify(features) => {
-                let mut isa_builder = isa::lookup(Triple::host())
-                    .map_err(|_| format_err!("host machine is not a supported target"))
-                    .context(LucetcErrorKind::Unsupported)?;
+        } else {
+            isa::lookup(Triple::host())
+                .map_err(|_| format_err!("host machine is not a supported target"))
+        }
+        .context(LucetcErrorKind::Unsupported)?;
 
-                macro_rules! enable_feature {
-                    ( $feature:ident ) => {
-                        if features.$feature {
-                            isa_builder
-                                .enable(stringify!($feature))
-                                .context(LucetcErrorKind::Unsupported)?;
-                        }
-                    };
-                }
+        let mut specific_features = self.specific_features.clone();
 
-                enable_feature!(has_sse3);
-                enable_feature!(has_ssse3);
-                enable_feature!(has_sse41);
-                enable_feature!(has_sse42);
-                enable_feature!(has_popcnt);
-                enable_feature!(has_avx);
-                enable_feature!(has_bmi1);
-                enable_feature!(has_bmi2);
-                enable_feature!(has_lzcnt);
+        // add any features from the CPU profile if they are not already individually specified
+        for cpu_feature in self.cpu.features() {
+            specific_features.entry(cpu_feature).or_insert(true);
+        }
 
-                Ok(isa_builder)
+        for (feature, enabled) in specific_features.into_iter() {
+            let enabled = if enabled { "true" } else { "false" };
+            match feature {
+                SSE3 => isa_builder.set("has_sse3", enabled).unwrap(),
+                SSSE3 => isa_builder.set("has_ssse3", enabled).unwrap(),
+                SSE41 => isa_builder.set("has_sse41", enabled).unwrap(),
+                SSE42 => isa_builder.set("has_sse42", enabled).unwrap(),
+                Popcnt => isa_builder.set("has_popcnt", enabled).unwrap(),
+                AVX => isa_builder.set("has_avx", enabled).unwrap(),
+                BMI1 => isa_builder.set("has_bmi1", enabled).unwrap(),
+                BMI2 => isa_builder.set("has_bmi2", enabled).unwrap(),
+                Lzcnt => isa_builder.set("has_lzcnt", enabled).unwrap(),
             }
         }
+
+
+        Ok(isa_builder)
     }
 }

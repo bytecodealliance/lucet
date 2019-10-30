@@ -1,6 +1,6 @@
 mod cpu_features;
 
-pub use self::cpu_features::{CpuFeatures, SpecificFeatures, TargetCpu};
+pub use self::cpu_features::{CpuFeatures, SpecificFeature, TargetCpu};
 use crate::decls::ModuleDecls;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::function::FuncInfo;
@@ -66,7 +66,7 @@ impl<'a> Compiler<'a> {
         count_instructions: bool,
         validator: &Option<Validator>,
     ) -> Result<Self, LucetcError> {
-        let isa = Self::target_isa(opt_level, cpu_features)?;
+        let isa = Self::target_isa(opt_level, &cpu_features)?;
 
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
@@ -222,13 +222,13 @@ impl<'a> Compiler<'a> {
         }
         Ok(CraneliftFuncs::new(
             funcs,
-            Self::target_isa(self.opt_level, self.cpu_features)?,
+            Self::target_isa(self.opt_level, &self.cpu_features)?,
         ))
     }
 
     fn target_isa(
         opt_level: OptLevel,
-        cpu_features: CpuFeatures,
+        cpu_features: &CpuFeatures,
     ) -> Result<Box<dyn TargetIsa>, LucetcError> {
         let mut flags_builder = settings::builder();
         let isa_builder = cpu_features.isa_builder()?;

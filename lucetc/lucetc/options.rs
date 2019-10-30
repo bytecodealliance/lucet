@@ -1,6 +1,6 @@
 use clap::{App, Arg, ArgMatches, Values};
-use failure::{format_err, Error};
-use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeatures, TargetCpu};
+use failure::Error;
+use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,46 +42,58 @@ fn humansized(bytes: u64) -> String {
 }
 
 fn cpu_features_from_args(cpu: Option<&str>, features: Values) -> Result<CpuFeatures, Error> {
+    use SpecificFeature::*;
+    use TargetCpu::*;
     if cpu.is_none() && features.len() == 0 {
-        Ok(CpuFeatures::DetectCpuid)
+        Ok(CpuFeatures::detect_cpuid())
     } else {
-        let mut sfs: SpecificFeatures = match cpu {
-            None => TargetCpu::Baseline,
+        let cpu: TargetCpu = match cpu {
+            None => Baseline,
             Some(s) => match s.to_lowercase().as_str() {
-                "baseline" => TargetCpu::Baseline,
-                "nehalem" => TargetCpu::Nehalem,
-                "haswell" => TargetCpu::Haswell,
-                "broadwell" => TargetCpu::Broadwell,
-                "skylake" => TargetCpu::Skylake,
-                "cannonlake" => TargetCpu::Cannonlake,
-                "icelake" => TargetCpu::Icelake,
-                "znver1" => TargetCpu::Znver1,
-                _ => Err(format_err!("unsupported CPU: {}", s))?,
+                "native" => Native,
+                "baseline" => Baseline,
+                "nehalem" => Nehalem,
+                "sandybridge" => Sandybridge,
+                "haswell" => Haswell,
+                "broadwell" => Broadwell,
+                "skylake" => Skylake,
+                "cannonlake" => Cannonlake,
+                "icelake" => Icelake,
+                "znver1" => Znver1,
+                _ => unreachable!("invalid CPU string despite passing validation: {}", s),
             },
-        }
-        .into();
-        for f in features {
-            let b = match f.chars().nth(0) {
-                Some('+') => true,
-                Some('-') => false,
-                _ => unreachable!("invalid feature string despite passing validation: {}", f),
-            };
-            // the only valid starting characters are single-byte '+' and '-', so this indexing
-            // ought not to fail
-            match &f[1..] {
-                "sse3" => sfs.has_sse3 = b,
-                "ssse3" => sfs.has_ssse3 = b,
-                "sse41" => sfs.has_sse41 = b,
-                "sse42" => sfs.has_sse42 = b,
-                "popcnt" => sfs.has_popcnt = b,
-                "avx" => sfs.has_avx = b,
-                "bmi1" => sfs.has_bmi1 = b,
-                "bmi2" => sfs.has_bmi2 = b,
-                "lzcnt" => sfs.has_lzcnt = b,
-                _ => unreachable!("invalid feature string despite passing validation: {}", f),
-            }
-        }
-        Ok(CpuFeatures::Specify(sfs))
+        };
+        let specific_features = features
+            .map(|fstr| {
+                let b = match fstr.chars().nth(0) {
+                    Some('+') => true,
+                    Some('-') => false,
+                    _ => unreachable!(
+                        "invalid feature string despite passing validation: {}",
+                        fstr
+                    ),
+                };
+                // the only valid starting characters are single-byte '+' and '-', so this indexing
+                // ought not to fail
+                let f = match &fstr[1..] {
+                    "sse3" => SSE3,
+                    "ssse3" => SSSE3,
+                    "sse41" => SSE41,
+                    "sse42" => SSE42,
+                    "popcnt" => Popcnt,
+                    "avx" => AVX,
+                    "bmi1" => BMI1,
+                    "bmi2" => BMI2,
+                    "lzcnt" => Lzcnt,
+                    _ => unreachable!(
+                        "invalid feature string despite passing validation: {}",
+                        fstr
+                    ),
+                };
+                (f, b)
+            })
+            .collect();
+        Ok(CpuFeatures::new(cpu, specific_features))
     }
 }
 
@@ -245,8 +257,10 @@ impl Options {
                     .multiple(false)
                     .number_of_values(1)
                     .possible_values(&[
+                        "native",
                         "baseline",
                         "nehalem",
+                        "sandybridge",
                         "haswell",
                         "broadwell",
                         "skylake",
@@ -260,6 +274,7 @@ impl Options {
 
 If neither `--target-cpu` nor `--target-feature` is provided, `lucetc`
 will automatically detect and use the features available on the host CPU.
+This is equivalent to choosing `--target-cpu=native`.
 
 "
                     )
