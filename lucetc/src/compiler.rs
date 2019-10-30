@@ -16,7 +16,7 @@ use cranelift_codegen::{
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_native;
-use cranelift_wasm::{translate_module, FuncTranslator, WasmError};
+use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use failure::{format_err, Fail, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::{FunctionSpec, ModuleData, MODULE_DATA_SYM};
@@ -50,6 +50,7 @@ pub struct Compiler<'a> {
     clif_module: ClifModule<FaerieBackend>,
     opt_level: OptLevel,
     count_instructions: bool,
+    module_translation_state: ModuleTranslationState,
 }
 
 impl<'a> Compiler<'a> {
@@ -84,12 +85,15 @@ impl<'a> Compiler<'a> {
                 .context(LucetcErrorKind::Validation)?;
         }
 
-        translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
-            WasmError::User(_) => e.context(LucetcErrorKind::Input),
-            WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation), // This will trigger once cranelift-wasm upgrades to a validating wasm parser.
-            WasmError::Unsupported { .. } => e.context(LucetcErrorKind::Unsupported),
-            WasmError::ImplLimitExceeded { .. } => e.context(LucetcErrorKind::TranslatingModule),
-        })?;
+        let module_translation_state =
+            translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
+                WasmError::User(_) => e.context(LucetcErrorKind::Input),
+                WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation), // This will trigger once cranelift-wasm upgrades to a validating wasm parser.
+                WasmError::Unsupported { .. } => e.context(LucetcErrorKind::Unsupported),
+                WasmError::ImplLimitExceeded { .. } => {
+                    e.context(LucetcErrorKind::TranslatingModule)
+                }
+            })?;
 
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
@@ -120,6 +124,7 @@ impl<'a> Compiler<'a> {
             clif_module,
             opt_level,
             count_instructions,
+            module_translation_state,
         })
     }
 
@@ -137,7 +142,13 @@ impl<'a> Compiler<'a> {
             clif_context.func.signature = func.signature.clone();
 
             func_translator
-                .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
+                .translate(
+                    &self.module_translation_state,
+                    code,
+                    *code_offset,
+                    &mut clif_context.func,
+                    &mut func_info,
+                )
                 .map_err(|e| format_err!("in {}: {:?}", func.name.symbol(), e))
                 .context(LucetcErrorKind::FunctionTranslation)?;
 
@@ -192,7 +203,13 @@ impl<'a> Compiler<'a> {
             clif_context.func.signature = func.signature.clone();
 
             func_translator
-                .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
+                .translate(
+                    &self.module_translation_state,
+                    code,
+                    *code_offset,
+                    &mut clif_context.func,
+                    &mut func_info,
+                )
                 .map_err(|e| format_err!("in {}: {:?}", func.name.symbol(), e))
                 .context(LucetcErrorKind::FunctionTranslation)?;
 
