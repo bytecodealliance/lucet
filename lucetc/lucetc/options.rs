@@ -1,6 +1,6 @@
-use clap::{App, Arg, ArgMatches};
-use failure::Error;
-use lucetc::{HeapSettings, OptLevel};
+use clap::{App, Arg, ArgMatches, Values};
+use failure::{format_err, Error};
+use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeatures, TargetCpu};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,6 +41,50 @@ fn humansized(bytes: u64) -> String {
     mb.to_string()
 }
 
+fn cpu_features_from_args(cpu: Option<&str>, features: Values) -> Result<CpuFeatures, Error> {
+    if cpu.is_none() && features.len() == 0 {
+        Ok(CpuFeatures::DetectCpuid)
+    } else {
+        let mut sfs: SpecificFeatures = match cpu {
+            None => TargetCpu::Baseline,
+            Some(s) => match s.to_lowercase().as_str() {
+                "baseline" => TargetCpu::Baseline,
+                "nehalem" => TargetCpu::Nehalem,
+                "haswell" => TargetCpu::Haswell,
+                "broadwell" => TargetCpu::Broadwell,
+                "skylake" => TargetCpu::Skylake,
+                "cannonlake" => TargetCpu::Cannonlake,
+                "icelake" => TargetCpu::Icelake,
+                "znver1" => TargetCpu::Znver1,
+                _ => Err(format_err!("unsupported CPU: {}", s))?,
+            },
+        }
+        .into();
+        for f in features {
+            let b = match f.chars().nth(0) {
+                Some('+') => true,
+                Some('-') => false,
+                _ => unreachable!("invalid feature string despite passing validation: {}", f),
+            };
+            // the only valid starting characters are single-byte '+' and '-', so this indexing
+            // ought not to fail
+            match &f[1..] {
+                "sse3" => sfs.has_sse3 = b,
+                "ssse3" => sfs.has_ssse3 = b,
+                "sse41" => sfs.has_sse41 = b,
+                "sse42" => sfs.has_sse42 = b,
+                "popcnt" => sfs.has_popcnt = b,
+                "avx" => sfs.has_avx = b,
+                "bmi1" => sfs.has_bmi1 = b,
+                "bmi2" => sfs.has_bmi2 = b,
+                "lzcnt" => sfs.has_lzcnt = b,
+                _ => unreachable!("invalid feature string despite passing validation: {}", f),
+            }
+        }
+        Ok(CpuFeatures::Specify(sfs))
+    }
+}
+
 #[derive(Debug)]
 pub struct Options {
     pub output: PathBuf,
@@ -55,6 +99,7 @@ pub struct Options {
     pub reserved_size: Option<u64>,
     pub guard_size: Option<u64>,
     pub opt_level: OptLevel,
+    pub cpu_features: CpuFeatures,
     pub keygen: bool,
     pub sign: bool,
     pub verify: bool,
@@ -128,6 +173,10 @@ impl Options {
             Some("2") | Some("speed_and_size") => OptLevel::SpeedAndSize,
             Some(_) => panic!("unknown value for opt-level"),
         };
+        let cpu_features = cpu_features_from_args(
+            m.value_of("target-cpu"),
+            m.values_of("target-feature").unwrap_or_default(),
+        )?;
 
         let keygen = m.is_present("keygen");
         let sign = m.is_present("sign");
@@ -156,6 +205,7 @@ impl Options {
             reserved_size,
             guard_size,
             opt_level,
+            cpu_features,
             keygen,
             sign,
             verify,
@@ -187,6 +237,69 @@ impl Options {
                     .takes_value(true)
                     .multiple(false)
                     .help("output destination, defaults to a.out if unspecified"),
+            )
+            .arg(
+                Arg::with_name("target-cpu")
+                    .long("--target-cpu")
+                    .takes_value(true)
+                    .multiple(false)
+                    .number_of_values(1)
+                    .possible_values(&[
+                        "baseline",
+                        "nehalem",
+                        "haswell",
+                        "broadwell",
+                        "skylake",
+                        "cannonlake",
+                        "icelake",
+                        "znver1",
+                    ])
+                    .help("Generate code for a particular type of CPU.")
+                    .long_help(
+"Generate code for a particular type of CPU.
+
+If neither `--target-cpu` nor `--target-feature` is provided, `lucetc`
+will automatically detect and use the features available on the host CPU.
+
+"
+                    )
+            )
+            .arg(
+                Arg::with_name("target-feature")
+                    .long("--target-feature")
+                    .takes_value(true)
+                    .multiple(true)
+                    .use_delimiter(true)
+                    .possible_values(&[
+                        "+sse3", "-sse3",
+                        "+ssse3", "-ssse3",
+                        "+sse41", "-sse41",
+                        "+sse42", "-sse42",
+                        "+popcnt", "-popcnt",
+                        "+avx", "-avx",
+                        "+bmi1", "-bmi1",
+                        "+bmi2", "-bmi2",
+                        "+lzcnt", "-lzcnt",
+                    ])
+                    .help("Enable (+) or disable (-) specific CPU features.")
+                    .long_help(
+"Enable (+) or disable (-) specific CPU features.
+
+If neither `--target-cpu` nor `--target-feature` is provided, `lucetc`
+will automatically detect and use the features available on the host CPU.
+
+This option is additive with, but takes precedence over `--target-cpu`.
+For example, `--target-cpu=haswell --target-feature=-avx` will disable
+AVX, but leave all other default Haswell features enabled.
+
+Multiple `--target-feature` groups may be specified, with precedence
+increasing from left to right. For example, these arguments will enable
+SSE3 but not AVX:
+
+    --target-feature=+sse3,+avx --target-feature=-avx
+
+"
+                    )
             )
             .arg(
                 Arg::with_name("bindings")

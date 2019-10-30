@@ -9,12 +9,9 @@ categories = ["wasm"]
 authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
-[lib]
-crate-type=["rlib"]
-
 [[bin]]
 name = "lucetc"
-path = "src/main.rs"
+path = "lucetc/main.rs"
 
 [dependencies]
 bincode = "1.1.4"
