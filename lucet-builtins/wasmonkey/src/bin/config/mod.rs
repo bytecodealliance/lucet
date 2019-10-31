@@ -11,6 +11,7 @@ pub struct Config {
 
 impl Config {
     pub fn parse_cmdline() -> Result<Self, WError> {
+        let _ = include_str!("../../../Cargo.toml");
         let matches = app_from_crate!()
             .arg(
                 Arg::with_name("input_file")

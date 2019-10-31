@@ -18,6 +18,7 @@ pub struct ExeConfig {
 
 impl ExeConfig {
     pub fn parse() -> Result<Self, IDLError> {
+        let _ = include_str!("../Cargo.toml");
         let matches = app_from_crate!()
             .arg(
                 Arg::with_name("input")

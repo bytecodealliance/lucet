@@ -228,6 +228,7 @@ impl Options {
         })
     }
     pub fn get() -> Result<Self, Error> {
+        let _ = include_str!("../Cargo.toml");
         let m = app_from_crate!()
             .arg(
                 Arg::with_name("precious")

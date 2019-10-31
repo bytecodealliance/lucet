@@ -7,6 +7,7 @@ use lucet_spectest;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Error> {
+    let _ = include_str!("../Cargo.toml");
     let matches = app_from_crate!()
         .arg(
             Arg::with_name("input")
