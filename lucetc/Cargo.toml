@@ -1,6 +1,6 @@
 [package]
 name = "lucetc"
-version = "0.4.0"
+version = "0.4.1"
 description = "Fastly's WebAssembly to native code compiler"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
@@ -23,8 +23,8 @@ cranelift-module = { path = "../cranelift/cranelift-module", version = "0.46.1" 
 cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.46.1" }
 cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.46.1" }
 target-lexicon = "0.8.0"
-lucet-module = { path = "../lucet-module", version = "0.4.0" }
-lucet-validate = { path = "../lucet-validate", version = "0.4.0" }
+lucet-module = { path = "../lucet-module", version = "0.4.1" }
+lucet-validate = { path = "../lucet-validate", version = "0.4.1" }
 wasmparser = "0.39.1"
 clap="2.32"
 log = "0.4"
@@ -38,12 +38,12 @@ wabt = "0.9.2"
 tempfile = "3.0"
 bimap = "0.2"
 human-size = "0.4"
-parity-wasm = "0.38"
+parity-wasm = "0.40.3"
 minisign = "0.5.11"
 memoffset = "0.5.1"
 serde = "1.0"
 serde_json = "1.0"
-raw-cpuid = "7.0.3"
+raw-cpuid = "6.0.0"
 
 [package.metadata.deb]
 name = "fst-lucetc"
