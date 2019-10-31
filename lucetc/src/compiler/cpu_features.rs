@@ -136,7 +136,6 @@ impl CpuFeatures {
             }
         }
 
-
         Ok(isa_builder)
     }
 }
