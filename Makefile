@@ -43,9 +43,10 @@ test-except-fuzz:
 test-fuzz:
 	cargo run -p lucet-wasi-fuzz -- test-seed 410757864950
 
+FUZZ_NUM_TESTS?=1000
 .PHONY: fuzz
 fuzz:
-	cargo run --release -p lucet-wasi-fuzz -- fuzz --num-tests=1000
+	cargo run --release -p lucet-wasi-fuzz -- fuzz --num-tests=$(FUZZ_NUM_TESTS)
 
 .PHONY: bench
 bench:
