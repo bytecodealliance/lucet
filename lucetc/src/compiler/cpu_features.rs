@@ -91,21 +91,21 @@ fn detect_features(features: &mut ModuleFeatures) {
     }
 }
 
-impl Into<ModuleFeatures> for CpuFeatures {
-    fn into(self) -> ModuleFeatures {
-        let mut features = ModuleFeatures::none();
+impl From<&CpuFeatures> for ModuleFeatures {
+    fn from(cpu_features: &CpuFeatures) -> ModuleFeatures {
+        let mut module_features = ModuleFeatures::none();
 
         let mut feature_set: HashSet<SpecificFeature> = HashSet::new();
 
-        if let TargetCpu::Native = self.cpu {
+        if let TargetCpu::Native = cpu_features.cpu {
             // If the target is `Native`, start with the current set of cpu features..
-            detect_features(&mut features);
+            detect_features(&mut module_features);
         } else {
             // otherwise, start with the target cpu's default feature set
-            feature_set = self.cpu.features().into_iter().collect();
+            feature_set = cpu_features.cpu.features().into_iter().collect();
         }
 
-        for (feature, enabled) in self.specific_features.iter() {
+        for (feature, enabled) in cpu_features.specific_features.iter() {
             if *enabled {
                 feature_set.insert(*feature);
             } else {
@@ -117,35 +117,35 @@ impl Into<ModuleFeatures> for CpuFeatures {
             use SpecificFeature::*;
             match feature {
                 SSE3 => {
-                    features.sse3 = true;
+                    module_features.sse3 = true;
                 }
                 SSSE3 => {
-                    features.ssse3 = true;
+                    module_features.ssse3 = true;
                 }
                 SSE41 => {
-                    features.sse41 = true;
+                    module_features.sse41 = true;
                 }
                 SSE42 => {
-                    features.sse42 = true;
+                    module_features.sse42 = true;
                 }
                 AVX => {
-                    features.avx = true;
+                    module_features.avx = true;
                 }
                 BMI1 => {
-                    features.bmi1 = true;
+                    module_features.bmi1 = true;
                 }
                 BMI2 => {
-                    features.bmi2 = true;
+                    module_features.bmi2 = true;
                 }
                 Popcnt => {
-                    features.popcnt = true;
+                    module_features.popcnt = true;
                 }
                 Lzcnt => {
-                    features.lzcnt = true;
+                    module_features.lzcnt = true;
                 }
             }
         }
-        features
+        module_features
     }
 }
 
