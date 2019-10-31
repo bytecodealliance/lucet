@@ -4,7 +4,7 @@ mod lucetc_tests {
     use lucet_module::bindings::Bindings;
     use lucet_validate::Validator;
     use lucet_wasi_sdk::*;
-    use lucetc::{Compiler, HeapSettings, OptLevel};
+    use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel};
     use std::collections::HashMap;
     use std::fs::File;
     use std::io::Read;
@@ -44,8 +44,16 @@ mod lucetc_tests {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let v = Validator::parse("").expect("empty validation environment");
-        let c =
-            Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile empty");
+        let c = Compiler::new(
+            &m,
+            OptLevel::default(),
+            CpuFeatures::default(),
+            &b,
+            h,
+            false,
+            &Some(v),
+        )
+        .expect("compile empty");
         let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());
         // clang creates just 1 global:
@@ -80,7 +88,16 @@ mod lucetc_tests {
         let h = HeapSettings::default();
         let v = Validator::parse("").expect("empty validation environment");
 
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile c");
+        let c = Compiler::new(
+            &m,
+            OptLevel::default(),
+            CpuFeatures::default(),
+            &b,
+            h,
+            false,
+            &Some(v),
+        )
+        .expect("compile c");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
         assert_eq!(mdata.export_functions().len(), 1, "export functions");
@@ -101,7 +118,16 @@ mod lucetc_tests {
             "(module $env (@interface func (export \"c\") (param $a1 s32) (result $r1 s32)))",
         )
         .expect("empty validation environment");
-        let c = Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile d");
+        let c = Compiler::new(
+            &m,
+            OptLevel::default(),
+            CpuFeatures::default(),
+            &b,
+            h,
+            false,
+            &Some(v),
+        )
+        .expect("compile d");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 1, "import functions");
         assert_eq!(mdata.export_functions().len(), 1, "export functions");
@@ -118,8 +144,16 @@ mod lucetc_tests {
         let b = Bindings::empty();
         let h = HeapSettings::default();
         let v = Validator::parse("").expect("empty validation environment");
-        let c =
-            Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile c & d");
+        let c = Compiler::new(
+            &m,
+            OptLevel::default(),
+            CpuFeatures::default(),
+            &b,
+            h,
+            false,
+            &Some(v),
+        )
+        .expect("compile c & d");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
         assert_eq!(mdata.export_functions().len(), 2, "export functions");
@@ -160,8 +194,16 @@ mod lucetc_tests {
             .expect("wasi spec validation")
             .with_wasi_exe(true);
         // Compiler will only unwrap if the Validator defined above accepts the module
-        let c =
-            Compiler::new(&m, OptLevel::default(), &b, h, false, &Some(v)).expect("compile empty");
+        let c = Compiler::new(
+            &m,
+            OptLevel::default(),
+            CpuFeatures::default(),
+            &b,
+            h,
+            false,
+            &Some(v),
+        )
+        .expect("compile empty");
         let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());
     }

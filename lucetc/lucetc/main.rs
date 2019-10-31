@@ -79,7 +79,8 @@ pub fn run(opts: &Options) -> Result<(), Error> {
 
     let mut c = Lucetc::new(PathBuf::from(input))
         .with_bindings(bindings)
-        .with_opt_level(opts.opt_level);
+        .with_opt_level(opts.opt_level)
+        .with_cpu_features(opts.cpu_features.clone());
 
     match opts.witx_specs.len() {
         0 => {}

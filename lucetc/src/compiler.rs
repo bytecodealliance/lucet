@@ -1,3 +1,6 @@
+mod cpu_features;
+
+pub use self::cpu_features::{CpuFeatures, SpecificFeature, TargetCpu};
 use crate::decls::ModuleDecls;
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::function::FuncInfo;
@@ -15,8 +18,7 @@ use cranelift_codegen::{
 };
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
-use cranelift_native;
-use cranelift_wasm::{translate_module, FuncTranslator, WasmError};
+use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use failure::{format_err, Fail, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::{FunctionSpec, ModuleData, MODULE_DATA_SYM};
@@ -49,19 +51,22 @@ pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
     clif_module: ClifModule<FaerieBackend>,
     opt_level: OptLevel,
+    cpu_features: CpuFeatures,
     count_instructions: bool,
+    module_translation_state: ModuleTranslationState,
 }
 
 impl<'a> Compiler<'a> {
     pub fn new(
         wasm_binary: &'a [u8],
         opt_level: OptLevel,
+        cpu_features: CpuFeatures,
         bindings: &'a Bindings,
         heap_settings: HeapSettings,
         count_instructions: bool,
         validator: &Option<Validator>,
     ) -> Result<Self, LucetcError> {
-        let isa = Self::target_isa(opt_level);
+        let isa = Self::target_isa(opt_level, &cpu_features)?;
 
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
@@ -84,12 +89,15 @@ impl<'a> Compiler<'a> {
                 .context(LucetcErrorKind::Validation)?;
         }
 
-        translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
-            WasmError::User(_) => e.context(LucetcErrorKind::Input),
-            WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation), // This will trigger once cranelift-wasm upgrades to a validating wasm parser.
-            WasmError::Unsupported { .. } => e.context(LucetcErrorKind::Unsupported),
-            WasmError::ImplLimitExceeded { .. } => e.context(LucetcErrorKind::TranslatingModule),
-        })?;
+        let module_translation_state =
+            translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
+                WasmError::User(_) => e.context(LucetcErrorKind::Input),
+                WasmError::InvalidWebAssembly { .. } => e.context(LucetcErrorKind::Validation), // This will trigger once cranelift-wasm upgrades to a validating wasm parser.
+                WasmError::Unsupported { .. } => e.context(LucetcErrorKind::Unsupported),
+                WasmError::ImplLimitExceeded { .. } => {
+                    e.context(LucetcErrorKind::TranslatingModule)
+                }
+            })?;
 
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
@@ -119,7 +127,9 @@ impl<'a> Compiler<'a> {
             decls,
             clif_module,
             opt_level,
+            cpu_features,
             count_instructions,
+            module_translation_state,
         })
     }
 
@@ -137,7 +147,13 @@ impl<'a> Compiler<'a> {
             clif_context.func.signature = func.signature.clone();
 
             func_translator
-                .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
+                .translate(
+                    &self.module_translation_state,
+                    code,
+                    *code_offset,
+                    &mut clif_context.func,
+                    &mut func_info,
+                )
                 .map_err(|e| format_err!("in {}: {:?}", func.name.symbol(), e))
                 .context(LucetcErrorKind::FunctionTranslation)?;
 
@@ -192,23 +208,34 @@ impl<'a> Compiler<'a> {
             clif_context.func.signature = func.signature.clone();
 
             func_translator
-                .translate(code, *code_offset, &mut clif_context.func, &mut func_info)
+                .translate(
+                    &self.module_translation_state,
+                    code,
+                    *code_offset,
+                    &mut clif_context.func,
+                    &mut func_info,
+                )
                 .map_err(|e| format_err!("in {}: {:?}", func.name.symbol(), e))
                 .context(LucetcErrorKind::FunctionTranslation)?;
 
             funcs.insert(func.name.clone(), clif_context.func);
         }
-        Ok(CraneliftFuncs::new(funcs, Self::target_isa(self.opt_level)))
+        Ok(CraneliftFuncs::new(
+            funcs,
+            Self::target_isa(self.opt_level, &self.cpu_features)?,
+        ))
     }
 
-    fn target_isa(opt_level: OptLevel) -> Box<dyn TargetIsa> {
+    fn target_isa(
+        opt_level: OptLevel,
+        cpu_features: &CpuFeatures,
+    ) -> Result<Box<dyn TargetIsa>, LucetcError> {
         let mut flags_builder = settings::builder();
-        let isa_builder =
-            cranelift_native::builder().expect("host machine is not a supported target");
+        let isa_builder = cpu_features.isa_builder()?;
         flags_builder.enable("enable_verifier").unwrap();
         flags_builder.enable("is_pic").unwrap();
         flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
-        isa_builder.finish(settings::Flags::new(flags_builder))
+        Ok(isa_builder.finish(settings::Flags::new(flags_builder)))
     }
 }
 

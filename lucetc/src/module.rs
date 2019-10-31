@@ -5,8 +5,8 @@ use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
-    TableElementType, TableIndex, WasmResult,
+    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, ModuleTranslationState,
+    SignatureIndex, Table, TableElementType, TableIndex, WasmResult,
 };
 use failure::ResultExt;
 use lucet_module::UniqueSignatureIndex;
@@ -327,7 +327,12 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         Ok(())
     }
 
-    fn define_function_body(&mut self, body_bytes: &'a [u8], body_offset: usize) -> WasmResult<()> {
+    fn define_function_body(
+        &mut self,
+        _module_translation_state: &ModuleTranslationState,
+        body_bytes: &'a [u8],
+        body_offset: usize,
+    ) -> WasmResult<()> {
         let func_index =
             UniqueFuncIndex::new(self.imported_funcs.len() + self.function_bodies.len());
         self.function_bodies

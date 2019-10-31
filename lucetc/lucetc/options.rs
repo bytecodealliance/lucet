@@ -1,6 +1,6 @@
-use clap::{App, Arg, ArgMatches};
+use clap::{App, Arg, ArgMatches, Values};
 use failure::Error;
-use lucetc::{HeapSettings, OptLevel};
+use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,6 +41,62 @@ fn humansized(bytes: u64) -> String {
     mb.to_string()
 }
 
+fn cpu_features_from_args(cpu: Option<&str>, features: Values) -> Result<CpuFeatures, Error> {
+    use SpecificFeature::*;
+    use TargetCpu::*;
+    if cpu.is_none() && features.len() == 0 {
+        Ok(CpuFeatures::detect_cpuid())
+    } else {
+        let cpu: TargetCpu = match cpu {
+            None => Baseline,
+            Some(s) => match s.to_lowercase().as_str() {
+                "native" => Native,
+                "baseline" => Baseline,
+                "nehalem" => Nehalem,
+                "sandybridge" => Sandybridge,
+                "haswell" => Haswell,
+                "broadwell" => Broadwell,
+                "skylake" => Skylake,
+                "cannonlake" => Cannonlake,
+                "icelake" => Icelake,
+                "znver1" => Znver1,
+                _ => unreachable!("invalid CPU string despite passing validation: {}", s),
+            },
+        };
+        let specific_features = features
+            .map(|fstr| {
+                let b = match fstr.chars().nth(0) {
+                    Some('+') => true,
+                    Some('-') => false,
+                    _ => unreachable!(
+                        "invalid feature string despite passing validation: {}",
+                        fstr
+                    ),
+                };
+                // the only valid starting characters are single-byte '+' and '-', so this indexing
+                // ought not to fail
+                let f = match &fstr[1..] {
+                    "sse3" => SSE3,
+                    "ssse3" => SSSE3,
+                    "sse41" => SSE41,
+                    "sse42" => SSE42,
+                    "popcnt" => Popcnt,
+                    "avx" => AVX,
+                    "bmi1" => BMI1,
+                    "bmi2" => BMI2,
+                    "lzcnt" => Lzcnt,
+                    _ => unreachable!(
+                        "invalid feature string despite passing validation: {}",
+                        fstr
+                    ),
+                };
+                (f, b)
+            })
+            .collect();
+        Ok(CpuFeatures::new(cpu, specific_features))
+    }
+}
+
 #[derive(Debug)]
 pub struct Options {
     pub output: PathBuf,
@@ -55,6 +111,7 @@ pub struct Options {
     pub reserved_size: Option<u64>,
     pub guard_size: Option<u64>,
     pub opt_level: OptLevel,
+    pub cpu_features: CpuFeatures,
     pub keygen: bool,
     pub sign: bool,
     pub verify: bool,
@@ -128,6 +185,10 @@ impl Options {
             Some("2") | Some("speed_and_size") => OptLevel::SpeedAndSize,
             Some(_) => panic!("unknown value for opt-level"),
         };
+        let cpu_features = cpu_features_from_args(
+            m.value_of("target-cpu"),
+            m.values_of("target-feature").unwrap_or_default(),
+        )?;
 
         let keygen = m.is_present("keygen");
         let sign = m.is_present("sign");
@@ -156,6 +217,7 @@ impl Options {
             reserved_size,
             guard_size,
             opt_level,
+            cpu_features,
             keygen,
             sign,
             verify,
@@ -187,6 +249,72 @@ impl Options {
                     .takes_value(true)
                     .multiple(false)
                     .help("output destination, defaults to a.out if unspecified"),
+            )
+            .arg(
+                Arg::with_name("target-cpu")
+                    .long("--target-cpu")
+                    .takes_value(true)
+                    .multiple(false)
+                    .number_of_values(1)
+                    .possible_values(&[
+                        "native",
+                        "baseline",
+                        "nehalem",
+                        "sandybridge",
+                        "haswell",
+                        "broadwell",
+                        "skylake",
+                        "cannonlake",
+                        "icelake",
+                        "znver1",
+                    ])
+                    .help("Generate code for a particular type of CPU.")
+                    .long_help(
+"Generate code for a particular type of CPU.
+
+If neither `--target-cpu` nor `--target-feature` is provided, `lucetc`
+will automatically detect and use the features available on the host CPU.
+This is equivalent to choosing `--target-cpu=native`.
+
+"
+                    )
+            )
+            .arg(
+                Arg::with_name("target-feature")
+                    .long("--target-feature")
+                    .takes_value(true)
+                    .multiple(true)
+                    .use_delimiter(true)
+                    .possible_values(&[
+                        "+sse3", "-sse3",
+                        "+ssse3", "-ssse3",
+                        "+sse41", "-sse41",
+                        "+sse42", "-sse42",
+                        "+popcnt", "-popcnt",
+                        "+avx", "-avx",
+                        "+bmi1", "-bmi1",
+                        "+bmi2", "-bmi2",
+                        "+lzcnt", "-lzcnt",
+                    ])
+                    .help("Enable (+) or disable (-) specific CPU features.")
+                    .long_help(
+"Enable (+) or disable (-) specific CPU features.
+
+If neither `--target-cpu` nor `--target-feature` is provided, `lucetc`
+will automatically detect and use the features available on the host CPU.
+
+This option is additive with, but takes precedence over `--target-cpu`.
+For example, `--target-cpu=haswell --target-feature=-avx` will disable
+AVX, but leave all other default Haswell features enabled.
+
+Multiple `--target-feature` groups may be specified, with precedence
+increasing from left to right. For example, these arguments will enable
+SSE3 but not AVX:
+
+    --target-feature=+sse3,+avx --target-feature=-avx
+
+"
+                    )
             )
             .arg(
                 Arg::with_name("bindings")

@@ -8,8 +8,8 @@ use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_frontend::FunctionBuilder;
 use cranelift_wasm::{
-    FuncEnvironment, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex, SignatureIndex,
-    TableIndex, VisibleTranslationState, WasmError, WasmResult,
+    FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex, GlobalVariable, MemoryIndex,
+    SignatureIndex, TableIndex, WasmError, WasmResult,
 };
 use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
@@ -496,7 +496,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         &mut self,
         op: &Operator,
         builder: &mut FunctionBuilder,
-        state: &VisibleTranslationState,
+        state: &FuncTranslationState,
     ) -> WasmResult<()> {
         if self.count_instructions {
             self.update_instruction_count_instrumentation(op, builder, state.reachable())?;
