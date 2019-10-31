@@ -1,5 +1,8 @@
 mod options;
 
+#[macro_use]
+extern crate clap;
+
 use crate::options::{CodegenOutput, ErrorStyle, Options};
 use failure::{format_err, Error, ResultExt};
 use log::info;
