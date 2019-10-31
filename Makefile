@@ -25,6 +25,7 @@ test: indent-check test-except-fuzz test-fuzz
 
 .PHONY: test-except-fuzz
 test-except-fuzz:
+	cargo build -p lucet-spectest # build but *not* run spectests to mitigate bitrot while spectests don't pass
 	cargo test --no-fail-fast \
             -p lucet-runtime-internals \
             -p lucet-runtime \
