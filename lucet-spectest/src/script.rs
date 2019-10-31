@@ -1,7 +1,7 @@
 use crate::bindings;
 use failure::{format_err, Error, Fail};
 use lucet_runtime::{self, MmapRegion, Module as LucetModule, Region, UntypedRetVal, Val};
-use lucetc::{Compiler, HeapSettings, LucetcError, LucetcErrorKind, OptLevel};
+use lucetc::{Compiler, CpuFeatures, HeapSettings, LucetcError, LucetcErrorKind, OptLevel};
 use std::io;
 use std::process::Command;
 use std::sync::Arc;
@@ -70,6 +70,7 @@ impl ScriptEnv {
         let compiler = Compiler::new(
             module,
             OptLevel::default(),
+            CpuFeatures::baseline(),
             &bindings,
             HeapSettings::default(),
             true,

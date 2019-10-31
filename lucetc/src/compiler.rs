@@ -21,7 +21,7 @@ use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use failure::{format_err, Fail, ResultExt};
 use lucet_module::bindings::Bindings;
-use lucet_module::{FunctionSpec, ModuleData, MODULE_DATA_SYM};
+use lucet_module::{FunctionSpec, ModuleData, ModuleFeatures, MODULE_DATA_SYM};
 use lucet_validate::Validator;
 
 #[derive(Debug, Clone, Copy)]
@@ -133,8 +133,13 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    pub fn module_features(&self) -> ModuleFeatures {
+        // This will grow in the future to encompass other options describing the compiled module.
+        (&self.cpu_features).into()
+    }
+
     pub fn module_data(&self) -> Result<ModuleData<'_>, LucetcError> {
-        self.decls.get_module_data()
+        self.decls.get_module_data(self.module_features())
     }
 
     pub fn object_file(mut self) -> Result<ObjectFile, LucetcError> {
@@ -165,7 +170,13 @@ impl<'a> Compiler<'a> {
 
         stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
 
-        let module_data_len = write_module_data(&mut self.clif_module, &self.decls)?;
+        let module_data_bytes = self
+            .module_data()?
+            .serialize()
+            .context(LucetcErrorKind::ModuleData)?;
+        let module_data_len = module_data_bytes.len();
+
+        write_module_data(&mut self.clif_module, module_data_bytes)?;
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
         let table_names = write_table_data(&mut self.clif_module, &self.decls)?;
 
@@ -241,19 +252,12 @@ impl<'a> Compiler<'a> {
 
 fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls<'_>,
-) -> Result<usize, LucetcError> {
+    module_data_bytes: Vec<u8>,
+) -> Result<(), LucetcError> {
     use cranelift_module::{DataContext, Linkage};
 
-    let module_data_serialized: Vec<u8> = decls
-        .get_module_data()?
-        .serialize()
-        .context(LucetcErrorKind::ModuleData)?;
-
-    let module_data_len = module_data_serialized.len();
-
     let mut module_data_ctx = DataContext::new();
-    module_data_ctx.define(module_data_serialized.into_boxed_slice());
+    module_data_ctx.define(module_data_bytes.into_boxed_slice());
 
     let module_data_decl = clif_module
         .declare_data(MODULE_DATA_SYM, Linkage::Local, true, None)
@@ -262,7 +266,7 @@ fn write_module_data<B: ClifBackend>(
         .define_data(module_data_decl, &module_data_ctx)
         .context(LucetcErrorKind::ModuleData)?;
 
-    Ok(module_data_len)
+    Ok(())
 }
 
 fn write_startfunc_data<B: ClifBackend>(

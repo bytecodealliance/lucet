@@ -1,8 +1,11 @@
 use crate::error::{LucetcError, LucetcErrorKind};
 use cranelift_codegen::{isa, settings::Configurable};
 use failure::{format_err, ResultExt};
-use std::collections::HashMap;
+use lucet_module::ModuleFeatures;
+use std::collections::{HashMap, HashSet};
 use target_lexicon::Triple;
+
+use raw_cpuid::CpuId;
 
 /// x86 CPU families used as shorthand for different CPU feature configurations.
 ///
@@ -64,6 +67,86 @@ pub struct CpuFeatures {
     cpu: TargetCpu,
     /// Specific CPU features to add or remove from the profile
     specific_features: HashMap<SpecificFeature, bool>,
+}
+
+fn detect_features(features: &mut ModuleFeatures) {
+    let cpuid = CpuId::new();
+
+    if let Some(info) = cpuid.get_feature_info() {
+        features.sse3 = info.has_sse3();
+        features.ssse3 = info.has_ssse3();
+        features.sse41 = info.has_sse41();
+        features.sse42 = info.has_sse42();
+        features.avx = info.has_avx();
+        features.popcnt = info.has_popcnt();
+    }
+
+    if let Some(info) = cpuid.get_extended_feature_info() {
+        features.bmi1 = info.has_bmi1();
+        features.bmi2 = info.has_bmi2();
+    }
+
+    if let Some(info) = cpuid.get_extended_function_info() {
+        features.lzcnt = info.has_lzcnt();
+    }
+}
+
+impl From<&CpuFeatures> for ModuleFeatures {
+    fn from(cpu_features: &CpuFeatures) -> ModuleFeatures {
+        let mut module_features = ModuleFeatures::none();
+
+        let mut feature_set: HashSet<SpecificFeature> = HashSet::new();
+
+        if let TargetCpu::Native = cpu_features.cpu {
+            // If the target is `Native`, start with the current set of cpu features..
+            detect_features(&mut module_features);
+        } else {
+            // otherwise, start with the target cpu's default feature set
+            feature_set = cpu_features.cpu.features().into_iter().collect();
+        }
+
+        for (feature, enabled) in cpu_features.specific_features.iter() {
+            if *enabled {
+                feature_set.insert(*feature);
+            } else {
+                feature_set.remove(feature);
+            }
+        }
+
+        for feature in feature_set {
+            use SpecificFeature::*;
+            match feature {
+                SSE3 => {
+                    module_features.sse3 = true;
+                }
+                SSSE3 => {
+                    module_features.ssse3 = true;
+                }
+                SSE41 => {
+                    module_features.sse41 = true;
+                }
+                SSE42 => {
+                    module_features.sse42 = true;
+                }
+                AVX => {
+                    module_features.avx = true;
+                }
+                BMI1 => {
+                    module_features.bmi1 = true;
+                }
+                BMI2 => {
+                    module_features.bmi2 = true;
+                }
+                Popcnt => {
+                    module_features.popcnt = true;
+                }
+                Lzcnt => {
+                    module_features.lzcnt = true;
+                }
+            }
+        }
+        module_features
+    }
 }
 
 impl Default for CpuFeatures {
