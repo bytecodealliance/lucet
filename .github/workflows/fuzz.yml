@@ -45,4 +45,6 @@ jobs:
       run: make test-fuzz
 
     - name: Fuzz
+      env:
+          FUZZ_NUM_TESTS: 100000
       run: make fuzz
