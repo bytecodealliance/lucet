@@ -18,3 +18,5 @@ pub type __wasi_exitcode_t = u32;
 
 // Re-export wasi-common's error type
 pub use wasi_common::Error;
+
+pub const START_SYMBOL: &'static str = "_start";
