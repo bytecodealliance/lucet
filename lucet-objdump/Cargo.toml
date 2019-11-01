@@ -1,6 +1,6 @@
 [package]
 name = "lucet-objdump"
-version = "0.4.0"
+version = "0.4.1"
 description = "Analyze object files emitted by the Lucet compiler"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
@@ -12,8 +12,8 @@ edition = "2018"
 [dependencies]
 goblin="0.0.24"
 byteorder="1.2.1"
-colored="1.6.1"
-lucet-module = { path = "../lucet-module", version = "0.4.0" }
+colored="1.8.0"
+lucet-module = { path = "../lucet-module", version = "0.4.1" }
 
 [package.metadata.deb]
 name = "fst-lucet-objdump"
