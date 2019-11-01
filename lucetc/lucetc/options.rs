@@ -1,4 +1,4 @@
-use clap::{App, Arg, ArgMatches, Values};
+use clap::{Arg, ArgMatches, Values};
 use failure::Error;
 use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu};
 use std::path::PathBuf;
@@ -228,7 +228,8 @@ impl Options {
         })
     }
     pub fn get() -> Result<Self, Error> {
-        let m = App::new("lucetc")
+        let _ = include_str!("../Cargo.toml");
+        let m = app_from_crate!()
             .arg(
                 Arg::with_name("precious")
                     .long("--precious")

@@ -1,4 +1,7 @@
-use clap::{App, Arg};
+#[macro_use]
+extern crate clap;
+
+use clap::Arg;
 use lucet_idl::{run, Config, IDLError};
 use std::fs::File;
 use std::io;
@@ -15,9 +18,8 @@ pub struct ExeConfig {
 
 impl ExeConfig {
     pub fn parse() -> Result<Self, IDLError> {
-        let matches = App::new("lucet-idl")
-            .version(env!("CARGO_PKG_VERSION"))
-            .about("lucet_idl code generator")
+        let _ = include_str!("../Cargo.toml");
+        let matches = app_from_crate!()
             .arg(
                 Arg::with_name("input")
                     .required(true)

@@ -1,5 +1,5 @@
 use crate::{PatcherConfig, WError};
-use clap::{App, Arg};
+use clap::Arg;
 use std::path::PathBuf;
 
 #[derive(Default, Clone, Debug)]
@@ -11,9 +11,8 @@ pub struct Config {
 
 impl Config {
     pub fn parse_cmdline() -> Result<Self, WError> {
-        let matches = App::new("wasmonkey")
-            .version("1.0")
-            .about("Transforms WASM exports to imports")
+        let _ = include_str!("../../../Cargo.toml");
+        let matches = app_from_crate!()
             .arg(
                 Arg::with_name("input_file")
                     .short("i")

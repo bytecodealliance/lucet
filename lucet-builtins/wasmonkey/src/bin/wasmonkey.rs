@@ -1,5 +1,8 @@
 mod config;
 
+#[macro_use]
+extern crate clap;
+
 use crate::config::*;
 use wasmonkey::*;
 

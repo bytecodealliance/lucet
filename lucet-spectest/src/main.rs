@@ -1,10 +1,14 @@
-use clap::{App, Arg};
+#[macro_use]
+extern crate clap;
+
+use clap::Arg;
 use failure::{format_err, Error};
 use lucet_spectest;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Error> {
-    let matches = App::new("lucet-spectest")
+    let _ = include_str!("../Cargo.toml");
+    let matches = app_from_crate!()
         .arg(
             Arg::with_name("input")
                 .multiple(false)

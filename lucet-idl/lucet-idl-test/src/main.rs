@@ -1,4 +1,7 @@
-use clap::{App, Arg};
+#[macro_use]
+extern crate clap;
+
+use clap::Arg;
 use env_logger;
 use log::{debug, info};
 use lucet_idl::{parse_package, Module, Package};
@@ -89,9 +92,8 @@ struct ExeConfig {
 
 impl ExeConfig {
     pub fn parse() -> Self {
-        let matches = App::new("lucet-idl-test")
-            .version("0.1.0")
-            .about("lucet-idl testing tool")
+        let _ = include_str!("../Cargo.toml");
+        let matches = app_from_crate!()
             .arg(
                 Arg::with_name("input")
                     .required(false)
