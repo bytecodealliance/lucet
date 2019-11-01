@@ -23,7 +23,7 @@ lazy_static = "1.1"
 lucetc = { path = "../lucetc", version = "0.4.1" }
 lucet-runtime-tests = { path = "lucet-runtime-tests", version = "0.4.1" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.4.1" }
-nix = "0.13"
+nix = "0.15"
 rayon = "1.0"
 tempfile = "3.0"
 
