@@ -1,6 +1,5 @@
 use crate::WasiCtxBuilder;
 
-use libc;
 use lucet_runtime::{DlModule, Module, Region};
 use lucet_runtime_internals::c_api::{lucet_dl_module, lucet_error, lucet_instance, lucet_region};
 use lucet_runtime_internals::instance::instance_handle_to_raw;
@@ -34,11 +33,11 @@ pub unsafe extern "C" fn lucet_wasi_ctx_args(
         .collect();
     let args = match args {
         Ok(args) => args,
-        Err(_) => return lucet_error::Unsupported,
+        Err(_) => return lucet_error::InvalidArgument,
     };
     *b = match b.args(args.iter()) {
         Ok(b) => b,
-        Err(_) => return lucet_error::Unsupported,
+        Err(_) => return lucet_error::InvalidArgument,
     };
     Box::into_raw(b);
     lucet_error::Ok
@@ -50,7 +49,7 @@ pub unsafe extern "C" fn lucet_wasi_ctx_inherit_env(wasi_ctx: *mut lucet_wasi_ct
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
     *b = match b.inherit_env() {
         Ok(b) => b,
-        Err(_) => return lucet_error::Unsupported,
+        Err(_) => return lucet_error::InvalidArgument,
     };
     Box::into_raw(b);
     lucet_error::Ok
@@ -64,7 +63,7 @@ pub unsafe extern "C" fn lucet_wasi_ctx_inherit_stdio(
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
     *b = match b.inherit_stdio() {
         Ok(b) => b,
-        Err(_) => return lucet_error::Unsupported,
+        Err(_) => return lucet_error::Internal,
     };
     Box::into_raw(b);
     lucet_error::Ok

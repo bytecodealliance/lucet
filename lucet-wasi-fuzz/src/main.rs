@@ -369,9 +369,9 @@ fn run_with_stdout<P: AsRef<Path>>(
     path: P,
 ) -> Result<(__wasi_exitcode_t, Vec<u8>), Error> {
     let ctx = WasiCtxBuilder::new()
-        .map_err(|_| format_err!("WasiCtxBuilder"))?
+        .map_err(|e| format_err!("WasiCtxBuilder: {}", e))?
         .args(["gen"].iter())
-        .map_err(|_| format_err!("args"))?;
+        .map_err(|e| format_err!("WasiCtxBuilder args: {}", e))?;
 
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
