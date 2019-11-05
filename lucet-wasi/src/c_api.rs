@@ -1,4 +1,5 @@
-use crate::ctx::WasiCtxBuilder;
+use crate::WasiCtxBuilder;
+
 use lucet_runtime::{DlModule, Module, Region};
 use lucet_runtime_internals::c_api::{lucet_dl_module, lucet_error, lucet_instance, lucet_region};
 use lucet_runtime_internals::instance::instance_handle_to_raw;
@@ -26,12 +27,18 @@ pub unsafe extern "C" fn lucet_wasi_ctx_args(
     assert_nonnull!(wasi_ctx);
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
     let args_raw = std::slice::from_raw_parts(argv, argc);
-    // TODO: error handling
-    let args = args_raw
+    let args: Result<Vec<_>, _> = args_raw
         .into_iter()
-        .map(|arg| CStr::from_ptr(*arg))
-        .collect::<Vec<&CStr>>();
-    *b = b.c_args(&args);
+        .map(|arg| CStr::from_ptr(*arg).to_str())
+        .collect();
+    let args = match args {
+        Ok(args) => args,
+        Err(_) => return lucet_error::InvalidArgument,
+    };
+    *b = match b.args(args.iter()) {
+        Ok(b) => b,
+        Err(_) => return lucet_error::InvalidArgument,
+    };
     Box::into_raw(b);
     lucet_error::Ok
 }
@@ -40,7 +47,10 @@ pub unsafe extern "C" fn lucet_wasi_ctx_args(
 pub unsafe extern "C" fn lucet_wasi_ctx_inherit_env(wasi_ctx: *mut lucet_wasi_ctx) -> lucet_error {
     assert_nonnull!(wasi_ctx);
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
-    *b = b.inherit_env();
+    *b = match b.inherit_env() {
+        Ok(b) => b,
+        Err(_) => return lucet_error::InvalidArgument,
+    };
     Box::into_raw(b);
     lucet_error::Ok
 }
@@ -51,7 +61,10 @@ pub unsafe extern "C" fn lucet_wasi_ctx_inherit_stdio(
 ) -> lucet_error {
     assert_nonnull!(wasi_ctx);
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
-    *b = b.inherit_stdio();
+    *b = match b.inherit_stdio() {
+        Ok(b) => b,
+        Err(_) => return lucet_error::Internal,
+    };
     Box::into_raw(b);
     lucet_error::Ok
 }
@@ -94,5 +107,5 @@ pub unsafe extern "C" fn lucet_region_new_instance_with_wasi_ctx(
 #[no_mangle]
 #[doc(hidden)]
 pub extern "C" fn lucet_wasi_internal_ensure_linked() {
-    crate::hostcalls::ensure_linked();
+    crate::wasi::export_wasi_funcs();
 }

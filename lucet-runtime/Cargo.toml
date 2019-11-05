@@ -10,7 +10,7 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-libc = "=0.2.59"
+libc = "0.2.65"
 lucet-runtime-internals = { path = "lucet-runtime-internals", version = "0.4.1" }
 lucet-module = { path = "../lucet-module", version = "0.4.1" }
 num-traits = "0.2"
@@ -23,7 +23,7 @@ lazy_static = "1.1"
 lucetc = { path = "../lucetc", version = "0.4.1" }
 lucet-runtime-tests = { path = "lucet-runtime-tests", version = "0.4.1" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.4.1" }
-nix = "0.13"
+nix = "0.15"
 rayon = "1.0"
 tempfile = "3.0"
 

@@ -28,12 +28,13 @@ cast = "0.2"
 clap = "2.23"
 failure = "0.1"
 human-size = "0.4"
-libc = "=0.2.59"
 lucet-runtime = { path = "../lucet-runtime", version = "0.4.1" }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "0.4.1" }
 lucet-module = { path = "../lucet-module", version = "0.4.1" }
-nix = "0.13"
+libc = "0.2.65"
+nix = "0.15"
 rand = "0.6"
+wasi-common = { git = "https://github.com/cranestation/wasi-common", rev = "f4ac1299b2001b575cfc99f5544a4a96355a6bff" }
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.4.1" }

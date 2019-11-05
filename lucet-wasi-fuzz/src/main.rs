@@ -4,8 +4,7 @@ use failure::{bail, format_err, Error};
 use libc::c_ulong;
 use lucet_module::bindings::Bindings;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
-use lucet_wasi::host::__wasi_exitcode_t;
-use lucet_wasi::{WasiCtx, WasiCtxBuilder};
+use lucet_wasi::{WasiCtx, WasiCtxBuilder, __wasi_exitcode_t};
 use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
 use rand::prelude::random;
@@ -52,7 +51,7 @@ enum Config {
 
 fn main() {
     lucet_runtime::lucet_internal_ensure_linked();
-    lucet_wasi::hostcalls::ensure_linked();
+    lucet_wasi::export_wasi_funcs();
 
     match Config::from_args() {
         Config::Fuzz { num_tests } => run_many(num_tests),
@@ -369,11 +368,14 @@ fn run_with_stdout<P: AsRef<Path>>(
     tmpdir: &TempDir,
     path: P,
 ) -> Result<(__wasi_exitcode_t, Vec<u8>), Error> {
-    let ctx = WasiCtxBuilder::new().args(&["gen"]);
+    let ctx = WasiCtxBuilder::new()
+        .map_err(|e| format_err!("WasiCtxBuilder: {}", e))?
+        .args(["gen"].iter())
+        .map_err(|e| format_err!("WasiCtxBuilder args: {}", e))?;
 
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = unsafe { ctx.raw_fd(1, pipe_in) }.build()?;
+    let ctx = ctx.stdout(unsafe { File::from_raw_fd(pipe_in) })?.build()?;
 
     let exitcode = run(tmpdir, path, ctx)?;
 

@@ -24,7 +24,7 @@ const SPARSE_HEAP_SIZES_KB: &'static [usize] = &[0, 256, 512, 1024, 2 * 1024, 4 
 /// To minimize the effects of filesystem cache on the `DlModule::load()`, this runs `sync` between
 /// each iteration.
 fn hello_load_mkregion_and_instantiate<R: RegionCreate + 'static>(c: &mut Criterion) {
-    lucet_wasi::hostcalls::ensure_linked();
+    lucet_wasi::export_wasi_funcs();
     fn body<R: RegionCreate + 'static>(so_file: &Path) -> InstanceHandle {
         let module = DlModule::load(so_file).unwrap();
         let region = R::create(1, &Limits::default()).unwrap();
@@ -259,10 +259,10 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
     c.bench_function(&format!("run_hello ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
             || {
-                let null = std::fs::File::open("/dev/null").unwrap();
                 let ctx = WasiCtxBuilder::new()
-                    .args(&["hello"])
-                    .fd(1, null)
+                    .expect("create a new WASI context")
+                    .args(["hello"].iter())
+                    .expect("WASI arguments")
                     .build()
                     .unwrap();
                 region

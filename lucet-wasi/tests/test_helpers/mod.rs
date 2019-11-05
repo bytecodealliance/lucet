@@ -1,7 +1,6 @@
 use failure::{bail, Error};
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
-use lucet_wasi::host::__wasi_exitcode_t;
-use lucet_wasi::{self, WasiCtx, WasiCtxBuilder};
+use lucet_wasi::{self, WasiCtx, WasiCtxBuilder, __wasi_exitcode_t};
 use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
 use std::fs::File;
@@ -104,7 +103,10 @@ pub fn run_with_stdout<P: AsRef<Path>>(
 ) -> Result<(__wasi_exitcode_t, String), Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = unsafe { ctx.raw_fd(1, pipe_in) }.build()?;
+    let ctx = ctx
+        .stdout(unsafe { File::from_raw_fd(pipe_in) })
+        .unwrap()
+        .build()?;
 
     let exitcode = run(path, ctx)?;
 
@@ -122,7 +124,10 @@ pub fn run_with_null_stdin<P: AsRef<Path>>(
 ) -> Result<__wasi_exitcode_t, Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = unsafe { ctx.raw_fd(0, pipe_out) }.build()?;
+    let ctx = ctx
+        .stdin(unsafe { File::from_raw_fd(pipe_out) })
+        .unwrap()
+        .build()?;
 
     let exitcode = run(path, ctx)?;
 
@@ -138,5 +143,5 @@ pub fn run_with_null_stdin<P: AsRef<Path>>(
 #[no_mangle]
 #[doc(hidden)]
 pub extern "C" fn lucet_wasi_tests_internal_ensure_linked() {
-    lucet_wasi::hostcalls::ensure_linked();
+    lucet_wasi::export_wasi_funcs();
 }
