@@ -973,7 +973,7 @@ dependencies = [
  "nix 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasi-common 0.4.0 (git+https://github.com/cranestation/wasi-common)",
+ "wasi-common 0.4.0 (git+https://github.com/cranestation/wasi-common?rev=f4ac1299b2001b575cfc99f5544a4a96355a6bff)",
 ]
 
 [[package]]
@@ -2001,7 +2001,7 @@ dependencies = [
 [[package]]
 name = "wasi-common"
 version = "0.4.0"
-source = "git+https://github.com/cranestation/wasi-common#74757fdd65ef6f8950e94bd2e7a8a7ed46530e46"
+source = "git+https://github.com/cranestation/wasi-common?rev=f4ac1299b2001b575cfc99f5544a4a96355a6bff#f4ac1299b2001b575cfc99f5544a4a96355a6bff"
 dependencies = [
  "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "cpu-time 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2013,15 +2013,15 @@ dependencies = [
  "nix 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasi-common-cbindgen 0.4.0 (git+https://github.com/cranestation/wasi-common)",
+ "wasi-common-cbindgen 0.4.0 (git+https://github.com/cranestation/wasi-common?rev=f4ac1299b2001b575cfc99f5544a4a96355a6bff)",
  "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "winx 0.4.0 (git+https://github.com/cranestation/wasi-common)",
+ "winx 0.4.0 (git+https://github.com/cranestation/wasi-common?rev=f4ac1299b2001b575cfc99f5544a4a96355a6bff)",
 ]
 
 [[package]]
 name = "wasi-common-cbindgen"
 version = "0.4.0"
-source = "git+https://github.com/cranestation/wasi-common#74757fdd65ef6f8950e94bd2e7a8a7ed46530e46"
+source = "git+https://github.com/cranestation/wasi-common?rev=f4ac1299b2001b575cfc99f5544a4a96355a6bff#f4ac1299b2001b575cfc99f5544a4a96355a6bff"
 dependencies = [
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2117,7 +2117,7 @@ dependencies = [
 [[package]]
 name = "winx"
 version = "0.4.0"
-source = "git+https://github.com/cranestation/wasi-common#74757fdd65ef6f8950e94bd2e7a8a7ed46530e46"
+source = "git+https://github.com/cranestation/wasi-common?rev=f4ac1299b2001b575cfc99f5544a4a96355a6bff#f4ac1299b2001b575cfc99f5544a4a96355a6bff"
 dependencies = [
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cvt 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2331,8 +2331,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum wabt-sys 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "af5d153dc96aad7dc13ab90835b892c69867948112d95299e522d370c4e13a08"
 "checksum wait-timeout 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9f200f5b12eb75f8c1ed65abd4b2db8a6e1b138a20de009dacee265a2498f3f6"
 "checksum walkdir 2.2.9 (registry+https://github.com/rust-lang/crates.io-index)" = "9658c94fa8b940eab2250bd5a457f9c48b748420d71293b165c8cdbe2f55f71e"
-"checksum wasi-common 0.4.0 (git+https://github.com/cranestation/wasi-common)" = "<none>"
-"checksum wasi-common-cbindgen 0.4.0 (git+https://github.com/cranestation/wasi-common)" = "<none>"
+"checksum wasi-common 0.4.0 (git+https://github.com/cranestation/wasi-common?rev=f4ac1299b2001b575cfc99f5544a4a96355a6bff)" = "<none>"
+"checksum wasi-common-cbindgen 0.4.0 (git+https://github.com/cranestation/wasi-common?rev=f4ac1299b2001b575cfc99f5544a4a96355a6bff)" = "<none>"
 "checksum wasmonkey 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "af7c4bc80224427965ba21d87982cfc07d12e859824f303272056fb19f571ef9"
 "checksum wasmparser 0.39.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e5083b449454f7de0b15f131eee17de54b5a71dcb9adcf11df2b2f78fad0cd82"
 "checksum which 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5475d47078209a02e60614f7ba5e645ef3ed60f771920ac1906d7c1cc65024c8"
@@ -2344,5 +2344,5 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum winapi-x86_64-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 "checksum wincolor 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "96f5016b18804d24db43cebf3c77269e7569b8954a8464501c216cc5e070eaa9"
 "checksum winconsole 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3ef84b96d10db72dd980056666d7f1e7663ce93d82fa33b63e71c966f4cf5032"
-"checksum winx 0.4.0 (git+https://github.com/cranestation/wasi-common)" = "<none>"
+"checksum winx 0.4.0 (git+https://github.com/cranestation/wasi-common?rev=f4ac1299b2001b575cfc99f5544a4a96355a6bff)" = "<none>"
 "checksum xfailure 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "da90eac47bf1d7871b75004b9b631d107df15f37669383b23f0b5297bc7516b6"
