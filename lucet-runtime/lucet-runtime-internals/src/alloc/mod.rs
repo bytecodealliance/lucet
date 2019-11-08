@@ -242,7 +242,7 @@ impl Alloc {
     }
 
     /// Return the heap as a mutable slice of 32-bit words.
-    pub unsafe fn heap_u32_mut(&self) -> &mut [u32] {
+    pub unsafe fn heap_u32_mut(&mut self) -> &mut [u32] {
         assert!(self.slot().heap as usize % 4 == 0, "heap is 4-byte aligned");
         assert!(
             self.heap_accessible_size % 4 == 0,
