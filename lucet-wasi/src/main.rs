@@ -39,6 +39,7 @@ fn parse_humansized(desc: &str) -> Result<u64, Error> {
 fn main() {
     // No-ops, but makes sure the linker doesn't throw away parts
     // of the runtime:
+    lucet_runtime::lucet_internal_ensure_linked();
     lucet_wasi::export_wasi_funcs();
 
     let matches = app_from_crate!()
