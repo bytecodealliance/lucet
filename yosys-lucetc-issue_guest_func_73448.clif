@@ -1,0 +1,266 @@
+; guest_func_73448
+function u0:73448(i64 vmctx, i32, i32) -> i32 system_v {
+    gv0 = vmctx
+    heap0 = static gv0, min 0x0052_0000, bound 0x0052_0000, offset_guard 0x0040_0000, index_type i32
+    sig0 = (i64 vmctx, i32, i32, i32, i32) system_v
+    sig1 = (i64 vmctx, i32) -> i32 system_v
+    fn0 = colocated u0:79271 sig0
+    fn1 = colocated u0:76736 sig1
+
+                                ebb0(v0: i64, v1: i32, v2: i32):
+                                    v14 -> v1
+                                    v22 -> v2
+@15eb1b5                            v4 = iconst.i32 0
+@15eb1b7                            v5 = iconst.i64 0
+@15eb1b9                            v6 = iconst.i32 0
+@15eb1cf                            v7 = heap_addr.i64 heap0, v2, 1
+@15eb1cf                            v8 = load.i32 v7+4
+@15eb1d2                            v9 = iconst.i32 1
+@15eb1d4                            v10 = icmp slt v8, v9
+@15eb1d4                            v11 = bint.i32 v10
+@15eb1d5                            brnz v11, ebb10(v1)
+@15eb1d5                            jump ebb11
+
+                                ebb11:
+@15eb1d7                            v12 = iconst.i32 0
+@15eb1db                            v13 = iconst.i32 0
+@15eb1df                            jump ebb12(v12, v13)
+
+                                ebb12(v25: i32, v110: i32):
+@15eb1e3                            v15 = heap_addr.i64 heap0, v14, 1
+@15eb1e3                            v16 = load.i32 v15+48
+@15eb1e8                            v17 = heap_addr.i64 heap0, v16, 1
+@15eb1e8                            v18 = load.i32 v17+4
+@15eb1ef                            v19 = heap_addr.i64 heap0, v14, 1
+@15eb1ef                            v20 = load.i32 v19+8
+@15eb1f2                            v21 = isub v18, v20
+@15eb1f5                            v23 = heap_addr.i64 heap0, v22, 1
+@15eb1f5                            v24 = load.i32 v23+8
+@15eb1fa                            v26 = iadd v24, v25
+@15eb1fb                            v27 = heap_addr.i64 heap0, v26, 1
+@15eb1fb                            v28 = load.i32 v27
+@15eb200                            v29 = icmp sle v21, v28
+@15eb200                            v30 = bint.i32 v29
+@15eb201                            brnz v30, ebb9
+@15eb201                            jump ebb14
+
+                                ebb14:
+@15eb205                            v31 = iconst.i32 0
+@15eb207                            v32 = icmp.i32 slt v28, v31
+@15eb207                            v33 = bint.i32 v32
+@15eb208                            brnz v33, ebb8
+@15eb208                            jump ebb15
+
+                                ebb15:
+@15eb20e                            v34 = icmp.i32 sle v18, v28
+@15eb20e                            v35 = bint.i32 v34
+@15eb20f                            brnz v35, ebb8
+@15eb20f                            jump ebb16
+
+                                ebb16:
+@15eb213                            v36 = heap_addr.i64 heap0, v16, 1
+@15eb213                            v37 = load.i32 v36+8
+@15eb218                            v38 = iconst.i32 2
+@15eb21a                            v39 = ishl.i32 v28, v38
+@15eb21b                            v40 = iadd v37, v39
+@15eb21c                            v41 = heap_addr.i64 heap0, v40, 1
+@15eb21c                            v42 = load.i32 v41
+@15eb221                            v43 = iconst.i32 0
+@15eb223                            v44 = icmp slt v42, v43
+@15eb223                            v45 = bint.i32 v44
+@15eb224                            brnz v45, ebb7
+@15eb224                            jump ebb17
+
+                                ebb17:
+@15eb228                            v46 = heap_addr.i64 heap0, v14, 1
+@15eb228                            v47 = load.i32 v46+16
+@15eb22d                            v48 = icmp sle v47, v42
+@15eb22d                            v49 = bint.i32 v48
+@15eb22e                            brnz v49, ebb7
+@15eb22e                            jump ebb18
+
+                                ebb18:
+@15eb232                            v50 = iconst.i32 12
+@15eb234                            v51 = imul.i32 v42, v50
+@15eb237                            v52 = iconst.i32 12
+@15eb239                            v53 = sdiv v51, v52
+@15eb23e                            v54 = heap_addr.i64 heap0, v14, 1
+@15eb23e                            v55 = load.i32 v54+24
+@15eb243                            v56 = iadd v55, v51
+@15eb246                            v57 = heap_addr.i64 heap0, v56, 1
+@15eb246                            v58 = load.i64 v57
+@15eb24b                            v59 = ireduce.i32 v58
+@15eb24e                            v60 = iconst.i32 0x1fff_ffff
+@15eb254                            v61 = band v59, v60
+@15eb255                            v62 = isub v53, v61
+@15eb258                            v63 = iconst.i32 -1
+@15eb25a                            v64 = icmp sle v62, v63
+@15eb25a                            v65 = bint.i32 v64
+@15eb25b                            brnz v65, ebb6
+@15eb25b                            jump ebb19
+
+                                ebb19:
+@15eb25f                            v66 = iconst.i32 1
+@15eb261                            v67 = ishl.i32 v62, v66
+@15eb264                            v68 = iconst.i32 29
+@15eb266                            v69 = ushr.i32 v59, v68
+@15eb267                            v70 = iconst.i32 1
+@15eb269                            v71 = band v69, v70
+@15eb26a                            v72 = bor v67, v71
+@15eb26b                            v73 = icmp_imm eq v72, 0
+@15eb26b                            v74 = bint.i32 v73
+@15eb26c                            brnz v74, ebb5
+@15eb26c                            jump ebb20
+
+                                ebb20:
+@15eb270                            v75 = iconst.i32 -1
+@15eb272                            v76 = icmp.i32 sgt v59, v75
+@15eb272                            v77 = bint.i32 v76
+@15eb273                            brnz v77, ebb4
+@15eb273                            jump ebb21
+
+                                ebb21:
+@15eb277                            v78 = iconst.i64 0x1fff_ffff
+@15eb27d                            v79 = band.i64 v58, v78
+@15eb27e                            v80 = iconst.i64 0x1fff_ffff
+@15eb284                            v81 = icmp eq v79, v80
+@15eb284                            v82 = bint.i32 v81
+@15eb285                            brnz v82, ebb4
+@15eb285                            jump ebb22
+
+                                ebb22:
+@15eb28b                            v83 = iconst.i64 0xffff_ffff_c000_0000
+@15eb291                            v84 = band.i64 v58, v83
+@15eb294                            v85 = iconst.i32 0x1fff_ffff
+@15eb29a                            v86 = band.i32 v53, v85
+@15eb29d                            v87 = uextend.i64 v86
+@15eb29e                            v88 = bor v84, v87
+@15eb29f                            v89 = heap_addr.i64 heap0, v56, 1
+@15eb29f                            store v88, v89
+@15eb2a4                            v90 = heap_addr.i64 heap0, v14, 1
+@15eb2a4                            v91 = load.i32 v90+24
+@15eb2ab                            v92 = icmp ugt v91, v56
+@15eb2ab                            v93 = bint.i32 v92
+@15eb2ac                            brnz v93, ebb3
+@15eb2ac                            jump ebb23
+
+                                ebb23:
+@15eb2b2                            v94 = heap_addr.i64 heap0, v14, 1
+@15eb2b2                            v95 = load.i32 v94+16
+@15eb2b5                            v96 = iconst.i32 12
+@15eb2b7                            v97 = imul v95, v96
+@15eb2b8                            v98 = iadd.i32 v91, v97
+@15eb2bb                            v99 = icmp ule v98, v56
+@15eb2bb                            v100 = bint.i32 v99
+@15eb2bc                            brnz v100, ebb3
+@15eb2bc                            jump ebb24
+
+                                ebb24:
+@15eb2c2                            v101 = isub.i32 v56, v91
+@15eb2c3                            v102 = iconst.i32 12
+@15eb2c5                            v103 = sdiv v101, v102
+@15eb2c8                            v104 = isub v103, v86
+@15eb2cb                            v105 = iconst.i32 -1
+@15eb2cd                            v106 = icmp sle v104, v105
+@15eb2cd                            v107 = bint.i32 v106
+@15eb2ce                            brnz v107, ebb2
+@15eb2ce                            jump ebb25
+
+                                ebb25:
+@15eb2d4                            brnz.i32 v104, ebb26
+@15eb2d4                            jump ebb27
+
+                                ebb27:
+@15eb2d8                            v108 = iconst.i32 4
+@15eb2da                            v109 = iadd.i32 v25, v108
+@15eb2df                            v111 = iconst.i32 1
+@15eb2e1                            v112 = iadd.i32 v110, v111
+@15eb2e6                            v113 = heap_addr.i64 heap0, v22, 1
+@15eb2e6                            v114 = load.i32 v113+4
+@15eb2e9                            v115 = icmp sge v112, v114
+@15eb2e9                            v116 = bint.i32 v115
+@15eb2ea                            brnz v116, ebb10(v14)
+@15eb2ea                            jump ebb28
+
+                                ebb28:
+@15eb2ec                            jump ebb12(v109, v112)
+
+                                ebb26:
+@15eb2ef                            jump ebb13
+
+                                ebb13:
+@15eb2f0                            v117 = iconst.i32 0x001a_fc1f
+@15eb2f6                            v118 = iconst.i32 0x001a_faff
+@15eb2fc                            v119 = iconst.i32 283
+@15eb2ff                            v120 = iconst.i32 0x001a_fc0e
+@15eb305                            call fn0(v0, v117, v118, v119, v120)
+@15eb30b                            trap unreachable
+
+                                ebb10(v121: i32):
+@15eb30f                            v122 = call fn1(v0, v121)
+@15eb315                            return v122
+
+                                ebb9:
+@15eb317                            v123 = iconst.i32 0x001a_ffad
+@15eb31d                            v124 = iconst.i32 0x001a_fdce
+@15eb323                            v125 = iconst.i32 464
+@15eb326                            v126 = iconst.i32 0x001a_ffc1
+@15eb32c                            call fn0(v0, v123, v124, v125, v126)
+@15eb332                            trap unreachable
+
+                                ebb8:
+@15eb334                            v127 = iconst.i32 0x001a_ffcb
+@15eb33a                            v128 = iconst.i32 0x001a_ffec
+@15eb340                            v129 = iconst.i32 423
+@15eb343                            v130 = iconst.i32 0x001b_0078
+@15eb349                            call fn0(v0, v127, v128, v129, v130)
+@15eb34f                            trap unreachable
+
+                                ebb7:
+@15eb351                            v131 = iconst.i32 0x001a_fdb7
+@15eb357                            v132 = iconst.i32 0x001a_fdce
+@15eb35d                            v133 = iconst.i32 460
+@15eb360                            v134 = iconst.i32 0x001a_fde2
+@15eb366                            call fn0(v0, v131, v132, v133, v134)
+@15eb36c                            trap unreachable
+
+                                ebb6:
+@15eb36e                            v135 = iconst.i32 0x001b_0010
+@15eb374                            v136 = iconst.i32 0x001a_ff08
+@15eb37a                            v137 = iconst.i32 302
+@15eb37d                            v138 = iconst.i32 0x001b_0026
+@15eb383                            call fn0(v0, v135, v136, v137, v138)
+@15eb389                            trap unreachable
+
+                                ebb5:
+@15eb38b                            v139 = iconst.i32 0x001a_fbee
+@15eb391                            v140 = iconst.i32 0x001a_faff
+@15eb397                            v141 = iconst.i32 281
+@15eb39a                            v142 = iconst.i32 0x001a_fc0e
+@15eb3a0                            call fn0(v0, v139, v140, v141, v142)
+@15eb3a6                            trap unreachable
+
+                                ebb4:
+@15eb3a8                            v143 = iconst.i32 0x001b_0085
+@15eb3ae                            v144 = iconst.i32 0x001a_faff
+@15eb3b4                            v145 = iconst.i32 263
+@15eb3b7                            v146 = iconst.i32 0x001b_0097
+@15eb3bd                            call fn0(v0, v143, v144, v145, v146)
+@15eb3c3                            trap unreachable
+
+                                ebb3:
+@15eb3c5                            v147 = iconst.i32 0x001a_ff25
+@15eb3cb                            v148 = iconst.i32 0x001a_fdce
+@15eb3d1                            v149 = iconst.i32 468
+@15eb3d4                            v150 = iconst.i32 0x001a_ff54
+@15eb3da                            call fn0(v0, v147, v148, v149, v150)
+@15eb3e0                            trap unreachable
+
+                                ebb2:
+@15eb3e2                            v151 = iconst.i32 0x001b_0010
+@15eb3e8                            v152 = iconst.i32 0x001a_ff08
+@15eb3ee                            v153 = iconst.i32 302
+@15eb3f1                            v154 = iconst.i32 0x001b_0026
+@15eb3f7                            call fn0(v0, v151, v152, v153, v154)
+@15eb3fd                            trap unreachable
+}
