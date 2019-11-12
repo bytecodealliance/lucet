@@ -1,5 +1,8 @@
 # Lucet &emsp; [![Build Status]][travis]
 
+**A [Bytecode Alliance][BA] project**
+
+[BA]: https://bytecodealliance.org/
 [Build Status]: https://travis-ci.org/fastly/lucet.svg?branch=master
 [travis]: https://travis-ci.org/fastly/lucet
 
