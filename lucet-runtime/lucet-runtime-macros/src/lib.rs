@@ -40,11 +40,9 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let vis = hostcall.vis.clone();
 
     // remove #[no_mangle] from the attributes of the impl hostcall if it's there
-    hostcall.attrs = attrs
-        .iter()
-        .filter(|attr| !attr.path.is_ident("no_mangle"))
-        .cloned()
-        .collect();
+    hostcall
+        .attrs
+        .retain(|attr| !attr.path.is_ident("no_mangle"));
     // make the impl hostcall private
     hostcall.vis = syn::Visibility::Inherited;
 
