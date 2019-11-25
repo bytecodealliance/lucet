@@ -127,7 +127,7 @@ macro_rules! guest_fault_tests {
         use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
+            lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, FaultDetails, Instance,
             Limits, Region, SignalBehavior, TerminationDetails, TrapCode,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
@@ -185,13 +185,10 @@ macro_rules! guest_fault_tests {
 
         static HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
 
-        lucet_hostcalls! {
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_test(
-                &mut _vmctx,
-            ) -> () {
-                lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
-            }
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_test(_vmctx: &mut Vmctx) {
+            lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
         }
 
         fn run_onetwothree(inst: &mut Instance) {
@@ -472,12 +469,9 @@ macro_rules! guest_fault_tests {
                 *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = true;
             }
 
-            lucet_hostcalls! {
-                pub unsafe extern "C" fn sleepy_guest(
-                    &mut _vmctx,
-                ) -> () {
-                    std::thread::sleep(std::time::Duration::from_millis(20));
-                }
+            #[lucet_hostcall]
+            pub fn sleepy_guest(_vmctx: &mut Vmctx) {
+                std::thread::sleep(std::time::Duration::from_millis(20));
             }
 
             test_ex(|| {

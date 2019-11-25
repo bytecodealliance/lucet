@@ -8,6 +8,7 @@
 pub mod error;
 #[macro_use]
 pub mod hostcall_macros;
+pub use lucet_runtime_macros::lucet_hostcall;
 
 #[macro_use]
 #[cfg(test)]

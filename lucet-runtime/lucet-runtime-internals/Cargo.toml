@@ -11,6 +11,7 @@ edition = "2018"
 
 [dependencies]
 lucet-module = { path = "../../lucet-module", version = "0.4.1" }
+lucet-runtime-macros = { path = "../lucet-runtime-macros", version = "0.4.1" }
 
 bitflags = "1.0"
 bincode = "1.1.4"

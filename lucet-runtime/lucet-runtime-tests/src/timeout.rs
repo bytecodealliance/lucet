@@ -58,7 +58,7 @@ macro_rules! timeout_tests {
     ( $TestRegion:path ) => {
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, FaultDetails, Instance,
+            lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, FaultDetails, Instance,
             KillError, KillSuccess, Limits, Region, RunResult, SignalBehavior, TerminationDetails,
             TrapCode, YieldedVal,
         };
@@ -75,22 +75,18 @@ macro_rules! timeout_tests {
         use $crate::helpers::{FunctionPointer, MockExportBuilder, MockModuleBuilder};
         use $crate::timeout::mock_timeout_module;
 
-        lucet_hostcalls! {
-            #[no_mangle]
-            pub unsafe extern "C" fn slow_hostcall(
-                &mut vmctx,
-            ) -> bool {
-                // make a window of time so we can timeout in a hostcall
-                thread::sleep(Duration::from_millis(200));
-                true
-            }
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn slow_hostcall(vmctx: &mut Vmctx) -> bool {
+            // make a window of time so we can timeout in a hostcall
+            thread::sleep(Duration::from_millis(200));
+            true
+        }
 
-            #[no_mangle]
-            pub unsafe extern "C" fn yielding_hostcall(
-                &mut vmctx,
-            ) -> () {
-                vmctx.yield_();
-            }
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn yielding_hostcall(vmctx: &mut Vmctx) {
+            vmctx.yield_();
         }
 
         fn run_onetwothree(inst: &mut Instance) {

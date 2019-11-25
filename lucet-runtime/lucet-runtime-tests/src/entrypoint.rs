@@ -194,19 +194,15 @@ macro_rules! entrypoint_tests {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcalls, DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE,
+            lucet_hostcall, DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE,
         };
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::entrypoint::{mock_calculator_module, wat_calculator_module};
 
-        lucet_hostcalls! {
-            #[no_mangle]
-            pub unsafe extern "C" fn black_box(
-                &mut _vmctx,
-                _val: *mut c_void,
-            ) -> () {}
-        }
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn black_box(_vmctx: &mut Vmctx, _val: *mut c_void) {}
 
         #[test]
         fn mock_calc_add_2() {
@@ -886,35 +882,28 @@ macro_rules! entrypoint_tests {
                 .expect("instance runs");
         }
 
-        lucet_hostcalls! {
-            #[no_mangle]
-            pub unsafe extern "C" fn callback_hostcall(
-                &mut vmctx,
-                cb_idx: u32,
-                x: u64,
-            ) -> u64 {
-                let func = vmctx
-                    .get_func_from_idx(0, cb_idx)
-                    .expect("can get function by index");
-                let func = std::mem::transmute::<
-                    usize,
-                    extern "C" fn(*mut lucet_vmctx, u64) -> u64
-                >(func.ptr.as_usize());
-                (func)(vmctx.as_raw(), x) + 1
-            }
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub unsafe extern "C" fn callback_hostcall(vmctx: &mut Vmctx, cb_idx: u32, x: u64) -> u64 {
+            let func = vmctx
+                .get_func_from_idx(0, cb_idx)
+                .expect("can get function by index");
+            let func = std::mem::transmute::<usize, extern "C" fn(*mut lucet_vmctx, u64) -> u64>(
+                func.ptr.as_usize(),
+            );
+            (func)(vmctx.as_raw(), x) + 1
         }
 
-        lucet_hostcalls! {
-            #[no_mangle]
-            pub unsafe extern "C" fn add_4_hostcall(
-                &mut vmctx,
-                x: u64,
-                y: u64,
-                z: u64,
-                w: u64,
-            ) -> u64 {
-                x + y + z + w
-            }
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub unsafe extern "C" fn add_4_hostcall(
+            vmctx: &mut Vmctx,
+            x: u64,
+            y: u64,
+            z: u64,
+            w: u64,
+        ) -> u64 {
+            x + y + z + w
         }
 
         #[test]

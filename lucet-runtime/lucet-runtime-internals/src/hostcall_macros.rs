@@ -1,5 +1,7 @@
 /// The macro that surrounds definitions of Lucet hostcalls in Rust.
 ///
+/// **Note:** this macro has been deprecated and replaced by the `#[lucet_hostcall]` attribute.
+///
 /// It is important to use this macro for hostcalls, rather than exporting them directly, as it
 /// installs unwind protection that prevents panics from unwinding into the guest stack.
 ///
@@ -20,6 +22,7 @@
 /// }
 /// ```
 #[macro_export]
+#[deprecated(since = "0.4.2", note = "Use the #[lucet_hostcall] attribute instead")]
 macro_rules! lucet_hostcalls {
     {
         $(

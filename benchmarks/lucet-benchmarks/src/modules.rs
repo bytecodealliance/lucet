@@ -1,5 +1,5 @@
 use lucet_module::lucet_signature;
-use lucet_runtime::lucet_hostcalls;
+use lucet_runtime::lucet_hostcall;
 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
 use lucet_runtime_internals::module::{
     FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder, Module,
@@ -215,33 +215,32 @@ pub fn many_args_mock() -> Arc<dyn Module> {
 }
 
 pub fn hostcalls_mock() -> Arc<dyn Module> {
-    lucet_hostcalls! {
-        #[inline(never)]
-        #[no_mangle]
-        pub unsafe extern "C" fn hostcall_wrapped(
-            &mut vmctx,
-            x1: u64,
-            x2: u64,
-            x3: u64,
-            x4: u64,
-            x5: u64,
-            x6: u64,
-            x7: u64,
-            x8: u64,
-            x9: u64,
-            x10: u64,
-            x11: u64,
-            x12: u64,
-            x13: u64,
-            x14: u64,
-            x15: u64,
-            x16: u64,
-        ) -> () {
-            vmctx.heap_mut()[0] =
-                (x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + x11 + x12 + x13 + x14 + x15 + x16)
-                    as u8;
-            assert_eq!(vmctx.heap()[0], 136);
-        }
+    #[lucet_hostcall]
+    #[inline(never)]
+    #[no_mangle]
+    pub unsafe extern "C" fn hostcall_wrapped(
+        vmctx: &mut Vmctx,
+        x1: u64,
+        x2: u64,
+        x3: u64,
+        x4: u64,
+        x5: u64,
+        x6: u64,
+        x7: u64,
+        x8: u64,
+        x9: u64,
+        x10: u64,
+        x11: u64,
+        x12: u64,
+        x13: u64,
+        x14: u64,
+        x15: u64,
+        x16: u64,
+    ) -> () {
+        vmctx.heap_mut()[0] =
+            (x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + x11 + x12 + x13 + x14 + x15 + x16)
+                as u8;
+        assert_eq!(vmctx.heap()[0], 136);
     }
 
     #[inline(never)]

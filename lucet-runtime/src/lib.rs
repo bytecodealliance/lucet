@@ -73,26 +73,23 @@
 //! demo](https://wasm.fastly-labs.com/), hostcalls are provided for manipulating HTTP requests,
 //! accessing a key/value store, etc.
 //!
-//! Some simple hostcalls can be implemented by wrapping an externed C function with the
-//! [`lucet_hostcalls!`](macro.lucet_hostcalls.html] macro. The function must take a special `&mut
-//! vmctx` argument for the guest context, similar to `&mut self` on methods. Hostcalls that require
-//! access to some underlying state, such as the key/value store in Terrarium, can access a custom
-//! embedder context through `vmctx`. For example, to make a `u32` available to hostcalls:
+//! Some simple hostcalls can be implemented by using the
+//! [`#[lucet_hostcall]`](attr.lucet_hostcall.html] attribute on a function that takes `&mut Vmctx`
+//! as its first argument. Hostcalls that require access to some embedder-specific state, such as
+//! Terrarium's key-value store, can access a custom embedder context through `vmctx`. For example,
+//! to make a `u32` available to hostcalls:
 //!
 //! ```no_run
-//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region, lucet_hostcalls};
+//! use lucet_runtime::{DlModule, Limits, MmapRegion, Region, lucet_hostcall};
 //! use lucet_runtime::vmctx::{Vmctx, lucet_vmctx};
 //!
 //! struct MyContext { x: u32 }
 //!
-//! lucet_hostcalls! {
-//!     #[no_mangle]
-//!     pub unsafe extern "C" fn foo(
-//!         &mut vmctx,
-//!     ) -> () {
-//!         let mut hostcall_context = vmctx.get_embed_ctx_mut::<MyContext>();
-//!         hostcall_context.x = 42;
-//!     }
+//! #[lucet_hostcall]
+//! #[no_mangle]
+//! pub fn foo(vmctx: &mut Vmctx) {
+//!     let mut hostcall_context = vmctx.get_embed_ctx_mut::<MyContext>();
+//!     hostcall_context.x = 42;
 //! }
 //!
 //! let module = DlModule::load("/my/lucet/module.so").unwrap();
@@ -198,7 +195,7 @@
 //! and yield it when appropriate.
 //!
 //! ```no_run
-//! use lucet_runtime::lucet_hostcalls;
+//! use lucet_runtime::lucet_hostcall;
 //! use lucet_runtime::vmctx::Vmctx;
 //!
 //! pub enum FactorialsK {
@@ -206,27 +203,23 @@
 //!     Result(u64),
 //! }
 //!
-//! lucet_hostcalls! {
-//!     #[no_mangle]
-//!     pub unsafe extern "C" fn hostcall_factorials(
-//!         &mut vmctx,
-//!         n: u64,
-//!     ) -> u64 {
-//!         fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
-//!             let result = if n <= 1 {
-//!                 1
-//!             } else {
-//!                 let n_rec = fact(vmctx, n - 1);
-//!                 // yield a request for the host to perform multiplication
-//!                 vmctx.yield_val_expecting_val(FactorialsK::Mult(n, n_rec))
-//!                 // once resumed, that yield evaluates to the multiplication result
-//!             };
-//!             // yield a result
-//!             vmctx.yield_val(FactorialsK::Result(result));
-//!             result
-//!         }
-//!         fact(vmctx, n)
+//! #[lucet_hostcall]
+//! #[no_mangle]
+//! pub fn hostcall_factorials(vmctx: &mut Vmctx, n: u64) -> u64 {
+//!     fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
+//!         let result = if n <= 1 {
+//!             1
+//!         } else {
+//!             let n_rec = fact(vmctx, n - 1);
+//!             // yield a request for the host to perform multiplication
+//!             vmctx.yield_val_expecting_val(FactorialsK::Mult(n, n_rec))
+//!             // once resumed, that yield evaluates to the multiplication result
+//!         };
+//!         // yield a result
+//!         vmctx.yield_val(FactorialsK::Result(result));
+//!         result
 //!     }
+//!     fact(vmctx, n)
 //! }
 //! ```
 //!
@@ -340,6 +333,10 @@
 
 #![deny(bare_trait_objects)]
 
+// This makes `lucet_runtime` in the expansion of `#[lucet_hostcall]` resolve to something
+// meaningful when used in this crate.
+extern crate self as lucet_runtime;
+
 pub mod c_api;
 
 pub use lucet_module::{PublicKey, TrapCode};
@@ -349,11 +346,13 @@ pub use lucet_runtime_internals::instance::{
     FaultDetails, Instance, InstanceHandle, KillError, KillSuccess, RunResult, SignalBehavior,
     TerminationDetails, YieldedVal,
 };
+#[allow(deprecated)]
+pub use lucet_runtime_internals::lucet_hostcalls;
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
-pub use lucet_runtime_internals::{lucet_hostcall_terminate, lucet_hostcalls, WASM_PAGE_SIZE};
+pub use lucet_runtime_internals::{lucet_hostcall, lucet_hostcall_terminate, WASM_PAGE_SIZE};
 
 pub mod vmctx {
     //! Functions for manipulating instances from hostcalls.
@@ -369,6 +368,10 @@ pub mod vmctx {
     //! associated with a running instance. This should never occur if run in guest code on the
     //! pointer argument inserted by the compiler.
     pub use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
+
+    // must be exported for `lucet_hostcall`, but we don't want to advertise it
+    #[doc(hidden)]
+    pub use lucet_runtime_internals::vmctx::VmctxInternal;
 }
 
 /// Call this if you're having trouble with `lucet_*` symbols not being exported.
