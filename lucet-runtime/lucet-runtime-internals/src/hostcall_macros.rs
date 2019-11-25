@@ -5,7 +5,7 @@
 /// It is important to use this macro for hostcalls, rather than exporting them directly, as it
 /// installs unwind protection that prevents panics from unwinding into the guest stack.
 ///
-/// Since this is not yet a proc macro, the syntax is unfortunately fairly brittle. The functions it
+/// Since this is not a proc macro, the syntax is unfortunately fairly brittle. The functions it
 /// encloses must be of the form:
 ///
 /// ```ignore
@@ -41,7 +41,7 @@ macro_rules! lucet_hostcalls {
             #[$crate::lucet_hostcall]
             $(#[$attr])*
             pub unsafe extern "C" fn $name(
-                $vmctx: &mut $crate::vmctx::Vmctx,
+                $vmctx: &mut lucet_runtime::vmctx::Vmctx,
                 $( $arg: $arg_ty ),*
             ) -> $ret_ty {
                 $($body)*
