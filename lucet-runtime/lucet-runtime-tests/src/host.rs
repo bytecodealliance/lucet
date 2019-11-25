@@ -53,12 +53,12 @@ macro_rules! host_tests {
         #[lucet_hostcall]
         #[allow(unreachable_code)]
         #[no_mangle]
-        pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &mut Vmctx) {
-            let lock = HOSTCALL_MUTEX.lock().unwrap();
+        pub fn hostcall_test_func_hostcall_error_unwind(_vmctx: &mut Vmctx) {
+            let _lock = HOSTCALL_MUTEX.lock().unwrap();
             unsafe {
                 lucet_hostcall_terminate!(ERROR_MESSAGE);
             }
-            drop(lock);
+            drop(_lock);
         }
 
         #[lucet_hostcall]

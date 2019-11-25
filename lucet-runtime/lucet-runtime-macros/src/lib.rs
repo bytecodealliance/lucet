@@ -77,8 +77,8 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .skip(1)
         .map(|arg| match arg {
             syn::FnArg::Receiver(_) => {
-                // this case is an error, but humor the token stream so it will produce a nicer
-                // error later
+                // this case is an error, but we produce some valid rust code anyway so that the
+                // compiler can produce a more meaningful error message at a later point
                 let s = syn::Token![self](arg.span());
                 quote!(#s)
             }

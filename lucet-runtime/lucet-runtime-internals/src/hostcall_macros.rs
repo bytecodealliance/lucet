@@ -36,40 +36,15 @@ macro_rules! lucet_hostcalls {
         )*
     } => {
         $(
+            #[allow(unused_mut)]
+            #[allow(unused_unsafe)]
+            #[$crate::lucet_hostcall]
             $(#[$attr])*
             pub unsafe extern "C" fn $name(
-                vmctx_raw: *mut $crate::vmctx::lucet_vmctx,
+                $vmctx: &mut $crate::vmctx::Vmctx,
                 $( $arg: $arg_ty ),*
             ) -> $ret_ty {
-                #[inline(always)]
-                unsafe fn hostcall_impl(
-                    $vmctx: &mut $crate::vmctx::Vmctx,
-                    $( $arg : $arg_ty ),*
-                ) -> $ret_ty {
-                    $($body)*
-                }
-                // don't warn if this macro happens to expand in a context where `VmctxInternal`
-                // was already imported
-                #[allow(unused_imports)]
-                use $crate::vmctx::VmctxInternal;
-
-                $crate::vmctx::Vmctx::from_raw(vmctx_raw).instance_mut().uninterruptable(|| {
-                    let res = std::panic::catch_unwind(move || {
-                        hostcall_impl(&mut $crate::vmctx::Vmctx::from_raw(vmctx_raw), $( $arg ),*)
-                    });
-                    match res {
-                        Ok(res) => res,
-                        Err(e) => {
-                            match e.downcast::<$crate::instance::TerminationDetails>() {
-                                Ok(details) => {
-                                    let mut vmctx = $crate::vmctx::Vmctx::from_raw(vmctx_raw);
-                                    vmctx.terminate_no_unwind(*details)
-                                },
-                                Err(e) => std::panic::resume_unwind(e),
-                            }
-                        }
-                    }
-                })
+                $($body)*
             }
         )*
     }
