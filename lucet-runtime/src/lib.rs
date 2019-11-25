@@ -325,7 +325,7 @@
 //!
 //! ## Interaction With Host Signal Handlers
 //!
-//! Great care must be taken if host application installs or otherwise modifies signal handlers
+//! Great care must be taken if a host application installs or otherwise modifies signal handlers
 //! anywhere in the process. Lucet installs handlers for `SIGBUS`, `SIGFPE`, `SIGILL`, and `SIGSEGV`
 //! when the first Lucet instance begins running, and restores the preëxisting handlers when the
 //! last Lucet instance terminates. During this time, other threads in the host process *must not*
