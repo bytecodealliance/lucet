@@ -31,7 +31,6 @@ test-except-fuzz:
             -p lucet-runtime \
             -p lucet-module \
             -p lucetc \
-            -p lucet-idl \
             -p lucet-wasi-sdk \
             -p lucet-wasi \
             -p lucet-wasi-fuzz \
@@ -80,7 +79,6 @@ watch:
             -p lucet-runtime \
             -p lucet-module \
             -p lucetc \
-            -p lucet-idl \
             -p lucet-wasi-sdk \
             -p lucet-wasi \
             -p lucet-benchmarks \
