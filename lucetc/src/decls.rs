@@ -186,7 +186,6 @@ impl<'a> ModuleDecls<'a> {
                 (None, Some(export_sym)) => {
                     // This is a function that is only exported, so there will be a body in this
                     // artifact. We can declare the export.
-                    let export_sym = custom_info.unwrap_or(export_sym);
                     decls.declare_function(clif_module, export_sym, Linkage::Export, func_index)?;
                 }
                 (None, None) => {
