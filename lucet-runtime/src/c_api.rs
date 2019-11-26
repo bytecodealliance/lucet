@@ -5,9 +5,10 @@ use lucet_runtime_internals::c_api::*;
 use lucet_runtime_internals::instance::{
     instance_handle_from_raw, instance_handle_to_raw, InstanceInternal,
 };
+use lucet_runtime_internals::vmctx::{Vmctx, VmctxInternal};
 use lucet_runtime_internals::WASM_PAGE_SIZE;
 use lucet_runtime_internals::{
-    assert_nonnull, lucet_hostcall_terminate, lucet_hostcalls, with_ffi_arcs,
+    assert_nonnull, lucet_hostcall, lucet_hostcall_terminate, with_ffi_arcs,
 };
 use num_traits::FromPrimitive;
 use std::ffi::CStr;
@@ -371,98 +372,93 @@ pub fn ensure_linked() {
     });
 }
 
-lucet_hostcalls! {
-    #[no_mangle]
-    pub unsafe extern "C" fn lucet_vmctx_get_heap(
-        &mut vmctx,
-    ) -> *mut u8 {
-        vmctx.instance().alloc().slot().heap as *mut u8
-    }
+#[lucet_hostcall]
+#[no_mangle]
+pub unsafe extern "C" fn lucet_vmctx_get_heap(vmctx: &mut Vmctx) -> *mut u8 {
+    vmctx.instance().alloc().slot().heap as *mut u8
+}
 
-    #[no_mangle]
-    pub unsafe extern "C" fn lucet_vmctx_get_globals(
-        &mut vmctx,
-    ) -> *mut i64 {
-        vmctx.instance().alloc().slot().globals as *mut i64
-    }
+#[lucet_hostcall]
+#[no_mangle]
+pub unsafe extern "C" fn lucet_vmctx_get_globals(vmctx: &mut Vmctx) -> *mut i64 {
+    vmctx.instance().alloc().slot().globals as *mut i64
+}
 
-    #[no_mangle]
-    /// Get the number of WebAssembly pages currently in the heap.
-    pub unsafe extern "C" fn lucet_vmctx_current_memory(
-        &mut vmctx,
-    ) -> u32 {
-        vmctx.instance().alloc().heap_len() as u32 / WASM_PAGE_SIZE
-    }
+#[lucet_hostcall]
+#[no_mangle]
+/// Get the number of WebAssembly pages currently in the heap.
+pub unsafe extern "C" fn lucet_vmctx_current_memory(vmctx: &mut Vmctx) -> u32 {
+    vmctx.instance().alloc().heap_len() as u32 / WASM_PAGE_SIZE
+}
 
-    #[no_mangle]
-    /// Grows the guest heap by the given number of WebAssembly pages.
-    ///
-    /// On success, returns the number of pages that existed before the call. On failure, returns `-1`.
-    pub unsafe extern "C" fn lucet_vmctx_grow_memory(
-        &mut vmctx,
-        additional_pages: u32,
-    ) -> i32 {
-        if let Ok(old_pages) = vmctx.instance_mut().grow_memory(additional_pages) {
-            old_pages as i32
-        } else {
-            -1
-        }
+#[lucet_hostcall]
+#[no_mangle]
+/// Grows the guest heap by the given number of WebAssembly pages.
+///
+/// On success, returns the number of pages that existed before the call. On failure, returns `-1`.
+pub unsafe extern "C" fn lucet_vmctx_grow_memory(vmctx: &mut Vmctx, additional_pages: u32) -> i32 {
+    if let Ok(old_pages) = vmctx.instance_mut().grow_memory(additional_pages) {
+        old_pages as i32
+    } else {
+        -1
     }
+}
 
-    #[no_mangle]
-    /// Check if a memory region is inside the instance heap.
-    pub unsafe extern "C" fn lucet_vmctx_check_heap(
-        &mut vmctx,
-        ptr: *mut c_void,
-        len: libc::size_t,
-    ) -> bool {
-        vmctx.instance().check_heap(ptr, len)
-    }
+#[lucet_hostcall]
+#[no_mangle]
+/// Check if a memory region is inside the instance heap.
+pub unsafe extern "C" fn lucet_vmctx_check_heap(
+    vmctx: &mut Vmctx,
+    ptr: *mut c_void,
+    len: libc::size_t,
+) -> bool {
+    vmctx.instance().check_heap(ptr, len)
+}
 
-    #[no_mangle]
-    pub unsafe extern "C" fn lucet_vmctx_get_func_from_idx(
-        &mut vmctx,
-        table_idx: u32,
-        func_idx: u32,
-    ) -> *const c_void {
-        vmctx.instance()
-            .module()
-            .get_func_from_idx(table_idx, func_idx)
-            .map(|fptr| fptr.ptr.as_usize() as *const c_void)
-            .unwrap_or(std::ptr::null())
-    }
+#[lucet_hostcall]
+#[no_mangle]
+pub unsafe extern "C" fn lucet_vmctx_get_func_from_idx(
+    vmctx: &mut Vmctx,
+    table_idx: u32,
+    func_idx: u32,
+) -> *const c_void {
+    vmctx
+        .instance()
+        .module()
+        .get_func_from_idx(table_idx, func_idx)
+        .map(|fptr| fptr.ptr.as_usize() as *const c_void)
+        .unwrap_or(std::ptr::null())
+}
 
-    #[no_mangle]
-    pub unsafe extern "C" fn lucet_vmctx_terminate(
-        &mut _vmctx,
-        details: *mut c_void,
-    ) -> () {
-        lucet_hostcall_terminate!(CTerminationDetails { details });
-    }
+#[lucet_hostcall]
+#[no_mangle]
+pub unsafe extern "C" fn lucet_vmctx_terminate(_vmctx: &mut Vmctx, details: *mut c_void) -> () {
+    lucet_hostcall_terminate!(CTerminationDetails { details });
+}
 
-    #[no_mangle]
-    /// Get the delegate object for the current instance.
-    ///
-    /// TODO: rename
-    pub unsafe extern "C" fn lucet_vmctx_get_delegate(
-        &mut vmctx,
-    ) -> *mut c_void {
-        vmctx.instance()
-            .get_embed_ctx::<*mut c_void>()
-            .map(|r| r.map(|p| *p).unwrap_or(ptr::null_mut()))
-            .unwrap_or(std::ptr::null_mut())
-    }
+#[lucet_hostcall]
+#[no_mangle]
+/// Get the delegate object for the current instance.
+///
+/// TODO: rename
+///
+/// TODO: C implementations of hostcalls are highly questionable
+pub unsafe extern "C" fn lucet_vmctx_get_delegate(vmctx: &mut Vmctx) -> *mut c_void {
+    vmctx
+        .instance()
+        .get_embed_ctx::<*mut c_void>()
+        .map(|r| r.map(|p| *p).unwrap_or(ptr::null_mut()))
+        .unwrap_or(std::ptr::null_mut())
+}
 
-    #[no_mangle]
-    pub unsafe extern "C" fn lucet_vmctx_yield(
-        &mut vmctx,
-        val: *mut c_void,
-    ) -> *mut c_void {
-        vmctx
-            .yield_val_try_val(CYieldedVal { val })
-            .map(|CYieldedVal { val }| val)
-            .unwrap_or(std::ptr::null_mut())
-    }
+/// TODO: C implementations of hostcalls are highly questionable
+#[lucet_hostcall]
+#[no_mangle]
+pub unsafe extern "C" fn lucet_vmctx_yield(vmctx: &mut Vmctx, val: *mut c_void) -> *mut c_void {
+    vmctx
+        .yield_val_try_val(CYieldedVal { val })
+        .map(|CYieldedVal { val }| val)
+        .unwrap_or(std::ptr::null_mut())
 }
 
 #[cfg(test)]

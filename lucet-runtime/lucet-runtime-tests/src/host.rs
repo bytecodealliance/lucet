@@ -5,7 +5,7 @@ macro_rules! host_tests {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall_terminate, lucet_hostcalls, DlModule, Error, Limits, Region,
+            lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, Limits, Region,
             TerminationDetails, TrapCode,
         };
         use std::sync::{Arc, Mutex};
@@ -29,115 +29,97 @@ macro_rules! host_tests {
             static ref HOSTCALL_MUTEX: Mutex<()> = Mutex::new(());
         }
 
-        lucet_hostcalls! {
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_test_func_hello(
-                &mut vmctx,
-                hello_ptr: u32,
-                hello_len: u32,
-            ) -> () {
-                let heap = vmctx.heap();
-                let hello = heap.as_ptr() as usize + hello_ptr as usize;
-                if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
-                    lucet_hostcall_terminate!("heap access");
-                }
-                let hello = std::slice::from_raw_parts(hello as *const u8, hello_len as usize);
-                if hello.starts_with(b"hello") {
-                    *vmctx.get_embed_ctx_mut::<bool>() = true;
-                }
-            }
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_test_func_hostcall_error(_vmctx: &mut Vmctx) {
+            lucet_hostcall_terminate!(ERROR_MESSAGE);
+        }
 
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_test_func_hostcall_error(
-                &mut _vmctx,
-            ) -> () {
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_test_func_hello(vmctx: &mut Vmctx, hello_ptr: u32, hello_len: u32) {
+            let heap = vmctx.heap();
+            let hello = heap.as_ptr() as usize + hello_ptr as usize;
+            if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
+                lucet_hostcall_terminate!("heap access");
+            }
+            let hello =
+                unsafe { std::slice::from_raw_parts(hello as *const u8, hello_len as usize) };
+            if hello.starts_with(b"hello") {
+                *vmctx.get_embed_ctx_mut::<bool>() = true;
+            }
+        }
+
+        #[lucet_hostcall]
+        #[allow(unreachable_code)]
+        #[no_mangle]
+        pub fn hostcall_test_func_hostcall_error_unwind(_vmctx: &mut Vmctx) {
+            let _lock = HOSTCALL_MUTEX.lock().unwrap();
+            unsafe {
                 lucet_hostcall_terminate!(ERROR_MESSAGE);
             }
+            drop(_lock);
+        }
 
-            #[allow(unreachable_code)]
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_test_func_hostcall_error_unwind(
-                &mut vmctx,
-            ) -> () {
-                let lock = HOSTCALL_MUTEX.lock().unwrap();
-                unsafe {
-                    lucet_hostcall_terminate!(ERROR_MESSAGE);
-                }
-                drop(lock);
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_bad_borrow(vmctx: &mut Vmctx) -> bool {
+            let heap = vmctx.heap();
+            let mut other_heap = vmctx.heap_mut();
+            heap[0] == other_heap[0]
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_missing_embed_ctx(vmctx: &mut Vmctx) -> bool {
+            struct S {
+                x: bool,
             }
+            let ctx = vmctx.get_embed_ctx::<S>();
+            ctx.x
+        }
 
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_bad_borrow(
-                &mut vmctx,
-            ) -> bool {
-                let heap = vmctx.heap();
-                let mut other_heap = vmctx.heap_mut();
-                heap[0] == other_heap[0]
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_multiple_vmctx(vmctx: &mut Vmctx) -> bool {
+            let mut vmctx1 = unsafe { Vmctx::from_raw(vmctx.as_raw()) };
+            vmctx1.heap_mut()[0] = 0xAF;
+            drop(vmctx1);
+
+            let mut vmctx2 = unsafe { Vmctx::from_raw(vmctx.as_raw()) };
+            let res = vmctx2.heap()[0] == 0xAF;
+            drop(vmctx2);
+
+            res
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_yields(vmctx: &mut Vmctx) {
+            vmctx.yield_();
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_yield_expects_5(vmctx: &mut Vmctx) -> u64 {
+            vmctx.yield_expecting_val()
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_yields_5(vmctx: &mut Vmctx) {
+            vmctx.yield_val(5u64);
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_yield_facts(vmctx: &mut Vmctx, n: u64) -> u64 {
+            fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
+                let result = if n <= 1 { 1 } else { n * fact(vmctx, n - 1) };
+                vmctx.yield_val(result);
+                result
             }
-
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_missing_embed_ctx(
-                &mut vmctx,
-            ) -> bool {
-                struct S {
-                    x: bool
-                }
-                let ctx = vmctx.get_embed_ctx::<S>();
-                ctx.x
-            }
-
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_multiple_vmctx(
-                &mut vmctx,
-            ) -> bool {
-                let mut vmctx1 = Vmctx::from_raw(vmctx.as_raw());
-                vmctx1.heap_mut()[0] = 0xAF;
-                drop(vmctx1);
-
-                let mut vmctx2 = Vmctx::from_raw(vmctx.as_raw());
-                let res = vmctx2.heap()[0] == 0xAF;
-                drop(vmctx2);
-
-                res
-            }
-
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_yields(
-                &mut vmctx,
-            ) -> () {
-                vmctx.yield_();
-            }
-
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_yield_expects_5(
-                &mut vmctx,
-            ) -> u64 {
-                vmctx.yield_expecting_val()
-            }
-
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_yields_5(
-                &mut vmctx,
-            ) -> () {
-                vmctx.yield_val(5u64);
-            }
-
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_yield_facts(
-                &mut vmctx,
-                n: u64,
-            ) -> u64 {
-                fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
-                    let result = if n <= 1 {
-                        1
-                    } else {
-                        n * fact(vmctx, n - 1)
-                    };
-                    vmctx.yield_val(result);
-                    result
-                }
-                fact(vmctx, n)
-            }
+            fact(vmctx, n)
         }
 
         pub enum CoopFactsK {
@@ -145,24 +127,20 @@ macro_rules! host_tests {
             Result(u64),
         }
 
-        lucet_hostcalls! {
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_coop_facts(
-                &mut vmctx,
-                n: u64,
-            ) -> u64 {
-                fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
-                    let result = if n <= 1 {
-                        1
-                    } else {
-                        let n_rec = fact(vmctx, n - 1);
-                        vmctx.yield_val_expecting_val(CoopFactsK::Mult(n, n_rec))
-                    };
-                    vmctx.yield_val(CoopFactsK::Result(result));
-                    result
-                }
-                fact(vmctx, n)
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_coop_facts(vmctx: &mut Vmctx, n: u64) -> u64 {
+            fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
+                let result = if n <= 1 {
+                    1
+                } else {
+                    let n_rec = fact(vmctx, n - 1);
+                    vmctx.yield_val_expecting_val(CoopFactsK::Mult(n, n_rec))
+                };
+                vmctx.yield_val(CoopFactsK::Result(result));
+                result
             }
+            fact(vmctx, n)
         }
 
         #[test]

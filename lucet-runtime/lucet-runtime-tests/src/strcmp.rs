@@ -2,19 +2,18 @@
 macro_rules! strcmp_tests {
     ( $TestRegion:path ) => {
         use libc::{c_char, c_int, c_void, strcmp};
-        use lucet_runtime::vmctx::lucet_vmctx;
-        use lucet_runtime::{lucet_hostcalls, Error, Limits, Region, Val, WASM_PAGE_SIZE};
+        use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
+        use lucet_runtime::{lucet_hostcall, Error, Limits, Region, Val, WASM_PAGE_SIZE};
         use std::ffi::CString;
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
 
-        lucet_hostcalls! {
-            #[no_mangle]
-            pub unsafe extern "C" fn hostcall_host_fault(
-                &mut _vmctx,
-            ) -> () {
-                let oob = (-1isize) as *mut c_char;
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_host_fault(_vmctx: &mut Vmctx) {
+            let oob = (-1isize) as *mut c_char;
+            unsafe {
                 *oob = 'x' as c_char;
             }
         }

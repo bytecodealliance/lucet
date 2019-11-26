@@ -114,8 +114,9 @@ impl VmctxInternal for Vmctx {
 impl Vmctx {
     /// Create a `Vmctx` from the compiler-inserted `vmctx` argument in a guest function.
     ///
-    /// This is almost certainly not what you want to use to get a `Vmctx`; instead use the `&mut
-    /// Vmctx` argument to a `lucet_hostcalls!`-wrapped function.
+    /// This is almost certainly not what you want to use to get a `Vmctx`; instead use the first
+    /// argument of a function with the `#[lucet_hostcall]` attribute, which must have the type
+    /// `&mut Vmctx`.
     pub unsafe fn from_raw(vmctx: *mut lucet_vmctx) -> Vmctx {
         let inst = instance_from_vmctx(vmctx);
         assert!(inst.valid_magic());
@@ -277,29 +278,30 @@ impl Vmctx {
     /// from its own context.
     ///
     /// ```no_run
-    /// use lucet_runtime_internals::{lucet_hostcalls, lucet_hostcall_terminate};
+    /// use lucet_runtime_macros::lucet_hostcall;
+    /// use lucet_runtime_internals::lucet_hostcall_terminate;
     /// use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
     ///
-    /// lucet_hostcalls! {
-    ///     #[no_mangle]
-    ///     pub unsafe extern "C" fn hostcall_call_binop(
-    ///         &mut vmctx,
-    ///         binop_table_idx: u32,
-    ///         binop_func_idx: u32,
-    ///         operand1: u32,
-    ///         operand2: u32,
-    ///     ) -> u32 {
-    ///         if let Ok(binop) = vmctx.get_func_from_idx(binop_table_idx, binop_func_idx) {
-    ///             let typed_binop = std::mem::transmute::<
-    ///                 usize,
-    ///                 extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32
-    ///             >(binop.ptr.as_usize());
-    ///             unsafe { (typed_binop)(vmctx.as_raw(), operand1, operand2) }
-    ///         } else {
-    ///             lucet_hostcall_terminate!("invalid function index")
-    ///         }
+    /// #[lucet_hostcall]
+    /// #[no_mangle]
+    /// pub unsafe extern "C" fn hostcall_call_binop(
+    ///     vmctx: &mut Vmctx,
+    ///     binop_table_idx: u32,
+    ///     binop_func_idx: u32,
+    ///     operand1: u32,
+    ///     operand2: u32,
+    /// ) -> u32 {
+    ///     if let Ok(binop) = vmctx.get_func_from_idx(binop_table_idx, binop_func_idx) {
+    ///         let typed_binop = std::mem::transmute::<
+    ///             usize,
+    ///             extern "C" fn(*mut lucet_vmctx, u32, u32) -> u32,
+    ///         >(binop.ptr.as_usize());
+    ///         unsafe { (typed_binop)(vmctx.as_raw(), operand1, operand2) }
+    ///     } else {
+    ///         lucet_hostcall_terminate!("invalid function index")
     ///     }
     /// }
+    /// ```
     pub fn get_func_from_idx(
         &self,
         table_idx: u32,
