@@ -127,8 +127,7 @@ impl<'a> ModuleDecls<'a> {
                 decls
                     .info
                     .function_names
-                    .get(&func_index)
-                    .cloned()
+                    .get(func_index)
                     .map(|s| format!("{}_{}", s, ix))
             }
 
@@ -168,13 +167,9 @@ impl<'a> ModuleDecls<'a> {
                 }
             };
 
-            let custom_info = custom_name_for(ix, func_index, decls);
             let import_info = import_name_for(func_index, decls, bindings)?;
             let export_info = export_name_for(func_index, decls);
 
-            // We don't match on `custom_info` because export and import info are needed to
-            // determine the linkage type, and because we use different values as a fallback for
-            // exported functions and local functions.
             match (import_info, export_info) {
                 (Some(import_sym), _) => {
                     // if a function is only an import, declare the corresponding artifact import.
@@ -192,7 +187,8 @@ impl<'a> ModuleDecls<'a> {
                     // No import or export for this function, which means that it is local. We can
                     // look for a name provided in the custom names section, otherwise we have to
                     // make up a placeholder name for it using its index.
-                    let local_sym = custom_info.unwrap_or_else(|| format!("guest_func_{}", ix));
+                    let local_sym = custom_name_for(ix, func_index, decls)
+                        .unwrap_or_else(|| format!("guest_func_{}", ix));
                     decls.declare_function(clif_module, local_sym, Linkage::Local, func_index)?;
                 }
             }

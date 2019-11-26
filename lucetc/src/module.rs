@@ -1,7 +1,7 @@
 //! Implements ModuleEnvironment for cranelift-wasm. Code derived from cranelift-wasm/environ/dummy.rs
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::pointer::NATIVE_POINTER;
-use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap};
+use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap, SecondaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
@@ -73,7 +73,7 @@ pub struct ModuleInfo<'a> {
     /// Function signatures: imported and local
     pub functions: PrimaryMap<UniqueFuncIndex, Exportable<'a, SignatureIndex>>,
     /// Function names.
-    pub function_names: HashMap<UniqueFuncIndex, String>,
+    pub function_names: SecondaryMap<UniqueFuncIndex, &'a str>,
     /// Provided by `declare_table`
     pub tables: PrimaryMap<TableIndex, Exportable<'a, Table>>,
     /// Provided by `declare_memory`
@@ -105,7 +105,7 @@ impl<'a> ModuleInfo<'a> {
             imported_memories: PrimaryMap::new(),
             function_mapping: PrimaryMap::new(),
             functions: PrimaryMap::new(),
-            function_names: HashMap::new(),
+            function_names: SecondaryMap::new(),
             tables: PrimaryMap::new(),
             memories: PrimaryMap::new(),
             globals: PrimaryMap::new(),
@@ -410,8 +410,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             .function_mapping
             .get(func_index)
             .expect("function indices are valid");
-        self.function_names
-            .insert(unique_func_index, name.to_owned());
+        self.function_names[unique_func_index] = name;
         Ok(())
     }
 }
