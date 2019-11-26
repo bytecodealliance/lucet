@@ -260,11 +260,9 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let ctx = WasiCtxBuilder::new()
-                    .expect("create a new WASI context")
                     .args(["hello"].iter())
-                    .expect("WASI arguments")
                     .build()
-                    .unwrap();
+                    .expect("build WasiCtx");
                 region
                     .new_instance_builder(module.clone())
                     .with_embed_ctx(ctx)

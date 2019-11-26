@@ -34,7 +34,7 @@ lucet-module = { path = "../lucet-module", version = "0.4.1" }
 libc = "0.2.65"
 nix = "0.15"
 rand = "0.6"
-wasi-common = { git = "https://github.com/cranestation/wasi-common", rev = "f4ac1299b2001b575cfc99f5544a4a96355a6bff" }
+wasi-common = "0.7"
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.4.1" }
