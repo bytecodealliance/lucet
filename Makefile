@@ -21,7 +21,7 @@ install-dev: build-dev
 	@helpers/install.sh --unoptimized
 
 .PHONY: test
-test: indent-check test-except-fuzz test-fuzz package
+test: indent-check test-except-fuzz test-fuzz
 
 .PHONY: test-except-fuzz
 test-except-fuzz:
