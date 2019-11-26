@@ -21,7 +21,7 @@ install-dev: build-dev
 	@helpers/install.sh --unoptimized
 
 .PHONY: test
-test: indent-check test-except-fuzz test-fuzz
+test: indent-check test-except-fuzz test-fuzz package
 
 .PHONY: test-except-fuzz
 test-except-fuzz:
@@ -71,6 +71,11 @@ indent:
 .PHONY: indent-check
 indent-check:
 	helpers/indent.sh check
+
+.PHONY: package
+package:
+	cargo deb -p lucet-validate
+	cargo deb -p lucetc
 
 .PHONY: watch
 watch:
