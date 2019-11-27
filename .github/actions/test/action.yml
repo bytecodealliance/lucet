@@ -1,5 +1,9 @@
 name: 'Test Lucet'
 description: 'run tests using standardized lucet development environment'
+inputs:
+  target:
+    description: "Makefile target to execute"
+    required: true
 runs:
   using: 'docker'
   image: '../../../Dockerfile'
@@ -11,4 +15,4 @@ runs:
       # rustup expects $HOME to be set to /root during `docker run` because thats what
       # it was set to during container creation. Actions clears $HOME so we set it here.
       # The test target of the Makefile is our standard CI.
-    - 'export HOME=/root; make test'
+    - 'export HOME=/root; make ${{ inputs.target }}'

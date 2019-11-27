@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod lucet_wasi_tests {
+mod lucet_validate_tests {
     use lucet_validate::Validator;
     use std::fs;
     use std::path::Path;
@@ -37,7 +37,7 @@ mod lucet_wasi_tests {
 
     #[test]
     fn validate_lucet_wasi_test_guests() {
-        let validator = Validator::load("../wasi/phases/unstable/witx/wasi_unstable_preview0.witx")
+        let validator = Validator::load("../wasi/phases/old/snapshot_0/witx/wasi_unstable.witx")
             .expect("load wasi_unstable_preview0");
 
         for entry in

@@ -15,21 +15,21 @@ path = "lucetc/main.rs"
 
 [dependencies]
 bincode = "1.1.4"
-cranelift-codegen = { path = "../cranelift/cranelift-codegen", version = "0.46.1" }
-cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.46.1" }
-cranelift-native = { path = "../cranelift/cranelift-native", version = "0.46.1" }
-cranelift-frontend = { path = "../cranelift/cranelift-frontend", version = "0.46.1" }
-cranelift-module = { path = "../cranelift/cranelift-module", version = "0.46.1" }
-cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.46.1" }
-cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.46.1" }
-target-lexicon = "0.8.0"
+cranelift-codegen = { path = "../cranelift/cranelift-codegen", version = "0.51.0" }
+cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.51.0" }
+cranelift-native = { path = "../cranelift/cranelift-native", version = "0.51.0" }
+cranelift-frontend = { path = "../cranelift/cranelift-frontend", version = "0.51.0" }
+cranelift-module = { path = "../cranelift/cranelift-module", version = "0.51.0" }
+cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.51.0" }
+cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.51.0" }
+target-lexicon = "0.9"
 lucet-module = { path = "../lucet-module", version = "0.4.2" }
 lucet-validate = { path = "../lucet-validate", version = "0.4.2" }
 wasmparser = "0.39.1"
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"
-faerie = "0.11.0"
+faerie = "0.12.0"
 goblin = "0.0.24"
 failure = "0.1"
 byteorder = "1.2"
@@ -56,8 +56,12 @@ assets = [
     ["target/release/lucetc", "/opt/fst-lucetc/bin/lucetc", "755"],
     ["target/release/liblucetc.rlib", "/opt/fst-lucetc/lib/", "644"],
     ["LICENSE", "/opt/fst-lucetc/share/doc/lucetc/", "644"],
-    ["../wasi/phases/unstable/witx/typenames.witx",
-     "/opt/fst-lucetc/share/wasi/unstable/typenames.witx", "644"],
-    ["../wasi/phases/unstable/witx/wasi_unstable_preview0.witx",
-     "/opt/fst-lucetc/share/wasi/unstable/wasi_unstable_preview0.witx", "644"],
+    ["../wasi/phases/old/snapshot_0/witx/typenames.witx",
+     "/opt/fst-lucetc/share/wasi/snapshot_0/typenames.witx", "644"],
+    ["../wasi/phases/old/snapshot_0/witx/wasi_unstable.witx",
+     "/opt/fst-lucetc/share/wasi/snapshot_0/wasi_unstable.witx", "644"],
+    ["../wasi/phases/snapshot/witx/typenames.witx",
+     "/opt/fst-lucetc/share/wasi/snapshot_1/typenames.witx", "644"],
+    ["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx",
+     "/opt/fst-lucetc/share/wasi/snapshot_1/wasi_snapshot_preview1.witx", "644"],
 ]

@@ -368,14 +368,11 @@ fn run_with_stdout<P: AsRef<Path>>(
     tmpdir: &TempDir,
     path: P,
 ) -> Result<(__wasi_exitcode_t, Vec<u8>), Error> {
-    let ctx = WasiCtxBuilder::new()
-        .map_err(|e| format_err!("WasiCtxBuilder: {}", e))?
-        .args(["gen"].iter())
-        .map_err(|e| format_err!("WasiCtxBuilder args: {}", e))?;
+    let ctx = WasiCtxBuilder::new().args(&["gen"]);
 
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = ctx.stdout(unsafe { File::from_raw_fd(pipe_in) })?.build()?;
+    let ctx = ctx.stdout(unsafe { File::from_raw_fd(pipe_in) }).build()?;
 
     let exitcode = run(tmpdir, path, ctx)?;
 

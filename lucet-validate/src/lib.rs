@@ -69,7 +69,7 @@ impl Validator {
     }
 
     pub fn load<P: AsRef<Path>>(source_path: P) -> Result<Self, WitxError> {
-        let witx = witx::load(source_path.as_ref())?;
+        let witx = witx::load(&[source_path.as_ref()])?;
         Ok(Self {
             witx,
             wasi_exe: false,
@@ -117,11 +117,9 @@ impl Validator {
     }
 
     fn witx_module(&self, module: &str) -> Result<Rc<Module>, Error> {
-        match module {
-            "wasi_unstable" => self.witx.module(&Id::new("wasi_unstable_preview0")),
-            _ => self.witx.module(&Id::new(module)),
-        }
-        .ok_or_else(|| Error::ModuleNotFound(module.to_string()))
+        self.witx
+            .module(&Id::new(module))
+            .ok_or_else(|| Error::ModuleNotFound(module.to_string()))
     }
 
     fn check_wasi_start_func(&self, moduletype: &ModuleType) -> Result<(), Error> {
