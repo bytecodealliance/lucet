@@ -6,7 +6,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -23,7 +23,7 @@ jobs:
     name: Package
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -41,7 +41,7 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-16.04
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
       with:
         submodules: true
     - name: Install Rust (rustup)
