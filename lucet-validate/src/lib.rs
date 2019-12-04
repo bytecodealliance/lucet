@@ -1,9 +1,9 @@
 mod moduletype;
 mod types;
 
-use failure::Fail;
 use std::path::Path;
 use std::rc::Rc;
+use thiserror::Error;
 use wasmparser;
 use witx::{self, Id, Module};
 
@@ -11,21 +11,24 @@ pub use self::moduletype::ModuleType;
 pub use self::types::{FuncSignature, ImportFunc};
 pub use witx::{AtomType, Document, WitxError};
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[fail(display = "WebAssembly validation error at offset {}: {}", _1, 0)]
+    #[error("WebAssembly validation error at offset {}: {}", _1, 0)]
     WasmValidation(&'static str, usize),
-    #[fail(display = "Unsupported: {}", _0)]
+    #[error("Unsupported: {}", _0)]
     Unsupported(String),
-    #[fail(display = "Module not found: {}", _0)]
+    #[error("Module not found: {}", _0)]
     ModuleNotFound(String),
-    #[fail(display = "Import not found: {}::{}", module, field)]
+    #[error("Import not found: {}::{}", module, field)]
     ImportNotFound { module: String, field: String },
-    #[fail(display = "Export not found: {}", field)]
+    #[error("Export not found: {}", field)]
     ExportNotFound { field: String },
-    #[fail(
-        display = "Import type error: for {}::{}, expected {:?}, got {:?}",
-        module, field, expected, got
+    #[error(
+        "Import type error: for {}::{}, expected {:?}, got {:?}",
+        module,
+        field,
+        expected,
+        got
     )]
     ImportTypeError {
         module: String,
@@ -33,9 +36,11 @@ pub enum Error {
         expected: FuncSignature,
         got: FuncSignature,
     },
-    #[fail(
-        display = "Export type error: for {}, expected {:?}, got {:?}",
-        field, expected, got
+    #[error(
+        "Export type error: for {}, expected {:?}, got {:?}",
+        field,
+        expected,
+        got
     )]
     ExportTypeError {
         field: String,
