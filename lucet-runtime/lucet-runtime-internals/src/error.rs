@@ -71,15 +71,6 @@ pub enum Error {
     Unsupported(String),
 }
 
-// TLC TODO What is this?  Can I use #[from] instead?
-/*
-impl From<AnyError> for Error {
-    fn from(e: AnyError) -> Error {
-	Error::InternalError(e)
-    }
-}
- */
-
 impl From<crate::context::Error> for Error {
     fn from(e: crate::context::Error) -> Error {
         Error::InternalError(e.into())
