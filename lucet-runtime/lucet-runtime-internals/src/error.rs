@@ -1,40 +1,41 @@
 use crate::instance::{FaultDetails, TerminationDetails};
-use failure::Fail;
+use anyhow::Error as AnyError;
+use thiserror::Error;
 
 /// Lucet runtime errors.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[fail(display = "Invalid argument: {}", _0)]
+    #[error("Invalid argument: {}", _0)]
     InvalidArgument(&'static str),
 
     /// A [`Region`](trait.Region.html) cannot currently accommodate additional instances.
-    #[fail(display = "Region capacity reached: {} instances", _0)]
+    #[error("Region capacity reached: {} instances", _0)]
     RegionFull(usize),
 
     /// A module error occurred.
-    #[fail(display = "Module error: {}", _0)]
+    #[error("Module error: {}", _0)]
     ModuleError(ModuleError),
 
     /// A method call or module specification would exceed an instance's
     /// [`Limit`s](struct.Limits.html).
-    #[fail(display = "Instance limits exceeded: {}", _0)]
+    #[error("Instance limits exceeded: {}", _0)]
     LimitsExceeded(String),
 
     /// A method call attempted to modify linear memory for an instance that
     /// does not have linear memory
-    #[fail(display = "No linear memory available: {}", _0)]
+    #[error("No linear memory available: {}", _0)]
     NoLinearMemory(String),
 
     /// An attempt to look up a WebAssembly function by its symbol name failed.
-    #[fail(display = "Symbol not found: {}", _0)]
+    #[error("Symbol not found: {}", _0)]
     SymbolNotFound(String),
 
     /// An attempt to look up a WebAssembly function by its table index failed.
-    #[fail(display = "Function not found: (table {}, func {})", _0, _1)]
+    #[error("Function not found: (table {}, func {})", _0, _1)]
     FuncNotFound(u32, u32),
 
     /// An instance aborted due to a runtime fault.
-    #[fail(display = "Runtime fault: {:?}", _0)]
+    #[error("Runtime fault: {:?}", _0)]
     RuntimeFault(FaultDetails),
 
     /// An instance terminated, potentially with extra information about the termination.
@@ -42,39 +43,42 @@ pub enum Error {
     /// This condition can arise from a hostcall explicitly calling
     /// [`Vmctx::terminate()`](vmctx/struct.Vmctx.html#method.terminate), or via a custom signal handler
     /// that returns [`SignalBehavior::Terminate`](enum.SignalBehavior.html#variant.Terminate).
-    #[fail(display = "Runtime terminated")]
+    #[error("Runtime terminated")]
     RuntimeTerminated(TerminationDetails),
 
     /// IO errors arising during dynamic loading with [`DlModule`](struct.DlModule.html).
-    #[fail(display = "Dynamic loading error: {}", _0)]
-    DlError(#[cause] std::io::Error),
+    #[error("Dynamic loading error: {}", _0)]
+    DlError(#[from] std::io::Error),
 
-    #[fail(display = "Instance not returned")]
+    #[error("Instance not returned")]
     InstanceNotReturned,
 
-    #[fail(display = "Instance not yielded")]
+    #[error("Instance not yielded")]
     InstanceNotYielded,
 
-    #[fail(display = "Start function yielded")]
+    #[error("Start function yielded")]
     StartYielded,
 
     /// A catch-all for internal errors that are likely unrecoverable by the runtime user.
     ///
     /// As the API matures, these will likely become rarer, replaced by new variants of this enum,
     /// or by panics for truly unrecoverable situations.
-    #[fail(display = "Internal error: {}", _0)]
-    InternalError(#[cause] failure::Error),
+    #[error("Internal error: {}", _0)]
+    InternalError(#[source] AnyError),
 
     /// An unsupported feature was used.
-    #[fail(display = "Unsupported feature: {}", _0)]
+    #[error("Unsupported feature: {}", _0)]
     Unsupported(String),
 }
 
-impl From<failure::Error> for Error {
-    fn from(e: failure::Error) -> Error {
-        Error::InternalError(e)
+// TLC TODO What is this?  Can I use #[from] instead?
+/*
+impl From<AnyError> for Error {
+    fn from(e: AnyError) -> Error {
+	Error::InternalError(e)
     }
 }
+ */
 
 impl From<crate::context::Error> for Error {
     fn from(e: crate::context::Error) -> Error {
@@ -101,16 +105,17 @@ impl From<lucet_module::Error> for Error {
 }
 
 /// Lucet module errors.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum ModuleError {
     /// An error was found in the definition of a Lucet module.
-    #[fail(display = "Incorrect module definition: {}", _0)]
+    #[error("Incorrect module definition: {}", _0)]
     IncorrectModule(String),
 
     /// An error occurred with the module data section, likely during deserialization.
-    #[fail(display = "Module data error: {}", _0)]
-    ModuleDataError(#[cause] lucet_module::Error),
+    #[error("Module data error: {}", _0)]
+    ModuleDataError(#[from] lucet_module::Error),
 }
+
 
 #[macro_export]
 macro_rules! lucet_bail {
@@ -138,7 +143,7 @@ macro_rules! lucet_ensure {
 
 #[macro_export]
 macro_rules! lucet_format_err {
-    ($($arg:tt)*) => { $crate::error::Error::InternalError(failure::format_err!($($arg)*)) }
+    ($($arg:tt)*) => { $crate::error::Error::InternalError($($arg)*) }
 }
 
 #[macro_export]
