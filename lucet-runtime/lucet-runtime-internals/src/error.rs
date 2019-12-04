@@ -89,13 +89,11 @@ impl From<std::ffi::IntoStringError> for Error {
     }
 }
 
-
 impl From<lucet_module::Error> for Error {
     fn from(e: lucet_module::Error) -> Error {
         Error::ModuleError(ModuleError::ModuleDataError(e))
     }
 }
-
 
 /// Lucet module errors.
 #[derive(Debug, Error)]
@@ -108,7 +106,6 @@ pub enum ModuleError {
     #[error("Module data error: {}", _0)]
     ModuleDataError(#[from] lucet_module::Error),
 }
-
 
 #[macro_export]
 macro_rules! lucet_bail {
