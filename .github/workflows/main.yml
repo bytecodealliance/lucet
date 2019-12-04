@@ -6,22 +6,42 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
     # Testing uses the development environment Docker container.
     # This action builds the container and executes the test suite inside it.
     - uses: ./.github/actions/test
+      with:
+        target: test
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    # Testing uses the development environment Docker container.
+    # This action builds the container and executes the test suite inside it.
+    - uses: ./.github/actions/test
+      with:
+        target: package
+
+    - name: Ensure testing did not change sources
+      run: git diff --exit-code
+
 
   rustfmt:
     name: Rustfmt
     runs-on: ubuntu-16.04
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
       with:
         submodules: true
     - name: Install Rust (rustup)

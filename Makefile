@@ -31,7 +31,6 @@ test-except-fuzz:
             -p lucet-runtime \
             -p lucet-module \
             -p lucetc \
-            -p lucet-idl \
             -p lucet-wasi-sdk \
             -p lucet-wasi \
             -p lucet-wasi-fuzz \
@@ -73,6 +72,11 @@ indent:
 indent-check:
 	helpers/indent.sh check
 
+.PHONY: package
+package:
+	cargo deb -p lucet-validate
+	cargo deb -p lucetc
+
 .PHONY: watch
 watch:
 	cargo watch --exec "test \
@@ -80,7 +84,6 @@ watch:
             -p lucet-runtime \
             -p lucet-module \
             -p lucetc \
-            -p lucet-idl \
             -p lucet-wasi-sdk \
             -p lucet-wasi \
             -p lucet-benchmarks \

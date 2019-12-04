@@ -1,6 +1,6 @@
 [package]
 name = "lucet-runtime-tests"
-version = "0.4.1"
+version = "0.4.2"
 description = "Pure Rust runtime for Lucet WebAssembly toolchain (tests)"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
@@ -18,10 +18,10 @@ test = false
 failure = "0.1"
 lazy_static = "1.1"
 tempfile = "3.0"
-lucet-module = { path = "../../lucet-module", version = "0.4.1" }
-lucet-runtime-internals = { path = "../lucet-runtime-internals", version = "0.4.1" }
-lucet-wasi-sdk = { path = "../../lucet-wasi-sdk", version = "0.4.1" }
-lucetc = { path = "../../lucetc", version = "0.4.1" }
+lucet-module = { path = "../../lucet-module", version = "0.4.2" }
+lucet-runtime-internals = { path = "../lucet-runtime-internals", version = "0.4.2" }
+lucet-wasi-sdk = { path = "../../lucet-wasi-sdk", version = "0.4.2" }
+lucetc = { path = "../../lucetc", version = "0.4.2" }
 
 [build-dependencies]
 cc = "1.0"

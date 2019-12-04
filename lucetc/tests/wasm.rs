@@ -2,15 +2,20 @@ use lucet_module::bindings::Bindings;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub fn load_wat_module(name: &str) -> Vec<u8> {
+fn load_wat_module(name: &str) -> Vec<u8> {
     use std::fs::File;
     use std::io::Read;
-    use wabt::wat2wasm;
+    use wabt::Wat2Wasm;
     let watfile = PathBuf::from(&format!("tests/wasm/{}.wat", name));
     let mut contents = Vec::new();
     let mut file = File::open(&watfile).expect("open module file");
     file.read_to_end(&mut contents).expect("read module file");
-    wat2wasm(contents).expect("convert module to wasm binary format")
+    Wat2Wasm::new()
+        .write_debug_names(true)
+        .convert(contents)
+        .expect("convert module to wasm binary format")
+        .as_ref()
+        .to_owned()
 }
 
 pub fn test_bindings() -> Bindings {
@@ -508,6 +513,32 @@ mod module_data {
         );
         */
     }
+
+    #[test]
+    fn names_local() {
+        let m = load_wat_module("names_local");
+        let b = super::test_bindings();
+        let h = HeapSettings::default();
+        let c = Compiler::new(
+            &m,
+            OptLevel::default(),
+            CpuFeatures::default(),
+            &b,
+            h,
+            false,
+            &None,
+        )
+        .expect("compile names_local");
+        let mdata = c.module_data().unwrap();
+
+        assert_eq!(mdata.import_functions().len(), 0);
+        assert_eq!(mdata.export_functions().len(), 0);
+        assert_eq!(mdata.function_info().len(), 3);
+        assert_eq!(
+            mdata.function_info().get(0).unwrap().name,
+            Some("func_name_0")
+        )
+    }
 }
 
 mod compile {
@@ -561,7 +592,6 @@ mod compile {
 }
 
 mod validate {
-
     use super::load_wat_module;
     use lucet_validate::Validator;
     use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel};

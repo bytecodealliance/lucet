@@ -1,27 +1,23 @@
 #![allow(clippy::too_many_arguments)]
 
-pub use lucet_runtime::{self, vmctx::lucet_vmctx};
-pub use wasi_common::{wasi, wasi32, WasiCtx};
-
-use lucet_runtime::lucet_hostcall_terminate;
+use lucet_runtime::vmctx::Vmctx;
+use lucet_runtime::{lucet_hostcall, lucet_hostcall_terminate};
 use std::mem;
 use std::rc::Rc;
 use wasi_common::hostcalls::*;
+use wasi_common::{wasi, wasi32, WasiCtx};
 
-lucet_runtime::lucet_hostcalls! {
-
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_proc_exit(
-    &mut _lucet_vmctx,
-    rval: wasi::__wasi_exitcode_t,
-) -> ! {
+pub unsafe fn __wasi_proc_exit(_lucet_ctx: &mut Vmctx, rval: wasi::__wasi_exitcode_t) -> ! {
     export_wasi_funcs();
     lucet_hostcall_terminate!(rval);
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_args_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_args_get(
+    lucet_ctx: &mut Vmctx,
     argv_ptr: wasi32::uintptr_t,
     argv_buf: wasi32::uintptr_t,
 ) -> wasi::__wasi_errno_t {
@@ -30,9 +26,10 @@ pub unsafe extern "C" fn __wasi_args_get(
     args_get(wasi_ctx, heap, argv_ptr, argv_buf)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_args_sizes_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_args_sizes_get(
+    lucet_ctx: &mut Vmctx,
     argc_ptr: wasi32::uintptr_t,
     argv_buf_size_ptr: wasi32::uintptr_t,
 ) -> wasi::__wasi_errno_t {
@@ -41,14 +38,16 @@ pub unsafe extern "C" fn __wasi_args_sizes_get(
     args_sizes_get(wasi_ctx, heap, argc_ptr, argv_buf_size_ptr)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_sched_yield(&mut _lucet_ctx,) -> wasi::__wasi_errno_t {
+pub unsafe fn __wasi_sched_yield(_lucet_ctx: &mut Vmctx) -> wasi::__wasi_errno_t {
     sched_yield()
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_clock_res_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_clock_res_get(
+    lucet_ctx: &mut Vmctx,
     clock_id: wasi::__wasi_clockid_t,
     resolution_ptr: wasi32::uintptr_t,
 ) -> wasi::__wasi_errno_t {
@@ -56,9 +55,10 @@ pub unsafe extern "C" fn __wasi_clock_res_get(
     clock_res_get(heap, clock_id, resolution_ptr)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_clock_time_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_clock_time_get(
+    lucet_ctx: &mut Vmctx,
     clock_id: wasi::__wasi_clockid_t,
     precision: wasi::__wasi_timestamp_t,
     time_ptr: wasi32::uintptr_t,
@@ -67,9 +67,10 @@ pub unsafe extern "C" fn __wasi_clock_time_get(
     clock_time_get(heap, clock_id, precision, time_ptr)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_environ_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_environ_get(
+    lucet_ctx: &mut Vmctx,
     environ_ptr: wasi32::uintptr_t,
     environ_buf: wasi32::uintptr_t,
 ) -> wasi::__wasi_errno_t {
@@ -78,9 +79,10 @@ pub unsafe extern "C" fn __wasi_environ_get(
     environ_get(wasi_ctx, heap, environ_ptr, environ_buf)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_environ_sizes_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_environ_sizes_get(
+    lucet_ctx: &mut Vmctx,
     environ_count_ptr: wasi32::uintptr_t,
     environ_size_ptr: wasi32::uintptr_t,
 ) -> wasi::__wasi_errno_t {
@@ -89,18 +91,20 @@ pub unsafe extern "C" fn __wasi_environ_sizes_get(
     environ_sizes_get(wasi_ctx, heap, environ_count_ptr, environ_size_ptr)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_close(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_close(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
 ) -> wasi::__wasi_errno_t {
     let wasi_ctx = &mut lucet_ctx.get_embed_ctx_mut::<WasiCtx>();
     fd_close(wasi_ctx, fd)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_fdstat_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_fdstat_get(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     fdstat_ptr: wasi32::uintptr_t,
 ) -> wasi::__wasi_errno_t {
@@ -109,9 +113,10 @@ pub unsafe extern "C" fn __wasi_fd_fdstat_get(
     fd_fdstat_get(wasi_ctx, heap, fd, fdstat_ptr)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_fdstat_set_flags(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_fdstat_set_flags(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     fdflags: wasi::__wasi_fdflags_t,
 ) -> wasi::__wasi_errno_t {
@@ -119,9 +124,10 @@ pub unsafe extern "C" fn __wasi_fd_fdstat_set_flags(
     fd_fdstat_set_flags(wasi_ctx, fd, fdflags)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_tell(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_tell(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     offset: wasi32::uintptr_t,
 ) -> wasi::__wasi_errno_t {
@@ -130,9 +136,10 @@ pub unsafe extern "C" fn __wasi_fd_tell(
     fd_tell(wasi_ctx, heap, fd, offset)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_seek(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_seek(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     offset: wasi::__wasi_filedelta_t,
     whence: wasi::__wasi_whence_t,
@@ -143,9 +150,10 @@ pub unsafe extern "C" fn __wasi_fd_seek(
     fd_seek(wasi_ctx, heap, fd, offset, whence, newoffset)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_prestat_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_prestat_get(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     prestat_ptr: wasi32::uintptr_t,
 ) -> wasi::__wasi_errno_t {
@@ -154,9 +162,10 @@ pub unsafe extern "C" fn __wasi_fd_prestat_get(
     fd_prestat_get(wasi_ctx, heap, fd, prestat_ptr)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_prestat_dir_name(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_prestat_dir_name(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     path_ptr: wasi32::uintptr_t,
     path_len: wasi32::size_t,
@@ -166,9 +175,10 @@ pub unsafe extern "C" fn __wasi_fd_prestat_dir_name(
     fd_prestat_dir_name(wasi_ctx, heap, fd, path_ptr, path_len)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_read(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_read(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     iovs_ptr: wasi32::uintptr_t,
     iovs_len: wasi32::size_t,
@@ -179,9 +189,10 @@ pub unsafe extern "C" fn __wasi_fd_read(
     fd_read(wasi_ctx, heap, fd, iovs_ptr, iovs_len, nread)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_write(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_write(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     iovs_ptr: wasi32::uintptr_t,
     iovs_len: wasi32::size_t,
@@ -192,9 +203,10 @@ pub unsafe extern "C" fn __wasi_fd_write(
     fd_write(wasi_ctx, heap, fd, iovs_ptr, iovs_len, nwritten)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_open(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_open(
+    lucet_ctx: &mut Vmctx,
     dirfd: wasi::__wasi_fd_t,
     dirflags: wasi::__wasi_lookupflags_t,
     path_ptr: wasi32::uintptr_t,
@@ -222,9 +234,10 @@ pub unsafe extern "C" fn __wasi_path_open(
     )
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_random_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_random_get(
+    lucet_ctx: &mut Vmctx,
     buf_ptr: wasi32::uintptr_t,
     buf_len: wasi32::size_t,
 ) -> wasi::__wasi_errno_t {
@@ -232,9 +245,10 @@ pub unsafe extern "C" fn __wasi_random_get(
     random_get(heap, buf_ptr, buf_len)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_poll_oneoff(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_poll_oneoff(
+    lucet_ctx: &mut Vmctx,
     input: wasi32::uintptr_t,
     output: wasi32::uintptr_t,
     nsubscriptions: wasi32::size_t,
@@ -245,9 +259,10 @@ pub unsafe extern "C" fn __wasi_poll_oneoff(
     poll_oneoff(wasi_ctx, heap, input, output, nsubscriptions, nevents)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_filestat_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_filestat_get(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     filestat_ptr: wasi32::uintptr_t,
 ) -> wasi::__wasi_errno_t {
@@ -256,9 +271,10 @@ pub unsafe extern "C" fn __wasi_fd_filestat_get(
     fd_filestat_get(wasi_ctx, heap, fd, filestat_ptr)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_filestat_get(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_filestat_get(
+    lucet_ctx: &mut Vmctx,
     dirfd: wasi::__wasi_fd_t,
     dirflags: wasi::__wasi_lookupflags_t,
     path_ptr: wasi32::uintptr_t,
@@ -278,9 +294,10 @@ pub unsafe extern "C" fn __wasi_path_filestat_get(
     )
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_create_directory(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_create_directory(
+    lucet_ctx: &mut Vmctx,
     dirfd: wasi::__wasi_fd_t,
     path_ptr: wasi32::uintptr_t,
     path_len: wasi32::size_t,
@@ -290,9 +307,10 @@ pub unsafe extern "C" fn __wasi_path_create_directory(
     path_create_directory(wasi_ctx, heap, dirfd, path_ptr, path_len)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_unlink_file(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_unlink_file(
+    lucet_ctx: &mut Vmctx,
     dirfd: wasi::__wasi_fd_t,
     path_ptr: wasi32::uintptr_t,
     path_len: wasi32::size_t,
@@ -302,9 +320,10 @@ pub unsafe extern "C" fn __wasi_path_unlink_file(
     path_unlink_file(wasi_ctx, heap, dirfd, path_ptr, path_len)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_allocate(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_allocate(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     offset: wasi::__wasi_filesize_t,
     len: wasi::__wasi_filesize_t,
@@ -313,9 +332,10 @@ pub unsafe extern "C" fn __wasi_fd_allocate(
     fd_allocate(wasi_ctx, fd, offset, len)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_advise(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_advise(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     offset: wasi::__wasi_filesize_t,
     len: wasi::__wasi_filesize_t,
@@ -325,27 +345,27 @@ pub unsafe extern "C" fn __wasi_fd_advise(
     fd_advise(wasi_ctx, fd, offset, len, advice)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_datasync(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_datasync(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
 ) -> wasi::__wasi_errno_t {
     let wasi_ctx = &lucet_ctx.get_embed_ctx::<WasiCtx>();
     fd_datasync(wasi_ctx, fd)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_sync(
-    &mut lucet_ctx,
-    fd: wasi::__wasi_fd_t,
-) -> wasi::__wasi_errno_t {
+pub unsafe fn __wasi_fd_sync(lucet_ctx: &mut Vmctx, fd: wasi::__wasi_fd_t) -> wasi::__wasi_errno_t {
     let wasi_ctx = &lucet_ctx.get_embed_ctx::<WasiCtx>();
     fd_sync(wasi_ctx, fd)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_fdstat_set_rights(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_fdstat_set_rights(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     fs_rights_base: wasi::__wasi_rights_t,
     fs_rights_inheriting: wasi::__wasi_rights_t,
@@ -354,9 +374,10 @@ pub unsafe extern "C" fn __wasi_fd_fdstat_set_rights(
     fd_fdstat_set_rights(wasi_ctx, fd, fs_rights_base, fs_rights_inheriting)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_filestat_set_size(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_filestat_set_size(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     st_size: wasi::__wasi_filesize_t,
 ) -> wasi::__wasi_errno_t {
@@ -364,9 +385,10 @@ pub unsafe extern "C" fn __wasi_fd_filestat_set_size(
     fd_filestat_set_size(wasi_ctx, fd, st_size)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_filestat_set_times(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_filestat_set_times(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     st_atim: wasi::__wasi_timestamp_t,
     st_mtim: wasi::__wasi_timestamp_t,
@@ -376,9 +398,10 @@ pub unsafe extern "C" fn __wasi_fd_filestat_set_times(
     fd_filestat_set_times(wasi_ctx, fd, st_atim, st_mtim, fst_flags)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_pread(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_pread(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     iovs_ptr: wasi32::uintptr_t,
     iovs_len: wasi32::size_t,
@@ -390,9 +413,10 @@ pub unsafe extern "C" fn __wasi_fd_pread(
     fd_pread(wasi_ctx, heap, fd, iovs_ptr, iovs_len, offset, nread)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_pwrite(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_pwrite(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     iovs_ptr: wasi32::uintptr_t,
     iovs_len: wasi32::size_t,
@@ -404,9 +428,10 @@ pub unsafe extern "C" fn __wasi_fd_pwrite(
     fd_pwrite(wasi_ctx, heap, fd, iovs_ptr, iovs_len, offset, nwritten)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_readdir(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_readdir(
+    lucet_ctx: &mut Vmctx,
     fd: wasi::__wasi_fd_t,
     buf: wasi32::uintptr_t,
     buf_len: wasi32::size_t,
@@ -418,9 +443,10 @@ pub unsafe extern "C" fn __wasi_fd_readdir(
     fd_readdir(wasi_ctx, heap, fd, buf, buf_len, cookie, bufused)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_fd_renumber(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_fd_renumber(
+    lucet_ctx: &mut Vmctx,
     from: wasi::__wasi_fd_t,
     to: wasi::__wasi_fd_t,
 ) -> wasi::__wasi_errno_t {
@@ -428,9 +454,10 @@ pub unsafe extern "C" fn __wasi_fd_renumber(
     fd_renumber(wasi_ctx, from, to)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_filestat_set_times(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_filestat_set_times(
+    lucet_ctx: &mut Vmctx,
     dirfd: wasi::__wasi_fd_t,
     dirflags: wasi::__wasi_lookupflags_t,
     path_ptr: wasi32::uintptr_t,
@@ -446,9 +473,10 @@ pub unsafe extern "C" fn __wasi_path_filestat_set_times(
     )
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_link(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_link(
+    lucet_ctx: &mut Vmctx,
     old_fd: wasi::__wasi_fd_t,
     old_flags: wasi::__wasi_lookupflags_t,
     old_path_ptr: wasi32::uintptr_t,
@@ -472,9 +500,10 @@ pub unsafe extern "C" fn __wasi_path_link(
     )
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_readlink(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_readlink(
+    lucet_ctx: &mut Vmctx,
     dirfd: wasi::__wasi_fd_t,
     path_ptr: wasi32::uintptr_t,
     path_len: wasi32::size_t,
@@ -489,9 +518,10 @@ pub unsafe extern "C" fn __wasi_path_readlink(
     )
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_remove_directory(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_remove_directory(
+    lucet_ctx: &mut Vmctx,
     dirfd: wasi::__wasi_fd_t,
     path_ptr: wasi32::uintptr_t,
     path_len: wasi32::size_t,
@@ -501,9 +531,10 @@ pub unsafe extern "C" fn __wasi_path_remove_directory(
     path_remove_directory(wasi_ctx, heap, dirfd, path_ptr, path_len)
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_rename(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_rename(
+    lucet_ctx: &mut Vmctx,
     old_dirfd: wasi::__wasi_fd_t,
     old_path_ptr: wasi32::uintptr_t,
     old_path_len: wasi32::size_t,
@@ -525,9 +556,10 @@ pub unsafe extern "C" fn __wasi_path_rename(
     )
 }
 
+#[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn __wasi_path_symlink(
-    &mut lucet_ctx,
+pub unsafe fn __wasi_path_symlink(
+    lucet_ctx: &mut Vmctx,
     old_path_ptr: wasi32::uintptr_t,
     old_path_len: wasi32::size_t,
     dir_fd: wasi::__wasi_fd_t,
@@ -545,8 +577,6 @@ pub unsafe extern "C" fn __wasi_path_symlink(
         new_path_ptr,
         new_path_len,
     )
-}
-
 }
 
 pub fn export_wasi_funcs() {

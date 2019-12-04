@@ -235,13 +235,9 @@ fn run(config: Config<'_>) {
             .chain(config.guest_args.into_iter())
             .collect::<Vec<&str>>();
         let mut ctx = WasiCtxBuilder::new()
-            .expect("wasi context can be built")
             .args(args.iter())
-            .expect("arguments can be stored")
             .inherit_stdio()
-            .expect("stdio can be inherited")
-            .inherit_env()
-            .expect("environment can be inherited");
+            .inherit_env();
         for (dir, guest_path) in config.preopen_dirs {
             ctx = ctx.preopened_dir(dir, guest_path);
         }

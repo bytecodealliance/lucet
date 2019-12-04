@@ -117,18 +117,30 @@ impl<'a> ModuleDecls<'a> {
         for ix in 0..decls.info.functions.len() {
             let func_index = UniqueFuncIndex::new(ix);
 
+            // Get the name for this function from the module names section, if it exists.
+            // Because names have to be unique, we append the index value (ix) to the name.
+            fn custom_name_for<'a>(
+                ix: usize,
+                func_index: UniqueFuncIndex,
+                decls: &mut ModuleDecls<'a>,
+            ) -> Option<String> {
+                decls
+                    .info
+                    .function_names
+                    .get(func_index)
+                    .map(|s| format!("{}_{}", s, ix))
+            }
+
             fn export_name_for<'a>(
                 func_ix: UniqueFuncIndex,
                 decls: &mut ModuleDecls<'a>,
             ) -> Option<String> {
                 let export = decls.info.functions.get(func_ix).unwrap();
-
                 if !export.export_names.is_empty() {
                     decls.exports.push(ExportFunction {
                         fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                         names: export.export_names.clone(),
                     });
-
                     Some(format!("guest_func_{}", export.export_names[0]))
                 } else {
                     None
@@ -164,7 +176,6 @@ impl<'a> ModuleDecls<'a> {
                     // if a function is an export and import, it will not have a real function body
                     // in this program, and we must not declare it with Linkage::Export (there will
                     // never be a define to satisfy the symbol!)
-
                     decls.declare_function(clif_module, import_sym, Linkage::Import, func_index)?;
                 }
                 (None, Some(export_sym)) => {
@@ -173,14 +184,12 @@ impl<'a> ModuleDecls<'a> {
                     decls.declare_function(clif_module, export_sym, Linkage::Export, func_index)?;
                 }
                 (None, None) => {
-                    // No import or export for this function. It's local, and we have to make up a
-                    // name.
-                    decls.declare_function(
-                        clif_module,
-                        format!("guest_func_{}", ix),
-                        Linkage::Local,
-                        func_index,
-                    )?;
+                    // No import or export for this function, which means that it is local. We can
+                    // look for a name provided in the custom names section, otherwise we have to
+                    // make up a placeholder name for it using its index.
+                    let local_sym = custom_name_for(ix, func_index, decls)
+                        .unwrap_or_else(|| format!("guest_func_{}", ix));
+                    decls.declare_function(clif_module, local_sym, Linkage::Local, func_index)?;
                 }
             }
         }
@@ -524,9 +533,6 @@ impl<'a> ModuleDecls<'a> {
 
             functions.push(FunctionMetadata {
                 signature: decl.signature_index,
-                // TODO: this is a best-effort attempt to figure out a useful name.
-                // in the future, we should use names from the module names section
-                // and maybe use export names as a fallback.
                 name: Some(name.symbol()),
             });
         }

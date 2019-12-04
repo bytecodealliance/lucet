@@ -9,7 +9,7 @@ jobs:
 
     runs-on: ubuntu-16.04
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
       with:
         submodules: true
 

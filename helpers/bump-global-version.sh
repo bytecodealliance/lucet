@@ -6,7 +6,7 @@ VERSION=$(grep '#*Lucet version ' Cargo.toml | sed 's/^ *# Lucet version *//')
 dry_run() {
     echo "Checking if the package can be published (dry run)..."
     echo
-    find lucetc lucet-* benchmarks/lucet-* lucet-runtime/lucet-* lucet-idl/lucet-* -type f -maxdepth 1 -name 'Cargo.toml' -print | while read -r file; do
+    find lucetc lucet-* benchmarks/lucet-* lucet-runtime/lucet-* -type f -maxdepth 1 -name 'Cargo.toml' -print | while read -r file; do
         dir="$(dirname $file)"
         echo "* Checking [$dir]"
         (cd "$dir" && cargo publish --allow-dirty --dry-run >/dev/null) || exit 1

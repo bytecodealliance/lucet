@@ -103,10 +103,7 @@ pub fn run_with_stdout<P: AsRef<Path>>(
 ) -> Result<(__wasi_exitcode_t, String), Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = ctx
-        .stdout(unsafe { File::from_raw_fd(pipe_in) })
-        .unwrap()
-        .build()?;
+    let ctx = ctx.stdout(unsafe { File::from_raw_fd(pipe_in) }).build()?;
 
     let exitcode = run(path, ctx)?;
 
@@ -124,10 +121,7 @@ pub fn run_with_null_stdin<P: AsRef<Path>>(
 ) -> Result<__wasi_exitcode_t, Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = ctx
-        .stdin(unsafe { File::from_raw_fd(pipe_out) })
-        .unwrap()
-        .build()?;
+    let ctx = ctx.stdin(unsafe { File::from_raw_fd(pipe_out) }).build()?;
 
     let exitcode = run(path, ctx)?;
 

@@ -7,10 +7,17 @@ use crate::{
     types::Signature,
     Error,
 };
+use derivative::Derivative;
 use minisign::SignatureBones;
 use serde::{Deserialize, Serialize};
+use serde_big_array::big_array;
 
 pub const MODULE_DATA_SYM: &str = "lucet_module_data";
+
+big_array! {
+    BigArray;
+    SignatureBones::BYTES,
+}
 
 /// The metadata (and some data) for a Lucet module.
 ///
@@ -20,7 +27,8 @@ pub const MODULE_DATA_SYM: &str = "lucet_module_data";
 ///
 /// The goal is for this structure to eventually include everything except the code for the guest
 /// functions themselves.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Derivative, Serialize, Deserialize)]
+#[derivative(Debug)]
 pub struct ModuleData<'a> {
     #[serde(borrow)]
     linear_memory: Option<LinearMemorySpec<'a>>,
@@ -33,7 +41,9 @@ pub struct ModuleData<'a> {
     #[serde(borrow)]
     export_functions: Vec<ExportFunction<'a>>,
     signatures: Vec<Signature>,
-    module_signature: Vec<u8>,
+    #[serde(with = "BigArray")]
+    #[derivative(Debug = "ignore")]
+    module_signature: [u8; SignatureBones::BYTES],
     features: ModuleFeatures,
 }
 
@@ -78,7 +88,6 @@ impl<'a> ModuleData<'a> {
         signatures: Vec<Signature>,
         features: ModuleFeatures,
     ) -> Self {
-        let module_signature = vec![0u8; SignatureBones::BYTES];
         Self {
             linear_memory,
             globals_spec,
@@ -86,7 +95,7 @@ impl<'a> ModuleData<'a> {
             import_functions,
             export_functions,
             signatures,
-            module_signature,
+            module_signature: [0u8; SignatureBones::BYTES],
             features,
         }
     }
