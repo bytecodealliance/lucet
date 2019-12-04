@@ -76,7 +76,11 @@ impl Bindings {
         match self.bindings.get(module) {
             Some(m) => match m.get(symbol) {
                 Some(s) => Ok(s),
-                None => Err(anyhow::format_err!("Unknown symbol `{}::{}`", module, symbol)),
+                None => Err(anyhow::format_err!(
+                    "Unknown symbol `{}::{}`",
+                    module,
+                    symbol
+                )),
             },
             None => Err(anyhow::format_err!(
                 "Unknown module for symbol `{}::{}`",
