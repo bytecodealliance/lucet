@@ -1,4 +1,4 @@
-use failure::{format_err, Error};
+use anyhow::Error;
 use serde_json::{self, Map, Value};
 use std::collections::{hash_map::Entry, HashMap};
 use std::fs;
@@ -27,7 +27,7 @@ impl Bindings {
     pub fn from_json(v: &Value) -> Result<Bindings, Error> {
         match v.as_object() {
             Some(modules) => Self::parse_modules_json_obj(modules),
-            None => Err(format_err!("top level json expected to be object"))?,
+            None => Err(anyhow::format_err!("top level json expected to be object"))?,
         }
     }
 
@@ -53,7 +53,7 @@ impl Bindings {
                             }
                             Entry::Occupied(e) => {
                                 if binding != e.get() {
-                                    Err(format_err!(
+                                    Err(anyhow::format_err!(
                                         "cannot re-bind {} from {} to {}",
                                         e.key(),
                                         binding,
@@ -76,9 +76,9 @@ impl Bindings {
         match self.bindings.get(module) {
             Some(m) => match m.get(symbol) {
                 Some(s) => Ok(s),
-                None => Err(format_err!("Unknown symbol `{}::{}`", module, symbol)),
+                None => Err(anyhow::format_err!("Unknown symbol `{}::{}`", module, symbol)),
             },
-            None => Err(format_err!(
+            None => Err(anyhow::format_err!(
                 "Unknown module for symbol `{}::{}`",
                 module,
                 symbol
@@ -94,7 +94,7 @@ impl Bindings {
                     let methodmap = Self::parse_methods_json_obj(methods)?;
                     res.insert(modulename.to_owned(), methodmap);
                 }
-                None => Err(format_err!(""))?,
+                None => Err(anyhow::format_err!(""))?,
             }
         }
         Ok(Self::new(res))
@@ -107,7 +107,7 @@ impl Bindings {
                 Some(importbinding) => {
                     res.insert(method.to_owned(), importbinding.to_owned());
                 }
-                None => Err(format_err!(""))?,
+                None => Err(anyhow::format_err!(""))?,
             }
         }
         Ok(res)

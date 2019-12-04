@@ -1,6 +1,5 @@
 use crate::instance::{FaultDetails, TerminationDetails};
 use anyhow::Error as AnyError;
-use anyhow::anyhow;
 use thiserror::Error;
 
 /// Lucet runtime errors.
@@ -99,11 +98,13 @@ impl From<std::ffi::IntoStringError> for Error {
     }
 }
 
+
 impl From<lucet_module::Error> for Error {
     fn from(e: lucet_module::Error) -> Error {
         Error::ModuleError(ModuleError::ModuleDataError(e))
     }
 }
+
 
 /// Lucet module errors.
 #[derive(Debug, Error)]
@@ -144,9 +145,7 @@ macro_rules! lucet_ensure {
 
 #[macro_export]
 macro_rules! lucet_format_err {
-    ($($arg:tt)*) => { $crate::error::Error::InternalError(
-	Err(anyhow!($($arg)*)))
-    }
+    ($($arg:tt)*) => { $crate::error::Error::InternalError(anyhow::format_err!($($arg)*)) }
 }
 
 #[macro_export]
