@@ -1,5 +1,6 @@
 use crate::instance::{FaultDetails, TerminationDetails};
 use anyhow::Error as AnyError;
+use anyhow::anyhow;
 use thiserror::Error;
 
 /// Lucet runtime errors.
@@ -143,7 +144,9 @@ macro_rules! lucet_ensure {
 
 #[macro_export]
 macro_rules! lucet_format_err {
-    ($($arg:tt)*) => { $crate::error::Error::InternalError($($arg)*) }
+    ($($arg:tt)*) => { $crate::error::Error::InternalError(
+	Err(anyhow!($($arg)*)))
+    }
 }
 
 #[macro_export]
