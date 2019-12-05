@@ -1,37 +1,36 @@
 use crate::instance::{FaultDetails, TerminationDetails};
-use anyhow::Error as AnyError;
 use thiserror::Error;
 
 /// Lucet runtime errors.
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Invalid argument: {}", _0)]
+    #[error("Invalid argument: {0}")]
     InvalidArgument(&'static str),
 
     /// A [`Region`](trait.Region.html) cannot currently accommodate additional instances.
-    #[error("Region capacity reached: {} instances", _0)]
+    #[error("Region capacity reached: {0} instances")]
     RegionFull(usize),
 
     /// A module error occurred.
-    #[error("Module error: {}", _0)]
+    #[error("Module error: {0}")]
     ModuleError(ModuleError),
 
     /// A method call or module specification would exceed an instance's
     /// [`Limit`s](struct.Limits.html).
-    #[error("Instance limits exceeded: {}", _0)]
+    #[error("Instance limits exceeded: {0}")]
     LimitsExceeded(String),
 
     /// A method call attempted to modify linear memory for an instance that
     /// does not have linear memory
-    #[error("No linear memory available: {}", _0)]
+    #[error("No linear memory available: {0}")]
     NoLinearMemory(String),
 
     /// An attempt to look up a WebAssembly function by its symbol name failed.
-    #[error("Symbol not found: {}", _0)]
+    #[error("Symbol not found: {0}")]
     SymbolNotFound(String),
 
     /// An attempt to look up a WebAssembly function by its table index failed.
-    #[error("Function not found: (table {}, func {})", _0, _1)]
+    #[error("Function not found: (table {0}, func {1}")]
     FuncNotFound(u32, u32),
 
     /// An instance aborted due to a runtime fault.
@@ -47,7 +46,7 @@ pub enum Error {
     RuntimeTerminated(TerminationDetails),
 
     /// IO errors arising during dynamic loading with [`DlModule`](struct.DlModule.html).
-    #[error("Dynamic loading error: {}", _0)]
+    #[error("Dynamic loading error: {0}")]
     DlError(#[from] std::io::Error),
 
     #[error("Instance not returned")]
@@ -63,11 +62,11 @@ pub enum Error {
     ///
     /// As the API matures, these will likely become rarer, replaced by new variants of this enum,
     /// or by panics for truly unrecoverable situations.
-    #[error("Internal error: {}", _0)]
-    InternalError(#[source] AnyError),
+    #[error("Internal error: {0}")]
+    InternalError(#[source] anyhow::Error),
 
     /// An unsupported feature was used.
-    #[error("Unsupported feature: {}", _0)]
+    #[error("Unsupported feature: {0}")]
     Unsupported(String),
 }
 
@@ -99,11 +98,11 @@ impl From<lucet_module::Error> for Error {
 #[derive(Debug, Error)]
 pub enum ModuleError {
     /// An error was found in the definition of a Lucet module.
-    #[error("Incorrect module definition: {}", _0)]
+    #[error("Incorrect module definition: {0}")]
     IncorrectModule(String),
 
     /// An error occurred with the module data section, likely during deserialization.
-    #[error("Module data error: {}", _0)]
+    #[error("Module data error: {0}")]
     ModuleDataError(#[from] lucet_module::Error),
 }
 
