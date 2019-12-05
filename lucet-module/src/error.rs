@@ -5,12 +5,12 @@ use thiserror::Error;
 pub enum Error {
     #[error("Sparse data contained a page with length other than 4096")]
     IncorrectPageSize,
-    #[error("Deserialization error: {}", _0)]
+    #[error("Deserialization error")]
     DeserializationError(#[source] bincode::Error),
-    #[error("Serialization error: {}", _0)]
+    #[error("Serialization error")]
     SerializationError(#[source] bincode::Error),
-    #[error("Module signature error: {}", _0)]
+    #[error("Module signature error")]
     ModuleSignatureError(#[source] minisign::PError),
-    #[error("I/O error: {}", _0)]
+    #[error("I/O error")]
     IOError(#[source] std::io::Error),
 }
