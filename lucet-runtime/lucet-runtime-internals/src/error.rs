@@ -132,7 +132,7 @@ macro_rules! lucet_ensure {
 
 #[macro_export]
 macro_rules! lucet_format_err {
-    ($($arg:tt)*) => { $crate::error::Error::InternalError(anyhow::format_err!($($arg)*)) }
+    ($($arg:tt)*) => { $crate::error::Error::InternalError(format_err!($($arg)*)) }
 }
 
 #[macro_export]

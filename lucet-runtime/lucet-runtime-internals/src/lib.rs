@@ -5,6 +5,8 @@
 #![deny(bare_trait_objects)]
 
 #[macro_use]
+extern crate anyhow;
+#[macro_use]
 pub mod error;
 #[macro_use]
 pub mod hostcall_macros;
