@@ -19,29 +19,18 @@ pub enum Error {
     Unsupported(String),
     #[error("Module not found: {0}")]
     ModuleNotFound(String),
-    #[error("Import not found: {}::{}", module, field)]
+    #[error("Import not found: {module}::{field}")]
     ImportNotFound { module: String, field: String },
-    #[error("Export not found: {}", field)]
+    #[error("Export not found: {field}")]
     ExportNotFound { field: String },
-    #[error(
-        "Import type error: for {}::{}, expected {:?}, got {:?}",
-        module,
-        field,
-        expected,
-        got
-    )]
+    #[error("Import type error: for {module}::{field}, expected {expected:?}, got {got:?}")]
     ImportTypeError {
         module: String,
         field: String,
         expected: FuncSignature,
         got: FuncSignature,
     },
-    #[error(
-        "Export type error: for {}, expected {:?}, got {:?}",
-        field,
-        expected,
-        got
-    )]
+    #[error("Export type error: for {field}, expected {expected:?}, got {got:?}")]
     ExportTypeError {
         field: String,
         expected: FuncSignature,
