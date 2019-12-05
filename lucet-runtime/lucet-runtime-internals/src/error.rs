@@ -34,7 +34,7 @@ pub enum Error {
     FuncNotFound(u32, u32),
 
     /// An instance aborted due to a runtime fault.
-    #[error("Runtime fault: {:?}", _0)]
+    #[error("Runtime fault: {0:?}")]
     RuntimeFault(FaultDetails),
 
     /// An instance terminated, potentially with extra information about the termination.
@@ -132,7 +132,7 @@ macro_rules! lucet_ensure {
 
 #[macro_export]
 macro_rules! lucet_format_err {
-    ($($arg:tt)*) => { $crate::error::Error::InternalError(format_err!($($arg)*)) }
+    ($($arg:tt)*) => { $crate::error::Error::InternalError(anyhow::format_err!($($arg)*)) }
 }
 
 #[macro_export]

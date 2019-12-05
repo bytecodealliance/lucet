@@ -13,11 +13,11 @@ pub use witx::{AtomType, Document, WitxError};
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("WebAssembly validation error at offset {}: {}", _1, 0)]
+    #[error("WebAssembly validation error at offset {1}: {0}")]
     WasmValidation(&'static str, usize),
-    #[error("Unsupported: {}", _0)]
+    #[error("Unsupported: {0}")]
     Unsupported(String),
-    #[error("Module not found: {}", _0)]
+    #[error("Module not found: {0}")]
     ModuleNotFound(String),
     #[error("Import not found: {}::{}", module, field)]
     ImportNotFound { module: String, field: String },
