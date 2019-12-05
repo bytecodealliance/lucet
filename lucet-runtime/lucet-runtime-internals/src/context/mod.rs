@@ -10,8 +10,6 @@ use nix::sys::signal;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::ptr::NonNull;
 use std::{mem, ptr};
-use thiserror::Error;
-use xfailure::xbail;
 
 /// Callee-saved general-purpose registers in the AMD64 ABI.
 ///
@@ -394,7 +392,7 @@ impl Context {
         args: &[Val],
     ) -> Result<(), Error> {
         if !stack_is_aligned(stack) {
-            xbail!(Error::UnalignedStack);
+            return Err(Error::UnalignedStack);
         }
 
         if backstop_callback != Context::default_backstop_callback {
@@ -687,7 +685,7 @@ impl Context {
 }
 
 /// Errors that may arise when working with contexts.
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Raised when the bottom of the stack provided to `Context::init` is not 16-byte aligned
     #[error("context initialized with unaligned stack")]

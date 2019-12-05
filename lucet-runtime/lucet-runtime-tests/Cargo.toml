@@ -15,7 +15,6 @@ edition = "2018"
 test = false
 
 [dependencies]
-failure = "0.1"
 lazy_static = "1.1"
 tempfile = "3.0"
 lucet-module = { path = "../../lucet-module", version = "0.4.2" }
