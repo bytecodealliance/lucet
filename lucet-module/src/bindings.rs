@@ -1,4 +1,4 @@
-use anyhow::{format_err, Error};
+use crate::Error;
 use serde_json::{self, Map, Value};
 use std::collections::{hash_map::Entry, HashMap};
 use std::fs;
@@ -27,7 +27,7 @@ impl Bindings {
     pub fn from_json(v: &Value) -> Result<Bindings, Error> {
         match v.as_object() {
             Some(modules) => Self::parse_modules_json_obj(modules),
-            None => Err(format_err!("top level json expected to be object"))?,
+            None => Err(Error::ParseJsonObjError),
         }
     }
 
@@ -53,12 +53,11 @@ impl Bindings {
                             }
                             Entry::Occupied(e) => {
                                 if binding != e.get() {
-                                    Err(format_err!(
-                                        "cannot re-bind {} from {} to {}",
-                                        e.key(),
-                                        binding,
-                                        e.get()
-                                    ))?;
+                                    return Err(Error::RebindError {
+                                        key: e.key().to_string(),
+                                        binding: binding.to_string(),
+                                        attempt: e.get().to_string(),
+                                    });
                                 }
                             }
                         }
@@ -76,13 +75,15 @@ impl Bindings {
         match self.bindings.get(module) {
             Some(m) => match m.get(symbol) {
                 Some(s) => Ok(s),
-                None => Err(format_err!("Unknown symbol `{}::{}`", module, symbol)),
+                None => Err(Error::UnknownSymbol {
+                    module: module.to_string(),
+                    symbol: symbol.to_string(),
+                }),
             },
-            None => Err(format_err!(
-                "Unknown module for symbol `{}::{}`",
-                module,
-                symbol
-            )),
+            None => Err(Error::UnknownModule {
+                module: module.to_string(),
+                symbol: symbol.to_string(),
+            }),
         }
     }
 
@@ -94,7 +95,12 @@ impl Bindings {
                     let methodmap = Self::parse_methods_json_obj(methods)?;
                     res.insert(modulename.to_owned(), methodmap);
                 }
-                None => Err(format_err!(""))?,
+                None => {
+                    return Err(Error::ParseError {
+                        key: modulename.to_string(),
+                        value: values.to_string(),
+                    });
+                }
             }
         }
         Ok(Self::new(res))
@@ -107,7 +113,12 @@ impl Bindings {
                 Some(importbinding) => {
                     res.insert(method.to_owned(), importbinding.to_owned());
                 }
-                None => Err(format_err!(""))?,
+                None => {
+                    return Err(Error::ParseError {
+                        key: method.to_string(),
+                        value: i.to_string(),
+                    });
+                }
             }
         }
         Ok(res)
