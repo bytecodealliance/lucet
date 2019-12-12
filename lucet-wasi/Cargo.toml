@@ -34,7 +34,8 @@ lucet-module = { path = "../lucet-module", version = "0.4.2" }
 libc = "0.2.65"
 nix = "0.15"
 rand = "0.6"
-wasi-common = "0.7"
+# wasi-common = "0.7"
+wasi-common = { path = "../../wasmtime/crates/wasi-common/" }
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.4.2" }

@@ -241,11 +241,27 @@ fn run(config: Config<'_>) {
         for (dir, guest_path) in config.preopen_dirs {
             ctx = ctx.preopened_dir(dir, guest_path);
         }
+        use wasi_common::VirtualDir;
+        use wasi_common::InMemoryFile;
+        use wasi_common::VirtualFile;
+        use std::io::IoSliceMut;
+        use std::path::Path;
+        let input = InMemoryFile::new();
+        input.append(b"hello from file!");
+        let fs = VirtualDir::new(true)
+            .with_file(Box::new(InMemoryFile::new()), "output.txt")
+            .with_file(Box::new(input), "input.txt");
+        let mut output = fs.openat(Path::new("output.txt"), true, false, 0, 0).unwrap();
+        ctx = ctx.preopened_virt(Box::new(fs), "/sandbox");
         let mut inst = region
             .new_instance_builder(module as Arc<dyn Module>)
             .with_embed_ctx(ctx.build().expect("WASI ctx can be created"))
             .build()
             .expect("instance can be created");
+
+        let mut data = vec![0; 4096];
+        output.read_vectored(&mut [IoSliceMut::new(&mut data)]).unwrap();
+//        println!("{}", unsafe { std::str::from_utf8_unchecked(&data) });
 
         if let Some(timeout) = config.timeout {
             let kill_switch = inst.kill_switch();
