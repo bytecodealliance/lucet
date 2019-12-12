@@ -54,9 +54,9 @@ impl Bindings {
                             Entry::Occupied(e) => {
                                 if binding != e.get() {
                                     return Err(Error::RebindError {
-                                        key: e.key().to_string(),
-                                        binding: binding.to_string(),
-                                        attempt: e.get().to_string(),
+                                        key: e.key().to_owned(),
+                                        binding: binding.to_owned(),
+                                        attempt: e.get().to_owned(),
                                     });
                                 }
                             }
@@ -76,13 +76,13 @@ impl Bindings {
             Some(m) => match m.get(symbol) {
                 Some(s) => Ok(s),
                 None => Err(Error::UnknownSymbol {
-                    module: module.to_string(),
-                    symbol: symbol.to_string(),
+                    module: module.to_owned(),
+                    symbol: symbol.to_owned(),
                 }),
             },
             None => Err(Error::UnknownModule {
-                module: module.to_string(),
-                symbol: symbol.to_string(),
+                module: module.to_owned(),
+                symbol: symbol.to_owned(),
             }),
         }
     }
