@@ -89,22 +89,11 @@ fn run(module_path: &Path, witx_path: &Path, wasi_exe: bool) -> Result<(), Error
 
 #[derive(Debug, Error)]
 enum Error {
-    #[error("{0}")]
-    Witx(#[source] witx::WitxError),
+    #[error("Witx error")]
+    Witx(#[from] witx::WitxError),
     #[error("With file {0:?}: {1}")]
     Io(PathBuf, #[source] io::Error),
-    #[error("{0}")]
-    Validate(#[source] lucet_validate::Error),
+    #[error("Validate error")]
+    Validate(#[from] lucet_validate::Error),
 }
 
-impl From<witx::WitxError> for Error {
-    fn from(e: witx::WitxError) -> Error {
-        Error::Witx(e)
-    }
-}
-
-impl From<lucet_validate::Error> for Error {
-    fn from(e: lucet_validate::Error) -> Error {
-        Error::Validate(e)
-    }
-}
