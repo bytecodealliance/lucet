@@ -97,7 +97,7 @@ impl Bindings {
                 }
                 None => {
                     return Err(Error::ParseError {
-                        key: modulename.to_string(),
+                        key: modulename.to_owned(),
                         value: values.to_string(),
                     });
                 }
@@ -115,7 +115,7 @@ impl Bindings {
                 }
                 None => {
                     return Err(Error::ParseError {
-                        key: method.to_string(),
+                        key: method.to_owned(),
                         value: i.to_string(),
                     });
                 }
