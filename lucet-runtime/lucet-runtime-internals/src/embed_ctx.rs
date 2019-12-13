@@ -10,6 +10,14 @@ pub struct CtxMap {
     map: HashMap<TypeId, RefCell<Box<dyn Any>>>,
 }
 
+impl Default for CtxMap {
+    fn default() -> Self {
+        CtxMap {
+            map: HashMap::default(),
+        }
+    }
+}
+
 impl CtxMap {
     pub fn clear(&mut self) {
         self.map.clear();
@@ -49,12 +57,6 @@ impl CtxMap {
                     .downcast::<T>()
                     .expect("value stored with TypeId::of::<T> is always type T")
             })
-    }
-
-    pub fn new() -> Self {
-        CtxMap {
-            map: HashMap::new(),
-        }
     }
 
     pub fn remove<T: Any>(&mut self) -> Option<T> {
