@@ -26,7 +26,7 @@ use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
 
-pub const LUCET_INSTANCE_MAGIC: u64 = 746932922;
+pub const LUCET_INSTANCE_MAGIC: u64 = 746_932_922;
 
 thread_local! {
     /// The host context.
@@ -79,7 +79,7 @@ pub fn new_instance_handle(
     embed_ctx: CtxMap,
 ) -> Result<InstanceHandle, Error> {
     let inst = NonNull::new(instance)
-        .ok_or(lucet_format_err!("instance pointer is null; this is a bug"))?;
+        .ok_or_else(|| lucet_format_err!("instance pointer is null; this is a bug"))?;
 
     lucet_ensure!(
         unsafe { inst.as_ref().magic } != LUCET_INSTANCE_MAGIC,
@@ -564,12 +564,9 @@ impl Instance {
     ///
     /// On success, returns the number of pages that existed before the call.
     pub fn grow_memory(&mut self, additional_pages: u32) -> Result<u32, Error> {
-        let additional_bytes =
-            additional_pages
-                .checked_mul(WASM_PAGE_SIZE)
-                .ok_or(lucet_format_err!(
-                    "additional pages larger than wasm address space",
-                ))?;
+        let additional_bytes = additional_pages
+            .checked_mul(WASM_PAGE_SIZE)
+            .ok_or_else(|| lucet_format_err!("additional pages larger than wasm address space",))?;
         let orig_len = self
             .alloc
             .expand_heap(additional_bytes, self.module.as_ref())?;
@@ -750,7 +747,7 @@ impl Instance {
 
         let mut inst = Instance {
             magic: LUCET_INSTANCE_MAGIC,
-            embed_ctx: embed_ctx,
+            embed_ctx,
             module,
             ctx: Context::new(),
             state: State::Ready,
@@ -976,8 +973,9 @@ impl Instance {
                     // handler.
 
                     // Run the C-style fatal handler, if it exists.
-                    self.c_fatal_handler
-                        .map(|h| unsafe { h(self as *mut Instance) });
+                    if let Some(h) = self.c_fatal_handler {
+                        unsafe { h(self as *mut Instance) }
+                    }
 
                     // If there is no C-style fatal handler, or if it (erroneously) returns,
                     // call the Rust handler that we know will not return
