@@ -6,16 +6,9 @@ use std::collections::HashMap;
 ///
 /// This is similar to the type provided by the `anymap` crate, but we can get away with simpler
 /// types on the methods due to our more specialized use case.
+#[derive(Default)]
 pub struct CtxMap {
     map: HashMap<TypeId, RefCell<Box<dyn Any>>>,
-}
-
-impl Default for CtxMap {
-    fn default() -> Self {
-        CtxMap {
-            map: HashMap::default(),
-        }
-    }
 }
 
 impl CtxMap {
