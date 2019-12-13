@@ -59,4 +59,8 @@ impl CtxMap {
                 .expect("value stored with TypeId::of::<T> is always type T")
         })
     }
+
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
