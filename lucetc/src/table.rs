@@ -3,12 +3,13 @@ use crate::error::{LucetcError, LucetcErrorKind};
 use crate::module::UniqueFuncIndex;
 use crate::name::Name;
 use crate::pointer::NATIVE_POINTER_SIZE;
+use anyhow::{format_err};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
 use cranelift_wasm::{TableElementType, TableIndex};
 use faerie::{Artifact, Link};
-use failure::{format_err, Error, ResultExt};
+//TLC use failure::{format_err, Error, ResultExt};
 use std::io::Cursor;
 
 /// This symbol will be used to reference the `tables` field in `Module` - a sequence of tables.

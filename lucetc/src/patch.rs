@@ -1,4 +1,4 @@
-use failure::Error;
+//TLC use failure::Error;
 use parity_wasm::elements::Module;
 use std::collections::HashMap;
 use std::path::Path;

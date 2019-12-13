@@ -6,6 +6,7 @@ use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
 use crate::table::TABLE_SYM;
 use crate::types::to_lucet_signature;
+use anyhow::{format_err};
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -14,7 +15,7 @@ use cranelift_wasm::{
     Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
     TableIndex,
 };
-use failure::{format_err, Error, ResultExt};
+//TLC use failure::{format_err, Error, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::ModuleFeatures;
 use lucet_module::{

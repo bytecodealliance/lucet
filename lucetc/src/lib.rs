@@ -28,7 +28,8 @@ pub use crate::{
     load::read_module,
     patch::patch_module,
 };
-use failure::{format_err, Error, ResultExt};
+//TLC use failure::{format_err, Error, ResultExt};
+use anyhow::{format_err};
 pub use lucet_module::bindings::Bindings;
 pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};

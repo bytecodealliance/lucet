@@ -4,11 +4,12 @@ use crate::name::Name;
 use crate::stack_probe;
 use crate::table::{link_tables, TABLE_SYM};
 use crate::traps::write_trap_tables;
+use anyhow::{format_err};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
-use failure::{format_err, Error, ResultExt};
+//TLC use failure::{format_err, Error, ResultExt};
 use lucet_module::{
     FunctionSpec, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };

@@ -18,7 +18,7 @@ use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
 use cranelift_faerie::FaerieProduct;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use faerie::Decl;
-use failure::Error;
+//TLC use failure::Error;
 
 /// Stack probe symbol name
 pub const STACK_PROBE_SYM: &'static str = "lucet_probestack";

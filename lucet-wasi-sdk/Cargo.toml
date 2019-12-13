@@ -10,10 +10,11 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-failure = "0.1"
+anyhow = "1"
 lucetc = { path = "../lucetc", version = "0.4.2" }
 lucet-module = { path = "../lucet-module", version = "0.4.2" }
 tempfile = "3.0"
+thiserror = "1.0.4"
 
 [dev-dependencies]
 lucet-validate = { path = "../lucet-validate", version  = "0.4.2" }

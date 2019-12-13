@@ -1,6 +1,6 @@
 use crate::error::{LucetcError, LucetcErrorKind};
+use anyhow::{format_err};
 use cranelift_codegen::{isa, settings::Configurable};
-use failure::{format_err, ResultExt};
 use lucet_module::ModuleFeatures;
 use std::collections::{HashMap, HashSet};
 use target_lexicon::Triple;

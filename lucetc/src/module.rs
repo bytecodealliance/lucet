@@ -8,7 +8,7 @@ use cranelift_wasm::{
     FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, ModuleTranslationState,
     SignatureIndex, Table, TableElementType, TableIndex, WasmResult,
 };
-use failure::ResultExt;
+//TLC use failure::ResultExt;
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
 

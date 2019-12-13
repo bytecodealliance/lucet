@@ -1,7 +1,7 @@
 use crate::output::write_relocated_slice;
 use crate::traps::trap_sym_for_func;
 use faerie::{Artifact, Decl};
-use failure::{Error, ResultExt};
+//TLC use failure::{Error, ResultExt};
 use lucet_module::FunctionSpec;
 use std::io::Cursor;
 use std::mem::size_of;

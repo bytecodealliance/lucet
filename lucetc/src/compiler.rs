@@ -10,6 +10,7 @@ use crate::output::{CraneliftFuncs, ObjectFile};
 use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
+use anyhow::{format_err};
 use cranelift_codegen::{
     ir,
     isa::TargetIsa,
@@ -19,7 +20,7 @@ use cranelift_codegen::{
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
-use failure::{format_err, Fail, ResultExt};
+//TLC use failure::{format_err, Fail, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::{FunctionSpec, ModuleData, ModuleFeatures, MODULE_DATA_SYM};
 use lucet_validate::Validator;

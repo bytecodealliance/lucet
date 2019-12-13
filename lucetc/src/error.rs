@@ -1,5 +1,6 @@
-use failure::{Backtrace, Context, Fail};
+//TLC use failure::{Backtrace, Context, Fail};
 use std::fmt::{self, Display};
+use thiserror::{Error};
 
 #[derive(Debug)]
 pub struct LucetcError {
@@ -41,30 +42,30 @@ impl Display for LucetcError {
     }
 }
 
-#[derive(Debug, Fail, PartialEq, Eq, Clone)]
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum LucetcErrorKind {
-    #[fail(display = "Input")]
+    #[error("Input")]
     Input,
-    #[fail(display = "Validation")]
+    #[error("Validation")]
     Validation,
-    #[fail(display = "Translating module")]
+    #[error("Translating module")]
     TranslatingModule,
-    #[fail(display = "Module data")]
+    #[error("Module data")]
     ModuleData,
-    #[fail(display = "Metadata Serializer")] // specifically non-ModuleData; this will go away soon
+    #[error("Metadata Serializer")] // specifically non-ModuleData; this will go away soon
     MetadataSerializer,
-    #[fail(display = "Function Translation")]
+    #[error("Function Translation")]
     FunctionTranslation,
-    #[fail(display = "Function Definition")]
+    #[error("Function Definition")]
     FunctionDefinition,
-    #[fail(display = "Table")]
+    #[error("Table")]
     Table,
-    #[fail(display = "Memory Specs")]
+    #[error("Memory Specs")]
     MemorySpecs,
-    #[fail(display = "Output")]
+    #[error("Output")]
     Output,
-    #[fail(display = "Signature")]
+    #[error("Signature")]
     Signature,
-    #[fail(display = "Unsupported")]
+    #[error("Unsupported")]
     Unsupported,
 }

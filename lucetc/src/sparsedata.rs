@@ -1,6 +1,7 @@
 use crate::error::{LucetcError, LucetcErrorKind};
 use crate::module::DataInitializer;
-use failure::{format_err, ResultExt};
+//TLC use failure::{format_err, ResultExt};
+use anyhow::{format_err};
 use lucet_module::owned::OwnedSparseData;
 use lucet_module::HeapSpec;
 use std::collections::hash_map::Entry;

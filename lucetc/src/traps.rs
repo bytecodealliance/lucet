@@ -2,7 +2,7 @@ use cranelift_codegen::ir;
 use cranelift_faerie::traps::FaerieTrapManifest;
 
 use faerie::{Artifact, Decl};
-use failure::{Error, ResultExt};
+//TLC use failure::{Error, ResultExt};
 use lucet_module::TrapSite;
 
 pub fn write_trap_tables(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> Result<(), Error> {
