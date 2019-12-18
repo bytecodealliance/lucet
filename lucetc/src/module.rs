@@ -1,6 +1,6 @@
 //! Implements ModuleEnvironment for cranelift-wasm. Code derived from cranelift-wasm/environ/dummy.rs
-//use crate::error::{LucetcError, LucetcErrorKind};
 use crate::pointer::NATIVE_POINTER;
+use anyhow::Error;
 use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap, SecondaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -8,7 +8,6 @@ use cranelift_wasm::{
     FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, ModuleTranslationState,
     SignatureIndex, Table, TableElementType, TableIndex, WasmResult,
 };
-//TLC use failure::ResultExt;
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -136,10 +135,10 @@ impl<'a> ModuleInfo<'a> {
     ) -> Result<(UniqueFuncIndex, SignatureIndex), LucetcError> {
         let new_sigidx = SignatureIndex::from_u32(self.signature_mapping.len() as u32);
         self.declare_signature(sig)
-            .context(LucetcErrorKind::TranslatingModule)?;
+            .map_err(|| Err(Error::TranslatingModule))?;
         let new_funcidx = UniqueFuncIndex::from_u32(self.functions.len() as u32);
         self.declare_func_type(new_sigidx)
-            .context(LucetcErrorKind::TranslatingModule)?;
+            .map_err(|| Err(Error::TranslatingModule))?;
         Ok((new_funcidx, new_sigidx))
     }
 }

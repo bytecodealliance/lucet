@@ -22,8 +22,6 @@ pub enum Error {
     GlobalDeclarationError(u32),
     #[error("Input")]
     Input,
-    #[error("Table")]
-    Table,
     #[error("Memory specs")]
     MemorySpecs,
     #[error("Metadata serializer; start index pointed to a non-function")]
@@ -37,12 +35,14 @@ pub enum Error {
     Signature,
     #[error("Error converting cranelift signature to wasm signature")]
     SignatureConversion(#[from] SignatureError),
+    #[error("Translating module")]
+    TranslatingModule,
+    #[error("Table")]
+    Table,
     #[error("Unsupported: {message}")]
-    Unsupported{
-	message: String
-    },
-    #[error("Validation")]
-    Validation,
+    Unsupported { message: String },
+    #[error("Validation: {message}")]
+    Validation { message: String },
 }
 
 // TLC: I think I can derive these froms with thiserror.

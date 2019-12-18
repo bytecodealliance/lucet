@@ -345,10 +345,14 @@ impl<'a> ModuleDecls<'a> {
                     if let Some((module, field)) = info.imported_globals.get(ix) {
                         Ok(GlobalVariant::Import { module, field })
                     } else {
-			Err(Error::GlobalDeclarationError(ix.as_u32()))
-		    }
-		} GlobalInit::V128Const(_) => Err(Error::InvalidGlobal{message: "v128const type is not supported", symbol: ix.as_u32()})
-		}?;
+                        Err(Error::GlobalDeclarationError(ix.as_u32()))
+                    }
+                }
+                GlobalInit::V128Const(_) => Err(Error::InvalidGlobal {
+                    message: "v128const type is not supported",
+                    symbol: ix.as_u32(),
+                }),
+            }?;
 
             globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));
         }
@@ -389,7 +393,9 @@ impl<'a> ModuleDecls<'a> {
                     max_size: max_size,
                 }))
             }
-            _ => Err(Error::Unsupported{message: "lucetc only supports memory 0"})
+            _ => Err(Error::Unsupported {
+                message: "lucetc only supports memory 0",
+            }),
         }
     }
     // ********************* Public Interface **************************
@@ -454,8 +460,8 @@ impl<'a> ModuleDecls<'a> {
             .table_elems
             .get(&table_index)
             .ok_or_else(|| {
-		let message = format!("table is not local: {:?}", table_index);
-		Err(Error::Unsupported{message})
+                let message = format!("table is not local: {:?}", table_index);
+                Err(Error::Unsupported { message })
             })?
             .as_slice();
         Ok(TableDecl {
@@ -531,10 +537,7 @@ impl<'a> ModuleDecls<'a> {
             .info
             .signatures
             .values()
-            .map(|sig| {
-                to_lucet_signature(sig)
-                    .map_err(|e| Err(Error::SignatureConverstion(e)))
-            })
+            .map(|sig| to_lucet_signature(sig).map_err(|e| Err(Error::SignatureConverstion(e))))
             .collect::<Result<Vec<LucetSignature>, Error>>()?;
 
         Ok(ModuleData::new(
