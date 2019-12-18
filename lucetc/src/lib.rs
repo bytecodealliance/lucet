@@ -23,13 +23,13 @@ mod types;
 use crate::load::read_bytes;
 pub use crate::{
     compiler::{Compiler, CpuFeatures, OptLevel, SpecificFeature, TargetCpu},
-    error::{LucetcError, LucetcErrorKind},
+    //TLC error::{LucetcError, LucetcErrorKind},
     heap::HeapSettings,
     load::read_module,
     patch::patch_module,
 };
 //TLC use failure::{format_err, Error, ResultExt};
-use anyhow::{format_err};
+use anyhow::{Error, format_err};
 pub use lucet_module::bindings::Bindings;
 pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};

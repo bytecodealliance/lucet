@@ -1,4 +1,4 @@
-use crate::error::{LucetcError, LucetcErrorKind};
+//TLC use crate::error::{LucetcError, LucetcErrorKind};
 use crate::heap::HeapSettings;
 pub use crate::module::{Exportable, TableElems};
 use crate::module::{ModuleInfo, UniqueFuncIndex};
@@ -6,7 +6,7 @@ use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
 use crate::table::TABLE_SYM;
 use crate::types::to_lucet_signature;
-use anyhow::{format_err};
+use anyhow::{Error, format_err};
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -85,7 +85,7 @@ impl<'a> ModuleDecls<'a> {
         bindings: &'a Bindings,
         runtime: Runtime,
         heap_settings: HeapSettings,
-    ) -> Result<Self, LucetcError> {
+    ) -> Result<Self, Error> {
         let imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
         let (tables_list_name, table_names) = Self::declare_tables(&info, clif_module)?;
         let globals_spec = Self::build_globals_spec(&info)?;
@@ -114,7 +114,7 @@ impl<'a> ModuleDecls<'a> {
         decls: &mut ModuleDecls<'a>,
         clif_module: &mut ClifModule<B>,
         bindings: &'a Bindings,
-    ) -> Result<(), LucetcError> {
+    ) -> Result<(), Error> {
         for ix in 0..decls.info.functions.len() {
             let func_index = UniqueFuncIndex::new(ix);
 
@@ -152,7 +152,7 @@ impl<'a> ModuleDecls<'a> {
                 func_ix: UniqueFuncIndex,
                 decls: &mut ModuleDecls<'a>,
                 bindings: &'a Bindings,
-            ) -> Result<Option<String>, failure::Context<LucetcErrorKind>> {
+            ) -> Result<Option<String>, Error> {
                 if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
                     let import_symbol = bindings
                         .translate(import_mod, import_field)
@@ -547,7 +547,7 @@ impl<'a> ModuleDecls<'a> {
                     .map_err(|e| format_err!("error converting cranelift sig to wasm sig: {:?}", e))
                     .context(LucetcErrorKind::TranslatingModule)
             })
-            .collect::<Result<Vec<LucetSignature>, failure::Context<LucetcErrorKind>>>()?;
+            .collect::<Result<Vec<LucetSignature>, Error>>()?;
 
         Ok(ModuleData::new(
             linear_memory,

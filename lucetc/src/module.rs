@@ -1,5 +1,5 @@
 //! Implements ModuleEnvironment for cranelift-wasm. Code derived from cranelift-wasm/environ/dummy.rs
-use crate::error::{LucetcError, LucetcErrorKind};
+//use crate::error::{LucetcError, LucetcErrorKind};
 use crate::pointer::NATIVE_POINTER;
 use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap, SecondaryMap};
 use cranelift_codegen::ir;

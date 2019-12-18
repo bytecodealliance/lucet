@@ -1,12 +1,48 @@
 //TLC use failure::{Backtrace, Context, Fail};
 use std::fmt::{self, Display};
+use anyhow::{Context};
 use thiserror::{Error};
+use cranelift_module::{ModuleError as ClifModuleError};
 
-#[derive(Debug)]
-pub struct LucetcError {
-    inner: Context<LucetcErrorKind>,
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Input")]
+    Input,
+    #[error("Validation")]
+    Validation,
+    #[error("Translating module")]
+    TranslatingModule,
+    #[error("Module data")]
+    ModuleData,
+    #[error("Metadata serializer; start index pointed to a non-function")] // specifically non-ModuleData; this will go away soon
+    MetadataSerializer,
+    #[error("Function translation error in {symbol}: {source:?}")]  
+    FunctionTranslation{
+	symbol: String,
+	#[source]
+	source: ClifModuleError,
+    },
+    #[error("Function definition error in {symbol}: {source:?}")]
+    FunctionDefinition{
+	symbol: String,
+	#[source]
+	source: ClifModuleError, 
+    },
+    #[error("Table")]
+    Table,
+    #[error("Memory specs")]
+    MemorySpecs,
+    #[error("Output")]
+    Output,
+    #[error("Signature")]
+    Signature,
+    #[error("Unsupported")]
+    Unsupported,
 }
+    
 
+// TLC: I think I can derive these froms with thiserror.  
 impl From<Context<LucetcErrorKind>> for LucetcError {
     fn from(inner: Context<LucetcErrorKind>) -> LucetcError {
         LucetcError { inner }
@@ -27,6 +63,7 @@ impl LucetcError {
     }
 }
 
+/*
 impl Fail for LucetcError {
     fn cause(&self) -> Option<&dyn Fail> {
         self.inner.cause()
@@ -35,6 +72,7 @@ impl Fail for LucetcError {
         self.inner.backtrace()
     }
 }
+*/
 
 impl Display for LucetcError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

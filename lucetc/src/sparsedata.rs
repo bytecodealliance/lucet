@@ -1,4 +1,4 @@
-use crate::error::{LucetcError, LucetcErrorKind};
+//use crate::error::{LucetcError, LucetcErrorKind};
 use crate::module::DataInitializer;
 //TLC use failure::{format_err, ResultExt};
 use anyhow::{format_err};

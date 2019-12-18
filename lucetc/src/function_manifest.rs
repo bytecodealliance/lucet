@@ -1,5 +1,6 @@
 use crate::output::write_relocated_slice;
 use crate::traps::trap_sym_for_func;
+use anyhow::Error;
 use faerie::{Artifact, Decl};
 //TLC use failure::{Error, ResultExt};
 use lucet_module::FunctionSpec;

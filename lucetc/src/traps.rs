@@ -1,6 +1,7 @@
 use cranelift_codegen::ir;
 use cranelift_faerie::traps::FaerieTrapManifest;
 
+use anyhow::Error;
 use faerie::{Artifact, Decl};
 //TLC use failure::{Error, ResultExt};
 use lucet_module::TrapSite;

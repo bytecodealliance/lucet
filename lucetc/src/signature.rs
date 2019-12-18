@@ -1,5 +1,5 @@
 //TLC use failure::*;
-use anyhow::{format_err};
+use anyhow::{Error, format_err};
 use lucet_module::ModuleSignature;
 pub use minisign::{KeyPair, PublicKey, SecretKey, SignatureBones, SignatureBox};
 use std::fs::File;

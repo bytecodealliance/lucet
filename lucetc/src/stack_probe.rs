@@ -10,6 +10,7 @@
 
 use crate::decls::ModuleDecls;
 use crate::module::UniqueFuncIndex;
+use anyhow::Error;
 use cranelift_codegen::binemit::TrapSink;
 use cranelift_codegen::ir;
 use cranelift_codegen::ir::{types, AbiParam, Signature};
@@ -18,7 +19,6 @@ use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
 use cranelift_faerie::FaerieProduct;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use faerie::Decl;
-//TLC use failure::Error;
 
 /// Stack probe symbol name
 pub const STACK_PROBE_SYM: &'static str = "lucet_probestack";
