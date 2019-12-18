@@ -4,7 +4,7 @@ use crate::name::Name;
 use crate::stack_probe;
 use crate::table::{link_tables, TABLE_SYM};
 use crate::traps::write_trap_tables;
-use anyhow::{Error, format_err};
+use anyhow::{format_err, Error};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;

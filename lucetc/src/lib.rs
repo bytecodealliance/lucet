@@ -29,7 +29,7 @@ pub use crate::{
     patch::patch_module,
 };
 //TLC use failure::{format_err, Error, ResultExt};
-use anyhow::{Error, format_err};
+use anyhow::{format_err, Error};
 pub use lucet_module::bindings::Bindings;
 pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};

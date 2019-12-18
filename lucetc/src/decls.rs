@@ -6,7 +6,7 @@ use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
 use crate::table::TABLE_SYM;
 use crate::types::to_lucet_signature;
-use anyhow::{Error, format_err};
+use anyhow::{format_err, Error};
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;

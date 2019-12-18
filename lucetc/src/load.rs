@@ -1,7 +1,7 @@
 use crate::error::LucetcErrorKind;
 use crate::signature::{self, PublicKey};
 //TLC use failure::*;
-use anyhow::{Error, format_err};
+use anyhow::{format_err, Error};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;

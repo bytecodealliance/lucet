@@ -1,9 +1,8 @@
 //TLC use failure::{Backtrace, Context, Fail};
+use anyhow::Context;
+use cranelift_module::ModuleError as ClifModuleError;
 use std::fmt::{self, Display};
-use anyhow::{Context};
-use thiserror::{Error};
-use cranelift_module::{ModuleError as ClifModuleError};
-
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -15,19 +14,20 @@ pub enum Error {
     TranslatingModule,
     #[error("Module data")]
     ModuleData,
-    #[error("Metadata serializer; start index pointed to a non-function")] // specifically non-ModuleData; this will go away soon
+    #[error("Metadata serializer; start index pointed to a non-function")]
+    // specifically non-ModuleData; this will go away soon
     MetadataSerializer,
-    #[error("Function translation error in {symbol}: {source:?}")]  
-    FunctionTranslation{
-	symbol: String,
-	#[source]
-	source: ClifModuleError,
+    #[error("Function translation error in {symbol}: {source:?}")]
+    FunctionTranslation {
+        symbol: String,
+        #[source]
+        source: ClifModuleError,
     },
     #[error("Function definition error in {symbol}: {source:?}")]
-    FunctionDefinition{
-	symbol: String,
-	#[source]
-	source: ClifModuleError, 
+    FunctionDefinition {
+        symbol: String,
+        #[source]
+        source: ClifModuleError,
     },
     #[error("Table")]
     Table,
@@ -40,9 +40,8 @@ pub enum Error {
     #[error("Unsupported")]
     Unsupported,
 }
-    
 
-// TLC: I think I can derive these froms with thiserror.  
+// TLC: I think I can derive these froms with thiserror.
 impl From<Context<LucetcErrorKind>> for LucetcError {
     fn from(inner: Context<LucetcErrorKind>) -> LucetcError {
         LucetcError { inner }

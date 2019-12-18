@@ -3,7 +3,7 @@ use crate::decls::{ModuleDecls, TableDecl};
 use crate::module::UniqueFuncIndex;
 use crate::name::Name;
 use crate::pointer::NATIVE_POINTER_SIZE;
-use anyhow::{Error, format_err};
+use anyhow::{format_err, Error};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};

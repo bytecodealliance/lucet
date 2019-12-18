@@ -3,7 +3,6 @@ mod cpu_features;
 pub use self::cpu_features::{CpuFeatures, SpecificFeature, TargetCpu};
 use crate::decls::ModuleDecls;
 use crate::error::Error;
-//TLC use crate::error::{LucetcError, LucetcErrorKind};
 use crate::function::FuncInfo;
 use crate::heap::HeapSettings;
 use crate::module::ModuleInfo;
@@ -11,7 +10,7 @@ use crate::output::{CraneliftFuncs, ObjectFile};
 use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
-use anyhow::{format_err};
+use anyhow::format_err;
 use cranelift_codegen::{
     ir,
     isa::TargetIsa,
@@ -21,7 +20,6 @@ use cranelift_codegen::{
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
-//TLC use failure::{format_err, Fail, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::{FunctionSpec, ModuleData, ModuleFeatures, MODULE_DATA_SYM};
 use lucet_validate::Validator;
@@ -73,18 +71,15 @@ impl<'a> Compiler<'a> {
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
         if let Some(v) = validator {
-            v.validate(wasm_binary)
-		.map_err(|_| Err(Error::Validation));
-        } 
+            v.validate(wasm_binary).map_err(|_| Err(Error::Validation));
+        }
 
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
-                WasmError::User(_) => Err(Error::Input), 
+                WasmError::User(_) => Err(Error::Input),
                 WasmError::InvalidWebAssembly { .. } => Err(Error::Validation),
                 WasmError::Unsupported { .. } => Err(Error::Unsupported),
-                WasmError::ImplLimitExceeded { .. } => {
-                    Err(Error::TranslatingModule)
-                }
+                WasmError::ImplLimitExceeded { .. } => Err(Error::TranslatingModule),
             })?;
 
         let libcalls = Box::new(move |libcall| match libcall {
@@ -99,7 +94,7 @@ impl<'a> Compiler<'a> {
                 FaerieTrapCollection::Enabled,
                 libcalls,
             )
-	.map_err(|| Err(Error::Validation))?,
+            .map_err(|| Err(Error::Validation))?,
         );
 
         let runtime = Runtime::lucet(frontend_config);
@@ -272,7 +267,7 @@ fn write_startfunc_data<B: ClifBackend>(
         let fid = start_func
             .name
             .as_funcid()
-	    .map_err(|| Err(Error::MetadataSerializer))?;
+            .map_err(|| Err(Error::MetadataSerializer))?;
         let fref = clif_module.declare_func_in_data(fid, &mut ctx);
         ctx.write_function_addr(0, fref);
         clif_module.define_data(name, &ctx).context(error_kind)?;
