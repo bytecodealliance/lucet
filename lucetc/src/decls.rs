@@ -1,4 +1,3 @@
-//TLC use crate::error::{LucetcError, LucetcErrorKind};
 use crate::heap::HeapSettings;
 pub use crate::module::{Exportable, TableElems};
 use crate::module::{ModuleInfo, UniqueFuncIndex};
@@ -15,7 +14,6 @@ use cranelift_wasm::{
     Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
     TableIndex,
 };
-//TLC use failure::{format_err, Error, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::ModuleFeatures;
 use lucet_module::{
@@ -156,7 +154,7 @@ impl<'a> ModuleDecls<'a> {
                 if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
                     let import_symbol = bindings
                         .translate(import_mod, import_field)
-                        .context(LucetcErrorKind::TranslatingModule)?;
+                        .map_err(|| Err(Error::TranslatingModule))?;
                     decls.imports.push(ImportFunction {
                         fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                         module: import_mod,
@@ -207,7 +205,7 @@ impl<'a> ModuleDecls<'a> {
         decl_sym: String,
         decl_linkage: Linkage,
         signature: ir::Signature,
-    ) -> Result<UniqueFuncIndex, LucetcError> {
+    ) -> Result<UniqueFuncIndex, Error> {
         let (new_funcidx, _) = self.info.declare_func_with_sig(signature)?;
 
         self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)?;
@@ -223,7 +221,7 @@ impl<'a> ModuleDecls<'a> {
         decl_sym: String,
         decl_linkage: Linkage,
         func_ix: UniqueFuncIndex,
-    ) -> Result<UniqueFuncIndex, LucetcError> {
+    ) -> Result<UniqueFuncIndex, Error> {
         // This function declaration may be a subsequent additional declaration for a function
         // we've already been told about. In that case, func_ix will already be a valid index for a
         // function name, and we should not try to declare it again.
@@ -237,7 +235,7 @@ impl<'a> ModuleDecls<'a> {
                 decl_linkage,
                 self.info.signature_for_function(func_ix),
             )
-            .context(LucetcErrorKind::TranslatingModule)?;
+            .map_err(|| Err(Error::TranslatingModule))?;
 
         if func_ix.as_u32() as usize >= self.function_names.len() {
             // `func_ix` is new, so we need to add the name. If func_ix is new, it should be
@@ -256,13 +254,13 @@ impl<'a> ModuleDecls<'a> {
     fn declare_tables<B: ClifBackend>(
         info: &ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
-    ) -> Result<(Name, PrimaryMap<TableIndex, Name>), LucetcError> {
+    ) -> Result<(Name, PrimaryMap<TableIndex, Name>), Error> {
         let mut table_names = PrimaryMap::new();
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id = clif_module
                 .declare_data(&def_symbol, Linkage::Export, false, None)
-                .context(LucetcErrorKind::TranslatingModule)?;
+                .map_err(|| Err(Error::TranslatingModule))?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             table_names.push(def_name);
@@ -270,7 +268,7 @@ impl<'a> ModuleDecls<'a> {
 
         let tables_list_id = clif_module
             .declare_data(TABLE_SYM, Linkage::Export, false, None)
-            .context(LucetcErrorKind::Table)?;
+            .map_err(|| Err(Error::Table))?;
         let tables_list = Name::new_data(TABLE_SYM.to_string(), tables_list_id);
 
         Ok((tables_list, table_names))
@@ -280,7 +278,7 @@ impl<'a> ModuleDecls<'a> {
         decls: &mut ModuleDecls<'a>,
         clif_module: &mut ClifModule<B>,
         runtime: Runtime,
-    ) -> Result<(), LucetcError> {
+    ) -> Result<(), Error> {
         for (func, (symbol, signature)) in runtime.functions.iter() {
             let func_id = decls.declare_new_function(
                 clif_module,
@@ -297,7 +295,7 @@ impl<'a> ModuleDecls<'a> {
     fn build_linear_memory_spec(
         info: &ModuleInfo<'a>,
         heap_settings: HeapSettings,
-    ) -> Result<Option<OwnedLinearMemorySpec>, LucetcError> {
+    ) -> Result<Option<OwnedLinearMemorySpec>, Error> {
         use crate::sparsedata::owned_sparse_data_from_initializers;
         if let Some(heap_spec) = Self::build_heap_spec(info, heap_settings)? {
             let data_initializers = info
@@ -315,7 +313,7 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    fn build_globals_spec(info: &ModuleInfo<'a>) -> Result<Vec<GlobalSpec<'a>>, LucetcError> {
+    fn build_globals_spec(info: &ModuleInfo<'a>) -> Result<Vec<GlobalSpec<'a>>, Error> {
         let mut globals = Vec::new();
         for ix in 0..info.globals.len() {
             let ix = GlobalIndex::new(ix);
@@ -336,29 +334,21 @@ impl<'a> ModuleDecls<'a> {
                         if let Some((module, field)) = info.imported_globals.get(ref_ix) {
                             Ok(GlobalVariant::Import { module, field })
                         } else {
-                            Err(format_err!("inconsistent state: global {} is declared as an import but has no entry in imported_globals", ref_ix.as_u32()))
-                            .context(LucetcErrorKind::TranslatingModule)
+                            Err(Error::GlobalDeclarationError(ref_ix.as_u32()))
                         }
                     } else {
                         // This WASM restriction may be loosened in the future:
-                        Err(format_err!("invalid global declarations: global {} is initialized by referencing another global value, but the referenced global is not an import", ix.as_u32()))
-                        .context(LucetcErrorKind::TranslatingModule)
+                        Err(Error::InvalidGlobal{message: "global is initialized by referencing another global value, but the referenced global is not an import", symbol: ix.as_u32()})
                     }
                 }
                 GlobalInit::Import => {
                     if let Some((module, field)) = info.imported_globals.get(ix) {
                         Ok(GlobalVariant::Import { module, field })
                     } else {
-                        Err(format_err!("inconsistent state: global {} is declared as an import but has no entry in imported_globals", ix.as_u32()))
-                        .context(LucetcErrorKind::TranslatingModule)
-                    }
-                }
-                GlobalInit::V128Const(_) => Err(format_err!(
-                    "invalid declaration of global {}: v128const type",
-                    ix.as_u32()
-                ))
-                .context(LucetcErrorKind::Unsupported),
-            }?;
+			Err(Error::GlobalDeclarationError(ix.as_u32()))
+		    }
+		} GlobalInit::V128Const(_) => Err(Error::InvalidGlobal{message: "v128const type is not supported", symbol: ix.as_u32()})
+		}?;
 
             globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));
         }
@@ -388,7 +378,7 @@ impl<'a> ModuleDecls<'a> {
                         reserved_size,
                         heap_settings.max_reserved_size
                     ))
-                    .context(LucetcErrorKind::MemorySpecs)?;
+                    .map_err(|| Err(Error::MemorySpecs))?;
                 }
                 // Find the max size permitted by the heap and the memory spec
                 let max_size = memory.maximum.map(|pages| pages as u64 * wasm_page);
@@ -399,8 +389,7 @@ impl<'a> ModuleDecls<'a> {
                     max_size: max_size,
                 }))
             }
-            _ => Err(format_err!("lucetc only supports memory 0"))
-                .context(LucetcErrorKind::Unsupported)?,
+            _ => Err(Error::Unsupported{message: "lucetc only supports memory 0"})
         }
     }
     // ********************* Public Interface **************************
@@ -465,8 +454,8 @@ impl<'a> ModuleDecls<'a> {
             .table_elems
             .get(&table_index)
             .ok_or_else(|| {
-                format_err!("table is not local: {:?}", table_index)
-                    .context(LucetcErrorKind::Unsupported)
+		let message = format!("table is not local: {:?}", table_index);
+		Err(Error::Unsupported{message})
             })?
             .as_slice();
         Ok(TableDecl {
@@ -544,8 +533,7 @@ impl<'a> ModuleDecls<'a> {
             .values()
             .map(|sig| {
                 to_lucet_signature(sig)
-                    .map_err(|e| format_err!("error converting cranelift sig to wasm sig: {:?}", e))
-                    .context(LucetcErrorKind::TranslatingModule)
+                    .map_err(|e| Err(Error::SignatureError(e)))
             })
             .collect::<Result<Vec<LucetSignature>, Error>>()?;
 

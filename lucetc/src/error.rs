@@ -6,39 +6,43 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Input")]
-    Input,
-    #[error("Validation")]
-    Validation,
-    #[error("Translating module")]
-    TranslatingModule,
-    #[error("Module data")]
-    ModuleData,
-    #[error("Metadata serializer; start index pointed to a non-function")]
-    // specifically non-ModuleData; this will go away soon
-    MetadataSerializer,
-    #[error("Function translation error in {symbol}: {source:?}")]
+    #[error("Function translation error in {symbol}")]
     FunctionTranslation {
         symbol: String,
         #[source]
         source: ClifModuleError,
     },
-    #[error("Function definition error in {symbol}: {source:?}")]
+    #[error("Function definition error in {symbol}")]
     FunctionDefinition {
         symbol: String,
         #[source]
         source: ClifModuleError,
     },
+    #[error("Inconsistent state when translating module: global {0} is declared as an import but has no entry in imported_globals")]
+    GlobalDeclarationError(u32),
+    #[error("Input")]
+    Input,
     #[error("Table")]
     Table,
     #[error("Memory specs")]
     MemorySpecs,
+    #[error("Metadata serializer; start index pointed to a non-function")]
+    // specifically non-ModuleData; this will go away soon
+    MetadataSerializer,
+    #[error("Module data")]
+    ModuleData,
     #[error("Output")]
     Output,
     #[error("Signature")]
     Signature,
-    #[error("Unsupported")]
-    Unsupported,
+    #[error("Error converting cranelift signature to wasm signature")]
+    SignatureConversion(#[from] SignatureError),
+    #[error("Unsupported: {message}")]
+    Unsupported{
+	message: String
+    },
+    #[error("Validation")]
+    Validation,
 }
 
 // TLC: I think I can derive these froms with thiserror.
