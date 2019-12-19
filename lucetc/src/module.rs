@@ -132,7 +132,7 @@ impl<'a> ModuleInfo<'a> {
     pub fn declare_func_with_sig(
         &mut self,
         sig: ir::Signature,
-    ) -> Result<(UniqueFuncIndex, SignatureIndex), LucetcError> {
+    ) -> Result<(UniqueFuncIndex, SignatureIndex), Error> {
         let new_sigidx = SignatureIndex::from_u32(self.signature_mapping.len() as u32);
         self.declare_signature(sig)
             .map_err(|| Err(Error::TranslatingModule))?;

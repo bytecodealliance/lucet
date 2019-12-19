@@ -10,7 +10,6 @@ use crate::output::{CraneliftFuncs, ObjectFile};
 use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
-use anyhow::format_err;
 use cranelift_codegen::{
     ir,
     isa::TargetIsa,

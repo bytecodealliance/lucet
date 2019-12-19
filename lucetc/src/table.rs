@@ -1,8 +1,8 @@
 use crate::decls::{ModuleDecls, TableDecl};
+use crate::error::Error;
 use crate::module::UniqueFuncIndex;
 use crate::name::Name;
 use crate::pointer::NATIVE_POINTER_SIZE;
-use anyhow::{format_err, Error};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
@@ -23,7 +23,7 @@ enum Elem {
     Empty,
 }
 
-fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, LucetcError> {
+fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
     match decl.table.ty {
         TableElementType::Func => Ok(()),
         _ => {
@@ -67,7 +67,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
 pub fn write_table_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     decls: &ModuleDecls<'_>,
-) -> Result<Vec<Name>, LucetcError> {
+) -> Result<Vec<Name>, Error> {
     let mut tables_vec = Cursor::new(Vec::new());
     let mut table_names: Vec<Name> = Vec::new();
 

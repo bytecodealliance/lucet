@@ -56,7 +56,7 @@ fn split<'a>(di: &DataInitializer<'a>) -> Vec<(usize, DataInitializer<'a>)> {
 pub fn owned_sparse_data_from_initializers<'a>(
     initializers: &[DataInitializer<'a>],
     heap: &HeapSpec,
-) -> Result<OwnedSparseData, LucetcError> {
+) -> Result<OwnedSparseData, Error> {
     let mut pagemap: HashMap<usize, Vec<u8>> = HashMap::new();
 
     for initializer in initializers {

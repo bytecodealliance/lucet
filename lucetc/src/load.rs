@@ -1,11 +1,9 @@
-use crate::error::LucetcErrorKind;
+use crate::error::Error;
 use crate::signature::{self, PublicKey};
-//TLC use failure::*;
-use anyhow::{format_err, Error};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use wabt::{wat2wasm, ErrorKind};
+use wabt::wat2wasm;
 
 pub fn read_module<P: AsRef<Path>>(
     path: P,
@@ -23,7 +21,7 @@ pub fn read_module<P: AsRef<Path>>(
             &contents,
             &signature_box,
             pk.as_ref()
-                .ok_or(format_err!("public key is missing").context(LucetcErrorKind::Signature))?,
+		.map_err(|| Err(Error::Signature{message: "public key is missing"}))?,
         )?;
     }
     read_bytes(contents)
@@ -33,8 +31,11 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     let converted = if wasm_preamble(&bytes) {
         bytes
     } else {
-        wat2wasm(bytes).map_err(|err| {
-            use std::error::Error;
+        wat2wasm(bytes).map_err(|err| Err(Error::WatInput))?;
+
+
+/* TLC
+	    use std::error::Error;
             let mut result = err.description().to_string();
             match unsafe { std::mem::transmute::<wabt::Error, wabt::ErrorKind>(err) } {
                 ErrorKind::Parse(msg) |
@@ -48,8 +49,11 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
                 },
                 _ => { }
             };
-            format_err!("{}", result).context(LucetcErrorKind::Input)
+	    
+	    format_err!("{}", result).context(LucetcErrorKind::Input)
+
         })?
+*/
     };
     Ok(converted)
 }

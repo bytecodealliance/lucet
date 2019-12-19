@@ -1,4 +1,3 @@
-use crate::error::LucetcErrorKind;
 use crate::function_manifest::{write_function_manifest, FUNCTION_MANIFEST_SYM};
 use crate::name::Name;
 use crate::stack_probe;
@@ -9,7 +8,6 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
-//TLC use failure::{format_err, Error, ResultExt};
 use lucet_module::{
     FunctionSpec, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };
@@ -99,8 +97,7 @@ impl ObjectFile {
                     FunctionSpec::new(0, fn_spec.code_len(), 0, sink.sites.len() as u64),
                 );
             } else {
-                Err(format_err!("Inconsistent state: trap records present for function {} but the function does not exist?", sink.name))
-                    .context(LucetcErrorKind::TranslatingModule)?;
+		Err(Error::TrapRecords{name: sink.name});
             }
         }
 

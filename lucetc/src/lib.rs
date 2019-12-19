@@ -21,15 +21,16 @@ mod traps;
 mod types;
 
 use crate::load::read_bytes;
+use crate::error::Error;
+
 pub use crate::{
     compiler::{Compiler, CpuFeatures, OptLevel, SpecificFeature, TargetCpu},
-    //TLC error::{LucetcError, LucetcErrorKind},
     heap::HeapSettings,
     load::read_module,
     patch::patch_module,
 };
 //TLC use failure::{format_err, Error, ResultExt};
-use anyhow::{format_err, Error};
+use anyhow::{format_err};
 pub use lucet_module::bindings::Bindings;
 pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};
@@ -291,7 +292,7 @@ impl Lucetc {
         };
 
         if !self.builtins_paths.is_empty() {
-            let mut module = deserialize_buffer(&module_binary)?;
+            let mut module = deserialize_buffer(&module_binary).map_err(|e| Err(Error::Build))?;
             for builtins in self.builtins_paths.iter() {
                 let (newmodule, builtins_map) = patch_module(module, builtins)?;
                 module = newmodule;
@@ -355,7 +356,7 @@ impl Lucetc {
         link_so(objpath, &output)?;
         if self.sign {
             let sk = self.sk.as_ref().ok_or(
-		Err(Error::Signature),
+		Err(Error::Signature{message: "signing requires a secret key"}),
             )?;
             signature::sign_module(&output, sk)?;
         }
