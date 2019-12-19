@@ -118,6 +118,7 @@ pub struct Options {
     pub pk_path: Option<PathBuf>,
     pub sk_path: Option<PathBuf>,
     pub count_instructions: bool,
+    pub report_times: bool,
     pub error_style: ErrorStyle,
 }
 
@@ -196,6 +197,7 @@ impl Options {
         let sk_path = m.value_of("sk_path").map(PathBuf::from);
         let pk_path = m.value_of("pk_path").map(PathBuf::from);
         let count_instructions = m.is_present("count_instructions");
+        let report_times = m.is_present("report_times");
 
         let error_style = match m.value_of("error_style") {
             None => ErrorStyle::default(),
@@ -224,6 +226,7 @@ impl Options {
             sk_path,
             pk_path,
             count_instructions,
+            report_times,
             error_style,
         })
     }
@@ -428,6 +431,12 @@ SSE3 but not AVX:
                     .long("--count-instructions")
                     .takes_value(false)
                     .help("Instrument the produced binary to count the number of wasm operations the translated program executes")
+            )
+            .arg(
+                Arg::with_name("report_times")
+                    .long("--report-times")
+                    .takes_value(false)
+                    .help("Report times for lucetc and cranelift compilation passes")
             )
             .arg(
                 Arg::with_name("error_style")

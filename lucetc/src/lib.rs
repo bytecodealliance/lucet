@@ -34,6 +34,7 @@ pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use tempfile;
 
 enum LucetcInput {
@@ -54,6 +55,7 @@ pub struct Lucetc {
     sign: bool,
     verify: bool,
     count_instructions: bool,
+    report_times: bool,
 }
 
 pub trait AsLucetc {
@@ -110,6 +112,8 @@ pub trait LucetcOpts {
     fn with_sign(self) -> Self;
     fn count_instructions(&mut self, enable_count: bool);
     fn with_count_instructions(self, enable_count: bool) -> Self;
+    fn report_times(&mut self, report_times: bool);
+    fn with_report_times(self, report_times: bool) -> Self;
 }
 
 impl<T: AsLucetc> LucetcOpts for T {
@@ -241,6 +245,15 @@ impl<T: AsLucetc> LucetcOpts for T {
         self.count_instructions(count_instructions);
         self
     }
+
+    fn report_times(&mut self, report_times: bool) {
+        self.as_lucetc().report_times = report_times;
+    }
+
+    fn with_report_times(mut self, report_times: bool) -> Self {
+        self.report_times(report_times);
+        self
+    }
 }
 
 impl Lucetc {
@@ -259,6 +272,7 @@ impl Lucetc {
             sign: false,
             verify: false,
             count_instructions: false,
+            report_times: false,
         }
     }
 
@@ -277,6 +291,7 @@ impl Lucetc {
             sign: false,
             verify: false,
             count_instructions: false,
+            report_times: false,
         })
     }
 
@@ -308,7 +323,7 @@ impl Lucetc {
         Ok((module_binary, bindings))
     }
 
-    pub fn object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+    pub fn object_file<P: AsRef<Path>>(&self, output: P) -> Result<Duration, Error> {
         let (module_contents, bindings) = self.build()?;
 
         let compiler = Compiler::new(
@@ -320,13 +335,13 @@ impl Lucetc {
             self.count_instructions,
             &self.validator,
         )?;
-        let obj = compiler.object_file()?;
+        let (obj, duration) = compiler.object_file()?;
 
         obj.write(output.as_ref()).context("writing object file")?;
-        Ok(())
+        Ok(duration)
     }
 
-    pub fn clif_ir<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+    pub fn clif_ir<P: AsRef<Path>>(&self, output: P) -> Result<Duration, Error> {
         let (module_contents, bindings) = self.build()?;
 
         let compiler = Compiler::new(
@@ -338,19 +353,23 @@ impl Lucetc {
             self.count_instructions,
             &self.validator,
         )?;
+
+        let start = Instant::now();
 
         compiler
             .cranelift_funcs()?
             .write(&output)
             .context("writing clif file")?;
 
-        Ok(())
+        let duration = start.elapsed();
+
+        Ok(duration)
     }
 
-    pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+    pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<Duration, Error> {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
-        self.object_file(objpath.clone())?;
+        let object_build_time = self.object_file(objpath.clone())?;
         link_so(objpath, &output)?;
         if self.sign {
             let sk = self.sk.as_ref().ok_or(
@@ -358,7 +377,7 @@ impl Lucetc {
             )?;
             signature::sign_module(&output, sk)?;
         }
-        Ok(())
+        Ok(object_build_time)
     }
 }
 

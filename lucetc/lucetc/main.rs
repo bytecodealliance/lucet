@@ -14,6 +14,7 @@ use lucetc::{
 };
 use serde::Serialize;
 use serde_json;
+use std::time::Duration;
 use std::path::PathBuf;
 use std::process;
 
@@ -135,11 +136,26 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.count_instructions(true);
     }
 
-    match opts.codegen {
-        CodegenOutput::Obj => c.object_file(&opts.output)?,
-        CodegenOutput::SharedObj => c.shared_object_file(&opts.output)?,
-        CodegenOutput::Clif => c.clif_ir(&opts.output)?,
+    let codegen_result = match opts.codegen {
+        CodegenOutput::Obj => c.object_file(&opts.output),
+        CodegenOutput::SharedObj => c.shared_object_file(&opts.output),
+        CodegenOutput::Clif => c.clif_ir(&opts.output),
+    };
+
+    if opts.report_times {
+        println!("--- compilation timing ---");
+        println!("cranelift:\n{}", cranelift_codegen::timing::take_current());
     }
+
+    let write_time = codegen_result?;
+
+    if opts.report_times {
+        // Round to nearest ms by adding 500us (copied from cranelift-codegen)
+        let write_time = write_time + Duration::new(0, 500_000);
+        let ms = write_time.subsec_millis();
+        println!("output: {:4}.{:03}", write_time.as_secs(), ms);
+    }
+
     Ok(())
 }
 

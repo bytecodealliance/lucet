@@ -23,6 +23,7 @@ use failure::{format_err, Fail, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::{FunctionSpec, ModuleData, ModuleFeatures, MODULE_DATA_SYM};
 use lucet_validate::Validator;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
@@ -142,7 +143,7 @@ impl<'a> Compiler<'a> {
         self.decls.get_module_data(self.module_features())
     }
 
-    pub fn object_file(mut self) -> Result<ObjectFile, LucetcError> {
+    pub fn object_file(mut self) -> Result<(ObjectFile, Duration), LucetcError> {
         let mut func_translator = FuncTranslator::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
@@ -196,6 +197,8 @@ impl<'a> Compiler<'a> {
             })
             .collect();
 
+        let start = Instant::now();
+
         let obj = ObjectFile::new(
             self.clif_module.finish(),
             module_data_len,
@@ -203,7 +206,10 @@ impl<'a> Compiler<'a> {
             table_names,
         )
         .context(LucetcErrorKind::Output)?;
-        Ok(obj)
+
+        let duration = start.elapsed();
+
+        Ok((obj, duration))
     }
 
     pub fn cranelift_funcs(self) -> Result<CraneliftFuncs, LucetcError> {
