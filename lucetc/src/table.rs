@@ -1,5 +1,4 @@
 use crate::decls::{ModuleDecls, TableDecl};
-//TLC use crate::error::{LucetcError, LucetcErrorKind};
 use crate::module::UniqueFuncIndex;
 use crate::name::Name;
 use crate::pointer::NATIVE_POINTER_SIZE;
@@ -9,7 +8,6 @@ use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
 use cranelift_wasm::{TableElementType, TableIndex};
 use faerie::{Artifact, Link};
-//TLC use failure::{format_err, Error, ResultExt};
 use std::io::Cursor;
 
 /// This symbol will be used to reference the `tables` field in `Module` - a sequence of tables.
@@ -28,19 +26,19 @@ enum Elem {
 fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, LucetcError> {
     match decl.table.ty {
         TableElementType::Func => Ok(()),
-        _ => Err(format_err!("table with non-function elements: {:?}", decl))
-            .context(LucetcErrorKind::Unsupported),
+        _ => {
+	    let message = format!("table with non-function elements: {:?}", decl);
+	    Err(Error::Unsupported{message})
+	}
     }?;
-
+	
     let mut elems = Vec::new();
 
     for initializer in decl.elems.iter() {
         if initializer.base.is_some() {
-            Err(format_err!(
-                "table elements with global index base: {:?}",
-                initializer
-            ))
-            .context(LucetcErrorKind::Unsupported)?
+	    let message = format!("table elements with global index base: {:?}",
+				  initializer);
+            Err(Error::Unsupported{message})?
         }
         let final_len = initializer.offset + initializer.elements.len();
         if final_len > elems.len() {
@@ -61,7 +59,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
             to: table.symbol(),
             at: (TABLE_REF_SIZE * idx) as u64,
         })
-        .context(LucetcErrorKind::Table)?;
+	.map_err(|| Err(Error::Table))?;
     }
     Ok(())
 }
@@ -98,7 +96,7 @@ pub fn write_table_data<B: ClifBackend>(
                     // function. If this is ever removed, make sure this check happens elsewhere.
                     let func = decls
                         .get_func(*func_index)
-                        .context(LucetcErrorKind::Table)?;
+			.map_err(|| Err(Error::Table))?;                       
                     // First element in row is the SignatureIndex for the function
                     putelem(&mut table_data, func.signature_index.as_u32() as u64);
 
@@ -128,7 +126,7 @@ pub fn write_table_data<B: ClifBackend>(
             .expect("tables are data");
         clif_module
             .define_data(table_id, &table_ctx)
-            .context(LucetcErrorKind::Table)?;
+	    .map_err(|| Err(Error::Table))?;
 
         // have to link TABLE_SYM, table_id,
         // add space for the TABLE_SYM pointer
@@ -154,6 +152,6 @@ pub fn write_table_data<B: ClifBackend>(
                 .expect("lucet_tables is declared as data"),
             &table_data_ctx,
         )
-        .context(LucetcErrorKind::Table)?;
+	.map_err(|| Err(Error::Table))?;       
     Ok(table_names)
 }

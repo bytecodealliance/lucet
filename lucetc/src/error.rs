@@ -31,7 +31,7 @@ pub enum Error {
     ModuleData,
     #[error("Output")]
     Output,
-    #[error("Signature")]
+    #[error("Signing requires a secret key")]
     Signature,
     #[error("Error converting cranelift signature to wasm signature")]
     SignatureConversion(#[from] SignatureError),

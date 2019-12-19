@@ -71,14 +71,14 @@ impl<'a> Compiler<'a> {
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
         if let Some(v) = validator {
-            v.validate(wasm_binary).map_err(|_| Err(Error::Validation));
+            v.validate(wasm_binary).map_err(|_| Err(Error::Validation{message: ""}));
         }
 
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
                 WasmError::User(_) => Err(Error::Input),
-                WasmError::InvalidWebAssembly { .. } => Err(Error::Validation),
-                WasmError::Unsupported { .. } => Err(Error::Unsupported),
+                WasmError::InvalidWebAssembly { .. } => Err(Error::Validation{message: ""}),
+                WasmError::Unsupported { .. } => Err(Error::Unsupported{message: ""}),
                 WasmError::ImplLimitExceeded { .. } => Err(Error::TranslatingModule),
             })?;
 
@@ -93,8 +93,7 @@ impl<'a> Compiler<'a> {
                 "lucet_guest".to_owned(),
                 FaerieTrapCollection::Enabled,
                 libcalls,
-            )
-            .map_err(|| Err(Error::Validation))?,
+            ).map_err(|| Err(Error::Validation{message: ""}))?, // Parse {})( here.
         );
 
         let runtime = Runtime::lucet(frontend_config);
@@ -121,11 +120,11 @@ impl<'a> Compiler<'a> {
         (&self.cpu_features).into()
     }
 
-    pub fn module_data(&self) -> Result<ModuleData<'_>, LucetcError> {
+    pub fn module_data(&self) -> Result<ModuleData<'_>, Error> {
         self.decls.get_module_data(self.module_features())
     }
 
-    pub fn object_file(mut self) -> Result<ObjectFile, LucetcError> {
+    pub fn object_file(mut self) -> Result<ObjectFile, Error> {
         let mut func_translator = FuncTranslator::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
@@ -142,11 +141,10 @@ impl<'a> Compiler<'a> {
                     &mut clif_context.func,
                     &mut func_info,
                 )
-                .map_err(|e| Err(Error::FunctionTranslation(func.name.symbol(), e)))?;
+                .map_err(|e| Err(Error::FunctionTranslation{symbol: func.name.symbol(), source: e}))?;
             self.clif_module
                 .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
-                .map_err(|e| Err(Error::FunctionDefinition(func.name.symbol(), e)))?
-        }
+                .map_err(|e| Err(Error::FunctionDefinition(symbol: func.name.symbol(), source: e}))?
 
         stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
 
@@ -186,7 +184,7 @@ impl<'a> Compiler<'a> {
         Ok(obj)
     }
 
-    pub fn cranelift_funcs(self) -> Result<CraneliftFuncs, LucetcError> {
+    pub fn cranelift_funcs(self) -> Result<CraneliftFuncs, Error> {
         use std::collections::HashMap;
 
         let mut funcs = HashMap::new();
@@ -219,7 +217,7 @@ impl<'a> Compiler<'a> {
     fn target_isa(
         opt_level: OptLevel,
         cpu_features: &CpuFeatures,
-    ) -> Result<Box<dyn TargetIsa>, LucetcError> {
+    ) -> Result<Box<dyn TargetIsa>, Error> {
         let mut flags_builder = settings::builder();
         let isa_builder = cpu_features.isa_builder()?;
         flags_builder.enable("enable_verifier").unwrap();
@@ -232,7 +230,7 @@ impl<'a> Compiler<'a> {
 fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     module_data_bytes: Vec<u8>,
-) -> Result<(), LucetcError> {
+) -> Result<(), Error> {
     use cranelift_module::{DataContext, Linkage};
 
     let mut module_data_ctx = DataContext::new();
@@ -251,7 +249,7 @@ fn write_module_data<B: ClifBackend>(
 fn write_startfunc_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     decls: &ModuleDecls<'_>,
-) -> Result<(), LucetcError> {
+) -> Result<(), Error> {
     use cranelift_module::{DataContext, Linkage};
 
     if let Some(func_ix) = decls.get_start_func() {
