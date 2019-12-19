@@ -144,7 +144,8 @@ impl<'a> Compiler<'a> {
                 .map_err(|e| Err(Error::FunctionTranslation{symbol: func.name.symbol(), source: e}))?;
             self.clif_module
                 .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
-                .map_err(|e| Err(Error::FunctionDefinition(symbol: func.name.symbol(), source: e}))?
+                .map_err(|e| Err(Error::FunctionDefinition{symbol: func.name.symbol(), source: e}))?;
+	}
 
         stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
 
