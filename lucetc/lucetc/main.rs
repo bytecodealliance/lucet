@@ -14,9 +14,9 @@ use lucetc::{
 };
 use serde::Serialize;
 use serde_json;
-use std::time::Duration;
 use std::path::PathBuf;
 use std::process;
+use std::time::Duration;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct SerializedLucetcError {
