@@ -205,7 +205,7 @@ impl<'a> Compiler<'a> {
                     &mut clif_context.func,
                     &mut func_info,
                 )
-                .map_err(|e| Err(Error::FunctionTranslation(func.name.symbol(), e)))?;
+                .map_err(|e| Err(Error::FunctionTranslation{symbol: func.name.symbol(), e}))?;
 
             funcs.insert(func.name.clone(), clif_context.func);
         }
@@ -256,7 +256,7 @@ fn write_startfunc_data<B: ClifBackend>(
     if let Some(func_ix) = decls.get_start_func() {
         let name = clif_module
             .declare_data("guest_start", Linkage::Export, false, None)
-            .context(error_kind.clone())?;
+	    .map_err(|| Err(Error::MetadataSerializer))?;
         let mut ctx = DataContext::new();
         ctx.define_zeroinit(8);
 
@@ -269,7 +269,8 @@ fn write_startfunc_data<B: ClifBackend>(
             .map_err(|| Err(Error::MetadataSerializer))?;
         let fref = clif_module.declare_func_in_data(fid, &mut ctx);
         ctx.write_function_addr(0, fref);
-        clif_module.define_data(name, &ctx).context(error_kind)?;
+        clif_module.define_data(name, &ctx)
+	    .map_err(|| Err(Error::MetadataSerializer))?;
     }
     Ok(())
 }

@@ -362,7 +362,7 @@ impl<'a> ModuleDecls<'a> {
     fn build_heap_spec(
         info: &ModuleInfo<'a>,
         heap_settings: HeapSettings,
-    ) -> Result<Option<HeapSpec>, LucetcError> {
+    ) -> Result<Option<HeapSpec>, Error> {
         match info.memories.len() {
             0 => Ok(None),
             1 => {
@@ -508,7 +508,7 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    pub fn get_module_data(&self, features: ModuleFeatures) -> Result<ModuleData<'_>, LucetcError> {
+    pub fn get_module_data(&self, features: ModuleFeatures) -> Result<ModuleData<'_>, Error> {
         let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
             Some(spec.to_ref())
         } else {
