@@ -180,7 +180,7 @@ impl<'a> Compiler<'a> {
             function_manifest,
             table_names,
         )
-        .map_err(|| Err(Error::Output))?;
+            .map_err(|| Err(Error::Output{message: ""}))?;
         Ok(obj)
     }
 

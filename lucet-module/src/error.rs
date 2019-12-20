@@ -1,3 +1,4 @@
+
 use thiserror::Error;
 
 /// Module data (de)serialization errors.

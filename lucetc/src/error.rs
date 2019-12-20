@@ -1,9 +1,12 @@
 use crate::types::SignatureError;
+use lucet_module::error::Error as LucetModuleError;
 use cranelift_module::ModuleError as ClifModuleError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("Binding error")]
+    Binding(#[from] LucetModuleError),
     #[error("Build error")]
     Build(#[from] parity_wasm::elements::Error),
     #[error("Function translation error in {symbol}")]
@@ -29,14 +32,20 @@ pub enum Error {
     MetadataSerializer,
     #[error("Module data")]
     ModuleData,
-    #[error("Output")]
-    Output,
+    #[error("Output: {message}")]
+    Output { message: String },
+//    #[error("Output file")]
+//    OutputFile(#[from] std::result::Error),
+    #[error("Output function: error writing function {name}")]
+    OutputFunction { name: String },
     #[error("Signature error: {message}")]
     Signature { message: String },
     #[error("Error converting cranelift signature to wasm signature")]
     SignatureConversion(#[from] SignatureError),
     #[error("Table")]
     Table,
+    #[error("Temp file")]
+    TempFile(#[from] std::io::Error),  
     #[error("Translating module")]
     TranslatingModule,
     #[error("Trap records are present for function {name} but the function does not exist.")]

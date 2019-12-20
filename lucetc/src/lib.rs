@@ -29,7 +29,6 @@ pub use crate::{
     load::read_module,
     patch::patch_module,
 };
-//TLC use failure::{format_err, Error, ResultExt};
 use anyhow::{format_err};
 pub use lucet_module::bindings::Bindings;
 pub use lucet_validate::Validator;
@@ -292,7 +291,7 @@ impl Lucetc {
         };
 
         if !self.builtins_paths.is_empty() {
-            let mut module = deserialize_buffer(&module_binary).map_err(|e| Err(Error::Build))?;
+            let mut module = deserialize_buffer(&module_binary)?; //.map_err(|e| Err(Error::Build))?;
             for builtins in self.builtins_paths.iter() {
                 let (newmodule, builtins_map) = patch_module(module, builtins)?;
                 module = newmodule;
@@ -323,8 +322,8 @@ impl Lucetc {
             &self.validator,
         )?;
         let obj = compiler.object_file()?;
+        obj.write(output.as_ref())?; // TLC lost context "writing object file"
 
-        obj.write(output.as_ref()).context("writing object file")?;
         Ok(())
     }
 
@@ -343,20 +342,19 @@ impl Lucetc {
 
         compiler
             .cranelift_funcs()?
-            .write(&output)
-            .context("writing clif file")?;
+            .write(&output)?;  // TLC Lost context "writing clif file to file."
 
         Ok(())
     }
 
     pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
-        let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
+        let dir = tempfile::Builder::new().prefix("lucetc").tempdir().map_err(|e| Err(Error::TempFile(e)))?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
         link_so(objpath, &output)?;
         if self.sign {
             let sk = self.sk.as_ref().ok_or(
-		Err(Error::Signature{message: "signing requires a secret key"}),
+		Err(Error::Signature{message: "signing requires a secret key".to_string()}),
             )?;
             signature::sign_module(&output, sk)?;
         }

@@ -1,9 +1,10 @@
+use crate::error::Error;
 use crate::function_manifest::{write_function_manifest, FUNCTION_MANIFEST_SYM};
 use crate::name::Name;
 use crate::stack_probe;
 use crate::table::{link_tables, TABLE_SYM};
 use crate::traps::write_trap_tables;
-use anyhow::{format_err, Error};
+use anyhow::format_err;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
@@ -33,7 +34,7 @@ impl CraneliftFuncs {
         for (n, func) in self.funcs.iter() {
             buffer.push_str(&format!("; {}\n", n.symbol()));
             write_function(&mut buffer, func, &Some(self.isa.as_ref()).into())
-                .context(format_err!("writing func {:?}", n))?
+		.map_error(|| Err(Error::OutputFunction{name: n.to_string()}))? 
         }
         let mut file = File::create(path)?;
         file.write_all(buffer.as_bytes())?;

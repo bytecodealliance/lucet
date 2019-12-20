@@ -1,5 +1,5 @@
 //TLC use failure::Error;
-use anyhow::Error;
+use crate::error::Error;
 use parity_wasm::elements::Module;
 use std::collections::HashMap;
 use std::path::Path;

@@ -1,9 +1,9 @@
+use crate::error::Error;
+
 use cranelift_codegen::ir;
 use cranelift_faerie::traps::FaerieTrapManifest;
 
-use anyhow::Error;
 use faerie::{Artifact, Decl};
-//TLC use failure::{Error, ResultExt};
 use lucet_module::TrapSite;
 
 pub fn write_trap_tables(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> Result<(), Error> {

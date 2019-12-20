@@ -9,8 +9,8 @@
 //! treated like any other guest trap.
 
 use crate::decls::ModuleDecls;
+use crate::error::Error;
 use crate::module::UniqueFuncIndex;
-use anyhow::Error;
 use cranelift_codegen::binemit::TrapSink;
 use cranelift_codegen::ir;
 use cranelift_codegen::ir::{types, AbiParam, Signature};

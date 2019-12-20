@@ -1,6 +1,6 @@
 //! Implements ModuleEnvironment for cranelift-wasm. Code derived from cranelift-wasm/environ/dummy.rs
+use crate::error::Error;
 use crate::pointer::NATIVE_POINTER;
-use anyhow::Error;
 use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap, SecondaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;

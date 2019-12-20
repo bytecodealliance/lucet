@@ -1,5 +1,5 @@
+use crate::error::Error;
 use crate::module::DataInitializer;
-use anyhow::Error;
 use lucet_module::owned::OwnedSparseData;
 use lucet_module::HeapSpec;
 use std::collections::hash_map::Entry;
