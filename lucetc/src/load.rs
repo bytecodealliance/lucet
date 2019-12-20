@@ -20,8 +20,11 @@ pub fn read_module<P: AsRef<Path>>(
         signature::verify_source_code(
             &contents,
             &signature_box,
-            pk.as_ref()
-		.map_err(|| Err(Error::Signature{message: "public key is missing"}))?,
+            pk.as_ref().map_err(|| {
+                Err(Error::Signature {
+                    message: "public key is missing",
+                })
+            })?,
         )?;
     }
     read_bytes(contents)
@@ -33,27 +36,26 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     } else {
         wat2wasm(bytes).map_err(|err| Err(Error::WatInput))?;
 
+        /* TLC
+                use std::error::Error;
+                    let mut result = err.description().to_string();
+                    match unsafe { std::mem::transmute::<wabt::Error, wabt::ErrorKind>(err) } {
+                        ErrorKind::Parse(msg) |
+                        // this shouldn't be reachable - we're going the other way
+                        ErrorKind::Deserialize(msg) |
+                        // not sure how this error comes up
+                        ErrorKind::ResolveNames(msg) |
+                        ErrorKind::Validate(msg) => {
+                            result.push_str(":\n");
+                            result.push_str(&msg);
+                        },
+                        _ => { }
+                    };
 
-/* TLC
-	    use std::error::Error;
-            let mut result = err.description().to_string();
-            match unsafe { std::mem::transmute::<wabt::Error, wabt::ErrorKind>(err) } {
-                ErrorKind::Parse(msg) |
-                // this shouldn't be reachable - we're going the other way
-                ErrorKind::Deserialize(msg) |
-                // not sure how this error comes up
-                ErrorKind::ResolveNames(msg) |
-                ErrorKind::Validate(msg) => {
-                    result.push_str(":\n");
-                    result.push_str(&msg);
-                },
-                _ => { }
-            };
-	    
-	    format_err!("{}", result).context(LucetcErrorKind::Input)
+                format_err!("{}", result).context(LucetcErrorKind::Input)
 
-        })?
-*/
+                })?
+        */
     };
     Ok(converted)
 }

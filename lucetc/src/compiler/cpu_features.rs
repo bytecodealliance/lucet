@@ -188,9 +188,9 @@ impl CpuFeatures {
         use TargetCpu::*;
 
         let mut isa_builder = if let Native = self.cpu {
-            cranelift_native::builder().map_err(|_| Err(Error::Unsupported{message: ""}))?;
+            cranelift_native::builder().map_err(|_| Err(Error::Unsupported { message: "" }))?;
         } else {
-            isa::lookup(Triple::host()).map_err(|_| Err(Error::Unsupported{message: ""}))?;
+            isa::lookup(Triple::host()).map_err(|_| Err(Error::Unsupported { message: "" }))?;
         };
         // TLC       .context(LucetcErrorKind::Unsupported)?;
 

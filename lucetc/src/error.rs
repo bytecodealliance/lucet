@@ -1,6 +1,6 @@
 use crate::types::SignatureError;
-use lucet_module::error::Error as LucetModuleError;
 use cranelift_module::ModuleError as ClifModuleError;
+use lucet_module::error::Error as LucetModuleError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -34,8 +34,8 @@ pub enum Error {
     ModuleData,
     #[error("Output: {message}")]
     Output { message: String },
-//    #[error("Output file")]
-//    OutputFile(#[from] std::result::Error),
+    //    #[error("Output file")]
+    //    OutputFile(#[from] std::result::Error),
     #[error("Output function: error writing function {name}")]
     OutputFunction { name: String },
     #[error("Signature error: {message}")]
@@ -45,7 +45,7 @@ pub enum Error {
     #[error("Table")]
     Table,
     #[error("Temp file")]
-    TempFile(#[from] std::io::Error),  
+    TempFile(#[from] std::io::Error),
     #[error("Translating module")]
     TranslatingModule,
     #[error("Trap records are present for function {name} but the function does not exist.")]
@@ -57,4 +57,3 @@ pub enum Error {
     #[error("Wat input")]
     WatInput(#[from] wabt::Error),
 }
-

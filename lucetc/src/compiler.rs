@@ -70,14 +70,15 @@ impl<'a> Compiler<'a> {
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
         if let Some(v) = validator {
-            v.validate(wasm_binary).map_err(|_| Err(Error::Validation{message: ""}));
+            v.validate(wasm_binary)
+                .map_err(|_| Err(Error::Validation { message: "" }));
         }
 
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
                 WasmError::User(_) => Err(Error::Input),
-                WasmError::InvalidWebAssembly { .. } => Err(Error::Validation{message: ""}),
-                WasmError::Unsupported { .. } => Err(Error::Unsupported{message: ""}),
+                WasmError::InvalidWebAssembly { .. } => Err(Error::Validation { message: "" }),
+                WasmError::Unsupported { .. } => Err(Error::Unsupported { message: "" }),
                 WasmError::ImplLimitExceeded { .. } => Err(Error::TranslatingModule),
             })?;
 
@@ -92,7 +93,8 @@ impl<'a> Compiler<'a> {
                 "lucet_guest".to_owned(),
                 FaerieTrapCollection::Enabled,
                 libcalls,
-            ).map_err(|| Err(Error::Validation{message: ""}))?, // Parse {})( here.
+            )
+            .map_err(|| Err(Error::Validation { message: "" }))?, // Parse {})( here.
         );
 
         let runtime = Runtime::lucet(frontend_config);
@@ -140,11 +142,21 @@ impl<'a> Compiler<'a> {
                     &mut clif_context.func,
                     &mut func_info,
                 )
-                .map_err(|e| Err(Error::FunctionTranslation{symbol: func.name.symbol(), source: e}))?;
+                .map_err(|e| {
+                    Err(Error::FunctionTranslation {
+                        symbol: func.name.symbol(),
+                        source: e,
+                    })
+                })?;
             self.clif_module
                 .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
-                .map_err(|e| Err(Error::FunctionDefinition{symbol: func.name.symbol(), source: e}))?;
-	}
+                .map_err(|e| {
+                    Err(Error::FunctionDefinition {
+                        symbol: func.name.symbol(),
+                        source: e,
+                    })
+                })?;
+        }
 
         stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
 
@@ -180,7 +192,7 @@ impl<'a> Compiler<'a> {
             function_manifest,
             table_names,
         )
-            .map_err(|| Err(Error::Output{message: ""}))?;
+        .map_err(|| Err(Error::Output { message: "" }))?;
         Ok(obj)
     }
 
@@ -204,7 +216,12 @@ impl<'a> Compiler<'a> {
                     &mut clif_context.func,
                     &mut func_info,
                 )
-                .map_err(|e| Err(Error::FunctionTranslation{symbol: func.name.symbol(), e}))?;
+                .map_err(|e| {
+                    Err(Error::FunctionTranslation {
+                        symbol: func.name.symbol(),
+                        e,
+                    })
+                })?;
 
             funcs.insert(func.name.clone(), clif_context.func);
         }
@@ -255,7 +272,7 @@ fn write_startfunc_data<B: ClifBackend>(
     if let Some(func_ix) = decls.get_start_func() {
         let name = clif_module
             .declare_data("guest_start", Linkage::Export, false, None)
-	    .map_err(|| Err(Error::MetadataSerializer))?;
+            .map_err(|| Err(Error::MetadataSerializer))?;
         let mut ctx = DataContext::new();
         ctx.define_zeroinit(8);
 
@@ -268,8 +285,9 @@ fn write_startfunc_data<B: ClifBackend>(
             .map_err(|| Err(Error::MetadataSerializer))?;
         let fref = clif_module.declare_func_in_data(fid, &mut ctx);
         ctx.write_function_addr(0, fref);
-        clif_module.define_data(name, &ctx)
-	    .map_err(|| Err(Error::MetadataSerializer))?;
+        clif_module
+            .define_data(name, &ctx)
+            .map_err(|| Err(Error::MetadataSerializer))?;
     }
     Ok(())
 }

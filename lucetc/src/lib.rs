@@ -20,8 +20,8 @@ mod table;
 mod traps;
 mod types;
 
-use crate::load::read_bytes;
 use crate::error::Error;
+use crate::load::read_bytes;
 
 pub use crate::{
     compiler::{Compiler, CpuFeatures, OptLevel, SpecificFeature, TargetCpu},
@@ -29,7 +29,7 @@ pub use crate::{
     load::read_module,
     patch::patch_module,
 };
-use anyhow::{format_err};
+use anyhow::format_err;
 pub use lucet_module::bindings::Bindings;
 pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};
@@ -340,22 +340,23 @@ impl Lucetc {
             &self.validator,
         )?;
 
-        compiler
-            .cranelift_funcs()?
-            .write(&output)?;  // TLC Lost context "writing clif file to file."
+        compiler.cranelift_funcs()?.write(&output)?; // TLC Lost context "writing clif file to file."
 
         Ok(())
     }
 
     pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
-        let dir = tempfile::Builder::new().prefix("lucetc").tempdir().map_err(|e| Err(Error::TempFile(e)))?;
+        let dir = tempfile::Builder::new()
+            .prefix("lucetc")
+            .tempdir()
+            .map_err(|e| Err(Error::TempFile(e)))?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
         link_so(objpath, &output)?;
         if self.sign {
-            let sk = self.sk.as_ref().ok_or(
-		Err(Error::Signature{message: "signing requires a secret key".to_string()}),
-            )?;
+            let sk = self.sk.as_ref().ok_or(Err(Error::Signature {
+                message: "signing requires a secret key".to_string(),
+            }))?;
             signature::sign_module(&output, sk)?;
         }
         Ok(())

@@ -33,8 +33,11 @@ impl CraneliftFuncs {
         let mut buffer = String::new();
         for (n, func) in self.funcs.iter() {
             buffer.push_str(&format!("; {}\n", n.symbol()));
-            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into())
-		.map_error(|| Err(Error::OutputFunction{name: n.to_string()}))? 
+            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into()).map_error(|| {
+                Err(Error::OutputFunction {
+                    name: n.to_string(),
+                })
+            })?
         }
         let mut file = File::create(path)?;
         file.write_all(buffer.as_bytes())?;
@@ -98,7 +101,7 @@ impl ObjectFile {
                     FunctionSpec::new(0, fn_spec.code_len(), 0, sink.sites.len() as u64),
                 );
             } else {
-		Err(Error::TrapRecords{name: sink.name});
+                Err(Error::TrapRecords { name: sink.name });
             }
         }
 
