@@ -349,14 +349,14 @@ impl Lucetc {
         let dir = tempfile::Builder::new()
             .prefix("lucetc")
             .tempdir()
-            .map_err(|e| Err(Error::TempFile(e)))?;
+            .map_err(|e| Error::TempFile(e))?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
         link_so(objpath, &output)?;
         if self.sign {
-            let sk = self.sk.as_ref().ok_or(Err(Error::Signature {
-                message: "signing requires a secret key".to_string(),
-            }))?;
+            let sk = self.sk.as_ref().ok_or(Error::Signature(
+                "signing requires a secret key".to_string(),
+            ))?;
             signature::sign_module(&output, sk)?;
         }
         Ok(())
@@ -388,14 +388,17 @@ where
 
     let run_ld = cmd_ld
         .output()
-        .context(format_err!("running ld on {:?}", objpath.as_ref()))?;
+	.map_err(|e| Error::Output("running ld on your stuff".to_string()))?;
+//        .context(format_err!("running ld on {:?}", objpath.as_ref()))?;
 
+    /*
     if !run_ld.status.success() {
         Err(format_err!(
             "ld of {} failed: {}",
             objpath.as_ref().to_str().unwrap(),
             String::from_utf8_lossy(&run_ld.stderr)
         ))?;
-    }
+
+    } */
     Ok(())
 }
