@@ -10,13 +10,14 @@ use lucet_module::bindings::Bindings;
 use lucet_validate::Validator;
 use lucetc::{
     signature::{self, PublicKey},
+    timing::TimingInfo,
     Lucetc, LucetcOpts,
 };
 use serde::Serialize;
 use serde_json;
+use serde_json::json;
 use std::path::PathBuf;
 use std::process;
-use std::time::Duration;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct SerializedLucetcError {
@@ -40,20 +41,45 @@ fn main() {
 
     let opts = Options::get().unwrap();
 
-    if let Err(err) = run(&opts) {
-        match opts.error_style {
-            ErrorStyle::Human => {
+    let compile_result = run(&opts);
+
+    let encountered_error = compile_result.is_err();
+
+    let timing_info = if opts.report_times {
+        Some(TimingInfo::collect())
+    } else {
+        None
+    };
+
+    match opts.error_style {
+        ErrorStyle::Human => {
+            if let Err(err) = &compile_result {
                 eprintln!("Error: {}\n", err);
                 if let Some(cause) = err.as_fail().cause() {
                     eprintln!("{}", cause);
                 }
             }
-            ErrorStyle::Json => {
-                let errs: Vec<SerializedLucetcError> = vec![err.into()];
-                let json = serde_json::to_string(&errs).unwrap();
-                eprintln!("{}", json);
+            if let Some(timing_info) = timing_info {
+                // reproduce the header from cranelift-codegen
+                eprintln!("======== ========  ==================================");
+                eprintln!("   Total     Self  Pass");
+                eprintln!("-------- --------- ----------------------------------");
+                eprintln!("{}", timing_info);
             }
         }
+        ErrorStyle::Json => {
+            let errs: Option<Vec<SerializedLucetcError>> =
+                compile_result.err().map(|err| vec![err.into()]);
+            let result = json!({
+                "errors": errs,
+                "timing": timing_info,
+            });
+            let json = serde_json::to_string(&result).unwrap();
+            eprintln!("{}", json);
+        }
+    }
+
+    if encountered_error {
         process::exit(1);
     }
 }
@@ -136,25 +162,11 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.count_instructions(true);
     }
 
-    let codegen_result = match opts.codegen {
-        CodegenOutput::Obj => c.object_file(&opts.output),
-        CodegenOutput::SharedObj => c.shared_object_file(&opts.output),
-        CodegenOutput::Clif => c.clif_ir(&opts.output),
+    match opts.codegen {
+        CodegenOutput::Obj => c.object_file(&opts.output)?,
+        CodegenOutput::SharedObj => c.shared_object_file(&opts.output)?,
+        CodegenOutput::Clif => c.clif_ir(&opts.output)?,
     };
-
-    if opts.report_times {
-        println!("--- compilation timing ---");
-        println!("cranelift:\n{}", cranelift_codegen::timing::take_current());
-    }
-
-    let write_time = codegen_result?;
-
-    if opts.report_times {
-        // Round to nearest ms by adding 500us (copied from cranelift-codegen)
-        let write_time = write_time + Duration::new(0, 500_000);
-        let ms = write_time.subsec_millis();
-        println!("output: {:4}.{:03}", write_time.as_secs(), ms);
-    }
 
     Ok(())
 }

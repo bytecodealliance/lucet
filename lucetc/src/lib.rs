@@ -17,6 +17,7 @@ pub mod signature;
 mod sparsedata;
 mod stack_probe;
 mod table;
+pub mod timing;
 mod traps;
 mod types;
 
@@ -34,7 +35,7 @@ pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tempfile;
 
 enum LucetcInput {
@@ -323,7 +324,7 @@ impl Lucetc {
         Ok((module_binary, bindings))
     }
 
-    pub fn object_file<P: AsRef<Path>>(&self, output: P) -> Result<Duration, Error> {
+    pub fn object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
         let (module_contents, bindings) = self.build()?;
 
         let compiler = Compiler::new(
@@ -335,13 +336,13 @@ impl Lucetc {
             self.count_instructions,
             &self.validator,
         )?;
-        let (obj, duration) = compiler.object_file()?;
+        let obj = compiler.object_file()?;
 
         obj.write(output.as_ref()).context("writing object file")?;
-        Ok(duration)
+        Ok(())
     }
 
-    pub fn clif_ir<P: AsRef<Path>>(&self, output: P) -> Result<Duration, Error> {
+    pub fn clif_ir<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
         let (module_contents, bindings) = self.build()?;
 
         let compiler = Compiler::new(
@@ -354,22 +355,22 @@ impl Lucetc {
             &self.validator,
         )?;
 
-        let start = Instant::now();
+        let output_start = Instant::now();
 
         compiler
             .cranelift_funcs()?
             .write(&output)
             .context("writing clif file")?;
 
-        let duration = start.elapsed();
+        timing::record_output_time(output_start.elapsed());
 
-        Ok(duration)
+        Ok(())
     }
 
-    pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<Duration, Error> {
+    pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
-        let object_build_time = self.object_file(objpath.clone())?;
+        self.object_file(objpath.clone())?;
         link_so(objpath, &output)?;
         if self.sign {
             let sk = self.sk.as_ref().ok_or(
@@ -377,7 +378,7 @@ impl Lucetc {
             )?;
             signature::sign_module(&output, sk)?;
         }
-        Ok(object_build_time)
+        Ok(())
     }
 }
 
