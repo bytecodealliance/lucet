@@ -28,8 +28,6 @@ pub enum Error {
     InitData,
     #[error("Input")]
     Input,
-    #[error("Invalid function id")]
-    InvalidFuncId(#[from] std::option::NoneError),
     #[error("Memory specs")]
     MemorySpecs,
     #[error("Metadata serializer; start index pointed to a non-function")]

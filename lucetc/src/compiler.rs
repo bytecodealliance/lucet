@@ -282,8 +282,8 @@ fn write_startfunc_data<B: ClifBackend>(
             .expect("start func is valid func id");
         let fid = start_func
             .name
-            .as_funcid()?
-//            .map_err(|_| Error::InvalidFuncId)?; // TLC don't ignore.
+            .as_funcid()
+	    .unwrap();
         let fref = clif_module.declare_func_in_data(fid, &mut ctx);
         ctx.write_function_addr(0, fref);
         clif_module
