@@ -166,8 +166,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         CodegenOutput::Obj => c.object_file(&opts.output)?,
         CodegenOutput::SharedObj => c.shared_object_file(&opts.output)?,
         CodegenOutput::Clif => c.clif_ir(&opts.output)?,
-    };
-
+    }
     Ok(())
 }
 
