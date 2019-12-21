@@ -24,6 +24,10 @@ pub enum Error {
     },
     #[error("Inconsistent state when translating module: global {0} is declared as an import but has no entry in imported_globals")]
     GlobalDeclarationError(u32),
+    #[error("global {0} is initialized by referencing another global value, but the referenced global is not an import")]
+    GlobalInitError(u32),
+    #[error("v128const type is not supported: {0}")]
+    GlobalUnsupported(u32),
     #[error("Cannot initialize data beyond linear memory's initial size")]
     InitData,
     #[error("Input")]

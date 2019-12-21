@@ -188,12 +188,11 @@ impl CpuFeatures {
         use TargetCpu::*;
 
         let mut isa_builder = if let Native = self.cpu {
-            cranelift_native::builder().map_err(|_| Error::Unsupported(""))?;
+            cranelift_native::builder().map_err(|_| Error::Unsupported("host machine is not a supported target".to_string()))  
         } else {
-            isa::lookup(Triple::host()).map_err(|_| Error::Unsupported(""))?;
-        };
-        // TLC       .context(LucetcErrorKind::Unsupported)?;
-
+            isa::lookup(Triple::host()).map_err(|_| Error::Unsupported("host machine is not a supported target".to_string()))
+        }?; 
+		  
         let mut specific_features = self.specific_features.clone();
 
         // add any features from the CPU profile if they are not already individually specified

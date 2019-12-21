@@ -155,7 +155,7 @@ impl<'a> ModuleDecls<'a> {
                 if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
                     let import_symbol = bindings
                         .translate(import_mod, import_field)
-                        .map_err(|| Err(Error::TranslatingModule))?;
+                        .map_err(|_| Error::TranslatingModule)?;
                     decls.imports.push(ImportFunction {
                         fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                         module: import_mod,
@@ -236,7 +236,7 @@ impl<'a> ModuleDecls<'a> {
                 decl_linkage,
                 self.info.signature_for_function(func_ix),
             )
-            .map_err(|| Err(Error::TranslatingModule))?;
+            .map_err(|_| Error::TranslatingModule)?;
 
         if func_ix.as_u32() as usize >= self.function_names.len() {
             // `func_ix` is new, so we need to add the name. If func_ix is new, it should be
@@ -261,7 +261,7 @@ impl<'a> ModuleDecls<'a> {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id = clif_module
                 .declare_data(&def_symbol, Linkage::Export, false, None)
-                .map_err(|| Err(Error::TranslatingModule))?;
+                .map_err(|_| Error::TranslatingModule)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             table_names.push(def_name);
@@ -269,7 +269,7 @@ impl<'a> ModuleDecls<'a> {
 
         let tables_list_id = clif_module
             .declare_data(TABLE_SYM, Linkage::Export, false, None)
-            .map_err(|| Err(Error::Table))?;
+            .map_err(|_| Error::Table)?;
         let tables_list = Name::new_data(TABLE_SYM.to_string(), tables_list_id);
 
         Ok((tables_list, table_names))
@@ -339,7 +339,7 @@ impl<'a> ModuleDecls<'a> {
                         }
                     } else {
                         // This WASM restriction may be loosened in the future:
-                        Err(Error::InvalidGlobal{message: "global is initialized by referencing another global value, but the referenced global is not an import", symbol: ix.as_u32()})
+                        Err(Error::GlobalInitError(ix.as_u32()))
                     }
                 }
                 GlobalInit::Import => {
@@ -349,10 +349,8 @@ impl<'a> ModuleDecls<'a> {
                         Err(Error::GlobalDeclarationError(ix.as_u32()))
                     }
                 }
-                GlobalInit::V128Const(_) => Err(Error::InvalidGlobal {
-                    message: "v128const type is not supported",
-                    symbol: ix.as_u32(),
-                }),
+                GlobalInit::V128Const(_) => Err(Error::GlobalUnsupported(ix.as_u32())),
+               
             }?;
 
             globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));
