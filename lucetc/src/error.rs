@@ -1,3 +1,4 @@
+use crate::module;
 use crate::types::SignatureError;
 use cranelift_module::ModuleError as ClifModuleError;
 //use cranelift_wasm::environ::spec::WasmError as ClifWasmError;
@@ -10,17 +11,19 @@ pub enum Error {
     Binding(#[from] LucetModuleError),
     #[error("Build error")]
     Build(#[from] parity_wasm::elements::Error),
-    #[error("Function translation error in {symbol}")]
-    FunctionTranslation {
-        symbol: String,
-   //     #[source]
-  //      source: ClifWasmError,
-    },
     #[error("Function definition error in {symbol}")]
     FunctionDefinition {
         symbol: String,
         #[source]
         source: ClifModuleError,
+    },
+    #[error("Function index out of bounds: {0}")]
+    FunctionIndex(module::UniqueFuncIndex),
+    #[error("Function translation error in {symbol}")]
+    FunctionTranslation {
+        symbol: String,
+   //     #[source]
+  //      source: ClifWasmError,
     },
     #[error("Inconsistent state when translating module: global {0} is declared as an import but has no entry in imported_globals")]
     GlobalDeclarationError(u32),
@@ -51,6 +54,8 @@ pub enum Error {
     SignatureConversion(#[from] SignatureError),
     #[error("Table")]
     Table,
+    #[error("Table index is out of bounds: {0}")]
+    TableIndexError(String),
     #[error("Temp file")]
     TempFile(#[from] std::io::Error),
     #[error("Translating module")]

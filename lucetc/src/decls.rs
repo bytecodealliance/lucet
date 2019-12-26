@@ -381,7 +381,7 @@ impl<'a> ModuleDecls<'a> {
                         reserved_size,
                         heap_settings.max_reserved_size
                     ))
-                    .map_err(|| Err(Error::MemorySpecs))?;
+                    .map_err(|_| Error::MemorySpecs)?;
                 }
                 // Find the max size permitted by the heap and the memory spec
                 let max_size = memory.maximum.map(|pages| pages as u64 * wasm_page);
@@ -392,9 +392,7 @@ impl<'a> ModuleDecls<'a> {
                     max_size: max_size,
                 }))
             }
-            _ => Err(Error::Unsupported {
-                message: "lucetc only supports memory 0",
-            }),
+            _ => Err(Error::Unsupported("lucetc only supports memory 0".to_string()))?,
         }
     }
     // ********************* Public Interface **************************
@@ -416,7 +414,8 @@ impl<'a> ModuleDecls<'a> {
         let name = self
             .function_names
             .get(func_index)
-            .ok_or_else(|| format_err!("func index out of bounds: {:?}", func_index))?;
+            .ok_or_else(|| Error::FunctionIndex(func_index))?;
+	
         let exportable_sigix = self.info.functions.get(func_index).unwrap();
         let signature_index = self.get_signature_uid(exportable_sigix.entity).unwrap();
         let signature = self.info.signatures.get(signature_index).unwrap();
@@ -451,7 +450,10 @@ impl<'a> ModuleDecls<'a> {
         let contents_name = self
             .table_names
             .get(table_index)
-            .ok_or_else(|| format_err!("table index out of bounds: {:?}", table_index))?;
+            .ok_or_else(|| {
+		let message = format!("{:?}", table_index);
+		Error::TableIndexError(message);
+	    });
         let exportable_tbl = self.info.tables.get(table_index).unwrap();
         let import_name = self.info.imported_tables.get(table_index);
         let elems = self
@@ -460,7 +462,7 @@ impl<'a> ModuleDecls<'a> {
             .get(&table_index)
             .ok_or_else(|| {
                 let message = format!("table is not local: {:?}", table_index);
-                Err(Error::Unsupported { message })
+                Error::Unsupported(message)
             })?
             .as_slice();
         Ok(TableDecl {
@@ -477,8 +479,11 @@ impl<'a> ModuleDecls<'a> {
             self.info
                 .signatures
                 .get(uid)
-                .ok_or_else(|| format_err!("signature out of bounds: {:?}", uid))
-        })
+                .ok_or_else(|| {
+		    let message = format!("signature out of bounds: {:?}", uid);
+		    Error::Signature(message)
+		})
+	})
     }
 
     pub fn get_signature_uid(
@@ -523,7 +528,7 @@ impl<'a> ModuleDecls<'a> {
             let name = self
                 .function_names
                 .get(fn_index)
-                .ok_or_else(|| format_err!("func index out of bounds: {:?}", fn_index))
+                .ok_or_else(|| Error::FunctionIndex(fn_index))
                 .unwrap();
 
             functions.push(FunctionMetadata {
