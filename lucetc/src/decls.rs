@@ -6,7 +6,7 @@ use crate::name::Name;
 use crate::runtime::{Runtime, RuntimeFunc};
 use crate::table::TABLE_SYM;
 use crate::types::to_lucet_signature;
-use anyhow::format_err;
+
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -350,7 +350,6 @@ impl<'a> ModuleDecls<'a> {
                     }
                 }
                 GlobalInit::V128Const(_) => Err(Error::GlobalUnsupported(ix.as_u32())),
-               
             }?;
 
             globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));
@@ -376,12 +375,11 @@ impl<'a> ModuleDecls<'a> {
 
                 let reserved_size = std::cmp::max(initial_size, heap_settings.min_reserved_size);
                 if reserved_size > heap_settings.max_reserved_size {
-                    Err(format_err!(
+                    let message = format!(
                         "module reserved size ({}) exceeds max reserved size ({})",
-                        reserved_size,
-                        heap_settings.max_reserved_size
-                    ))
-                    .map_err(|_| Error::MemorySpecs)?;
+                        reserved_size, heap_settings.max_reserved_size
+                    );
+                    Err(Error::MemorySpecs(message))?;
                 }
                 // Find the max size permitted by the heap and the memory spec
                 let max_size = memory.maximum.map(|pages| pages as u64 * wasm_page);
@@ -392,7 +390,9 @@ impl<'a> ModuleDecls<'a> {
                     max_size: max_size,
                 }))
             }
-            _ => Err(Error::Unsupported("lucetc only supports memory 0".to_string()))?,
+            _ => Err(Error::Unsupported(
+                "lucetc only supports memory 0".to_string(),
+            ))?,
         }
     }
     // ********************* Public Interface **************************
@@ -414,8 +414,11 @@ impl<'a> ModuleDecls<'a> {
         let name = self
             .function_names
             .get(func_index)
-            .ok_or_else(|| Error::FunctionIndex(func_index))?;
-	
+            .ok_or_else(|| {
+		let message = format!("{:?}", func_index);
+		Error::FunctionIndexError(message)
+	    })?;
+
         let exportable_sigix = self.info.functions.get(func_index).unwrap();
         let signature_index = self.get_signature_uid(exportable_sigix.entity).unwrap();
         let signature = self.info.signatures.get(signature_index).unwrap();
@@ -447,13 +450,10 @@ impl<'a> ModuleDecls<'a> {
     }
 
     pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl<'_>, Error> {
-        let contents_name = self
-            .table_names
-            .get(table_index)
-            .ok_or_else(|| {
-		let message = format!("{:?}", table_index);
-		Error::TableIndexError(message);
-	    });
+        let contents_name = self.table_names.get(table_index).ok_or_else(|| {
+            let message = format!("{:?}", table_index);
+            Error::TableIndexError(message)
+        })?;
         let exportable_tbl = self.info.tables.get(table_index).unwrap();
         let import_name = self.info.imported_tables.get(table_index);
         let elems = self
@@ -476,14 +476,11 @@ impl<'a> ModuleDecls<'a> {
 
     pub fn get_signature(&self, signature_index: SignatureIndex) -> Result<&ir::Signature, Error> {
         self.get_signature_uid(signature_index).and_then(|uid| {
-            self.info
-                .signatures
-                .get(uid)
-                .ok_or_else(|| {
-		    let message = format!("signature out of bounds: {:?}", uid);
-		    Error::Signature(message)
-		})
-	})
+            self.info.signatures.get(uid).ok_or_else(|| {
+                let message = format!("signature out of bounds: {:?}", uid);
+                Error::Signature(message)
+            })
+        })
     }
 
     pub fn get_signature_uid(
@@ -494,14 +491,17 @@ impl<'a> ModuleDecls<'a> {
             .signature_mapping
             .get(signature_index)
             .map(|x| *x)
-            .ok_or_else(|| format_err!("signature out of bounds: {:?}", signature_index))
+            .ok_or_else(|| {
+                let message = format!("signature out of bounds: {:?}", signature_index);
+                Error::Signature(message)
+            })
     }
 
     pub fn get_global(&self, global_index: GlobalIndex) -> Result<&Exportable<'_, Global>, Error> {
-        self.info
-            .globals
-            .get(global_index)
-            .ok_or_else(|| format_err!("global out of bounds: {:?}", global_index))
+        self.info.globals.get(global_index).ok_or_else(|| {
+            let message = format!("global out of bounds: {:?}", global_index);
+            Error::GlobalIndexError(message)
+        })
     }
 
     pub fn get_heap(&self) -> Option<&HeapSpec> {
@@ -528,7 +528,10 @@ impl<'a> ModuleDecls<'a> {
             let name = self
                 .function_names
                 .get(fn_index)
-                .ok_or_else(|| Error::FunctionIndex(fn_index))
+                .ok_or_else(|| {
+		    let message = format!("{:?}", fn_index);
+		    Error::FunctionIndexError(message)
+		})
                 .unwrap();
 
             functions.push(FunctionMetadata {
@@ -541,7 +544,10 @@ impl<'a> ModuleDecls<'a> {
             .info
             .signatures
             .values()
-            .map(|sig| to_lucet_signature(sig).map_err(|e| Err(Error::SignatureConverstion(e))))
+            .map(|sig| to_lucet_signature(sig).map_err(|e| {
+		let message = format!("{:?}", e);
+		Error::SignatureConversion(message)
+	    }))
             .collect::<Result<Vec<LucetSignature>, Error>>()?;
 
         Ok(ModuleData::new(

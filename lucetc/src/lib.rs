@@ -29,7 +29,6 @@ pub use crate::{
     load::read_module,
     patch::patch_module,
 };
-use anyhow::format_err;
 pub use lucet_module::bindings::Bindings;
 pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};
@@ -388,8 +387,8 @@ where
 
     let run_ld = cmd_ld
         .output()
-	.map_err(|e| Error::Output("running ld on your stuff".to_string()))?;
-//        .context(format_err!("running ld on {:?}", objpath.as_ref()))?;
+        .map_err(|e| Error::Output("running ld on your stuff".to_string()))?;
+    //        .context(format_err!("running ld on {:?}", objpath.as_ref()))?;
 
     /*
     if !run_ld.status.success() {

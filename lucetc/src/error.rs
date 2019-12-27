@@ -1,7 +1,5 @@
-use crate::module;
-use crate::types::SignatureError;
+// use crate::types::SignatureError;  // TLC impl something so I can use this...
 use cranelift_module::ModuleError as ClifModuleError;
-//use cranelift_wasm::environ::spec::WasmError as ClifWasmError;
 use lucet_module::error::Error as LucetModuleError;
 use thiserror::Error;
 
@@ -18,15 +16,17 @@ pub enum Error {
         source: ClifModuleError,
     },
     #[error("Function index out of bounds: {0}")]
-    FunctionIndex(module::UniqueFuncIndex),
+    FunctionIndexError(String),
+    #[error("Function manifest error declaring {0}")]
+    FunctionManifestError(String),
     #[error("Function translation error in {symbol}")]
     FunctionTranslation {
         symbol: String,
-   //     #[source]
-  //      source: ClifWasmError,
     },
     #[error("Inconsistent state when translating module: global {0} is declared as an import but has no entry in imported_globals")]
     GlobalDeclarationError(u32),
+    #[error("global out of bounds: {0}")]
+    GlobalIndexError(String),
     #[error("global {0} is initialized by referencing another global value, but the referenced global is not an import")]
     GlobalInitError(u32),
     #[error("v128const type is not supported: {0}")]
@@ -35,8 +35,8 @@ pub enum Error {
     InitData,
     #[error("Input")]
     Input,
-    #[error("Memory specs")]
-    MemorySpecs,
+    #[error("Memory specs: {0}")]
+    MemorySpecs(String),
     #[error("Metadata serializer; start index pointed to a non-function")]
     // specifically non-ModuleData; this will go away soon
     MetadataSerializer,
@@ -44,14 +44,13 @@ pub enum Error {
     ModuleData,
     #[error("Output: {0}")]
     Output(String),
-    //    #[error("Output file")]
-    //    OutputFile(#[from] std::result::Error),
     #[error("Output function: error writing function {0}")]
     OutputFunction(String),
     #[error("Signature error: {0}")]
     Signature(String),
-    #[error("Error converting cranelift signature to wasm signature")]
-    SignatureConversion(#[from] SignatureError),
+    #[error("Error converting cranelift signature to wasm signature: {0}")]
+//    SignatureConversion(#[from] SignatureError), // TLC I wish I could do this...
+    SignatureConversion(String),
     #[error("Table")]
     Table,
     #[error("Table index is out of bounds: {0}")]

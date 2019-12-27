@@ -21,9 +21,7 @@ pub fn read_module<P: AsRef<Path>>(
             &contents,
             &signature_box,
             pk.as_ref().map_err(|| {
-                Err(Error::Signature {
-                    message: "public key is missing",
-                })
+		Error::Signature("public key is missing".to_string())
             })?,
         )?;
     }
@@ -34,7 +32,7 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     let converted = if wasm_preamble(&bytes) {
         bytes
     } else {
-        wat2wasm(bytes).map_err(|err| Err(Error::WatInput))?;
+        wat2wasm(bytes).map_err(|err| Error::WatInput)?;
 
         /* TLC
                 use std::error::Error;

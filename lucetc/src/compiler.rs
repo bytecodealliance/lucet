@@ -70,12 +70,11 @@ impl<'a> Compiler<'a> {
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
         if let Some(v) = validator {
-            v.validate(wasm_binary)
-                .map_err(|_| Error::Validation); // TLC I don't like ignoring
+            v.validate(wasm_binary).map_err(|_| Error::Validation); // TLC I don't like ignoring
         }
 
-	// TLC I don't like this manual error translation bit.
-        let module_translation_state =	    
+        // TLC I don't like this manual error translation bit.
+        let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
                 WasmError::User(_) => Error::Input,
                 WasmError::InvalidWebAssembly { .. } => Error::Validation,
@@ -95,7 +94,7 @@ impl<'a> Compiler<'a> {
                 FaerieTrapCollection::Enabled,
                 libcalls,
             )
-            .map_err(|_| Error::Validation)?,  // TLC I don't like ignoring.
+            .map_err(|_| Error::Validation)?, // TLC I don't like ignoring.
         );
 
         let runtime = Runtime::lucet(frontend_config);
@@ -146,24 +145,20 @@ impl<'a> Compiler<'a> {
                 .map_err(|e| {
                     Error::FunctionTranslation {
                         symbol: func.name.symbol().to_string(),
-//                        source: e,  // TLC the cranelift error here is private.
+                        //                        source: e,  // TLC the cranelift error here is private.
                     }
                 })?;
             self.clif_module
                 .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
-                .map_err(|e| {
-                    Error::FunctionDefinition {
-                        symbol: func.name.symbol().to_string(),
-                        source: e,
-                    }
+                .map_err(|e| Error::FunctionDefinition {
+                    symbol: func.name.symbol().to_string(),
+                    source: e,
                 })?;
         }
 
         stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
 
-        let module_data_bytes = self
-            .module_data()?
-            .serialize()?;
+        let module_data_bytes = self.module_data()?.serialize()?;
 
         let module_data_len = module_data_bytes.len();
 
@@ -193,7 +188,7 @@ impl<'a> Compiler<'a> {
             function_manifest,
             table_names,
         )?;
-	
+
         Ok(obj)
     }
 
@@ -220,7 +215,7 @@ impl<'a> Compiler<'a> {
                 .map_err(|e| {
                     Error::FunctionTranslation {
                         symbol: func.name.symbol().to_string(),
-//                        e,
+                        //                        e,
                     }
                 })?;
 
@@ -256,10 +251,10 @@ fn write_module_data<B: ClifBackend>(
 
     let module_data_decl = clif_module
         .declare_data(MODULE_DATA_SYM, Linkage::Local, true, None)
-        .map_err(|_| Error::ModuleData)?;  // TLC don't ignore.
+        .map_err(|_| Error::ModuleData)?; // TLC don't ignore.
     clif_module
         .define_data(module_data_decl, &module_data_ctx)
-        .map_err(|_| Error::ModuleData)?;  // TLC don't ignore.
+        .map_err(|_| Error::ModuleData)?; // TLC don't ignore.
 
     Ok(())
 }
@@ -280,10 +275,7 @@ fn write_startfunc_data<B: ClifBackend>(
         let start_func = decls
             .get_func(func_ix)
             .expect("start func is valid func id");
-        let fid = start_func
-            .name
-            .as_funcid()
-	    .unwrap();
+        let fid = start_func.name.as_funcid().unwrap();
         let fref = clif_module.declare_func_in_data(fid, &mut ctx);
         ctx.write_function_addr(0, fref);
         clif_module
