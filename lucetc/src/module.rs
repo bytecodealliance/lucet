@@ -135,10 +135,10 @@ impl<'a> ModuleInfo<'a> {
     ) -> Result<(UniqueFuncIndex, SignatureIndex), Error> {
         let new_sigidx = SignatureIndex::from_u32(self.signature_mapping.len() as u32);
         self.declare_signature(sig)
-            .map_err(|| Err(Error::TranslatingModule))?;
+            .map_err(|_| Error::TranslatingModule)?; // TLC Don't ignore
         let new_funcidx = UniqueFuncIndex::from_u32(self.functions.len() as u32);
         self.declare_func_type(new_sigidx)
-            .map_err(|| Err(Error::TranslatingModule))?;
+            .map_err(|_| Error::TranslatingModule)?; // TLC Don't ignore
         Ok((new_funcidx, new_sigidx))
     }
 }
