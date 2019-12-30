@@ -365,7 +365,7 @@ impl MmapRegion {
                     region.limits.total_memory_size(),
                     ProtFlags::PROT_NONE,
                     MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
-                    0,
+                    -1,
                     0,
                 )?
             }
@@ -436,7 +436,7 @@ unsafe fn mmap_aligned(
     alignment_offset: usize,
 ) -> Result<*mut c_void, Error> {
     let addr = ptr::null_mut();
-    let fd = 0;
+    let fd = -1;
     let offset = 0;
 
     let padded_length = requested_length + alignment + alignment_offset;
