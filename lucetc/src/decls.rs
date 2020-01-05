@@ -411,13 +411,10 @@ impl<'a> ModuleDecls<'a> {
     }
 
     pub fn get_func(&self, func_index: UniqueFuncIndex) -> Result<FunctionDecl<'_>, Error> {
-        let name = self
-            .function_names
-            .get(func_index)
-            .ok_or_else(|| {
-		let message = format!("{:?}", func_index);
-		Error::FunctionIndexError(message)
-	    })?;
+        let name = self.function_names.get(func_index).ok_or_else(|| {
+            let message = format!("{:?}", func_index);
+            Error::FunctionIndexError(message)
+        })?;
 
         let exportable_sigix = self.info.functions.get(func_index).unwrap();
         let signature_index = self.get_signature_uid(exportable_sigix.entity).unwrap();
@@ -529,9 +526,9 @@ impl<'a> ModuleDecls<'a> {
                 .function_names
                 .get(fn_index)
                 .ok_or_else(|| {
-		    let message = format!("{:?}", fn_index);
-		    Error::FunctionIndexError(message)
-		})
+                    let message = format!("{:?}", fn_index);
+                    Error::FunctionIndexError(message)
+                })
                 .unwrap();
 
             functions.push(FunctionMetadata {
@@ -544,10 +541,12 @@ impl<'a> ModuleDecls<'a> {
             .info
             .signatures
             .values()
-            .map(|sig| to_lucet_signature(sig).map_err(|e| {
-		let message = format!("{:?}", e);
-		Error::SignatureConversion(message)
-	    }))
+            .map(|sig| {
+                to_lucet_signature(sig).map_err(|e| {
+                    let message = format!("{:?}", e);
+                    Error::SignatureConversion(message)
+                })
+            })
             .collect::<Result<Vec<LucetSignature>, Error>>()?;
 
         Ok(ModuleData::new(

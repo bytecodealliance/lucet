@@ -28,7 +28,7 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
         TableElementType::Func => Ok(()),
         _ => {
             let message = format!("table with non-function elements: {:?}", decl);
-            Err(Error::Unsupported { message })
+            Err(Error::Unsupported(message))
         }
     }?;
 
@@ -37,7 +37,7 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
     for initializer in decl.elems.iter() {
         if initializer.base.is_some() {
             let message = format!("table elements with global index base: {:?}", initializer);
-            Err(Error::Unsupported { message })?
+            Err(Error::Unsupported(message))?
         }
         let final_len = initializer.offset + initializer.elements.len();
         if final_len > elems.len() {
@@ -58,7 +58,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
             to: table.symbol(),
             at: (TABLE_REF_SIZE * idx) as u64,
         })
-        .map_err(|| Err(Error::Table))?;
+        .map_err(|_| Error::Table)?; // TLC Don't ignore
     }
     Ok(())
 }
@@ -93,7 +93,7 @@ pub fn write_table_data<B: ClifBackend>(
                 Elem::Func(func_index) => {
                     // Note: this is the only place we validate that the table entry points to a valid
                     // function. If this is ever removed, make sure this check happens elsewhere.
-                    let func = decls.get_func(*func_index).map_err(|| Err(Error::Table))?;
+                    let func = decls.get_func(*func_index).map_err(|_| Error::Table)?;
                     // First element in row is the SignatureIndex for the function
                     putelem(&mut table_data, func.signature_index.as_u32() as u64);
 
@@ -123,7 +123,7 @@ pub fn write_table_data<B: ClifBackend>(
             .expect("tables are data");
         clif_module
             .define_data(table_id, &table_ctx)
-            .map_err(|| Err(Error::Table))?;
+            .map_err(|_| Error::Table)?; // TLC Don't ignore
 
         // have to link TABLE_SYM, table_id,
         // add space for the TABLE_SYM pointer
@@ -149,6 +149,6 @@ pub fn write_table_data<B: ClifBackend>(
                 .expect("lucet_tables is declared as data"),
             &table_data_ctx,
         )
-        .map_err(|| Err(Error::Table))?;
+        .map_err(|_| Error::Table)?;  // TLC Don't ignore
     Ok(table_names)
 }

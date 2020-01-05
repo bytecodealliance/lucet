@@ -20,7 +20,8 @@ pub fn read_module<P: AsRef<Path>>(
         signature::verify_source_code(
             &contents,
             &signature_box,
-            pk.as_ref().ok_or(Error::Signature("public key is missing".to_string()))?,
+            pk.as_ref()
+                .ok_or(Error::Signature("public key is missing".to_string()))?,
         )?;
     }
     read_bytes(contents)

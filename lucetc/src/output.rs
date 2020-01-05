@@ -4,7 +4,6 @@ use crate::name::Name;
 use crate::stack_probe;
 use crate::table::{link_tables, TABLE_SYM};
 use crate::traps::write_trap_tables;
-use anyhow::format_err;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
@@ -34,7 +33,7 @@ impl CraneliftFuncs {
         for (n, func) in self.funcs.iter() {
             buffer.push_str(&format!("; {}\n", n.symbol()));
             write_function(&mut buffer, func, &Some(self.isa.as_ref()).into()).map_err(|_| {
-		let message = format!("{:?}", n);
+                let message = format!("{:?}", n);
                 Error::OutputFunction(message) // TLC Don't ignore
             })?
         }
@@ -100,7 +99,7 @@ impl ObjectFile {
                     FunctionSpec::new(0, fn_spec.code_len(), 0, sink.sites.len() as u64),
                 );
             } else {
-                Err(Error::TrapRecord(sink.name));
+                Error::TrapRecord(sink.name);
             }
         }
 
@@ -122,12 +121,14 @@ impl ObjectFile {
     }
 
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
-        let _ = path.as_ref().file_name().ok_or(format_err!(
-            "path {:?} needs to have filename",
-            path.as_ref()
-        ));
+        let _ = path.as_ref().file_name().ok_or(|| {
+            let message = format!("Path must be filename {:?}", path.as_ref());
+            Error::PathError(message);
+        });
         let file = File::create(path)?;
-        self.artifact.write(file)?;
+        self.artifact
+            .write(file)
+            .map_err(|e| Error::ArtifactError(e.to_string()))?;
         Ok(())
     }
 }
@@ -140,7 +141,7 @@ fn write_module(
 ) -> Result<(), Error> {
     let mut native_data = Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
     obj.declare(LUCET_MODULE_SYM, Decl::data().global())
-        .context(format!("declaring {}", LUCET_MODULE_SYM))?;
+        .map_err(|_| Error::ManifestDeclaration(FUNCTION_MANIFEST_SYM.to_string()))?;
 
     let version =
         VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
@@ -170,7 +171,7 @@ fn write_module(
     )?;
 
     obj.define(LUCET_MODULE_SYM, native_data.into_inner())
-        .context(format!("defining {}", LUCET_MODULE_SYM))?;
+        .map_err(|_| Error::ManifestDefinition(FUNCTION_MANIFEST_SYM.to_string()))?;
 
     Ok(())
 }
@@ -205,7 +206,7 @@ pub(crate) fn write_relocated_slice(
                 },
                 absolute_reloc,
             )
-            .context(format!("linking {} into function manifest", to))?;
+            .map_err(|_| Error::ManifestLinking(to.to_string()))?; // TLC Don't ignore.
         }
         (Some(to), _len) => {
             // This is a local buffer of known size
@@ -214,7 +215,7 @@ pub(crate) fn write_relocated_slice(
                 to,   // is a reference to `to`    (eg. fn_name)
                 at: buf.position(),
             })
-            .context(format!("linking {} into function manifest", to))?;
+            .map_err(|_| Error::ManifestLinking(to.to_string()))?; // TLC Don't ignore.
         }
         (None, len) => {
             // There's actually no relocation to add, because there's no slice to put here.

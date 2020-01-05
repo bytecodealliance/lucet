@@ -12,7 +12,7 @@ pub fn write_trap_tables(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> R
         let trap_sym = trap_sym_for_func(func_sym);
 
         obj.declare(&trap_sym, Decl::data())
-            .context(format!("declaring {}", &trap_sym))?;
+	    .map_err(|_| Error::TrapTable(trap_sym))?;  // TLC Unsure about this &
 
         // write the actual function-level trap table
         let traps: Vec<TrapSite> = sink
@@ -33,7 +33,8 @@ pub fn write_trap_tables(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> R
 
         // and write the function trap table into the object
         obj.define(&trap_sym, trap_site_bytes.to_vec())
-            .context(format!("defining {}", &trap_sym))?;
+	    .map_err(|_| Error::TrapDefinition(trap_sym))?;
+            //.context(format!("defining {}", &trap_sym))?;
     }
 
     Ok(())

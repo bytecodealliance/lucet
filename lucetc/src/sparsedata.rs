@@ -61,9 +61,9 @@ pub fn owned_sparse_data_from_initializers<'a>(
 
     for initializer in initializers {
         if initializer.base.is_some() {
-            Err(Error::Unsupported {
-                message: "cannot create sparse data: data initializer uses global as base",
-            })?;
+            Err(Error::Unsupported(
+               "cannot create sparse data: data initializer uses global as base".to_string()
+            ))?;
         }
         let chunks = split(initializer);
         for (pagenumber, chunk) in chunks {
@@ -93,6 +93,6 @@ pub fn owned_sparse_data_from_initializers<'a>(
         }
     }
     assert_eq!(out.len() * 4096, heap.initial_size as usize);
-    let o = OwnedSparseData::new(out).map_err(|| Err(Error::ModuleData))?;
+    let o = OwnedSparseData::new(out).map_err(|_| Error::ModuleData)?; // TLC
     Ok(o)
 }
