@@ -55,28 +55,23 @@ pub fn keygen<P: AsRef<Path>, Q: AsRef<Path>>(pk_path: P, sk_path: Q) -> Result<
         None => {
             let pk_writer = File::create(pk_path)?;
             let sk_writer = File::create(sk_path)?;
-            KeyPair::generate_and_write_encrypted_keypair(pk_writer, sk_writer, None, None)
-                .map_err(|e| {
-		    let message = format!("Unable to generate the key pair: {}", e);
-		    Error::Signature(message)
-		})
+            KeyPair::generate_and_write_encrypted_keypair(pk_writer, sk_writer, None, None).map_err(
+                |e| {
+                    let message = format!("Unable to generate the key pair: {}", e);
+                    Error::Signature(message)
+                },
+            )
         }
         Some(sk_path_raw) => {
-            let kp = KeyPair::generate_unencrypted_keypair()
-                .map_err(|e| {
-		    let message = format!("Unable to generate the key pair: {}", e);
-		    Error::Signature(message)
-		})?;
+            let kp = KeyPair::generate_unencrypted_keypair().map_err(|e| {
+                let message = format!("Unable to generate the key pair: {}", e);
+                Error::Signature(message)
+            })?;
             let mut pk_writer = File::create(pk_path)?;
             let mut sk_writer = File::create(sk_path_raw)?;
 
-	    //let kp = &kp.pk.to_box().map_err(|_| Error::BoxConversion).to_bytes()?;
-
-	    //let kp = kp.pk.to_box().map_err(|_| Error::BoxConversion);
-	    //let kp = &kp.to_bytes()?;
-	    
-            pk_writer.write_all(&kp.pk.to_box()?.to_bytes())?;
-            //sk_writer.write_all(&kp.sk.to_bytes())?;
+            pk_writer.write_all(&kp.pk.to_box().unwrap().to_bytes())?;
+            sk_writer.write_all(&kp.sk.to_bytes())?;
 
             Ok(kp)
         }
@@ -89,7 +84,7 @@ pub fn verify_source_code(
     signature_box: &SignatureBox,
     pk: &PublicKey,
 ) -> Result<(), Error> {
-    minisign::verify(pk, signature_box, Cursor::new(buf), false, false).map_err(|e| e.into())
+    minisign::verify(pk, signature_box, Cursor::new(buf), false, false).map_err(|e| Error::Signature(e.to_string()))
 }
 
 // Sign the compiled code

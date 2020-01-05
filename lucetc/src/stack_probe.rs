@@ -59,11 +59,14 @@ pub fn declare_metadata<'a, B: ClifBackend>(
 }
 
 pub fn declare_and_define(product: &mut FaerieProduct) -> Result<(), Error> {
-    product.artifact.declare_with(
-        STACK_PROBE_SYM,
-        Decl::function(),
-        STACK_PROBE_BINARY.to_vec(),
-    )?;
+    product
+        .artifact
+        .declare_with(
+            STACK_PROBE_SYM,
+            Decl::function(),
+            STACK_PROBE_BINARY.to_vec(),
+        )
+        .map_err(|_| Error::StackProbe);
     add_sink(
         product
             .trap_manifest

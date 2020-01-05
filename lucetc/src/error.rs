@@ -9,8 +9,6 @@ pub enum Error {
     ArtifactError(String),
     #[error("Binding error")]
     Binding(#[from] LucetModuleError),
-    #[error("Box conversion")]
-    BoxConversion,
     #[error("Build error")]
     Build(#[from] parity_wasm::elements::Error),
     #[error("Function definition error in {symbol}")]
@@ -75,10 +73,15 @@ pub enum Error {
     TrapRecord(String),
     #[error("Trap table error declaring {0}")]
     TrapTable(String),
+    #[error("Stack probe")]
+    StackProbe,
     #[error("Unsupported: {0}")]
     Unsupported(String),
     #[error("Validation")]
     Validation,
     #[error("Wat input")]
     WatInput(#[from] wabt::Error),
+    #[error("Zzz")]
+    ZzzError,
 }
+

@@ -62,7 +62,7 @@ pub fn owned_sparse_data_from_initializers<'a>(
     for initializer in initializers {
         if initializer.base.is_some() {
             Err(Error::Unsupported(
-               "cannot create sparse data: data initializer uses global as base".to_string()
+                "cannot create sparse data: data initializer uses global as base".to_string(),
             ))?;
         }
         let chunks = split(initializer);

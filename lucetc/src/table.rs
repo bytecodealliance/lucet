@@ -149,6 +149,6 @@ pub fn write_table_data<B: ClifBackend>(
                 .expect("lucet_tables is declared as data"),
             &table_data_ctx,
         )
-        .map_err(|_| Error::Table)?;  // TLC Don't ignore
+        .map_err(|_| Error::Table)?; // TLC Don't ignore
     Ok(table_names)
 }
