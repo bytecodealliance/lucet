@@ -4,7 +4,7 @@ mod options;
 extern crate clap;
 
 use crate::options::{CodegenOutput, ErrorStyle, Options};
-use anyhow::{Error, format_err};
+use anyhow::{format_err, Error};
 use log::info;
 use lucet_module::bindings::Bindings;
 use lucet_validate::Validator;
@@ -22,6 +22,16 @@ pub struct SerializedLucetcError {
     error: String,
 }
 
+
+impl From<Error> for SerializedLucetcError {
+    fn from(e: Error) -> Self {
+        SerializedLucetcError {
+            error: format!("{}", e)
+        }
+    }
+}
+
+/*
 impl From<Error> for SerializedLucetcError {
     fn from(e: Error) -> Self {
         SerializedLucetcError {
@@ -33,6 +43,7 @@ impl From<Error> for SerializedLucetcError {
         }
     }
 }
+*/
 
 fn main() {
     env_logger::init();
@@ -43,9 +54,9 @@ fn main() {
         match opts.error_style {
             ErrorStyle::Human => {
                 eprintln!("Error: {}\n", err);
-                if let Some(cause) = err.as_fail().cause() {
-                    eprintln!("{}", cause);
-                }
+//                if let Some(cause) = err.as_fail().cause() {
+//                    eprintln!("{}", cause);
+//                }
             }
             ErrorStyle::Json => {
                 let errs: Vec<SerializedLucetcError> = vec![err.into()];
@@ -74,10 +85,10 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     let mut bindings = Bindings::empty();
     for file in opts.binding_files.iter() {
         let file_bindings =
-            Bindings::from_file(file).context(format!("bindings file {:?}", file))?;
+            Bindings::from_file(file).map_err(|_| format_err!("bindings file {:?}", file))?;
         bindings
             .extend(&file_bindings)
-            .context(format!("adding bindings from {:?}", file))?;
+            .map_err(|_| format_err!("adding bindings from {:?}", file))?;
     }
 
     let mut c = Lucetc::new(PathBuf::from(input))
