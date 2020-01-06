@@ -96,4 +96,3 @@ enum Error {
     #[error("Validate error")]
     Validate(#[from] lucet_validate::Error),
 }
-

@@ -22,28 +22,13 @@ pub struct SerializedLucetcError {
     error: String,
 }
 
-
 impl From<Error> for SerializedLucetcError {
     fn from(e: Error) -> Self {
         SerializedLucetcError {
-            error: format!("{}", e)
+            error: format!("{}", e),
         }
     }
 }
-
-/*
-impl From<Error> for SerializedLucetcError {
-    fn from(e: Error) -> Self {
-        SerializedLucetcError {
-            error: if let Some(cause) = e.as_fail().cause() {
-                format!("{}: {}", e, cause)
-            } else {
-                format!("{}", e)
-            },
-        }
-    }
-}
-*/
 
 fn main() {
     env_logger::init();
@@ -54,9 +39,6 @@ fn main() {
         match opts.error_style {
             ErrorStyle::Human => {
                 eprintln!("Error: {}\n", err);
-//                if let Some(cause) = err.as_fail().cause() {
-//                    eprintln!("{}", cause);
-//                }
             }
             ErrorStyle::Json => {
                 let errs: Vec<SerializedLucetcError> = vec![err.into()];
