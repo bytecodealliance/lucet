@@ -272,10 +272,18 @@ impl Vmctx {
     /// This is useful when a hostcall takes a function pointer as its argument, as WebAssembly uses
     /// table indices as its runtime representation of function pointers.
     ///
+    /// # Safety
+    ///
     /// We do not currently reflect function type information into the Rust type system, so callers
     /// of the returned function must take care to cast it to the correct type before calling. The
     /// correct type will include the `vmctx` argument, which the caller is responsible for passing
     /// from its own context.
+    ///
+    /// There is currently no guarantee that guest functions will return before faulting, or
+    /// terminating the instance in a subsequent hostcall. This means that any Rust resources that
+    /// are held open when the guest function is called might be leaked if the guest function, for
+    /// example, divides by zero. Work to make this safer is
+    /// [ongoing](https://github.com/bytecodealliance/lucet/pull/254).
     ///
     /// ```no_run
     /// use lucet_runtime_macros::lucet_hostcall;
