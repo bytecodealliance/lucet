@@ -290,7 +290,7 @@ impl Lucetc {
         };
 
         if !self.builtins_paths.is_empty() {
-            let mut module = deserialize_buffer(&module_binary)?; //.map_err(|e| Err(Error::Build))?;
+            let mut module = deserialize_buffer(&module_binary)?; 
             for builtins in self.builtins_paths.iter() {
                 let (newmodule, builtins_map) = patch_module(module, builtins)?;
                 module = newmodule;
@@ -387,17 +387,17 @@ where
 
     let run_ld = cmd_ld
         .output()
-        .map_err(|e| Error::Output("running ld on your stuff".to_string()))?;
-    //        .context(format_err!("running ld on {:?}", objpath.as_ref()))?;
+        .map_err(|_| {
+	    let message = format!("running ld on {:?}", objpath.as_ref());
+	    Error::Output(message)
+	})?;
 
-    /*
+    
     if !run_ld.status.success() {
-        Err(format_err!(
-            "ld of {} failed: {}",
-            objpath.as_ref().to_str().unwrap(),
-            String::from_utf8_lossy(&run_ld.stderr)
-        ))?;
-
-    } */
+	let message = format!("ld of {} failed: {}",
+			      objpath.as_ref().to_str().unwrap(),
+			      String::from_utf8_lossy(&run_ld.stderr));
+        Err(Error::Output(message))?;
+    } 
     Ok(())
 }

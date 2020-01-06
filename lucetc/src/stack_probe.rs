@@ -66,7 +66,7 @@ pub fn declare_and_define(product: &mut FaerieProduct) -> Result<(), Error> {
             Decl::function(),
             STACK_PROBE_BINARY.to_vec(),
         )
-        .map_err(|_| Error::StackProbe);
+        .map_err(|_| Error::StackProbe)?;
     add_sink(
         product
             .trap_manifest

@@ -4,7 +4,6 @@ mod options;
 extern crate clap;
 
 use crate::options::{CodegenOutput, ErrorStyle, Options};
-use failure::{format_err, Error, ResultExt};
 use log::info;
 use lucet_module::bindings::Bindings;
 use lucet_validate::Validator;
@@ -66,9 +65,12 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     }
 
     let input = &match opts.input.len() {
-        0 => Err(format_err!("must provide at least one input")),
+        0 => Err(Error::Input("must provide at least one input".to_string())),
         1 => Ok(opts.input[0].clone()),
-        _ => Err(format_err!("provided too many inputs: {:?}", opts.input)),
+        _ => {
+	    let message = format!("provided too many inputs: {:?}", opts.input);
+	    Err(Error::Input(message))
+	}
     }?;
 
     let mut bindings = Bindings::empty();

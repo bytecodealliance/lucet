@@ -70,13 +70,13 @@ impl<'a> Compiler<'a> {
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
         if let Some(v) = validator {
-            v.validate(wasm_binary).map_err(|_| Error::Validation); // TLC I don't like ignoring
+            v.validate(wasm_binary).map_err(|_| Error::Validation)?; // TLC I don't like ignoring
         }
 
         // TLC I don't like this manual error translation bit.
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
-                WasmError::User(_) => Error::Input,
+                WasmError::User(u) => Error::Input(u.to_string()),
                 WasmError::InvalidWebAssembly { .. } => Error::Validation,
                 WasmError::Unsupported { .. } => Error::Unsupported("".to_string()),
                 WasmError::ImplLimitExceeded { .. } => Error::TranslatingModule,
@@ -142,7 +142,7 @@ impl<'a> Compiler<'a> {
                     &mut clif_context.func,
                     &mut func_info,
                 )
-                .map_err(|e| {
+                .map_err(|_| {
                     Error::FunctionTranslation {
                         symbol: func.name.symbol().to_string(),
                         //                        source: e,  // TLC the cranelift error here is private.
@@ -212,7 +212,7 @@ impl<'a> Compiler<'a> {
                     &mut clif_context.func,
                     &mut func_info,
                 )
-                .map_err(|e| {
+                .map_err(|_| {
                     Error::FunctionTranslation {
                         symbol: func.name.symbol().to_string(),
                         //                        e,

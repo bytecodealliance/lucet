@@ -31,8 +31,8 @@ pub enum Error {
     GlobalUnsupported(u32),
     #[error("Cannot initialize data beyond linear memory's initial size")]
     InitData,
-    #[error("Input")]
-    Input,
+    #[error("Input error: {0}")]
+    Input(String),
     #[error("Manifest error declaring {0}")]
     ManifestDeclaration(String),
     #[error("Manifest error defining {0}")]

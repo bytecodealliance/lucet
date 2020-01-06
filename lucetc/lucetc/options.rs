@@ -1,5 +1,4 @@
 use clap::{Arg, ArgMatches, Values};
-use failure::Error;
 use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu};
 use std::path::PathBuf;
 
