@@ -1,26 +1,27 @@
 #![deny(bare_trait_objects)]
 
-use failure::{Error, Fail};
+//use failure::{Error, Fail};
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::TempDir;
+use thiserror::Error;
 
 const WASI_TARGET: &str = "wasm32-unknown-wasi";
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum CompileError {
-    #[fail(display = "File not found: {}", _0)]
+    #[error("File not found: {0}")]
     FileNotFound(String),
-    #[fail(display = "Clang reported error: {}", _0)]
+    #[error("Clang reported error: {0}")]
     Execution { stdout: String, stderr: String },
-    #[fail(display = "Lucetc error: {}", _0)]
+    #[error("Lucetc error: {0}")]
     Lucetc {
         #[cause]
         e: Error,
     },
-    #[fail(display = "IO error: {}", _0)]
+    #[error("IO error: {0}")]
     IO {
         #[cause]
         e: std::io::Error,
