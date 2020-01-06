@@ -1,3 +1,4 @@
+use anyhow::Error;
 use clap::{Arg, ArgMatches, Values};
 use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu};
 use std::path::PathBuf;
