@@ -1,6 +1,5 @@
 #![deny(bare_trait_objects)]
 
-//use failure::{Error, Fail};
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -17,22 +16,18 @@ pub enum CompileError {
     #[error("Clang reported error: {stdout}")]
     Execution { stdout: String, stderr: String },
     #[error("Lucetc error")]
-    Lucetc {
-        #[source]
-        e: anyhow::Error,
-    },
+    Lucetc(#[from] lucetc::error::Error),
     #[error("IO error")]
-    IO {
-        #[source]
-        e: std::io::Error,
-    },
+    IO(#[from] std::io::Error),
 }
 
+/*
 impl From<std::io::Error> for CompileError {
     fn from(e: std::io::Error) -> CompileError {
         CompileError::IO { e }
     }
 }
+ */
 
 impl CompileError {
     pub fn check(output: Output, print: bool) -> Result<(), Self> {
@@ -359,7 +354,7 @@ impl Lucetc {
         self.link.link(&self.wasm_file)?;
         self.lucetc
             .shared_object_file(output.as_ref())
-            .map_err(|e| CompileError::Lucetc { e })?;
+            .map_err(|e| CompileError::Lucetc(e))?;
         Ok(self.tmpdir.close()?)
     }
 }
