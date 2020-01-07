@@ -21,14 +21,6 @@ pub enum CompileError {
     IO(#[from] std::io::Error),
 }
 
-/*
-impl From<std::io::Error> for CompileError {
-    fn from(e: std::io::Error) -> CompileError {
-        CompileError::IO { e }
-    }
-}
- */
-
 impl CompileError {
     pub fn check(output: Output, print: bool) -> Result<(), Self> {
         if print {
