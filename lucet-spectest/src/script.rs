@@ -1,31 +1,31 @@
 use crate::bindings;
-use failure::{format_err, Error, Fail};
 use lucet_runtime::{self, MmapRegion, Module as LucetModule, Region, UntypedRetVal, Val};
 use lucetc::{Compiler, CpuFeatures, Error as LucetcError, HeapSettings, OptLevel};
 use std::io;
 use std::process::Command;
 use std::sync::Arc;
+use thiserror::Error;
 
-#[derive(Fail, Debug)]
+#[derive(Fail, Error)]
 pub enum ScriptError {
-    #[fail(display = "Validation error: {}", _0)]
-    ValidationError(LucetcError),
-    #[fail(display = "Program creation error: {}", _0)]
-    ProgramError(LucetcError),
-    #[fail(display = "Compilation error: {}", _0)]
-    CompileError(LucetcError),
-    #[fail(display = "Codegen error: {}", _0)]
-    CodegenError(Error),
-    #[fail(display = "Load error: {}", _0)]
-    LoadError(lucet_runtime::Error),
-    #[fail(display = "Instaitiation error: {}", _0)]
-    InstantiateError(lucet_runtime::Error),
-    #[fail(display = "Runtime error: {}", _0)]
-    RuntimeError(lucet_runtime::Error),
-    #[fail(display = "Malformed script: {}", _0)]
+    #[error("Validation error")]
+    ValidationError(#[from] LucetcError),
+    #[error("Program creation error")]
+    ProgramError(#[from] LucetcError),
+    #[error("Compilation error")]
+    CompileError(#[from] LucetcError),
+    #[error("Codegen error")]
+    CodegenError(#[from] LucetcError),
+    #[error("Load error")]
+    LoadError(#[from] lucet_runtime::Error),
+    #[error("Instaitiation error")]
+    InstantiateError(#[from] lucet_runtime::Error),
+    #[error("Runtime error")]
+    RuntimeError(#[from] lucet_runtime::Error),
+    #[error("Malformed script: {0}")]
     MalformedScript(String),
-    #[fail(display = "IO error: {}", _0)]
-    IoError(io::Error),
+    #[error("IO error")]
+    IoError(#[from] io::Error),
 }
 
 impl ScriptError {
@@ -33,7 +33,7 @@ impl ScriptError {
         match self {
             ScriptError::ProgramError(ref lucetc_err)
             | ScriptError::ValidationError(ref lucetc_err)
-            | ScriptError::CompileError(ref lucetc_err) => match lucetc_err.get_context() {
+            | ScriptError::CompileError(ref lucetc_err) => match lucetc_err {
                 &LucetcError::Unsupported(_) => true,
                 _ => false,
             },
@@ -53,7 +53,7 @@ pub struct ScriptEnv {
 }
 
 fn program_error(e: LucetcError) -> ScriptError {
-    match e.get_context() {
+    match e {
         LucetcError::Validation => ScriptError::ValidationError(e),
         _ => ScriptError::ProgramError(e),
     }
