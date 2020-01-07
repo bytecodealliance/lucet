@@ -1,7 +1,7 @@
 use crate::bindings;
 use failure::{format_err, Error, Fail};
 use lucet_runtime::{self, MmapRegion, Module as LucetModule, Region, UntypedRetVal, Val};
-use lucetc::{Compiler, CpuFeatures, HeapSettings, LucetcError, LucetcErrorKind, OptLevel};
+use lucetc::{Compiler, CpuFeatures, Error as LucetcError, HeapSettings, OptLevel};
 use std::io;
 use std::process::Command;
 use std::sync::Arc;
@@ -34,7 +34,7 @@ impl ScriptError {
             ScriptError::ProgramError(ref lucetc_err)
             | ScriptError::ValidationError(ref lucetc_err)
             | ScriptError::CompileError(ref lucetc_err) => match lucetc_err.get_context() {
-                &LucetcErrorKind::Unsupported => true,
+                &LucetcError::Unsupported(_) => true,
                 _ => false,
             },
             _ => false,
@@ -54,7 +54,7 @@ pub struct ScriptEnv {
 
 fn program_error(e: LucetcError) -> ScriptError {
     match e.get_context() {
-        LucetcErrorKind::Validation => ScriptError::ValidationError(e),
+        LucetcError::Validation => ScriptError::ValidationError(e),
         _ => ScriptError::ProgramError(e),
     }
 }

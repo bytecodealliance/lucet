@@ -6,7 +6,7 @@
 #![deny(bare_trait_objects)]
 
 pub mod bindings;
-pub mod error;
+mod error;
 mod functions;
 mod globals;
 mod linear_memory;
