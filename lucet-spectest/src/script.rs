@@ -6,7 +6,7 @@ use std::process::Command;
 use std::sync::Arc;
 use thiserror::Error;
 
-#[derive(Fail, Error)]
+#[derive(Debug, Error)]
 pub enum ScriptError {
     #[error("Validation error")]
     ValidationError(#[from] LucetcError),
