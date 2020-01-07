@@ -14,16 +14,16 @@ const WASI_TARGET: &str = "wasm32-unknown-wasi";
 pub enum CompileError {
     #[error("File not found: {0}")]
     FileNotFound(String),
-    #[error("Clang reported error: {0}")]
+    #[error("Clang reported error: {stdout}")]
     Execution { stdout: String, stderr: String },
-    #[error("Lucetc error: {0}")]
+    #[error("Lucetc error")]
     Lucetc {
-        #[cause]
-        e: Error,
+        #[source]
+        e: anyhow::Error,
     },
-    #[error("IO error: {0}")]
+    #[error("IO error")]
     IO {
-        #[cause]
+        #[source]
         e: std::io::Error,
     },
 }
