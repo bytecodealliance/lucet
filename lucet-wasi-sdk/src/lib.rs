@@ -16,7 +16,7 @@ pub enum CompileError {
     #[error("Clang reported error: {stdout}")]
     Execution { stdout: String, stderr: String },
     #[error("Lucetc error")]
-    Lucetc(#[from] lucetc::error::Error),
+    Lucetc(#[from] lucetc::Error),
     #[error("IO error")]
     IO(#[from] std::io::Error),
 }
