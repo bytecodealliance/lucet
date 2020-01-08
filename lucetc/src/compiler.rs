@@ -70,20 +70,21 @@ impl<'a> Compiler<'a> {
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
         if let Some(v) = validator {
-            v.validate(wasm_binary).map_err(|_| Error::Validation)?; // TLC I don't like ignoring
+            v.validate(wasm_binary).map_err(Error::Validashun)?; // TLC Don't ignore.
         } else {
             // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside
             // cranelift-wasm does not validate. We need to run the validating parser on the binary
             // first. The InvalidWebAssembly error below will never trigger.
+
+            // wasmparser::primitives::BinaryReaderError is private
             wasmparser::validate(wasm_binary, None).map_err(|_| Error::Validation)?;
         }
 
-        // TLC I don't like this manual error translation bit.
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
                 WasmError::User(u) => Error::Input(u.to_string()),
                 WasmError::InvalidWebAssembly { .. } => Error::Validation,
-                WasmError::Unsupported { .. } => Error::Unsupported("".to_string()),
+                WasmError::Unsupported { .. } => Error::Unsupported(String::new()),
                 WasmError::ImplLimitExceeded { .. } => Error::TranslatingModule,
             })?;
 
@@ -99,7 +100,7 @@ impl<'a> Compiler<'a> {
                 FaerieTrapCollection::Enabled,
                 libcalls,
             )
-            .map_err(|_| Error::Validation)?, // TLC I don't like ignoring.
+            .map_err(Error::ClifModuleError)?,
         );
 
         let runtime = Runtime::lucet(frontend_config);
@@ -147,17 +148,15 @@ impl<'a> Compiler<'a> {
                     &mut clif_context.func,
                     &mut func_info,
                 )
-                .map_err(|_| {
-                    Error::FunctionTranslation {
-                        symbol: func.name.symbol().to_string(),
-                        //                        source: e,  // TLC the cranelift error here is private.
-                    }
+                .map_err(|source| Error::FunctionTranslation {
+                    symbol: func.name.symbol().to_string(),
+                    source,
                 })?;
             self.clif_module
                 .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
-                .map_err(|e| Error::FunctionDefinition {
+                .map_err(|source| Error::FunctionDefinition {
                     symbol: func.name.symbol().to_string(),
-                    source: e,
+                    source,
                 })?;
         }
 
@@ -217,11 +216,9 @@ impl<'a> Compiler<'a> {
                     &mut clif_context.func,
                     &mut func_info,
                 )
-                .map_err(|_| {
-                    Error::FunctionTranslation {
-                        symbol: func.name.symbol().to_string(),
-                        //                        e,
-                    }
+                .map_err(|source| Error::FunctionTranslation {
+                    symbol: func.name.symbol().to_string(),
+                    source,
                 })?;
 
             funcs.insert(func.name.clone(), clif_context.func);
@@ -256,10 +253,10 @@ fn write_module_data<B: ClifBackend>(
 
     let module_data_decl = clif_module
         .declare_data(MODULE_DATA_SYM, Linkage::Local, true, None)
-        .map_err(|_| Error::ModuleData)?; // TLC don't ignore.
+        .map_err(Error::ClifModuleError)?;
     clif_module
         .define_data(module_data_decl, &module_data_ctx)
-        .map_err(|_| Error::ModuleData)?; // TLC don't ignore.
+        .map_err(Error::ClifModuleError)?;
 
     Ok(())
 }
@@ -273,7 +270,7 @@ fn write_startfunc_data<B: ClifBackend>(
     if let Some(func_ix) = decls.get_start_func() {
         let name = clif_module
             .declare_data("guest_start", Linkage::Export, false, None)
-            .map_err(|_| Error::MetadataSerializer)?; // TLC don't ignore.
+            .map_err(Error::MetadataSerializer)?;
         let mut ctx = DataContext::new();
         ctx.define_zeroinit(8);
 
@@ -285,7 +282,7 @@ fn write_startfunc_data<B: ClifBackend>(
         ctx.write_function_addr(0, fref);
         clif_module
             .define_data(name, &ctx)
-            .map_err(|_| Error::MetadataSerializer)?; // TLC don't ignore.
+            .map_err(Error::MetadataSerializer)?;
     }
     Ok(())
 }

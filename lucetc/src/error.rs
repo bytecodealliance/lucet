@@ -1,5 +1,6 @@
 // use crate::types::SignatureError;  // TLC impl something so I can use this...
 use cranelift_module::ModuleError as ClifModuleError;
+use cranelift_wasm::WasmError as ClifWasmError;
 use lucet_module::error::Error as LucetModuleError;
 use thiserror::Error;
 
@@ -11,6 +12,8 @@ pub enum Error {
     Binding(#[from] LucetModuleError),
     #[error("Build error")]
     Build(#[from] parity_wasm::elements::Error),
+    #[error("Clif module error")]
+    ClifModuleError(#[from] ClifModuleError),
     #[error("Function definition error in {symbol}")]
     FunctionDefinition {
         symbol: String,
@@ -20,7 +23,11 @@ pub enum Error {
     #[error("Function index out of bounds: {0}")]
     FunctionIndexError(String),
     #[error("Function translation error in {symbol}")]
-    FunctionTranslation { symbol: String },
+    FunctionTranslation {
+        symbol: String,
+        #[source]
+        source: ClifWasmError,
+    },
     #[error("Inconsistent state when translating module: global {0} is declared as an import but has no entry in imported_globals")]
     GlobalDeclarationError(u32),
     #[error("global out of bounds: {0}")]
@@ -41,9 +48,8 @@ pub enum Error {
     ManifestLinking(String),
     #[error("Memory specs: {0}")]
     MemorySpecs(String),
-    #[error("Metadata serializer; start index pointed to a non-function")]
-    // specifically non-ModuleData; this will go away soon
-    MetadataSerializer,
+    #[error("Metadata serializer; start index point to a non-function")]
+    MetadataSerializer(#[source] ClifModuleError),
     #[error("Module data")]
     ModuleData,
     #[error("Output: {0}")]
@@ -79,6 +85,8 @@ pub enum Error {
     Unsupported(String),
     #[error("Validation")]
     Validation,
+    #[error("Validashun")]
+    Validashun(#[from] lucet_validate::Error),
     #[error("Wat input")]
     WatInput(#[from] wabt::Error),
     #[error("Zzz")]
