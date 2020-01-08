@@ -6,24 +6,40 @@ use std::process::Command;
 use std::sync::Arc;
 use thiserror::Error;
 
+#[derive(Debug)]
+pub enum GenerationErrorKind {
+    Validation,
+    Program,
+    Compile,
+    Codegen,
+}
+    
 #[derive(Debug, Error)]
 pub enum ScriptError {
-    #[error("Validation error")]
-    ValidationError(#[from] LucetcError),
-    #[error("Program creation error")]
-    ProgramError(#[from] LucetcError),
-    #[error("Compilation error")]
-    CompileError(#[from] LucetcError),
-    #[error("Codegen error")]
-    CodegenError(#[from] LucetcError),
-    #[error("Load error")]
-    LoadError(#[from] lucet_runtime::Error),
-    #[error("Instaitiation error")]
-    InstantiateError(#[from] lucet_runtime::Error),
-    #[error("Runtime error")]
-    RuntimeError(#[from] lucet_runtime::Error),
+    /*
+        #[error("Validation error")]
+        ValidationError(#[from] LucetcError),
+        #[error("Program creation error")]
+        ProgramError(#[from] LucetcError),
+        #[error("Compilation error")]
+        CompileError(#[from] LucetcError),
+        #[error("Codegen error")]
+        CodegenError(#[from] LucetcError),
+        #[error("Load error")]
+        LoadError(#[from] lucet_runtime::Error),
+        #[error("Instaitiation error")]
+        InstantiateError(#[from] lucet_runtime::Error),
+        #[error("Runtime error")]
+        RuntimeError(#[from] lucet_runtime::Error),
+    */
+    #[error("Lucetc error")]
+    GenerationError(#[source] LucetcError, GenerationErrorKind), /* Validation or Program or Compile or Codegen */
+    #[error("Load error: {0}")]
+    LoadError(String),
     #[error("Malformed script: {0}")]
     MalformedScript(String),
+    #[error("Runtime error: {1}")]
+    RuntimeError(#[source] lucet_runtime::Error, String), /* Instantiate or Load */
     #[error("IO error")]
     IoError(#[from] io::Error),
 }
@@ -31,20 +47,14 @@ pub enum ScriptError {
 impl ScriptError {
     pub fn unsupported(&self) -> bool {
         match self {
-            ScriptError::ProgramError(ref lucetc_err)
-            | ScriptError::ValidationError(ref lucetc_err)
-            | ScriptError::CompileError(ref lucetc_err) => match lucetc_err {
+            ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Program)
+            | ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Validation)
+            | ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Compile) => match lucetc_err {
                 &LucetcError::Unsupported(_) => true,
                 _ => false,
             },
             _ => false,
         }
-    }
-}
-
-impl From<io::Error> for ScriptError {
-    fn from(e: io::Error) -> ScriptError {
-        ScriptError::IoError(e)
     }
 }
 
@@ -54,8 +64,8 @@ pub struct ScriptEnv {
 
 fn program_error(e: LucetcError) -> ScriptError {
     match e {
-        LucetcError::Validation => ScriptError::ValidationError(e),
-        _ => ScriptError::ProgramError(e),
+        LucetcError::Validation => ScriptError::GenerationError(e, GenerationErrorKind::Validation),
+        _ => ScriptError::GenerationError(e, GenerationErrorKind::Program),
     }
 }
 
@@ -84,9 +94,9 @@ impl ScriptEnv {
 
         compiler
             .object_file()
-            .map_err(ScriptError::CompileError)?
+            .map_err(|e| ScriptError::GenerationError(e, GenerationErrorKind::Compile))?
             .write(&objfile_path)
-            .map_err(ScriptError::CodegenError)?;
+            .map_err(|e| ScriptError::GenerationError(e, GenerationErrorKind::Codegen))?;
 
         let mut cmd_ld = Command::new("ld");
         cmd_ld.arg(objfile_path.clone());
@@ -95,15 +105,16 @@ impl ScriptEnv {
         cmd_ld.arg(sofile_path.clone());
         let run_ld = cmd_ld.output()?;
         if !run_ld.status.success() {
-            Err(ScriptError::CodegenError(format_err!(
-                "ld {:?}: {}",
+	    let message = format!(
+		"ld {:?}: {}",
                 objfile_path,
-                String::from_utf8_lossy(&run_ld.stderr)
-            )))?;
+                String::from_utf8_lossy(&run_ld.stderr));
+	    
+            Err(ScriptError::LoadError(message))?;
         }
 
         let lucet_module: Arc<dyn LucetModule> =
-            lucet_runtime::DlModule::load(sofile_path).map_err(ScriptError::LoadError)?;
+            lucet_runtime::DlModule::load(sofile_path).map_err(ScriptError::RuntimeError)?;
 
         let lucet_region = MmapRegion::create(
             1,

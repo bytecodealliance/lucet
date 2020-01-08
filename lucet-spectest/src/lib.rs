@@ -3,22 +3,22 @@
 pub mod error;
 pub mod script;
 
-pub use crate::error::{SpecTestError, SpecTestErrorKind};
+pub use crate::error::Error;
 pub use crate::result::{command_description, SpecScriptResult};
 
 mod bindings;
 mod result;
 
 use crate::script::{ScriptEnv, ScriptError};
-use failure::{format_err, Error, ResultExt};
 use lucet_runtime::{Error as RuntimeError, TrapCode, UntypedRetVal, Val};
 use std::fs;
 use std::path::PathBuf;
 use wabt::script::{Action, CommandKind, ScriptParser, Value};
 
 pub fn run_spec_test(spec_path: &PathBuf) -> Result<SpecScriptResult, Error> {
-    let wast = fs::read_to_string(spec_path)?;
-    let mut parser: ScriptParser = ScriptParser::from_str(&wast)?;
+    let wast = fs::read_to_string(spec_path).map_err(|e| Error::ReadError(e))?;
+    let mut parser: ScriptParser =
+        ScriptParser::from_str(&wast).map_err(|e| Error::ParseError(e))?;
 
     let mut script = ScriptEnv::new();
     let mut res = SpecScriptResult::new();
@@ -26,8 +26,8 @@ pub fn run_spec_test(spec_path: &PathBuf) -> Result<SpecScriptResult, Error> {
     while let Some(ref cmd) = parser.next()? {
         match step(&mut script, &cmd.kind) {
             Ok(()) => res.pass(cmd),
-            Err(e) => match e.get_context() {
-                SpecTestErrorKind::UnsupportedCommand | SpecTestErrorKind::UnsupportedLucetc => {
+            Err(e) => match e {
+                Error::UnsupportedCommand(_) | Error::UnsupportedLucetc => {
                     println!("skipped unsupported command");
                     res.skip(cmd, e)
                 }
@@ -42,19 +42,15 @@ pub fn run_spec_test(spec_path: &PathBuf) -> Result<SpecScriptResult, Error> {
     Ok(res)
 }
 
-fn unexpected_failure(e: ScriptError) -> SpecTestError {
+fn unexpected_failure(e: ScriptError) -> Error {
     if e.unsupported() {
-        Error::from(e)
-            .context(SpecTestErrorKind::UnsupportedLucetc)
-            .into()
+        Error::UnsupportedLucetc
     } else {
-        Error::from(e)
-            .context(SpecTestErrorKind::UnexpectedFailure)
-            .into()
+        Error::UnexpectedFailure(String::new())
     }
 }
 
-fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> {
+fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
     match cmd {
         CommandKind::Module {
             ref module,
@@ -72,10 +68,10 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
             println!("assert_invalid");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
-                Err(ScriptError::ValidationError(_)) => Ok(()),
+                Err(ScriptError::GenerationError(_, _)) => Ok(()),
                 Ok(_) => {
                     script.delete_last();
-                    Err(SpecTestErrorKind::UnexpectedSuccess)?
+                    Err(Error::UnexpectedSuccess)?
                 }
                 Err(e) => Err(unexpected_failure(e))?,
             }
@@ -85,8 +81,8 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
             println!("assert_malformed");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
-                Err(ScriptError::ValidationError(_)) => Ok(()),
-                Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
+                Err(ScriptError::GenerationError(_, _)) => Ok(()),
+                Ok(_) => Err(Error::UnexpectedSuccess)?,
                 Err(e) => Err(unexpected_failure(e))?,
             }
         }
@@ -95,8 +91,8 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
             println!("assert_uninstantiable");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
-                Err(ScriptError::InstantiateError(_)) => Ok(()),
-                Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
+                Err(ScriptError::RuntimeError(_, _)) => Ok(()),
+                Ok(_) => Err(Error::UnexpectedSuccess)?,
                 Err(e) => Err(unexpected_failure(e))?,
             }
         }
@@ -105,8 +101,8 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
             println!("assert_unlinkable");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
-                Err(ScriptError::ValidationError(_)) => Ok(()),
-                Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
+                Err(ScriptError::GenerationError(_, _)) => Ok(()),
+                Ok(_) => Err(Error::UnexpectedSuccess)?,
                 Err(e) => Err(unexpected_failure(e))?,
             }
         }
@@ -133,7 +129,10 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                     .map_err(unexpected_failure)?;
                 Ok(())
             }
-            _ => Err(SpecTestErrorKind::UnsupportedCommand)?,
+            _ => {
+                let message = format!("invoke {:?}", action);
+                Err(Error::UnsupportedCommand(message))?
+            }
         },
 
         // TODO: verify the exhaustion message is what we expected
@@ -150,23 +149,28 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 let args = translate_args(args);
                 let res = script.run(module, field, args);
                 match res {
-                    Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
+                    Ok(_) => Err(Error::UnexpectedSuccess)?,
 
-                    Err(ScriptError::RuntimeError(RuntimeError::RuntimeFault(details))) => {
+                    Err(ScriptError::RuntimeError(RuntimeError::RuntimeFault(details), s)) => {
                         match details.trapcode {
                             Some(TrapCode::StackOverflow) => Ok(()),
-                            e => Err(format_err!(
-                                "AssertExhaustion expects stack overflow, got {:?}",
-                                e
-                            )
-                            .context(SpecTestErrorKind::UnexpectedFailure))?,
+                            e => {
+                                let message = format!(
+                                    "AssertExhaustion expects stack overflow, got {}. {:?}",
+                                    s, e
+                                );
+                                Err(Error::UnexpectedFailure(message))
+                            }
                         }
                     }
 
                     Err(e) => Err(unexpected_failure(e))?,
                 }
             }
-            _ => Err(SpecTestErrorKind::UnsupportedCommand)?,
+            _ => {
+                let message = format!("invoke {:?}", action);
+                Err(Error::UnsupportedCommand(message))?
+            }
         },
 
         CommandKind::AssertReturn {
@@ -189,8 +193,10 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 check_retval(expected, res)?;
                 Ok(())
             }
-            _ => Err(format_err!("non-invoke action"))
-                .context(SpecTestErrorKind::UnsupportedCommand)?,
+            _ => {
+                let message = format!("non-invoke action");
+                Err(Error::UnsupportedCommand(message))?
+            }
         },
         CommandKind::AssertReturnCanonicalNan { action }
         | CommandKind::AssertReturnArithmeticNan { action } => match action {
@@ -207,12 +213,14 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 if res.as_f32().is_nan() || res.as_f64().is_nan() {
                     Ok(())
                 } else {
-                    Err(format_err!("expected NaN, got {}", res))
-                        .context(SpecTestErrorKind::IncorrectResult)?
+                    let message = format!("expected NaN, got {}", res);
+                    Err(Error::IncorrectResult(message))?
                 }
             }
-            _ => Err(format_err!("non-invoke action"))
-                .context(SpecTestErrorKind::UnsupportedCommand)?,
+            _ => {
+		let message = format!("non-invoke action");
+		Err(Error::UnsupportedCommand(message))?
+	    }
         },
         CommandKind::AssertTrap { ref action, .. } => match action {
             Action::Invoke {
@@ -224,51 +232,56 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), SpecTestError> 
                 let args = translate_args(args);
                 let res = script.run(module, field, args);
                 match res {
-                    Err(ScriptError::RuntimeError(_luceterror)) => Ok(()),
+                    Err(ScriptError::RuntimeError(_luceterror, _)) => Ok(()),
                     Err(e) => Err(unexpected_failure(e)),
-                    Ok(_) => Err(SpecTestErrorKind::UnexpectedSuccess)?,
+                    Ok(_) => Err(Error::UnexpectedSuccess)?,
                 }
             }
-            _ => Err(SpecTestErrorKind::UnsupportedCommand)?,
+            _ => {
+		let message = format!("invoke {:?}", action);
+		Err(Error::UnsupportedCommand(message))?
+	    }
         },
     }
 }
 
-fn check_retval(expected: &[Value], got: UntypedRetVal) -> Result<(), SpecTestError> {
+fn check_retval(expected: &[Value], got: UntypedRetVal) -> Result<(), Error> {
     match expected.len() {
         0 => {}
         1 => match expected[0] {
             Value::I32(expected) => {
                 if expected != got.as_i32() {
-                    Err(format_err!("expected {}, got {}", expected, got.as_i32()))
-                        .context(SpecTestErrorKind::IncorrectResult)?
+		    let message = format!("expected {}, got {}", expected, got.as_i32());
+                    Err(Error::IncorrectResult(message))?
                 }
             }
             Value::I64(expected) => {
                 if expected != got.as_i64() {
-                    Err(format_err!("expected {}, got {}", expected, got.as_i64()))
-                        .context(SpecTestErrorKind::IncorrectResult)?
+		    let message = format!("expected {}, got {}", expected, got.as_i64());
+		    Err(Error::IncorrectResult(message))?
                 }
             }
             Value::F32(expected) => {
                 if expected != got.as_f32() && !expected.is_nan() && !got.as_f32().is_nan() {
-                    Err(format_err!("expected {}, got {}", expected, got.as_f32()))
-                        .context(SpecTestErrorKind::IncorrectResult)?
+		    let message = format!("expected {}, got {}", expected, got.as_f32());
+		    Err(Error::IncorrectResult(message))?
                 }
             }
             Value::F64(expected) => {
                 if expected != got.as_f64() && !expected.is_nan() && !got.as_f64().is_nan() {
-                    Err(format_err!("expected {}, got {}", expected, got.as_f64()))
-                        .context(SpecTestErrorKind::IncorrectResult)?
+                    let message = format!("expected {}, got {}", expected, got.as_f64());
+		    Err(Error::IncorrectResult(message))?                   
                 }
             }
             Value::V128(_) => {
-                Err(format_err!("got unsupported SIMD V128 value"))
-                    .context(SpecTestErrorKind::UnsupportedCommand)?;
+		let message = format!("got unsupported SIMD V128 value");
+                Err(Error::UnsupportedCommand(message))?;
             }
         },
-        n => Err(format_err!("{} expected return values not supported", n))
-            .context(SpecTestErrorKind::UnsupportedCommand)?,
+        n => {
+	    let message = format!("{} expected return values not supported", n);
+	    Err(Error::UnsupportedCommand(message))?
+	}
     }
     Ok(())
 }

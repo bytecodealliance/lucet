@@ -1,6 +1,7 @@
-use failure::{Backtrace, Context, Fail};
-use std::fmt::{self, Display};
+//use std::fmt::{self, Display};
+use thiserror::Error;
 
+/*
 #[derive(Debug)]
 pub struct SpecTestError {
     inner: Context<SpecTestErrorKind>,
@@ -40,17 +41,22 @@ impl Display for SpecTestError {
         Display::fmt(&self.inner, f)
     }
 }
+ */
 
-#[derive(Fail, Debug, PartialEq, Eq)]
-pub enum SpecTestErrorKind {
-    #[fail(display = "Unsupported command")]
-    UnsupportedCommand,
-    #[fail(display = "Unexpected success")]
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Parse error")]
+    ParseError(#[from] wabt::script::Error),
+    #[error("Read error")]
+    ReadError(#[from] std::io::Error),
+    #[error("Unsupported command: {0}")]
+    UnsupportedCommand(String),
+    #[error("Unexpected success")]
     UnexpectedSuccess,
-    #[fail(display = "Unexpected failure")]
-    UnexpectedFailure,
-    #[fail(display = "Incorrect result")]
-    IncorrectResult,
-    #[fail(display = "Unsupported by lucetc")]
+    #[error("Unexpected failure: {0}")]
+    UnexpectedFailure(String),
+    #[error("Incorrect result: {0}")]
+    IncorrectResult(String),
+    #[error("Unsupported by lucetc")]
     UnsupportedLucetc,
 }

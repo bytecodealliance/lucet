@@ -17,6 +17,7 @@ name = "spec-test"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1"
 lucetc = { path = "../lucetc", version = "0.4.2" }
 lucet-module = { path = "../lucet-module", version = "0.4.2" }
 lucet-runtime = { path = "../lucet-runtime", version = "0.4.2" }

@@ -1,10 +1,10 @@
-use crate::error::SpecTestError;
+use crate::error::Error;
 use wabt::script::{Command, CommandKind};
 
 pub struct SpecScriptResult {
     pass: Vec<Command>,
-    skip: Vec<(Command, SpecTestError)>,
-    fail: Vec<(Command, SpecTestError)>,
+    skip: Vec<(Command, Error)>,
+    fail: Vec<(Command, Error)>,
 }
 
 impl SpecScriptResult {
@@ -20,11 +20,11 @@ impl SpecScriptResult {
         self.pass.push(command.clone())
     }
 
-    pub fn skip(&mut self, command: &Command, reason: SpecTestError) {
+    pub fn skip(&mut self, command: &Command, reason: Error) {
         self.skip.push((command.clone(), reason))
     }
 
-    pub fn fail(&mut self, command: &Command, reason: SpecTestError) {
+    pub fn fail(&mut self, command: &Command, reason: Error) {
         self.fail.push((command.clone(), reason))
     }
 
@@ -32,11 +32,11 @@ impl SpecScriptResult {
         &self.pass
     }
 
-    pub fn skipped(&self) -> &[(Command, SpecTestError)] {
+    pub fn skipped(&self) -> &[(Command, Error)] {
         &self.skip
     }
 
-    pub fn failed(&self) -> &[(Command, SpecTestError)] {
+    pub fn failed(&self) -> &[(Command, Error)] {
         &self.fail
     }
 

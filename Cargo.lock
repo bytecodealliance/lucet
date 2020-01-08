@@ -880,6 +880,7 @@ dependencies = [
 name = "lucet-spectest"
 version = "0.4.2"
 dependencies = [
+ "anyhow 1.0.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module 0.4.2",
  "lucet-runtime 0.4.2",
