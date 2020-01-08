@@ -1,6 +1,6 @@
 #![deny(bare_trait_objects)]
 
-use failure::{bail, format_err, Error};
+use anyhow::{format_err, Error};
 use libc::c_ulong;
 use lucet_module::bindings::Bindings;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
@@ -299,14 +299,14 @@ fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<
     let res = cmd.output()?;
 
     if !res.status.success() {
-        bail!(
+        Err(format_err!(
             "native C compilation failed: {}",
-            String::from_utf8_lossy(&res.stderr)
+            String::from_utf8_lossy(&res.stderr))
         );
     }
 
     if String::from_utf8_lossy(&res.stderr).contains("too few arguments in call") {
-        bail!("saw \"too few arguments in call\" warning");
+        Err(format_err!("saw \"too few arguments in call\" warning"));
     }
 
     let mut native_child = Command::new(&gen_path).stdout(Stdio::piped()).spawn()?;
@@ -405,7 +405,7 @@ fn run<P: AsRef<Path>>(
         )) => Ok(*any
             .downcast_ref::<__wasi_exitcode_t>()
             .expect("termination yields an exitcode")),
-        Err(e) => bail!("runtime error: {}", e),
+        Err(e) => Err(anyhow!(e)),
     }
 }
 

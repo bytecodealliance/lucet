@@ -6,40 +6,22 @@ use std::process::Command;
 use std::sync::Arc;
 use thiserror::Error;
 
-#[derive(Debug)]
-pub enum GenerationErrorKind {
-    Validation,
-    Program,
-    Compile,
-    Codegen,
-}
-
 #[derive(Debug, Error)]
 pub enum ScriptError {
-    /*
-        #[error("Validation error")]
-        ValidationError(#[from] LucetcError),
-        #[error("Program creation error")]
-        ProgramError(#[from] LucetcError),
-        #[error("Compilation error")]
-        CompileError(#[from] LucetcError),
-        #[error("Codegen error")]
-        CodegenError(#[from] LucetcError),
-        #[error("Load error")]
-        LoadError(#[from] lucet_runtime::Error),
-        #[error("Instaitiation error")]
-        InstantiateError(#[from] lucet_runtime::Error),
-        #[error("Runtime error")]
-        RuntimeError(#[from] lucet_runtime::Error),
-    */
-    #[error("Lucetc error")]
-    GenerationError(#[source] LucetcError, GenerationErrorKind), /* Validation or Program or Compile or Codegen */
+    #[error("Validation error")]
+    ValidationError(#[source] LucetcError), 
+    #[error("Program error")]
+    ProgramError(#[source] LucetcError),
+    #[error("Compile error")]
+    CompileError(#[source] LucetcError),
+    #[error("Codegen error")]
+    CodegenError(#[source] LucetcError),
     #[error("Load error: {0}")]
     LoadError(String),
     #[error("Malformed script: {0}")]
     MalformedScript(String),
     #[error("Runtime error: {1}")]
-    RuntimeError(#[source] lucet_runtime::Error, String), /* Instantiate or Load */
+    RuntimeError(#[source] lucet_runtime::Error, String), 
     #[error("IO error")]
     IoError(#[from] io::Error),
 }
@@ -47,9 +29,9 @@ pub enum ScriptError {
 impl ScriptError {
     pub fn unsupported(&self) -> bool {
         match self {
-            ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Program)
-            | ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Validation)
-            | ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Compile) => {
+            ScriptError::ProgramError(ref lucetc_err)
+            | ScriptError::ValidationError(ref lucetc_err)
+            | ScriptError::CompileError(ref lucetc_err) => {
                 match lucetc_err {
                     &LucetcError::Unsupported(_) => true,
                     _ => false,
@@ -66,8 +48,8 @@ pub struct ScriptEnv {
 
 fn program_error(e: LucetcError) -> ScriptError {
     match e {
-        LucetcError::Validation => ScriptError::GenerationError(e, GenerationErrorKind::Validation),
-        _ => ScriptError::GenerationError(e, GenerationErrorKind::Program),
+        LucetcError::Validation => ScriptError::ValidationError(e),
+        _ => ScriptError::ProgramError(e),
     }
 }
 
@@ -96,9 +78,9 @@ impl ScriptEnv {
 
         compiler
             .object_file()
-            .map_err(|e| ScriptError::GenerationError(e, GenerationErrorKind::Compile))?
+            .map_err(|e| ScriptError::CompileError(e))?
             .write(&objfile_path)
-            .map_err(|e| ScriptError::GenerationError(e, GenerationErrorKind::Codegen))?;
+            .map_err(|e| ScriptError::CodegenError(e))?;
 
         let mut cmd_ld = Command::new("ld");
         cmd_ld.arg(objfile_path.clone());

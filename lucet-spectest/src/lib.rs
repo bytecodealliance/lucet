@@ -68,7 +68,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
             println!("assert_invalid");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
-                Err(ScriptError::GenerationError(_, _)) => Ok(()),
+                Err(ScriptError::ValidationError(_)) => Ok(()),
                 Ok(_) => {
                     script.delete_last();
                     Err(Error::UnexpectedSuccess)?
@@ -81,7 +81,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
             println!("assert_malformed");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
-                Err(ScriptError::GenerationError(_, _)) => Ok(()),
+                Err(ScriptError::ValidationError(_)) => Ok(()),
                 Ok(_) => Err(Error::UnexpectedSuccess)?,
                 Err(e) => Err(unexpected_failure(e))?,
             }
@@ -101,7 +101,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
             println!("assert_unlinkable");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
-                Err(ScriptError::GenerationError(_, _)) => Ok(()),
+                Err(ScriptError::ValidationError(_)) => Ok(()),
                 Ok(_) => Err(Error::UnexpectedSuccess)?,
                 Err(e) => Err(unexpected_failure(e))?,
             }
