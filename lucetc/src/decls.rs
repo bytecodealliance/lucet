@@ -155,7 +155,7 @@ impl<'a> ModuleDecls<'a> {
                 if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
                     let import_symbol = bindings
                         .translate(import_mod, import_field)
-                        .map_err(|_| Error::TranslatingModule)?;
+                        .map_err(Error::TranslatingLucetModule)?;
                     decls.imports.push(ImportFunction {
                         fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                         module: import_mod,
@@ -236,7 +236,7 @@ impl<'a> ModuleDecls<'a> {
                 decl_linkage,
                 self.info.signature_for_function(func_ix),
             )
-            .map_err(|_| Error::TranslatingModule)?;
+            .map_err(Error::TranslatingClifModule)?;
 
         if func_ix.as_u32() as usize >= self.function_names.len() {
             // `func_ix` is new, so we need to add the name. If func_ix is new, it should be
@@ -261,7 +261,7 @@ impl<'a> ModuleDecls<'a> {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id = clif_module
                 .declare_data(&def_symbol, Linkage::Export, false, None)
-                .map_err(|_| Error::TranslatingModule)?;
+                .map_err(Error::TranslatingClifModule)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             table_names.push(def_name);

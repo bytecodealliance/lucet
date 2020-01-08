@@ -9,7 +9,7 @@ pub enum Error {
     #[error("Artifact error: {0}")]
     ArtifactError(String),
     #[error("Binding error")]
-    Binding(#[from] LucetModuleError),
+    Binding(#[source] LucetModuleError),
     #[error("Build error")]
     Build(#[from] parity_wasm::elements::Error),
     #[error("Clif module error")]
@@ -40,6 +40,8 @@ pub enum Error {
     InitData,
     #[error("Input error: {0}")]
     Input(String),
+    #[error("Lucet Module error")]
+    LucetModule(#[from] LucetModuleError),
     #[error("Manifest error declaring {0}")]
     ManifestDeclaration(String),
     #[error("Manifest error defining {0}")]
@@ -73,6 +75,12 @@ pub enum Error {
     TempFile(#[from] std::io::Error),
     #[error("Translating module")]
     TranslatingModule,
+    #[error("Tranzlating lucet module")]
+    TranslatingLucetModule(#[source] LucetModuleError),    
+    #[error("Translating cranelift module")]
+    TranslatingClifModule(#[source] ClifModuleError),
+    #[error("Translating cranelift wasm")]
+    TranslatingClifWasm(#[source] ClifWasmError),
     #[error("Error defining {0} writing the function trap table into the object")]
     TrapDefinition(String),
     #[error("Trap records are present for function {0} but the function does not exist.")]
