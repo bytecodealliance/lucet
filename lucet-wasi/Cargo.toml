@@ -24,9 +24,9 @@ edition = "2018"
 update-bindings = ["bindgen"]
 
 [dependencies]
+anyhow = "1"
 cast = "0.2"
 clap = "2.23"
-failure = "0.1"
 human-size = "0.4"
 lucet-runtime = { path = "../lucet-runtime", version = "0.5.0" }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "0.5.0" }
