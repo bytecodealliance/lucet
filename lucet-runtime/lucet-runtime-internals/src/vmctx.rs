@@ -78,7 +78,7 @@ pub trait VmctxInternal {
     ///
     /// The dynamic type checks used by the other yield methods should make this explicit option
     /// type redundant, however this interface is used to avoid exposing a panic to the C API.
-    fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> Option<R>;
+    fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&mut self, val: A) -> Option<R>;
 }
 
 impl VmctxInternal for Vmctx {
@@ -105,7 +105,7 @@ impl VmctxInternal for Vmctx {
         }
     }
 
-    fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> Option<R> {
+    fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&mut self, val: A) -> Option<R> {
         self.yield_impl::<A, R>(val);
         self.try_take_resumed_val()
     }
@@ -272,10 +272,18 @@ impl Vmctx {
     /// This is useful when a hostcall takes a function pointer as its argument, as WebAssembly uses
     /// table indices as its runtime representation of function pointers.
     ///
+    /// # Safety
+    ///
     /// We do not currently reflect function type information into the Rust type system, so callers
     /// of the returned function must take care to cast it to the correct type before calling. The
     /// correct type will include the `vmctx` argument, which the caller is responsible for passing
     /// from its own context.
+    ///
+    /// There is currently no guarantee that guest functions will return before faulting, or
+    /// terminating the instance in a subsequent hostcall. This means that any Rust resources that
+    /// are held open when the guest function is called might be leaked if the guest function, for
+    /// example, divides by zero. Work to make this safer is
+    /// [ongoing](https://github.com/bytecodealliance/lucet/pull/254).
     ///
     /// ```no_run
     /// use lucet_runtime_macros::lucet_hostcall;
@@ -321,7 +329,7 @@ impl Vmctx {
     ///
     /// (The reason for the trailing underscore in the name is that Rust reserves `yield` as a
     /// keyword for future use.)
-    pub fn yield_(&self) {
+    pub fn yield_(&mut self) {
         self.yield_val_expecting_val::<EmptyYieldVal, EmptyYieldVal>(EmptyYieldVal);
     }
 
@@ -332,7 +340,7 @@ impl Vmctx {
     /// After suspending, the instance may be resumed by calling
     /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
     /// host with a value of type `R`.
-    pub fn yield_expecting_val<R: Any + 'static>(&self) -> R {
+    pub fn yield_expecting_val<R: Any + 'static>(&mut self) -> R {
         self.yield_val_expecting_val::<EmptyYieldVal, R>(EmptyYieldVal)
     }
 
@@ -342,7 +350,7 @@ impl Vmctx {
     ///
     /// After suspending, the instance may be resumed by the host using
     /// [`Instance::resume()`](../struct.Instance.html#method.resume).
-    pub fn yield_val<A: Any + 'static>(&self, val: A) {
+    pub fn yield_val<A: Any + 'static>(&mut self, val: A) {
         self.yield_val_expecting_val::<A, EmptyYieldVal>(val);
     }
 
@@ -353,12 +361,12 @@ impl Vmctx {
     /// After suspending, the instance may be resumed by calling
     /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
     /// host with a value of type `R`.
-    pub fn yield_val_expecting_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> R {
+    pub fn yield_val_expecting_val<A: Any + 'static, R: Any + 'static>(&mut self, val: A) -> R {
         self.yield_impl::<A, R>(val);
         self.take_resumed_val()
     }
 
-    fn yield_impl<A: Any + 'static, R: Any + 'static>(&self, val: A) {
+    fn yield_impl<A: Any + 'static, R: Any + 'static>(&mut self, val: A) {
         let inst = unsafe { self.instance_mut() };
         let expecting: Box<PhantomData<R>> = Box::new(PhantomData);
         inst.state = State::Yielding {

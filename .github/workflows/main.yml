@@ -14,7 +14,7 @@ jobs:
     # This action builds the container and executes the test suite inside it.
     - uses: ./.github/actions/test
       with:
-        target: test
+        target: test-full
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code

@@ -22,7 +22,7 @@
 /// }
 /// ```
 #[macro_export]
-#[deprecated(since = "0.4.2", note = "Use the #[lucet_hostcall] attribute instead")]
+#[deprecated(since = "0.5.0", note = "Use the #[lucet_hostcall] attribute instead")]
 macro_rules! lucet_hostcalls {
     {
         $(
