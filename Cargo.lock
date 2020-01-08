@@ -868,6 +868,7 @@ dependencies = [
 name = "lucet-runtime-tests"
 version = "0.5.0"
 dependencies = [
+ "anyhow 1.0.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module 0.5.0",
