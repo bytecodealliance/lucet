@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod lucetc_tests {
-    use failure::Error;
+    use anyhow::Error;
     use lucet_module::bindings::Bindings;
     use lucet_validate::Validator;
     use lucet_wasi_sdk::*;
