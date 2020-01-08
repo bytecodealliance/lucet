@@ -49,6 +49,8 @@ pub enum Error {
     ParseError(#[from] wabt::script::Error),
     #[error("Read error")]
     ReadError(#[from] std::io::Error),
+    #[error("Run failed with {0} failures")]
+    RunError(usize),
     #[error("Unsupported command: {0}")]
     UnsupportedCommand(String),
     #[error("Unexpected success")]
