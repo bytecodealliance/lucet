@@ -114,7 +114,7 @@ impl ScriptEnv {
         }
 
         let lucet_module: Arc<dyn LucetModule> =
-            lucet_runtime::DlModule::load(sofile_path).map_err(ScriptError::RuntimeError)?;
+            lucet_runtime::DlModule::load(sofile_path).map_err(|e| ScriptError::RuntimeError(e, "load error".to_string()))?;
 
         let lucet_region = MmapRegion::create(
             1,
@@ -127,7 +127,7 @@ impl ScriptEnv {
 
         let lucet_instance = lucet_region
             .new_instance(lucet_module.clone())
-            .map_err(ScriptError::InstantiateError)?;
+            .map_err(|e| ScriptError::RuntimeError(e, "instantiate error".to_string()))?;
 
         self.instances.push((name.clone(), lucet_instance));
         Ok(())
@@ -180,7 +180,7 @@ impl ScriptEnv {
         let (_, ref mut inst) = self.instance_named_mut(name)?;
         inst.run(field, &args)
             .and_then(|rr| rr.returned())
-            .map_err(|e| ScriptError::RuntimeError(e))
+            .map_err(|e| ScriptError::RuntimeError(e, ))
     }
 
     pub fn register(&mut self, name: &Option<String>, as_name: &str) -> Result<(), ScriptError> {
