@@ -457,7 +457,11 @@ mod module_data {
             c.is_err(),
             "compilation error because data initializers are oversized"
         );
-	assert!(if let LucetcError::Validation = c.err().unwrap() {true} else {false});
+        assert!(if let LucetcError::Validation = c.err().unwrap() {
+            true
+        } else {
+            false
+        });
     }
 
     // XXX adding more negative tests like the one above is valuable - lets do it
@@ -488,7 +492,11 @@ mod module_data {
             c.is_err(),
             "compilation error because wasm module is invalid"
         );
-	assert!(if let LucetcError::Validation = c.err().unwrap() {true} else {false});
+        assert!(if let LucetcError::Validation = c.err().unwrap() {
+            true
+        } else {
+            false
+        });
     }
 
     #[test]

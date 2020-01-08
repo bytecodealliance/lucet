@@ -218,9 +218,9 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                 }
             }
             _ => {
-		let message = format!("non-invoke action");
-		Err(Error::UnsupportedCommand(message))?
-	    }
+                let message = format!("non-invoke action");
+                Err(Error::UnsupportedCommand(message))?
+            }
         },
         CommandKind::AssertTrap { ref action, .. } => match action {
             Action::Invoke {
@@ -238,9 +238,9 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                 }
             }
             _ => {
-		let message = format!("invoke {:?}", action);
-		Err(Error::UnsupportedCommand(message))?
-	    }
+                let message = format!("invoke {:?}", action);
+                Err(Error::UnsupportedCommand(message))?
+            }
         },
     }
 }
@@ -251,37 +251,37 @@ fn check_retval(expected: &[Value], got: UntypedRetVal) -> Result<(), Error> {
         1 => match expected[0] {
             Value::I32(expected) => {
                 if expected != got.as_i32() {
-		    let message = format!("expected {}, got {}", expected, got.as_i32());
+                    let message = format!("expected {}, got {}", expected, got.as_i32());
                     Err(Error::IncorrectResult(message))?
                 }
             }
             Value::I64(expected) => {
                 if expected != got.as_i64() {
-		    let message = format!("expected {}, got {}", expected, got.as_i64());
-		    Err(Error::IncorrectResult(message))?
+                    let message = format!("expected {}, got {}", expected, got.as_i64());
+                    Err(Error::IncorrectResult(message))?
                 }
             }
             Value::F32(expected) => {
                 if expected != got.as_f32() && !expected.is_nan() && !got.as_f32().is_nan() {
-		    let message = format!("expected {}, got {}", expected, got.as_f32());
-		    Err(Error::IncorrectResult(message))?
+                    let message = format!("expected {}, got {}", expected, got.as_f32());
+                    Err(Error::IncorrectResult(message))?
                 }
             }
             Value::F64(expected) => {
                 if expected != got.as_f64() && !expected.is_nan() && !got.as_f64().is_nan() {
                     let message = format!("expected {}, got {}", expected, got.as_f64());
-		    Err(Error::IncorrectResult(message))?                   
+                    Err(Error::IncorrectResult(message))?
                 }
             }
             Value::V128(_) => {
-		let message = format!("got unsupported SIMD V128 value");
+                let message = format!("got unsupported SIMD V128 value");
                 Err(Error::UnsupportedCommand(message))?;
             }
         },
         n => {
-	    let message = format!("{} expected return values not supported", n);
-	    Err(Error::UnsupportedCommand(message))?
-	}
+            let message = format!("{} expected return values not supported", n);
+            Err(Error::UnsupportedCommand(message))?
+        }
     }
     Ok(())
 }

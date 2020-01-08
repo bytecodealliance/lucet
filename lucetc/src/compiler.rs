@@ -71,12 +71,11 @@ impl<'a> Compiler<'a> {
 
         if let Some(v) = validator {
             v.validate(wasm_binary).map_err(|_| Error::Validation)?; // TLC I don't like ignoring
-        } else {	
-            // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside	
-            // cranelift-wasm does not validate. We need to run the validating parser on the binary	
-            // first. The InvalidWebAssembly error below will never trigger.	
-            wasmparser::validate(wasm_binary, None)	
-                .map_err(|_| Error::Validation)?;
+        } else {
+            // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside
+            // cranelift-wasm does not validate. We need to run the validating parser on the binary
+            // first. The InvalidWebAssembly error below will never trigger.
+            wasmparser::validate(wasm_binary, None).map_err(|_| Error::Validation)?;
         }
 
         // TLC I don't like this manual error translation bit.

@@ -68,7 +68,7 @@ pub fn owned_sparse_data_from_initializers<'a>(
         let chunks = split(initializer);
         for (pagenumber, chunk) in chunks {
             if pagenumber > heap.initial_size as usize / PAGE_SIZE {
-                Err(Error::Validation)?;  // TLC missing context
+                Err(Error::Validation)?; // TLC missing context
             }
             let base = chunk.offset as usize;
             let page = match pagemap.entry(pagenumber) {

@@ -13,7 +13,7 @@ pub enum GenerationErrorKind {
     Compile,
     Codegen,
 }
-    
+
 #[derive(Debug, Error)]
 pub enum ScriptError {
     /*
@@ -49,10 +49,12 @@ impl ScriptError {
         match self {
             ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Program)
             | ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Validation)
-            | ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Compile) => match lucetc_err {
-                &LucetcError::Unsupported(_) => true,
-                _ => false,
-            },
+            | ScriptError::GenerationError(ref lucetc_err, GenerationErrorKind::Compile) => {
+                match lucetc_err {
+                    &LucetcError::Unsupported(_) => true,
+                    _ => false,
+                }
+            }
             _ => false,
         }
     }
@@ -105,16 +107,17 @@ impl ScriptEnv {
         cmd_ld.arg(sofile_path.clone());
         let run_ld = cmd_ld.output()?;
         if !run_ld.status.success() {
-	    let message = format!(
-		"ld {:?}: {}",
+            let message = format!(
+                "ld {:?}: {}",
                 objfile_path,
-                String::from_utf8_lossy(&run_ld.stderr));
-	    
+                String::from_utf8_lossy(&run_ld.stderr)
+            );
+
             Err(ScriptError::LoadError(message))?;
         }
 
-        let lucet_module: Arc<dyn LucetModule> =
-            lucet_runtime::DlModule::load(sofile_path).map_err(|e| ScriptError::RuntimeError(e, "load error".to_string()))?;
+        let lucet_module: Arc<dyn LucetModule> = lucet_runtime::DlModule::load(sofile_path)
+            .map_err(|e| ScriptError::RuntimeError(e, "load error".to_string()))?;
 
         let lucet_region = MmapRegion::create(
             1,
