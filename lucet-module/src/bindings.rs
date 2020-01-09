@@ -53,11 +53,11 @@ impl Bindings {
                             }
                             Entry::Occupied(e) => {
                                 if binding != e.get() {
-                                    return Err(Error::RebindError {
+                                    Err(Error::RebindError {
                                         key: e.key().to_owned(),
                                         binding: binding.to_owned(),
                                         attempt: e.get().to_owned(),
-                                    });
+                                    })?;
                                 }
                             }
                         }
@@ -96,10 +96,10 @@ impl Bindings {
                     res.insert(modulename.to_owned(), methodmap);
                 }
                 None => {
-                    return Err(Error::ParseError {
+                    Err(Error::ParseError {
                         key: modulename.to_owned(),
                         value: values.to_string(),
-                    });
+                    })?;
                 }
             }
         }
@@ -114,10 +114,10 @@ impl Bindings {
                     res.insert(method.to_owned(), importbinding.to_owned());
                 }
                 None => {
-                    return Err(Error::ParseError {
+                    Err(Error::ParseError {
                         key: method.to_owned(),
                         value: i.to_string(),
-                    });
+                    })?;
                 }
             }
         }

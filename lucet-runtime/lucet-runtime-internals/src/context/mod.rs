@@ -10,6 +10,7 @@ use nix::sys::signal;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::ptr::NonNull;
 use std::{mem, ptr};
+use thiserror::Error;
 
 /// Callee-saved general-purpose registers in the AMD64 ABI.
 ///
@@ -685,7 +686,7 @@ impl Context {
 }
 
 /// Errors that may arise when working with contexts.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 pub enum Error {
     /// Raised when the bottom of the stack provided to `Context::init` is not 16-byte aligned
     #[error("context initialized with unaligned stack")]
