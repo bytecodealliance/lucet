@@ -16,12 +16,10 @@ fn explicit() {
     assert!(result == "goodbye");
 
     let result = map.translate("env", "nonexistent");
-    if let Ok(_) = result {
-        assert!(
-            false,
-            "explicit import map returned value for non-existent symbol"
-        )
-    }
+    assert!(
+        result.is_err(),
+        "explicit import map returned value for non-existent symbol"
+    );
 }
 
 #[test]
