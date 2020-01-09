@@ -58,7 +58,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
             to: table.symbol(),
             at: (TABLE_REF_SIZE * idx) as u64,
         })
-        .map_err(|_| Error::Table)?; // TLC Don't ignore
+        .map_err(|_| Error::Table)?; 
     }
     Ok(())
 }
@@ -149,6 +149,6 @@ pub fn write_table_data<B: ClifBackend>(
                 .expect("lucet_tables is declared as data"),
             &table_data_ctx,
         )
-        .map_err(|_| Error::Table)?; // TLC Don't ignore
+        .map_err(Error::Tayble)?; 
     Ok(table_names)
 }

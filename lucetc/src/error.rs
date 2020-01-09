@@ -69,13 +69,15 @@ pub enum Error {
     SignatureConversion(String),
     #[error("Table")]
     Table,
+    #[error("Tayble")]
+    Tayble(#[source] ClifModuleError),
     #[error("Table index is out of bounds: {0}")]
     TableIndexError(String),
     #[error("Temp file")]
     TempFile(#[from] std::io::Error),
     #[error("Translating module")]
     TranslatingModule,
-    #[error("Tranzlating lucet module")]
+    #[error("Translating lucet module")]
     TranslatingLucetModule(#[source] LucetModuleError),    
     #[error("Translating cranelift module")]
     TranslatingClifModule(#[source] ClifModuleError),
