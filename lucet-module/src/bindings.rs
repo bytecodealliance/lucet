@@ -27,7 +27,7 @@ impl Bindings {
     pub fn from_json(v: &Value) -> Result<Bindings, Error> {
         match v.as_object() {
             Some(modules) => Self::parse_modules_json_obj(modules),
-            None => Err(Error::ParseJsonObjError),
+            None => Err(Error::ParseJsonObjError)?,
         }
     }
 
