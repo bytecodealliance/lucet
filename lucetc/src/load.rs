@@ -3,7 +3,7 @@ use crate::signature::{self, PublicKey};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use wabt::wat2wasm;
+use wabt::{wat2wasm, ErrorKind};
 
 pub fn read_module<P: AsRef<Path>>(
     path: P,
@@ -31,7 +31,23 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     let converted = if wasm_preamble(&bytes) {
         bytes
     } else {
-        wat2wasm(bytes).map_err(|err| Error::WatInput(err))?
+	wat2wasm(bytes).map_err(|err| {
+            use std::error::Error;	
+            let mut result = err.description().to_string();	
+            match unsafe { std::mem::transmute::<wabt::Error, wabt::ErrorKind>(err) } {	
+                ErrorKind::Parse(msg) |	
+                // this shouldn't be reachable - we're going the other way	
+                ErrorKind::Deserialize(msg) |	
+                // not sure how this error comes up	
+                ErrorKind::ResolveNames(msg) |	
+                ErrorKind::Validate(msg) => {	
+                    result.push_str(":\n");	
+                    result.push_str(&msg);	
+                },	
+                _ => { }	
+            };	
+	    crate::error::Error::ReadError(result)
+        })?
     };
     Ok(converted)
 }

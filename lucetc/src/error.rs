@@ -62,6 +62,8 @@ pub enum Error {
     Patcher,
     #[error("Path error: {0}")]
     PathError(String),
+    #[error("Read error: {0}")]
+    ReadError(String),
     #[error("Signature error: {0}")]
     Signature(String),
     #[error("Error converting cranelift signature to wasm signature: {0}")]
@@ -96,7 +98,7 @@ pub enum Error {
     #[error("Validation")]
     Validation,
     #[error("Validashun")]
-    Validashun(#[from] lucet_validate::Error),
+    Validashun(#[from] lucet_validate::Error),    
     #[error("Wat input")]
     WatInput(#[from] wabt::Error),
     #[error("Zzz")]
