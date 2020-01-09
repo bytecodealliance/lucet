@@ -302,7 +302,7 @@ fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<
         bail!(
             "native C compilation failed: {}",
             String::from_utf8_lossy(&res.stderr)
-	);
+        );
     }
 
     if String::from_utf8_lossy(&res.stderr).contains("too few arguments in call") {
