@@ -20,7 +20,7 @@ pub enum Error {
     #[error("I/O error")]
     IOError(#[from] std::io::Error),
     // Attempts to use this in compilers.rs cause many failures in spectests.
-    // #[error("Wasm validating parser error")]  
+    // #[error("Wasm validating parser error")]
     // WasmValidation(#[from] wasmparser::BinaryReaderError),
     #[error("Wat input")]
     WatInput(#[from] wabt::Error),
