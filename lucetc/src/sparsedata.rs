@@ -93,6 +93,6 @@ pub fn owned_sparse_data_from_initializers<'a>(
         }
     }
     assert_eq!(out.len() * 4096, heap.initial_size as usize);
-    let o = OwnedSparseData::new(out).map_err(|_| Error::ModuleData)?; // TLC
+    let o = OwnedSparseData::new(out)?; 
     Ok(o)
 }

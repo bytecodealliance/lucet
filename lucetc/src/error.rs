@@ -67,8 +67,6 @@ pub enum Error {
     MemorySpecs(String),
     #[error("Metadata serializer; start index point to a non-function")]
     MetadataSerializer(#[source] ClifModuleError),
-    #[error("Module data")]
-    ModuleData,
     #[error("Output: {0}")]
     Output(String),
     #[error("Output function: error writing function {1}")]
