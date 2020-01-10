@@ -1,19 +1,30 @@
 // use crate::types::SignatureError;  // TLC impl something so I can use this...
 use cranelift_module::ModuleError as ClifModuleError;
 use cranelift_wasm::WasmError as ClifWasmError;
+use faerie::ArtifactError;
 use lucet_module::error::Error as LucetModuleError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Artifact error: {0}")]
-    ArtifactError(String),
-    #[error("Binding error")]
-    Binding(#[source] LucetModuleError),
     #[error("Build error")]
     Build(#[from] parity_wasm::elements::Error),
     #[error("Clif module error")]
     ClifModuleError(#[from] ClifModuleError),
+    #[error("Lucet Module error")]
+    LucetModule(#[from] LucetModuleError),
+    #[error("Lucet validation error")]
+    LucetValidation(#[from] lucet_validate::Error),    
+    #[error("I/O error")]
+    IOError(#[from] std::io::Error),
+    #[error("Wat input")]
+    WatInput(#[from] wabt::Error),    
+
+    #[error("Artifact error: {0:?}")]
+    ArtifactError(failure::Error),
+    #[error("Manifest error declaring {1}: {0:?}")]
+    ManifestDeclaration(ArtifactError, String),
+    
     #[error("Function definition error in {symbol}")]
     FunctionDefinition {
         symbol: String,
@@ -28,6 +39,8 @@ pub enum Error {
         #[source]
         source: ClifWasmError,
     },
+    #[error("Output error: {1}")]
+    LoaderOutput(#[source] std::io::Error, String),
     #[error("Inconsistent state when translating module: global {0} is declared as an import but has no entry in imported_globals")]
     GlobalDeclarationError(u32),
     #[error("global out of bounds: {0}")]
@@ -40,10 +53,6 @@ pub enum Error {
     InitData,
     #[error("Input error: {0}")]
     Input(String),
-    #[error("Lucet Module error")]
-    LucetModule(#[from] LucetModuleError),
-    #[error("Manifest error declaring {0}")]
-    ManifestDeclaration(String),
     #[error("Manifest error defining {0}")]
     ManifestDefinition(String),
     #[error("Manifest error linking {0}")]
@@ -56,8 +65,8 @@ pub enum Error {
     ModuleData,
     #[error("Output: {0}")]
     Output(String),
-    #[error("Output function: error writing function {0}")]
-    OutputFunction(String),
+    #[error("Output function: error writing function {1}")]
+    OutputFunction(#[source] std::fmt::Error, String),
     #[error("Patcher error")]
     Patcher,
     #[error("Path error: {0}")]
@@ -75,8 +84,6 @@ pub enum Error {
     Tayble(#[source] ClifModuleError),
     #[error("Table index is out of bounds: {0}")]
     TableIndexError(String),
-    #[error("Temp file")]
-    TempFile(#[from] std::io::Error),
     #[error("Translating module")]
     TranslatingModule,
     #[error("Translating lucet module")]
@@ -97,10 +104,6 @@ pub enum Error {
     Unsupported(String),
     #[error("Validation")]
     Validation,
-    #[error("Validashun")]
-    Validashun(#[from] lucet_validate::Error),    
-    #[error("Wat input")]
-    WatInput(#[from] wabt::Error),
     #[error("Zzz")]
     ZzzError,
 }

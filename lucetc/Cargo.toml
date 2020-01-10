@@ -31,6 +31,7 @@ clap="2.32"
 log = "0.4"
 env_logger = "0.6"
 faerie = "0.12.0"
+failure = "0.1"
 goblin = "0.0.24"
 byteorder = "1.2"
 # precisely pin wasmonkey, because the shared dependency on parity-wasm is very sensitive

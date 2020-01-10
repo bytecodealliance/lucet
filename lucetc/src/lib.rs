@@ -346,8 +346,7 @@ impl Lucetc {
     pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
         let dir = tempfile::Builder::new()
             .prefix("lucetc")
-            .tempdir()
-            .map_err(|e| Error::TempFile(e))?;
+            .tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
         link_so(objpath, &output)?;
@@ -384,10 +383,10 @@ where
     cmd_ld.arg("-o");
     cmd_ld.arg(sopath.as_ref());
 
-    let run_ld = cmd_ld.output().map_err(|_| {
+    let run_ld = cmd_ld.output().map_err(|source| {
         let message = format!("running ld on {:?}", objpath.as_ref());
-        Error::Output(message)
-    })?;
+        Error::LoaderOutput(source, message) 
+    })?; 
 
     if !run_ld.status.success() {
         let message = format!(

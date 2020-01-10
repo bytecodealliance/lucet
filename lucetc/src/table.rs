@@ -58,7 +58,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
             to: table.symbol(),
             at: (TABLE_REF_SIZE * idx) as u64,
         })
-        .map_err(|_| Error::Table)?; 
+        .map_err(|_| Error::Table)?;  /* From<failure::error::Error> */
     }
     Ok(())
 }
@@ -93,7 +93,8 @@ pub fn write_table_data<B: ClifBackend>(
                 Elem::Func(func_index) => {
                     // Note: this is the only place we validate that the table entry points to a valid
                     // function. If this is ever removed, make sure this check happens elsewhere.
-                    let func = decls.get_func(*func_index).map_err(|_| Error::Table)?;
+                    let func = decls.get_func(*func_index)?;
+		    
                     // First element in row is the SignatureIndex for the function
                     putelem(&mut table_data, func.signature_index.as_u32() as u64);
 
@@ -122,8 +123,7 @@ pub fn write_table_data<B: ClifBackend>(
             .as_dataid()
             .expect("tables are data");
         clif_module
-            .define_data(table_id, &table_ctx)
-            .map_err(|_| Error::Table)?; // TLC Don't ignore
+            .define_data(table_id, &table_ctx)?;
 
         // have to link TABLE_SYM, table_id,
         // add space for the TABLE_SYM pointer

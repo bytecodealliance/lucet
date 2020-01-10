@@ -70,7 +70,7 @@ impl<'a> Compiler<'a> {
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
         if let Some(v) = validator {
-            v.validate(wasm_binary).map_err(Error::Validashun)?; // TLC Don't ignore.
+            v.validate(wasm_binary)?;
         } else {
             // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside
             // cranelift-wasm does not validate. We need to run the validating parser on the binary

@@ -16,7 +16,7 @@ pub fn write_function_manifest(
     obj: &mut Artifact,
 ) -> Result<(), Error> {
     obj.declare(FUNCTION_MANIFEST_SYM, Decl::data())
-        .map_err(|_| Error::ManifestDeclaration(FUNCTION_MANIFEST_SYM.to_string()))?;
+        .map_err(|e| Error::ManifestDeclaration(e, FUNCTION_MANIFEST_SYM.to_string()))?;
 
     let mut manifest_buf: Cursor<Vec<u8>> = Cursor::new(Vec::with_capacity(
         functions.len() * size_of::<FunctionSpec>(),
@@ -57,7 +57,7 @@ pub fn write_function_manifest(
     }
 
     obj.define(FUNCTION_MANIFEST_SYM, manifest_buf.into_inner())
-        .map_err(|_| Error::ManifestDeclaration(FUNCTION_MANIFEST_SYM.to_string()))?;
+        .map_err(|e| Error::ManifestDeclaration(e, FUNCTION_MANIFEST_SYM.to_string()))?;
 
     Ok(())
 }

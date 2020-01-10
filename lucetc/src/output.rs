@@ -32,9 +32,9 @@ impl CraneliftFuncs {
         let mut buffer = String::new();
         for (n, func) in self.funcs.iter() {
             buffer.push_str(&format!("; {}\n", n.symbol()));
-            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into()).map_err(|_| {
+            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into()).map_err(|e| { 
                 let message = format!("{:?}", n);
-                Error::OutputFunction(message) // TLC Don't ignore
+                Error::OutputFunction(e, message)
             })?
         }
         let mut file = File::create(path)?;
@@ -128,7 +128,7 @@ impl ObjectFile {
         let file = File::create(path)?;
         self.artifact
             .write(file)
-            .map_err(|e| Error::ArtifactError(e.to_string()))?;
+            .map_err(Error::ArtifactError)?;
         Ok(())
     }
 }
@@ -141,7 +141,7 @@ fn write_module(
 ) -> Result<(), Error> {
     let mut native_data = Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
     obj.declare(LUCET_MODULE_SYM, Decl::data().global())
-        .map_err(|_| Error::ManifestDeclaration(FUNCTION_MANIFEST_SYM.to_string()))?;
+        .map_err(|e| Error::ManifestDeclaration(e, FUNCTION_MANIFEST_SYM.to_string()))?;
 
     let version =
         VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
