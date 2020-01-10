@@ -1,4 +1,5 @@
 use crate::instance::{FaultDetails, TerminationDetails};
+use lucetc::Error as LucetcError;
 use thiserror::Error;
 
 /// Lucet runtime errors.
@@ -19,6 +20,9 @@ pub enum Error {
     /// [`Limit`s](struct.Limits.html).
     #[error("Instance limits exceeded: {0}")]
     LimitsExceeded(String),
+
+    #[error("Lucetc error")]
+    LucetcError(#[from] LucetcError),
 
     /// A method call attempted to modify linear memory for an instance that
     /// does not have linear memory

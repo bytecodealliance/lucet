@@ -848,6 +848,7 @@ dependencies = [
  "libloading 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module 0.5.0",
  "lucet-runtime-macros 0.5.0",
+ "lucetc 0.5.0",
  "memoffset 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "nix 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
