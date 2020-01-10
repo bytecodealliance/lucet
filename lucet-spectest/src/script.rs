@@ -9,7 +9,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum ScriptError {
     #[error("Validation error")]
-    ValidationError(#[source] LucetcError), 
+    ValidationError(#[source] LucetcError),
     #[error("Program error")]
     ProgramError(#[source] LucetcError),
     #[error("Compile error")]
@@ -21,7 +21,7 @@ pub enum ScriptError {
     #[error("Malformed script: {0}")]
     MalformedScript(String),
     #[error("Runtime error: {1}")]
-    RuntimeError(#[source] lucet_runtime::Error, String), 
+    RuntimeError(#[source] lucet_runtime::Error, String),
     #[error("IO error")]
     IoError(#[from] io::Error),
 }
@@ -31,12 +31,10 @@ impl ScriptError {
         match self {
             ScriptError::ProgramError(ref lucetc_err)
             | ScriptError::ValidationError(ref lucetc_err)
-            | ScriptError::CompileError(ref lucetc_err) => {
-                match lucetc_err {
-                    &LucetcError::Unsupported(_) => true,
-                    _ => false,
-                }
-            }
+            | ScriptError::CompileError(ref lucetc_err) => match lucetc_err {
+                &LucetcError::Unsupported(_) => true,
+                _ => false,
+            },
             _ => false,
         }
     }

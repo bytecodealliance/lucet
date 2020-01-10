@@ -16,9 +16,8 @@ use std::path::PathBuf;
 use wabt::script::{Action, CommandKind, ScriptParser, Value};
 
 pub fn run_spec_test(spec_path: &PathBuf) -> Result<SpecScriptResult, Error> {
-    let wast = fs::read_to_string(spec_path)?; 
-    let mut parser: ScriptParser =
-        ScriptParser::from_str(&wast)?;
+    let wast = fs::read_to_string(spec_path)?;
+    let mut parser: ScriptParser = ScriptParser::from_str(&wast)?;
 
     let mut script = ScriptEnv::new();
     let mut res = SpecScriptResult::new();
