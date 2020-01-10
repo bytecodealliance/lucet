@@ -75,7 +75,7 @@ impl<'a> Compiler<'a> {
             // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside
             // cranelift-wasm does not validate. We need to run the validating parser on the binary
             // first. The InvalidWebAssembly error below will never trigger.
-            wasmparser::validate(wasm_binary, None)?;
+	    wasmparser::validate(wasm_binary, None).map_err(|_| Error::Validation)?;
         }
 
         let module_translation_state =
