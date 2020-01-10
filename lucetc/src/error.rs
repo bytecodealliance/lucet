@@ -19,10 +19,12 @@ pub enum Error {
     LucetValidation(#[from] lucet_validate::Error),
     #[error("I/O error")]
     IOError(#[from] std::io::Error),
+    #[error("Wasm validating parser error")]
+    WasmValidation(#[from] wasmparser::BinaryReaderError),
     #[error("Wat input")]
     WatInput(#[from] wabt::Error),
     /*
-     * Cannot apply #[source] to these errors due to missing traits. */
+     * Cannot apply #[from] or #[source] to these error types due to missing traits. */
     #[error("Artifact error: {0:?}")]
     ArtifactError(failure::Error),
     #[error("Manifest error declaring {1}: {0:?}")]
@@ -31,8 +33,16 @@ pub enum Error {
     ManifestDefinition(ArtifactError, String),
     #[error("Manifest error linking {1}: {0:?}")]
     ManifestLinking(failure::Error, String),
+    #[error("Patcher error: {0:?}")]
+    Patcher(wasmonkey::WError),
     #[error("Stack probe: {0:?}")]
     StackProbe(failure::Error),
+    #[error("Table: {0:?}")]
+    Table(failure::Error),
+    #[error("Trap table error declaring {1}: {0:?}")]
+    TrapTableDeclaration(ArtifactError, String),
+    #[error("Error defining {0} writing the function trap table into the object: {0:?}")]
+    TrapTableDefinition(ArtifactError, String),
     /*
      * And all the rest */
     #[error("Function definition error in {symbol}")]
@@ -71,8 +81,6 @@ pub enum Error {
     Output(String),
     #[error("Output function: error writing function {1}")]
     OutputFunction(#[source] std::fmt::Error, String),
-    #[error("Patcher error")]
-    Patcher,
     #[error("Path error: {0}")]
     PathError(String),
     #[error("Read error: {0}")]
@@ -82,8 +90,6 @@ pub enum Error {
     #[error("Error converting cranelift signature to wasm signature: {0}")]
     //    SignatureConversion(#[from] SignatureError), // TLC I wish I could do this...
     SignatureConversion(String),
-    #[error("Table")]
-    Table,
     #[error("Table index is out of bounds: {0}")]
     TableIndexError(String),
     #[error("Translating module")]
@@ -94,16 +100,12 @@ pub enum Error {
     TranslatingClifModule(#[source] ClifModuleError),
     #[error("Translating cranelift wasm")]
     TranslatingClifWasm(#[source] ClifWasmError),
-    #[error("Error defining {0} writing the function trap table into the object")]
-    TrapDefinition(String),
     #[error("Trap records are present for function {0} but the function does not exist.")]
     TrapRecord(String),
-    #[error("Trap table error declaring {0}")]
-    TrapTable(String),
     #[error("Unsupported: {0}")]
     Unsupported(String),
+    #[error("host machine is not a supported target")]
+    UnsupportedIsa(#[from] cranelift_codegen::isa::LookupError),
     #[error("Validation")]
     Validation,
-    #[error("Zzz")]
-    ZzzError,
 }

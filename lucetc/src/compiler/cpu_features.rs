@@ -192,9 +192,7 @@ impl CpuFeatures {
                 Error::Unsupported("host machine is not a supported target".to_string())
             })
         } else {
-            isa::lookup(Triple::host()).map_err(|_| {
-                Error::Unsupported("host machine is not a supported target".to_string())
-            })
+            isa::lookup(Triple::host()).map_err(Error::UnsupportedIsa)
         }?;
 
         let mut specific_features = self.specific_features.clone();

@@ -58,7 +58,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
             to: table.symbol(),
             at: (TABLE_REF_SIZE * idx) as u64,
         })
-        .map_err(|_| Error::Table)?; /* From<failure::error::Error> */
+        .map_err(Error::Table)?;
     }
     Ok(())
 }
