@@ -31,22 +31,22 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     let converted = if wasm_preamble(&bytes) {
         bytes
     } else {
-	wat2wasm(bytes).map_err(|err| {
-            use std::error::Error;	
-            let mut result = err.description().to_string();	
-            match unsafe { std::mem::transmute::<wabt::Error, wabt::ErrorKind>(err) } {	
-                ErrorKind::Parse(msg) |	
-                // this shouldn't be reachable - we're going the other way	
-                ErrorKind::Deserialize(msg) |	
+        wat2wasm(bytes).map_err(|err| {
+            use std::error::Error;
+            let mut result = err.description().to_string();
+            match unsafe { std::mem::transmute::<wabt::Error, wabt::ErrorKind>(err) } {
+                ErrorKind::Parse(msg) |
+                // this shouldn't be reachable - we're going the other way
+                ErrorKind::Deserialize(msg) |
                 // not sure how this error comes up	
-                ErrorKind::ResolveNames(msg) |	
-                ErrorKind::Validate(msg) => {	
-                    result.push_str(":\n");	
-                    result.push_str(&msg);	
-                },	
-                _ => { }	
-            };	
-	    crate::error::Error::ReadError(result)
+                ErrorKind::ResolveNames(msg) |
+                ErrorKind::Validate(msg) => {
+                    result.push_str(":\n");
+                    result.push_str(&msg);
+                },
+                _ => { }
+            };
+            crate::error::Error::ReadError(result)
         })?
     };
     Ok(converted)

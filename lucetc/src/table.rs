@@ -58,7 +58,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
             to: table.symbol(),
             at: (TABLE_REF_SIZE * idx) as u64,
         })
-        .map_err(|_| Error::Table)?;  /* From<failure::error::Error> */
+        .map_err(|_| Error::Table)?; /* From<failure::error::Error> */
     }
     Ok(())
 }
@@ -94,7 +94,7 @@ pub fn write_table_data<B: ClifBackend>(
                     // Note: this is the only place we validate that the table entry points to a valid
                     // function. If this is ever removed, make sure this check happens elsewhere.
                     let func = decls.get_func(*func_index)?;
-		    
+
                     // First element in row is the SignatureIndex for the function
                     putelem(&mut table_data, func.signature_index.as_u32() as u64);
 
@@ -122,8 +122,7 @@ pub fn write_table_data<B: ClifBackend>(
             .contents_name
             .as_dataid()
             .expect("tables are data");
-        clif_module
-            .define_data(table_id, &table_ctx)?;
+        clif_module.define_data(table_id, &table_ctx)?;
 
         // have to link TABLE_SYM, table_id,
         // add space for the TABLE_SYM pointer
@@ -141,14 +140,12 @@ pub fn write_table_data<B: ClifBackend>(
     let mut table_data_ctx = DataContext::new();
     table_data_ctx.define(inner.into_boxed_slice());
 
-    clif_module
-        .define_data(
-            decls
-                .get_tables_list_name()
-                .as_dataid()
-                .expect("lucet_tables is declared as data"),
-            &table_data_ctx,
-        )
-        .map_err(Error::Tayble)?; 
+    clif_module.define_data(
+        decls
+            .get_tables_list_name()
+            .as_dataid()
+            .expect("lucet_tables is declared as data"),
+        &table_data_ctx,
+    )?;
     Ok(table_names)
 }

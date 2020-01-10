@@ -32,7 +32,7 @@ impl CraneliftFuncs {
         let mut buffer = String::new();
         for (n, func) in self.funcs.iter() {
             buffer.push_str(&format!("; {}\n", n.symbol()));
-            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into()).map_err(|e| { 
+            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into()).map_err(|e| {
                 let message = format!("{:?}", n);
                 Error::OutputFunction(e, message)
             })?
@@ -126,9 +126,7 @@ impl ObjectFile {
             Error::PathError(message);
         });
         let file = File::create(path)?;
-        self.artifact
-            .write(file)
-            .map_err(Error::ArtifactError)?;
+        self.artifact.write(file).map_err(Error::ArtifactError)?;
         Ok(())
     }
 }
@@ -171,7 +169,7 @@ fn write_module(
     )?;
 
     obj.define(LUCET_MODULE_SYM, native_data.into_inner())
-        .map_err(|_| Error::ManifestDefinition(FUNCTION_MANIFEST_SYM.to_string()))?;
+        .map_err(|source| Error::ManifestDefinition(source, FUNCTION_MANIFEST_SYM.to_string()))?;
 
     Ok(())
 }
@@ -206,7 +204,7 @@ pub(crate) fn write_relocated_slice(
                 },
                 absolute_reloc,
             )
-            .map_err(|_| Error::ManifestLinking(to.to_string()))?; // TLC Don't ignore.
+            .map_err(|source| Error::ManifestLinking(source, to.to_string()))?;
         }
         (Some(to), _len) => {
             // This is a local buffer of known size
@@ -215,7 +213,7 @@ pub(crate) fn write_relocated_slice(
                 to,   // is a reference to `to`    (eg. fn_name)
                 at: buf.position(),
             })
-            .map_err(|_| Error::ManifestLinking(to.to_string()))?; // TLC Don't ignore.
+            .map_err(|source| Error::ManifestLinking(source, to.to_string()))?;
         }
         (None, len) => {
             // There's actually no relocation to add, because there's no slice to put here.

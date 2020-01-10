@@ -7,6 +7,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    /*
+     * General #[from] implementations. */
     #[error("Build error")]
     Build(#[from] parity_wasm::elements::Error),
     #[error("Clif module error")]
@@ -14,17 +16,25 @@ pub enum Error {
     #[error("Lucet Module error")]
     LucetModule(#[from] LucetModuleError),
     #[error("Lucet validation error")]
-    LucetValidation(#[from] lucet_validate::Error),    
+    LucetValidation(#[from] lucet_validate::Error),
     #[error("I/O error")]
     IOError(#[from] std::io::Error),
     #[error("Wat input")]
-    WatInput(#[from] wabt::Error),    
-
+    WatInput(#[from] wabt::Error),
+    /*
+     * Cannot apply #[source] to these errors due to missing traits. */
     #[error("Artifact error: {0:?}")]
     ArtifactError(failure::Error),
     #[error("Manifest error declaring {1}: {0:?}")]
     ManifestDeclaration(ArtifactError, String),
-    
+    #[error("Manifest error defining {1}: {0:?}")]
+    ManifestDefinition(ArtifactError, String),
+    #[error("Manifest error linking {1}: {0:?}")]
+    ManifestLinking(failure::Error, String),
+    #[error("Stack probe: {0:?}")]
+    StackProbe(failure::Error),
+    /*
+     * And all the rest */
     #[error("Function definition error in {symbol}")]
     FunctionDefinition {
         symbol: String,
@@ -53,10 +63,6 @@ pub enum Error {
     InitData,
     #[error("Input error: {0}")]
     Input(String),
-    #[error("Manifest error defining {0}")]
-    ManifestDefinition(String),
-    #[error("Manifest error linking {0}")]
-    ManifestLinking(String),
     #[error("Memory specs: {0}")]
     MemorySpecs(String),
     #[error("Metadata serializer; start index point to a non-function")]
@@ -80,14 +86,12 @@ pub enum Error {
     SignatureConversion(String),
     #[error("Table")]
     Table,
-    #[error("Tayble")]
-    Tayble(#[source] ClifModuleError),
     #[error("Table index is out of bounds: {0}")]
     TableIndexError(String),
     #[error("Translating module")]
     TranslatingModule,
     #[error("Translating lucet module")]
-    TranslatingLucetModule(#[source] LucetModuleError),    
+    TranslatingLucetModule(#[source] LucetModuleError),
     #[error("Translating cranelift module")]
     TranslatingClifModule(#[source] ClifModuleError),
     #[error("Translating cranelift wasm")]
@@ -98,8 +102,6 @@ pub enum Error {
     TrapRecord(String),
     #[error("Trap table error declaring {0}")]
     TrapTable(String),
-    #[error("Stack probe")]
-    StackProbe,
     #[error("Unsupported: {0}")]
     Unsupported(String),
     #[error("Validation")]

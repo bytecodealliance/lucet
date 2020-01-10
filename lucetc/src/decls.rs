@@ -266,9 +266,7 @@ impl<'a> ModuleDecls<'a> {
             table_names.push(def_name);
         }
 
-        let tables_list_id = clif_module
-            .declare_data(TABLE_SYM, Linkage::Export, false, None)
-            .map_err(Error::Tayble)?;
+        let tables_list_id = clif_module.declare_data(TABLE_SYM, Linkage::Export, false, None)?;
         let tables_list = Name::new_data(TABLE_SYM.to_string(), tables_list_id);
 
         Ok((tables_list, table_names))
