@@ -21,9 +21,6 @@ pub enum Error {
     #[error("Instance limits exceeded: {0}")]
     LimitsExceeded(String),
 
-    #[error("Lucetc error")]
-    LucetcError(#[from] LucetcError),
-
     /// A method call attempted to modify linear memory for an instance that
     /// does not have linear memory
     #[error("No linear memory available: {0}")]
@@ -62,6 +59,11 @@ pub enum Error {
     #[error("Start function yielded")]
     StartYielded,
 
+    // A test in instruction_counting.rs requires the conversion of a
+    // Lucetc error to the error type in this crate. 
+    #[error("Lucetc error")]
+    LucetcError(#[from] LucetcError),
+    
     /// A catch-all for internal errors that are likely unrecoverable by the runtime user.
     ///
     /// As the API matures, these will likely become rarer, replaced by new variants of this enum,

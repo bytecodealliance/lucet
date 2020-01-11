@@ -1,5 +1,5 @@
 use lucet_runtime::{DlModule, Error, Limits, MmapRegion, Region, RunResult};
-use lucetc::{Lucetc, LucetcOpts};
+use lucetc::{Error as LucetcError, Lucetc, LucetcOpts};
 use rayon::prelude::*;
 use std::fs::DirEntry;
 use std::path::Path;
