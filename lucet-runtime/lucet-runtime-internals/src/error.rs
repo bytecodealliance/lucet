@@ -60,10 +60,10 @@ pub enum Error {
     StartYielded,
 
     // A test in instruction_counting.rs requires the conversion of a
-    // Lucetc error to the error type in this crate. 
+    // Lucetc error to the error type in this crate.
     #[error("Lucetc error")]
     LucetcError(#[from] LucetcError),
-    
+
     /// A catch-all for internal errors that are likely unrecoverable by the runtime user.
     ///
     /// As the API matures, these will likely become rarer, replaced by new variants of this enum,

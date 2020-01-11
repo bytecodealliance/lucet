@@ -97,7 +97,7 @@ impl From<&Error> for lucet_error {
             Error::RegionFull(_) => lucet_error::RegionFull,
             Error::ModuleError(_) => lucet_error::Module,
             Error::LimitsExceeded(_) => lucet_error::LimitsExceeded,
-	    Error::LucetcError(_) => lucet_error::LucetcError,
+            Error::LucetcError(_) => lucet_error::LucetcError,
             Error::NoLinearMemory(_) => lucet_error::NoLinearMemory,
             Error::SymbolNotFound(_) => lucet_error::SymbolNotFound,
             Error::FuncNotFound(_, _) => lucet_error::FuncNotFound,
