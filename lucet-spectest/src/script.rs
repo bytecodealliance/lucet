@@ -76,9 +76,9 @@ impl ScriptEnv {
 
         compiler
             .object_file()
-            .map_err(|e| ScriptError::CompileError(e))?
+            .map_err(ScriptError::CompileError)?
             .write(&objfile_path)
-            .map_err(|e| ScriptError::CodegenError(e))?;
+            .map_err(ScriptError::CodegenError)?;
 
         let mut cmd_ld = Command::new("ld");
         cmd_ld.arg(objfile_path.clone());

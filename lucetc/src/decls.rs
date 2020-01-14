@@ -235,7 +235,7 @@ impl<'a> ModuleDecls<'a> {
                 decl_linkage,
                 self.info.signature_for_function(func_ix),
             )
-            .map_err(Error::TranslatingClifModule)?;
+            .map_err(Error::TranslatingClifModule)?; // TLC
 
         if func_ix.as_u32() as usize >= self.function_names.len() {
             // `func_ix` is new, so we need to add the name. If func_ix is new, it should be

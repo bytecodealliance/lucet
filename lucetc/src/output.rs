@@ -99,7 +99,7 @@ impl ObjectFile {
                     FunctionSpec::new(0, fn_spec.code_len(), 0, sink.sites.len() as u64),
                 );
             } else {
-                Error::TrapRecord(sink.name.to_owned());
+                return Err(Error::TrapRecord(sink.name.to_owned())); // TLC
             }
         }
 

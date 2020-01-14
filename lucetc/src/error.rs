@@ -9,6 +9,8 @@ use thiserror::Error;
 pub enum Error {
     /*
      * General #[from] implementations. */
+    #[error("Anyhow error")]
+    Any(#[from] anyhow::Error),
     #[error("Build error")]
     Build(#[from] parity_wasm::elements::Error),
     #[error("Clif module error")]

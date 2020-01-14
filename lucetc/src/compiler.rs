@@ -16,6 +16,7 @@ use cranelift_codegen::{
     settings::{self, Configurable},
     Context as ClifContext,
 };
+use anyhow::{format_err};
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
@@ -70,7 +71,7 @@ impl<'a> Compiler<'a> {
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
         if let Some(v) = validator {
-            v.validate(wasm_binary)?;
+            v.validate(wasm_binary).map_err(|_| Error::Validation)?;
         } else {
             // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside
             // cranelift-wasm does not validate. We need to run the validating parser on the binary
@@ -160,7 +161,7 @@ impl<'a> Compiler<'a> {
 
         stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
 
-        let module_data_bytes = self.module_data()?.serialize()?;
+        let module_data_bytes = self.module_data()?.serialize()?; // TLC
 
         let module_data_len = module_data_bytes.len();
 
@@ -189,7 +190,7 @@ impl<'a> Compiler<'a> {
             module_data_len,
             function_manifest,
             table_names,
-        )?;
+        )?; // TLC
 
         Ok(obj)
     }
@@ -275,7 +276,8 @@ fn write_startfunc_data<B: ClifBackend>(
         let start_func = decls
             .get_func(func_ix)
             .expect("start func is valid func id");
-        let fid = start_func.name.as_funcid().unwrap();
+        let fid = start_func.name.as_funcid()
+	    .ok_or(format_err!("start index pointed to a non-function"))?;
         let fref = clif_module.declare_func_in_data(fid, &mut ctx);
         ctx.write_function_addr(0, fref);
         clif_module

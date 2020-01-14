@@ -158,7 +158,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                                     "AssertExhaustion expects stack overflow, got {}. {:?}",
                                     s, e
                                 );
-                                Err(Error::UnexpectedFailure(message))
+                                Err(Error::UnexpectedFailure(message))?
                             }
                         }
                     }
