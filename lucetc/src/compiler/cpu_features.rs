@@ -184,7 +184,7 @@ impl CpuFeatures {
     }
 
     /// Return a `cranelift_codegen::isa::Builder` configured with these CPU features.
-    pub fn isa_builder(&self) -> Result<isa::Builder, LucetcError> {
+    pub fn isa_builder(&self, target: Triple) -> Result<isa::Builder, LucetcError> {
         use SpecificFeature::*;
         use TargetCpu::*;
 
@@ -192,8 +192,7 @@ impl CpuFeatures {
             cranelift_native::builder()
                 .map_err(|_| format_err!("host machine is not a supported target"))
         } else {
-            isa::lookup(Triple::host())
-                .map_err(|_| format_err!("host machine is not a supported target"))
+            isa::lookup(target).map_err(|_| format_err!("not a supported target"))
         }
         .context(LucetcErrorKind::Unsupported)?;
 

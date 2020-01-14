@@ -9,6 +9,7 @@ mod lucetc_tests {
     use std::fs::File;
     use std::io::Read;
     use std::path::PathBuf;
+    use target_lexicon::Triple;
 
     /// Compile C -> WebAssembly using wasi-sdk's clang. Does not use the wasi-sdk
     /// libc, and does not produce a wasi executable, just a wasm module with the given set of
@@ -46,6 +47,7 @@ mod lucetc_tests {
         let v = Validator::parse("").expect("empty validation environment");
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -90,6 +92,7 @@ mod lucetc_tests {
 
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -120,6 +123,7 @@ mod lucetc_tests {
         .expect("empty validation environment");
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -146,6 +150,7 @@ mod lucetc_tests {
         let v = Validator::parse("").expect("empty validation environment");
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -196,6 +201,7 @@ mod lucetc_tests {
         // Compiler will only unwrap if the Validator defined above accepts the module
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,

@@ -5,6 +5,7 @@ use lucetc::{Compiler, CpuFeatures, HeapSettings, LucetcError, LucetcErrorKind, 
 use std::io;
 use std::process::Command;
 use std::sync::Arc;
+use target_lexicon::Triple;
 
 #[derive(Fail, Debug)]
 pub enum ScriptError {
@@ -69,6 +70,7 @@ impl ScriptEnv {
         let bindings = bindings::spec_test_bindings();
         let compiler = Compiler::new(
             module,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::baseline(),
             &bindings,

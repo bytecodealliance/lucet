@@ -23,6 +23,7 @@ use failure::{format_err, Fail, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::{FunctionSpec, ModuleData, ModuleFeatures, MODULE_DATA_SYM};
 use lucet_validate::Validator;
+use target_lexicon::Triple;
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
@@ -50,6 +51,7 @@ impl OptLevel {
 pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
     clif_module: ClifModule<FaerieBackend>,
+    target: Triple,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
     count_instructions: bool,
@@ -59,6 +61,7 @@ pub struct Compiler<'a> {
 impl<'a> Compiler<'a> {
     pub fn new(
         wasm_binary: &'a [u8],
+        target: Triple,
         opt_level: OptLevel,
         cpu_features: CpuFeatures,
         bindings: &'a Bindings,
@@ -66,7 +69,7 @@ impl<'a> Compiler<'a> {
         count_instructions: bool,
         validator: &Option<Validator>,
     ) -> Result<Self, LucetcError> {
-        let isa = Self::target_isa(opt_level, &cpu_features)?;
+        let isa = Self::target_isa(target.clone(), opt_level, &cpu_features)?;
 
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
@@ -130,6 +133,7 @@ impl<'a> Compiler<'a> {
             cpu_features,
             count_instructions,
             module_translation_state,
+            target,
         })
     }
 
@@ -233,16 +237,17 @@ impl<'a> Compiler<'a> {
         }
         Ok(CraneliftFuncs::new(
             funcs,
-            Self::target_isa(self.opt_level, &self.cpu_features)?,
+            Self::target_isa(self.target, self.opt_level, &self.cpu_features)?,
         ))
     }
 
     fn target_isa(
+        target: Triple,
         opt_level: OptLevel,
         cpu_features: &CpuFeatures,
     ) -> Result<Box<dyn TargetIsa>, LucetcError> {
         let mut flags_builder = settings::builder();
-        let isa_builder = cpu_features.isa_builder()?;
+        let isa_builder = cpu_features.isa_builder(target)?;
         flags_builder.enable("enable_verifier").unwrap();
         flags_builder.enable("is_pic").unwrap();
         flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
