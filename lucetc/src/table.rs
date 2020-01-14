@@ -93,7 +93,7 @@ pub fn write_table_data<B: ClifBackend>(
                 Elem::Func(func_index) => {
                     // Note: this is the only place we validate that the table entry points to a valid
                     // function. If this is ever removed, make sure this check happens elsewhere.
-                    let func = decls.get_func(*func_index)?;  // TLC
+                    let func = decls.get_func(*func_index)?; // TLC
 
                     // First element in row is the SignatureIndex for the function
                     putelem(&mut table_data, func.signature_index.as_u32() as u64);

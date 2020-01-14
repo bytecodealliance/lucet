@@ -10,13 +10,13 @@ use crate::output::{CraneliftFuncs, ObjectFile};
 use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
+use anyhow::format_err;
 use cranelift_codegen::{
     ir,
     isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
 };
-use anyhow::{format_err};
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
@@ -276,8 +276,10 @@ fn write_startfunc_data<B: ClifBackend>(
         let start_func = decls
             .get_func(func_ix)
             .expect("start func is valid func id");
-        let fid = start_func.name.as_funcid()
-	    .ok_or(format_err!("start index pointed to a non-function"))?;
+        let fid = start_func
+            .name
+            .as_funcid()
+            .ok_or(format_err!("start index pointed to a non-function"))?;
         let fref = clif_module.declare_func_in_data(fid, &mut ctx);
         ctx.write_function_addr(0, fref);
         clif_module
