@@ -346,7 +346,7 @@ impl Lucetc {
         self.link.link(&self.wasm_file)?;
         self.lucetc
             .shared_object_file(output.as_ref())
-            .map_err(|e| CompileError::Lucetc(e))?;
+            .map_err(CompileError::Lucetc)?;
         Ok(self.tmpdir.close()?)
     }
 }
