@@ -101,7 +101,10 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
                 Err(ScriptError::ValidationError(_)) => Ok(()),
-                Ok(_) => Err(Error::UnexpectedSuccess)?,
+                Ok(o) => {
+		    println!("{:?}", o);
+		    Err(Error::UnexpectedSuccess)?
+		},
                 Err(e) => Err(unexpected_failure(e))?,
             }
         }
