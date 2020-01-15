@@ -30,6 +30,14 @@ impl From<Error> for SerializedLucetcError {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+enum BindingError {
+    #[error("adding bindings from {1}")]
+    ExtendError(#[source] lucet_module::error::Error, String),
+    #[error("bindings file {1}")]
+    FileError(#[source] lucet_module::error::Error, String),
+}
+
 fn main() {
     env_logger::init();
 
@@ -66,11 +74,17 @@ pub fn run(opts: &Options) -> Result<(), Error> {
 
     let mut bindings = Bindings::empty();
     for file in opts.binding_files.iter() {
-        let file_bindings =
-            Bindings::from_file(file).map_err(|_| format_err!("bindings file {:?}", file))?;
+        let file_bindings = Bindings::from_file(file).map_err(|source| {
+            let file = format!("{:?}", file);
+            BindingError::FileError(source, file)
+        })?;
+
         bindings
             .extend(&file_bindings)
-            .map_err(|_| format_err!("adding bindings from {:?}", file))?;
+            .map_err(|source| {
+		let file = format!("{:?}", file);
+		BindingError::ExtendError(source, file)
+	    })?;
     }
 
     let mut c = Lucetc::new(PathBuf::from(input))
