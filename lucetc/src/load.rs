@@ -38,7 +38,7 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
                 ErrorKind::Parse(msg) |
                 // this shouldn't be reachable - we're going the other way
                 ErrorKind::Deserialize(msg) |
-                // not sure how this error comes up	
+                // not sure how this error comes up
                 ErrorKind::ResolveNames(msg) |
                 ErrorKind::Validate(msg) => {
                     result.push_str(":\n");
