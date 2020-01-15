@@ -98,8 +98,7 @@ impl<'a> Compiler<'a> {
                 "lucet_guest".to_owned(),
                 FaerieTrapCollection::Enabled,
                 libcalls,
-            )
-            .map_err(Error::ClifModuleError)?,
+            )?,
         );
 
         let runtime = Runtime::lucet(frontend_config);

@@ -1,4 +1,4 @@
-use crate::types::SignatureError;  
+use crate::types::SignatureError;
 use cranelift_module::ModuleError as ClifModuleError;
 use cranelift_wasm::WasmError as ClifWasmError;
 use faerie::ArtifactError;
@@ -37,7 +37,7 @@ pub enum Error {
     #[error("Patcher error: {0:?}")]
     Patcher(wasmonkey::WError),
     #[error("Error converting cranelift signature to wasm signature: {0:?}")]
-    SignatureConversion(SignatureError), 
+    SignatureConversion(SignatureError),
     #[error("Stack probe: {0:?}")]
     StackProbe(failure::Error),
     #[error("Table: {0:?}")]
