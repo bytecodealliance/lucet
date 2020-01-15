@@ -147,11 +147,11 @@ impl<'a> ModuleDecls<'a> {
             func_ix: UniqueFuncIndex,
             decls: &mut ModuleDecls<'a>,
             bindings: &'a Bindings,
-        ) -> Result<Option<String>, failure::Context<LucetcErrorKind>> {
+        ) -> Result<Option<String>, Error> {
             if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
                 let import_symbol = bindings
                     .translate(import_mod, import_field)
-                    .context(LucetcErrorKind::TranslatingModule)?;
+		    .map_err(Error::TranslatingLucetModule)?;
                 decls.imports.push(ImportFunction {
                     fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                     module: import_mod,
