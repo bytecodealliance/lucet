@@ -1,4 +1,4 @@
-// use crate::types::SignatureError;  // TLC impl something so I can use this...
+use crate::types::SignatureError;  
 use cranelift_module::ModuleError as ClifModuleError;
 use cranelift_wasm::WasmError as ClifWasmError;
 use faerie::ArtifactError;
@@ -36,6 +36,8 @@ pub enum Error {
     ManifestLinking(failure::Error, String),
     #[error("Patcher error: {0:?}")]
     Patcher(wasmonkey::WError),
+    #[error("Error converting cranelift signature to wasm signature: {0:?}")]
+    SignatureConversion(SignatureError), 
     #[error("Stack probe: {0:?}")]
     StackProbe(failure::Error),
     #[error("Table: {0:?}")]
@@ -90,9 +92,7 @@ pub enum Error {
     StartError,
     #[error("Signature error: {0}")]
     Signature(String),
-    #[error("Error converting cranelift signature to wasm signature: {0}")]
-    //    SignatureConversion(#[from] SignatureError), // TLC I wish I could do this...
-    SignatureConversion(String),
+    //SignatureConversion(String),
     #[error("Table index is out of bounds: {0}")]
     TableIndexError(String),
     #[error("Translating module")]

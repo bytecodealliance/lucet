@@ -539,10 +539,7 @@ impl<'a> ModuleDecls<'a> {
             .signatures
             .values()
             .map(|sig| {
-                to_lucet_signature(sig).map_err(|e| {
-                    let message = format!("{:?}", e);
-                    Error::SignatureConversion(message)
-                })
+                to_lucet_signature(sig).map_err(Error::SignatureConversion)
             })
             .collect::<Result<Vec<LucetSignature>, Error>>()?;
 
