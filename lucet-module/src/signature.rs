@@ -150,22 +150,18 @@ impl RawModuleAndData {
         let obj = object::ElfFile::parse(obj_bin)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
         let symbol_map = obj.symbol_map();
-        for symbol in symbol_map.symbols() {
-            let kind = symbol.kind();
-            if kind != SymbolKind::Data {
-                continue;
+        for symbol in symbol_map
+            .symbols()
+            .iter()
+            .filter(|sym| sym.kind() == SymbolKind::Data)
+            .filter(|sym| sym.name() == Some(symbol_name))
+        {
+            if let Some(section_index) = symbol.section_index() {
+                let section = &obj.elf().section_headers[section_index.0];
+                let offset = (symbol.address() - section.sh_addr + section.sh_offset) as usize;
+                let len = symbol.size() as usize;
+                return Ok(Some(SymbolData { offset, len }));
             }
-            if symbol.name() != Some(symbol_name) {
-                continue;
-            }
-            let section_index = match symbol.section_index() {
-                Some(section_index) => section_index,
-                None => continue,
-            };
-            let section = &obj.elf().section_headers[section_index.0];
-            let offset = (symbol.address() - section.sh_addr + section.sh_offset) as usize;
-            let len = symbol.size() as usize;
-            return Ok(Some(SymbolData { offset, len }));
         }
         Ok(None)
     }
@@ -186,14 +182,12 @@ impl RawModuleAndData {
         } else {
             symbol_name
         };
-        for symbol in symbol_map.symbols() {
-            let kind = symbol.kind();
-            if kind != SymbolKind::Data && kind != SymbolKind::Unknown {
-                continue;
-            }
-            if symbol.name() != Some(symbol_name) {
-                continue;
-            }
+        if let Some(symbol) = symbol_map
+            .symbols()
+            .iter()
+            .filter(|sym| sym.kind() == SymbolKind::Data || sym.kind() == SymbolKind::Unknown)
+            .find(|sym| sym.name() == Some(symbol_name))
+        {
             let offset = symbol.address() as usize;
             let len = symbol.size() as usize;
             return Ok(Some(SymbolData { offset, len }));
