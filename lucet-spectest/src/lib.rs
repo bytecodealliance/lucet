@@ -45,7 +45,7 @@ fn unexpected_failure(e: ScriptError) -> Error {
     if e.unsupported() {
         Error::UnsupportedLucetc
     } else {
-        Error::UnexpectedFailure(String::new())
+        Error::UnexpectedFailure(e.to_string())
     }
 }
 
