@@ -71,19 +71,22 @@ impl<'a> Compiler<'a> {
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
         if let Some(v) = validator {
-            v.validate(wasm_binary).map_err(|_| Error::Validation)?;
+            v.validate(wasm_binary).map_err(Error::LucetValidation)?;
         } else {
             // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside
             // cranelift-wasm does not validate. We need to run the validating parser on the binary
             // first. The InvalidWebAssembly error below will never trigger.
-            wasmparser::validate(wasm_binary, None).map_err(|_| Error::Validation)?;
+            wasmparser::validate(wasm_binary, None).map_err(Error::WasmValidation)?;
         }
 
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
                 WasmError::User(u) => Error::Input(u.to_string()),
-                WasmError::InvalidWebAssembly { .. } => Error::Validation,
-                WasmError::Unsupported { .. } => Error::Unsupported(String::new()),
+                WasmError::InvalidWebAssembly { message, offset } => {
+                    let message = format!("invalid input at offset {}: {}", offset, message);
+                    Error::Validation(message)
+                }
+                WasmError::Unsupported(s) => Error::Unsupported(s.to_owned()),
                 WasmError::ImplLimitExceeded { .. } => Error::TranslatingModule,
             })?;
 
@@ -92,14 +95,12 @@ impl<'a> Compiler<'a> {
             _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
-        let mut clif_module: ClifModule<FaerieBackend> = ClifModule::new(
-            FaerieBuilder::new(
-                isa,
-                "lucet_guest".to_owned(),
-                FaerieTrapCollection::Enabled,
-                libcalls,
-            )?,
-        );
+        let mut clif_module: ClifModule<FaerieBackend> = ClifModule::new(FaerieBuilder::new(
+            isa,
+            "lucet_guest".to_owned(),
+            FaerieTrapCollection::Enabled,
+            libcalls,
+        )?);
 
         let runtime = Runtime::lucet(frontend_config);
         let decls = ModuleDecls::new(

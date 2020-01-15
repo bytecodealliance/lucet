@@ -5,6 +5,15 @@ use faerie::ArtifactError;
 use lucet_module::error::Error as LucetModuleError;
 use thiserror::Error;
 
+pub fn validation_error(e: Error) -> bool {
+    match e {
+        Error::LucetValidation(_) => true,
+        Error::Validation(_) => true,
+        Error::WasmValidation(_) => true,
+        _ => false,
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum Error {
     /*
@@ -19,9 +28,8 @@ pub enum Error {
     LucetValidation(#[from] lucet_validate::Error),
     #[error("I/O error")]
     IOError(#[from] std::io::Error),
-    // Attempts to use this in compilers.rs cause many failures in spectests.
-    // #[error("Wasm validating parser error")]
-    // WasmValidation(#[from] wasmparser::BinaryReaderError),
+    #[error("Wasm validating parser error")]
+    WasmValidation(#[from] wasmparser::BinaryReaderError),
     #[error("Wat input")]
     WatInput(#[from] wabt::Error),
     /*
@@ -108,8 +116,8 @@ pub enum Error {
     Unsupported(String),
     #[error("host machine is not a supported target")]
     UnsupportedIsa(#[from] cranelift_codegen::isa::LookupError),
-    #[error("Validation")]
-    Validation,
+    #[error("Validation: {0}")]
+    Validation(String),
     #[error("Writing clif file to file")]
     WritingClifFile(#[source] ClifModuleError),
 }
