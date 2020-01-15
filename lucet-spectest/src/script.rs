@@ -50,8 +50,9 @@ pub struct ScriptEnv {
 
 fn program_error(e: LucetcError) -> ScriptError {
     match e {
-        LucetcError::Validation(_) => ScriptError::ValidationError(e),
-        LucetcError::WasmValidation(_) => ScriptError::ValidationError(e),
+        LucetcError::Validation(_) | LucetcError::WasmValidation(_) => {
+            ScriptError::ValidationError(e)
+        }
         _ => ScriptError::ProgramError(e),
     }
 }
