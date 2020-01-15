@@ -114,58 +114,58 @@ impl<'a> ModuleDecls<'a> {
         clif_module: &mut ClifModule<B>,
         bindings: &'a Bindings,
     ) -> Result<(), LucetcError> {
+        // Get the name for this function from the module names section, if it exists.
+        // Because names have to be unique, we append the index value (ix) to the name.
+        fn custom_name_for<'a>(
+            ix: usize,
+            func_index: UniqueFuncIndex,
+            decls: &mut ModuleDecls<'a>,
+        ) -> Option<String> {
+            decls
+                .info
+                .function_names
+                .get(func_index)
+                .map(|s| format!("{}_{}", s, ix))
+        }
+
+        fn export_name_for<'a>(
+            func_ix: UniqueFuncIndex,
+            decls: &mut ModuleDecls<'a>,
+        ) -> Option<String> {
+            let export = decls.info.functions.get(func_ix).unwrap();
+            if !export.export_names.is_empty() {
+                decls.exports.push(ExportFunction {
+                    fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
+                    names: export.export_names.clone(),
+                });
+                Some(format!("guest_func_{}", export.export_names[0]))
+            } else {
+                None
+            }
+        }
+
+        fn import_name_for<'a>(
+            func_ix: UniqueFuncIndex,
+            decls: &mut ModuleDecls<'a>,
+            bindings: &'a Bindings,
+        ) -> Result<Option<String>, failure::Context<LucetcErrorKind>> {
+            if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
+                let import_symbol = bindings
+                    .translate(import_mod, import_field)
+                    .context(LucetcErrorKind::TranslatingModule)?;
+                decls.imports.push(ImportFunction {
+                    fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
+                    module: import_mod,
+                    name: import_field,
+                });
+                Ok(Some(import_symbol.to_string()))
+            } else {
+                Ok(None)
+            }
+        }
+
         for ix in 0..decls.info.functions.len() {
             let func_index = UniqueFuncIndex::new(ix);
-
-            // Get the name for this function from the module names section, if it exists.
-            // Because names have to be unique, we append the index value (ix) to the name.
-            fn custom_name_for<'a>(
-                ix: usize,
-                func_index: UniqueFuncIndex,
-                decls: &mut ModuleDecls<'a>,
-            ) -> Option<String> {
-                decls
-                    .info
-                    .function_names
-                    .get(func_index)
-                    .map(|s| format!("{}_{}", s, ix))
-            }
-
-            fn export_name_for<'a>(
-                func_ix: UniqueFuncIndex,
-                decls: &mut ModuleDecls<'a>,
-            ) -> Option<String> {
-                let export = decls.info.functions.get(func_ix).unwrap();
-                if !export.export_names.is_empty() {
-                    decls.exports.push(ExportFunction {
-                        fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
-                        names: export.export_names.clone(),
-                    });
-                    Some(format!("guest_func_{}", export.export_names[0]))
-                } else {
-                    None
-                }
-            };
-
-            fn import_name_for<'a>(
-                func_ix: UniqueFuncIndex,
-                decls: &mut ModuleDecls<'a>,
-                bindings: &'a Bindings,
-            ) -> Result<Option<String>, failure::Context<LucetcErrorKind>> {
-                if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
-                    let import_symbol = bindings
-                        .translate(import_mod, import_field)
-                        .context(LucetcErrorKind::TranslatingModule)?;
-                    decls.imports.push(ImportFunction {
-                        fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
-                        module: import_mod,
-                        name: import_field,
-                    });
-                    Ok(Some(import_symbol.to_string()))
-                } else {
-                    Ok(None)
-                }
-            };
 
             let import_info = import_name_for(func_index, decls, bindings)?;
             let export_info = export_name_for(func_index, decls);
