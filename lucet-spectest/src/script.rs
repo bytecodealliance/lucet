@@ -12,7 +12,7 @@ pub enum ScriptError {
     ValidationError(#[source] LucetcError),
     #[error("Program error")]
     ProgramError(#[source] LucetcError),
-    #[error("Compile error")]
+    #[error("Compilation error")]
     CompileError(#[source] LucetcError),
     #[error("Codegen error")]
     CodegenError(#[source] LucetcError),
