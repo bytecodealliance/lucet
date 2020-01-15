@@ -59,11 +59,6 @@ pub enum Error {
     #[error("Start function yielded")]
     StartYielded,
 
-    // A test in instruction_counting.rs requires the conversion of a
-    // Lucetc error to the error type in this crate.
-    #[error("Lucetc error")]
-    LucetcError(#[from] LucetcError),
-
     /// A catch-all for internal errors that are likely unrecoverable by the runtime user.
     ///
     /// As the API matures, these will likely become rarer, replaced by new variants of this enum,
@@ -74,6 +69,12 @@ pub enum Error {
     /// An unsupported feature was used.
     #[error("Unsupported feature: {0}")]
     Unsupported(String),
+}
+
+impl From<LucetcError> for Error {
+    fn from(e: LucetcError) -> Error {
+        Error::InternalError(e.into())
+    }
 }
 
 impl From<crate::context::Error> for Error {
