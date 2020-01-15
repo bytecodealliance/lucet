@@ -66,6 +66,7 @@ impl<'a> Compiler<'a> {
         validator: &Option<Validator>,
     ) -> Result<Self, Error> {
         let isa = Self::target_isa(opt_level, &cpu_features)?;
+
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
