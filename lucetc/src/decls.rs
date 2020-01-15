@@ -151,7 +151,7 @@ impl<'a> ModuleDecls<'a> {
             if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
                 let import_symbol = bindings
                     .translate(import_mod, import_field)
-		    .map_err(Error::TranslatingLucetModule)?;
+                    .map_err(Error::TranslatingLucetModule)?;
                 decls.imports.push(ImportFunction {
                     fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                     module: import_mod,

@@ -190,10 +190,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                 check_retval(expected, res)?;
                 Ok(())
             }
-            _ => {
-                let message = format!("non-invoke action");
-                Err(Error::UnsupportedCommand(message))?
-            }
+            _ => Err(Error::UnsupportedCommand("non-invoke action".to_owned()))?,
         },
         CommandKind::AssertReturnCanonicalNan { action }
         | CommandKind::AssertReturnArithmeticNan { action } => match action {
@@ -214,10 +211,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                     Err(Error::IncorrectResult(message))?
                 }
             }
-            _ => {
-                let message = format!("non-invoke action");
-                Err(Error::UnsupportedCommand(message))?
-            }
+            _ => Err(Error::UnsupportedCommand("non-invoke action".to_owned()))?,
         },
         CommandKind::AssertTrap { ref action, .. } => match action {
             Action::Invoke {
@@ -270,8 +264,8 @@ fn check_retval(expected: &[Value], got: UntypedRetVal) -> Result<(), Error> {
                     Err(Error::IncorrectResult(message))?
                 }
             }
-            Value::V128(_) => {
-                let message = format!("got unsupported SIMD V128 value");
+            Value::V128(v) => {
+                let message = format!("got unsupported SIMD V128 value: {}", v);
                 Err(Error::UnsupportedCommand(message))?;
             }
         },

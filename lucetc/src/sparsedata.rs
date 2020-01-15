@@ -62,13 +62,14 @@ pub fn owned_sparse_data_from_initializers<'a>(
     for initializer in initializers {
         if initializer.base.is_some() {
             let message =
-                format!("cannot create sparse data: data initializer uses global as base");
+                "cannot create sparse data: data initializer uses global as base".to_owned();
             Err(Error::Unsupported(message))?;
         }
         let chunks = split(initializer);
         for (pagenumber, chunk) in chunks {
             if pagenumber > heap.initial_size as usize / PAGE_SIZE {
-                let message = format!("cannot initialize data beyond linear memory's initial size");
+                let message =
+                    "cannot initialize data beyond linear memory's initial size".to_owned();
                 Err(Error::Validation(message))?;
             }
             let base = chunk.offset as usize;
