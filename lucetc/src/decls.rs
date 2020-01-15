@@ -394,8 +394,8 @@ impl<'a> ModuleDecls<'a> {
                 Ok(Some(HeapSpec {
                     reserved_size,
                     guard_size: heap_settings.guard_size,
-                    initial_size: initial_size,
-                    max_size: max_size,
+                    initial_size,
+                    max_size,
                 }))
             }
             _ => Err(format_err!("lucetc only supports memory 0"))
