@@ -16,18 +16,18 @@ pub enum ScriptError {
     CompileError(#[source] LucetcError),
     #[error("Codegen error")]
     CodegenError(#[source] LucetcError),
-    #[error("run_ld error: {0}")]
-    LdError(String),
-    #[error("Malformed script: {0}")]
-    MalformedScript(String),
-    #[error("Runtime error")]
-    RuntimeError(#[source] lucet_runtime::Error),
-    #[error("Instantiate error")]
-    InstantiateError(#[source] lucet_runtime::Error),
     #[error("Load error")]
     LoadError(#[source] lucet_runtime::Error),
+    #[error("Instantiation error")]
+    InstantiateError(#[source] lucet_runtime::Error),
+    #[error("Runtime error")]
+    RuntimeError(#[source] lucet_runtime::Error),
+    #[error("Malformed script: {0}")]
+    MalformedScript(String),
     #[error("IO error")]
     IoError(#[from] io::Error),
+    #[error("run_ld error: {0}")]
+    LdError(String),
 }
 
 impl ScriptError {
