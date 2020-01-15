@@ -79,12 +79,10 @@ pub fn run(opts: &Options) -> Result<(), Error> {
             BindingError::FileError(source, file)
         })?;
 
-        bindings
-            .extend(&file_bindings)
-            .map_err(|source| {
-		let file = format!("{:?}", file);
-		BindingError::ExtendError(source, file)
-	    })?;
+        bindings.extend(&file_bindings).map_err(|source| {
+            let file = format!("{:?}", file);
+            BindingError::ExtendError(source, file)
+        })?;
     }
 
     let mut c = Lucetc::new(PathBuf::from(input))
