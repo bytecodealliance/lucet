@@ -9,8 +9,6 @@ use thiserror::Error;
 pub enum Error {
     /*
      * General #[from] implementations. */
-    #[error("Anyhow error")]
-    Any(#[from] anyhow::Error),
     #[error("Build error")]
     Build(#[from] parity_wasm::elements::Error),
     #[error("Clif module error")]
@@ -88,6 +86,8 @@ pub enum Error {
     PathError(String),
     #[error("Read error: {0}")]
     ReadError(String),
+    #[error("Start index pointed to a non-function")]
+    StartError,
     #[error("Signature error: {0}")]
     Signature(String),
     #[error("Error converting cranelift signature to wasm signature: {0}")]
