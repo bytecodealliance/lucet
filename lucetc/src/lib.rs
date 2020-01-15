@@ -320,7 +320,7 @@ impl Lucetc {
             &self.validator,
         )?;
         let obj = compiler.object_file()?;
-        obj.write(output.as_ref())?; // TLC lost context "writing object file"
+        obj.write(output.as_ref())?;
 
         Ok(())
     }
@@ -338,7 +338,7 @@ impl Lucetc {
             &self.validator,
         )?;
 
-        compiler.cranelift_funcs()?.write(&output)?; // TLC Lost context "writing clif file to file."
+        compiler.cranelift_funcs()?.write(&output)?;
 
         Ok(())
     }

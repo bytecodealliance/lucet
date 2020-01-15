@@ -161,7 +161,7 @@ impl<'a> Compiler<'a> {
 
         stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
 
-        let module_data_bytes = self.module_data()?.serialize()?; // TLC
+        let module_data_bytes = self.module_data()?.serialize()?;
 
         let module_data_len = module_data_bytes.len();
 
@@ -190,7 +190,7 @@ impl<'a> Compiler<'a> {
             module_data_len,
             function_manifest,
             table_names,
-        )?; // TLC
+        )?;
 
         Ok(obj)
     }

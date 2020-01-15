@@ -111,4 +111,6 @@ pub enum Error {
     UnsupportedIsa(#[from] cranelift_codegen::isa::LookupError),
     #[error("Validation")]
     Validation,
+    #[error("Writing clif file to file")]
+    WritingClifFile(#[source] ClifModuleError),
 }
