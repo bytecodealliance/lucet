@@ -90,7 +90,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
             println!("assert_uninstantiable");
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
-                Err(ScriptError::RuntimeError(_, _)) => Ok(()),
+                Err(ScriptError::InstantiateError(_)) => Ok(()),
                 Ok(_) => Err(Error::UnexpectedSuccess)?,
                 Err(e) => Err(unexpected_failure(e))?,
             }
@@ -150,14 +150,12 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                 match res {
                     Ok(_) => Err(Error::UnexpectedSuccess)?,
 
-                    Err(ScriptError::RuntimeError(RuntimeError::RuntimeFault(details), s)) => {
+                    Err(ScriptError::RuntimeError(RuntimeError::RuntimeFault(details))) => {
                         match details.trapcode {
                             Some(TrapCode::StackOverflow) => Ok(()),
                             e => {
-                                let message = format!(
-                                    "AssertExhaustion expects stack overflow, got {}. {:?}",
-                                    s, e
-                                );
+                                let message =
+                                    format!("AssertExhaustion expects stack overflow, got {:?}", e);
                                 Err(Error::UnexpectedFailure(message))?
                             }
                         }
@@ -231,7 +229,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                 let args = translate_args(args);
                 let res = script.run(module, field, args);
                 match res {
-                    Err(ScriptError::RuntimeError(_luceterror, _)) => Ok(()),
+                    Err(ScriptError::RuntimeError(_luceterror)) => Ok(()),
                     Err(e) => Err(unexpected_failure(e)),
                     Ok(_) => Err(Error::UnexpectedSuccess)?,
                 }

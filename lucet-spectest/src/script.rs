@@ -16,12 +16,16 @@ pub enum ScriptError {
     CompileError(#[source] LucetcError),
     #[error("Codegen error")]
     CodegenError(#[source] LucetcError),
-    #[error("Load error: {0}")]
-    LoadError(String),
+    #[error("run_ld error: {0}")]
+    LdError(String),
     #[error("Malformed script: {0}")]
     MalformedScript(String),
-    #[error("Runtime error: {1}")]
-    RuntimeError(#[source] lucet_runtime::Error, String),
+    #[error("Runtime error")]
+    RuntimeError(#[source] lucet_runtime::Error),
+    #[error("Instantiate error")]
+    InstantiateError(#[source] lucet_runtime::Error),
+    #[error("Load error")]
+    LoadError(#[source] lucet_runtime::Error),
     #[error("IO error")]
     IoError(#[from] io::Error),
 }
@@ -93,11 +97,11 @@ impl ScriptEnv {
                 String::from_utf8_lossy(&run_ld.stderr)
             );
 
-            Err(ScriptError::LoadError(message))?;
+            Err(ScriptError::LdError(message))?;
         }
 
-        let lucet_module: Arc<dyn LucetModule> = lucet_runtime::DlModule::load(sofile_path)
-            .map_err(|e| ScriptError::RuntimeError(e, "load error".to_string()))?;
+        let lucet_module: Arc<dyn LucetModule> =
+            lucet_runtime::DlModule::load(sofile_path).map_err(ScriptError::LoadError)?;
 
         let lucet_region = MmapRegion::create(
             1,
@@ -110,7 +114,7 @@ impl ScriptEnv {
 
         let lucet_instance = lucet_region
             .new_instance(lucet_module.clone())
-            .map_err(|e| ScriptError::RuntimeError(e, "instantiate error".to_string()))?;
+            .map_err(ScriptError::InstantiateError)?;
 
         self.instances.push((name.clone(), lucet_instance));
         Ok(())
@@ -163,7 +167,7 @@ impl ScriptEnv {
         let (_, ref mut inst) = self.instance_named_mut(name)?;
         inst.run(field, &args)
             .and_then(|rr| rr.returned())
-            .map_err(|e| ScriptError::RuntimeError(e, "runtime error".to_string()))
+            .map_err(ScriptError::RuntimeError)
     }
 
     pub fn register(&mut self, name: &Option<String>, as_name: &str) -> Result<(), ScriptError> {
