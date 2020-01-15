@@ -25,10 +25,65 @@ macro_rules! host_tests {
             assert!(module.is_err());
         }
 
+        const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
+
+        lazy_static! {
+            static ref HOSTCALL_MUTEX: Mutex<()> = Mutex::new(());
+            static ref NESTED_OUTER: Mutex<()> = Mutex::new(());
+            static ref NESTED_INNER: Mutex<()> = Mutex::new(());
+            static ref NESTED_REGS_OUTER: Mutex<()> = Mutex::new(());
+            static ref NESTED_REGS_INNER: Mutex<()> = Mutex::new(());
+            static ref BAD_ACCESS_UNWIND: Mutex<()> = Mutex::new(());
+            static ref STACK_OVERFLOW_UNWIND: Mutex<()> = Mutex::new(());
+        }
+
+        #[allow(unreachable_code)]
+        #[inline]
+        unsafe fn unwind_inner(vmctx: &Vmctx, mutex: &Mutex<()>) {
+            let lock = mutex.lock().unwrap();
+            lucet_hostcall_terminate!(ERROR_MESSAGE);
+            drop(lock);
+        }
+
+        #[inline]
+        unsafe fn unwind_outer(vmctx: &Vmctx, mutex: &Mutex<()>, cb_idx: u32) -> u64 {
+            let lock = mutex.lock().unwrap();
+            let func = vmctx
+                .get_func_from_idx(0, cb_idx)
+                .expect("can get function by index");
+            let func = std::mem::transmute::<usize, extern "C" fn(*mut lucet_vmctx) -> u64>(
+                func.ptr.as_usize(),
+            );
+            let res = (func)(vmctx.as_raw());
+            drop(lock);
+            res
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_test_func_hostcall_error(_vmctx: &Vmctx) {
+            lucet_hostcall_terminate!(ERROR_MESSAGE);
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_test_func_hello(vmctx: &Vmctx, hello_ptr: u32, hello_len: u32) {
+            let heap = vmctx.heap();
+            let hello = heap.as_ptr() as usize + hello_ptr as usize;
+            if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
+                lucet_hostcall_terminate!("heap access");
+            }
+            let hello =
+                unsafe { std::slice::from_raw_parts(hello as *const u8, hello_len as usize) };
+            if hello.starts_with(b"hello") {
+                *vmctx.get_embed_ctx_mut::<bool>() = true;
+            }
+        }
+
+        #[lucet_hostcall]
         #[allow(unreachable_code)]
         #[no_mangle]
-        pub fn hostcall_test_func_hostcall_error_unwind(
-            vmctx: &Vmctx,
+        pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &Vmctx) {
         ) -> () {
             let lock = HOSTCALL_MUTEX.lock().unwrap();
             unsafe {
@@ -318,73 +373,6 @@ macro_rules! host_tests {
                 use $crate::build::test_module_c;
                 use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder};
                 use $TestRegion as TestRegion;
-
-                const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
-
-                lazy_static! {
-                    static ref HOSTCALL_MUTEX: Mutex<()> = Mutex::new(());
-                    static ref NESTED_OUTER: Mutex<()> = Mutex::new(());
-                    static ref NESTED_INNER: Mutex<()> = Mutex::new(());
-                    static ref NESTED_REGS_OUTER: Mutex<()> = Mutex::new(());
-                    static ref NESTED_REGS_INNER: Mutex<()> = Mutex::new(());
-                    static ref BAD_ACCESS_UNWIND: Mutex<()> = Mutex::new(());
-                    static ref STACK_OVERFLOW_UNWIND: Mutex<()> = Mutex::new(());
-                }
-
-                #[inline]
-                unsafe fn unwind_outer(vmctx: &mut Vmctx, mutex: &Mutex<()>, cb_idx: u32) -> u64 {
-                    let lock = mutex.lock().unwrap();
-                    let func = vmctx
-                        .get_func_from_idx(0, cb_idx)
-                        .expect("can get function by index");
-                    let func = std::mem::transmute::<usize, extern "C" fn(*const lucet_vmctx) -> u64>(
-                        func.ptr.as_usize(),
-                    );
-                    let res = (func)(vmctx.as_raw());
-                    drop(lock);
-                    res
-                }
-
-                #[allow(unreachable_code)]
-                #[inline]
-                unsafe fn unwind_inner(vmctx: &mut Vmctx, mutex: &Mutex<()>) {
-                    let lock = mutex.lock().unwrap();
-                    lucet_hostcall_terminate!(ERROR_MESSAGE);
-                    drop(lock);
-                }
-
-                /*
-                #[lucet_hostcall]
-                #[no_mangle]
-                pub fn hostcall_test_func_hostcall_error(_vmctx: &Vmctx) {
-                    lucet_hostcall_terminate!(ERROR_MESSAGE);
-                }
-
-                #[lucet_hostcall]
-                #[no_mangle]
-                pub fn hostcall_test_func_hello(vmctx: &Vmctx, hello_ptr: u32, hello_len: u32) {
-                    let heap = vmctx.heap();
-                    let hello = heap.as_ptr() as usize + hello_ptr as usize;
-                    if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
-                        lucet_hostcall_terminate!("heap access");
-                    }
-                    let hello =
-                        unsafe { std::slice::from_raw_parts(hello as *const u8, hello_len as usize) };
-                    if hello.starts_with(b"hello") {
-                        *vmctx.get_embed_ctx_mut::<bool>() = true;
-                    }
-                }
-
-                #[lucet_hostcall]
-                #[allow(unreachable_code)]
-                #[no_mangle]
-                pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &Vmctx) {
-                    let lock = vmctx.get_embed_ctx::<Arc<Mutex<()>>>();
-                    let _mutex_guard = lock.lock().unwrap();
-                    lucet_hostcall_terminate!(ERROR_MESSAGE);
-                    drop(_mutex_guard);
-                }
-                */
 
                 #[test]
                 fn load_module() {
