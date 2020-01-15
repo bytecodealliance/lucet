@@ -92,7 +92,6 @@ pub enum Error {
     StartError,
     #[error("Signature error: {0}")]
     Signature(String),
-    //SignatureConversion(String),
     #[error("Table index is out of bounds: {0}")]
     TableIndexError(String),
     #[error("Translating module")]
