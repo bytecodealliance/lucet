@@ -1,5 +1,4 @@
 use crate::instance::{FaultDetails, TerminationDetails};
-use lucetc::Error as LucetcError;
 use thiserror::Error;
 
 /// Lucet runtime errors.
@@ -69,12 +68,6 @@ pub enum Error {
     /// An unsupported feature was used.
     #[error("Unsupported feature: {0}")]
     Unsupported(String),
-}
-
-impl From<LucetcError> for Error {
-    fn from(e: LucetcError) -> Error {
-        Error::InternalError(e.into())
-    }
 }
 
 impl From<crate::context::Error> for Error {

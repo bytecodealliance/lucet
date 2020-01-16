@@ -817,6 +817,7 @@ dependencies = [
 name = "lucet-runtime"
 version = "0.5.0"
 dependencies = [
+ "anyhow 1.0.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -848,7 +849,6 @@ dependencies = [
  "libloading 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module 0.5.0",
  "lucet-runtime-macros 0.5.0",
- "lucetc 0.5.0",
  "memoffset 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "nix 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
