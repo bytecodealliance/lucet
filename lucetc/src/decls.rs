@@ -149,9 +149,7 @@ impl<'a> ModuleDecls<'a> {
             bindings: &'a Bindings,
         ) -> Result<Option<String>, Error> {
             if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
-                let import_symbol = bindings
-                    .translate(import_mod, import_field)
-                    .map_err(Error::TranslatingLucetModule)?;
+                let import_symbol = bindings.translate(import_mod, import_field)?;
                 decls.imports.push(ImportFunction {
                     fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                     module: import_mod,
@@ -228,13 +226,11 @@ impl<'a> ModuleDecls<'a> {
         // Regardless of the function being known internally, we must forward the additional
         // declaration to `clif_module` so functions with multiple forms of linkage (import +
         // export, exported twice, ...) are correctly declared in the resultant artifact.
-        let funcid = clif_module
-            .declare_function(
-                &decl_sym,
-                decl_linkage,
-                self.info.signature_for_function(func_ix),
-            )
-            .map_err(Error::TranslatingClifModule)?;
+        let funcid = clif_module.declare_function(
+            &decl_sym,
+            decl_linkage,
+            self.info.signature_for_function(func_ix),
+        )?;
 
         if func_ix.as_u32() as usize >= self.function_names.len() {
             // `func_ix` is new, so we need to add the name. If func_ix is new, it should be
@@ -257,9 +253,8 @@ impl<'a> ModuleDecls<'a> {
         let mut table_names = PrimaryMap::new();
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
-            let def_data_id = clif_module
-                .declare_data(&def_symbol, Linkage::Export, false, None)
-                .map_err(Error::TranslatingClifModule)?;
+            let def_data_id =
+                clif_module.declare_data(&def_symbol, Linkage::Export, false, None)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             table_names.push(def_name);
@@ -406,17 +401,13 @@ impl<'a> ModuleDecls<'a> {
         )
     }
 
-    pub fn get_func(&self, func_index: UniqueFuncIndex) -> Result<FunctionDecl<'_>, Error> {
-        let name = self.function_names.get(func_index).ok_or_else(|| {
-            let message = format!("{:?}", func_index);
-            Error::FunctionIndexError(message)
-        })?;
-
+    pub fn get_func(&self, func_index: UniqueFuncIndex) -> Option<FunctionDecl<'_>> {
+        let name = self.function_names.get(func_index).unwrap();
         let exportable_sigix = self.info.functions.get(func_index).unwrap();
         let signature_index = self.get_signature_uid(exportable_sigix.entity).unwrap();
         let signature = self.info.signatures.get(signature_index).unwrap();
         let import_name = self.info.imported_funcs.get(func_index);
-        Ok(FunctionDecl {
+        Some(FunctionDecl {
             signature,
             signature_index,
             export_names: exportable_sigix.export_names.clone(),
@@ -521,11 +512,7 @@ impl<'a> ModuleDecls<'a> {
             let name = self
                 .function_names
                 .get(fn_index)
-                .ok_or_else(|| {
-                    let message = format!("{:?}", fn_index);
-                    Error::FunctionIndexError(message)
-                })
-                .unwrap();
+                .expect("fn_index is key into function_names");
 
             functions.push(FunctionMetadata {
                 signature: decl.signature_index,

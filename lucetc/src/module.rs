@@ -134,11 +134,9 @@ impl<'a> ModuleInfo<'a> {
         sig: ir::Signature,
     ) -> Result<(UniqueFuncIndex, SignatureIndex), Error> {
         let new_sigidx = SignatureIndex::from_u32(self.signature_mapping.len() as u32);
-        self.declare_signature(sig)
-            .map_err(Error::TranslatingClifWasm)?;
+        self.declare_signature(sig)?;
         let new_funcidx = UniqueFuncIndex::from_u32(self.functions.len() as u32);
-        self.declare_func_type(new_sigidx)
-            .map_err(Error::TranslatingClifWasm)?;
+        self.declare_func_type(new_sigidx)?;
         Ok((new_funcidx, new_sigidx))
     }
 }

@@ -58,7 +58,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
             to: table.symbol(),
             at: (TABLE_REF_SIZE * idx) as u64,
         })
-        .map_err(Error::Table)?;
+        .map_err(|source| Error::Failure(source, "Table error".to_owned()))?;
     }
     Ok(())
 }
@@ -93,18 +93,21 @@ pub fn write_table_data<B: ClifBackend>(
                 Elem::Func(func_index) => {
                     // Note: this is the only place we validate that the table entry points to a valid
                     // function. If this is ever removed, make sure this check happens elsewhere.
-                    let func = decls.get_func(*func_index)?; // TLC
+                    if let Some(func) = decls.get_func(*func_index) {
+                        // First element in row is the SignatureIndex for the function
+                        putelem(&mut table_data, func.signature_index.as_u32() as u64);
 
-                    // First element in row is the SignatureIndex for the function
-                    putelem(&mut table_data, func.signature_index.as_u32() as u64);
-
-                    // Second element in row is the pointer to the function. The Reloc is doing the work
-                    // here. We put a 0 in the table data itself to be overwritten at link time.
-                    let funcref = table_ctx.import_function(func.name.into());
-                    let position = table_data.position();
-                    assert!(position < <u32>::max_value() as u64);
-                    table_ctx.write_function_addr(position as u32, funcref);
-                    putelem(&mut table_data, 0);
+                        // Second element in row is the pointer to the function. The Reloc is doing the work
+                        // here. We put a 0 in the table data itself to be overwritten at link time.
+                        let funcref = table_ctx.import_function(func.name.into());
+                        let position = table_data.position();
+                        assert!(position < <u32>::max_value() as u64);
+                        table_ctx.write_function_addr(position as u32, funcref);
+                        putelem(&mut table_data, 0);
+                    } else {
+                        let message = format!("{:?}", func_index);
+                        return Err(Error::FunctionIndexError(message));
+                    }
                 }
                 // EMPTY:
                 Elem::Empty => {

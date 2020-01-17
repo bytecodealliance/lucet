@@ -82,12 +82,14 @@ impl<'a> Compiler<'a> {
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
                 WasmError::User(u) => Error::Input(u.to_string()),
-                WasmError::InvalidWebAssembly { message, offset } => {
-                    let message = format!("invalid input at offset {}: {}", offset, message);
-                    Error::Validation(message)
+                WasmError::InvalidWebAssembly { .. } => {
+                    // Since wasmparser was already used to validate,
+                    // reaching this case means there's a significant
+                    // bug in either wasmparser or cranelift-wasm.
+                    unreachable!();
                 }
                 WasmError::Unsupported(s) => Error::Unsupported(s.to_owned()),
-                WasmError::ImplLimitExceeded { .. } => Error::TranslatingModule,
+                WasmError::ImplLimitExceeded { .. } => Error::ClifWasmError(e),
             })?;
 
         let libcalls = Box::new(move |libcall| match libcall {
@@ -276,7 +278,7 @@ fn write_startfunc_data<B: ClifBackend>(
         let start_func = decls
             .get_func(func_ix)
             .expect("start func is valid func id");
-        let fid = start_func.name.as_funcid().ok_or(Error::StartError)?;
+        let fid = start_func.name.as_funcid().expect("start func is a func");
         let fref = clif_module.declare_func_in_data(fid, &mut ctx);
         ctx.write_function_addr(0, fref);
         clif_module

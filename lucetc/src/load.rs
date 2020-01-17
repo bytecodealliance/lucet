@@ -33,7 +33,8 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     } else {
         wat2wasm(bytes).map_err(|err| {
             use std::error::Error;
-            let mut result = err.description().to_string();
+            let mut result = String::from("wat2wasm error: ");
+            result.push_str(err.description());
             match unsafe { std::mem::transmute::<wabt::Error, wabt::ErrorKind>(err) } {
                 ErrorKind::Parse(msg) |
                 // this shouldn't be reachable - we're going the other way
@@ -46,7 +47,7 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
                 },
                 _ => { }
             };
-            crate::error::Error::ReadError(result)
+            crate::error::Error::Input(result)
         })?
     };
     Ok(converted)

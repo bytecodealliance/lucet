@@ -36,8 +36,8 @@ pub fn sk_from_file<P: AsRef<Path>>(sk_path: P) -> Result<SecretKey, Error> {
 
 fn signature_path<P: AsRef<Path>>(path: P) -> Result<PathBuf, Error> {
     let path = path.as_ref().to_str().ok_or_else(|| {
-        let message = format!("Invalid path {:?}", path.as_ref());
-        Error::PathError(message)
+        let message = format!("Invalid signature path {:?}", path.as_ref());
+        Error::Input(message)
     })?;
     Ok(PathBuf::from(format!("{}.minisig", path)))
 }

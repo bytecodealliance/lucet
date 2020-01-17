@@ -441,6 +441,7 @@ mod module_data {
 
     #[test]
     fn oversize_data_segment() {
+        use lucetc::Error as LucetcError;
         let m = load_wat_module("oversize_data_segment");
         let b = Bindings::empty();
         let h = HeapSettings::default();
@@ -457,13 +458,18 @@ mod module_data {
             c.is_err(),
             "compilation error because data initializers are oversized"
         );
-        assert!(lucetc::validation_error(c.err().unwrap()));
+        assert!(if let LucetcError::InitData = c.err().unwrap() {
+            true
+        } else {
+            false
+        });
     }
 
     // XXX adding more negative tests like the one above is valuable - lets do it
 
     #[test]
     fn invalid_module() {
+        use lucetc::Error as LucetcError;
         use std::fs::File;
         use std::io::Read;
         // I used the `wast2json` tool to produce the file invalid.wasm from an assert_invalid part
@@ -488,7 +494,11 @@ mod module_data {
             c.is_err(),
             "compilation error because wasm module is invalid"
         );
-        assert!(lucetc::validation_error(c.err().unwrap()));
+        assert!(if let LucetcError::WasmValidation(_) = c.err().unwrap() {
+            true
+        } else {
+            false
+        });
     }
 
     #[test]

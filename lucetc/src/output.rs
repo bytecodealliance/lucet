@@ -123,10 +123,12 @@ impl ObjectFile {
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
         let _ = path.as_ref().file_name().ok_or(|| {
             let message = format!("Path must be filename {:?}", path.as_ref());
-            Error::PathError(message);
+            Error::Input(message);
         });
         let file = File::create(path)?;
-        self.artifact.write(file).map_err(Error::ArtifactError)?;
+        self.artifact
+            .write(file)
+            .map_err(|source| Error::Failure(source, "Write error".to_owned()))?;
         Ok(())
     }
 }
@@ -139,7 +141,10 @@ fn write_module(
 ) -> Result<(), Error> {
     let mut native_data = Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
     obj.declare(LUCET_MODULE_SYM, Decl::data().global())
-        .map_err(|e| Error::ManifestDeclaration(e, FUNCTION_MANIFEST_SYM.to_string()))?;
+        .map_err(|source| {
+            let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
+            Error::ArtifactError(source, message)
+        })?;
 
     let version =
         VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
@@ -169,7 +174,10 @@ fn write_module(
     )?;
 
     obj.define(LUCET_MODULE_SYM, native_data.into_inner())
-        .map_err(|source| Error::ManifestDefinition(source, FUNCTION_MANIFEST_SYM.to_string()))?;
+        .map_err(|source| {
+            let message = format!("Manifest error defining {}", FUNCTION_MANIFEST_SYM);
+            Error::ArtifactError(source, message)
+        })?;
 
     Ok(())
 }
@@ -204,7 +212,10 @@ pub(crate) fn write_relocated_slice(
                 },
                 absolute_reloc,
             )
-            .map_err(|source| Error::ManifestLinking(source, to.to_string()))?;
+            .map_err(|source| {
+                let message = format!("Manifest error linking {}", to);
+                Error::Failure(source, message)
+            })?;
         }
         (Some(to), _len) => {
             // This is a local buffer of known size
@@ -213,7 +224,10 @@ pub(crate) fn write_relocated_slice(
                 to,   // is a reference to `to`    (eg. fn_name)
                 at: buf.position(),
             })
-            .map_err(|source| Error::ManifestLinking(source, to.to_string()))?;
+            .map_err(|source| {
+                let message = format!("Manifest error linking {}", to);
+                Error::Failure(source, message)
+            })?;
         }
         (None, len) => {
             // There's actually no relocation to add, because there's no slice to put here.

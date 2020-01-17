@@ -1,6 +1,8 @@
 use cranelift_codegen::ir;
 use lucet_module::Signature;
 use lucet_module::ValueType;
+use std::fmt::{self, Display};
+use thiserror::Error;
 
 #[derive(Debug)]
 pub enum ValueError {
@@ -38,10 +40,16 @@ fn to_lucet_value(value: &ir::AbiParam) -> Result<ValueType, ValueError> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum SignatureError {
     BadElement(ir::AbiParam, ValueError),
     BadSignature,
+}
+
+impl Display for SignatureError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self, f)
+    }
 }
 
 pub fn to_lucet_signature(value: &ir::Signature) -> Result<Signature, SignatureError> {

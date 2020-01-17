@@ -23,7 +23,7 @@ mod types;
 use crate::load::read_bytes;
 pub use crate::{
     compiler::{Compiler, CpuFeatures, OptLevel, SpecificFeature, TargetCpu},
-    error::{validation_error, Error},
+    error::Error,
     heap::HeapSettings,
     load::read_module,
     patch::patch_module,
@@ -381,10 +381,7 @@ where
     cmd_ld.arg("-o");
     cmd_ld.arg(sopath.as_ref());
 
-    let run_ld = cmd_ld.output().map_err(|source| {
-        let message = format!("running ld on {:?}", objpath.as_ref());
-        Error::LoaderOutput(source, message)
-    })?;
+    let run_ld = cmd_ld.output()?;
 
     if !run_ld.status.success() {
         let message = format!(
@@ -392,7 +389,7 @@ where
             objpath.as_ref().to_str().unwrap(),
             String::from_utf8_lossy(&run_ld.stderr)
         );
-        Err(Error::Output(message))?;
+        Err(Error::LdError(message))?;
     }
     Ok(())
 }

@@ -5,57 +5,38 @@ use faerie::ArtifactError;
 use lucet_module::error::Error as LucetModuleError;
 use thiserror::Error;
 
-pub fn validation_error(e: Error) -> bool {
-    match e {
-        Error::LucetValidation(_) => true,
-        Error::Validation(_) => true,
-        Error::WasmValidation(_) => true,
-        _ => false,
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum Error {
-    /*
-     * General #[from] implementations. */
-    #[error("Build error")]
-    Build(#[from] parity_wasm::elements::Error),
+    //
+    // General #[from] implementations.
+    #[error("Builtins error")]
+    Builtins(#[from] parity_wasm::elements::Error),
     #[error("Clif module error")]
     ClifModuleError(#[from] ClifModuleError),
+    #[error("Translating error")]
+    ClifWasmError(#[from] ClifWasmError),
     #[error("Lucet Module error")]
     LucetModule(#[from] LucetModuleError),
     #[error("Lucet validation error")]
     LucetValidation(#[from] lucet_validate::Error),
     #[error("I/O error")]
     IOError(#[from] std::io::Error),
+    #[error("Error converting cranelift signature to wasm signature")]
+    SignatureConversion(#[from] SignatureError),
     #[error("Wasm validating parser error")]
     WasmValidation(#[from] wasmparser::BinaryReaderError),
     #[error("Wat input")]
     WatInput(#[from] wabt::Error),
-    /*
-     * Cannot apply #[from] or #[source] to these error types due to missing traits. */
-    #[error("Artifact error: {0:?}")]
-    ArtifactError(failure::Error),
-    #[error("Manifest error declaring {1}: {0:?}")]
-    ManifestDeclaration(ArtifactError, String),
-    #[error("Manifest error defining {1}: {0:?}")]
-    ManifestDefinition(ArtifactError, String),
-    #[error("Manifest error linking {1}: {0:?}")]
-    ManifestLinking(failure::Error, String),
+    //
+    // Cannot apply #[from] or #[source] to these error types due to missing traits.
+    #[error("Artifact error: {1}. {0:?}")]
+    ArtifactError(ArtifactError, String),
+    #[error("Failure: {1}. {0:?}")]
+    Failure(failure::Error, String),
     #[error("Patcher error: {0:?}")]
     Patcher(wasmonkey::WError),
-    #[error("Error converting cranelift signature to wasm signature: {0:?}")]
-    SignatureConversion(SignatureError),
-    #[error("Stack probe: {0:?}")]
-    StackProbe(failure::Error),
-    #[error("Table: {0:?}")]
-    Table(failure::Error),
-    #[error("Trap table error declaring {1}: {0:?}")]
-    TrapTableDeclaration(ArtifactError, String),
-    #[error("Error defining {0} writing the function trap table into the object: {0:?}")]
-    TrapTableDefinition(ArtifactError, String),
-    /*
-     * And all the rest */
+    //
+    // And all the rest
     #[error("Function definition error in {symbol}")]
     FunctionDefinition {
         symbol: String,
@@ -70,8 +51,6 @@ pub enum Error {
         #[source]
         source: ClifWasmError,
     },
-    #[error("Output error: {1}")]
-    LoaderOutput(#[source] std::io::Error, String),
     #[error("Inconsistent state when translating module: global {0} is declared as an import but has no entry in imported_globals")]
     GlobalDeclarationError(u32),
     #[error("global out of bounds: {0}")]
@@ -84,40 +63,22 @@ pub enum Error {
     InitData,
     #[error("Input error: {0}")]
     Input(String),
+    #[error("Ld error: {0}")]
+    LdError(String),
     #[error("Memory specs: {0}")]
     MemorySpecs(String),
     #[error("Metadata serializer; start index point to a non-function")]
     MetadataSerializer(#[source] ClifModuleError),
-    #[error("Output: {0}")]
-    Output(String),
     #[error("Output function: error writing function {1}")]
     OutputFunction(#[source] std::fmt::Error, String),
-    #[error("Path error: {0}")]
-    PathError(String),
-    #[error("Read error: {0}")]
-    ReadError(String),
-    #[error("Start index pointed to a non-function")]
-    StartError,
     #[error("Signature error: {0}")]
     Signature(String),
     #[error("Table index is out of bounds: {0}")]
     TableIndexError(String),
-    #[error("Translating module")]
-    TranslatingModule,
-    #[error("Translating lucet module")]
-    TranslatingLucetModule(#[source] LucetModuleError),
-    #[error("Translating cranelift module")]
-    TranslatingClifModule(#[source] ClifModuleError),
-    #[error("Translating cranelift wasm")]
-    TranslatingClifWasm(#[source] ClifWasmError),
     #[error("Trap records are present for function {0} but the function does not exist.")]
     TrapRecord(String),
     #[error("Unsupported: {0}")]
     Unsupported(String),
     #[error("host machine is not a supported target")]
     UnsupportedIsa(#[from] cranelift_codegen::isa::LookupError),
-    #[error("Validation: {0}")]
-    Validation(String),
-    #[error("Writing clif file to file")]
-    WritingClifFile(#[source] ClifModuleError),
 }
