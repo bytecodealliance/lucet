@@ -1,4 +1,3 @@
-use libc::{c_void, ucontext_t, REG_RDI, REG_RIP};
 use crate::context::Context;
 use libc::{
     c_void, ucontext_t, REG_R12, REG_R13, REG_R14, REG_R15, REG_RBP, REG_RBX, REG_RDI, REG_RIP,
@@ -85,8 +84,8 @@ impl UContext {
         }
     }
 
-    pub fn as_ptr(&self) -> UContextPtr {
-        UContextPtr::new(&self.context as *const _ as *const _)
+    pub fn as_ptr(&mut self) -> UContextPtr {
+        UContextPtr::new(self.context as *mut _ as *mut _)
     }
 }
 

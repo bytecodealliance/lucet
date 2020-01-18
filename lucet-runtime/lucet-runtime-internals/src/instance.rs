@@ -1265,7 +1265,7 @@ impl Instance {
 
     // Force a guest to unwind the stack from the specified guest address
     fn force_unwind(&mut self) -> Result<(), Error> {
-        match &self.state {
+        match &mut self.state {
             State::Yielded { .. } => {
                 self.pending_termination = Some(TerminationDetails::ForcedUnwind);
                 match self.with_redzone_stack(|inst| inst.swap_and_return()) {
