@@ -13,6 +13,7 @@ edition = "2018"
 anyhow = "1"
 lucetc = { path = "../lucetc", version = "0.5.0" }
 lucet-module = { path = "../lucet-module", version = "0.5.0" }
+target-lexicon = "0.9"
 tempfile = "3.0"
 thiserror = "1.0.4"
 

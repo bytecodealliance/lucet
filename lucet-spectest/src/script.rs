@@ -4,6 +4,7 @@ use lucetc::{Compiler, CpuFeatures, Error as LucetcError, HeapSettings, OptLevel
 use std::io;
 use std::process::Command;
 use std::sync::Arc;
+use target_lexicon::Triple;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -65,6 +66,7 @@ impl ScriptEnv {
         let bindings = bindings::spec_test_bindings();
         let compiler = Compiler::new(
             module,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::baseline(),
             &bindings,

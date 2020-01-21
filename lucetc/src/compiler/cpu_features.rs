@@ -183,7 +183,8 @@ impl CpuFeatures {
     }
 
     /// Return a `cranelift_codegen::isa::Builder` configured with these CPU features.
-    pub fn isa_builder(&self) -> Result<isa::Builder, Error> {
+
+    pub fn isa_builder(&self, target: Triple) -> Result<isa::Builder, Error> {
         use SpecificFeature::*;
         use TargetCpu::*;
 

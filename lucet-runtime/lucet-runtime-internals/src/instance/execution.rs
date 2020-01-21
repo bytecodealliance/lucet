@@ -225,6 +225,7 @@ pub enum Domain {
     Terminated,
 }
 
+/// An object that can be used to terminate an instance's execution from a separate thread.
 pub struct KillSwitch {
     state: Weak<KillState>,
 }
@@ -242,7 +243,6 @@ pub enum KillError {
 
 type KillResult = Result<KillSuccess, KillError>;
 
-/// An object that can be used to terminate an instance's execution from a separate thread.
 impl KillSwitch {
     pub(crate) fn new(state: Weak<KillState>) -> Self {
         KillSwitch { state }

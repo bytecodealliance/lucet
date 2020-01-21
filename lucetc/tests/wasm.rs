@@ -41,6 +41,7 @@ mod module_data {
     use lucet_module::bindings::Bindings;
     use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel};
     use std::path::PathBuf;
+    use target_lexicon::Triple;
 
     #[test]
     fn exported_import() {
@@ -49,6 +50,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -77,6 +79,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -101,6 +104,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -126,6 +130,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -149,6 +154,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -175,6 +181,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -210,6 +217,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -255,6 +263,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -289,6 +298,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -337,6 +347,7 @@ mod module_data {
 
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -367,6 +378,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -398,6 +410,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -428,6 +441,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -447,6 +461,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -483,6 +498,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -508,6 +524,7 @@ mod module_data {
         let h = HeapSettings::default();
         let _c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -531,6 +548,7 @@ mod module_data {
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -555,12 +573,14 @@ mod compile {
     // Tests for compilation completion
     use super::load_wat_module;
     use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel};
+    use target_lexicon::Triple;
     fn run_compile_test(file: &str) {
         let m = load_wat_module(file);
         let b = super::test_bindings();
         let h = HeapSettings::default();
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -605,6 +625,7 @@ mod validate {
     use super::load_wat_module;
     use lucet_validate::Validator;
     use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel};
+    use target_lexicon::Triple;
 
     #[test]
     fn validate_arith() {
@@ -619,6 +640,7 @@ mod validate {
 
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -646,6 +668,7 @@ mod validate {
 
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -675,6 +698,7 @@ mod validate {
 
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -702,6 +726,7 @@ mod validate {
 
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -729,6 +754,7 @@ mod validate {
 
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -758,6 +784,7 @@ mod validate {
 
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,
@@ -782,6 +809,7 @@ mod validate {
 
         let c = Compiler::new(
             &m,
+            Triple::host(),
             OptLevel::default(),
             CpuFeatures::default(),
             &b,

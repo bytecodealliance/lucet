@@ -2,6 +2,8 @@ use anyhow::Error;
 use clap::{Arg, ArgMatches, Values};
 use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu};
 use std::path::PathBuf;
+use std::str::FromStr;
+use target_lexicon::{Architecture, Triple};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CodegenOutput {
@@ -119,6 +121,7 @@ pub struct Options {
     pub sk_path: Option<PathBuf>,
     pub count_instructions: bool,
     pub error_style: ErrorStyle,
+    pub target: Triple,
 }
 
 impl Options {
@@ -185,10 +188,23 @@ impl Options {
             Some("2") | Some("speed_and_size") => OptLevel::SpeedAndSize,
             Some(_) => panic!("unknown value for opt-level"),
         };
+
+        let target = match m.value_of("target") {
+            None => Triple::host(),
+            Some(t) => match Triple::from_str(&t) {
+                Ok(triple) => triple,
+                Err(_) => panic!("specified target is invalid"),
+            },
+        };
+
         let cpu_features = cpu_features_from_args(
             m.value_of("target-cpu"),
             m.values_of("target-feature").unwrap_or_default(),
         )?;
+
+        if target.architecture != Architecture::X86_64 {
+            panic!("architectures other than x86-64 are unsupported");
+        }
 
         let keygen = m.is_present("keygen");
         let sign = m.is_present("sign");
@@ -225,6 +241,7 @@ impl Options {
             pk_path,
             count_instructions,
             error_style,
+            target,
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -250,6 +267,13 @@ impl Options {
                     .takes_value(true)
                     .multiple(false)
                     .help("output destination, defaults to a.out if unspecified"),
+            )
+            .arg(
+                Arg::with_name("target")
+                    .long("target")
+                    .takes_value(true)
+                    .multiple(false)
+                    .help(format!("target to compile for, defaults to {} if unspecified", Triple::host()).as_str()),
             )
             .arg(
                 Arg::with_name("target-cpu")

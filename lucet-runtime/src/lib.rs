@@ -343,8 +343,8 @@ pub use lucet_module::{PublicKey, TrapCode};
 pub use lucet_runtime_internals::alloc::Limits;
 pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::{
-    FaultDetails, Instance, InstanceHandle, KillError, KillSuccess, RunResult, SignalBehavior,
-    TerminationDetails, YieldedVal,
+    FaultDetails, Instance, InstanceHandle, KillError, KillSuccess, KillSwitch, RunResult,
+    SignalBehavior, TerminationDetails, YieldedVal,
 };
 #[allow(deprecated)]
 pub use lucet_runtime_internals::lucet_hostcalls;
