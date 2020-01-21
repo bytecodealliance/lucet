@@ -112,26 +112,79 @@ impl Drop for Alloc {
     }
 }
 
-impl Alloc {
-    pub fn addr_in_guard_page(&self, addr: *const c_void) -> bool {
-        let addr = addr as usize;
-        let heap = self.slot().heap as usize;
-        let guard_start = heap + self.heap_accessible_size;
-        let guard_end = heap + self.slot().limits.heap_address_space_size;
-        // eprintln!(
-        //     "addr = {:p}, guard_start = {:p}, guard_end = {:p}",
-        //     addr, guard_start as *mut c_void, guard_end as *mut c_void
-        // );
-        let stack_guard_end = self.slot().stack as usize;
-        let stack_guard_start = stack_guard_end - host_page_size();
-        // eprintln!(
-        //     "addr = {:p}, stack_guard_start = {:p}, stack_guard_end = {:p}",
-        //     addr, stack_guard_start as *mut c_void, stack_guard_end as *mut c_void
-        // );
-        let in_heap_guard = (addr >= guard_start) && (addr < guard_end);
-        let in_stack_guard = (addr >= stack_guard_start) && (addr < stack_guard_end);
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AddrLocation {
+    Heap,
+    InaccessibleHeap,
+    StackGuard,
+    Stack,
+    Globals,
+    SigStackGuard,
+    SigStack,
+    Unknown,
+}
 
-        in_heap_guard || in_stack_guard
+impl AddrLocation {
+    /// If a fault occurs in this location, is it fatal to the entire process?
+    ///
+    /// This is currently a permissive baseline that only returns true for unknown locations and the
+    /// signal stack guard, in case a `Region` implementation uses faults to populate the accessible
+    /// locations like the heap and the globals.
+    pub fn is_fault_fatal(self) -> bool {
+        use AddrLocation::*;
+        match self {
+            SigStackGuard | Unknown => true,
+            _ => false,
+        }
+    }
+}
+
+impl Alloc {
+    /// Where in an `Alloc` does a particular address fall?
+    pub fn addr_location(&self, addr: *const c_void) -> AddrLocation {
+        let addr = addr as usize;
+
+        let heap_start = self.slot().heap as usize;
+        let heap_inaccessible_start = heap_start + self.heap_accessible_size;
+        let heap_inaccessible_end = heap_start + self.slot().limits.heap_address_space_size;
+
+        if (addr >= heap_start) && (addr < heap_inaccessible_start) {
+            return AddrLocation::Heap;
+        }
+        if (addr >= heap_inaccessible_start) && (addr < heap_inaccessible_end) {
+            return AddrLocation::InaccessibleHeap;
+        }
+
+        let stack_start = self.slot().stack as usize;
+        let stack_end = stack_start + self.slot().limits.stack_size;
+        let stack_guard_start = stack_start - host_page_size();
+
+        if (addr >= stack_guard_start) && (addr < stack_start) {
+            return AddrLocation::StackGuard;
+        }
+        if (addr >= stack_start) && (addr < stack_end) {
+            return AddrLocation::Stack;
+        }
+
+        let globals_start = self.slot().globals as usize;
+        let globals_end = globals_start + self.slot().limits.globals_size;
+
+        if (addr >= globals_start) && (addr < globals_end) {
+            return AddrLocation::Globals;
+        }
+
+        let sigstack_start = self.slot().sigstack as usize;
+        let sigstack_end = sigstack_start + self.slot().limits.signal_stack_size;
+        let sigstack_guard_start = sigstack_start - host_page_size();
+
+        if (addr >= sigstack_guard_start) && (addr < sigstack_start) {
+            return AddrLocation::SigStackGuard;
+        }
+        if (addr >= sigstack_start) && (addr < sigstack_end) {
+            return AddrLocation::SigStack;
+        }
+
+        AddrLocation::Unknown
     }
 
     pub fn expand_heap(&mut self, expand_bytes: u32, module: &dyn Module) -> Result<u32, Error> {

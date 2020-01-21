@@ -41,6 +41,19 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         }
     }
 
+    extern "C" fn hit_sigstack_guard_page(vmctx: *mut lucet_vmctx) -> () {
+        extern "C" {
+            fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut u8;
+        }
+
+        unsafe {
+            let globals_base = lucet_vmctx_get_globals(vmctx);
+
+            // Using the default limits, the globals are a page; try to write just off the end
+            *globals_base.offset(0x1000) = 0;
+        }
+    }
+
     extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) -> () {
         use std::os::raw::c_char;
         extern "C" {
@@ -112,6 +125,10 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         .with_export_func(MockExportBuilder::new(
             "fatal",
             FunctionPointer::from_usize(fatal as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
+            "hit_sigstack_guard_page",
+            FunctionPointer::from_usize(hit_sigstack_guard_page as usize),
         ))
         .with_export_func(MockExportBuilder::new(
             "recoverable_fatal",
@@ -596,6 +613,43 @@ macro_rules! guest_fault_tests {
                         // cause the entire process to abort before returning from `run`
                         inst.set_fatal_handler(handler);
                         inst.run("fatal", &[]).expect("instance runs");
+                        // Show that we never get here:
+                        std::process::exit(1);
+                    }
+                    ForkResult::Parent { child } => {
+                        match waitpid(Some(child), None).expect("can wait on child") {
+                            WaitStatus::Signaled(_, sig, _) => {
+                                assert_eq!(sig, Signal::SIGABRT);
+                            }
+                            ws => panic!("unexpected wait status: {:?}", ws),
+                        }
+                    }
+                }
+            })
+        }
+
+        #[test]
+        fn hit_sigstack_guard_page() {
+            lucet_internal_ensure_linked();
+            fn handler(_inst: &Instance) -> ! {
+                std::process::abort()
+            }
+            test_ex(|| {
+                let module = mock_traps_module();
+                let region =
+                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let mut inst = region
+                    .new_instance(module)
+                    .expect("instance can be created");
+
+                match fork().expect("can fork") {
+                    ForkResult::Child => {
+                        // Child code should run code that will hit the signal stack's guard
+                        // page. This will cause the entire process to abort before returning from
+                        // `run`
+                        inst.set_fatal_handler(handler);
+                        inst.run("hit_sigstack_guard_page", &[])
+                            .expect("instance runs");
                         // Show that we never get here:
                         std::process::exit(1);
                     }
