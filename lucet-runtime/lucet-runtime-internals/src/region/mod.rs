@@ -80,7 +80,7 @@ impl<'a> InstanceBuilder<'a> {
         InstanceBuilder {
             region,
             module,
-            embed_ctx: CtxMap::new(),
+            embed_ctx: CtxMap::default(),
         }
     }
 

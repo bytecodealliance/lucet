@@ -6,6 +6,7 @@ use std::collections::HashMap;
 ///
 /// This is similar to the type provided by the `anymap` crate, but we can get away with simpler
 /// types on the methods due to our more specialized use case.
+#[derive(Default)]
 pub struct CtxMap {
     map: HashMap<TypeId, RefCell<Box<dyn Any>>>,
 }
@@ -51,17 +52,15 @@ impl CtxMap {
             })
     }
 
-    pub fn new() -> Self {
-        CtxMap {
-            map: HashMap::new(),
-        }
-    }
-
     pub fn remove<T: Any>(&mut self) -> Option<T> {
         self.map.remove(&TypeId::of::<T>()).map(|x| {
             *(x.into_inner())
                 .downcast::<T>()
                 .expect("value stored with TypeId::of::<T> is always type T")
         })
+    }
+
+    pub fn new() -> Self {
+        Self::default()
     }
 }
