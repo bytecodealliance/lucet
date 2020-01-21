@@ -178,6 +178,7 @@ fn main() {
         heap_address_space_size,
         stack_size,
         globals_size: 0, // calculated from module
+        ..Limits::default()
     };
 
     let guest_args = matches

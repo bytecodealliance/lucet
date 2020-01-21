@@ -61,7 +61,7 @@ impl Instance {
         let guest_sigstack = SigStack::new(
             self.alloc.slot().sigstack,
             SigStackFlags::empty(),
-            libc::SIGSTKSZ,
+            self.alloc.slot().limits.signal_stack_size,
         );
         let previous_sigstack = unsafe { sigaltstack(Some(guest_sigstack)) }
             .expect("enabling or changing the signal stack succeeds");
