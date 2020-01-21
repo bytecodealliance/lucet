@@ -67,6 +67,8 @@ pub struct CpuFeatures {
     cpu: TargetCpu,
     /// Specific CPU features to add or remove from the profile
     specific_features: HashMap<SpecificFeature, bool>,
+    /// Host triple to target
+    target_triple: Triple,
 }
 
 fn detect_features(features: &mut ModuleFeatures) {
@@ -151,23 +153,29 @@ impl From<&CpuFeatures> for ModuleFeatures {
 
 impl Default for CpuFeatures {
     fn default() -> Self {
-        Self::detect_cpuid()
+        Self::detect_cpuid(Triple::default())
     }
 }
 
 impl CpuFeatures {
-    pub fn new(cpu: TargetCpu, specific_features: HashMap<SpecificFeature, bool>) -> Self {
+    pub fn new(
+        cpu: TargetCpu,
+        specific_features: HashMap<SpecificFeature, bool>,
+        target_triple: Triple,
+    ) -> Self {
         Self {
             cpu,
             specific_features,
+            target_triple,
         }
     }
 
     /// Return a `CpuFeatures` that uses the CPUID instruction to determine which features to enable.
-    pub fn detect_cpuid() -> Self {
+    pub fn detect_cpuid(target_triple: Triple) -> Self {
         CpuFeatures {
             cpu: TargetCpu::Native,
             specific_features: HashMap::new(),
+            target_triple,
         }
     }
 
@@ -176,6 +184,7 @@ impl CpuFeatures {
         CpuFeatures {
             cpu: TargetCpu::Baseline,
             specific_features: HashMap::new(),
+            target_triple: Triple::host(),
         }
     }
 
@@ -192,7 +201,7 @@ impl CpuFeatures {
             cranelift_native::builder()
                 .map_err(|_| format_err!("host machine is not a supported target"))
         } else {
-            isa::lookup(Triple::host())
+            isa::lookup(self.target_triple.clone())
                 .map_err(|_| format_err!("host machine is not a supported target"))
         }
         .context(LucetcErrorKind::Unsupported)?;

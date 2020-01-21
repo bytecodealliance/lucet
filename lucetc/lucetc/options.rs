@@ -1,7 +1,9 @@
 use clap::{Arg, ArgMatches, Values};
-use failure::Error;
+use failure::{err_msg, Error};
 use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu};
 use std::path::PathBuf;
+use std::str::FromStr;
+use target_lexicon::Triple;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CodegenOutput {
@@ -41,11 +43,21 @@ fn humansized(bytes: u64) -> String {
     mb.to_string()
 }
 
-fn cpu_features_from_args(cpu: Option<&str>, features: Values) -> Result<CpuFeatures, Error> {
+fn cpu_features_from_args(
+    cpu: Option<&str>,
+    features: Values,
+    triple: Option<&str>,
+) -> Result<CpuFeatures, Error> {
     use SpecificFeature::*;
     use TargetCpu::*;
+
+    let target_triple = match triple {
+        Some(v) => Triple::from_str(v).map_err(|e| err_msg(e.to_string()))?,
+        None => Triple::host(),
+    };
+
     if cpu.is_none() && features.len() == 0 {
-        Ok(CpuFeatures::detect_cpuid())
+        Ok(CpuFeatures::detect_cpuid(target_triple))
     } else {
         let cpu: TargetCpu = match cpu {
             None => Baseline,
@@ -93,7 +105,7 @@ fn cpu_features_from_args(cpu: Option<&str>, features: Values) -> Result<CpuFeat
                 (f, b)
             })
             .collect();
-        Ok(CpuFeatures::new(cpu, specific_features))
+        Ok(CpuFeatures::new(cpu, specific_features, target_triple))
     }
 }
 
@@ -188,6 +200,7 @@ impl Options {
         let cpu_features = cpu_features_from_args(
             m.value_of("target-cpu"),
             m.values_of("target-feature").unwrap_or_default(),
+            m.value_of("target-triple"),
         )?;
 
         let keygen = m.is_present("keygen");
@@ -279,6 +292,14 @@ This is equivalent to choosing `--target-cpu=native`.
 
 "
                     )
+            )
+            .arg(
+                Arg::with_name("target-triple")
+                .long("--target-triple")
+                .takes_value(true)
+                .multiple(false)
+                .takes_value(true)
+                .help("Generate code for a different host target or 'triple', like: x86_64-unknown-linux-musl")
             )
             .arg(
                 Arg::with_name("target-feature")
