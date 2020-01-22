@@ -5,13 +5,12 @@ mod tests;
 
 use crate::instance::Instance;
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
-use failure::Fail;
 use nix;
 use nix::sys::signal;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::ptr::NonNull;
 use std::{mem, ptr};
-use xfailure::xbail;
+use thiserror::Error;
 
 /// Callee-saved general-purpose registers in the AMD64 ABI.
 ///
@@ -394,7 +393,7 @@ impl Context {
         args: &[Val],
     ) -> Result<(), Error> {
         if !stack_is_aligned(stack) {
-            xbail!(Error::UnalignedStack);
+            return Err(Error::UnalignedStack);
         }
 
         if backstop_callback != Context::default_backstop_callback {
@@ -687,10 +686,10 @@ impl Context {
 }
 
 /// Errors that may arise when working with contexts.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum Error {
     /// Raised when the bottom of the stack provided to `Context::init` is not 16-byte aligned
-    #[fail(display = "context initialized with unaligned stack")]
+    #[error("context initialized with unaligned stack")]
     UnalignedStack,
 }
 

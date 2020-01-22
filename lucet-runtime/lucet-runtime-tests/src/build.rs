@@ -1,4 +1,4 @@
-use failure::Error;
+use anyhow::Error;
 use lucet_module::bindings::Bindings;
 use lucet_runtime_internals::module::DlModule;
 use lucet_wasi_sdk::{CompileOpts, Link, LinkOpt, LinkOpts};

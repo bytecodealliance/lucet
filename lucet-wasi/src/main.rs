@@ -3,8 +3,8 @@
 #[macro_use]
 extern crate clap;
 
+use anyhow::{format_err, Error};
 use clap::Arg;
-use failure::{format_err, Error};
 use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region, RunResult};
 use lucet_wasi::{self, WasiCtxBuilder, __wasi_exitcode_t};
 use std::fs::File;

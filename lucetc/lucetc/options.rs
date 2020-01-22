@@ -1,5 +1,5 @@
+use anyhow::Error;
 use clap::{Arg, ArgMatches, Values};
-use failure::Error;
 use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu};
 use std::path::PathBuf;
 use std::str::FromStr;

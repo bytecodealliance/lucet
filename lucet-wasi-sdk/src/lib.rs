@@ -1,36 +1,24 @@
 #![deny(bare_trait_objects)]
 
-use failure::{Error, Fail};
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::TempDir;
+use thiserror::Error;
 
 const WASI_TARGET: &str = "wasm32-unknown-wasi";
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum CompileError {
-    #[fail(display = "File not found: {}", _0)]
+    #[error("File not found: {0}")]
     FileNotFound(String),
-    #[fail(display = "Clang reported error: {}", _0)]
+    #[error("Clang reported error: {stdout}")]
     Execution { stdout: String, stderr: String },
-    #[fail(display = "Lucetc error: {}", _0)]
-    Lucetc {
-        #[cause]
-        e: Error,
-    },
-    #[fail(display = "IO error: {}", _0)]
-    IO {
-        #[cause]
-        e: std::io::Error,
-    },
-}
-
-impl From<std::io::Error> for CompileError {
-    fn from(e: std::io::Error) -> CompileError {
-        CompileError::IO { e }
-    }
+    #[error("Lucetc error")]
+    Lucetc(#[from] lucetc::Error),
+    #[error("IO error")]
+    IO(#[from] std::io::Error),
 }
 
 impl CompileError {
@@ -358,7 +346,7 @@ impl Lucetc {
         self.link.link(&self.wasm_file)?;
         self.lucetc
             .shared_object_file(output.as_ref())
-            .map_err(|e| CompileError::Lucetc { e })?;
+            .map_err(CompileError::Lucetc)?;
         Ok(self.tmpdir.close()?)
     }
 }

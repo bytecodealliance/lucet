@@ -1,4 +1,4 @@
-use failure::Error;
+use crate::error::Error;
 use parity_wasm::elements::Module;
 use std::collections::HashMap;
 use std::path::Path;
@@ -11,8 +11,10 @@ pub fn patch_module<P: AsRef<Path>>(
     let mut patcher_config = PatcherConfig::default();
     patcher_config.builtins_map_original_names = false;
     patcher_config.builtins_path = Some(builtins_path.as_ref().into());
-    let patcher = Patcher::new(patcher_config, module)?;
-    let patched_builtins_map = patcher.patched_builtins_map("env")?;
+    let patcher = Patcher::new(patcher_config, module).map_err(Error::Patcher)?;
+    let patched_builtins_map = patcher
+        .patched_builtins_map("env")
+        .map_err(Error::Patcher)?;
     let patched_module = patcher.patched_module();
     Ok((patched_module, patched_builtins_map))
 }

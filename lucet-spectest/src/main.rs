@@ -2,8 +2,7 @@
 extern crate clap;
 
 use clap::Arg;
-use failure::{format_err, Error};
-use lucet_spectest;
+use lucet_spectest::Error;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Error> {
@@ -22,7 +21,7 @@ fn main() -> Result<(), Error> {
     run.report();
 
     if run.failed().len() > 0 {
-        Err(format_err!("{} failures", run.failed().len()))
+        Err(Error::RunError(run.failed().len()))
     } else {
         Ok(())
     }

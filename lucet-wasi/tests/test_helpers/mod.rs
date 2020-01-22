@@ -1,4 +1,4 @@
-use failure::{bail, Error};
+use anyhow::{bail, Error};
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::{self, WasiCtx, WasiCtxBuilder, __wasi_exitcode_t};
 use lucet_wasi_sdk::{CompileOpts, Link};

@@ -1,6 +1,5 @@
-use crate::error::{LucetcError, LucetcErrorKind};
+use crate::error::Error;
 use cranelift_codegen::{isa, settings::Configurable};
-use failure::{format_err, ResultExt};
 use lucet_module::ModuleFeatures;
 use std::collections::{HashMap, HashSet};
 use target_lexicon::Triple;
@@ -184,17 +183,18 @@ impl CpuFeatures {
     }
 
     /// Return a `cranelift_codegen::isa::Builder` configured with these CPU features.
-    pub fn isa_builder(&self, target: Triple) -> Result<isa::Builder, LucetcError> {
+
+    pub fn isa_builder(&self, target: Triple) -> Result<isa::Builder, Error> {
         use SpecificFeature::*;
         use TargetCpu::*;
 
         let mut isa_builder = if let Native = self.cpu {
-            cranelift_native::builder()
-                .map_err(|_| format_err!("host machine is not a supported target"))
+            cranelift_native::builder().map_err(|_| {
+                Error::Unsupported("host machine is not a supported target".to_string())
+            })
         } else {
-            isa::lookup(target).map_err(|_| format_err!("not a supported target"))
-        }
-        .context(LucetcErrorKind::Unsupported)?;
+            isa::lookup(Triple::host()).map_err(Error::UnsupportedIsa)
+        }?;
 
         let mut specific_features = self.specific_features.clone();
 

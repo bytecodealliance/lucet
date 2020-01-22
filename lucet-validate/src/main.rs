@@ -1,12 +1,12 @@
 #[macro_use]
 extern crate clap;
 use clap::Arg;
-use failure::Fail;
 use lucet_validate::{self, Validator};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process;
+use thiserror::Error;
 use witx;
 
 pub fn main() {
@@ -87,24 +87,12 @@ fn run(module_path: &Path, witx_path: &Path, wasi_exe: bool) -> Result<(), Error
     Ok(())
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 enum Error {
-    #[fail(display = "{}", _0)]
-    Witx(#[cause] witx::WitxError),
-    #[fail(display = "With file {:?}: {}", _0, _1)]
-    Io(PathBuf, #[cause] io::Error),
-    #[fail(display = "{}", _0)]
-    Validate(#[cause] lucet_validate::Error),
-}
-
-impl From<witx::WitxError> for Error {
-    fn from(e: witx::WitxError) -> Error {
-        Error::Witx(e)
-    }
-}
-
-impl From<lucet_validate::Error> for Error {
-    fn from(e: lucet_validate::Error) -> Error {
-        Error::Validate(e)
-    }
+    #[error("Witx error")]
+    Witx(#[from] witx::WitxError),
+    #[error("With file {0:?}: {1}")]
+    Io(PathBuf, #[source] io::Error),
+    #[error("Validate error")]
+    Validate(#[from] lucet_validate::Error),
 }

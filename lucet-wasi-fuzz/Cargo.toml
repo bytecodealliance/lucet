@@ -10,8 +10,8 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1"
 clap = "2.32"
-failure = "0.1"
 libc = "0.2.65"
 lucetc = { path = "../lucetc" }
 lucet-runtime = { path = "../lucet-runtime" }

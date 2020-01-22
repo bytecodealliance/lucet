@@ -1,8 +1,9 @@
+use crate::error::Error;
+
 use cranelift_codegen::ir;
 use cranelift_faerie::traps::FaerieTrapManifest;
 
 use faerie::{Artifact, Decl};
-use failure::{Error, ResultExt};
 use lucet_module::TrapSite;
 
 pub fn write_trap_tables(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> Result<(), Error> {
@@ -10,8 +11,10 @@ pub fn write_trap_tables(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> R
         let func_sym = &sink.name;
         let trap_sym = trap_sym_for_func(func_sym);
 
-        obj.declare(&trap_sym, Decl::data())
-            .context(format!("declaring {}", &trap_sym))?;
+        obj.declare(&trap_sym, Decl::data()).map_err(|source| {
+            let message = format!("Trap table error declaring {}", trap_sym);
+            Error::ArtifactError(source, message)
+        })?;
 
         // write the actual function-level trap table
         let traps: Vec<TrapSite> = sink
@@ -32,7 +35,10 @@ pub fn write_trap_tables(manifest: &FaerieTrapManifest, obj: &mut Artifact) -> R
 
         // and write the function trap table into the object
         obj.define(&trap_sym, trap_site_bytes.to_vec())
-            .context(format!("defining {}", &trap_sym))?;
+            .map_err(|source| {
+                let message = format!("Trap table error defining {}", trap_sym);
+                Error::ArtifactError(source, message)
+            })?;
     }
 
     Ok(())

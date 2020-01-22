@@ -9,6 +9,7 @@
 //! treated like any other guest trap.
 
 use crate::decls::ModuleDecls;
+use crate::error::Error;
 use crate::module::UniqueFuncIndex;
 use cranelift_codegen::binemit::TrapSink;
 use cranelift_codegen::ir;
@@ -18,7 +19,6 @@ use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
 use cranelift_faerie::FaerieProduct;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use faerie::Decl;
-use failure::Error;
 
 /// Stack probe symbol name
 pub const STACK_PROBE_SYM: &'static str = "lucet_probestack";
@@ -59,11 +59,14 @@ pub fn declare_metadata<'a, B: ClifBackend>(
 }
 
 pub fn declare_and_define(product: &mut FaerieProduct) -> Result<(), Error> {
-    product.artifact.declare_with(
-        STACK_PROBE_SYM,
-        Decl::function(),
-        STACK_PROBE_BINARY.to_vec(),
-    )?;
+    product
+        .artifact
+        .declare_with(
+            STACK_PROBE_SYM,
+            Decl::function(),
+            STACK_PROBE_BINARY.to_vec(),
+        )
+        .map_err(|source| Error::Failure(source, "Stack probe error".to_owned()))?;
     add_sink(
         product
             .trap_manifest

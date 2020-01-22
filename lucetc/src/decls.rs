@@ -1,4 +1,4 @@
-use crate::error::{LucetcError, LucetcErrorKind};
+use crate::error::Error;
 use crate::heap::HeapSettings;
 pub use crate::module::{Exportable, TableElems};
 use crate::module::{ModuleInfo, UniqueFuncIndex};
@@ -14,7 +14,6 @@ use cranelift_wasm::{
     Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
     TableIndex,
 };
-use failure::{format_err, Error, ResultExt};
 use lucet_module::bindings::Bindings;
 use lucet_module::ModuleFeatures;
 use lucet_module::{
@@ -84,7 +83,7 @@ impl<'a> ModuleDecls<'a> {
         bindings: &'a Bindings,
         runtime: Runtime,
         heap_settings: HeapSettings,
-    ) -> Result<Self, LucetcError> {
+    ) -> Result<Self, Error> {
         let imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
         let (tables_list_name, table_names) = Self::declare_tables(&info, clif_module)?;
         let globals_spec = Self::build_globals_spec(&info)?;
@@ -113,7 +112,7 @@ impl<'a> ModuleDecls<'a> {
         decls: &mut ModuleDecls<'a>,
         clif_module: &mut ClifModule<B>,
         bindings: &'a Bindings,
-    ) -> Result<(), LucetcError> {
+    ) -> Result<(), Error> {
         // Get the name for this function from the module names section, if it exists.
         // Because names have to be unique, we append the index value (ix) to the name.
         fn custom_name_for<'a>(
@@ -148,11 +147,9 @@ impl<'a> ModuleDecls<'a> {
             func_ix: UniqueFuncIndex,
             decls: &mut ModuleDecls<'a>,
             bindings: &'a Bindings,
-        ) -> Result<Option<String>, failure::Context<LucetcErrorKind>> {
+        ) -> Result<Option<String>, Error> {
             if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
-                let import_symbol = bindings
-                    .translate(import_mod, import_field)
-                    .context(LucetcErrorKind::TranslatingModule)?;
+                let import_symbol = bindings.translate(import_mod, import_field)?;
                 decls.imports.push(ImportFunction {
                     fn_idx: LucetFunctionIndex::from_u32(decls.function_names.len() as u32),
                     module: import_mod,
@@ -166,7 +163,6 @@ impl<'a> ModuleDecls<'a> {
 
         for ix in 0..decls.info.functions.len() {
             let func_index = UniqueFuncIndex::new(ix);
-
             let import_info = import_name_for(func_index, decls, bindings)?;
             let export_info = export_name_for(func_index, decls);
 
@@ -206,7 +202,7 @@ impl<'a> ModuleDecls<'a> {
         decl_sym: String,
         decl_linkage: Linkage,
         signature: ir::Signature,
-    ) -> Result<UniqueFuncIndex, LucetcError> {
+    ) -> Result<UniqueFuncIndex, Error> {
         let (new_funcidx, _) = self.info.declare_func_with_sig(signature)?;
 
         self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)?;
@@ -222,7 +218,7 @@ impl<'a> ModuleDecls<'a> {
         decl_sym: String,
         decl_linkage: Linkage,
         func_ix: UniqueFuncIndex,
-    ) -> Result<UniqueFuncIndex, LucetcError> {
+    ) -> Result<UniqueFuncIndex, Error> {
         // This function declaration may be a subsequent additional declaration for a function
         // we've already been told about. In that case, func_ix will already be a valid index for a
         // function name, and we should not try to declare it again.
@@ -230,13 +226,11 @@ impl<'a> ModuleDecls<'a> {
         // Regardless of the function being known internally, we must forward the additional
         // declaration to `clif_module` so functions with multiple forms of linkage (import +
         // export, exported twice, ...) are correctly declared in the resultant artifact.
-        let funcid = clif_module
-            .declare_function(
-                &decl_sym,
-                decl_linkage,
-                self.info.signature_for_function(func_ix),
-            )
-            .context(LucetcErrorKind::TranslatingModule)?;
+        let funcid = clif_module.declare_function(
+            &decl_sym,
+            decl_linkage,
+            self.info.signature_for_function(func_ix),
+        )?;
 
         if func_ix.as_u32() as usize >= self.function_names.len() {
             // `func_ix` is new, so we need to add the name. If func_ix is new, it should be
@@ -255,21 +249,18 @@ impl<'a> ModuleDecls<'a> {
     fn declare_tables<B: ClifBackend>(
         info: &ModuleInfo<'a>,
         clif_module: &mut ClifModule<B>,
-    ) -> Result<(Name, PrimaryMap<TableIndex, Name>), LucetcError> {
+    ) -> Result<(Name, PrimaryMap<TableIndex, Name>), Error> {
         let mut table_names = PrimaryMap::new();
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
-            let def_data_id = clif_module
-                .declare_data(&def_symbol, Linkage::Export, false, None)
-                .context(LucetcErrorKind::TranslatingModule)?;
+            let def_data_id =
+                clif_module.declare_data(&def_symbol, Linkage::Export, false, None)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             table_names.push(def_name);
         }
 
-        let tables_list_id = clif_module
-            .declare_data(TABLE_SYM, Linkage::Export, false, None)
-            .context(LucetcErrorKind::Table)?;
+        let tables_list_id = clif_module.declare_data(TABLE_SYM, Linkage::Export, false, None)?;
         let tables_list = Name::new_data(TABLE_SYM.to_string(), tables_list_id);
 
         Ok((tables_list, table_names))
@@ -279,7 +270,7 @@ impl<'a> ModuleDecls<'a> {
         decls: &mut ModuleDecls<'a>,
         clif_module: &mut ClifModule<B>,
         runtime: Runtime,
-    ) -> Result<(), LucetcError> {
+    ) -> Result<(), Error> {
         for (func, (symbol, signature)) in runtime.functions.iter() {
             let func_id = decls.declare_new_function(
                 clif_module,
@@ -296,7 +287,7 @@ impl<'a> ModuleDecls<'a> {
     fn build_linear_memory_spec(
         info: &ModuleInfo<'a>,
         heap_settings: HeapSettings,
-    ) -> Result<Option<OwnedLinearMemorySpec>, LucetcError> {
+    ) -> Result<Option<OwnedLinearMemorySpec>, Error> {
         use crate::sparsedata::owned_sparse_data_from_initializers;
         if let Some(heap_spec) = Self::build_heap_spec(info, heap_settings)? {
             let data_initializers = info
@@ -314,7 +305,7 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    fn build_globals_spec(info: &ModuleInfo<'a>) -> Result<Vec<GlobalSpec<'a>>, LucetcError> {
+    fn build_globals_spec(info: &ModuleInfo<'a>) -> Result<Vec<GlobalSpec<'a>>, Error> {
         let mut globals = Vec::new();
         for ix in 0..info.globals.len() {
             let ix = GlobalIndex::new(ix);
@@ -335,28 +326,21 @@ impl<'a> ModuleDecls<'a> {
                         if let Some((module, field)) = info.imported_globals.get(ref_ix) {
                             Ok(GlobalVariant::Import { module, field })
                         } else {
-                            Err(format_err!("inconsistent state: global {} is declared as an import but has no entry in imported_globals", ref_ix.as_u32()))
-                            .context(LucetcErrorKind::TranslatingModule)
+                            Err(Error::GlobalDeclarationError(ref_ix.as_u32()))
                         }
                     } else {
                         // This WASM restriction may be loosened in the future:
-                        Err(format_err!("invalid global declarations: global {} is initialized by referencing another global value, but the referenced global is not an import", ix.as_u32()))
-                        .context(LucetcErrorKind::TranslatingModule)
+                        Err(Error::GlobalInitError(ix.as_u32()))
                     }
                 }
                 GlobalInit::Import => {
                     if let Some((module, field)) = info.imported_globals.get(ix) {
                         Ok(GlobalVariant::Import { module, field })
                     } else {
-                        Err(format_err!("inconsistent state: global {} is declared as an import but has no entry in imported_globals", ix.as_u32()))
-                        .context(LucetcErrorKind::TranslatingModule)
+                        Err(Error::GlobalDeclarationError(ix.as_u32()))
                     }
                 }
-                GlobalInit::V128Const(_) => Err(format_err!(
-                    "invalid declaration of global {}: v128const type",
-                    ix.as_u32()
-                ))
-                .context(LucetcErrorKind::Unsupported),
+                GlobalInit::V128Const(_) => Err(Error::GlobalUnsupported(ix.as_u32())),
             }?;
 
             globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));
@@ -367,7 +351,7 @@ impl<'a> ModuleDecls<'a> {
     fn build_heap_spec(
         info: &ModuleInfo<'a>,
         heap_settings: HeapSettings,
-    ) -> Result<Option<HeapSpec>, LucetcError> {
+    ) -> Result<Option<HeapSpec>, Error> {
         match info.memories.len() {
             0 => Ok(None),
             1 => {
@@ -382,12 +366,11 @@ impl<'a> ModuleDecls<'a> {
 
                 let reserved_size = std::cmp::max(initial_size, heap_settings.min_reserved_size);
                 if reserved_size > heap_settings.max_reserved_size {
-                    Err(format_err!(
+                    let message = format!(
                         "module reserved size ({}) exceeds max reserved size ({})",
-                        reserved_size,
-                        heap_settings.max_reserved_size
-                    ))
-                    .context(LucetcErrorKind::MemorySpecs)?;
+                        reserved_size, heap_settings.max_reserved_size
+                    );
+                    Err(Error::MemorySpecs(message))?;
                 }
                 // Find the max size permitted by the heap and the memory spec
                 let max_size = memory.maximum.map(|pages| pages as u64 * wasm_page);
@@ -398,8 +381,9 @@ impl<'a> ModuleDecls<'a> {
                     max_size,
                 }))
             }
-            _ => Err(format_err!("lucetc only supports memory 0"))
-                .context(LucetcErrorKind::Unsupported)?,
+            _ => Err(Error::Unsupported(
+                "lucetc only supports memory 0".to_string(),
+            ))?,
         }
     }
     // ********************* Public Interface **************************
@@ -417,16 +401,13 @@ impl<'a> ModuleDecls<'a> {
         )
     }
 
-    pub fn get_func(&self, func_index: UniqueFuncIndex) -> Result<FunctionDecl<'_>, Error> {
-        let name = self
-            .function_names
-            .get(func_index)
-            .ok_or_else(|| format_err!("func index out of bounds: {:?}", func_index))?;
+    pub fn get_func(&self, func_index: UniqueFuncIndex) -> Option<FunctionDecl<'_>> {
+        let name = self.function_names.get(func_index).unwrap();
         let exportable_sigix = self.info.functions.get(func_index).unwrap();
         let signature_index = self.get_signature_uid(exportable_sigix.entity).unwrap();
         let signature = self.info.signatures.get(signature_index).unwrap();
         let import_name = self.info.imported_funcs.get(func_index);
-        Ok(FunctionDecl {
+        Some(FunctionDecl {
             signature,
             signature_index,
             export_names: exportable_sigix.export_names.clone(),
@@ -453,10 +434,10 @@ impl<'a> ModuleDecls<'a> {
     }
 
     pub fn get_table(&self, table_index: TableIndex) -> Result<TableDecl<'_>, Error> {
-        let contents_name = self
-            .table_names
-            .get(table_index)
-            .ok_or_else(|| format_err!("table index out of bounds: {:?}", table_index))?;
+        let contents_name = self.table_names.get(table_index).ok_or_else(|| {
+            let message = format!("{:?}", table_index);
+            Error::TableIndexError(message)
+        })?;
         let exportable_tbl = self.info.tables.get(table_index).unwrap();
         let import_name = self.info.imported_tables.get(table_index);
         let elems = self
@@ -464,8 +445,8 @@ impl<'a> ModuleDecls<'a> {
             .table_elems
             .get(&table_index)
             .ok_or_else(|| {
-                format_err!("table is not local: {:?}", table_index)
-                    .context(LucetcErrorKind::Unsupported)
+                let message = format!("table is not local: {:?}", table_index);
+                Error::Unsupported(message)
             })?
             .as_slice();
         Ok(TableDecl {
@@ -479,10 +460,10 @@ impl<'a> ModuleDecls<'a> {
 
     pub fn get_signature(&self, signature_index: SignatureIndex) -> Result<&ir::Signature, Error> {
         self.get_signature_uid(signature_index).and_then(|uid| {
-            self.info
-                .signatures
-                .get(uid)
-                .ok_or_else(|| format_err!("signature out of bounds: {:?}", uid))
+            self.info.signatures.get(uid).ok_or_else(|| {
+                let message = format!("signature out of bounds: {:?}", uid);
+                Error::Signature(message)
+            })
         })
     }
 
@@ -494,14 +475,17 @@ impl<'a> ModuleDecls<'a> {
             .signature_mapping
             .get(signature_index)
             .map(|x| *x)
-            .ok_or_else(|| format_err!("signature out of bounds: {:?}", signature_index))
+            .ok_or_else(|| {
+                let message = format!("signature out of bounds: {:?}", signature_index);
+                Error::Signature(message)
+            })
     }
 
     pub fn get_global(&self, global_index: GlobalIndex) -> Result<&Exportable<'_, Global>, Error> {
-        self.info
-            .globals
-            .get(global_index)
-            .ok_or_else(|| format_err!("global out of bounds: {:?}", global_index))
+        self.info.globals.get(global_index).ok_or_else(|| {
+            let message = format!("global out of bounds: {:?}", global_index);
+            Error::GlobalIndexError(message)
+        })
     }
 
     pub fn get_heap(&self) -> Option<&HeapSpec> {
@@ -512,7 +496,7 @@ impl<'a> ModuleDecls<'a> {
         }
     }
 
-    pub fn get_module_data(&self, features: ModuleFeatures) -> Result<ModuleData<'_>, LucetcError> {
+    pub fn get_module_data(&self, features: ModuleFeatures) -> Result<ModuleData<'_>, Error> {
         let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
             Some(spec.to_ref())
         } else {
@@ -528,8 +512,7 @@ impl<'a> ModuleDecls<'a> {
             let name = self
                 .function_names
                 .get(fn_index)
-                .ok_or_else(|| format_err!("func index out of bounds: {:?}", fn_index))
-                .unwrap();
+                .expect("fn_index is key into function_names");
 
             functions.push(FunctionMetadata {
                 signature: decl.signature_index,
@@ -541,12 +524,8 @@ impl<'a> ModuleDecls<'a> {
             .info
             .signatures
             .values()
-            .map(|sig| {
-                to_lucet_signature(sig)
-                    .map_err(|e| format_err!("error converting cranelift sig to wasm sig: {:?}", e))
-                    .context(LucetcErrorKind::TranslatingModule)
-            })
-            .collect::<Result<Vec<LucetSignature>, failure::Context<LucetcErrorKind>>>()?;
+            .map(|sig| to_lucet_signature(sig).map_err(Error::SignatureConversion))
+            .collect::<Result<Vec<LucetSignature>, Error>>()?;
 
         Ok(ModuleData::new(
             linear_memory,

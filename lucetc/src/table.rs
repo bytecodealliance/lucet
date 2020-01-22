@@ -1,5 +1,5 @@
 use crate::decls::{ModuleDecls, TableDecl};
-use crate::error::{LucetcError, LucetcErrorKind};
+use crate::error::Error;
 use crate::module::UniqueFuncIndex;
 use crate::name::Name;
 use crate::pointer::NATIVE_POINTER_SIZE;
@@ -8,7 +8,6 @@ use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
 use cranelift_wasm::{TableElementType, TableIndex};
 use faerie::{Artifact, Link};
-use failure::{format_err, Error, ResultExt};
 use std::io::Cursor;
 
 /// This symbol will be used to reference the `tables` field in `Module` - a sequence of tables.
@@ -24,22 +23,21 @@ enum Elem {
     Empty,
 }
 
-fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, LucetcError> {
+fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
     match decl.table.ty {
         TableElementType::Func => Ok(()),
-        _ => Err(format_err!("table with non-function elements: {:?}", decl))
-            .context(LucetcErrorKind::Unsupported),
+        _ => {
+            let message = format!("table with non-function elements: {:?}", decl);
+            Err(Error::Unsupported(message))
+        }
     }?;
 
     let mut elems = Vec::new();
 
     for initializer in decl.elems.iter() {
         if initializer.base.is_some() {
-            Err(format_err!(
-                "table elements with global index base: {:?}",
-                initializer
-            ))
-            .context(LucetcErrorKind::Unsupported)?
+            let message = format!("table elements with global index base: {:?}", initializer);
+            Err(Error::Unsupported(message))?
         }
         let final_len = initializer.offset + initializer.elements.len();
         if final_len > elems.len() {
@@ -60,7 +58,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
             to: table.symbol(),
             at: (TABLE_REF_SIZE * idx) as u64,
         })
-        .context(LucetcErrorKind::Table)?;
+        .map_err(|source| Error::Failure(source, "Table error".to_owned()))?;
     }
     Ok(())
 }
@@ -68,7 +66,7 @@ pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
 pub fn write_table_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     decls: &ModuleDecls<'_>,
-) -> Result<Vec<Name>, LucetcError> {
+) -> Result<Vec<Name>, Error> {
     let mut tables_vec = Cursor::new(Vec::new());
     let mut table_names: Vec<Name> = Vec::new();
 
@@ -95,19 +93,21 @@ pub fn write_table_data<B: ClifBackend>(
                 Elem::Func(func_index) => {
                     // Note: this is the only place we validate that the table entry points to a valid
                     // function. If this is ever removed, make sure this check happens elsewhere.
-                    let func = decls
-                        .get_func(*func_index)
-                        .context(LucetcErrorKind::Table)?;
-                    // First element in row is the SignatureIndex for the function
-                    putelem(&mut table_data, func.signature_index.as_u32() as u64);
+                    if let Some(func) = decls.get_func(*func_index) {
+                        // First element in row is the SignatureIndex for the function
+                        putelem(&mut table_data, func.signature_index.as_u32() as u64);
 
-                    // Second element in row is the pointer to the function. The Reloc is doing the work
-                    // here. We put a 0 in the table data itself to be overwritten at link time.
-                    let funcref = table_ctx.import_function(func.name.into());
-                    let position = table_data.position();
-                    assert!(position < <u32>::max_value() as u64);
-                    table_ctx.write_function_addr(position as u32, funcref);
-                    putelem(&mut table_data, 0);
+                        // Second element in row is the pointer to the function. The Reloc is doing the work
+                        // here. We put a 0 in the table data itself to be overwritten at link time.
+                        let funcref = table_ctx.import_function(func.name.into());
+                        let position = table_data.position();
+                        assert!(position < <u32>::max_value() as u64);
+                        table_ctx.write_function_addr(position as u32, funcref);
+                        putelem(&mut table_data, 0);
+                    } else {
+                        let message = format!("{:?}", func_index);
+                        return Err(Error::FunctionIndexError(message));
+                    }
                 }
                 // EMPTY:
                 Elem::Empty => {
@@ -125,9 +125,7 @@ pub fn write_table_data<B: ClifBackend>(
             .contents_name
             .as_dataid()
             .expect("tables are data");
-        clif_module
-            .define_data(table_id, &table_ctx)
-            .context(LucetcErrorKind::Table)?;
+        clif_module.define_data(table_id, &table_ctx)?;
 
         // have to link TABLE_SYM, table_id,
         // add space for the TABLE_SYM pointer
@@ -145,14 +143,12 @@ pub fn write_table_data<B: ClifBackend>(
     let mut table_data_ctx = DataContext::new();
     table_data_ctx.define(inner.into_boxed_slice());
 
-    clif_module
-        .define_data(
-            decls
-                .get_tables_list_name()
-                .as_dataid()
-                .expect("lucet_tables is declared as data"),
-            &table_data_ctx,
-        )
-        .context(LucetcErrorKind::Table)?;
+    clif_module.define_data(
+        decls
+            .get_tables_list_name()
+            .as_dataid()
+            .expect("lucet_tables is declared as data"),
+        &table_data_ctx,
+    )?;
     Ok(table_names)
 }

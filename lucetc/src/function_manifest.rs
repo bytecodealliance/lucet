@@ -1,7 +1,7 @@
+use crate::error::Error;
 use crate::output::write_relocated_slice;
 use crate::traps::trap_sym_for_func;
 use faerie::{Artifact, Decl};
-use failure::{Error, ResultExt};
 use lucet_module::FunctionSpec;
 use std::io::Cursor;
 use std::mem::size_of;
@@ -16,7 +16,10 @@ pub fn write_function_manifest(
     obj: &mut Artifact,
 ) -> Result<(), Error> {
     obj.declare(FUNCTION_MANIFEST_SYM, Decl::data())
-        .context(format!("declaring {}", FUNCTION_MANIFEST_SYM))?;
+        .map_err(|source| {
+            let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
+            Error::ArtifactError(source, message)
+        })?;
 
     let mut manifest_buf: Cursor<Vec<u8>> = Cursor::new(Vec::with_capacity(
         functions.len() * size_of::<FunctionSpec>(),
@@ -57,7 +60,10 @@ pub fn write_function_manifest(
     }
 
     obj.define(FUNCTION_MANIFEST_SYM, manifest_buf.into_inner())
-        .context(format!("defining {}", FUNCTION_MANIFEST_SYM))?;
+        .map_err(|source| {
+            let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
+            Error::ArtifactError(source, message)
+        })?;
 
     Ok(())
 }

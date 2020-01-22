@@ -4,7 +4,7 @@ mod options;
 extern crate clap;
 
 use crate::options::{CodegenOutput, ErrorStyle, Options};
-use failure::{format_err, Error, ResultExt};
+use anyhow::{format_err, Error};
 use log::info;
 use lucet_module::bindings::Bindings;
 use lucet_validate::Validator;
@@ -25,13 +25,17 @@ pub struct SerializedLucetcError {
 impl From<Error> for SerializedLucetcError {
     fn from(e: Error) -> Self {
         SerializedLucetcError {
-            error: if let Some(cause) = e.as_fail().cause() {
-                format!("{}: {}", e, cause)
-            } else {
-                format!("{}", e)
-            },
+            error: format!("{}", e),
         }
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+enum BindingError {
+    #[error("adding bindings from {1}")]
+    ExtendError(#[source] lucet_module::error::Error, String),
+    #[error("bindings file {1}")]
+    FileError(#[source] lucet_module::error::Error, String),
 }
 
 fn main() {
@@ -43,9 +47,6 @@ fn main() {
         match opts.error_style {
             ErrorStyle::Human => {
                 eprintln!("Error: {}\n", err);
-                if let Some(cause) = err.as_fail().cause() {
-                    eprintln!("{}", cause);
-                }
             }
             ErrorStyle::Json => {
                 let errs: Vec<SerializedLucetcError> = vec![err.into()];
@@ -73,11 +74,15 @@ pub fn run(opts: &Options) -> Result<(), Error> {
 
     let mut bindings = Bindings::empty();
     for file in opts.binding_files.iter() {
-        let file_bindings =
-            Bindings::from_file(file).context(format!("bindings file {:?}", file))?;
-        bindings
-            .extend(&file_bindings)
-            .context(format!("adding bindings from {:?}", file))?;
+        let file_bindings = Bindings::from_file(file).map_err(|source| {
+            let file = format!("{:?}", file);
+            BindingError::FileError(source, file)
+        })?;
+
+        bindings.extend(&file_bindings).map_err(|source| {
+            let file = format!("{:?}", file);
+            BindingError::ExtendError(source, file)
+        })?;
     }
 
     let mut c = Lucetc::new(PathBuf::from(input))

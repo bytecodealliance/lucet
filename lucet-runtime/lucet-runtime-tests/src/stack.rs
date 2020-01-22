@@ -1,4 +1,4 @@
-use failure::Error;
+use anyhow::Error;
 use lucet_runtime_internals::module::DlModule;
 use lucetc::Lucetc;
 use std::sync::Arc;

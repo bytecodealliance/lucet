@@ -1,6 +1,6 @@
 #![deny(bare_trait_objects)]
 
-use failure::{bail, format_err, Error};
+use anyhow::{bail, format_err, Error};
 use libc::c_ulong;
 use lucet_module::bindings::Bindings;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};

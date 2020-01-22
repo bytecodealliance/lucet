@@ -1,4 +1,4 @@
-use crate::error::LucetcErrorKind;
+use crate::error::Error;
 use crate::function_manifest::{write_function_manifest, FUNCTION_MANIFEST_SYM};
 use crate::name::Name;
 use crate::stack_probe;
@@ -8,7 +8,6 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
-use failure::{format_err, Error, ResultExt};
 use lucet_module::{
     FunctionSpec, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };
@@ -33,8 +32,10 @@ impl CraneliftFuncs {
         let mut buffer = String::new();
         for (n, func) in self.funcs.iter() {
             buffer.push_str(&format!("; {}\n", n.symbol()));
-            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into())
-                .context(format_err!("writing func {:?}", n))?
+            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into()).map_err(|e| {
+                let message = format!("{:?}", n);
+                Error::OutputFunction(e, message)
+            })?
         }
         let mut file = File::create(path)?;
         file.write_all(buffer.as_bytes())?;
@@ -98,8 +99,7 @@ impl ObjectFile {
                     FunctionSpec::new(0, fn_spec.code_len(), 0, sink.sites.len() as u64),
                 );
             } else {
-                Err(format_err!("Inconsistent state: trap records present for function {} but the function does not exist?", sink.name))
-                    .context(LucetcErrorKind::TranslatingModule)?;
+                return Err(Error::TrapRecord(sink.name.to_owned()));
             }
         }
 
@@ -121,12 +121,14 @@ impl ObjectFile {
     }
 
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
-        let _ = path.as_ref().file_name().ok_or(format_err!(
-            "path {:?} needs to have filename",
-            path.as_ref()
-        ));
+        let _ = path.as_ref().file_name().ok_or(|| {
+            let message = format!("Path must be filename {:?}", path.as_ref());
+            Error::Input(message);
+        });
         let file = File::create(path)?;
-        self.artifact.write(file)?;
+        self.artifact
+            .write(file)
+            .map_err(|source| Error::Failure(source, "Write error".to_owned()))?;
         Ok(())
     }
 }
@@ -139,7 +141,10 @@ fn write_module(
 ) -> Result<(), Error> {
     let mut native_data = Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
     obj.declare(LUCET_MODULE_SYM, Decl::data().global())
-        .context(format!("declaring {}", LUCET_MODULE_SYM))?;
+        .map_err(|source| {
+            let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
+            Error::ArtifactError(source, message)
+        })?;
 
     let version =
         VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
@@ -169,7 +174,10 @@ fn write_module(
     )?;
 
     obj.define(LUCET_MODULE_SYM, native_data.into_inner())
-        .context(format!("defining {}", LUCET_MODULE_SYM))?;
+        .map_err(|source| {
+            let message = format!("Manifest error defining {}", FUNCTION_MANIFEST_SYM);
+            Error::ArtifactError(source, message)
+        })?;
 
     Ok(())
 }
@@ -204,7 +212,10 @@ pub(crate) fn write_relocated_slice(
                 },
                 absolute_reloc,
             )
-            .context(format!("linking {} into function manifest", to))?;
+            .map_err(|source| {
+                let message = format!("Manifest error linking {}", to);
+                Error::Failure(source, message)
+            })?;
         }
         (Some(to), _len) => {
             // This is a local buffer of known size
@@ -213,7 +224,10 @@ pub(crate) fn write_relocated_slice(
                 to,   // is a reference to `to`    (eg. fn_name)
                 at: buf.position(),
             })
-            .context(format!("linking {} into function manifest", to))?;
+            .map_err(|source| {
+                let message = format!("Manifest error linking {}", to);
+                Error::Failure(source, message)
+            })?;
         }
         (None, len) => {
             // There's actually no relocation to add, because there's no slice to put here.

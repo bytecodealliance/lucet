@@ -23,12 +23,11 @@ mod types;
 use crate::load::read_bytes;
 pub use crate::{
     compiler::{Compiler, CpuFeatures, OptLevel, SpecificFeature, TargetCpu},
-    error::{LucetcError, LucetcErrorKind},
+    error::Error,
     heap::HeapSettings,
     load::read_module,
     patch::patch_module,
 };
-use failure::{format_err, Error, ResultExt};
 pub use lucet_module::bindings::Bindings;
 pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};
@@ -338,8 +337,8 @@ impl Lucetc {
             &self.validator,
         )?;
         let obj = compiler.object_file()?;
+        obj.write(output.as_ref())?;
 
-        obj.write(output.as_ref()).context("writing object file")?;
         Ok(())
     }
 
@@ -357,10 +356,7 @@ impl Lucetc {
             &self.validator,
         )?;
 
-        compiler
-            .cranelift_funcs()?
-            .write(&output)
-            .context("writing clif file")?;
+        compiler.cranelift_funcs()?.write(&output)?;
 
         Ok(())
     }
@@ -371,9 +367,9 @@ impl Lucetc {
         self.object_file(objpath.clone())?;
         link_so(objpath, &self.target, &output)?;
         if self.sign {
-            let sk = self.sk.as_ref().ok_or(
-                format_err!("signing requires a secret key").context(LucetcErrorKind::Signature),
-            )?;
+            let sk = self.sk.as_ref().ok_or(Error::Signature(
+                "signing requires a secret key".to_string(),
+            ))?;
             signature::sign_module(&output, sk)?;
         }
         Ok(())
@@ -397,16 +393,15 @@ where
     cmd_ld.arg("-o");
     cmd_ld.arg(sopath.as_ref());
 
-    let run_ld = cmd_ld
-        .output()
-        .context(format_err!("running ld on {:?}", objpath.as_ref()))?;
+    let run_ld = cmd_ld.output()?;
 
     if !run_ld.status.success() {
-        Err(format_err!(
+        let message = format!(
             "ld of {} failed: {}",
             objpath.as_ref().to_str().unwrap(),
             String::from_utf8_lossy(&run_ld.stderr)
-        ))?;
+        );
+        Err(Error::LdError(message))?;
     }
     Ok(())
 }

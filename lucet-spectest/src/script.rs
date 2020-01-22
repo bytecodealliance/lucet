@@ -1,32 +1,34 @@
 use crate::bindings;
-use failure::{format_err, Error, Fail};
 use lucet_runtime::{self, MmapRegion, Module as LucetModule, Region, UntypedRetVal, Val};
-use lucetc::{Compiler, CpuFeatures, HeapSettings, LucetcError, LucetcErrorKind, OptLevel};
+use lucetc::{Compiler, CpuFeatures, Error as LucetcError, HeapSettings, OptLevel};
 use std::io;
 use std::process::Command;
 use std::sync::Arc;
 use target_lexicon::Triple;
+use thiserror::Error;
 
-#[derive(Fail, Debug)]
+#[derive(Debug, Error)]
 pub enum ScriptError {
-    #[fail(display = "Validation error: {}", _0)]
-    ValidationError(LucetcError),
-    #[fail(display = "Program creation error: {}", _0)]
-    ProgramError(LucetcError),
-    #[fail(display = "Compilation error: {}", _0)]
-    CompileError(LucetcError),
-    #[fail(display = "Codegen error: {}", _0)]
-    CodegenError(Error),
-    #[fail(display = "Load error: {}", _0)]
-    LoadError(lucet_runtime::Error),
-    #[fail(display = "Instaitiation error: {}", _0)]
-    InstantiateError(lucet_runtime::Error),
-    #[fail(display = "Runtime error: {}", _0)]
-    RuntimeError(lucet_runtime::Error),
-    #[fail(display = "Malformed script: {}", _0)]
+    #[error("Validation error")]
+    ValidationError(#[source] LucetcError),
+    #[error("Program error")]
+    ProgramError(#[source] LucetcError),
+    #[error("Compilation error")]
+    CompileError(#[source] LucetcError),
+    #[error("Codegen error")]
+    CodegenError(#[source] LucetcError),
+    #[error("Load error")]
+    LoadError(#[source] lucet_runtime::Error),
+    #[error("Instantiation error")]
+    InstantiateError(#[source] lucet_runtime::Error),
+    #[error("Runtime error")]
+    RuntimeError(#[source] lucet_runtime::Error),
+    #[error("Malformed script: {0}")]
     MalformedScript(String),
-    #[fail(display = "IO error: {}", _0)]
-    IoError(io::Error),
+    #[error("IO error")]
+    IoError(#[from] io::Error),
+    #[error("run_ld error: {0}")]
+    LdError(String),
 }
 
 impl ScriptError {
@@ -34,18 +36,12 @@ impl ScriptError {
         match self {
             ScriptError::ProgramError(ref lucetc_err)
             | ScriptError::ValidationError(ref lucetc_err)
-            | ScriptError::CompileError(ref lucetc_err) => match lucetc_err.get_context() {
-                &LucetcErrorKind::Unsupported => true,
+            | ScriptError::CompileError(ref lucetc_err) => match lucetc_err {
+                &LucetcError::Unsupported(_) => true,
                 _ => false,
             },
             _ => false,
         }
-    }
-}
-
-impl From<io::Error> for ScriptError {
-    fn from(e: io::Error) -> ScriptError {
-        ScriptError::IoError(e)
     }
 }
 
@@ -54,8 +50,8 @@ pub struct ScriptEnv {
 }
 
 fn program_error(e: LucetcError) -> ScriptError {
-    match e.get_context() {
-        LucetcErrorKind::Validation => ScriptError::ValidationError(e),
+    match e {
+        LucetcError::WasmValidation(_) => ScriptError::ValidationError(e),
         _ => ScriptError::ProgramError(e),
     }
 }
@@ -97,11 +93,13 @@ impl ScriptEnv {
         cmd_ld.arg(sofile_path.clone());
         let run_ld = cmd_ld.output()?;
         if !run_ld.status.success() {
-            Err(ScriptError::CodegenError(format_err!(
+            let message = format!(
                 "ld {:?}: {}",
                 objfile_path,
                 String::from_utf8_lossy(&run_ld.stderr)
-            )))?;
+            );
+
+            Err(ScriptError::LdError(message))?;
         }
 
         let lucet_module: Arc<dyn LucetModule> =
@@ -171,7 +169,7 @@ impl ScriptEnv {
         let (_, ref mut inst) = self.instance_named_mut(name)?;
         inst.run(field, &args)
             .and_then(|rr| rr.returned())
-            .map_err(|e| ScriptError::RuntimeError(e))
+            .map_err(ScriptError::RuntimeError)
     }
 
     pub fn register(&mut self, name: &Option<String>, as_name: &str) -> Result<(), ScriptError> {
