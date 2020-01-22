@@ -13,7 +13,7 @@ edition = "2018"
 goblin="0.0.24"
 byteorder="1.2.1"
 colored="1.8.0"
-lucet-module = { path = "../lucet-module", version = "0.4.3" }
+lucet-module = { path = "../lucet-module", version = "=0.4.3" }
 
 [package.metadata.deb]
 name = "fst-lucet-objdump"

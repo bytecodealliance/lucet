@@ -11,8 +11,8 @@ edition = "2018"
 
 [dependencies]
 libc = "=0.2.59"
-lucet-runtime-internals = { path = "lucet-runtime-internals", version = "0.4.3" }
-lucet-module = { path = "../lucet-module", version = "0.4.3" }
+lucet-runtime-internals = { path = "lucet-runtime-internals", version = "=0.4.3" }
+lucet-module = { path = "../lucet-module", version = "=0.4.3" }
 num-traits = "0.2"
 num-derive = "0.3.0"
 
@@ -20,9 +20,9 @@ num-derive = "0.3.0"
 byteorder = "1.2"
 failure = "0.1"
 lazy_static = "1.1"
-lucetc = { path = "../lucetc", version = "0.4.3" }
-lucet-runtime-tests = { path = "lucet-runtime-tests", version = "0.4.3" }
-lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.4.3" }
+lucetc = { path = "../lucetc", version = "=0.4.3" }
+lucet-runtime-tests = { path = "lucet-runtime-tests", version = "=0.4.3" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.4.3" }
 nix = "0.13"
 rayon = "1.0"
 tempfile = "3.0"

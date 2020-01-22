@@ -10,7 +10,7 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-lucet-module = { path = "../../lucet-module", version = "0.4.3" }
+lucet-module = { path = "../../lucet-module", version = "=0.4.3" }
 
 bitflags = "1.0"
 bincode = "1.1.4"

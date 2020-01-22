@@ -18,10 +18,10 @@ test = false
 failure = "0.1"
 lazy_static = "1.1"
 tempfile = "3.0"
-lucet-module = { path = "../../lucet-module", version = "0.4.3" }
-lucet-runtime-internals = { path = "../lucet-runtime-internals", version = "0.4.3" }
-lucet-wasi-sdk = { path = "../../lucet-wasi-sdk", version = "0.4.3" }
-lucetc = { path = "../../lucetc", version = "0.4.3" }
+lucet-module = { path = "../../lucet-module", version = "=0.4.3" }
+lucet-runtime-internals = { path = "../lucet-runtime-internals", version = "=0.4.3" }
+lucet-wasi-sdk = { path = "../../lucet-wasi-sdk", version = "=0.4.3" }
+lucetc = { path = "../../lucetc", version = "=0.4.3" }
 
 [build-dependencies]
 cc = "1.0"
