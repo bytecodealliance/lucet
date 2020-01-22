@@ -1,3 +1,4 @@
+use crate::alloc::SIGNAL_STACK_SIZE;
 use crate::context::Context;
 use crate::error::Error;
 use crate::instance::{
@@ -61,7 +62,7 @@ impl Instance {
         let guest_sigstack = SigStack::new(
             self.alloc.slot().sigstack,
             SigStackFlags::empty(),
-            libc::SIGSTKSZ,
+            SIGNAL_STACK_SIZE,
         );
         let previous_sigstack = unsafe { sigaltstack(Some(guest_sigstack)) }
             .expect("enabling or changing the signal stack succeeds");

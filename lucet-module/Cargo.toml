@@ -1,6 +1,6 @@
 [package]
 name = "lucet-module"
-version = "0.4.1"
+version = "0.4.3"
 description = "A structured interface for Lucet modules"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"

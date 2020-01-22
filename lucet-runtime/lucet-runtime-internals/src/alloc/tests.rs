@@ -366,7 +366,7 @@ macro_rules! alloc_tests {
                 }
 
                 let sigstack = unsafe { inst.alloc_mut().sigstack_mut() };
-                assert_eq!(sigstack.len(), libc::SIGSTKSZ);
+                assert_eq!(sigstack.len(), $crate::alloc::SIGNAL_STACK_SIZE);
 
                 assert_eq!(sigstack[0], 0);
                 sigstack[0] = 0xFF;

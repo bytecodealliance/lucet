@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::module::Module;
 use crate::region::RegionInternal;
-use libc::{c_void, SIGSTKSZ};
+use libc::c_void;
 use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
 use std::sync::{Arc, Once, Weak};
@@ -9,6 +9,12 @@ use std::sync::{Arc, Once, Weak};
 pub const HOST_PAGE_SIZE_EXPECTED: usize = 4096;
 static mut HOST_PAGE_SIZE: usize = 0;
 static HOST_PAGE_SIZE_INIT: Once = Once::new();
+// needs to be large enough for the signal stack to not overflow even in debug mode, but for the
+// hotfix we can't add a configurable size without breaking semver
+#[cfg(debug_assertions)]
+pub const SIGNAL_STACK_SIZE: usize = 12 * 1024;
+#[cfg(not(debug_assertions))]
+pub const SIGNAL_STACK_SIZE: usize = libc::SIGSTKSZ;
 
 /// Our host is Linux x86_64, which should always use a 4K page.
 ///
@@ -318,7 +324,7 @@ impl Alloc {
 
     /// Return the sigstack as a mutable byte slice.
     pub unsafe fn sigstack_mut(&mut self) -> &mut [u8] {
-        std::slice::from_raw_parts_mut(self.slot().sigstack as *mut u8, libc::SIGSTKSZ)
+        std::slice::from_raw_parts_mut(self.slot().sigstack as *mut u8, SIGNAL_STACK_SIZE)
     }
 
     pub fn mem_in_heap<T>(&self, ptr: *const T, len: usize) -> bool {
@@ -373,7 +379,7 @@ impl Limits {
         // * one guard page (for good luck?)
         // * globals
         // * one guard page (to catch signal stack overflow)
-        // * the signal stack (size given by signal.h SIGSTKSZ macro)
+        // * the signal stack (size given by SIGNAL_STACK_SIZE constant)
 
         [
             instance_heap_offset(),
@@ -382,7 +388,7 @@ impl Limits {
             host_page_size(),
             self.globals_size,
             host_page_size(),
-            SIGSTKSZ,
+            SIGNAL_STACK_SIZE,
         ]
         .iter()
         .try_fold(0usize, |acc, &x| acc.checked_add(x))
