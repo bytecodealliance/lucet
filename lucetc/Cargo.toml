@@ -24,8 +24,8 @@ cranelift-module = { path = "../cranelift/cranelift-module", version = "0.51.0" 
 cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.51.0" }
 cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.51.0" }
 target-lexicon = "0.9"
-lucet-module = { path = "../lucet-module", version = "0.5.0" }
-lucet-validate = { path = "../lucet-validate", version = "0.5.0" }
+lucet-module = { path = "../lucet-module", version = "=0.5.0" }
+lucet-validate = { path = "../lucet-validate", version = "=0.5.0" }
 wasmparser = "0.39.1"
 clap="2.32"
 log = "0.4"
@@ -46,7 +46,7 @@ minisign = "0.5.11"
 memoffset = "0.5.1"
 serde = "1.0"
 serde_json = "1.0"
-thiserror = "1.0.4" 
+thiserror = "1.0.4"
 raw-cpuid = "6.0.0"
 
 [package.metadata.deb]

@@ -10,8 +10,8 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-lucet-module = { path = "../../lucet-module", version = "0.5.0" }
-lucet-runtime-macros = { path = "../lucet-runtime-macros", version = "0.5.0" }
+lucet-module = { path = "../../lucet-module", version = "=0.5.0" }
+lucet-runtime-macros = { path = "../lucet-runtime-macros", version = "=0.5.0" }
 
 anyhow = "1.0"
 bitflags = "1.0"
