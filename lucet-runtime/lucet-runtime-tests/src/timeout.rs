@@ -1,66 +1,11 @@
-use crate::helpers::{MockExportBuilder, MockModuleBuilder};
-use lucet_module::FunctionPointer;
-use lucet_runtime_internals::module::Module;
-use lucet_runtime_internals::vmctx::lucet_vmctx;
-use std::sync::Arc;
-
-pub fn mock_timeout_module() -> Arc<dyn Module> {
-    extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
-        123
-    }
-
-    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) -> () {
-        loop {}
-    }
-
-    extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () {}
-
-    extern "C" fn run_slow_hostcall(vmctx: *mut lucet_vmctx) -> bool {
-        extern "C" {
-            fn slow_hostcall(vmctx: *mut lucet_vmctx) -> bool;
-        }
-        unsafe { slow_hostcall(vmctx) }
-    }
-
-    extern "C" fn run_yielding_hostcall(vmctx: *mut lucet_vmctx) -> () {
-        extern "C" {
-            fn yielding_hostcall(vmctx: *mut lucet_vmctx) -> ();
-        }
-        unsafe { yielding_hostcall(vmctx) }
-    }
-
-    MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(
-            "infinite_loop",
-            FunctionPointer::from_usize(infinite_loop as usize),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            "do_nothing",
-            FunctionPointer::from_usize(do_nothing as usize),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            "onetwothree",
-            FunctionPointer::from_usize(onetwothree as usize),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            "run_slow_hostcall",
-            FunctionPointer::from_usize(run_slow_hostcall as usize),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            "run_yielding_hostcall",
-            FunctionPointer::from_usize(run_yielding_hostcall as usize),
-        ))
-        .build()
-}
-
 #[macro_export]
 macro_rules! timeout_tests {
     ( $TestRegion:path ) => {
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, FaultDetails, Instance,
-            KillError, KillSuccess, Limits, Region, RunResult, SignalBehavior, TerminationDetails,
-            TrapCode, YieldedVal,
+            KillError, KillSuccess, Limits, Module, Region, RunResult, SignalBehavior,
+            TerminationDetails, TrapCode, YieldedVal,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -73,7 +18,55 @@ macro_rules! timeout_tests {
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
         use $crate::helpers::{FunctionPointer, MockExportBuilder, MockModuleBuilder};
-        use $crate::timeout::mock_timeout_module;
+
+        pub fn mock_timeout_module() -> Arc<dyn Module> {
+            extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
+                123
+            }
+
+            extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) -> () {
+                loop {}
+            }
+
+            extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () {}
+
+            extern "C" fn run_slow_hostcall(vmctx: *mut lucet_vmctx) -> bool {
+                extern "C" {
+                    fn slow_hostcall(vmctx: *mut lucet_vmctx) -> bool;
+                }
+                unsafe { slow_hostcall(vmctx) }
+            }
+
+            extern "C" fn run_yielding_hostcall(vmctx: *mut lucet_vmctx) -> () {
+                extern "C" {
+                    fn yielding_hostcall(vmctx: *mut lucet_vmctx) -> ();
+                }
+                unsafe { yielding_hostcall(vmctx) }
+            }
+
+            MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "infinite_loop",
+                    FunctionPointer::from_usize(infinite_loop as usize),
+                ))
+                .with_export_func(MockExportBuilder::new(
+                    "do_nothing",
+                    FunctionPointer::from_usize(do_nothing as usize),
+                ))
+                .with_export_func(MockExportBuilder::new(
+                    "onetwothree",
+                    FunctionPointer::from_usize(onetwothree as usize),
+                ))
+                .with_export_func(MockExportBuilder::new(
+                    "run_slow_hostcall",
+                    FunctionPointer::from_usize(run_slow_hostcall as usize),
+                ))
+                .with_export_func(MockExportBuilder::new(
+                    "run_yielding_hostcall",
+                    FunctionPointer::from_usize(run_yielding_hostcall as usize),
+                ))
+                .build()
+        }
 
         #[lucet_hostcall]
         #[no_mangle]

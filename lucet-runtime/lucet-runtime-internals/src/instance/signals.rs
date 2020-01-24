@@ -61,7 +61,7 @@ impl Instance {
         let guest_sigstack = SigStack::new(
             self.alloc.slot().sigstack,
             SigStackFlags::empty(),
-            libc::SIGSTKSZ,
+            self.alloc.slot().limits.signal_stack_size,
         );
         let previous_sigstack = unsafe { sigaltstack(Some(guest_sigstack)) }
             .expect("enabling or changing the signal stack succeeds");
@@ -218,10 +218,13 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                     // If the trap table lookup returned unknown, it is a fatal error
                     let unknown_fault = trapcode.is_none();
 
-                    // If the trap was a segv or bus fault and the addressed memory was outside the
-                    // guard pages, it is also a fatal error
+                    // If the trap was a segv or bus fault and the addressed memory was in the
+                    // signal stack guard page or outside the alloc entirely, the fault is fatal
                     let outside_guard = (siginfo.si_signo == SIGSEGV || siginfo.si_signo == SIGBUS)
-                        && !inst.alloc.addr_in_guard_page(siginfo.si_addr_ext());
+                        && inst
+                            .alloc
+                            .addr_location(siginfo.si_addr_ext())
+                            .is_fault_fatal();
 
                     // record the fault and jump back to the host context
                     inst.state = State::Faulted {

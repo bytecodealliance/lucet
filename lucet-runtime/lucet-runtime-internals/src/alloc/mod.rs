@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::module::Module;
 use crate::region::RegionInternal;
-use libc::{c_void, SIGSTKSZ};
+use libc::c_void;
 use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
 use std::sync::{Arc, Once, Weak};
@@ -112,26 +112,79 @@ impl Drop for Alloc {
     }
 }
 
-impl Alloc {
-    pub fn addr_in_guard_page(&self, addr: *const c_void) -> bool {
-        let addr = addr as usize;
-        let heap = self.slot().heap as usize;
-        let guard_start = heap + self.heap_accessible_size;
-        let guard_end = heap + self.slot().limits.heap_address_space_size;
-        // eprintln!(
-        //     "addr = {:p}, guard_start = {:p}, guard_end = {:p}",
-        //     addr, guard_start as *mut c_void, guard_end as *mut c_void
-        // );
-        let stack_guard_end = self.slot().stack as usize;
-        let stack_guard_start = stack_guard_end - host_page_size();
-        // eprintln!(
-        //     "addr = {:p}, stack_guard_start = {:p}, stack_guard_end = {:p}",
-        //     addr, stack_guard_start as *mut c_void, stack_guard_end as *mut c_void
-        // );
-        let in_heap_guard = (addr >= guard_start) && (addr < guard_end);
-        let in_stack_guard = (addr >= stack_guard_start) && (addr < stack_guard_end);
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AddrLocation {
+    Heap,
+    InaccessibleHeap,
+    StackGuard,
+    Stack,
+    Globals,
+    SigStackGuard,
+    SigStack,
+    Unknown,
+}
 
-        in_heap_guard || in_stack_guard
+impl AddrLocation {
+    /// If a fault occurs in this location, is it fatal to the entire process?
+    ///
+    /// This is currently a permissive baseline that only returns true for unknown locations and the
+    /// signal stack guard, in case a `Region` implementation uses faults to populate the accessible
+    /// locations like the heap and the globals.
+    pub fn is_fault_fatal(self) -> bool {
+        use AddrLocation::*;
+        match self {
+            SigStackGuard | Unknown => true,
+            _ => false,
+        }
+    }
+}
+
+impl Alloc {
+    /// Where in an `Alloc` does a particular address fall?
+    pub fn addr_location(&self, addr: *const c_void) -> AddrLocation {
+        let addr = addr as usize;
+
+        let heap_start = self.slot().heap as usize;
+        let heap_inaccessible_start = heap_start + self.heap_accessible_size;
+        let heap_inaccessible_end = heap_start + self.slot().limits.heap_address_space_size;
+
+        if (addr >= heap_start) && (addr < heap_inaccessible_start) {
+            return AddrLocation::Heap;
+        }
+        if (addr >= heap_inaccessible_start) && (addr < heap_inaccessible_end) {
+            return AddrLocation::InaccessibleHeap;
+        }
+
+        let stack_start = self.slot().stack as usize;
+        let stack_end = stack_start + self.slot().limits.stack_size;
+        let stack_guard_start = stack_start - host_page_size();
+
+        if (addr >= stack_guard_start) && (addr < stack_start) {
+            return AddrLocation::StackGuard;
+        }
+        if (addr >= stack_start) && (addr < stack_end) {
+            return AddrLocation::Stack;
+        }
+
+        let globals_start = self.slot().globals as usize;
+        let globals_end = globals_start + self.slot().limits.globals_size;
+
+        if (addr >= globals_start) && (addr < globals_end) {
+            return AddrLocation::Globals;
+        }
+
+        let sigstack_start = self.slot().sigstack as usize;
+        let sigstack_end = sigstack_start + self.slot().limits.signal_stack_size;
+        let sigstack_guard_start = sigstack_start - host_page_size();
+
+        if (addr >= sigstack_guard_start) && (addr < sigstack_start) {
+            return AddrLocation::SigStackGuard;
+        }
+        if (addr >= sigstack_start) && (addr < sigstack_end) {
+            return AddrLocation::SigStack;
+        }
+
+        AddrLocation::Unknown
     }
 
     pub fn expand_heap(&mut self, expand_bytes: u32, module: &dyn Module) -> Result<u32, Error> {
@@ -318,7 +371,10 @@ impl Alloc {
 
     /// Return the sigstack as a mutable byte slice.
     pub unsafe fn sigstack_mut(&mut self) -> &mut [u8] {
-        std::slice::from_raw_parts_mut(self.slot().sigstack as *mut u8, libc::SIGSTKSZ)
+        std::slice::from_raw_parts_mut(
+            self.slot().sigstack as *mut u8,
+            self.slot().limits.signal_stack_size,
+        )
     }
 
     pub fn mem_in_heap<T>(&self, ptr: *const T, len: usize) -> bool {
@@ -351,15 +407,30 @@ pub struct Limits {
     pub stack_size: usize,
     /// Size of the globals region in bytes; each global uses 8 bytes. (default 4K)
     pub globals_size: usize,
+    /// Size of the signal stack in bytes. (default SIGSTKSZ for release builds, 12K for debug builds)
+    ///
+    /// This difference is to account for the greatly increased stack size usage in the signal
+    /// handler when running without optimizations.
+    ///
+    /// Note that debug vs. release mode is determined by `cfg(debug_assertions)`, so if you are
+    /// specifically enabling debug assertions in your release builds, the default signal stack will
+    /// be larger.
+    pub signal_stack_size: usize,
 }
 
-impl Default for Limits {
-    fn default() -> Limits {
+#[cfg(debug_assertions)]
+pub const DEFAULT_SIGNAL_STACK_SIZE: usize = 12 * 1024;
+#[cfg(not(debug_assertions))]
+pub const DEFAULT_SIGNAL_STACK_SIZE: usize = libc::SIGSTKSZ;
+
+impl Limits {
+    pub const fn default() -> Limits {
         Limits {
             heap_memory_size: 16 * 64 * 1024,
             heap_address_space_size: 0x200000000,
             stack_size: 128 * 1024,
             globals_size: 4096,
+            signal_stack_size: DEFAULT_SIGNAL_STACK_SIZE,
         }
     }
 }
@@ -370,19 +441,18 @@ impl Limits {
         // * the instance (up to instance_heap_offset)
         // * the heap, followed by guard pages
         // * the stack (grows towards heap guard pages)
-        // * one guard page (for good luck?)
         // * globals
         // * one guard page (to catch signal stack overflow)
-        // * the signal stack (size given by signal.h SIGSTKSZ macro)
+        // * the signal stack
 
         [
             instance_heap_offset(),
             self.heap_address_space_size,
-            self.stack_size,
             host_page_size(),
+            self.stack_size,
             self.globals_size,
             host_page_size(),
-            SIGSTKSZ,
+            self.signal_stack_size,
         ]
         .iter()
         .try_fold(0usize, |acc, &x| acc.checked_add(x))
@@ -418,6 +488,11 @@ impl Limits {
         }
         if self.stack_size <= 0 {
             return Err(Error::InvalidArgument("stack size must be greater than 0"));
+        }
+        if self.signal_stack_size % host_page_size() != 0 {
+            return Err(Error::InvalidArgument(
+                "signal stack size must be a multiple of host page size",
+            ));
         }
         Ok(())
     }
