@@ -411,7 +411,7 @@ fn ldflags_default(target: &Triple) -> String {
 
     match target.operating_system {
         OperatingSystem::Linux => "-shared",
-        OperatingSystem::MacOSX { .. } => {
+        OperatingSystem::MacOSX { .. } | OperatingSystem::Darwin => {
             "-dylib -dead_strip -export_dynamic -undefined dynamic_lookup"
         }
         _ => panic!(
