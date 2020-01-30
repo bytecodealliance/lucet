@@ -1,3 +1,4 @@
 # Summary
 
-- [Versioning and releasing to crates.io](./versioning_releasing.md)
+[Changelog](./CHANGELOG.md)
+[Versioning and releasing to crates.io](./versioning_releasing.md)

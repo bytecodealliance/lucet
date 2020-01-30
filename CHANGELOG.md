@@ -4,7 +4,7 @@
 
 - Fixed a memory corruption bug that could arise in certain runtime
   configurations. ([PR](https://github.com/bytecodealliance/lucet/pull/401)) ([RustSec
-  advisory])(https://rustsec.org/advisories/RUSTSEC-2020-0004.html))
+  advisory](https://rustsec.org/advisories/RUSTSEC-2020-0004.html))
 
 ### 0.5.0 (2020-01-24)
 
@@ -41,4 +41,4 @@
 
 - Backported the fix for a memory corruption bug that could arise in certain runtime
   configurations. ([PR](https://github.com/bytecodealliance/lucet/pull/401)) ([RustSec
-  advisory])(https://rustsec.org/advisories/RUSTSEC-2020-0004.html))
+  advisory](https://rustsec.org/advisories/RUSTSEC-2020-0004.html))
