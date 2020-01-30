@@ -55,6 +55,7 @@ pub struct Lucetc {
     sign: bool,
     verify: bool,
     count_instructions: bool,
+    canonicalize_nans: bool,
 }
 
 pub trait AsLucetc {
@@ -273,6 +274,7 @@ impl Lucetc {
             sign: false,
             verify: false,
             count_instructions: false,
+            canonicalize_nans: false,
         }
     }
 
@@ -292,6 +294,7 @@ impl Lucetc {
             sign: false,
             verify: false,
             count_instructions: false,
+            canonicalize_nans: false,
         })
     }
 
@@ -335,6 +338,7 @@ impl Lucetc {
             self.heap.clone(),
             self.count_instructions,
             &self.validator,
+            self.canonicalize_nans
         )?;
         let obj = compiler.object_file()?;
         obj.write(output.as_ref())?;
@@ -354,6 +358,7 @@ impl Lucetc {
             self.heap.clone(),
             self.count_instructions,
             &self.validator,
+            self.canonicalize_nans,
         )?;
 
         compiler.cranelift_funcs()?.write(&output)?;
