@@ -37,7 +37,46 @@ it would change the serialized representation in a compiled Lucet module.
 
 [module-data]: https://docs.rs/lucet-module/latest/lucet_module/struct.ModuleData.html
 
-## Releasing
+## The release process
+
+The release process for a normal (non-hotfix) release consists of several phases:
+
+1. [Preparing the release commit](#preparing-the-release-commit)
+
+1. [Releasing to crates.io](#releasing-to-cratesio)
+
+1. [Tagging and annotating the release in Git](#tagging-and-annotating-the-release-in-git)
+
+1. [Merging the release commit](#merging-the-release-commit)
+
+### Preparing the release commit
+
+**Note** This is a new practice since we've introduced the practice of `-dev` versions and the
+changelog, and is expected to be refined as we get more experience with it.
+
+1. Determine the version for the new release (see [Versioning](#versioning)).
+
+1. Create a new release branch based on the commit you want to eventually release. For example:
+
+   ```shell
+   $ git checkout -b 0.5.2-release origin/master
+   ```
+
+1. Replace the development version with the final version in the crates' `Cargo.toml` files. For
+   example, `0.5.2-dev` should become `0.5.2`. Run the test suite in order to make sure `Cargo.lock`
+   is up to date.
+
+1. Edit `CHANGELOG.md` to add a new header with the version number and date of release.
+
+1. Commit, then open a pull request for the release and mark it with the **DO NOT MERGE** label.
+
+1. Secure review and approval from the Lucet team for the pull request.
+
+At this point, you should have a commit on your release branch that you are prepared to release to
+crates.io. Do not merge the pull request yet! Instead, proceed to [release](#releasing-to-cratesio)
+the crates.
+
+### Releasing to crates.io
 
 Releasing a workspace full of interdependent crates can be challenging. Crates must be published in
 the correct order, and any cyclic dependencies that might be introduced via `[dev-dependencies]`
@@ -60,8 +99,8 @@ to muddle through more manually.
 
    ```diff
     [dev-dependencies]
-   -lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.5.2-dev" }
-   +#lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.5.2-dev" }
+   -lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.5.2" }
+   +#lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.5.2" }
     tempfile = "3.0"
    ```
    
@@ -93,11 +132,32 @@ to muddle through more manually.
    some of the crates published but not others. What to do next will depend on the situation; please
    consult with the Lucet team.
 
+Congratulations, the new crates are now on crates.io! 🎉
+
+### Tagging and annotating the release in Git
+
 1. Undo any changes in your local tree to break cycles.
 
 1. Tag the release; `--sign` is optional but recommended if you have code signing configured:
 
    ```shell
-   $ git tag --annotate --sign -m '0.5.1 crates.io release' 0.5.1
+   $ git tag --annotate --sign -m '0.5.2 crates.io release' 0.5.2
    $ git push --tags
    ```
+
+1. Browse to this version's tag on the Github [tags page][tags-page], click **Edit tag**, and then
+   paste this release's section of `CHANGELOG.md` into the description. Enter a title like `0.5.2
+   crates.io release`, and then click **Publish release**.
+
+[tags-page]: https://github.com/bytecodealliance/lucet/tags
+
+### Merging the release commit
+
+1. Edit the versions in the repo once more, this time to the next patch development version. For
+   example, if we just released `0.5.2`, change the version to `0.5.3-dev`.
+
+1. Commit, remove the **DO NOT MERGE** tag from your release PR, and seek final approval from the
+   Lucet team.
+
+1. Merge the release PR, and make sure the release branch is deleted. The release *tag* will not be
+   deleted, and will be the basis for any future hotfix releases that may be required.
