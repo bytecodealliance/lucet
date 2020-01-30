@@ -26,8 +26,7 @@ For the other Lucet crates that are primarily meant for internal consumption, a 
 2. The binary format of a compiled Lucet module is changed.
 
 For example, a change to the type of [`Instance::run()`][public-method] would require a major
-version bump, but a change to the type of [`RegionInternal::expand_heap()`][internal-method] would
-not.
+version bump, but a change to the type of [`InstanceInternal::alloc()`][internal-method] would not.
 
 [public-method]: https://docs.rs/lucet-runtime-internals/latest/lucet_runtime_internals/instance/struct.Instance.html#method.run
 [internal-method]: https://docs.rs/lucet-runtime-internals/latest/lucet_runtime_internals/instance/trait.InstanceInternal.html#tymethod.alloc
