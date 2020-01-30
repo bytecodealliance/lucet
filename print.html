@@ -1,0 +1,448 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Lucet</title>
+        
+        <meta name="robots" content="noindex" />
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
+        <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div id="sidebar-scrollbox" class="sidebar-scrollbox">
+                <ol class="chapter"><li class="expanded affix "><a href="CHANGELOG.html">Changelog</a></li><li class="expanded affix "><a href="versioning_releasing.html">Versioning and releasing to crates.io</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar" class="menu-bar">
+                    <div id="menu-bar-sticky-container">
+                        <div class="left-buttons">
+                            <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                                <i class="fa fa-bars"></i>
+                            </button>
+                            <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                                <i class="fa fa-paint-brush"></i>
+                            </button>
+                            <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                                <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                            </ul>
+                            
+                            <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                                <i class="fa fa-search"></i>
+                            </button>
+                            
+                        </div>
+
+                        <h1 class="menu-title">Lucet</h1>
+
+                        <div class="right-buttons">
+                            <a href="print.html" title="Print this book" aria-label="Print this book">
+                                <i id="print-button" class="fa fa-print"></i>
+                            </a>
+                            
+                            <a href="https://github.com/bytecodealliance/lucet" title="Git repository" aria-label="Git repository">
+                                <i id="git-repository-button" class="fa fa-github"></i>
+                            </a>
+                            
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1><a class="header" href="#changelog" id="changelog">Changelog</a></h1>
+<h3><a class="header" href="#unreleased" id="unreleased">Unreleased</a></h3>
+<h3><a class="header" href="#051-2020-01-24" id="051-2020-01-24">0.5.1 (2020-01-24)</a></h3>
+<ul>
+<li>Fixed a memory corruption bug that could arise in certain runtime
+configurations. (<a href="https://github.com/bytecodealliance/lucet/pull/401">PR</a>) (<a href="https://rustsec.org/advisories/RUSTSEC-2020-0004.html">RustSec
+advisory</a>)</li>
+</ul>
+<h3><a class="header" href="#050-2020-01-24" id="050-2020-01-24">0.5.0 (2020-01-24)</a></h3>
+<ul>
+<li>
+<p>Lucet officially became a project of the <a href="https://bytecodealliance.org/">Bytecode Alliance</a> 🎉.</p>
+</li>
+<li>
+<p>Integrated <code>wasi-common</code> as the underlying implementation for WASI in <code>lucet-wasi</code>.</p>
+</li>
+<li>
+<p>Updated to Cranelift to version 0.51.0.</p>
+</li>
+<li>
+<p>Fixed a soundness bug by changing the types of the <code>Vmctx::yield*()</code> methods to require exclusive
+<code>&amp;mut self</code> access to the <code>Vmctx</code>. This prevents resources like embedder contexts or heap views
+from living across yield points, which is important for safety since the host can modify the data
+underlying those resources while the instance is suspended.</p>
+</li>
+<li>
+<p>Added the <code>#[lucet_hostcall]</code> attribute to replace <code>lucet_hostcalls!</code>, which is now deprecated.</p>
+</li>
+<li>
+<p>Added the ability to specify an alignment for the base of a <code>MmapRegion</code>-backed instance's
+heap. Thanks, @shravanrn!</p>
+</li>
+<li>
+<p>Added a <code>--target</code> option to <code>lucetc</code> to allow cross-compilation to other architectures than the
+host's. Thanks, @froydnj!</p>
+</li>
+<li>
+<p>Changed the Cargo dependencies between Lucet crates to be exact (e.g., <code>&quot;=0.5.0&quot;</code> rather than
+<code>&quot;0.5.0&quot;</code>) rather than allowing semver differences.</p>
+</li>
+<li>
+<p>Fixed the <code>KillSwitch</code> type not being exported from the public API, despite being usable via
+<code>Instance::kill_switch()</code>.</p>
+</li>
+<li>
+<p>Improved the formatting of error messages.</p>
+</li>
+<li>
+<p>Ensured the <code>lucet-wasi</code> executable properly links in the exported symbols from <code>lucet-runtime</code>.</p>
+</li>
+</ul>
+<h3><a class="header" href="#043-2020-01-24" id="043-2020-01-24">0.4.3 (2020-01-24)</a></h3>
+<ul>
+<li>Backported the fix for a memory corruption bug that could arise in certain runtime
+configurations. (<a href="https://github.com/bytecodealliance/lucet/pull/401">PR</a>) (<a href="https://rustsec.org/advisories/RUSTSEC-2020-0004.html">RustSec
+advisory</a>)</li>
+</ul>
+<h1><a class="header" href="#versioning-and-releasing-to-cratesio" id="versioning-and-releasing-to-cratesio">Versioning and releasing to crates.io</a></h1>
+<p>This document describes how to appropriately decide the version of a new release, and the steps to
+actually get it published on crates.io.</p>
+<h2><a class="header" href="#versioning" id="versioning">Versioning</a></h2>
+<p>We release new versions of the Lucet crates all at once, keeping the versions in sync across
+crates. As a result, our adherence to <a href="https://semver.org/">semver</a> is project-wide, rather than
+per-crate.</p>
+<p>The versioning reflects the semantics of the <em>public</em> interface to Lucet. That is, any breaking
+change to the following crates requires a semver major version bump:</p>
+<ul>
+<li><code>lucetc</code></li>
+<li><code>lucet-objdump</code></li>
+<li><code>lucet-runtime</code></li>
+<li><code>lucet-validate</code></li>
+<li><code>lucet-wasi</code></li>
+<li><code>lucet-wasi-sdk</code></li>
+</ul>
+<p>For the other Lucet crates that are primarily meant for internal consumption, a breaking change does
+<em>not</em> inherently require a semver major version bump unless either:</p>
+<ol>
+<li>The changed interfaces are reexported as part of the public interface via the above crates, or</li>
+<li>The binary format of a compiled Lucet module is changed.</li>
+</ol>
+<p>For example, a change to the type of <a href="https://docs.rs/lucet-runtime-internals/latest/lucet_runtime_internals/instance/struct.Instance.html#method.run"><code>Instance::run()</code></a> would require a major
+version bump, but a change to the type of <a href="https://docs.rs/lucet-runtime-internals/latest/lucet_runtime_internals/instance/trait.InstanceInternal.html#tymethod.alloc"><code>InstanceInternal::alloc()</code></a> would not.</p>
+<p>Likewise, a change to a field on <a href="https://docs.rs/lucet-module/latest/lucet_module/struct.ModuleData.html"><code>ModuleData</code></a> would require a major version bump, as
+it would change the serialized representation in a compiled Lucet module.</p>
+<h2><a class="header" href="#the-release-process" id="the-release-process">The release process</a></h2>
+<p>The release process for a normal (non-hotfix) release consists of several phases:</p>
+<ol>
+<li>
+<p><a href="versioning_releasing.html#preparing-the-release-commit">Preparing the release commit</a></p>
+</li>
+<li>
+<p><a href="versioning_releasing.html#releasing-to-cratesio">Releasing to crates.io</a></p>
+</li>
+<li>
+<p><a href="versioning_releasing.html#tagging-and-annotating-the-release-in-git">Tagging and annotating the release in Git</a></p>
+</li>
+<li>
+<p><a href="versioning_releasing.html#merging-the-release-commit">Merging the release commit</a></p>
+</li>
+</ol>
+<h3><a class="header" href="#preparing-the-release-commit" id="preparing-the-release-commit">Preparing the release commit</a></h3>
+<p><strong>Note</strong> This is a new practice since we've introduced the practice of <code>-dev</code> versions and the
+changelog, and is expected to be refined as we get more experience with it.</p>
+<ol>
+<li>
+<p>Determine the version for the new release (see <a href="versioning_releasing.html#versioning">Versioning</a>).</p>
+</li>
+<li>
+<p>Create a new release branch based on the commit you want to eventually release. For example:</p>
+<pre><code class="language-shell">$ git checkout -b 0.5.2-release origin/master
+</code></pre>
+</li>
+<li>
+<p>Replace the development version with the final version in the crates' <code>Cargo.toml</code> files. For
+example, <code>0.5.2-dev</code> should become <code>0.5.2</code>. Run the test suite in order to make sure <code>Cargo.lock</code>
+is up to date.</p>
+</li>
+<li>
+<p>Edit <code>CHANGELOG.md</code> to add a new header with the version number and date of release.</p>
+</li>
+<li>
+<p>Commit, then open a pull request for the release and mark it with the <strong>DO NOT MERGE</strong> label.</p>
+</li>
+<li>
+<p>Secure review and approval from the Lucet team for the pull request.</p>
+</li>
+</ol>
+<p>At this point, you should have a commit on your release branch that you are prepared to release to
+crates.io. Do not merge the pull request yet! Instead, proceed to <a href="versioning_releasing.html#releasing-to-cratesio">release</a>
+the crates.</p>
+<h3><a class="header" href="#releasing-to-cratesio" id="releasing-to-cratesio">Releasing to crates.io</a></h3>
+<p>Releasing a workspace full of interdependent crates can be challenging. Crates must be published in
+the correct order, and any cyclic dependencies that might be introduced via <code>[dev-dependencies]</code>
+must be broken. While there is <a href="https://github.com/rust-lang/cargo/issues/4242">interest in making this smoother</a>, for now we have
+to muddle through more manually.</p>
+<ol>
+<li>
+<p>Authenticate with <code>cargo login</code> using a Github account with the appropriate access to the Lucet
+repository. You should only have to do this once per development environment.</p>
+</li>
+<li>
+<p>Ensure that you have the commit checked out that you would like to release.</p>
+</li>
+<li>
+<p>Ensure that the version in all of the Lucet <code>Cargo.toml</code> files matches the version you expect to
+release. Between releases, the versions will end in <code>-dev</code>; if this is still the case, you'll
+need to replace this version with the appropriate version according to the guidelines above,
+likely through a PR.</p>
+</li>
+<li>
+<p>Edit <code>lucet-validate/Cargo.toml</code> and make the following change (note the leading <code>#</code>):</p>
+<pre><code class="language-diff"> [dev-dependencies]
+-lucet-wasi-sdk = { path = &quot;../lucet-wasi-sdk&quot;, version = &quot;=0.5.2&quot; }
++#lucet-wasi-sdk = { path = &quot;../lucet-wasi-sdk&quot;, version = &quot;=0.5.2&quot; }
+ tempfile = &quot;3.0&quot;
+</code></pre>
+<p>This breaks the only cycle that exists among the crates as of <code>0.5.1</code>; if other cycles develop,
+you'll need to similarly break them by temporarily removing the dev dependency.</p>
+</li>
+<li>
+<p>Begin publishing the crates in a topological order by <code>cd</code>ing to the each crate and running
+<code>cargo publish --allow-dirty</code> (the tree should only be dirty due to the cycles broken
+above). While we would like to run <code>cargo publish --dry-run</code> beforehand to ensure all
+of the crates will be successfully published, this will fail for any crates that depend on other
+Lucet crates, as the new versions will not yet be available to download.</p>
+<p>Do not worry too much about calculating the order ahead of time; if you get it wrong, <code>cargo publish</code> will tell you which crates need to be published before the one you tried. An order which
+worked for the <code>0.5.1</code> release was:</p>
+<ol>
+<li><code>lucet-module</code></li>
+<li><code>lucet-validate</code></li>
+<li><code>lucetc</code></li>
+<li><code>lucet-wasi-sdk</code></li>
+<li><code>lucet-objdump</code></li>
+<li><code>lucet-runtime-macros</code></li>
+<li><code>lucet-runtime-internals</code></li>
+<li><code>lucet-runtime-tests</code></li>
+<li><code>lucet-runtime</code></li>
+<li><code>lucet-wasi</code></li>
+</ol>
+<p>It is unlikely but not impossible that a publish will fail in the middle of this process, leaving
+some of the crates published but not others. What to do next will depend on the situation; please
+consult with the Lucet team.</p>
+</li>
+</ol>
+<p>Congratulations, the new crates are now on crates.io! 🎉</p>
+<h3><a class="header" href="#tagging-and-annotating-the-release-in-git" id="tagging-and-annotating-the-release-in-git">Tagging and annotating the release in Git</a></h3>
+<ol>
+<li>
+<p>Undo any changes in your local tree to break cycles.</p>
+</li>
+<li>
+<p>Tag the release; <code>--sign</code> is optional but recommended if you have code signing configured:</p>
+<pre><code class="language-shell">$ git tag --annotate --sign -m '0.5.2 crates.io release' 0.5.2
+$ git push --tags
+</code></pre>
+</li>
+<li>
+<p>Browse to this version's tag on the Github <a href="https://github.com/bytecodealliance/lucet/tags">tags page</a>, click <strong>Edit tag</strong>, and then
+paste this release's section of <code>CHANGELOG.md</code> into the description. Enter a title like <code>0.5.2 crates.io release</code>, and then click <strong>Publish release</strong>.</p>
+</li>
+</ol>
+<h3><a class="header" href="#merging-the-release-commit" id="merging-the-release-commit">Merging the release commit</a></h3>
+<ol>
+<li>
+<p>Edit the versions in the repo once more, this time to the next patch development version. For
+example, if we just released <code>0.5.2</code>, change the version to <code>0.5.3-dev</code>.</p>
+</li>
+<li>
+<p>Commit, remove the <strong>DO NOT MERGE</strong> tag from your release PR, and seek final approval from the
+Lucet team.</p>
+</li>
+<li>
+<p>Merge the release PR, and make sure the release branch is deleted. The release <em>tag</em> will not be
+deleted, and will be the basis for any future hotfix releases that may be required.</p>
+</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+
+                
+            </nav>
+
+        </div>
+
+        
+        <!-- Livereload script (if served using the cli tool) -->
+        <script type="text/javascript">
+            var socket = new WebSocket("ws://localhost:3001");
+            socket.onmessage = function (event) {
+                if (event.data === "reload") {
+                    socket.close();
+                    location.reload(true); // force reload from server (not from cache)
+                }
+            };
+
+            window.onbeforeunload = function() {
+                socket.close();
+            }
+        </script>
+        
+
+        
+
+        
+        
+        
+        <script type="text/javascript">
+            window.playpen_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+        
+        <script type="text/javascript">
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+        
+        
+
+    </body>
+</html>
