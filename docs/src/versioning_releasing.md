@@ -95,7 +95,7 @@ to muddle through more manually.
    need to replace this version with the appropriate version according to the guidelines above,
    likely through a PR.
 
-1. Edit `lucet-validate/Cargo.toml` and make the following change:
+1. Edit `lucet-validate/Cargo.toml` and make the following change (note the leading `#`):
 
    ```diff
     [dev-dependencies]
