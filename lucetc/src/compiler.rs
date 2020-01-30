@@ -55,6 +55,7 @@ pub struct Compiler<'a> {
     cpu_features: CpuFeatures,
     count_instructions: bool,
     module_translation_state: ModuleTranslationState,
+    canonicalize_nans: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -67,8 +68,9 @@ impl<'a> Compiler<'a> {
         heap_settings: HeapSettings,
         count_instructions: bool,
         validator: &Option<Validator>,
+        canonicalize_nans: bool,
     ) -> Result<Self, Error> {
-        let isa = Self::target_isa(target.clone(), opt_level, &cpu_features)?;
+        let isa = Self::target_isa(target.clone(), opt_level, &cpu_features, canonicalize_nans)?;
 
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
@@ -124,6 +126,7 @@ impl<'a> Compiler<'a> {
             count_instructions,
             module_translation_state,
             target,
+            canonicalize_nans,
         })
     }
 
@@ -230,7 +233,12 @@ impl<'a> Compiler<'a> {
         }
         Ok(CraneliftFuncs::new(
             funcs,
-            Self::target_isa(self.target, self.opt_level, &self.cpu_features)?,
+            Self::target_isa(
+                self.target,
+                self.opt_level,
+                &self.cpu_features,
+                self.canonicalize_nans,
+            )?,
         ))
     }
 
@@ -238,12 +246,16 @@ impl<'a> Compiler<'a> {
         target: Triple,
         opt_level: OptLevel,
         cpu_features: &CpuFeatures,
+        canonicalize_nans: bool,
     ) -> Result<Box<dyn TargetIsa>, Error> {
         let mut flags_builder = settings::builder();
         let isa_builder = cpu_features.isa_builder(target)?;
         flags_builder.enable("enable_verifier").unwrap();
         flags_builder.enable("is_pic").unwrap();
         flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
+        if canonicalize_nans {
+            flags_builder.enable("enable_nan_canonicalization").unwrap();
+        }
         Ok(isa_builder.finish(settings::Flags::new(flags_builder)))
     }
 }

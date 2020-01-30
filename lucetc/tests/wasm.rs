@@ -57,6 +57,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compiling exported_import");
         let mdata = c.module_data().unwrap();
@@ -86,6 +87,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compiling multiple_import");
         let mdata = c.module_data().unwrap();
@@ -111,6 +113,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compiling globals_export");
         let mdata = c.module_data().unwrap();
@@ -137,6 +140,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compiling fibonacci");
         let mdata = c.module_data().unwrap();
@@ -161,6 +165,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compiling arith");
         let mdata = c.module_data().unwrap();
@@ -188,6 +193,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compile duplicate_imports");
         let mdata = c.module_data().unwrap();
@@ -224,6 +230,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compile icall");
         let mdata = c.module_data().unwrap();
@@ -270,6 +277,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compile icall");
         let _module_data = c.module_data().unwrap();
@@ -305,6 +313,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compile icall_sparse");
         let _module_data = c.module_data().unwrap();
@@ -354,6 +363,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compile globals_import");
         let module_data = c.module_data().unwrap();
@@ -385,6 +395,7 @@ mod module_data {
             h.clone(),
             false,
             &None,
+            false,
         )
         .expect("compiling heap_spec_import");
 
@@ -417,6 +428,7 @@ mod module_data {
             h.clone(),
             false,
             &None,
+            false,
         )
         .expect("compiling heap_spec_definition");
 
@@ -448,6 +460,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compiling heap_spec_none");
         assert_eq!(c.module_data().unwrap().heap_spec(), None,);
@@ -468,6 +481,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         );
         assert!(
             c.is_err(),
@@ -505,6 +519,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         );
         assert!(
             c.is_err(),
@@ -531,6 +546,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compile start_section");
         /*
@@ -555,6 +571,7 @@ mod module_data {
             h,
             false,
             &None,
+            false,
         )
         .expect("compile names_local");
         let mdata = c.module_data().unwrap();
@@ -587,6 +604,7 @@ mod compile {
             h,
             false,
             &None,
+            false,
         )
         .expect(&format!("compile {}", file));
         let _obj = c.object_file().expect(&format!("codegen {}", file));
@@ -647,6 +665,7 @@ mod validate {
             h,
             false,
             &Some(v),
+            false,
         )
         .expect("compile");
         let _obj = c.object_file().expect("codegen");
@@ -675,6 +694,7 @@ mod validate {
             h,
             false,
             &Some(v),
+            false,
         )
         .expect("compile");
         let _obj = c.object_file().expect("codegen");
@@ -705,6 +725,7 @@ mod validate {
             h,
             false,
             &Some(v),
+            false,
         )
         .expect("compile");
         let _obj = c.object_file().expect("codegen");
@@ -733,6 +754,7 @@ mod validate {
             h,
             false,
             &Some(v),
+            false,
         )
         .expect("compile");
         let _obj = c.object_file().expect("codegen");
@@ -761,6 +783,7 @@ mod validate {
             h,
             false,
             &Some(v),
+            false,
         )
         .expect("compile");
         let _obj = c.object_file().expect("codegen");
@@ -791,6 +814,7 @@ mod validate {
             h,
             false,
             &Some(v),
+            false,
         )
         .expect("compile");
         let _obj = c.object_file().expect("codegen");
@@ -816,6 +840,7 @@ mod validate {
             h,
             false,
             &Some(v),
+            false,
         )
         .expect("compile");
         let _obj = c.object_file().expect("codegen");
