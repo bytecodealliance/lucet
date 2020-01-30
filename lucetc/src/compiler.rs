@@ -233,7 +233,12 @@ impl<'a> Compiler<'a> {
         }
         Ok(CraneliftFuncs::new(
             funcs,
-            Self::target_isa(self.target, self.opt_level, &self.cpu_features, self.canonicalize_nans)?,
+            Self::target_isa(
+                self.target,
+                self.opt_level,
+                &self.cpu_features,
+                self.canonicalize_nans,
+            )?,
         ))
     }
 
@@ -241,7 +246,7 @@ impl<'a> Compiler<'a> {
         target: Triple,
         opt_level: OptLevel,
         cpu_features: &CpuFeatures,
-        canonicalize_nans: bool
+        canonicalize_nans: bool,
     ) -> Result<Box<dyn TargetIsa>, Error> {
         let mut flags_builder = settings::builder();
         let isa_builder = cpu_features.isa_builder(target)?;

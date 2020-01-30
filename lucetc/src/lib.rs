@@ -338,7 +338,7 @@ impl Lucetc {
             self.heap.clone(),
             self.count_instructions,
             &self.validator,
-            self.canonicalize_nans
+            self.canonicalize_nans,
         )?;
         let obj = compiler.object_file()?;
         obj.write(output.as_ref())?;
