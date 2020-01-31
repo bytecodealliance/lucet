@@ -55,8 +55,8 @@ As a result, Lucet can be compiled with an existing LLVM installation, provided 
 date. Most distributions now include LLVM 8 or LLVM 9, so that an additional installation is not
 required to compile to WebAssembly .
 
-On distributions such as Ubuntu (> 18.04) and Debian, the following command installs the
-prerequisites:
+On distributions such as Ubuntu (19.04 or newer) and Debian (bullseye or newer), the following
+command installs the prerequisites:
 
 ```sh
 apt install curl ca-certificates clang lld cmake
