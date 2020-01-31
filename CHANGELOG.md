@@ -1,5 +1,7 @@
 ### Unreleased
 
+- Added `free_slots()`, `used_slots()`, and `capacity()` methods to the `Region` trait.
+
 ### 0.5.1 (2020-01-24)
 
 - Fixed a memory corruption bug that could arise in certain runtime

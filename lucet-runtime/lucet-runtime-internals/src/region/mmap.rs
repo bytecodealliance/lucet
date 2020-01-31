@@ -9,7 +9,7 @@ use libc::c_void;
 use libc::memset;
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::ptr;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, RwLock, Weak};
 
 /// A [`Region`](../trait.Region.html) backed by `mmap`.
 ///
@@ -54,12 +54,24 @@ use std::sync::{Arc, Mutex, Weak};
 /// ```
 pub struct MmapRegion {
     capacity: usize,
-    freelist: Mutex<Vec<Slot>>,
+    freelist: RwLock<Vec<Slot>>,
     limits: Limits,
     min_heap_alignment: usize,
 }
 
-impl Region for MmapRegion {}
+impl Region for MmapRegion {
+    fn free_slots(&self) -> usize {
+        self.freelist.read().unwrap().len()
+    }
+
+    fn used_slots(&self) -> usize {
+        self.capacity() - self.free_slots()
+    }
+
+    fn capacity(&self) -> usize {
+        self.capacity
+    }
+}
 
 impl RegionInternal for MmapRegion {
     fn new_instance_with(
@@ -69,7 +81,7 @@ impl RegionInternal for MmapRegion {
     ) -> Result<InstanceHandle, Error> {
         let slot = self
             .freelist
-            .lock()
+            .write()
             .unwrap()
             .pop()
             .ok_or(Error::RegionFull(self.capacity))?;
@@ -155,7 +167,7 @@ impl RegionInternal for MmapRegion {
             }
         }
 
-        self.freelist.lock().unwrap().push(slot);
+        self.freelist.write().unwrap().push(slot);
     }
 
     fn expand_heap(&self, slot: &Slot, start: u32, len: u32) -> Result<(), Error> {
@@ -276,12 +288,12 @@ impl MmapRegion {
 
         let region = Arc::new(MmapRegion {
             capacity: instance_capacity,
-            freelist: Mutex::new(Vec::with_capacity(instance_capacity)),
+            freelist: RwLock::new(Vec::with_capacity(instance_capacity)),
             limits: limits.clone(),
             min_heap_alignment: 0, // No constaints on heap alignment by default
         });
         {
-            let mut freelist = region.freelist.lock().unwrap();
+            let mut freelist = region.freelist.write().unwrap();
             for _ in 0..instance_capacity {
                 freelist.push(MmapRegion::create_slot(&region)?);
             }
@@ -313,12 +325,12 @@ impl MmapRegion {
 
         let region = Arc::new(MmapRegion {
             capacity: instance_capacity,
-            freelist: Mutex::new(Vec::with_capacity(instance_capacity)),
+            freelist: RwLock::new(Vec::with_capacity(instance_capacity)),
             limits: limits.clone(),
             min_heap_alignment: heap_alignment,
         });
         {
-            let mut freelist = region.freelist.lock().unwrap();
+            let mut freelist = region.freelist.write().unwrap();
             for _ in 0..instance_capacity {
                 freelist.push(MmapRegion::create_slot(&region)?);
             }
