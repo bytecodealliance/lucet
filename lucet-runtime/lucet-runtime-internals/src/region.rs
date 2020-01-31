@@ -32,6 +32,23 @@ pub trait Region: RegionInternal {
     fn new_instance_builder<'a>(&'a self, module: Arc<dyn Module>) -> InstanceBuilder<'a> {
         InstanceBuilder::new(self.as_dyn_internal(), module)
     }
+
+    /// Return the number of instance slots that are currently free in the region.
+    ///
+    /// A value greater than zero does not guarantee that a subsequent call to
+    /// `Region::new_instance()` will succeed, as other threads may instantiate from the region in
+    /// the meantime.
+    fn free_slots(&self) -> usize;
+
+    /// Return the number of instance slots that are currently in use in the region.
+    ///
+    /// A value less than `self.capacity()` does not guarantee that a subsequent call to
+    /// `Region::new_instance()` will succeed, as other threads may instantiate from the region in
+    /// the meantime.
+    fn used_slots(&self) -> usize;
+
+    /// Return the total instance slot capacity of the region.
+    fn capacity(&self) -> usize;
 }
 
 /// A `RegionInternal` is a collection of `Slot`s which are managed as a whole.

@@ -684,6 +684,35 @@ macro_rules! alloc_tests {
             drop(region);
             drop(inst);
         }
+
+        #[test]
+        fn slot_counts_work() {
+            let module = MockModuleBuilder::new()
+                .with_heap_spec(ONE_PAGE_HEAP)
+                .build();
+            let region = TestRegion::create(2, &LIMITS).expect("region created");
+            assert_eq!(region.capacity(), 2);
+            assert_eq!(region.free_slots(), 2);
+            assert_eq!(region.used_slots(), 0);
+            let inst1 = region
+                .new_instance(module.clone())
+                .expect("new_instance succeeds");
+            assert_eq!(region.capacity(), 2);
+            assert_eq!(region.free_slots(), 1);
+            assert_eq!(region.used_slots(), 1);
+            let inst2 = region.new_instance(module).expect("new_instance succeeds");
+            assert_eq!(region.capacity(), 2);
+            assert_eq!(region.free_slots(), 0);
+            assert_eq!(region.used_slots(), 2);
+            drop(inst1);
+            assert_eq!(region.capacity(), 2);
+            assert_eq!(region.free_slots(), 1);
+            assert_eq!(region.used_slots(), 1);
+            drop(inst2);
+            assert_eq!(region.capacity(), 2);
+            assert_eq!(region.free_slots(), 2);
+            assert_eq!(region.used_slots(), 0);
+        }
     };
 }
 
