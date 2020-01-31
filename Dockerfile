@@ -36,8 +36,8 @@ RUN rustup target add wasm32-wasi
 # Optional additional Rust programs
 RUN cargo install --debug cargo-audit cargo-watch rsign2 cargo-deb mdbook
 
-RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk_8.0_amd64.deb \
-	&& dpkg -i wasi-sdk_8.0_amd64.deb && rm -f wasi-sdk_8.0_amd64.deb
+RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-7/wasi-sdk_7.0_amd64.deb \
+	&& dpkg -i wasi-sdk_7.0_amd64.deb && rm -f wasi-sdk_7.0_amd64.deb
 
 ENV WASI_SDK=/opt/wasi-sdk
 
