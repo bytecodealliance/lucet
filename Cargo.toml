@@ -3,6 +3,7 @@
 [workspace]
 members = [
   "benchmarks/lucet-benchmarks",
+  "docs/lucet-runtime-example",
   "lucet-module",
   "lucet-objdump",
   "lucet-runtime",

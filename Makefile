@@ -40,8 +40,10 @@ test-full: indent-check test-except-fuzz test-fuzz book
 
 .PHONY: test-except-fuzz
 test-except-fuzz: test-packages
-	cargo build -p lucet-spectest # build but *not* run spectests to mitigate bitrot while spectests don't pass
-	cargo test --benches -p lucet-benchmarks -- --test # run the benchmarks in debug mode
+	# check but do *not* build or run these packages to mitigate bitrot
+	cargo check -p lucet-spectest -p lucet-runtime-example
+	# run the benchmarks in debug mode
+	cargo test --benches -p lucet-benchmarks -- --test
 	helpers/lucet-toolchain-tests/signature.sh
 
 # run a single seed through the fuzzer to stave off bitrot

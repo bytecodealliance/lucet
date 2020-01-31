@@ -1,0 +1,12 @@
+[package]
+name = "lucet-runtime-example"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+lucet-runtime = { path = "../../lucet-runtime" }
+lucet-wasi = { path = "../../lucet-wasi" }
+
+# or, if compiling against released crates.io versions:
+# lucet-runtime = "0.5.1"
+# lucet-wasi = "0.5.1"
