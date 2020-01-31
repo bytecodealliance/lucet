@@ -83,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded affix "><a href="CHANGELOG.html">Changelog</a></li><li class="expanded affix "><a href="versioning_releasing.html">Versioning and releasing to crates.io</a></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="Overview.html"><strong aria-hidden="true">1.</strong> Overview</a></li><li class="expanded "><a href="Using-lucet.html"><strong aria-hidden="true">2.</strong> Using Lucet</a></li><li><ol class="section"><li class="expanded "><a href="Docker-based-development.html"><strong aria-hidden="true">2.1.</strong> Docker-based development</a></li><li class="expanded "><a href="Compiling.html"><strong aria-hidden="true">2.2.</strong> Compiling Lucet from scratch</a></li><li><ol class="section"><li class="expanded "><a href="Compiling-on-Linux.html"><strong aria-hidden="true">2.2.1.</strong> Compiling on Linux</a></li><li class="expanded "><a href="Compiling-on-macOS.html"><strong aria-hidden="true">2.2.2.</strong> Compiling on macOS</a></li></ol></li><li class="expanded "><a href="Your-first-Lucet-application.html"><strong aria-hidden="true">2.3.</strong> Lucet &quot;Hello World&quot;</a></li><li class="expanded "><a href="lucet-runtime-example.html"><strong aria-hidden="true">2.4.</strong> Using the Lucet runtime API from Rust</a></li><li class="expanded "><a href="Integrity-and-authentication.html"><strong aria-hidden="true">2.5.</strong> Module integrity and authentication</a></li></ol></li><li class="expanded "><a href="Lucet-components.html"><strong aria-hidden="true">3.</strong> Lucet components</a></li><li><ol class="section"><li class="expanded "><a href="lucetc.html"><strong aria-hidden="true">3.1.</strong> lucetc</a></li><li><ol class="section"><li class="expanded "><a href="lucet-builtins.html"><strong aria-hidden="true">3.1.1.</strong> lucet-builtins</a></li></ol></li><li class="expanded "><a href="lucet-runtime.html"><strong aria-hidden="true">3.2.</strong> lucet-runtime</a></li><li class="expanded "><a href="lucet-wasi.html"><strong aria-hidden="true">3.3.</strong> lucet-wasi</a></li><li class="expanded "><a href="lucet-objdump.html"><strong aria-hidden="true">3.4.</strong> lucet-objdump</a></li><li class="expanded "><a href="lucet-spectest.html"><strong aria-hidden="true">3.5.</strong> lucet-spectest</a></li><li class="expanded "><a href="lucet-wasi-sdk.html"><strong aria-hidden="true">3.6.</strong> lucet-wasi-sdk</a></li><li class="expanded "><a href="lucet-module.html"><strong aria-hidden="true">3.7.</strong> lucet-module</a></li><li class="expanded "><a href="Tests-and-benchmarks.html"><strong aria-hidden="true">3.8.</strong> Tests and benchmarks</a></li><li><ol class="section"><li class="expanded "><a href="sightglass.html"><strong aria-hidden="true">3.8.1.</strong> sightglass</a></li></ol></li></ol></li><li class="expanded "><a href="versioning_releasing.html"><strong aria-hidden="true">4.</strong> Versioning and releasing to crates.io</a></li><li class="expanded "><a href="Security.html"><strong aria-hidden="true">5.</strong> Security</a></li><li class="expanded "><a href="CHANGELOG.html"><strong aria-hidden="true">6.</strong> Changelog</a></li><li class="expanded "><a href="License.html"><strong aria-hidden="true">7.</strong> License</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -154,63 +154,753 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#changelog" id="changelog">Changelog</a></h1>
-<h3><a class="header" href="#unreleased" id="unreleased">Unreleased</a></h3>
-<h3><a class="header" href="#051-2020-01-24" id="051-2020-01-24">0.5.1 (2020-01-24)</a></h3>
+                        <h1><a class="header" href="#lucet---a-hrefhttpsgithubcombytecodealliancelucetactionsqueryworkflow3aciimg-srchttpsgithubcombytecodealliancelucetworkflowscibadgesvg-altbuild-status-a" id="lucet---a-hrefhttpsgithubcombytecodealliancelucetactionsqueryworkflow3aciimg-srchttpsgithubcombytecodealliancelucetworkflowscibadgesvg-altbuild-status-a">Lucet   <a href="https://github.com/bytecodealliance/lucet/actions?query=workflow%3ACI"><img src="https://github.com/bytecodealliance/lucet/workflows/CI/badge.svg" alt="Build Status" /></a></a></h1>
+<p><strong>A <a href="https://bytecodealliance.org/">Bytecode Alliance</a> project</strong></p>
+<p><strong>Lucet is a native WebAssembly compiler and runtime. It is designed
+to safely execute untrusted WebAssembly programs inside your application.</strong></p>
+<p>Check out our <a href="https://www.fastly.com/blog/announcing-lucet-fastly-native-webassembly-compiler-runtime">announcement post on the Fastly blog</a>.</p>
+<p>Lucet uses, and is developed in collaboration with, the Bytecode Alliance's
+<a href="http://github.com/bytecodealliance/cranelift">Cranelift</a> code generator. It powers Fastly's
+<a href="https://wasm.fastlylabs.com">Terrarium</a> platform.</p>
+<p><a href="https://asciinema.org/a/249302"><img src="https://asciinema.org/a/249302.svg" alt="asciicast" /></a></p>
+<p>Lucet's documentation is available at <a href="https://bytecodealliance.github.io/lucet">https://bytecodealliance.github.io/lucet</a>
+(<a href="https://github.com/bytecodealliance/lucet/tree/master/docs">sources</a>).</p>
+<h2><a class="header" href="#getting-started" id="getting-started">Getting started</a></h2>
+<p>To learn how to set up the toolchain, and then compile and run your first WebAssembly application
+using Lucet, see <a href="./Getting-started.html">Getting started</a>.</p>
+<h2><a class="header" href="#development-environment" id="development-environment">Development environment</a></h2>
+<p>Lucet is developed and tested on x86-64 Linux, with experimental support for macOS. For compilation
+instructions, see <a href="./Compiling.html">Compiling</a>.</p>
+<h2><a class="header" href="#supported-languages-and-platforms" id="supported-languages-and-platforms">Supported languages and platforms</a></h2>
+<p>Lucet supports running WebAssembly programs written in C and C++ (via <code>clang</code>), Rust, and
+AssemblyScript. It does not yet support the entire WebAssembly spec, but full support is
+<a href="./lucet-spectest.html">planned</a>.</p>
+<p>Lucet's runtime currently supports x86-64 based Linux systems, with experimental support for macOS.</p>
+<h2><a class="header" href="#security" id="security">Security</a></h2>
+<p>The Lucet project aims to provide support for secure execution of untrusted code. Security is
+achieved through a combination of Lucet-supplied security controls and user-supplied security
+controls. See <a href="./Security.html">Security</a> for more information on the Lucet security model.</p>
+<h3><a class="header" href="#reporting-security-issues" id="reporting-security-issues">Reporting Security Issues</a></h3>
+<p>The Lucet project team welcomes security reports and is committed to providing prompt attention to
+security issues. Security issues should be reported privately via <a href="https://www.fastly.com/security/report-security-issue">Fastly’s security issue reporting
+process</a>. Remediation of security
+vulnerabilities is prioritized. The project teams endeavors to coordinate remediation with
+third-party stakeholders, and is committed to transparency in the disclosure process.</p>
+<h1><a class="header" href="#using-lucet" id="using-lucet">Using Lucet</a></h1>
+<p>To get started using Lucet, you will need to either set up the provided <a href="./Docker-based-development.html">Docker-based development
+environment</a>, or <a href="./Compiling.html">compile Lucet from scratch</a>.</p>
+<p>Once the Lucet command-line tools are available, you can <a href="./Your-first-Lucet-application.html">run a Lucet &quot;Hello World&quot;
+application</a>, or use the <a href="./lucet-runtime-example.html"><code>lucet-runtime</code>
+API</a> to embed a Lucet program in your Rust application.</p>
+<h1><a class="header" href="#getting-started-1" id="getting-started-1">Getting started</a></h1>
+<p>The easiest way to get started with the Lucet toolchain is by using the provided
+Docker-based development environment.</p>
+<p>This repository includes a <code>Dockerfile</code> to build a complete environment for
+compiling and running WebAssembly code with Lucet, but you shouldn't have to use
+Docker commands directly. A set of shell scripts with the <code>devenv_</code> prefix are
+used to manage the container.</p>
+<h2><a class="header" href="#setting-up-the-environment" id="setting-up-the-environment">Setting up the environment</a></h2>
+<ol>
+<li>
+<p>The Lucet repository uses Git submodules. Make sure they are checked out by running <code>git submodule update --init --recursive</code>.</p>
+</li>
+<li>
+<p>Install and run the <code>docker</code> service. We do not support <code>podman</code> at this time. On macOS, <a href="https://docs.docker.com/docker-for-mac/install/">Docker
+for Mac</a> is an option.</p>
+</li>
+<li>
+<p>Once Docker is running, in a terminal at the root of the cloned repository, run: <code>source devenv_setenv.sh</code>. (This command requires the current shell to be <code>zsh</code>, <code>ksh</code> or <code>bash</code>). After
+a couple minutes, the Docker image is built and a new container is run.</p>
+</li>
+<li>
+<p>Check that new commands are now available:</p>
+</li>
+</ol>
+<pre><code class="language-sh">lucetc --help
+</code></pre>
+<p>You're now all set! You can now compile and run a <a href="./Your-first-Lucet-application.html">&quot;Hello World&quot; using
+Lucet</a>.</p>
+<h2><a class="header" href="#top-level-scripts-for-the-docker-environment" id="top-level-scripts-for-the-docker-environment">Top-level scripts for the Docker environment</a></h2>
 <ul>
-<li>Fixed a memory corruption bug that could arise in certain runtime
-configurations. (<a href="https://github.com/bytecodealliance/lucet/pull/401">PR</a>) (<a href="https://rustsec.org/advisories/RUSTSEC-2020-0004.html">RustSec
-advisory</a>)</li>
+<li><code>./devenv_build_container.sh</code> rebuilds the container image. This is never
+required unless you edit the <code>Dockerfile</code>.</li>
+<li><code>./devenv_run.sh [&lt;command&gt;] [&lt;arg&gt;...]</code> runs a command in the container. If
+a command is not provided, an interactive shell is spawned. In this
+container, Lucet tools are installed in <code>/opt/lucet</code> by default. The command
+<code>source /opt/lucet/bin/devenv_setenv.sh</code> can be used to initialize the
+environment.</li>
+<li><code>./devenv_start.sh</code> and <code>./devenv_stop.sh</code> start and stop the container.</li>
 </ul>
-<h3><a class="header" href="#050-2020-01-24" id="050-2020-01-24">0.5.0 (2020-01-24)</a></h3>
+<h1><a class="header" href="#compiling-lucet-from-scratch" id="compiling-lucet-from-scratch">Compiling Lucet from scratch</a></h1>
+<p>Specific instructions are available for <a href="./Compiling-on-Linux.html">some flavors of Linux</a> and for
+<a href="./Compiling-on-macOS.html">macOS</a> (experimental).</p>
+<p>If you are using another platform, or if the provided instructions are not working, it may be
+helpful to try adapting the setup code in the <code>Dockerfile</code> that defines the Lucet continuous
+integration environment. While the image is defined in terms of Ubuntu, many of the packages are
+available through other package managers and operating systems.</p>
+<pre><code class="language-Dockerfile">FROM ubuntu:xenial
+
+RUN apt-get update \
+	&amp;&amp; apt-get install -y --no-install-recommends \
+	build-essential \
+	curl \
+	git \
+	libbsd-dev \
+	doxygen \
+	python-sphinx \
+	cmake \
+	ninja-build \
+	ca-certificates \
+	software-properties-common \
+	libssl-dev \
+	pkg-config \
+	csmith \
+	libcsmith-dev \
+	creduce \
+	gcc-multilib \
+	clang-6.0 \
+	&amp;&amp; rm -rf /var/lib/apt/lists/*
+
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
+
+# Setting a consistent LD_LIBRARY_PATH across the entire environment prevents unnecessary Cargo
+# rebuilds.
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+# Install our supported version of Rust, rustfmt, and the wasm32-wasi cross-compilation target
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.40.0 -y
+ENV PATH=/root/.cargo/bin:$PATH
+RUN rustup component add rustfmt
+RUN rustup target add wasm32-wasi
+
+# Optional additional Rust programs
+RUN cargo install --debug cargo-audit cargo-watch rsign2 cargo-deb mdbook
+
+RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk_8.0_amd64.deb \
+	&amp;&amp; dpkg -i wasi-sdk_8.0_amd64.deb &amp;&amp; rm -f wasi-sdk_8.0_amd64.deb
+
+ENV WASI_SDK=/opt/wasi-sdk
+
+# optional install of wasm-opt and wasm-reduce for fuzzing and benchmarking
+ENV BINARYEN_DIR=/opt/binaryen
+ENV BINARYEN_VERSION=86
+RUN curl -sS -L &quot;https://github.com/WebAssembly/binaryen/archive/version_${BINARYEN_VERSION}.tar.gz&quot; | tar xzf - &amp;&amp; \
+    mkdir -p binaryen-build &amp;&amp; ( cd binaryen-build &amp;&amp; cmake &quot;../binaryen-version_${BINARYEN_VERSION}&quot; &amp;&amp; \
+    make wasm-opt wasm-reduce ) &amp;&amp; \
+    install -d -v &quot;${BINARYEN_DIR}/bin&quot; &amp;&amp; \
+    for tool in wasm-opt wasm-reduce; do install -v &quot;binaryen-build/bin/${tool}&quot; &quot;${BINARYEN_DIR}/bin/&quot;; done &amp;&amp; \
+    rm -fr binaryen-build binaryen-version_${BINARYEN_VERSION}
+ENV PATH=$BINARYEN_DIR:$PATH
+</code></pre>
+<h1><a class="header" href="#compiling-on-linux" id="compiling-on-linux">Compiling on Linux</a></h1>
+<p>We successfully compiled Lucet on Arch Linux, Fedora, Gentoo and Ubuntu. Only x86_64 CPUs are
+supported at this time.</p>
+<h2><a class="header" href="#installation-on-ubuntu-with-a-sidecar-installation-of-llvmclang" id="installation-on-ubuntu-with-a-sidecar-installation-of-llvmclang">Installation on Ubuntu, with a sidecar installation of LLVM/clang</a></h2>
+<p>The following instructions only work on Ubuntu. They install a recent version of LLVM and <code>clang</code>
+(in <code>/opt/wasi-sdk</code>), so that WebAssembly code can be compiled on Ubuntu versions older than 19.04.</p>
+<p>First, the <code>curl</code> and <code>cmake</code> package must be installed:</p>
+<pre><code class="language-sh">apt install curl ca-certificates
+</code></pre>
+<p>You will need to install <code>wasi-sdk</code> as well. Note that you may need to run <code>dpkg</code> with elevated
+privileges to install the package.</p>
+<pre><code class="language-sh">curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk_8.0_amd64.deb \
+    &amp;&amp; dpkg -i wasi-sdk_8.0_amd64.deb &amp;&amp; rm -f wasi-sdk_8.0_amd64.deb
+</code></pre>
+<p>Install the latest stable version of the Rust compiler:</p>
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+</code></pre>
+<p>Enter your clone of the Lucet repository, and then fetch/update the submodules:</p>
+<pre><code class="language-sh">cd lucet
+
+git submodule update --init --recursive
+</code></pre>
+<p>Finally, compile the toolchain:</p>
+<pre><code class="language-sh">make install
+</code></pre>
+<p>In order to use <code>clang</code> to compile WebAssembly code, you need to adjust your <code>PATH</code> to use tools
+from <code>/opt/wasi-sdk/bin</code> instead of the system compiler. Or use set of commands prefixed by
+<code>wasm-wasi-</code>, such as <code>wasm32-wasi-clang</code> instead of <code>clang</code>.</p>
+<h2><a class="header" href="#installation-on-any-recent-linux-system-using-the-base-compiler" id="installation-on-any-recent-linux-system-using-the-base-compiler">Installation on any recent Linux system, using the base compiler</a></h2>
+<p>Support for WebAssembly was introduced in LLVM 8, released in March 2019.</p>
+<p>As a result, Lucet can be compiled with an existing LLVM installation, provided that it is up to
+date. Most distributions now include LLVM 8 or LLVM 9, so that an additional installation is not
+required to compile to WebAssembly .</p>
+<p>On distributions such as Ubuntu (&gt; 18.04) and Debian, the following command installs the
+prerequisites:</p>
+<pre><code class="language-sh">apt install curl ca-certificates clang lld cmake
+</code></pre>
+<p>On Arch Linux:</p>
+<pre><code>pacman -S curl clang lld cmake
+</code></pre>
+<p>Next, install the WebAssembly compiler builtins:</p>
+<pre><code class="language-sh">curl -sL https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
+sudo tar x -zf - -C /usr/lib/llvm-*/lib/clang/*
+</code></pre>
+<p>Install the latest stable version of the Rust compiler:</p>
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+</code></pre>
+<p>Install the WASI sysroot:</p>
+<pre><code class="language-sh">mkdir -p /opt
+curl https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk-8.0-linux.tar.gz | \
+sudo tar x -zv -C /opt -f - wasi-sdk-8.0/share &amp;&amp; \
+  sudo ln -s /opt/wasi-sdk-*/share/wasi-sysroot /opt/wasi-sysroot
+</code></pre>
+<p>Enter your clone of the Lucet repository, and then fetch/update the submodules:</p>
+<pre><code class="language-sh">cd lucet
+
+git submodule update --init --recursive
+</code></pre>
+<p>Set the <code>LLVM</code> path:</p>
+<pre><code class="language-sh">export LLVM_BIN=/usr/lib/llvm-*/bin
+</code></pre>
+<p>Finally, install the Lucet toolchain with:</p>
+<pre><code class="language-sh">make install
+</code></pre>
+<p>The standard system compiler can be used to compile to WebAssembly, simply by adding
+<code>--host=wasm32-wasi</code> to the compilation flags.</p>
+<h1><a class="header" href="#compiling-on-macos" id="compiling-on-macos">Compiling on macOS</a></h1>
+<p>Install <code>llvm</code>, <code>rust</code> and <code>cmake</code> using <a href="https://brew.sh">Homebrew</a>:</p>
+<pre><code class="language-sh">brew install llvm rust cmake
+</code></pre>
+<p>In order to compile applications to WebAssembly, builtins need to be installed
+as well:</p>
+<pre><code class="language-sh">curl -sL https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
+sudo tar x -zf - -C /usr/local/opt/llvm/lib/clang/9*
+</code></pre>
+<p>Fetch, compile and install the WASI libc:</p>
+<pre><code class="language-sh">git clone --recursive https://github.com/CraneStation/wasi-libc
+
+cd wasi-libc
+
+sudo env PATH=/usr/local/opt/llvm/bin:$PATH \
+  make INSTALL_DIR=/opt/wasi-sysroot install
+
+cd - &amp;&amp; sudo rm -fr wasi-libc
+</code></pre>
+<p>Enter the Lucet git repository clone, and fetch/update the submodules:</p>
+<pre><code class="language-sh">cd lucet
+
+git submodule update --init
+</code></pre>
+<p>Set relevant environment variables:</p>
+<pre><code class="language-sh">export WASI_SYSROOT=/opt/wasi-sysroot
+export CLANG_ROOT=&quot;$(echo /usr/local/opt/llvm/lib/clang/9*)&quot;
+export CLANG=/usr/local/opt/llvm/bin/clang
+</code></pre>
+<p>Finally, compile and install toolchain:</p>
+<pre><code class="language-sh">env LUCET_PREFIX=/opt/lucet make install
+</code></pre>
+<p>Change <code>LUCET_PREFIX</code> to the directory you would like to install Lucet into. <code>/opt/lucet</code> is the default directory.
+The Lucet executable files can be found in the <code>target/release/</code> directory.</p>
+<h1><a class="header" href="#your-first-lucet-application" id="your-first-lucet-application">Your first Lucet application</a></h1>
+<p>Ensure the Lucet command-line tools are available in your shell, either by using the <a href="./Docker-based-development.html">Docker-based
+development environment</a>, or by <a href="./Compiling.html">compiling them
+yourself</a>.</p>
+<p>If you are using the Docker environment, note that container has limited visibility into the host's
+filesystem—it can only see files under the <code>lucet</code> repository.</p>
+<p>Create a new work directory in the <code>lucet</code> directory:</p>
+<pre><code class="language-sh">mkdir -p src/hello
+
+cd src/hello
+</code></pre>
+<p>Save the following C source code as <code>hello.c</code>:</p>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+
+int main(void)
+{
+    puts(&quot;Hello world&quot;);
+    return 0;
+}
+</code></pre>
+<p>Time to compile to WebAssembly! The development environment includes a version of the Clang
+toolchain that is built to generate WebAssembly by default. The related commands are accessible from
+your current shell, and are prefixed by <code>wasm32-wasi-</code>.</p>
+<p>For example, to create a WebAssembly module <code>hello.wasm</code> from <code>hello.c</code>:</p>
+<pre><code class="language-sh">wasm32-wasi-clang -Ofast -o hello.wasm hello.c
+</code></pre>
+<p>The next step is to use Lucet to build native <code>x86_64</code> code from that WebAssembly file:</p>
+<pre><code class="language-sh">lucetc-wasi -o hello.so hello.wasm
+</code></pre>
+<p><code>lucetc</code> is the WebAssembly to native code compiler. The <code>lucetc-wasi</code> command runs the same
+compiler, but automatically configures it to target WASI.</p>
+<p><code>hello.so</code> is created and ready to be run:</p>
+<pre><code class="language-sh">lucet-wasi hello.so
+</code></pre>
+<h1><a class="header" href="#example-usage-of-the-lucet-runtime-crate" id="example-usage-of-the-lucet-runtime-crate">Example usage of the <code>lucet-runtime</code> crate.</a></h1>
+<p>The following Rust code loads a WebAssembly module compiled using <code>lucetc-wasi</code> and calls its
+<code>main()</code> function.</p>
+<h2><a class="header" href="#cargoconfig" id="cargoconfig"><code>.cargo/config</code>:</a></h2>
+<p>These flags must be set in order to have symbols from the runtime properly exported.</p>
+<pre><code class="language-toml">[build]
+rustflags = [&quot;-C&quot;, &quot;link-args=-rdynamic&quot;]
+</code></pre>
+<h2><a class="header" href="#cargotoml" id="cargotoml"><code>Cargo.toml</code>:</a></h2>
+<pre><code class="language-toml">[package]
+name = &quot;lucet-runtime-example&quot;
+version = &quot;0.1.0&quot;
+edition = &quot;2018&quot;
+
+[dependencies]
+lucet-runtime = { path = &quot;../../lucet-runtime&quot; }
+lucet-wasi = { path = &quot;../../lucet-wasi&quot; }
+
+# or, if compiling against released crates.io versions:
+# lucet-runtime = &quot;0.5.1&quot;
+# lucet-wasi = &quot;0.5.1&quot;
+</code></pre>
+<h2><a class="header" href="#srcmainrs" id="srcmainrs"><code>src/main.rs</code>:</a></h2>
+<pre><pre class="playpen"><code class="language-rust">use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
+use lucet_wasi::WasiCtxBuilder;
+
+fn main() {
+    // ensure the WASI symbols are exported from the final executable
+    lucet_wasi::export_wasi_funcs();
+    // load the compiled Lucet module
+    let dl_module = DlModule::load(&quot;example.so&quot;).unwrap();
+    // create a new memory region with default limits on heap and stack size
+    let region = MmapRegion::create(1, &amp;Limits::default()).unwrap();
+    // instantiate the module in the memory region
+    let mut instance = region.new_instance(dl_module).unwrap();
+    // prepare the WASI context, inheriting stdio handles from the host executable
+    let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build().unwrap();
+    instance.insert_embed_ctx(wasi_ctx);
+    // run the WASI main function
+    instance.run(&quot;main&quot;, &amp;[]).unwrap();
+}
+</code></pre></pre>
+<h1><a class="header" href="#end-to-end-integrity-and-authentication-of-lucet-assets" id="end-to-end-integrity-and-authentication-of-lucet-assets">End-to-end integrity and authentication of Lucet assets</a></h1>
+<p>Lucet tools have the ability to verify digital signatures of their input, and produce signed output, ensuring continuous trust even if assets have to transit over unsecured networks.</p>
+<ul>
+<li><code>lucetc</code> can be configured to only compile source code (<code>.wasm</code>, <code>.wat</code> files) if a signature is present, and can be verified using a pre-configured public key.</li>
+<li>Shared libraries produced by the <code>lucetc</code> compiler can themselves embed a signature, computed using the same secret key as the source code, or a different key.</li>
+<li>The <code>lucet-wasi</code> runtime can accept to run native code from <code>lucetc</code> only if it embeds a valid signature for a pre-configured public key.</li>
+</ul>
+<p>Secret keys can be protected by a password for interactive use, or be password-less for automation.</p>
+<p><a href="https://jedisct1.github.io/minisign/">Minisign</a> is the highly secure signature system used in Lucet via the <a href="https://crates.io/crates/minisign">minisign crate</a>. Key pairs and signatures are fully compatible with other implementations.</p>
+<h2><a class="header" href="#lucetc-signature-verification" id="lucetc-signature-verification">Lucetc signature verification</a></h2>
+<p>Source files (<code>.wasm</code>, <code>.wat</code>) can be signed with <a href="https://jedisct1.github.io/minisign/"><code>minisign</code></a>, <a href="https://github.com/jedisct1/rsign2"><code>rsign2</code></a>, or another Minisign implementation.</p>
+<p>The Lucet container ships with <code>rsign2</code> preinstalled.</p>
+<h3><a class="header" href="#creating-a-new-key-pair" id="creating-a-new-key-pair">Creating a new key pair</a></h3>
+<pre><code class="language-sh">rsign generate
+</code></pre>
+<pre><code class="language-text">Please enter a password to protect the secret key.
+Password:
+Password (one more time):
+Deriving a key from the password in order to encrypt the secret key... done
+
+The secret key was saved as /Users/j/.rsign/rsign.key - Keep it secret!
+The public key was saved as rsign.pub - That one can be public.
+
+Files signed using this key pair can be verified with the following command:
+
+rsign verify &lt;file&gt; -P RWRJwC2NawX3xnBK6mvAAehmFWQ6Z1PLXoyIz78LYkLsklDdaeHEcAU5
+</code></pre>
+<h3><a class="header" href="#signing-a-webassembly-input-file" id="signing-a-webassembly-input-file">Signing a WebAssembly input file</a></h3>
+<pre><code class="language-sh">rsign sign example.wasm
+</code></pre>
+<pre><code class="language-text">Password:
+Deriving a key from the password and decrypting the secret key... done
+</code></pre>
+<p>The resulting signature is stored into a file with the same name as the file having been signed, with a <code>.minisig</code> suffix (in the example above: <code>example.wasm.minisig</code>).</p>
+<h3><a class="header" href="#configuring-lucetc-to-verify-signatures" id="configuring-lucetc-to-verify-signatures">Configuring lucetc to verify signatures</a></h3>
+<p>Source files can be verified by adding the following command-line switches to <code>lucetc</code>.</p>
+<pre><code class="language-text">--signature-verify
+--signature-pk=&lt;path to the public key file&gt;
+</code></pre>
+<p><code>lucetc</code> assumes that a source file and its signature are in the same directory.</p>
+<p>Compilation will only start if the signature is valid for the given public key.</p>
+<h2><a class="header" href="#producing-signed-shared-objects" id="producing-signed-shared-objects">Producing signed shared objects</a></h2>
+<p>Shared libraries produced by the <code>lucetc</code> compiler can embed a signature.</p>
+<h3><a class="header" href="#creating-a-key-pair" id="creating-a-key-pair">Creating a key pair</a></h3>
+<p>This requires a secret key, that can be either created using a 3rd party minisign implementation, or by <code>lucetc</code> itself:</p>
+<pre><code class="language-sh">lucetc --signature-keygen \
+  --signature-sk &lt;file to store the secret key into&gt; \
+  --signature-pk &lt;file to store the public key into&gt;
+</code></pre>
+<p>By default, secret keys are protected by a password. If this is inconvenient, <code>lucetc</code> also supports <code>raw</code>, unencrypted secret keys.
+In order to use raw keys, add a <code>raw:</code> prefix before the file name (ex: <code>--signature-sk=raw:/opt/etc/lucet.key</code>).</p>
+<h3><a class="header" href="#signing-shared-objects-produced-by-lucetc" id="signing-shared-objects-produced-by-lucetc">Signing shared objects produced by lucetc</a></h3>
+<p>In order to embed a signature in a shared object produced by <code>lucetc</code> or <code>lucetc-wasi</code>, the following command-line switches should be present:</p>
+<pre><code class="language-text">--signature-create
+--signature-sk &lt;path to the secret key file&gt;
+</code></pre>
+<p>If the secret key was encrypted with a password, the password will be asked interactively.</p>
+<p>Signatures are directly stored in the <code>.so</code> or <code>.dylib</code> files.</p>
+<p>Key pairs used for source verification and for signing compiled objects can be different, and both operations are optional.</p>
+<h2><a class="header" href="#signature-verification-in-the-lucet-runtime" id="signature-verification-in-the-lucet-runtime">Signature verification in the Lucet runtime</a></h2>
+<p><code>lucet-wasi</code> can be configured to run only trusted native code, that includes a valid signature for a pre-configured key. In order to do so, the following command-line switches have to be present:</p>
+<pre><code class="language-text">--signature-verify
+--signature-pk &lt;path to the public key file&gt;
+</code></pre>
+<h1><a class="header" href="#lucet-components" id="lucet-components">Lucet components</a></h1>
 <ul>
 <li>
-<p>Lucet officially became a project of the <a href="https://bytecodealliance.org/">Bytecode Alliance</a> 🎉.</p>
-</li>
-<li>
-<p>Integrated <code>wasi-common</code> as the underlying implementation for WASI in <code>lucet-wasi</code>.</p>
-</li>
-<li>
-<p>Updated to Cranelift to version 0.51.0.</p>
-</li>
-<li>
-<p>Fixed a soundness bug by changing the types of the <code>Vmctx::yield*()</code> methods to require exclusive
-<code>&amp;mut self</code> access to the <code>Vmctx</code>. This prevents resources like embedder contexts or heap views
-from living across yield points, which is important for safety since the host can modify the data
-underlying those resources while the instance is suspended.</p>
-</li>
-<li>
-<p>Added the <code>#[lucet_hostcall]</code> attribute to replace <code>lucet_hostcalls!</code>, which is now deprecated.</p>
-</li>
-<li>
-<p>Added the ability to specify an alignment for the base of a <code>MmapRegion</code>-backed instance's
-heap. Thanks, @shravanrn!</p>
-</li>
-<li>
-<p>Added a <code>--target</code> option to <code>lucetc</code> to allow cross-compilation to other architectures than the
-host's. Thanks, @froydnj!</p>
-</li>
-<li>
-<p>Changed the Cargo dependencies between Lucet crates to be exact (e.g., <code>&quot;=0.5.0&quot;</code> rather than
-<code>&quot;0.5.0&quot;</code>) rather than allowing semver differences.</p>
-</li>
-<li>
-<p>Fixed the <code>KillSwitch</code> type not being exported from the public API, despite being usable via
-<code>Instance::kill_switch()</code>.</p>
-</li>
-<li>
-<p>Improved the formatting of error messages.</p>
-</li>
-<li>
-<p>Ensured the <code>lucet-wasi</code> executable properly links in the exported symbols from <code>lucet-runtime</code>.</p>
-</li>
-</ul>
-<h3><a class="header" href="#043-2020-01-24" id="043-2020-01-24">0.4.3 (2020-01-24)</a></h3>
+<p><a href="lucetc.html"><code>lucetc</code></a>: the Lucet Compiler.</p>
 <ul>
-<li>Backported the fix for a memory corruption bug that could arise in certain runtime
-configurations. (<a href="https://github.com/bytecodealliance/lucet/pull/401">PR</a>) (<a href="https://rustsec.org/advisories/RUSTSEC-2020-0004.html">RustSec
-advisory</a>)</li>
+<li><a href="lucet-builtins.html"><code>lucet-builtins</code></a>: a C library that provides optimized native versions of
+libc primitives.</li>
 </ul>
+</li>
+<li>
+<p><a href="lucet-runtime.html"><code>lucet-runtime</code></a>: the runtime for WebAssembly modules compiled through
+<code>lucetc</code>.</p>
+</li>
+<li>
+<p><a href="./lucet-wasi.html"><code>lucet-wasi</code></a>: runtime support for the <a href="https://wasi.dev">WebAssembly System Interface
+(WASI)</a>.</p>
+</li>
+<li>
+<p><a href="./lucet-objdump.html"><code>lucet-objdump</code></a>: an executable for inspecting the contents of a shared
+object generated by <code>lucetc</code>.</p>
+</li>
+<li>
+<p><a href="./lucet-spectest.html"><code>lucet-spectest</code></a>: a driver for running the official WebAssembly spec test
+suite under Lucet.</p>
+</li>
+<li>
+<p><a href="./lucet-wasi-sdk.html"><code>lucet-wasi-sdk</code></a>: convenient wrappers around the WASI Clang toolchain and
+<code>lucetc</code>.</p>
+</li>
+<li>
+<p><a href="./lucet-module.html"><code>lucet-module</code></a>: data structure definitions and serialization functions that
+we emit into shared objects with <code>lucetc</code>, and read with <code>lucet-runtime</code>.</p>
+</li>
+</ul>
+<h1><a class="header" href="#lucetc---a-hrefhttpsdocsrslucetcimg-srchttpsdocsrslucetcbadgesvg-altdocs-badge-a" id="lucetc---a-hrefhttpsdocsrslucetcimg-srchttpsdocsrslucetcbadgesvg-altdocs-badge-a"><code>lucetc</code>   <a href="https://docs.rs/lucetc"><img src="https://docs.rs/lucetc/badge.svg" alt="docs-badge" /></a></a></h1>
+<p><code>lucetc</code> is the Lucet Compiler.</p>
+<p>The Rust crate <code>lucetc</code> provides an executable <code>lucetc</code>.</p>
+<p>It compiles WebAssembly modules (<code>.wasm</code> or <code>.wat</code> files) into native code (<code>.o</code> or <code>.so</code> files).</p>
+<h2><a class="header" href="#example" id="example">Example</a></h2>
+<pre><code class="language-sh">lucetc example.wasm --output example.so --bindings lucet-wasi/bindings.json --reserved-size 64MiB --opt-level best
+</code></pre>
+<p>This command compiles <code>example.wasm</code>, a WebAssembly module, into a shared library <code>example.so</code>. At
+run time, the heap can grow up to 64 MiB.</p>
+<p>Lucetc can produce ELF (on Linux) and Mach-O (on macOS) objects and libraries. For debugging
+purposes or code analysis, it can also dump Cranelift code.</p>
+<h2><a class="header" href="#usage" id="usage">Usage</a></h2>
+<pre><code class="language-text">    lucetc [FLAGS] [OPTIONS] [--] [input]
+
+FLAGS:
+        --count-instructions    Instrument the produced binary to count the number of wasm operations the translated
+                                program executes
+    -h, --help                  Prints help information
+        --signature-keygen      Create a new key pair
+        --signature-create      Sign the object file
+    -V, --version               Prints version information
+        --signature-verify      Verify the signature of the source file
+
+OPTIONS:
+        --bindings &lt;bindings&gt;...                   path to bindings json file
+        --builtins &lt;builtins&gt;                      builtins file
+        --emit &lt;emit&gt;
+            type of code to generate (default: so) [possible values: obj, so, clif]
+
+        --guard-size &lt;guard_size&gt;                  size of linear memory guard. must be multiple of 4k. default: 4 MiB
+        --max-reserved-size &lt;max_reserved_size&gt;
+            maximum size of usable linear memory region. must be multiple of 4k. default: 4 GiB
+
+        --min-reserved-size &lt;min_reserved_size&gt;
+            minimum size of usable linear memory region. must be multiple of 4k. default: 4 MiB
+
+        --opt-level &lt;opt_level&gt;
+            optimization level (default: 'speed_and_size'). 0 is alias to 'none', 1 to 'speed', 2 to 'speed_and_size'
+            [possible values: 0, 1, 2, none, speed, speed_and_size]
+    -o, --output &lt;output&gt;                          output destination, defaults to a.out if unspecified
+        --signature-pk &lt;pk_path&gt;                   Path to the public key to verify the source code signature
+        --precious &lt;precious&gt;                      directory to keep intermediate build artifacts in
+        --reserved-size &lt;reserved_size&gt;
+            exact size of usable linear memory region, overriding --{min,max}-reserved-size. must be multiple of 4k
+
+        --signature-sk &lt;sk_path&gt;
+            Path to the secret key to sign the object file. The file can be prefixed with &quot;raw:&quot; in order to store a
+            raw, unencrypted secret key
+
+ARGS:
+    &lt;input&gt;    input file
+
+</code></pre>
+<h2><a class="header" href="#external-symbols" id="external-symbols">External symbols</a></h2>
+<p>By default, compiled files cannot call any external function. Not even WASI's. Allowed external
+functions have to be explicitly listed in bindings JSON file, that have the following format:</p>
+<pre><code class="language-json">{
+    &quot;wasi_unstable&quot;: {
+        &quot;symbol_name_1&quot;: &quot;native_symbol_name_1&quot;,
+        &quot;symbol_name_n&quot;: &quot;native_symbol_name_n&quot;,
+    }
+}
+</code></pre>
+<p>The example above allows the WebAssembly module to refer to an external symbol <code>symbol_name_1</code>, that
+maps to the native symbol <code>native_symbol_name_1</code>.</p>
+<p>The <code>--bindings</code> command-line switch can be used more than once in order to split the definitions
+into multiple files.</p>
+<p>When using WASI, the <code>bindings.json</code> file shipped with <code>lucet-wasi</code> can be used in order to import
+all the symbols available in the <code>lucet-wasi</code> runtime.</p>
+<h2><a class="header" href="#memory-limits" id="memory-limits">Memory limits</a></h2>
+<ul>
+<li>
+<p><code>--max-reserved-size &lt;size&gt;</code> makes the compiler assume that the heap will never grow more than
+<code>&lt;size&gt;</code> bytes. The compiler will generate code optimized for that size, inserting bound checks
+with static values whenever necessary. As a side effect, the module will trap if the limit is ever
+reached, even if the runtime could allow the heap to grow even further.</p>
+</li>
+<li>
+<p><code>--min-reserved-size &lt;size&gt;</code> sets the maximum heap size the runtime should use.</p>
+</li>
+<li>
+<p><code>--reserved-size &lt;size&gt;</code> is a shortcut to set both values simultaneously, and is the recommended
+way to configure how much memory the module can use. The default is only 4 MiB, so this is
+something you may want to increase.</p>
+</li>
+<li>
+<p><code>--guard-size &lt;size&gt;</code> controls how much virtual memory with no read nor write access is reserved
+after an instance's heap. The compiler can avoid some bound checking when it is safe to do so
+according to this value.</p>
+</li>
+</ul>
+<h2><a class="header" href="#optimization-levels" id="optimization-levels">Optimization levels</a></h2>
+<ul>
+<li>
+<p><code>--opt-level 0</code> makes the compilation as fast as possible, but the resulting code itself may not
+be optimal.</p>
+</li>
+<li>
+<p><code>--opt-level 1</code> generates fast code, but does not run passes intended to reduce code size.</p>
+</li>
+<li>
+<p><code>--opt-level 2</code> generates the fastest and smallest, but is compilation is about twice as slow as
+<code>0</code>.</p>
+</li>
+</ul>
+<h2><a class="header" href="#builtins" id="builtins">Builtins</a></h2>
+<p><code>lucetc</code> can replace internal functions with calls to external, optimized implementations; see
+<a href="./lucet-builtins.html"><code>lucet-builtins</code></a>.</p>
+<h1><a class="header" href="#lucet-builtins" id="lucet-builtins"><code>lucet-builtins</code></a></h1>
+<p><code>lucet-builtins</code> is a C library that provides optimized native versions of libc primitives. <code>lucetc</code>
+can substitute the implementations defined in this library for the WebAssembly implementations.</p>
+<h1><a class="header" href="#lucet-runtime---a-hrefhttpsdocsrslucet-runtimeimg-srchttpsdocsrslucet-runtimebadgesvg-altdocs-badge-a" id="lucet-runtime---a-hrefhttpsdocsrslucet-runtimeimg-srchttpsdocsrslucet-runtimebadgesvg-altdocs-badge-a"><code>lucet-runtime</code>   <a href="https://docs.rs/lucet-runtime"><img src="https://docs.rs/lucet-runtime/badge.svg" alt="docs-badge" /></a></a></h1>
+<p><code>lucet-runtime</code> is the runtime for WebAssembly modules compiled through <code>lucetc</code>.</p>
+<p>It is a Rust crate that provides the functionality to load modules from shared object files,
+instantiate them, and call exported WebAssembly functions. <code>lucet-runtime</code> manages the resources
+used by each WebAssembly instance (linear memory &amp; globals), and the exception mechanisms that
+detect and recover from illegal operations.</p>
+<p>The public API of the library is defined <code>lucet-runtime</code>, but the bulk of the implementation is in
+the child crate <code>lucet-runtime-internals</code>. Proc macros are defined in <code>lucet-runtime-macros</code>, and
+test suites are defined in the child crate <code>lucet-runtime-tests</code>. Many of these tests invoke
+<code>lucetc</code> and the <code>wasi-sdk</code> tools.</p>
+<p><code>lucet-runtime</code> is usable as a Rust crate or as a C library. The C language interface is found at
+<code>lucet-runtime/include/lucet.h</code>.</p>
+<h1><a class="header" href="#lucet-wasi---a-hrefhttpsdocsrslucet-wasiimg-srchttpsdocsrslucet-wasibadgesvg-altdocs-badge-a" id="lucet-wasi---a-hrefhttpsdocsrslucet-wasiimg-srchttpsdocsrslucet-wasibadgesvg-altdocs-badge-a"><code>lucet-wasi</code>   <a href="https://docs.rs/lucet-wasi"><img src="https://docs.rs/lucet-wasi/badge.svg" alt="docs-badge" /></a></a></h1>
+<p><code>lucet-wasi</code> is a crate providing runtime support for the <a href="https://wasi.dev">WebAssembly System Interface
+(WASI)</a>.  It can be used as a library to support WASI in another application, or
+as an executable, <code>lucet-wasi</code>, to execute WASI programs compiled through <code>lucetc</code>.</p>
+<p>Example WASI programs are in the <a href="examples"><code>examples</code></a> directory.</p>
+<h2><a class="header" href="#example-1" id="example-1">Example</a></h2>
+<pre><code class="language-sh">lucet-wasi example.so --dir .:. --max-heap-size 2GiB -- example_arg
+</code></pre>
+<h2><a class="header" href="#usage-1" id="usage-1">Usage</a></h2>
+<pre><code class="language-text">    lucet-wasi [OPTIONS] &lt;lucet_module&gt; [--] [guest_args]...
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+        --entrypoint &lt;entrypoint&gt;                         Entrypoint to run within the WASI module [default: _start]
+        --heap-address-space &lt;heap_address_space_size&gt;
+            Maximum heap address space size (must be a multiple of 4 KiB, and &gt;= `max-heap-size`) [default: 8 GiB]
+
+        --max-heap-size &lt;heap_memory_size&gt;
+            Maximum heap size (must be a multiple of 4 KiB) [default: 4 GiB]
+
+        --dir &lt;preopen_dirs&gt;...                           A directory to provide to the WASI guest
+        --stack-size &lt;stack_size&gt;
+            Maximum stack size (must be a multiple of 4 KiB) [default: 8 MiB]
+
+
+ARGS:
+    &lt;lucet_module&gt;     Path to the `lucetc`-compiled WASI module
+    &lt;guest_args&gt;...    Arguments to the WASI `main` function
+</code></pre>
+<h2><a class="header" href="#preopened-files-and-directories" id="preopened-files-and-directories">Preopened files and directories</a></h2>
+<p>By default, WASI doesn't allow any access to the filesystem. Files and directories must be
+explicitly allowed by the host.</p>
+<p>Instead of directly accessing the filesystem using paths, an instance will use inherited descriptors
+from pre-opened files.</p>
+<p>This means that even the current directory cannot be accessed by a WebAssembly instance, unless this
+has been allowed with:</p>
+<pre><code class="language-text">--dir .:.
+</code></pre>
+<p>This maps the current directory <code>.</code> as seen by the WebAssembly module to <code>.</code> as seen on the host.</p>
+<p>Multiple <code>--dir &lt;wasm path&gt;:&lt;host path&gt;</code> arguments can be used in order to allow the instance to
+access more paths.</p>
+<p>Along with a preopened file/directory, WASI stores a set of capabilities. Lucet currently sets all
+the capabilities. In particular, once a directory has been preopened, its content as well as files
+from any of its subdirectories can be accessed as well.</p>
+<h2><a class="header" href="#maximum-heap-size" id="maximum-heap-size">Maximum heap size</a></h2>
+<p><code>--heap-address-space</code> controls the maximum allowed heap size.</p>
+<p>Usually, this should match the <code>--reserved-size</code> value given to <code>lucetc</code>.</p>
+<h2><a class="header" href="#supported-syscalls" id="supported-syscalls">Supported syscalls</a></h2>
+<p>We support the entire <a href="https://github.com/bytecodealliance/wasmtime/blob/master/docs/WASI-api.md">WASI
+API</a>, with the exception of
+socket-related syscalls. These will be added when network access is standardized.</p>
+<h2><a class="header" href="#thread-safety" id="thread-safety">Thread safety</a></h2>
+<p>Lucet guests are currently single-threaded only. The WASI embedding assumes this, and so the syscall
+implementations are not thread-safe. This is not a fundamental limitation, should Lucet support
+multi-threaded guests in the future.</p>
+<h1><a class="header" href="#lucet-objdump" id="lucet-objdump"><code>lucet-objdump</code></a></h1>
+<p><code>lucet-objdump</code> is a Rust executable for inspecting the contents of a shared object generated by
+<code>lucetc</code>.</p>
+<h2><a class="header" href="#usage-2" id="usage-2">Usage</a></h2>
+<pre><code class="language-sh">lucet-objdump &lt;lucetc-compiled-shared-object&gt;
+</code></pre>
+<p><code>lucetc-objdump</code> prints details about a shared object producted by <code>lucetc</code>:</p>
+<ul>
+<li>Required symbols</li>
+<li>Exported functions and symbols</li>
+<li>Imported functions and symbols</li>
+<li>Heap specification</li>
+<li>Globals specification</li>
+<li>Data segments</li>
+<li>Sparse page data</li>
+<li>Trap manifest</li>
+</ul>
+<p>This can be useful for debugging purposes.</p>
+<p><img src="https://user-images.githubusercontent.com/49215183/58720565-5ae08d00-8387-11e9-8b38-49dcb12e20d2.png" alt="lucet-objdump" /></p>
+<h1><a class="header" href="#lucet-spectest" id="lucet-spectest"><code>lucet-spectest</code></a></h1>
+<p><code>lucet-spectest</code> is a Rust crate that uses <code>lucetc</code> and <code>lucet-runtime</code>, as well as the (external)
+<code>wabt</code> crate, to run the official WebAssembly spec test suite, which is provided as a submodule in
+this directory.</p>
+<p>Lucet is not yet fully spec compliant, however reaching spec compliance is part of our project
+roadmap.</p>
+<h1><a class="header" href="#lucet-wasi-sdk---a-hrefhttpsdocsrslucet-wasi-sdkimg-srchttpsdocsrslucet-wasi-sdkbadgesvg-altdocs-badge-a" id="lucet-wasi-sdk---a-hrefhttpsdocsrslucet-wasi-sdkimg-srchttpsdocsrslucet-wasi-sdkbadgesvg-altdocs-badge-a"><code>lucet-wasi-sdk</code>   <a href="https://docs.rs/lucet-wasi-sdk"><img src="https://docs.rs/lucet-wasi-sdk/badge.svg" alt="docs-badge" /></a></a></h1>
+<p><a href="https://github.com/cranestation/wasi-sdk"><code>wasi-sdk</code></a> is a Cranelift project that packages a build
+of the Clang toolchain, the WASI reference sysroot, and a libc based on WASI syscalls.</p>
+<p><code>lucet-wasi-sdk</code> is a Rust crate that provides wrappers around these tools for building C programs
+into Lucet modules. We use this crate to build test cases in <code>lucet-runtime-tests</code> and <code>lucet-wasi</code>.</p>
+<h1><a class="header" href="#lucet-module---a-hrefhttpsdocsrslucet-moduleimg-srchttpsdocsrslucet-modulebadgesvg-altdocs-badge-a" id="lucet-module---a-hrefhttpsdocsrslucet-moduleimg-srchttpsdocsrslucet-modulebadgesvg-altdocs-badge-a"><code>lucet-module</code>   <a href="https://docs.rs/lucet-module"><img src="https://docs.rs/lucet-module/badge.svg" alt="docs-badge" /></a></a></h1>
+<p><code>lucet-module</code> is a crate with data structure definitions and serialization functions that we emit
+into shared objects with <code>lucetc</code>, and read with <code>lucet-runtime</code>.</p>
+<h1><a class="header" href="#tests-and-benchmarks" id="tests-and-benchmarks">Tests and benchmarks</a></h1>
+<p>Most of the crates in this repository have some form of unit tests. In addition,
+<code>lucet-runtime/lucet-runtime-tests</code> defines a number of integration tests for the runtime, and
+<code>lucet-wasi</code> has a number of integration tests using WASI C programs.</p>
+<p>We also created the <a href="./sightglass.html">Sight Glass</a> benchmarking tool to measure the runtime of C
+code compiled through a standard native toolchain against the Lucet toolchain. It is provided as a
+submodule at <code>/sightglass</code>.</p>
+<p>Sightglass ships with a set of microbenchmarks called <code>shootout</code>. The scripts to build the shootout
+tests with native and various versions of the Lucet toolchain are in <code>/benchmarks/shootout</code>.</p>
+<p>Furthermore, there is a suite of benchmarks of various Lucet runtime functions, such as instance
+creation and teardown, in <code>/benchmarks/lucet-benchmarks</code>.</p>
+<h2><a class="header" href="#adding-new-tests-for-crates-other-than-lucet-runtime-or-lucet-runtime-internals" id="adding-new-tests-for-crates-other-than-lucet-runtime-or-lucet-runtime-internals">Adding new tests for crates other than <code>lucet-runtime</code> or <code>lucet-runtime-internals</code></a></h2>
+<p>Most of the crates in this repository are tested in the usual way, with a mix of unit tests defined
+alongside the modules they test, and integration tests defined in separate test targets.</p>
+<p>Note that <code>lucetc</code> and <code>lucet-wasi-sdk</code> provide library interfaces for the Wasm compiler and the
+C-to-Wasm cross compiler, respectively. You should prefer using these interfaces in a test to using
+the command-line tools directly with <code>std::process:Command</code>, a Makefile, or a shell script.</p>
+<h2><a class="header" href="#adding-new-tests-for-lucet-runtime-or-lucet-runtime-internals" id="adding-new-tests-for-lucet-runtime-or-lucet-runtime-internals">Adding new tests for <code>lucet-runtime</code> or <code>lucet-runtime-internals</code></a></h2>
+<p>While these crates have a similar mix of unit and integration tests, there are some additional
+complications to make sure the public interface is well-tested, and to allow reuse of tests across
+backends.</p>
+<h3><a class="header" href="#public-interface-tests" id="public-interface-tests">Public interface tests</a></h3>
+<p>The tests defined in <code>lucet-runtime</code> and <code>lucet-runtime-tests</code> are meant to exclusively test the
+public interface exported from <code>lucet-runtime</code>. This is to ensure that the public interface is
+sufficiently expressive to use all of the features we want to expose to users, and to catch linking
+problems as early as possible.</p>
+<p>While some tests in these crates use APIs exported only from <code>lucet-runtime-internals</code>, this is only
+for test scaffolding or inspection of results. The parts of the test that are &quot;what the user might
+do&quot; should only be defined in terms of <code>lucet-runtime</code> APIs.</p>
+<h3><a class="header" href="#test-reuse-regions-and-macros" id="test-reuse-regions-and-macros">Test reuse, regions, and macros</a></h3>
+<p>Many of the tests in the runtime require the use of a <code>lucet_runtime::Region</code> in order to create
+Lucet instances. To enable reuse of these tests across multiple <code>Region</code> implementations, many tests
+are defined in macros. For example, the unit tests defined in
+<code>/lucet-runtime/lucet-runtime-internals/src/alloc/tests.rs</code> are parameterized by a <code>TestRegion</code>
+argument, which is then applied using <code>crate::region::mmap::MmapRegion</code>. Likewise, many of the
+integration tests in <code>/lucet-runtime/lucet-runtime-tests</code> are defined using macros that take a
+<code>TestRegion</code>.</p>
+<p>Most tests that use a <code>Region</code> should be defined within a macro like this. The exception is for
+tests that are specific to a particular region implementation, likely using an API that is not part
+of the <code>Region</code> trait. These tests should be defined alongside the implementation of the region (for
+unit tests) or directly in a <code>lucet-runtime</code> test target (for integration tests).</p>
+<h1><a class="header" href="#sight-glass" id="sight-glass">Sight Glass</a></h1>
+<p>Sight Glass is a benchmark suite and tool to compare different implementations of the same primitives.</p>
+<h2><a class="header" href="#usage-3" id="usage-3">Usage</a></h2>
+<p>Sight Glass loads multiple shared libraries implementing the same test suite, runs all tests from all suites, and produces reports to evaluate how implementations compare to each other.</p>
+<p>Functions from each library are evaluated as follows:</p>
+<pre><code class="language-c">tests_config.global_setup(&amp;global_ctx);
+
+  test1_setup(global_ctx, &amp;test1_ctx);
+  test1_body(test1_ctx);
+  test1_teardown(test1_ctx);
+
+  test2_setup(global_ctx, &amp;test2_ctx);
+  test2_body(test2_ctx);
+  test2_teardown(test2_ctx);
+
+  // ...
+
+  testN_setup(global_ctx, &amp;testN_ctx);
+  testN_body(testN_ctx);
+  testN_teardown(testN_ctx);
+
+tests_config.global_teardown(global_ctx);
+</code></pre>
+<p>Each shared library must export a <code>tests_config</code> symbol:</p>
+<pre><code class="language-c">typedef struct TestsConfig {
+    void     (*global_setup)(void **global_ctx_p);
+    void     (*global_teardown)(void *global_ctx);
+    uint64_t version;
+} TestsConfig;
+
+TestsConfig tests_config;
+</code></pre>
+<p><code>global_setup</code> and <code>global_teardown</code> are optional, and can be set to <code>NULL</code> if not required.</p>
+<p>A test must at least export a function named <code>&lt;testname&gt;_body</code>:</p>
+<pre><code class="language-c">void testname_body(void *ctx);
+</code></pre>
+<p>This function contains the actual code to be benchmarked.</p>
+<p>By default, <code>ctx</code> will be set to the <code>global_ctx</code>. However, optional <code>setup</code> and <code>teardown</code> functions can also be provided for individual tests:</p>
+<pre><code class="language-c">void testname_setup(void *global_ctx, void **ctx_p);
+
+void testname_teardown(void *ctx);
+</code></pre>
+<p>See <code>example/example.c</code> for an example test suite.</p>
+<p>Sightglass extracts all symbols matching the above convention to define and run the test suite.</p>
+<h2><a class="header" href="#running-multiple-functions-for-a-single-test" id="running-multiple-functions-for-a-single-test">Running multiple functions for a single test</a></h2>
+<p>A single test can evaluate multiple body functions sharing the same context.</p>
+<p>These functions have to be named <code>&lt;testname&gt;_body_&lt;bodyname&gt;</code>.</p>
+<p><code>&lt;bodyname&gt;</code> can be anything; a numeric ID or a short description of the purpose of the function.</p>
+<pre><code class="language-c">void testname_body_2(void *ctx);
+void testname_body_randomized(void *ctx);
+</code></pre>
+<p>These functions are guaranteed to be evaluated according to their names sorted in lexical order.</p>
+<h2><a class="header" href="#configuration" id="configuration">Configuration</a></h2>
+<p>The global configuration is loaded from <code>sightglass.toml</code> file. This can be changed using the <code>-c</code> command-line flag.</p>
+<p>The configuration lists implementations to be benchmarked:</p>
+<pre><code class="language-toml">test_suites = [
+  { name = &quot;test1&quot;, library_path = &quot;implementation1.so&quot; },
+  { name = &quot;test2&quot;, library_path = &quot;implementation2.so&quot; }
+]
+</code></pre>
+<p>Individual test suites can also run a command in order to be optionally skipped if that command returns a non-zero exit code:</p>
+<pre><code class="language-toml">test_suites = [
+  { name = &quot;test1&quot;, library_path = &quot;implementation1.so&quot; },
+  { name = &quot;test2&quot;, library_path = &quot;implementation2.so&quot;, guard = [&quot;/opt/sg/guard-scripts/check&quot;, &quot;arg1&quot;, &quot;arg2&quot;] }
+]
+</code></pre>
+<p>Additional properties that the file can include:</p>
+<ul>
+<li>
+<p><code>single_core = &lt;bool&gt;</code>: set to <code>true</code> in order to run the tests on a single CPU core, in order to get more accurate results. This only works on Linux.</p>
+</li>
+<li>
+<p><code>output = [ { format = &quot;Text|CSV|JSON&quot; [, file = &lt;file&gt;] [, breakdown = &lt;bool&gt;] } ... ]</code>: how to store or display the results.</p>
+</li>
+</ul>
+<p>By defaut, the <code>Text</code> and <code>CSV</code> output do not include a breakdown of the time spent in individual functions for tests made of multiple functions.
+This can be changed with the optional <code>breakdown</code> property being set to <code>true</code>.</p>
+<p>The <code>JSON</code> output always includes this information.</p>
 <h1><a class="header" href="#versioning-and-releasing-to-cratesio" id="versioning-and-releasing-to-cratesio">Versioning and releasing to crates.io</a></h1>
 <p>This document describes how to appropriately decide the version of a new release, and the steps to
 actually get it published on crates.io.</p>
@@ -337,6 +1027,10 @@ worked for the <code>0.5.1</code> release was:</p>
 some of the crates published but not others. What to do next will depend on the situation; please
 consult with the Lucet team.</p>
 </li>
+<li>
+<p>Ensure the new crates have been published by checking for matching version tags on the <a href="https://crates.io/search?q=lucet">Lucet
+crates</a>.</p>
+</li>
 </ol>
 <p>Congratulations, the new crates are now on crates.io! 🎉</p>
 <h3><a class="header" href="#tagging-and-annotating-the-release-in-git" id="tagging-and-annotating-the-release-in-git">Tagging and annotating the release in Git</a></h3>
@@ -370,6 +1064,327 @@ Lucet team.</p>
 deleted, and will be the basis for any future hotfix releases that may be required.</p>
 </li>
 </ol>
+<h1><a class="header" href="#lucet-security-overview" id="lucet-security-overview">Lucet security overview</a></h1>
+<p>This document provides a high-level summary of the security architecture of the Lucet project. It is meant to be used for orientation and a starting point for deploying a secure embedding of Lucet.</p>
+<h2><a class="header" href="#security-model" id="security-model">Security model</a></h2>
+<p>The Lucet project aims to provide support for secure execution of untrusted code. The project does not provide a complete secure sandbox framework at this time; security is achieved through a combination of Lucet-supplied security controls and user-supplied security controls.</p>
+<p>At a high level, this jointly-constructed security architecture aims to prevent untrusted input, data, and activity from compromising the security of trusted components. It also aims to prevent an untrusted actor from compromising the security (e.g. data and activity) of another untrusted actor. For example, one user of a Lucet embedding should not be able to affect the security of another user of the same Lucet embedding.</p>
+<p>Some security requirements for the Lucet project have not been implemented yet. See the remainder of this document as well as <a href="https://github.com/bytecodealliance/lucet/issues">project Github issues</a> for more information. Note that even when lucet project security goals have been met, overall system security requirements will vary by embedding.</p>
+<p>The Lucet security model can be summarized via two simplified execution scenarios: compiling/loading of sandboxed guest code and execution of untrusted guest programs. These scenarios are described in terms of the following levels.</p>
+<ul>
+<li>Trusted: refers to code, processes, or inputs that are fully trusted and generally controlled by the administrator of a system that runs or embeds Lucet components.</li>
+<li>Untrusted: refers to code, processes, or inputs that are completely untrusted and generally supplied by a third party. For example, user-supplied WASM code is untrusted.</li>
+</ul>
+<p>The scenarios are modeled as simplified data flow diagrams below. <a href="https://draw.io">draw.io</a> diagram source files are available <a href="assets/lucet_dfds.xml">here</a>.</p>
+<h3><a class="header" href="#compileload-scenario" id="compileload-scenario">Compile/load scenario</a></h3>
+<p><img src="assets/security_dfd_cl.png" alt="" /></p>
+<p>In the compile/load scenario, a user provides untrusted WebAssembly code to the <a href="https://github.com/bytecodealliance/lucet/tree/master/lucetc"><code>lucetc</code></a> compiler. The <code>lucetc</code> compiler consumes this code along with trusted bindings and produces a shared object file. A trusted application (e.g. server) that embeds <code>lucet-runtime</code> then loads the guest program.</p>
+<h3><a class="header" href="#program-execution-scenario" id="program-execution-scenario">Program execution scenario</a></h3>
+<p><img src="assets/security_dfd_pe.png" alt="" /></p>
+<p>In the program execution scenario, an untrusted third party end-user sends data to a trusted server that has loaded a guest program (via the compile/load scenario above). The trusted server handles this data and passes it to an instance of the untrusted guest program for processing. The guest program may call into trusted server APIs to perform privileged processing, such as further communication with the end-user, untrusted network endpoints, etc. before execution terminates.</p>
+<h2><a class="header" href="#security-requirements" id="security-requirements">Security requirements</a></h2>
+<p>This section summarizes salient security requirements for the Lucet projects in terms of high-level attack scenarios. As mentioned above, Lucet does not provide a complete secure sandbox framework at this time; security is achieved through a combination of Lucet-supplied security controls and user-supplied security controls.</p>
+<h3><a class="header" href="#attacks-against-compilation-process" id="attacks-against-compilation-process">Attacks against compilation process</a></h3>
+<p>An attacker may be able to supply a malicious input file to the <code>lucetc</code> compiler toolchain in the context of the “compile/load” scenario above, with a goal of compromising <code>lucetc</code> and/or the host system it is executing within.</p>
+<p>Lucet is designed to prevent elevation of privilege attacks and against the <code>lucetc</code> compiler toolchain. Due to the nature of WebAssembly application, upstream components of the <code>lucetc</code> compiler (particularly <a href="https://github.com/bytecodealliance/cranelift">Cranelift</a>) generally have a similar design goals in this respect, and have corresponding security measures in place. The Lucet project has undergone an initial security assessment.</p>
+<p>Bugs in <code>lucetc</code> that can lead to information leaks, elevation of privilege (e.g. arbitrary remote code execution) and otherwise compromise security attributes are considered security vulnerabilities in the context of the Lucet project.</p>
+<p>Attack vectors stemming from asymmetric consumption of resources inherent in compilation processes, for example consumption of CPU or memory for large or complex inputs, should be addressed by user/administrator via environmental controls or similar. For example, a <code>lucetc</code> deployment could limit input size earlier in the processing flow, include cgroup runtime controls, etc.</p>
+<p>Note that an evolving compiler toolchain like <code>lucetc</code> presents a rich attack surface that will likely require ongoing patching of vulnerabilities. It is highly recommended that additional protections common classes of attacks be deployed by administrators for defense-in-depth. For example, the <a href="https://wasm.fastlylabs.com/">terrarium project</a> runs <code>lucetc</code> compilation jobs in minimal, single-use, security-hardened containers in an isolated environment subject to runtime security monitoring.</p>
+<h3><a class="header" href="#guest-to-host-attacks" id="guest-to-host-attacks">Guest-to-host attacks</a></h3>
+<p>An attacker can supply malicious guest code to a Lucet embedding. Bugs in <code>lucetc</code>, <code>lucet-runtime</code>, or any other project components that allow code generated by an attacker to elevate privileges against the embedding host, crash the host, leak host data, or otherwise compromise the host’s security are considered security vulnerabilities. Correspondingly, bugs in Lucet that compromise of security policies of system components (e.g. <a href="https://github.com/bytecodealliance/wasmtime/blob/master/docs/WASI-overview.md">WASI capabilities policies</a>) are considered security vulnerabilities.</p>
+<p>Lucet leverages WebAssembly semantics, control flow, and operational memory isolation models to prevent broad classes of attacks against the host embedding (see the <a href="https://webassembly.org/docs/security/">WebAssembly docs</a> for details). Specifically, Lucet provides WebAssembly-based mechanisms for isolating most faults to a specific instance of guest program; in these cases mitigations can be applied (e.g. alerting, guest banning, etc.) and execution of the host process can continue unabated. Lucet is compatible with the <a href="https://wasi.dev">WebAssembly System Interface (WASI)</a> API for system interfaces, which supplies a capabilities-based security model for system resource access. Lucet is designed to provide a baseline for integration with additional host sandboxing technologies, such as seccomp-bpf.</p>
+<p>Host function call bindings supplied by the Lucet user/administrator are analogous to WebAssembly imported functions. Lucet project components aim to generate code that provides ABI-level consistency checking of function call arguments (work in progress), but vulnerabilities explicitly defined in host-side functionality supplied by Lucet administrators (e.g. memory corruption in an embedding server’s C code) is considered out-of-scope for the Lucet project.</p>
+<h4><a class="header" href="#caveats" id="caveats">Caveats</a></h4>
+<ul>
+<li>Lucet does not provide complete protection against transient/speculative execution attacks against the host. Efforts are underway in <code>lucetc</code> and upstream projects to supply industry-standard protections to generated native code, but Lucet users/administrators must deploy additional defenses, such as protecting imported function APIs from speculative execution, applying privilege separation, <a href="https://www.chromium.org/Home/chromium-security/site-isolation">site isolation</a>, <a href="https://wiki.mozilla.org/Security/Sandbox/Seccomp#Intro_to_seccomp_and_seccomp-bpf">sandboxing technology</a> and so on.</li>
+<li>Support for automated ABI-level consistency checking of function call arguments is not complete. In the meantime, Lucet users/administrators must implement this checking.</li>
+<li>Lucet is a new technology and under active development. Designers and architects should plan to monitor releases and regularly patch Lucet to benefit from remediation of security vulnerabilities.</li>
+</ul>
+<h3><a class="header" href="#guest-to-guest-attacks" id="guest-to-guest-attacks">Guest-to-guest attacks</a></h3>
+<p>This scenario is similar to the previous one, except an attacker is targeting another guest. Similarly, bugs in <code>lucetc</code>, <code>lucet-runtime</code>, or any other project components that allow code generated by an attacker to leak data of other guest or other compromise the security of other guests are considered vulnerabilities.</p>
+<p>The protections, responsibilities, and caveats defined in the previous section apply to this attack scenario as well.</p>
+<h3><a class="header" href="#attacks-against-guest-programs" id="attacks-against-guest-programs">Attacks against guest programs</a></h3>
+<p>An attacker may attempt to exploit a victim guest program that is executing in a Lucet host embedding. Lucet provides WebAssembly-based security guarantees for guest programs, but WebAssembly programs may still be vulnerable to exploitation. For example, memory allocated within a linear memory region <a href="https://00f.net/2018/11/25/webassembly-doesnt-make-unsafe-languages-safe/">may not have conventional protections in place</a>, <a href="https://www.fastly.com/blog/hijacking-control-flow-webassembly">type confusion</a> or <a href="https://i.blackhat.com/us-18/Thu-August-9/us-18-Lukasiewicz-WebAssembly-A-New-World-of-Native_Exploits-On-The-Web-wp.pdf">other basic memory corruption vulnerabilities</a> that are not obviated by WebAssembly may be present in guest programs, and so on. It is the Lucet administrator’s responsibility to protect vulnerable guest program logic beyond WebAssembly-provided safety measures.</p>
+<h2><a class="header" href="#report-a-security-issue" id="report-a-security-issue">Report a security issue</a></h2>
+<p>The Lucet project team welcomes security reports and is committed to providing prompt attention to security issues. Security issues should be reported privately via <a href="https://www.fastly.com/security/report-security-issue">Fastly’s security issue reporting process</a>. Remediation of security vulnerabilities is prioritized. The project teams endeavors to coordinate remediation with third-party stakeholders, and is committed to transparency in the disclosure process.</p>
+<h1><a class="header" href="#changelog" id="changelog">Changelog</a></h1>
+<h3><a class="header" href="#unreleased" id="unreleased">Unreleased</a></h3>
+<h3><a class="header" href="#051-2020-01-24" id="051-2020-01-24">0.5.1 (2020-01-24)</a></h3>
+<ul>
+<li>Fixed a memory corruption bug that could arise in certain runtime
+configurations. (<a href="https://github.com/bytecodealliance/lucet/pull/401">PR</a>) (<a href="https://rustsec.org/advisories/RUSTSEC-2020-0004.html">RustSec
+advisory</a>)</li>
+</ul>
+<h3><a class="header" href="#050-2020-01-24" id="050-2020-01-24">0.5.0 (2020-01-24)</a></h3>
+<ul>
+<li>
+<p>Lucet officially became a project of the <a href="https://bytecodealliance.org/">Bytecode Alliance</a> 🎉.</p>
+</li>
+<li>
+<p>Integrated <code>wasi-common</code> as the underlying implementation for WASI in <code>lucet-wasi</code>.</p>
+</li>
+<li>
+<p>Updated to Cranelift to version 0.51.0.</p>
+</li>
+<li>
+<p>Fixed a soundness bug by changing the types of the <code>Vmctx::yield*()</code> methods to require exclusive
+<code>&amp;mut self</code> access to the <code>Vmctx</code>. This prevents resources like embedder contexts or heap views
+from living across yield points, which is important for safety since the host can modify the data
+underlying those resources while the instance is suspended.</p>
+</li>
+<li>
+<p>Added the <code>#[lucet_hostcall]</code> attribute to replace <code>lucet_hostcalls!</code>, which is now deprecated.</p>
+</li>
+<li>
+<p>Added the ability to specify an alignment for the base of a <code>MmapRegion</code>-backed instance's
+heap. Thanks, @shravanrn!</p>
+</li>
+<li>
+<p>Added a <code>--target</code> option to <code>lucetc</code> to allow cross-compilation to other architectures than the
+host's. Thanks, @froydnj!</p>
+</li>
+<li>
+<p>Changed the Cargo dependencies between Lucet crates to be exact (e.g., <code>&quot;=0.5.0&quot;</code> rather than
+<code>&quot;0.5.0&quot;</code>) rather than allowing semver differences.</p>
+</li>
+<li>
+<p>Fixed the <code>KillSwitch</code> type not being exported from the public API, despite being usable via
+<code>Instance::kill_switch()</code>.</p>
+</li>
+<li>
+<p>Improved the formatting of error messages.</p>
+</li>
+<li>
+<p>Ensured the <code>lucet-wasi</code> executable properly links in the exported symbols from <code>lucet-runtime</code>.</p>
+</li>
+</ul>
+<h3><a class="header" href="#043-2020-01-24" id="043-2020-01-24">0.4.3 (2020-01-24)</a></h3>
+<ul>
+<li>Backported the fix for a memory corruption bug that could arise in certain runtime
+configurations. (<a href="https://github.com/bytecodealliance/lucet/pull/401">PR</a>) (<a href="https://rustsec.org/advisories/RUSTSEC-2020-0004.html">RustSec
+advisory</a>)</li>
+</ul>
+<pre><code class="language-text">
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      &quot;License&quot; shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      &quot;Licensor&quot; shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      &quot;Legal Entity&quot; shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      &quot;control&quot; means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      &quot;You&quot; (or &quot;Your&quot;) shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      &quot;Source&quot; form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      &quot;Object&quot; form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      &quot;Work&quot; shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      &quot;Derivative Works&quot; shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      &quot;Contribution&quot; shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, &quot;submitted&quot;
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as &quot;Not a Contribution.&quot;
+
+      &quot;Contributor&quot; shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a &quot;NOTICE&quot; text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an &quot;AS IS&quot; BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets &quot;[]&quot;
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same &quot;printed page&quot; as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+
+--- LLVM Exceptions to the Apache 2.0 License ----
+
+As an exception, if, as a result of your compiling your source code, portions
+of this Software are embedded into an Object form of such source code, you
+may redistribute such embedded portions in such Object form without complying
+with the conditions of Sections 4(a), 4(b) and 4(d) of the License.
+
+In addition, if you combine or link compiled forms of this Software with
+software that is licensed under the GPLv2 (&quot;Combined Software&quot;) and if a
+court of competent jurisdiction determines that the patent provision (Section
+3), the indemnity provision (Section 9) or other Section of the License
+conflicts with the conditions of the GPLv2, you may retroactively and
+prospectively choose to deem waived or otherwise exclude such Section(s) of
+the License, but only in their entirety and only with respect to the Combined
+Software.
+
+</code></pre>
 
                     </main>
 
@@ -392,21 +1407,6 @@ deleted, and will be the basis for any future hotfix releases that may be requir
 
         </div>
 
-        
-        <!-- Livereload script (if served using the cli tool) -->
-        <script type="text/javascript">
-            var socket = new WebSocket("ws://localhost:3001");
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload(true); // force reload from server (not from cache)
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
         
 
         

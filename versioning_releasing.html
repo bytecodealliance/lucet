@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded affix "><a href="CHANGELOG.html">Changelog</a></li><li class="expanded affix "><a href="versioning_releasing.html" class="active">Versioning and releasing to crates.io</a></li></ol>
+                <ol class="chapter"><li class="expanded "><a href="Overview.html"><strong aria-hidden="true">1.</strong> Overview</a></li><li class="expanded "><a href="Using-lucet.html"><strong aria-hidden="true">2.</strong> Using Lucet</a></li><li><ol class="section"><li class="expanded "><a href="Docker-based-development.html"><strong aria-hidden="true">2.1.</strong> Docker-based development</a></li><li class="expanded "><a href="Compiling.html"><strong aria-hidden="true">2.2.</strong> Compiling Lucet from scratch</a></li><li><ol class="section"><li class="expanded "><a href="Compiling-on-Linux.html"><strong aria-hidden="true">2.2.1.</strong> Compiling on Linux</a></li><li class="expanded "><a href="Compiling-on-macOS.html"><strong aria-hidden="true">2.2.2.</strong> Compiling on macOS</a></li></ol></li><li class="expanded "><a href="Your-first-Lucet-application.html"><strong aria-hidden="true">2.3.</strong> Lucet &quot;Hello World&quot;</a></li><li class="expanded "><a href="lucet-runtime-example.html"><strong aria-hidden="true">2.4.</strong> Using the Lucet runtime API from Rust</a></li><li class="expanded "><a href="Integrity-and-authentication.html"><strong aria-hidden="true">2.5.</strong> Module integrity and authentication</a></li></ol></li><li class="expanded "><a href="Lucet-components.html"><strong aria-hidden="true">3.</strong> Lucet components</a></li><li><ol class="section"><li class="expanded "><a href="lucetc.html"><strong aria-hidden="true">3.1.</strong> lucetc</a></li><li><ol class="section"><li class="expanded "><a href="lucet-builtins.html"><strong aria-hidden="true">3.1.1.</strong> lucet-builtins</a></li></ol></li><li class="expanded "><a href="lucet-runtime.html"><strong aria-hidden="true">3.2.</strong> lucet-runtime</a></li><li class="expanded "><a href="lucet-wasi.html"><strong aria-hidden="true">3.3.</strong> lucet-wasi</a></li><li class="expanded "><a href="lucet-objdump.html"><strong aria-hidden="true">3.4.</strong> lucet-objdump</a></li><li class="expanded "><a href="lucet-spectest.html"><strong aria-hidden="true">3.5.</strong> lucet-spectest</a></li><li class="expanded "><a href="lucet-wasi-sdk.html"><strong aria-hidden="true">3.6.</strong> lucet-wasi-sdk</a></li><li class="expanded "><a href="lucet-module.html"><strong aria-hidden="true">3.7.</strong> lucet-module</a></li><li class="expanded "><a href="Tests-and-benchmarks.html"><strong aria-hidden="true">3.8.</strong> Tests and benchmarks</a></li><li><ol class="section"><li class="expanded "><a href="sightglass.html"><strong aria-hidden="true">3.8.1.</strong> sightglass</a></li></ol></li></ol></li><li class="expanded "><a href="versioning_releasing.html" class="active"><strong aria-hidden="true">4.</strong> Versioning and releasing to crates.io</a></li><li class="expanded "><a href="Security.html"><strong aria-hidden="true">5.</strong> Security</a></li><li class="expanded "><a href="CHANGELOG.html"><strong aria-hidden="true">6.</strong> Changelog</a></li><li class="expanded "><a href="License.html"><strong aria-hidden="true">7.</strong> License</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -278,6 +278,10 @@ worked for the <code>0.5.1</code> release was:</p>
 some of the crates published but not others. What to do next will depend on the situation; please
 consult with the Lucet team.</p>
 </li>
+<li>
+<p>Ensure the new crates have been published by checking for matching version tags on the <a href="https://crates.io/search?q=lucet">Lucet
+crates</a>.</p>
+</li>
 </ol>
 <p>Congratulations, the new crates are now on crates.io! 🎉</p>
 <h3><a class="header" href="#tagging-and-annotating-the-release-in-git" id="tagging-and-annotating-the-release-in-git">Tagging and annotating the release in Git</a></h3>
@@ -317,11 +321,15 @@ deleted, and will be the basis for any future hotfix releases that may be requir
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-                            <a rel="prev" href="CHANGELOG.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="sightglass.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
 
+                        
+                            <a rel="next" href="Security.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
                         
 
                         <div style="clear: both"></div>
@@ -331,31 +339,20 @@ deleted, and will be the basis for any future hotfix releases that may be requir
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a href="CHANGELOG.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a href="sightglass.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
                 
+                    <a href="Security.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
             </nav>
 
         </div>
 
-        
-        <!-- Livereload script (if served using the cli tool) -->
-        <script type="text/javascript">
-            var socket = new WebSocket("ws://localhost:3001");
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload(true); // force reload from server (not from cache)
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
         
 
         

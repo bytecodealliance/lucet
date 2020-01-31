@@ -1,0 +1,331 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>lucetc - Lucet</title>
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
+        <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div id="sidebar-scrollbox" class="sidebar-scrollbox">
+                <ol class="chapter"><li class="expanded "><a href="Overview.html"><strong aria-hidden="true">1.</strong> Overview</a></li><li class="expanded "><a href="Using-lucet.html"><strong aria-hidden="true">2.</strong> Using Lucet</a></li><li><ol class="section"><li class="expanded "><a href="Docker-based-development.html"><strong aria-hidden="true">2.1.</strong> Docker-based development</a></li><li class="expanded "><a href="Compiling.html"><strong aria-hidden="true">2.2.</strong> Compiling Lucet from scratch</a></li><li><ol class="section"><li class="expanded "><a href="Compiling-on-Linux.html"><strong aria-hidden="true">2.2.1.</strong> Compiling on Linux</a></li><li class="expanded "><a href="Compiling-on-macOS.html"><strong aria-hidden="true">2.2.2.</strong> Compiling on macOS</a></li></ol></li><li class="expanded "><a href="Your-first-Lucet-application.html"><strong aria-hidden="true">2.3.</strong> Lucet &quot;Hello World&quot;</a></li><li class="expanded "><a href="lucet-runtime-example.html"><strong aria-hidden="true">2.4.</strong> Using the Lucet runtime API from Rust</a></li><li class="expanded "><a href="Integrity-and-authentication.html"><strong aria-hidden="true">2.5.</strong> Module integrity and authentication</a></li></ol></li><li class="expanded "><a href="Lucet-components.html"><strong aria-hidden="true">3.</strong> Lucet components</a></li><li><ol class="section"><li class="expanded "><a href="lucetc.html" class="active"><strong aria-hidden="true">3.1.</strong> lucetc</a></li><li><ol class="section"><li class="expanded "><a href="lucet-builtins.html"><strong aria-hidden="true">3.1.1.</strong> lucet-builtins</a></li></ol></li><li class="expanded "><a href="lucet-runtime.html"><strong aria-hidden="true">3.2.</strong> lucet-runtime</a></li><li class="expanded "><a href="lucet-wasi.html"><strong aria-hidden="true">3.3.</strong> lucet-wasi</a></li><li class="expanded "><a href="lucet-objdump.html"><strong aria-hidden="true">3.4.</strong> lucet-objdump</a></li><li class="expanded "><a href="lucet-spectest.html"><strong aria-hidden="true">3.5.</strong> lucet-spectest</a></li><li class="expanded "><a href="lucet-wasi-sdk.html"><strong aria-hidden="true">3.6.</strong> lucet-wasi-sdk</a></li><li class="expanded "><a href="lucet-module.html"><strong aria-hidden="true">3.7.</strong> lucet-module</a></li><li class="expanded "><a href="Tests-and-benchmarks.html"><strong aria-hidden="true">3.8.</strong> Tests and benchmarks</a></li><li><ol class="section"><li class="expanded "><a href="sightglass.html"><strong aria-hidden="true">3.8.1.</strong> sightglass</a></li></ol></li></ol></li><li class="expanded "><a href="versioning_releasing.html"><strong aria-hidden="true">4.</strong> Versioning and releasing to crates.io</a></li><li class="expanded "><a href="Security.html"><strong aria-hidden="true">5.</strong> Security</a></li><li class="expanded "><a href="CHANGELOG.html"><strong aria-hidden="true">6.</strong> Changelog</a></li><li class="expanded "><a href="License.html"><strong aria-hidden="true">7.</strong> License</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar" class="menu-bar">
+                    <div id="menu-bar-sticky-container">
+                        <div class="left-buttons">
+                            <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                                <i class="fa fa-bars"></i>
+                            </button>
+                            <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                                <i class="fa fa-paint-brush"></i>
+                            </button>
+                            <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                                <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                            </ul>
+                            
+                            <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                                <i class="fa fa-search"></i>
+                            </button>
+                            
+                        </div>
+
+                        <h1 class="menu-title">Lucet</h1>
+
+                        <div class="right-buttons">
+                            <a href="print.html" title="Print this book" aria-label="Print this book">
+                                <i id="print-button" class="fa fa-print"></i>
+                            </a>
+                            
+                            <a href="https://github.com/bytecodealliance/lucet" title="Git repository" aria-label="Git repository">
+                                <i id="git-repository-button" class="fa fa-github"></i>
+                            </a>
+                            
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1><a class="header" href="#lucetc---a-hrefhttpsdocsrslucetcimg-srchttpsdocsrslucetcbadgesvg-altdocs-badge-a" id="lucetc---a-hrefhttpsdocsrslucetcimg-srchttpsdocsrslucetcbadgesvg-altdocs-badge-a"><code>lucetc</code>   <a href="https://docs.rs/lucetc"><img src="https://docs.rs/lucetc/badge.svg" alt="docs-badge" /></a></a></h1>
+<p><code>lucetc</code> is the Lucet Compiler.</p>
+<p>The Rust crate <code>lucetc</code> provides an executable <code>lucetc</code>.</p>
+<p>It compiles WebAssembly modules (<code>.wasm</code> or <code>.wat</code> files) into native code (<code>.o</code> or <code>.so</code> files).</p>
+<h2><a class="header" href="#example" id="example">Example</a></h2>
+<pre><code class="language-sh">lucetc example.wasm --output example.so --bindings lucet-wasi/bindings.json --reserved-size 64MiB --opt-level best
+</code></pre>
+<p>This command compiles <code>example.wasm</code>, a WebAssembly module, into a shared library <code>example.so</code>. At
+run time, the heap can grow up to 64 MiB.</p>
+<p>Lucetc can produce ELF (on Linux) and Mach-O (on macOS) objects and libraries. For debugging
+purposes or code analysis, it can also dump Cranelift code.</p>
+<h2><a class="header" href="#usage" id="usage">Usage</a></h2>
+<pre><code class="language-text">    lucetc [FLAGS] [OPTIONS] [--] [input]
+
+FLAGS:
+        --count-instructions    Instrument the produced binary to count the number of wasm operations the translated
+                                program executes
+    -h, --help                  Prints help information
+        --signature-keygen      Create a new key pair
+        --signature-create      Sign the object file
+    -V, --version               Prints version information
+        --signature-verify      Verify the signature of the source file
+
+OPTIONS:
+        --bindings &lt;bindings&gt;...                   path to bindings json file
+        --builtins &lt;builtins&gt;                      builtins file
+        --emit &lt;emit&gt;
+            type of code to generate (default: so) [possible values: obj, so, clif]
+
+        --guard-size &lt;guard_size&gt;                  size of linear memory guard. must be multiple of 4k. default: 4 MiB
+        --max-reserved-size &lt;max_reserved_size&gt;
+            maximum size of usable linear memory region. must be multiple of 4k. default: 4 GiB
+
+        --min-reserved-size &lt;min_reserved_size&gt;
+            minimum size of usable linear memory region. must be multiple of 4k. default: 4 MiB
+
+        --opt-level &lt;opt_level&gt;
+            optimization level (default: 'speed_and_size'). 0 is alias to 'none', 1 to 'speed', 2 to 'speed_and_size'
+            [possible values: 0, 1, 2, none, speed, speed_and_size]
+    -o, --output &lt;output&gt;                          output destination, defaults to a.out if unspecified
+        --signature-pk &lt;pk_path&gt;                   Path to the public key to verify the source code signature
+        --precious &lt;precious&gt;                      directory to keep intermediate build artifacts in
+        --reserved-size &lt;reserved_size&gt;
+            exact size of usable linear memory region, overriding --{min,max}-reserved-size. must be multiple of 4k
+
+        --signature-sk &lt;sk_path&gt;
+            Path to the secret key to sign the object file. The file can be prefixed with &quot;raw:&quot; in order to store a
+            raw, unencrypted secret key
+
+ARGS:
+    &lt;input&gt;    input file
+
+</code></pre>
+<h2><a class="header" href="#external-symbols" id="external-symbols">External symbols</a></h2>
+<p>By default, compiled files cannot call any external function. Not even WASI's. Allowed external
+functions have to be explicitly listed in bindings JSON file, that have the following format:</p>
+<pre><code class="language-json">{
+    &quot;wasi_unstable&quot;: {
+        &quot;symbol_name_1&quot;: &quot;native_symbol_name_1&quot;,
+        &quot;symbol_name_n&quot;: &quot;native_symbol_name_n&quot;,
+    }
+}
+</code></pre>
+<p>The example above allows the WebAssembly module to refer to an external symbol <code>symbol_name_1</code>, that
+maps to the native symbol <code>native_symbol_name_1</code>.</p>
+<p>The <code>--bindings</code> command-line switch can be used more than once in order to split the definitions
+into multiple files.</p>
+<p>When using WASI, the <code>bindings.json</code> file shipped with <code>lucet-wasi</code> can be used in order to import
+all the symbols available in the <code>lucet-wasi</code> runtime.</p>
+<h2><a class="header" href="#memory-limits" id="memory-limits">Memory limits</a></h2>
+<ul>
+<li>
+<p><code>--max-reserved-size &lt;size&gt;</code> makes the compiler assume that the heap will never grow more than
+<code>&lt;size&gt;</code> bytes. The compiler will generate code optimized for that size, inserting bound checks
+with static values whenever necessary. As a side effect, the module will trap if the limit is ever
+reached, even if the runtime could allow the heap to grow even further.</p>
+</li>
+<li>
+<p><code>--min-reserved-size &lt;size&gt;</code> sets the maximum heap size the runtime should use.</p>
+</li>
+<li>
+<p><code>--reserved-size &lt;size&gt;</code> is a shortcut to set both values simultaneously, and is the recommended
+way to configure how much memory the module can use. The default is only 4 MiB, so this is
+something you may want to increase.</p>
+</li>
+<li>
+<p><code>--guard-size &lt;size&gt;</code> controls how much virtual memory with no read nor write access is reserved
+after an instance's heap. The compiler can avoid some bound checking when it is safe to do so
+according to this value.</p>
+</li>
+</ul>
+<h2><a class="header" href="#optimization-levels" id="optimization-levels">Optimization levels</a></h2>
+<ul>
+<li>
+<p><code>--opt-level 0</code> makes the compilation as fast as possible, but the resulting code itself may not
+be optimal.</p>
+</li>
+<li>
+<p><code>--opt-level 1</code> generates fast code, but does not run passes intended to reduce code size.</p>
+</li>
+<li>
+<p><code>--opt-level 2</code> generates the fastest and smallest, but is compilation is about twice as slow as
+<code>0</code>.</p>
+</li>
+</ul>
+<h2><a class="header" href="#builtins" id="builtins">Builtins</a></h2>
+<p><code>lucetc</code> can replace internal functions with calls to external, optimized implementations; see
+<a href="./lucet-builtins.html"><code>lucet-builtins</code></a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="Lucet-components.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="lucet-builtins.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a href="Lucet-components.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a href="lucet-builtins.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+        
+        
+        <script type="text/javascript">
+            window.playpen_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+
+    </body>
+</html>
