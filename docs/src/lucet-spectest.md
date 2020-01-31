@@ -1,4 +1,4 @@
-# lucet-spectest
+# `lucet-spectest`
 
 `lucet-spectest` is a Rust crate that uses `lucetc` and `lucet-runtime`, as well as the (external)
 `wabt` crate, to run the official WebAssembly spec test suite, which is provided as a submodule in

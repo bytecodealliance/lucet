@@ -1,4 +1,7 @@
-# Lucetc
+# `lucetc` &nbsp; [![docs-badge]][docs-rs]
+
+[docs-badge]: https://docs.rs/lucetc/badge.svg
+[docs-rs]: https://docs.rs/lucetc
 
 `lucetc` is the Lucet Compiler.
 

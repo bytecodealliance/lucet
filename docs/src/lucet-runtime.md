@@ -1,4 +1,7 @@
-# lucet-runtime
+# `lucet-runtime` &nbsp; [![docs-badge]][docs-rs]
+
+[docs-badge]: https://docs.rs/lucet-runtime/badge.svg
+[docs-rs]: https://docs.rs/lucet-runtime
 
 `lucet-runtime` is the runtime for WebAssembly modules compiled through `lucetc`.
 

@@ -17,7 +17,7 @@
   - [`lucet-objdump`](./lucet-objdump.md)
   - [`lucet-spectest`](./lucet-spectest.md)
   - [`lucet-wasi-sdk`](./lucet-wasi-sdk.md)
-  - [`lucet-module-data`](./lucet-module-data.md)
+  - [`lucet-module`](./lucet-module.md)
   - [Tests and benchmarks](./Tests-and-benchmarks.md)
     - [`sightglass`](./sightglass.md)
 - [Versioning and releasing to crates.io](./versioning_releasing.md)

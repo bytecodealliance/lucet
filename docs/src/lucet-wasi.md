@@ -1,4 +1,7 @@
-# lucet-wasi
+# `lucet-wasi` &nbsp; [![docs-badge]][docs-rs]
+
+[docs-badge]: https://docs.rs/lucet-wasi/badge.svg
+[docs-rs]: https://docs.rs/lucet-wasi
 
 `lucet-wasi` is a crate providing runtime support for the [WebAssembly System Interface
 (WASI)](https://wasi.dev).  It can be used as a library to support WASI in another application, or

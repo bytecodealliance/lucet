@@ -1,4 +1,7 @@
-# lucet-wasi-sdk
+# `lucet-wasi-sdk` &nbsp; [![docs-badge]][docs-rs]
+
+[docs-badge]: https://docs.rs/lucet-wasi-sdk/badge.svg
+[docs-rs]: https://docs.rs/lucet-wasi-sdk
 
 [`wasi-sdk`](https://github.com/cranestation/wasi-sdk) is a Cranelift project that packages a build
 of the Clang toolchain, the WASI reference sysroot, and a libc based on WASI syscalls.
