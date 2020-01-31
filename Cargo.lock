@@ -840,6 +840,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lucet-runtime-example"
+version = "0.1.0"
+dependencies = [
+ "lucet-runtime 0.5.2-dev",
+ "lucet-wasi 0.5.2-dev",
+]
+
+[[package]]
 name = "lucet-runtime-internals"
 version = "0.5.2-dev"
 dependencies = [
