@@ -131,6 +131,9 @@ to muddle through more manually.
    some of the crates published but not others. What to do next will depend on the situation; please
    consult with the Lucet team.
 
+1. Ensure the new crates have been published by checking for matching version tags on the [Lucet
+   crates](https://crates.io/search?q=lucet).
+
 Congratulations, the new crates are now on crates.io! 🎉
 
 ### Tagging and annotating the release in Git
