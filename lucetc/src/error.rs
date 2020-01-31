@@ -9,31 +9,31 @@ use thiserror::Error;
 pub enum Error {
     //
     // General #[from] implementations.
-    #[error("Builtins error")]
+    #[error("Builtins: {0}")]
     Builtins(#[from] parity_wasm::elements::Error),
-    #[error("Clif module error")]
+    #[error("Clif module: {0}")]
     ClifModuleError(#[from] ClifModuleError),
-    #[error("Translating error")]
+    #[error("Translating: {0}")]
     ClifWasmError(#[from] ClifWasmError),
-    #[error("Lucet Module error")]
+    #[error("Lucet Module: {0}")]
     LucetModule(#[from] LucetModuleError),
-    #[error("Lucet validation error")]
+    #[error("Lucet validation: {0}")]
     LucetValidation(#[from] lucet_validate::Error),
-    #[error("I/O error")]
+    #[error("I/O: {0}")]
     IOError(#[from] std::io::Error),
-    #[error("Error converting cranelift signature to wasm signature")]
+    #[error("Converting to Wasm signature: {0}")]
     SignatureConversion(#[from] SignatureError),
-    #[error("Wasm validating parser error")]
+    #[error("Wasm validation: {0}")]
     WasmValidation(#[from] wasmparser::BinaryReaderError),
-    #[error("Wat input")]
+    #[error("Wat input: {0}")]
     WatInput(#[from] wabt::Error),
     //
     // Cannot apply #[from] or #[source] to these error types due to missing traits.
-    #[error("Artifact error: {1}. {0:?}")]
+    #[error("Artifact: {1}. {0:?}")]
     ArtifactError(ArtifactError, String),
     #[error("Failure: {1}. {0:?}")]
     Failure(failure::Error, String),
-    #[error("Patcher error: {0:?}")]
+    #[error("Patcher: {0:?}")]
     Patcher(wasmonkey::WError),
     //
     // And all the rest
@@ -67,7 +67,7 @@ pub enum Error {
     LdError(String),
     #[error("Memory specs: {0}")]
     MemorySpecs(String),
-    #[error("Metadata serializer; start index point to a non-function")]
+    #[error("Metadata serializer; start index points to a non-function: {0}")]
     MetadataSerializer(#[source] ClifModuleError),
     #[error("Output function: error writing function {1}")]
     OutputFunction(#[source] std::fmt::Error, String),
@@ -79,6 +79,6 @@ pub enum Error {
     TrapRecord(String),
     #[error("Unsupported: {0}")]
     Unsupported(String),
-    #[error("host machine is not a supported target")]
+    #[error("host machine is not a supported target: {0}")]
     UnsupportedIsa(#[from] cranelift_codegen::isa::LookupError),
 }
