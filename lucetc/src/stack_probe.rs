@@ -11,14 +11,12 @@
 use crate::decls::ModuleDecls;
 use crate::error::Error;
 use crate::module::UniqueFuncIndex;
-use cranelift_codegen::binemit::TrapSink;
-use cranelift_codegen::ir;
-use cranelift_codegen::ir::{types, AbiParam, Signature};
-use cranelift_codegen::isa::CallConv;
-use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
-use cranelift_faerie::FaerieProduct;
+use cranelift_codegen::{
+    binemit,
+    ir::{self, types, AbiParam, Signature},
+    isa::CallConv,
+};
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
-use faerie::Decl;
 
 /// Stack probe symbol name
 pub const STACK_PROBE_SYM: &'static str = "lucet_probestack";
@@ -40,6 +38,27 @@ pub(crate) const STACK_PROBE_BINARY: &'static [u8] = &[
     0x29, 0xdc, 0x48, 0x85, 0x64, 0x24, 0x08, 0x48, 0x01, 0xc4, 0xc3,
 ];
 
+pub struct MachinecodeTrapSite {
+    pub offset: binemit::CodeOffset,
+    pub srcloc: ir::SourceLoc,
+    pub code: ir::TrapCode,
+}
+
+pub fn trap_sites() -> Vec<MachinecodeTrapSite> {
+    vec![
+        MachinecodeTrapSite {
+            offset: 10, /* test %rsp,0x8(%rsp) */
+            srcloc: ir::SourceLoc::default(),
+            code: ir::TrapCode::StackOverflow,
+        },
+        MachinecodeTrapSite {
+            offset: 34, /* test %rsp,0x8(%rsp) */
+            srcloc: ir::SourceLoc::default(),
+            code: ir::TrapCode::StackOverflow,
+        },
+    ]
+}
+
 pub fn declare_metadata<'a, B: ClifBackend>(
     decls: &mut ModuleDecls<'a>,
     clif_module: &mut ClifModule<B>,
@@ -56,38 +75,4 @@ pub fn declare_metadata<'a, B: ClifBackend>(
             },
         )
         .unwrap())
-}
-
-pub fn declare_and_define(product: &mut FaerieProduct) -> Result<(), Error> {
-    product
-        .artifact
-        .declare_with(
-            STACK_PROBE_SYM,
-            Decl::function(),
-            STACK_PROBE_BINARY.to_vec(),
-        )
-        .map_err(|source| Error::Failure(source, "Stack probe error".to_owned()))?;
-    add_sink(
-        product
-            .trap_manifest
-            .as_mut()
-            .expect("trap manifest is present"),
-    );
-    Ok(())
-}
-
-fn add_sink(manifest: &mut FaerieTrapManifest) {
-    let mut stack_probe_trap_sink =
-        FaerieTrapSink::new(STACK_PROBE_SYM, STACK_PROBE_BINARY.len() as u32);
-    stack_probe_trap_sink.trap(
-        10, /* test %rsp,0x8(%rsp) */
-        ir::SourceLoc::default(),
-        ir::TrapCode::StackOverflow,
-    );
-    stack_probe_trap_sink.trap(
-        34, /* test %rsp,0x8(%rsp) */
-        ir::SourceLoc::default(),
-        ir::TrapCode::StackOverflow,
-    );
-    manifest.add_sink(stack_probe_trap_sink);
 }
