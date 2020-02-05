@@ -4,8 +4,9 @@ macro_rules! alloc_tests {
         use libc::c_void;
         use std::sync::Arc;
         use $TestRegion as TestRegion;
-        use $crate::alloc::Limits;
+        use $crate::alloc::{host_page_size, Limits, MINSIGSTKSZ};
         use $crate::context::{Context, ContextHandle};
+        use $crate::error::Error;
         use $crate::instance::InstanceInternal;
         use $crate::module::{GlobalValue, HeapSpec, MockModuleBuilder};
         use $crate::region::Region;
@@ -712,6 +713,69 @@ macro_rules! alloc_tests {
             assert_eq!(region.capacity(), 2);
             assert_eq!(region.free_slots(), 2);
             assert_eq!(region.used_slots(), 0);
+        }
+
+        #[test]
+        fn reject_sigstack_smaller_than_min() {
+            if MINSIGSTKSZ == 0 {
+                // can't trigger the error on this platform
+                return;
+            }
+            let limits = Limits {
+                // keep it page-aligned but make it too small
+                signal_stack_size: (MINSIGSTKSZ.checked_sub(1).unwrap() / host_page_size())
+                    * host_page_size(),
+                ..Limits::default()
+            };
+            let res = TestRegion::create(1, &limits);
+            match res {
+                Err(Error::InvalidArgument(
+                    "signal stack size must be at least MINSIGSTKSZ (defined in <signal.h>)",
+                )) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+                Ok(_) => panic!("unexpected success"),
+            }
+        }
+
+        /// This test ensures that a signal stack smaller than 12KiB is rejected when Lucet is
+        /// compiled in debug mode.
+        #[test]
+        #[cfg(debug_assertions)]
+        fn reject_debug_sigstack_smaller_than_12kib() {
+            if 8192 < MINSIGSTKSZ {
+                // can't trigger the error on this platform, as the MINSIGSTKSZ check runs first
+                return;
+            }
+            let limits = Limits {
+                signal_stack_size: 8192,
+                ..Limits::default()
+            };
+            let res = TestRegion::create(1, &limits);
+            match res {
+                Err(Error::InvalidArgument(
+                    "signal stack size must be at least 12KiB for debug builds",
+                )) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+                Ok(_) => panic!("unexpected success"),
+            }
+        }
+
+        #[test]
+        fn reject_unaligned_sigstack() {
+            let limits = Limits {
+                signal_stack_size: std::cmp::max(libc::SIGSTKSZ, 12 * 1024)
+                    .checked_add(1)
+                    .unwrap(),
+                ..Limits::default()
+            };
+            let res = TestRegion::create(1, &limits);
+            match res {
+                Err(Error::InvalidArgument(
+                    "signal stack size must be a multiple of host page size",
+                )) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+                Ok(_) => panic!("unexpected success"),
+            }
         }
     };
 }

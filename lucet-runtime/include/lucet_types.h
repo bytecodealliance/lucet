@@ -124,7 +124,7 @@ struct lucet_alloc_limits {
      */
     uint64_t globals_size;
     /**
-     * Size of the signal stack region in bytes.
+     * Size of the signal stack region in bytes. (minimum MINSIGSTKSZ)
      *
      * SIGSTKSZ from <signals.h> is a good default when linking against a Rust release build of
      * lucet-runtime, but 12K or more is recommended when using a Rust debug build.

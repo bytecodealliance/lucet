@@ -407,19 +407,34 @@ pub struct Limits {
     pub stack_size: usize,
     /// Size of the globals region in bytes; each global uses 8 bytes. (default 4K)
     pub globals_size: usize,
-    /// Size of the signal stack in bytes. (default SIGSTKSZ for release builds, 12K for debug builds)
+    /// Size of the signal stack in bytes. (default SIGSTKSZ for release builds, at least 12K for
+    /// debug builds; minimum MINSIGSTKSZ)
     ///
     /// This difference is to account for the greatly increased stack size usage in the signal
     /// handler when running without optimizations.
     ///
     /// Note that debug vs. release mode is determined by `cfg(debug_assertions)`, so if you are
-    /// specifically enabling debug assertions in your release builds, the default signal stack will
+    /// specifically enabling debug assertions in your release builds, the default signal stack may
     /// be larger.
     pub signal_stack_size: usize,
 }
 
-#[cfg(debug_assertions)]
+// this constant isn't exported by `libc` on Mac
+#[cfg(target_os = "macos")]
+pub const MINSIGSTKSZ: usize = 32 * 1024;
+
+#[cfg(not(target_os = "macos"))]
+pub const MINSIGSTKSZ: usize = libc::MINSIGSTKSZ;
+
+// on Linux, `SIGSTKSZ` is too small for the signal handler when compiled in debug mode
+#[cfg(all(debug_assertions, not(target_os = "macos")))]
 pub const DEFAULT_SIGNAL_STACK_SIZE: usize = 12 * 1024;
+
+// on Mac, `SIGSTKSZ` is way larger than we need; it would be nice to combine these debug cases once
+// `std::cmp::max` is a const fn
+#[cfg(all(debug_assertions, target_os = "macos"))]
+pub const DEFAULT_SIGNAL_STACK_SIZE: usize = libc::SIGSTKSZ;
+
 #[cfg(not(debug_assertions))]
 pub const DEFAULT_SIGNAL_STACK_SIZE: usize = libc::SIGSTKSZ;
 
@@ -488,6 +503,16 @@ impl Limits {
         }
         if self.stack_size <= 0 {
             return Err(Error::InvalidArgument("stack size must be greater than 0"));
+        }
+        if self.signal_stack_size < MINSIGSTKSZ {
+            return Err(Error::InvalidArgument(
+                "signal stack size must be at least MINSIGSTKSZ (defined in <signal.h>)",
+            ));
+        }
+        if cfg!(debug_assertions) && self.signal_stack_size < 12 * 1024 {
+            return Err(Error::InvalidArgument(
+                "signal stack size must be at least 12KiB for debug builds",
+            ));
         }
         if self.signal_stack_size % host_page_size() != 0 {
             return Err(Error::InvalidArgument(
