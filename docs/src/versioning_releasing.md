@@ -102,7 +102,7 @@ to muddle through more manually.
    +#lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.5.2" }
     tempfile = "3.0"
    ```
-   
+
    This breaks the only cycle that exists among the crates as of `0.5.1`; if other cycles develop,
    you'll need to similarly break them by temporarily removing the dev dependency.
 
@@ -115,7 +115,7 @@ to muddle through more manually.
    Do not worry too much about calculating the order ahead of time; if you get it wrong, `cargo
    publish` will tell you which crates need to be published before the one you tried. An order which
    worked for the `0.5.1` release was:
-   
+
    1. `lucet-module`
    1. `lucet-validate`
    1. `lucetc`
