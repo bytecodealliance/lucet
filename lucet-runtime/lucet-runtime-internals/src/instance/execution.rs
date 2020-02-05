@@ -138,7 +138,7 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
         // only signal-safe behavior.
         //
         // For now, hang indefinitely, waiting for the sigalrm to arrive.
-
+        #[allow(clippy::empty_loop)]
         loop {}
     }
 }
