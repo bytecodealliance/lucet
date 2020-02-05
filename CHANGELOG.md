@@ -1,9 +1,18 @@
 ### Unreleased
 
+### 0.6.0 (2020-02-05)
+
 - Added `free_slots()`, `used_slots()`, and `capacity()` methods to the `Region` trait.
 
 - Added a check to ensure the `Limits` signal stack size is at least `MINSIGSTKSZ`, and increased
   the default signal stack size on macOS debug builds to fit this constraint.
+
+- Added an option to canonicalize NaNs to the `lucetc` API. Thanks, @DavidM-D!
+
+- Restored some of the verbosity of pretty-printed errors in `lucetc` and `lucet-validate`, with
+  more on the way.
+
+- Fixed OS detection for LDFLAGS on macOS. Thanks, @roman-kashitsyn!
 
 ### 0.5.1 (2020-01-24)
 

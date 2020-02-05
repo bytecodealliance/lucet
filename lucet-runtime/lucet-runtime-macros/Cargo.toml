@@ -1,6 +1,6 @@
 [package]
 name = "lucet-runtime-macros"
-version = "0.5.2-dev"
+version = "0.6.0"
 description = "Macros for the Lucet WebAssembly runtime"
 homepage = "https://github.com/bytecodealliance/lucet"
 repository = "https://github.com/bytecodealliance/lucet"

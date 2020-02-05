@@ -1,6 +1,6 @@
 [package]
 name = "lucet-benchmarks"
-version = "0.5.2-dev"
+version = "0.6.0"
 description = "Benchmarks for the Lucet runtime"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
