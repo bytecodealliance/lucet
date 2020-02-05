@@ -140,15 +140,15 @@ pub struct lucet_alloc_limits {
     pub stack_size: u64,
     /// Size of the globals region in bytes; each global uses 8 bytes. (default 4K)
     pub globals_size: u64,
-    /// Size of the signal stack in bytes. (default SIGSTKSZ for Rust release builds, 12K for Rust
-    /// debug builds)
+    /// Size of the signal stack in bytes. (default SIGSTKSZ for release builds, at least 12K for
+    /// debug builds; minimum MINSIGSTKSZ)
     ///
     /// This difference is to account for the greatly increased stack size usage in the signal
     /// handler when running without optimizations.
     ///
     /// Note that debug vs. release mode is determined by `cfg(debug_assertions)`, so if you are
-    /// specifically enabling Rust debug assertions in your Cargo release builds, the default signal
-    /// stack will be larger.
+    /// specifically enabling debug assertions in your release builds, the default signal stack may
+    /// be larger.
     pub signal_stack_size: u64,
 }
 

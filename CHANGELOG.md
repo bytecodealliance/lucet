@@ -2,6 +2,9 @@
 
 - Added `free_slots()`, `used_slots()`, and `capacity()` methods to the `Region` trait.
 
+- Added a check to ensure the `Limits` signal stack size is at least `MINSIGSTKSZ`, and increased
+  the default signal stack size on macOS debug builds to fit this constraint.
+
 ### 0.5.1 (2020-01-24)
 
 - Fixed a memory corruption bug that could arise in certain runtime
