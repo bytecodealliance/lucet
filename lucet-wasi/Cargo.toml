@@ -1,6 +1,6 @@
 [package]
 name = "lucet-wasi"
-version = "0.6.0"
+version = "0.6.1-dev"
 description = "Fastly's runtime for the WebAssembly System Interface (WASI)"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
@@ -28,17 +28,17 @@ anyhow = "1"
 cast = "0.2"
 clap = "2.23"
 human-size = "0.4"
-lucet-runtime = { path = "../lucet-runtime", version = "=0.6.0" }
-lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "=0.6.0" }
-lucet-module = { path = "../lucet-module", version = "=0.6.0" }
+lucet-runtime = { path = "../lucet-runtime", version = "=0.6.1-dev" }
+lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "=0.6.1-dev" }
+lucet-module = { path = "../lucet-module", version = "=0.6.1-dev" }
 libc = "0.2.65"
 nix = "0.15"
 rand = "0.6"
 wasi-common = "0.7"
 
 [dev-dependencies]
-lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.6.0" }
-lucetc = { path = "../lucetc", version = "=0.6.0" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.6.1-dev" }
+lucetc = { path = "../lucetc", version = "=0.6.1-dev" }
 tempfile = "3.0"
 
 [build-dependencies]
