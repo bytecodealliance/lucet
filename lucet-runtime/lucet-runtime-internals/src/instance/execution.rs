@@ -29,8 +29,8 @@
 //! possible points of interest in an instance's lifecycle:
 //!
 //! * `Instance created`
-//!   - terminable: `false`
-//!   - execution_domain: `Guest`
+//!   - terminable: `true`
+//!   - execution_domain: `Pending`
 //! * `Instance::run called`
 //!   - terminable: `true`
 //!   - execution_domain: `Guest`
@@ -73,6 +73,8 @@
 //!   false, but the hostcall would then exit. If a hostcall successfully returns to its caller it
 //!   was not terminated, so the only state an instance will have after returning from a hostcall
 //!   will be that it's executing terminable guest code.
+//!
+//! FIXME KTM 2020-02-13: Some details in the documentation above will need to change.
 
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
@@ -125,6 +127,41 @@ pub struct KillState {
     tid_change_notifier: Condvar,
 }
 
+/// This function is called by `lucet_context_activate` before entering a region of guest code.
+///
+/// This function is responsible for setting the terminable flag on the instance's
+/// [`KillState`](struct.KillState.html), so that we can appropriately signal the instance to
+/// terminate. If a pending instance was signalled before it started executing guest code, we will
+/// terminate the instance and swap back to its host context.
+///
+///
+/// entering a guest region, so that we can use signals to terminate the instance.  check that the
+/// instance has not already been remotely terminated by a killswitch.  set the `terminable` flag
+/// on our instance's [`KillState`](struct.KillState.html).
+///
+/// # Safety
+///
+/// This function will call [Instance::terminate](struct.Instance.html#method.terminate) if the
+/// execution domain is [`Domain::Cancelled`](enum.Domain.html). In that case, this function will
+/// not return, and we will swap back to the host context without unwinding.
+pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
+    let mut current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
+    match *current_domain {
+        // We are about to start executing a guest. Set the execution domain accordingly.
+        Domain::Pending => *current_domain = Domain::Guest,
+        // We are about to enter guest code for an instance that has already been terminated.
+        // Instead, we should forgo entering the guest region entirely, terminate the instance, and
+        // swap back to the host without any unwinding.
+        Domain::Cancelled => (*instance).terminate(TerminationDetails::Remote),
+        // If we are in some other domain, do nothing. These variants are handled elsewhere.
+        _ => {}
+    }
+    // All systems go! Set the flag showing that we are now running guest code.
+    (*instance).kill_state.enable_termination();
+    mem::drop(current_domain);
+}
+
+#[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
     let terminable = (*instance)
         .kill_state
@@ -146,9 +183,9 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
 impl KillState {
     pub fn new() -> KillState {
         KillState {
-            terminable: AtomicBool::new(false),
+            terminable: AtomicBool::new(true),
             tid_change_notifier: Condvar::new(),
-            execution_domain: Mutex::new(Domain::Guest),
+            execution_domain: Mutex::new(Domain::Pending),
             thread_id: Mutex::new(None),
         }
     }
@@ -173,6 +210,9 @@ impl KillState {
         // Lock the current execution domain, so we can update to `Hostcall`.
         let mut current_domain = self.execution_domain.lock().unwrap();
         match *current_domain {
+            Domain::Pending => {
+                panic!("Invalid state: Instance marked as pending while in guest code. This should be an error.");
+            }
             Domain::Guest => {
                 // Guest is the expected domain until this point. Switch to the Hostcall
                 // domain so we know to not interrupt this instance.
@@ -186,12 +226,18 @@ impl KillState {
             Domain::Terminated => {
                 panic!("Invalid state: Instance marked as terminated while in guest code. This should be an error.");
             }
+            Domain::Cancelled => {
+                panic!("Invalid state: Instance marked as cancelled while in guest code. This should be an error.");
+            }
         }
     }
 
     pub fn end_hostcall(&self) -> Option<TerminationDetails> {
         let mut current_domain = self.execution_domain.lock().unwrap();
         match *current_domain {
+            Domain::Pending => {
+                panic!("Invalid state: Instance marked as pending while exiting a hostcall.");
+            }
             Domain::Guest => {
                 panic!("Invalid state: Instance marked as in guest code while exiting a hostcall.");
             }
@@ -204,6 +250,9 @@ impl KillState {
                 debug_assert!(!self.terminable.load(Ordering::SeqCst));
                 std::mem::drop(current_domain);
                 Some(TerminationDetails::Remote)
+            }
+            Domain::Cancelled => {
+                panic!("Invalid state: Instance marked as cancelled while exiting a hostcall.");
             }
         }
     }
@@ -220,9 +269,11 @@ impl KillState {
 }
 
 pub enum Domain {
+    Pending,
     Guest,
     Hostcall,
     Terminated,
+    Cancelled,
 }
 
 /// An object that can be used to terminate an instance's execution from a separate thread.
@@ -234,6 +285,7 @@ pub struct KillSwitch {
 pub enum KillSuccess {
     Signalled,
     Pending,
+    Cancelled,
 }
 
 #[derive(Debug, PartialEq)]
@@ -307,9 +359,15 @@ impl KillSwitch {
                 *execution_domain = Domain::Terminated;
                 Ok(KillSuccess::Pending)
             }
-            Domain::Terminated => {
+            Domain::Pending => {
+                // the guest has not started, so we indicate that it has been cancelled.
+                *execution_domain = Domain::Cancelled;
+                Ok(KillSuccess::Cancelled)
+            }
+            Domain::Cancelled | Domain::Terminated => {
                 // Something else (another KillSwitch?) has already signalled this instance
-                // to exit when it has completed its hostcall. Nothing to do here.
+                // to exit, either when it has completed its hostcall, or when it starts.
+                // In either case, there is nothing to do here.
                 Err(KillError::NotTerminable)
             }
         };

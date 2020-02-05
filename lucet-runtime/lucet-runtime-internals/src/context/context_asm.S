@@ -199,13 +199,14 @@ _lucet_context_set:
 .globl _lucet_context_activate
 #endif
 .align 16
-// lucet_context_activate is essentially a function with two arguments:
-// in rdi, the address of this guest's "running" flag.
-// in rsi, the address of the guest code to resume at.
+// lucet_context_activate is essentially a function with three arguments:
+//     * `rdi`  -  the data for the activation setup function.
+//     * `rsi`  -  the address of the activation setup function.
+//     * `rbx`  -  the address of the guest code to resume at.
 lucet_context_activate:
 _lucet_context_activate:
-    movb $1, (%rdi)
-    jmp *%rsi
+    call *%rsi /* call `enter_guest_region`, passing along `rdi` */
+    jmp *%rbx /* jump to the guest code */
 #ifdef __ELF__
 .size lucet_context_activate,.-lucet_context_activate
 #endif

@@ -26,7 +26,7 @@ use thiserror::Error;
 /// `u64`, this should be fine?
 #[repr(C)]
 pub(crate) struct GpRegs {
-    rbx: u64,
+    pub(crate) rbx: u64,
     pub(crate) rsp: u64,
     rbp: u64,
     pub(crate) rdi: u64,
@@ -122,7 +122,8 @@ pub struct Context {
     parent_ctx: *mut Context,
     // TODO ACF 2019-10-23: make Instance into a generic parameter?
     backstop_callback: *const unsafe extern "C" fn(*mut Instance),
-    backstop_data: *mut Instance,
+    // FIXME KTM 2020-02-14: this should NOT be pub(crate)
+    pub(crate) backstop_data: *mut Instance,
     sigset: signal::SigSet,
 }
 

@@ -127,10 +127,13 @@ macro_rules! timeout_tests {
                 .expect("instance can be created");
 
             let kill_switch = inst.kill_switch();
-            assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
+            assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled));
 
-            // not being terminable, the instance still runs and is unaffected
-            run_onetwothree(&mut inst);
+            // if terminated before running, the guest should not start at all
+            match inst.run("onetwothree", &[]) {
+                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+                res => panic!("unexpected result: {:?}", res),
+            }
         }
 
         #[test]
@@ -253,11 +256,10 @@ macro_rules! timeout_tests {
             let kill_switch = inst.kill_switch();
 
             let t = thread::spawn(move || {
-                assert!(kill_switch.terminate().is_err()); // fails too soon
                 thread::sleep(Duration::from_millis(100));
                 assert!(kill_switch.terminate().is_ok()); // works
                 thread::sleep(Duration::from_millis(100));
-                assert!(kill_switch.terminate().is_err()); // fails too soon
+                assert!(kill_switch.terminate().is_err()); // fails
             });
 
             thread::sleep(Duration::from_millis(10));
@@ -271,6 +273,21 @@ macro_rules! timeout_tests {
             };
 
             t.join().unwrap();
+        }
+
+        // after resetting, existing kill swtiches will not work. we can still run a function.
+        // FIXME KTM 2020-02-19: I did not see a way around this behavior. Bring this up in review.
+        #[test]
+        fn timeout_after_reset() {
+            let module = mock_timeout_module();
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+            let kill_switch = inst.kill_switch();
+            inst.reset().expect("instance resets");
+            assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
+            run_onetwothree(&mut inst);
         }
 
         #[test]
