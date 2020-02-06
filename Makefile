@@ -36,7 +36,7 @@ test-packages:
             -p lucet-validate
 
 .PHONY: test-full
-test-full: indent-check test-except-fuzz test-fuzz book
+test-full: indent-check audit book test-except-fuzz test-fuzz
 
 .PHONY: test-except-fuzz
 test-except-fuzz: test-packages
@@ -57,8 +57,8 @@ fuzz:
 	cargo run --release -p lucet-wasi-fuzz -- fuzz --num-tests=$(FUZZ_NUM_TESTS)
 
 .PHONY: book
+book:
 	mdbook build docs
-	mdbook test docs
 
 .PHONY: bench
 bench:
