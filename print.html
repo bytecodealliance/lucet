@@ -276,8 +276,8 @@ RUN rustup target add wasm32-wasi
 # Optional additional Rust programs
 RUN cargo install --debug cargo-audit cargo-watch rsign2 cargo-deb mdbook
 
-RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk_8.0_amd64.deb \
-	&amp;&amp; dpkg -i wasi-sdk_8.0_amd64.deb &amp;&amp; rm -f wasi-sdk_8.0_amd64.deb
+RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-7/wasi-sdk_7.0_amd64.deb \
+	&amp;&amp; dpkg -i wasi-sdk_7.0_amd64.deb &amp;&amp; rm -f wasi-sdk_7.0_amd64.deb
 
 ENV WASI_SDK=/opt/wasi-sdk
 
@@ -326,12 +326,12 @@ from <code>/opt/wasi-sdk/bin</code> instead of the system compiler. Or use set o
 <p>As a result, Lucet can be compiled with an existing LLVM installation, provided that it is up to
 date. Most distributions now include LLVM 8 or LLVM 9, so that an additional installation is not
 required to compile to WebAssembly .</p>
-<p>On distributions such as Ubuntu (&gt; 18.04) and Debian, the following command installs the
-prerequisites:</p>
+<p>On distributions such as Ubuntu (19.04 or newer) and Debian (bullseye or newer), the following
+command installs the prerequisites:</p>
 <pre><code class="language-sh">apt install curl ca-certificates clang lld cmake
 </code></pre>
 <p>On Arch Linux:</p>
-<pre><code>pacman -S curl clang lld cmake
+<pre><code class="language-sh">pacman -S curl clang lld cmake
 </code></pre>
 <p>Next, install the WebAssembly compiler builtins:</p>
 <pre><code class="language-sh">curl -sL https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
@@ -1109,6 +1109,26 @@ deleted, and will be the basis for any future hotfix releases that may be requir
 <p>The Lucet project team welcomes security reports and is committed to providing prompt attention to security issues. Security issues should be reported privately via <a href="https://www.fastly.com/security/report-security-issue">Fastly’s security issue reporting process</a>. Remediation of security vulnerabilities is prioritized. The project teams endeavors to coordinate remediation with third-party stakeholders, and is committed to transparency in the disclosure process.</p>
 <h1><a class="header" href="#changelog" id="changelog">Changelog</a></h1>
 <h3><a class="header" href="#unreleased" id="unreleased">Unreleased</a></h3>
+<h3><a class="header" href="#060-2020-02-05" id="060-2020-02-05">0.6.0 (2020-02-05)</a></h3>
+<ul>
+<li>
+<p>Added <code>free_slots()</code>, <code>used_slots()</code>, and <code>capacity()</code> methods to the <code>Region</code> trait.</p>
+</li>
+<li>
+<p>Added a check to ensure the <code>Limits</code> signal stack size is at least <code>MINSIGSTKSZ</code>, and increased
+the default signal stack size on macOS debug builds to fit this constraint.</p>
+</li>
+<li>
+<p>Added an option to canonicalize NaNs to the <code>lucetc</code> API. Thanks, @DavidM-D!</p>
+</li>
+<li>
+<p>Restored some of the verbosity of pretty-printed errors in <code>lucetc</code> and <code>lucet-validate</code>, with
+more on the way.</p>
+</li>
+<li>
+<p>Fixed OS detection for LDFLAGS on macOS. Thanks, @roman-kashitsyn!</p>
+</li>
+</ul>
 <h3><a class="header" href="#051-2020-01-24" id="051-2020-01-24">0.5.1 (2020-01-24)</a></h3>
 <ul>
 <li>Fixed a memory corruption bug that could arise in certain runtime

@@ -154,6 +154,26 @@
                     <main>
                         <h1><a class="header" href="#changelog" id="changelog">Changelog</a></h1>
 <h3><a class="header" href="#unreleased" id="unreleased">Unreleased</a></h3>
+<h3><a class="header" href="#060-2020-02-05" id="060-2020-02-05">0.6.0 (2020-02-05)</a></h3>
+<ul>
+<li>
+<p>Added <code>free_slots()</code>, <code>used_slots()</code>, and <code>capacity()</code> methods to the <code>Region</code> trait.</p>
+</li>
+<li>
+<p>Added a check to ensure the <code>Limits</code> signal stack size is at least <code>MINSIGSTKSZ</code>, and increased
+the default signal stack size on macOS debug builds to fit this constraint.</p>
+</li>
+<li>
+<p>Added an option to canonicalize NaNs to the <code>lucetc</code> API. Thanks, @DavidM-D!</p>
+</li>
+<li>
+<p>Restored some of the verbosity of pretty-printed errors in <code>lucetc</code> and <code>lucet-validate</code>, with
+more on the way.</p>
+</li>
+<li>
+<p>Fixed OS detection for LDFLAGS on macOS. Thanks, @roman-kashitsyn!</p>
+</li>
+</ul>
 <h3><a class="header" href="#051-2020-01-24" id="051-2020-01-24">0.5.1 (2020-01-24)</a></h3>
 <ul>
 <li>Fixed a memory corruption bug that could arise in certain runtime

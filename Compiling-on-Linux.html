@@ -186,12 +186,12 @@ from <code>/opt/wasi-sdk/bin</code> instead of the system compiler. Or use set o
 <p>As a result, Lucet can be compiled with an existing LLVM installation, provided that it is up to
 date. Most distributions now include LLVM 8 or LLVM 9, so that an additional installation is not
 required to compile to WebAssembly .</p>
-<p>On distributions such as Ubuntu (&gt; 18.04) and Debian, the following command installs the
-prerequisites:</p>
+<p>On distributions such as Ubuntu (19.04 or newer) and Debian (bullseye or newer), the following
+command installs the prerequisites:</p>
 <pre><code class="language-sh">apt install curl ca-certificates clang lld cmake
 </code></pre>
 <p>On Arch Linux:</p>
-<pre><code>pacman -S curl clang lld cmake
+<pre><code class="language-sh">pacman -S curl clang lld cmake
 </code></pre>
 <p>Next, install the WebAssembly compiler builtins:</p>
 <pre><code class="language-sh">curl -sL https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
