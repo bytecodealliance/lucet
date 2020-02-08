@@ -21,7 +21,7 @@ mod types;
 
 use crate::load::read_bytes;
 pub use crate::{
-    compiler::{Compiler, CpuFeatures, OptLevel, SpecificFeature, TargetCpu},
+    compiler::{Compiler, CompilerBuilder, CpuFeatures, OptLevel, SpecificFeature, TargetCpu},
     error::Error,
     heap::HeapSettings,
     load::read_module,
