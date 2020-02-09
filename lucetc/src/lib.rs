@@ -392,7 +392,11 @@ fn ldflags_default(target: &Triple) -> String {
     use target_lexicon::OperatingSystem;
 
     match target.operating_system {
-        OperatingSystem::Linux => "-shared",
+        OperatingSystem::Linux
+        | OperatingSystem::Freebsd
+        | OperatingSystem::Dragonfly
+        | OperatingSystem::Netbsd
+        | OperatingSystem::Openbsd => "-shared",
         OperatingSystem::Darwin | OperatingSystem::MacOSX { .. } => {
             "-dylib -dead_strip -export_dynamic -undefined dynamic_lookup"
         }
