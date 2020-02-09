@@ -41,11 +41,12 @@ mod lucetc_tests {
     #[test]
     fn empty() {
         let m = module_from_c(&["empty"], &[]).expect("build module for empty");
+        let b = Bindings::empty();
         let v = Validator::parse("").expect("empty validation environment");
         let mut builder = CompilerBuilder::new();
         let c = builder
             .validator(&Some(v))
-            .create(&m)
+            .create(&m, &b)
             .expect("compile empty");
         let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());
@@ -77,9 +78,13 @@ mod lucetc_tests {
     #[test]
     fn just_c() {
         let m = module_from_c(&["c"], &["c"]).expect("build module for c");
+        let b = Bindings::empty();
         let v = Validator::parse("").expect("empty validation environment");
         let mut builder = CompilerBuilder::new();
-        let c = builder.validator(&Some(v)).create(&m).expect("compile c");
+        let c = builder
+            .validator(&Some(v))
+            .create(&m, &b)
+            .expect("compile c");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
         assert_eq!(mdata.export_functions().len(), 1, "export functions");
@@ -101,9 +106,8 @@ mod lucetc_tests {
         .expect("empty validation environment");
         let mut builder = CompilerBuilder::new();
         let c = builder
-            .bindings(&b)
             .validator(&Some(v))
-            .create(&m)
+            .create(&m, &b)
             .expect("compile d");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 1, "import functions");
@@ -118,11 +122,12 @@ mod lucetc_tests {
     #[test]
     fn c_and_d() {
         let m = module_from_c(&["c", "d"], &["c", "d"]).expect("build module for c & d");
+        let b = Bindings::empty();
         let v = Validator::parse("").expect("empty validation environment");
         let mut builder = CompilerBuilder::new();
         let c = builder
             .validator(&Some(v))
-            .create(&m)
+            .create(&m, &b)
             .expect("compile c & d");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
@@ -165,9 +170,8 @@ mod lucetc_tests {
         // Compiler will only unwrap if the Validator defined above accepts the module
         let mut builder = CompilerBuilder::new();
         let c = builder
-            .bindings(&b)
             .validator(&Some(v))
-            .create(&m)
+            .create(&m, &b)
             .expect("compile empty");
         let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());

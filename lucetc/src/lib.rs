@@ -42,18 +42,12 @@ enum LucetcInput {
 pub struct Lucetc {
     input: LucetcInput,
     bindings: Vec<Bindings>,
-    target: Triple,
-    opt_level: OptLevel,
-    cpu_features: CpuFeatures,
-    heap: HeapSettings,
     builtins_paths: Vec<PathBuf>,
-    validator: Option<Validator>,
+    builder: CompilerBuilder,
     sk: Option<SecretKey>,
     pk: Option<PublicKey>,
     sign: bool,
     verify: bool,
-    count_instructions: bool,
-    canonicalize_nans: bool,
 }
 
 pub trait AsLucetc {
@@ -128,7 +122,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn target(&mut self, target: Triple) {
-        self.as_lucetc().target = target;
+        self.as_lucetc().builder.target(target);
     }
 
     fn with_target(mut self, target: Triple) -> Self {
@@ -137,7 +131,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn opt_level(&mut self, opt_level: OptLevel) {
-        self.as_lucetc().opt_level = opt_level;
+        self.as_lucetc().builder.opt_level(opt_level);
     }
 
     fn with_opt_level(mut self, opt_level: OptLevel) -> Self {
@@ -146,7 +140,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn cpu_features(&mut self, cpu_features: CpuFeatures) {
-        self.as_lucetc().cpu_features = cpu_features;
+        self.as_lucetc().builder.cpu_features(cpu_features);
     }
 
     fn with_cpu_features(mut self, cpu_features: CpuFeatures) -> Self {
@@ -166,7 +160,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn validator(&mut self, validator: Validator) {
-        self.as_lucetc().validator = Some(validator);
+        self.as_lucetc().builder.validator(&Some(validator));
     }
 
     fn with_validator(mut self, validator: Validator) -> Self {
@@ -175,7 +169,10 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn min_reserved_size(&mut self, min_reserved_size: u64) {
-        self.as_lucetc().heap.min_reserved_size = min_reserved_size;
+        self.as_lucetc()
+            .builder
+            .heap_settings_mut()
+            .min_reserved_size = min_reserved_size;
     }
 
     fn with_min_reserved_size(mut self, min_reserved_size: u64) -> Self {
@@ -184,7 +181,10 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn max_reserved_size(&mut self, max_reserved_size: u64) {
-        self.as_lucetc().heap.max_reserved_size = max_reserved_size;
+        self.as_lucetc()
+            .builder
+            .heap_settings_mut()
+            .max_reserved_size = max_reserved_size;
     }
 
     fn with_max_reserved_size(mut self, max_reserved_size: u64) -> Self {
@@ -193,8 +193,14 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn reserved_size(&mut self, reserved_size: u64) {
-        self.as_lucetc().heap.min_reserved_size = reserved_size;
-        self.as_lucetc().heap.max_reserved_size = reserved_size;
+        self.as_lucetc()
+            .builder
+            .heap_settings_mut()
+            .min_reserved_size = reserved_size;
+        self.as_lucetc()
+            .builder
+            .heap_settings_mut()
+            .max_reserved_size = reserved_size;
     }
 
     fn with_reserved_size(mut self, reserved_size: u64) -> Self {
@@ -203,7 +209,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn guard_size(&mut self, guard_size: u64) {
-        self.as_lucetc().heap.guard_size = guard_size;
+        self.as_lucetc().builder.heap_settings_mut().guard_size = guard_size;
     }
 
     fn with_guard_size(mut self, guard_size: u64) -> Self {
@@ -248,7 +254,9 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn count_instructions(&mut self, count_instructions: bool) {
-        self.as_lucetc().count_instructions = count_instructions;
+        self.as_lucetc()
+            .builder
+            .count_instructions(count_instructions);
     }
 
     fn with_count_instructions(mut self, count_instructions: bool) -> Self {
@@ -257,7 +265,9 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn canonicalize_nans(&mut self, enable_nans_canonicalization: bool) {
-        self.as_lucetc().canonicalize_nans = enable_nans_canonicalization;
+        self.as_lucetc()
+            .builder
+            .canonicalize_nans(enable_nans_canonicalization);
     }
 
     fn with_canonicalize_nans(mut self, enable_nans_canonicalization: bool) -> Self {
@@ -272,18 +282,12 @@ impl Lucetc {
         Self {
             input: LucetcInput::Path(input.to_owned()),
             bindings: vec![],
-            target: Triple::host(),
-            opt_level: OptLevel::default(),
-            cpu_features: CpuFeatures::default(),
-            heap: HeapSettings::default(),
+            builder: CompilerBuilder::new(),
             builtins_paths: vec![],
-            validator: None,
             pk: None,
             sk: None,
             sign: false,
             verify: false,
-            count_instructions: false,
-            canonicalize_nans: false,
         }
     }
 
@@ -292,18 +296,12 @@ impl Lucetc {
         Ok(Self {
             input: LucetcInput::Bytes(input),
             bindings: vec![],
-            target: Triple::host(),
-            opt_level: OptLevel::default(),
-            cpu_features: CpuFeatures::default(),
-            heap: HeapSettings::default(),
+            builder: CompilerBuilder::new(),
             builtins_paths: vec![],
-            validator: None,
             pk: None,
             sk: None,
             sign: false,
             verify: false,
-            count_instructions: false,
-            canonicalize_nans: false,
         })
     }
 
@@ -337,18 +335,7 @@ impl Lucetc {
 
     pub fn object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
         let (module_contents, bindings) = self.build()?;
-
-        let compiler = Compiler::new(
-            &module_contents,
-            self.target.clone(),
-            self.opt_level,
-            self.cpu_features.clone(),
-            &bindings,
-            self.heap.clone(),
-            self.count_instructions,
-            &self.validator,
-            self.canonicalize_nans,
-        )?;
+        let compiler = self.builder.create(&module_contents, &bindings)?;
         let obj = compiler.object_file()?;
         obj.write(output.as_ref())?;
 
@@ -358,17 +345,7 @@ impl Lucetc {
     pub fn clif_ir<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
         let (module_contents, bindings) = self.build()?;
 
-        let compiler = Compiler::new(
-            &module_contents,
-            self.target.clone(),
-            self.opt_level,
-            self.cpu_features.clone(),
-            &bindings,
-            self.heap.clone(),
-            self.count_instructions,
-            &self.validator,
-            self.canonicalize_nans,
-        )?;
+        let compiler = self.builder.create(&module_contents, &bindings)?;
 
         compiler.cranelift_funcs()?.write(&output)?;
 
@@ -379,7 +356,7 @@ impl Lucetc {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
-        link_so(objpath, &self.target, &output)?;
+        link_so(objpath, &self.builder.target, &output)?;
         if self.sign {
             let sk = self.sk.as_ref().ok_or(Error::Signature(
                 "signing requires a secret key".to_string(),

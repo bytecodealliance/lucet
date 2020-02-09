@@ -48,10 +48,9 @@ impl OptLevel {
 }
 
 pub struct CompilerBuilder {
-    target: Triple,
+    pub target: Triple,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
-    bindings: Bindings,
     heap_settings: HeapSettings,
     count_instructions: bool,
     canonicalize_nans: bool,
@@ -64,7 +63,6 @@ impl CompilerBuilder {
             target: Triple::host(),
             opt_level: OptLevel::default(),
             cpu_features: CpuFeatures::default(),
-            bindings: Bindings::empty(),
             heap_settings: HeapSettings::default(),
             count_instructions: false,
             canonicalize_nans: false,
@@ -91,18 +89,13 @@ impl CompilerBuilder {
         &mut self.cpu_features
     }
 
-    pub fn bindings(&mut self, bindings: &Bindings) -> &mut Self {
-        self.bindings = bindings.clone();
-        self
-    }
-
-    pub fn bindings_mut(&mut self) -> &mut Bindings {
-        &mut self.bindings
-    }
-
     pub fn heap_settings(&mut self, heap_settings: HeapSettings) -> &mut Self {
         self.heap_settings = heap_settings;
         self
+    }
+
+    pub fn heap_settings_mut(&mut self) -> &mut HeapSettings {
+        &mut self.heap_settings
     }
 
     pub fn count_instructions(&mut self, count_instructions: bool) -> &mut Self {
@@ -120,13 +113,17 @@ impl CompilerBuilder {
         self
     }
 
-    pub fn create<'a>(&'a self, wasm_binary: &'a [u8]) -> Result<Compiler<'a>, Error> {
+    pub fn create<'a>(
+        &'a self,
+        wasm_binary: &'a [u8],
+        bindings: &'a Bindings,
+    ) -> Result<Compiler<'a>, Error> {
         Compiler::new(
             wasm_binary,
             self.target.clone(),
             self.opt_level,
             self.cpu_features.clone(),
-            &self.bindings,
+            bindings,
             self.heap_settings.clone(),
             self.count_instructions,
             &self.validator,
