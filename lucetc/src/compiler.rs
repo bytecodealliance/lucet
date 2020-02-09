@@ -215,6 +215,10 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    pub fn builder() -> CompilerBuilder {
+        CompilerBuilder::new()
+    }
+
     pub fn module_features(&self) -> ModuleFeatures {
         let mut mf: ModuleFeatures = (&self.cpu_features).into();
         mf.instruction_count = self.count_instructions;

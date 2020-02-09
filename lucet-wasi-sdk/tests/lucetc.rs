@@ -4,7 +4,7 @@ mod lucetc_tests {
     use lucet_module::bindings::Bindings;
     use lucet_validate::Validator;
     use lucet_wasi_sdk::*;
-    use lucetc::CompilerBuilder;
+    use lucetc::Compiler;
     use std::collections::HashMap;
     use std::fs::File;
     use std::io::Read;
@@ -43,7 +43,7 @@ mod lucetc_tests {
         let m = module_from_c(&["empty"], &[]).expect("build module for empty");
         let b = Bindings::empty();
         let v = Validator::parse("").expect("empty validation environment");
-        let mut builder = CompilerBuilder::new();
+        let mut builder = Compiler::builder();
         let c = builder
             .validator(&Some(v))
             .create(&m, &b)
@@ -80,7 +80,7 @@ mod lucetc_tests {
         let m = module_from_c(&["c"], &["c"]).expect("build module for c");
         let b = Bindings::empty();
         let v = Validator::parse("").expect("empty validation environment");
-        let mut builder = CompilerBuilder::new();
+        let mut builder = Compiler::builder();
         let c = builder
             .validator(&Some(v))
             .create(&m, &b)
@@ -104,7 +104,7 @@ mod lucetc_tests {
             "(module $env (@interface func (export \"c\") (param $a1 s32) (result $r1 s32)))",
         )
         .expect("empty validation environment");
-        let mut builder = CompilerBuilder::new();
+        let mut builder = Compiler::builder();
         let c = builder
             .validator(&Some(v))
             .create(&m, &b)
@@ -124,7 +124,7 @@ mod lucetc_tests {
         let m = module_from_c(&["c", "d"], &["c", "d"]).expect("build module for c & d");
         let b = Bindings::empty();
         let v = Validator::parse("").expect("empty validation environment");
-        let mut builder = CompilerBuilder::new();
+        let mut builder = Compiler::builder();
         let c = builder
             .validator(&Some(v))
             .create(&m, &b)
@@ -168,7 +168,7 @@ mod lucetc_tests {
             .expect("wasi spec validation")
             .with_wasi_exe(true);
         // Compiler will only unwrap if the Validator defined above accepts the module
-        let mut builder = CompilerBuilder::new();
+        let mut builder = Compiler::builder();
         let c = builder
             .validator(&Some(v))
             .create(&m, &b)

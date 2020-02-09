@@ -282,7 +282,7 @@ impl Lucetc {
         Self {
             input: LucetcInput::Path(input.to_owned()),
             bindings: vec![],
-            builder: CompilerBuilder::new(),
+            builder: Compiler::builder(),
             builtins_paths: vec![],
             pk: None,
             sk: None,
@@ -296,7 +296,7 @@ impl Lucetc {
         Ok(Self {
             input: LucetcInput::Bytes(input),
             bindings: vec![],
-            builder: CompilerBuilder::new(),
+            builder: Compiler::builder(),
             builtins_paths: vec![],
             pk: None,
             sk: None,
