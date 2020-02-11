@@ -389,7 +389,16 @@ where
     Q: AsRef<Path>,
 {
     use std::process::Command;
-    let mut cmd_ld = Command::new(env::var("LD").unwrap_or(LD_DEFAULT.into()));
+
+    // Let `LD` be something like "clang --target=... ..." for convenience.
+    let env_ld = env::var("LD").unwrap_or(LD_DEFAULT.into());
+    let mut ld_iter = env_ld.split_whitespace();
+    let ld_prog = ld_iter.next().expect("LD must not be empty");
+    let mut cmd_ld = Command::new(ld_prog);
+    for flag in ld_iter {
+        cmd_ld.arg(flag);
+    }
+
     cmd_ld.arg(objpath.as_ref());
     let env_ldflags = env::var("LDFLAGS").unwrap_or_else(|_| ldflags_default(target));
     for flag in env_ldflags.split_whitespace() {
