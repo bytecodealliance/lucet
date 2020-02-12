@@ -68,6 +68,16 @@ fn check_feature_support(module_features: &ModuleFeatures) -> Result<(), Error> 
         return Err(missing_feature("LZCNT"));
     }
 
+    // Given the module features, check the xxx to affirm
+    // whether or not
+    // We'd like to ask the question, does this module have
+    // instruction count?
+/*
+    if module_features.icnt {
+        return Err(missing_feature("ICNT"));
+    }
+*/
+    
     // Features are fine, we're compatible!
     Ok(())
 }
@@ -203,6 +213,10 @@ impl DlModule {
 impl Module for DlModule {}
 
 impl ModuleInternal for DlModule {
+    fn is_icnt_instrumented(&self) -> bool {
+	self.module.module_data.features().icnt
+    }
+	
     fn heap_spec(&self) -> Option<&HeapSpec> {
         self.module.module_data.heap_spec()
     }

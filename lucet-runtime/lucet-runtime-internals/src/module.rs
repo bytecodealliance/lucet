@@ -38,6 +38,11 @@ pub trait Module: ModuleInternal {
 }
 
 pub trait ModuleInternal: Send + Sync {
+    /// Determine whether this module has been instrumented with additional
+    /// instructions that monitor the number of wasm operations executed
+    /// during runtime.
+    fn is_icnt_instrumented(&self) -> bool;
+    
     fn heap_spec(&self) -> Option<&HeapSpec>;
 
     /// Get the WebAssembly globals of the module.

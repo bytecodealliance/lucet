@@ -260,6 +260,10 @@ unsafe impl Sync for MockModule {}
 impl Module for MockModule {}
 
 impl ModuleInternal for MockModule {
+    fn is_icnt_instrumented(&self) -> bool {
+	self.module_data.features().icnt
+    }
+
     fn heap_spec(&self) -> Option<&HeapSpec> {
         self.module_data.heap_spec()
     }
