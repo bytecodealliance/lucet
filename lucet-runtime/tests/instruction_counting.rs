@@ -7,10 +7,10 @@ use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-pub fn wasm_test<P: AsRef<Path>>(wasm_file: P, icnt_option: bool) -> Result<Arc<DlModule>, Error> {
+pub fn wasm_test<P: AsRef<Path>>(wasm_file: P, icount_option: bool) -> Result<Arc<DlModule>, Error> {
     let workdir = TempDir::new().expect("create working directory");
 
-    let native_build = Lucetc::new(wasm_file).with_count_instructions(icnt_option);
+    let native_build = Lucetc::new(wasm_file).with_count_instructions(icount_option);
 
     let so_file = workdir.path().join("out.so");
 
@@ -21,7 +21,7 @@ pub fn wasm_test<P: AsRef<Path>>(wasm_file: P, icnt_option: bool) -> Result<Arc<
     Ok(dlmodule)
 }
 
-pub fn get_icnt_test_files() -> Vec<DirEntry> {
+pub fn get_instruction_count_test_files() -> Vec<DirEntry> {
     std::fs::read_dir("./tests/instruction_counting")
         .expect("can iterate test files")
         .map(|ent| {
@@ -36,8 +36,8 @@ pub fn get_icnt_test_files() -> Vec<DirEntry> {
 }
 
 #[test]
-pub fn check_icnt_off() {
-    let files: Vec<DirEntry> = get_icnt_test_files();
+pub fn check_instruction_count_off() {
+    let files: Vec<DirEntry> = get_instruction_count_test_files();
 
     assert!(
         files.len() > 0,
@@ -46,7 +46,8 @@ pub fn check_icnt_off() {
 
     files.par_iter().for_each(|ent| {
         let wasm_path = ent.path();
-        let module = wasm_test(&wasm_path, false).expect("can load module");
+	let do_not_instrument = false;
+        let module = wasm_test(&wasm_path, do_not_instrument).expect("can load module");
 
         let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
 
@@ -64,8 +65,8 @@ pub fn check_icnt_off() {
 }
 
 #[test]
-pub fn check_icnt() {
-    let files: Vec<DirEntry> = get_icnt_test_files();
+pub fn check_instruction_count() {
+    let files: Vec<DirEntry> = get_instruction_count_test_files();
 
     assert!(
         files.len() > 0,
@@ -74,7 +75,8 @@ pub fn check_icnt() {
 
     files.par_iter().for_each(|ent| {
         let wasm_path = ent.path();
-        let module = wasm_test(&wasm_path, true).expect("can load instrumented module");
+	let do_instrument = true;
+        let module = wasm_test(&wasm_path, do_instrument).expect("can load instrumented module");
 
         let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
 

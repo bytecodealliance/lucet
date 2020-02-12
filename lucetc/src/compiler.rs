@@ -132,7 +132,7 @@ impl<'a> Compiler<'a> {
 
     pub fn module_features(&self) -> ModuleFeatures {
         let mut mf: ModuleFeatures = (&self.cpu_features).into();
-        mf.icnt = self.count_instructions;
+        mf.instruction_count = self.count_instructions;
         mf
     }
 
