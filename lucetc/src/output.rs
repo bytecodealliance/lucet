@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::name::Name;
 use crate::stack_probe;
-use crate::table::{link_tables, TABLE_SYM};
+use crate::table::{TABLE_SYM, TABLE_REF_SIZE};
 use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa, binemit::TrapSink};
@@ -90,7 +90,7 @@ impl ObjectFile {
 
         obj.write_trap_tables(&trap_manifest)?;
         obj.write_function_manifest(function_manifest.as_slice())?;
-        link_tables(table_manifest.as_slice(), &mut obj.artifact)?;
+        obj.link_tables(table_manifest.as_slice())?;
 
         // And now write out the actual structure tying together all the data in this module.
         write_module(
@@ -248,6 +248,18 @@ impl ObjectFile {
                 })?;
         }
 
+        Ok(())
+    }
+
+    fn link_tables(&mut self, tables: &[Name]) -> Result<(), Error> {
+        for (idx, table) in tables.iter().enumerate() {
+            self.artifact.link(Link {
+                from: TABLE_SYM,
+                to: table.symbol(),
+                at: (TABLE_REF_SIZE * idx) as u64,
+            })
+                .map_err(|source| Error::Failure(source, "Table error".to_owned()))?;
+        }
         Ok(())
     }
 
