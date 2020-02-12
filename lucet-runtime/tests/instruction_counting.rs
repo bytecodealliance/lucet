@@ -19,7 +19,7 @@ pub fn wasm_test<P: AsRef<Path>>(wasm_file: P, icnt_option: bool) -> Result<Arc<
     let dlmodule = DlModule::load(so_file)?;
 
     Ok(dlmodule)
-}    
+}
 
 pub fn get_icnt_test_files() -> Vec<DirEntry> {
     std::fs::read_dir("./tests/instruction_counting")

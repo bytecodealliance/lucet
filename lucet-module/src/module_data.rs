@@ -74,7 +74,7 @@ impl ModuleFeatures {
             bmi2: false,
             lzcnt: false,
             popcnt: false,
-	    icnt: false,  // TLC Instruction Count
+            icnt: false,
             _hidden: (),
         }
     }

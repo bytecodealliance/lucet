@@ -731,10 +731,10 @@ impl Instance {
 
     #[inline]
     pub fn get_instruction_count(&self) -> Option<u64> {
-	if self.module.is_icnt_instrumented() {
+        if self.module.is_icnt_instrumented() {
             return Some(self.get_instance_implicits().instruction_count);
-	}
-	None
+        }
+        None
     }
 
     #[inline]
