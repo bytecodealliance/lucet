@@ -203,6 +203,10 @@ impl DlModule {
 impl Module for DlModule {}
 
 impl ModuleInternal for DlModule {
+    fn is_instruction_count_instrumented(&self) -> bool {
+        self.module.module_data.features().instruction_count
+    }
+
     fn heap_spec(&self) -> Option<&HeapSpec> {
         self.module.module_data.heap_spec()
     }

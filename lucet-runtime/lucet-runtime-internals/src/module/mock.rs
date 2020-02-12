@@ -260,6 +260,10 @@ unsafe impl Sync for MockModule {}
 impl Module for MockModule {}
 
 impl ModuleInternal for MockModule {
+    fn is_instruction_count_instrumented(&self) -> bool {
+        self.module_data.features().instruction_count
+    }
+
     fn heap_spec(&self) -> Option<&HeapSpec> {
         self.module_data.heap_spec()
     }

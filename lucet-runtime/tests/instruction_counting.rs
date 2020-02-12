@@ -7,10 +7,13 @@ use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-pub fn wasm_test<P: AsRef<Path>>(wasm_file: P) -> Result<Arc<DlModule>, Error> {
+pub fn wasm_test<P: AsRef<Path>>(
+    wasm_file: P,
+    icount_option: bool,
+) -> Result<Arc<DlModule>, Error> {
     let workdir = TempDir::new().expect("create working directory");
 
-    let native_build = Lucetc::new(wasm_file).with_count_instructions(true);
+    let native_build = Lucetc::new(wasm_file).with_count_instructions(icount_option);
 
     let so_file = workdir.path().join("out.so");
 
@@ -21,9 +24,8 @@ pub fn wasm_test<P: AsRef<Path>>(wasm_file: P) -> Result<Arc<DlModule>, Error> {
     Ok(dlmodule)
 }
 
-#[test]
-pub fn check_instruction_counts() {
-    let files: Vec<DirEntry> = std::fs::read_dir("./tests/instruction_counting")
+pub fn get_instruction_count_test_files() -> Vec<DirEntry> {
+    std::fs::read_dir("./tests/instruction_counting")
         .expect("can iterate test files")
         .map(|ent| {
             let ent = ent.expect("can get test files");
@@ -33,7 +35,12 @@ pub fn check_instruction_counts() {
             );
             ent
         })
-        .collect();
+        .collect()
+}
+
+#[test]
+pub fn check_instruction_count_off() {
+    let files: Vec<DirEntry> = get_instruction_count_test_files();
 
     assert!(
         files.len() > 0,
@@ -42,7 +49,8 @@ pub fn check_instruction_counts() {
 
     files.par_iter().for_each(|ent| {
         let wasm_path = ent.path();
-        let module = wasm_test(&wasm_path).expect("can load module");
+        let do_not_instrument = false;
+        let module = wasm_test(&wasm_path, do_not_instrument).expect("can load module");
 
         let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
 
@@ -53,6 +61,37 @@ pub fn check_instruction_counts() {
         inst.run("test_function", &[]).expect("instance runs");
 
         let instruction_count = inst.get_instruction_count();
+        if instruction_count.is_some() {
+            panic!("instruction count instrumentation was not expected from instance");
+        }
+    });
+}
+
+#[test]
+pub fn check_instruction_count() {
+    let files: Vec<DirEntry> = get_instruction_count_test_files();
+
+    assert!(
+        files.len() > 0,
+        "there are no test cases in the `instruction_counting` directory"
+    );
+
+    files.par_iter().for_each(|ent| {
+        let wasm_path = ent.path();
+        let do_instrument = true;
+        let module = wasm_test(&wasm_path, do_instrument).expect("can load instrumented module");
+
+        let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+
+        let mut inst = region
+            .new_instance(module)
+            .expect("instance can be created");
+
+        inst.run("test_function", &[]).expect("instance runs");
+
+        let instruction_count = inst
+            .get_instruction_count()
+            .expect("instruction count expected from instance");
 
         assert_eq!(
             instruction_count,

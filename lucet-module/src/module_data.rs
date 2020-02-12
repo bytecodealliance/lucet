@@ -58,6 +58,7 @@ pub struct ModuleFeatures {
     pub bmi2: bool,
     pub lzcnt: bool,
     pub popcnt: bool,
+    pub instruction_count: bool,
     _hidden: (),
 }
 
@@ -73,6 +74,7 @@ impl ModuleFeatures {
             bmi2: false,
             lzcnt: false,
             popcnt: false,
+            instruction_count: false,
             _hidden: (),
         }
     }

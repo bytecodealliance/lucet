@@ -131,8 +131,9 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn module_features(&self) -> ModuleFeatures {
-        // This will grow in the future to encompass other options describing the compiled module.
-        (&self.cpu_features).into()
+        let mut mf: ModuleFeatures = (&self.cpu_features).into();
+        mf.instruction_count = self.count_instructions;
+        mf
     }
 
     pub fn module_data(&self) -> Result<ModuleData<'_>, Error> {
