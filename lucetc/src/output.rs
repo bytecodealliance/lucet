@@ -1,9 +1,8 @@
 use crate::error::Error;
-use crate::function_manifest::{write_function_manifest, FUNCTION_MANIFEST_SYM};
 use crate::name::Name;
 use crate::stack_probe;
 use crate::table::{link_tables, TABLE_SYM};
-use crate::traps::write_trap_tables;
+use crate::traps::{trap_sym_for_func, write_trap_tables};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa, binemit::TrapSink};
 use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
@@ -15,8 +14,11 @@ use lucet_module::{
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Cursor, Write};
+use std::mem::size_of;
 use std::path::Path;
 use target_lexicon::BinaryFormat;
+
+pub(crate) const FUNCTION_MANIFEST_SYM: &str = "lucet_function_manifest";
 
 pub struct CraneliftFuncs {
     funcs: HashMap<Name, ir::Function>,
@@ -87,7 +89,7 @@ impl ObjectFile {
         }
 
         write_trap_tables(&trap_manifest, &mut obj.artifact)?;
-        write_function_manifest(function_manifest.as_slice(), &mut obj.artifact)?;
+        obj.write_function_manifest(function_manifest.as_slice())?;
         link_tables(table_manifest.as_slice(), &mut obj.artifact)?;
 
         // And now write out the actual structure tying together all the data in this module.
@@ -150,6 +152,67 @@ impl ObjectFile {
 
         Ok(())
     }
+
+    ///
+    /// Writes a manifest of functions, with relocations, to the artifact.
+    ///
+    fn write_function_manifest(
+        &mut self,
+        functions: &[(String, FunctionSpec)],
+    ) -> Result<(), Error> {
+        self.artifact.declare(FUNCTION_MANIFEST_SYM, Decl::data())
+            .map_err(|source| {
+                let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
+                Error::ArtifactError(source, message)
+            })?;
+
+        let mut manifest_buf: Cursor<Vec<u8>> = Cursor::new(Vec::with_capacity(
+            functions.len() * size_of::<FunctionSpec>(),
+        ));
+
+        for (fn_name, fn_spec) in functions.iter() {
+            /*
+             * This has implicit knowledge of the layout of `FunctionSpec`!
+             *
+             * Each iteraction writes out bytes with relocations that will
+             * result in data forming a valid FunctionSpec when this is loaded.
+             *
+             * Because the addresses don't exist until relocations are applied
+             * when the artifact is loaded, we can't just populate the fields
+             * and transmute, unfortunately.
+             */
+            // Writes a (ptr, len) pair with relocation for code
+            write_relocated_slice(
+                &mut self.artifact,
+                &mut manifest_buf,
+                FUNCTION_MANIFEST_SYM,
+                Some(fn_name),
+                fn_spec.code_len() as u64,
+            )?;
+            // Writes a (ptr, len) pair with relocation for this function's trap table
+            let trap_sym = trap_sym_for_func(fn_name);
+            write_relocated_slice(
+                &mut self.artifact,
+                &mut manifest_buf,
+                FUNCTION_MANIFEST_SYM,
+                if fn_spec.traps_len() > 0 {
+                    Some(&trap_sym)
+                } else {
+                    None
+                },
+                fn_spec.traps_len() as u64,
+            )?;
+        }
+
+        self.artifact.define(FUNCTION_MANIFEST_SYM, manifest_buf.into_inner())
+            .map_err(|source| {
+                let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
+                Error::ArtifactError(source, message)
+            })?;
+
+        Ok(())
+    }
+
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
         let _ = path.as_ref().file_name().ok_or(|| {
             let message = format!("Path must be filename {:?}", path.as_ref());
