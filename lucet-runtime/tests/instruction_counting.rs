@@ -61,7 +61,7 @@ pub fn check_instruction_count_off() {
         inst.run("test_function", &[]).expect("instance runs");
 
         let instruction_count = inst.get_instruction_count();
-        if let Some(_) = instruction_count {
+        if instruction_count.is_some() {
             panic!("instruction count instrumentation was not expected from instance");
         }
     });
@@ -89,13 +89,12 @@ pub fn check_instruction_count() {
 
         inst.run("test_function", &[]).expect("instance runs");
 
-        let instruction_count = inst.get_instruction_count();
-        if let None = instruction_count {
-            panic!("instruction count expected from instance");
-        }
+        let instruction_count = inst
+            .get_instruction_count()
+            .expect("instruction count expected from instance");
 
         assert_eq!(
-            instruction_count.unwrap(),
+            instruction_count,
             match inst
                 .run("instruction_count", &[])
                 .expect("instance still runs")
