@@ -1,10 +1,10 @@
 use crate::error::Error;
 use crate::name::Name;
 use crate::stack_probe;
-use crate::table::{TABLE_SYM, TABLE_REF_SIZE};
+use crate::table::{TABLE_REF_SIZE, TABLE_SYM};
 use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
-use cranelift_codegen::{ir, isa, binemit::TrapSink};
+use cranelift_codegen::{binemit::TrapSink, ir, isa};
 use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
@@ -108,14 +108,16 @@ impl ObjectFile {
         traps: &mut FaerieTrapManifest,
         function_manifest: &mut Vec<(String, FunctionSpec)>,
     ) -> Result<(), Error> {
-        self.artifact.declare_with(
-            stack_probe::STACK_PROBE_SYM,
-            Decl::function(),
-            stack_probe::STACK_PROBE_BINARY.to_vec(),
-        ).map_err(|source| {
-            let message = format!("Error declaring {}", stack_probe::STACK_PROBE_SYM);
-            Error::Failure(source, message)
-        })?;
+        self.artifact
+            .declare_with(
+                stack_probe::STACK_PROBE_SYM,
+                Decl::function(),
+                stack_probe::STACK_PROBE_BINARY.to_vec(),
+            )
+            .map_err(|source| {
+                let message = format!("Error declaring {}", stack_probe::STACK_PROBE_SYM);
+                Error::Failure(source, message)
+            })?;
 
         {
             let mut stack_probe_trap_sink = FaerieTrapSink::new(
@@ -160,7 +162,8 @@ impl ObjectFile {
         &mut self,
         functions: &[(String, FunctionSpec)],
     ) -> Result<(), Error> {
-        self.artifact.declare(FUNCTION_MANIFEST_SYM, Decl::data())
+        self.artifact
+            .declare(FUNCTION_MANIFEST_SYM, Decl::data())
             .map_err(|source| {
                 let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
                 Error::ArtifactError(source, message)
@@ -204,7 +207,8 @@ impl ObjectFile {
             )?;
         }
 
-        self.artifact.define(FUNCTION_MANIFEST_SYM, manifest_buf.into_inner())
+        self.artifact
+            .define(FUNCTION_MANIFEST_SYM, manifest_buf.into_inner())
             .map_err(|source| {
                 let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
                 Error::ArtifactError(source, message)
@@ -218,10 +222,12 @@ impl ObjectFile {
             let func_sym = &sink.name;
             let trap_sym = trap_sym_for_func(func_sym);
 
-            self.artifact.declare(&trap_sym, Decl::data()).map_err(|source| {
-                let message = format!("Trap table error declaring {}", trap_sym);
-                Error::ArtifactError(source, message)
-            })?;
+            self.artifact
+                .declare(&trap_sym, Decl::data())
+                .map_err(|source| {
+                    let message = format!("Trap table error declaring {}", trap_sym);
+                    Error::ArtifactError(source, message)
+                })?;
 
             // write the actual function-level trap table
             let traps: Vec<TrapSite> = sink
@@ -241,7 +247,8 @@ impl ObjectFile {
             };
 
             // and write the function trap table into the object
-            self.artifact.define(&trap_sym, trap_site_bytes.to_vec())
+            self.artifact
+                .define(&trap_sym, trap_site_bytes.to_vec())
                 .map_err(|source| {
                     let message = format!("Trap table error defining {}", trap_sym);
                     Error::ArtifactError(source, message)
@@ -253,11 +260,12 @@ impl ObjectFile {
 
     fn link_tables(&mut self, tables: &[Name]) -> Result<(), Error> {
         for (idx, table) in tables.iter().enumerate() {
-            self.artifact.link(Link {
-                from: TABLE_SYM,
-                to: table.symbol(),
-                at: (TABLE_REF_SIZE * idx) as u64,
-            })
+            self.artifact
+                .link(Link {
+                    from: TABLE_SYM,
+                    to: table.symbol(),
+                    at: (TABLE_REF_SIZE * idx) as u64,
+                })
                 .map_err(|source| Error::Failure(source, "Table error".to_owned()))?;
         }
         Ok(())
