@@ -7,7 +7,10 @@ use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-pub fn wasm_test<P: AsRef<Path>>(wasm_file: P, icount_option: bool) -> Result<Arc<DlModule>, Error> {
+pub fn wasm_test<P: AsRef<Path>>(
+    wasm_file: P,
+    icount_option: bool,
+) -> Result<Arc<DlModule>, Error> {
     let workdir = TempDir::new().expect("create working directory");
 
     let native_build = Lucetc::new(wasm_file).with_count_instructions(icount_option);
@@ -46,7 +49,7 @@ pub fn check_instruction_count_off() {
 
     files.par_iter().for_each(|ent| {
         let wasm_path = ent.path();
-	let do_not_instrument = false;
+        let do_not_instrument = false;
         let module = wasm_test(&wasm_path, do_not_instrument).expect("can load module");
 
         let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
@@ -75,7 +78,7 @@ pub fn check_instruction_count() {
 
     files.par_iter().for_each(|ent| {
         let wasm_path = ent.path();
-	let do_instrument = true;
+        let do_instrument = true;
         let module = wasm_test(&wasm_path, do_instrument).expect("can load instrumented module");
 
         let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
