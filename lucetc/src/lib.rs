@@ -115,6 +115,8 @@ pub trait LucetcOpts {
     fn with_sign(self) -> Self;
     fn count_instructions(&mut self, enable_count: bool);
     fn with_count_instructions(self, enable_count: bool) -> Self;
+    fn canonicalize_nans(&mut self, enable_canonicalize_nans: bool);
+    fn with_canonicalize_nans(self, enable_canonicalize_nans: bool) -> Self;
 }
 
 impl<T: AsLucetc> LucetcOpts for T {
@@ -253,6 +255,15 @@ impl<T: AsLucetc> LucetcOpts for T {
 
     fn with_count_instructions(mut self, count_instructions: bool) -> Self {
         self.count_instructions(count_instructions);
+        self
+    }
+
+    fn canonicalize_nans(&mut self, enable_nans_canonicalization: bool) {
+        self.as_lucetc().canonicalize_nans = enable_nans_canonicalization;
+    }
+
+    fn with_canonicalize_nans(mut self, enable_nans_canonicalization: bool) -> Self {
+        self.canonicalize_nans(enable_nans_canonicalization);
         self
     }
 }
