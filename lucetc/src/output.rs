@@ -1,21 +1,24 @@
 use crate::error::Error;
-use crate::function_manifest::{write_function_manifest, FUNCTION_MANIFEST_SYM};
 use crate::name::Name;
 use crate::stack_probe;
-use crate::table::{link_tables, TABLE_SYM};
-use crate::traps::write_trap_tables;
+use crate::table::{TABLE_REF_SIZE, TABLE_SYM};
+use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
-use cranelift_codegen::{ir, isa};
+use cranelift_codegen::{binemit::TrapSink, ir, isa};
+use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
 use lucet_module::{
-    FunctionSpec, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
+    FunctionSpec, SerializedModule, TrapSite, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Cursor, Write};
+use std::mem::size_of;
 use std::path::Path;
 use target_lexicon::BinaryFormat;
+
+pub(crate) const FUNCTION_MANIFEST_SYM: &str = "lucet_function_manifest";
 
 pub struct CraneliftFuncs {
     funcs: HashMap<Name, ir::Function>,
@@ -48,38 +51,20 @@ pub struct ObjectFile {
 }
 impl ObjectFile {
     pub fn new(
-        mut product: FaerieProduct,
+        product: FaerieProduct,
         module_data_len: usize,
         mut function_manifest: Vec<(String, FunctionSpec)>,
         table_manifest: Vec<Name>,
     ) -> Result<Self, Error> {
-        stack_probe::declare_and_define(&mut product)?;
+        let mut obj = Self {
+            artifact: product.artifact,
+        };
 
-        // stack_probe::declare_and_define never exists as clif, and as a result never exists a
-        // cranelift-compiled function. As a result, the declared length of the stack probe's
-        // "code" is 0. This is incorrect, and must be fixed up before writing out the function
-        // manifest.
-
-        // because the stack probe is the last declared function...
-        let last_idx = function_manifest.len() - 1;
-        let stack_probe_entry = function_manifest
-            .get_mut(last_idx)
-            .expect("function manifest has entries");
-        debug_assert!(stack_probe_entry.0 == stack_probe::STACK_PROBE_SYM);
-        debug_assert!(stack_probe_entry.1.code_len() == 0);
-        std::mem::swap(
-            &mut stack_probe_entry.1,
-            &mut FunctionSpec::new(
-                0, // there is no real address for the function until written to an object file
-                stack_probe::STACK_PROBE_BINARY.len() as u32,
-                0,
-                0, // fix up this FunctionSpec with trap info like any other
-            ),
-        );
-
-        let trap_manifest = &product
+        let mut trap_manifest: FaerieTrapManifest = product
             .trap_manifest
             .expect("trap manifest will be present");
+
+        obj.write_stack_probe(&mut trap_manifest, &mut function_manifest)?;
 
         // Now that we have trap information, we can fix up FunctionSpec entries to have
         // correct `trap_length` values
@@ -103,21 +88,187 @@ impl ObjectFile {
             }
         }
 
-        write_trap_tables(trap_manifest, &mut product.artifact)?;
-        write_function_manifest(function_manifest.as_slice(), &mut product.artifact)?;
-        link_tables(table_manifest.as_slice(), &mut product.artifact)?;
+        obj.write_trap_tables(&trap_manifest)?;
+        obj.write_function_manifest(function_manifest.as_slice())?;
+        obj.link_tables(table_manifest.as_slice())?;
 
         // And now write out the actual structure tying together all the data in this module.
         write_module(
             module_data_len,
             table_manifest.len(),
             function_manifest.len(),
-            &mut product.artifact,
+            &mut obj.artifact,
         )?;
 
-        Ok(Self {
-            artifact: product.artifact,
-        })
+        Ok(obj)
+    }
+
+    fn write_stack_probe(
+        &mut self,
+        traps: &mut FaerieTrapManifest,
+        function_manifest: &mut Vec<(String, FunctionSpec)>,
+    ) -> Result<(), Error> {
+        self.artifact
+            .declare_with(
+                stack_probe::STACK_PROBE_SYM,
+                Decl::function(),
+                stack_probe::STACK_PROBE_BINARY.to_vec(),
+            )
+            .map_err(|source| {
+                let message = format!("Error declaring {}", stack_probe::STACK_PROBE_SYM);
+                Error::Failure(source, message)
+            })?;
+
+        {
+            let mut stack_probe_trap_sink = FaerieTrapSink::new(
+                stack_probe::STACK_PROBE_SYM,
+                stack_probe::STACK_PROBE_BINARY.len() as u32,
+            );
+            stack_probe::trap_sites()
+                .iter()
+                .for_each(|t| stack_probe_trap_sink.trap(t.offset, t.srcloc, t.code));
+            traps.add_sink(stack_probe_trap_sink);
+        }
+
+        // The stack probe never exists as clif, and as a result never exists a
+        // cranelift-compiled function. As a result, the declared length of the stack probe's
+        // "code" is 0. This is incorrect, and must be fixed up before writing out the function
+        // manifest.
+
+        // because the stack probe is the last declared function...
+        let last_idx = function_manifest.len() - 1;
+        let stack_probe_entry = function_manifest
+            .get_mut(last_idx)
+            .expect("function manifest has entries");
+        debug_assert!(stack_probe_entry.0 == stack_probe::STACK_PROBE_SYM);
+        debug_assert!(stack_probe_entry.1.code_len() == 0);
+        std::mem::swap(
+            &mut stack_probe_entry.1,
+            &mut FunctionSpec::new(
+                0, // there is no real address for the function until written to an object file
+                stack_probe::STACK_PROBE_BINARY.len() as u32,
+                0,
+                0, // fix up this FunctionSpec with trap info like any other
+            ),
+        );
+
+        Ok(())
+    }
+
+    ///
+    /// Writes a manifest of functions, with relocations, to the artifact.
+    ///
+    fn write_function_manifest(
+        &mut self,
+        functions: &[(String, FunctionSpec)],
+    ) -> Result<(), Error> {
+        self.artifact
+            .declare(FUNCTION_MANIFEST_SYM, Decl::data())
+            .map_err(|source| {
+                let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
+                Error::ArtifactError(source, message)
+            })?;
+
+        let mut manifest_buf: Cursor<Vec<u8>> = Cursor::new(Vec::with_capacity(
+            functions.len() * size_of::<FunctionSpec>(),
+        ));
+
+        for (fn_name, fn_spec) in functions.iter() {
+            /*
+             * This has implicit knowledge of the layout of `FunctionSpec`!
+             *
+             * Each iteraction writes out bytes with relocations that will
+             * result in data forming a valid FunctionSpec when this is loaded.
+             *
+             * Because the addresses don't exist until relocations are applied
+             * when the artifact is loaded, we can't just populate the fields
+             * and transmute, unfortunately.
+             */
+            // Writes a (ptr, len) pair with relocation for code
+            write_relocated_slice(
+                &mut self.artifact,
+                &mut manifest_buf,
+                FUNCTION_MANIFEST_SYM,
+                Some(fn_name),
+                fn_spec.code_len() as u64,
+            )?;
+            // Writes a (ptr, len) pair with relocation for this function's trap table
+            let trap_sym = trap_sym_for_func(fn_name);
+            write_relocated_slice(
+                &mut self.artifact,
+                &mut manifest_buf,
+                FUNCTION_MANIFEST_SYM,
+                if fn_spec.traps_len() > 0 {
+                    Some(&trap_sym)
+                } else {
+                    None
+                },
+                fn_spec.traps_len() as u64,
+            )?;
+        }
+
+        self.artifact
+            .define(FUNCTION_MANIFEST_SYM, manifest_buf.into_inner())
+            .map_err(|source| {
+                let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
+                Error::ArtifactError(source, message)
+            })?;
+
+        Ok(())
+    }
+
+    fn write_trap_tables(&mut self, manifest: &FaerieTrapManifest) -> Result<(), Error> {
+        for sink in manifest.sinks.iter() {
+            let func_sym = &sink.name;
+            let trap_sym = trap_sym_for_func(func_sym);
+
+            self.artifact
+                .declare(&trap_sym, Decl::data())
+                .map_err(|source| {
+                    let message = format!("Trap table error declaring {}", trap_sym);
+                    Error::ArtifactError(source, message)
+                })?;
+
+            // write the actual function-level trap table
+            let traps: Vec<TrapSite> = sink
+                .sites
+                .iter()
+                .map(|site| TrapSite {
+                    offset: site.offset,
+                    code: translate_trapcode(site.code),
+                })
+                .collect();
+
+            let trap_site_bytes = unsafe {
+                std::slice::from_raw_parts(
+                    traps.as_ptr() as *const u8,
+                    traps.len() * std::mem::size_of::<TrapSite>(),
+                )
+            };
+
+            // and write the function trap table into the object
+            self.artifact
+                .define(&trap_sym, trap_site_bytes.to_vec())
+                .map_err(|source| {
+                    let message = format!("Trap table error defining {}", trap_sym);
+                    Error::ArtifactError(source, message)
+                })?;
+        }
+
+        Ok(())
+    }
+
+    fn link_tables(&mut self, tables: &[Name]) -> Result<(), Error> {
+        for (idx, table) in tables.iter().enumerate() {
+            self.artifact
+                .link(Link {
+                    from: TABLE_SYM,
+                    to: table.symbol(),
+                    at: (TABLE_REF_SIZE * idx) as u64,
+                })
+                .map_err(|source| Error::Failure(source, "Table error".to_owned()))?;
+        }
+        Ok(())
     }
 
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {

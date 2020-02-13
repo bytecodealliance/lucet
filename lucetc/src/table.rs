@@ -7,7 +7,6 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
 use cranelift_wasm::{TableElementType, TableIndex};
-use faerie::{Artifact, Link};
 use std::io::Cursor;
 
 /// This symbol will be used to reference the `tables` field in `Module` - a sequence of tables.
@@ -49,18 +48,6 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
     }
 
     Ok(elems)
-}
-
-pub fn link_tables(tables: &[Name], obj: &mut Artifact) -> Result<(), Error> {
-    for (idx, table) in tables.iter().enumerate() {
-        obj.link(Link {
-            from: TABLE_SYM,
-            to: table.symbol(),
-            at: (TABLE_REF_SIZE * idx) as u64,
-        })
-        .map_err(|source| Error::Failure(source, "Table error".to_owned()))?;
-    }
-    Ok(())
 }
 
 pub fn write_table_data<B: ClifBackend>(
