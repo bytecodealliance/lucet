@@ -72,7 +72,13 @@ impl<'a> Compiler<'a> {
         canonicalize_nans: bool,
         pinned_heap: bool,
     ) -> Result<Self, Error> {
-        let isa = Self::target_isa(target.clone(), opt_level, &cpu_features, canonicalize_nans, pinned_heap)?;
+        let isa = Self::target_isa(
+            target.clone(),
+            opt_level,
+            &cpu_features,
+            canonicalize_nans,
+            pinned_heap,
+        )?;
 
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
