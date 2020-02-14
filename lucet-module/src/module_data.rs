@@ -59,6 +59,7 @@ pub struct ModuleFeatures {
     pub lzcnt: bool,
     pub popcnt: bool,
     pub instruction_count: bool,
+    pub pinned_heap: bool,
     _hidden: (),
 }
 
@@ -75,6 +76,7 @@ impl ModuleFeatures {
             lzcnt: false,
             popcnt: false,
             instruction_count: false,
+            pinned_heap: false,
             _hidden: (),
         }
     }

@@ -74,6 +74,7 @@ impl ScriptEnv {
             true,
             &None,
             false,
+            false,
         )
         .map_err(program_error)?;
 

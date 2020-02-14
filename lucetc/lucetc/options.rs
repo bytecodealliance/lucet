@@ -454,6 +454,12 @@ SSE3 but not AVX:
                     .help("Instrument the produced binary to count the number of wasm operations the translated program executes")
             )
             .arg(
+                Arg::with_name("pinned_heap")
+                    .long("--pinned-heap-reg")
+                    .takes_value(false)
+                    .help("This feature is not stable - it may be removed in the future! Pin a register to use as this module's heap base. Typically improves performance.")
+            )
+            .arg(
                 Arg::with_name("error_style")
                     .long("error-style")
                     .takes_value(true)
