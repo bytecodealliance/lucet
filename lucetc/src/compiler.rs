@@ -177,7 +177,7 @@ impl<'a> Compiler<'a> {
 
         write_module_data(&mut self.clif_module, module_data_bytes)?;
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
-        let table_names = write_table_data(&mut self.clif_module, &self.decls)?;
+        let table_len = write_table_data(&mut self.clif_module, &self.decls)?;
 
         let function_manifest: Vec<(String, FunctionSpec)> = self
             .clif_module
@@ -199,7 +199,7 @@ impl<'a> Compiler<'a> {
             self.clif_module.finish(),
             module_data_len,
             function_manifest,
-            table_names,
+            table_len,
         )?;
 
         Ok(obj)

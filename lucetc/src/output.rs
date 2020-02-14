@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::name::Name;
 use crate::stack_probe;
-use crate::table::{TABLE_REF_SIZE, TABLE_SYM};
+use crate::table::TABLE_SYM;
 use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{binemit::TrapSink, ir, isa};
@@ -54,7 +54,7 @@ impl ObjectFile {
         product: FaerieProduct,
         module_data_len: usize,
         mut function_manifest: Vec<(String, FunctionSpec)>,
-        table_manifest: Vec<Name>,
+        table_manifest_len: usize,
     ) -> Result<Self, Error> {
         let mut obj = Self {
             artifact: product.artifact,
@@ -90,12 +90,11 @@ impl ObjectFile {
 
         obj.write_trap_tables(&trap_manifest)?;
         obj.write_function_manifest(function_manifest.as_slice())?;
-        obj.link_tables(table_manifest.as_slice())?;
 
         // And now write out the actual structure tying together all the data in this module.
         write_module(
             module_data_len,
-            table_manifest.len(),
+            table_manifest_len,
             function_manifest.len(),
             &mut obj.artifact,
         )?;
@@ -255,19 +254,6 @@ impl ObjectFile {
                 })?;
         }
 
-        Ok(())
-    }
-
-    fn link_tables(&mut self, tables: &[Name]) -> Result<(), Error> {
-        for (idx, table) in tables.iter().enumerate() {
-            self.artifact
-                .link(Link {
-                    from: TABLE_SYM,
-                    to: table.symbol(),
-                    at: (TABLE_REF_SIZE * idx) as u64,
-                })
-                .map_err(|source| Error::Failure(source, "Table error".to_owned()))?;
-        }
         Ok(())
     }
 
