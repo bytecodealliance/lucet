@@ -1,7 +1,6 @@
 use crate::decls::{ModuleDecls, TableDecl};
 use crate::error::Error;
 use crate::module::UniqueFuncIndex;
-use crate::name::Name;
 use crate::pointer::NATIVE_POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
@@ -53,9 +52,10 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
 pub fn write_table_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     decls: &ModuleDecls<'_>,
-) -> Result<Vec<Name>, Error> {
+) -> Result<usize, Error> {
     let mut tables_vec = Cursor::new(Vec::new());
-    let mut table_names: Vec<Name> = Vec::new();
+    let mut table_ctx = DataContext::new();
+    let mut table_len = 0;
 
     if let Ok(table_decl) = decls.get_table(TableIndex::new(0)) {
         // Indirect calls are performed by looking up the callee function and type in a table that
@@ -71,7 +71,7 @@ pub fn write_table_data<B: ClifBackend>(
             table.write_u64::<LittleEndian>(elem).unwrap()
         }
 
-        let mut table_ctx = DataContext::new();
+        let mut table_data_ctx = DataContext::new();
 
         // table.elems is a vector that gives every entry of the table, either specifying the
         // wasm function index or that no element was given for that table entry.
@@ -86,10 +86,10 @@ pub fn write_table_data<B: ClifBackend>(
 
                         // Second element in row is the pointer to the function. The Reloc is doing the work
                         // here. We put a 0 in the table data itself to be overwritten at link time.
-                        let funcref = table_ctx.import_function(func.name.into());
+                        let funcref = table_data_ctx.import_function(func.name.into());
                         let position = table_data.position();
                         assert!(position < <u32>::max_value() as u64);
-                        table_ctx.write_function_addr(position as u32, funcref);
+                        table_data_ctx.write_function_addr(position as u32, funcref);
                         putelem(&mut table_data, 0);
                     } else {
                         let message = format!("{:?}", func_index);
@@ -107,35 +107,38 @@ pub fn write_table_data<B: ClifBackend>(
                 }
             }
         }
-        table_ctx.define(table_data.into_inner().into_boxed_slice());
+        table_data_ctx.define(table_data.into_inner().into_boxed_slice());
         let table_id = table_decl
             .contents_name
             .as_dataid()
             .expect("tables are data");
-        clif_module.define_data(table_id, &table_ctx)?;
+        clif_module.define_data(table_id, &table_data_ctx)?;
 
         // have to link TABLE_SYM, table_id,
         // add space for the TABLE_SYM pointer
+        let dataref = clif_module.declare_data_in_data(table_id, &mut table_ctx);
+        let position = tables_vec.position();
+        assert!(position < <u32>::max_value() as u64);
+        table_ctx.write_data_addr(position as u32, dataref, 0 as i64);
         tables_vec.write_u64::<LittleEndian>(0).unwrap();
 
         // Define the length of the table as a u64:
+        table_len = elements.len();
         tables_vec
-            .write_u64::<LittleEndian>(elements.len() as u64)
+            .write_u64::<LittleEndian>(table_len as u64)
             .unwrap();
-        table_names.push(table_decl.contents_name.clone())
     }
 
     let inner = tables_vec.into_inner();
 
-    let mut table_data_ctx = DataContext::new();
-    table_data_ctx.define(inner.into_boxed_slice());
+    table_ctx.define(inner.into_boxed_slice());
 
     clif_module.define_data(
         decls
             .get_tables_list_name()
             .as_dataid()
             .expect("lucet_tables is declared as data"),
-        &table_data_ctx,
+        &table_ctx,
     )?;
-    Ok(table_names)
+    Ok(table_len)
 }
