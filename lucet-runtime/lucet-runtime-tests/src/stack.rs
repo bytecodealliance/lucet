@@ -157,7 +157,9 @@ macro_rules! stack_tests {
             expect_stack_overflow(
                 // Same note as `expect_ok_locals64_481`
                 stack_testcase(64 - 4).expect("generate stack_testcase 64"),
-                481,
+                // TODO: pick some high enough number that this test overflows still
+                // cranelift changes made 480 the wrong magic number
+                591,
                 true,
             );
         }
