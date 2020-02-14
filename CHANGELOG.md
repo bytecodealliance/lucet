@@ -1,4 +1,12 @@
 ### Unreleased
+### 0.6.1 (2020-02-14)
+
+- Modules record if instruction count instrumentation is present
+
+- The `LD` environment variable now takes a space-separated set of tokens the first of which
+  specifies the program to invoke, and the remaining tokens specifying arguments to be passed
+
+- LucetOpt now supports canonicalize_nans flag
 
 ### 0.6.0 (2020-02-05)
 
