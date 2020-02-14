@@ -64,7 +64,7 @@ apt install curl ca-certificates clang lld cmake
 
 On Arch Linux:
 
-```
+```sh
 pacman -S curl clang lld cmake
 ```
 
