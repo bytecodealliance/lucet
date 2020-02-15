@@ -48,7 +48,7 @@ impl OptLevel {
 }
 
 pub struct CompilerBuilder {
-    pub target: Triple,
+    target: Triple,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
     heap_settings: HeapSettings,
@@ -68,6 +68,10 @@ impl CompilerBuilder {
             canonicalize_nans: false,
             validator: None,
         }
+    }
+
+    pub(crate) fn target(&self) -> &Triple {
+        &self.target
     }
 
     pub fn with_target(&mut self, target: Triple) -> &mut Self {

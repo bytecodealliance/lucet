@@ -356,7 +356,7 @@ impl Lucetc {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
-        link_so(objpath, &self.builder.target, &output)?;
+        link_so(objpath, self.builder.target(), &output)?;
         if self.sign {
             let sk = self.sk.as_ref().ok_or(Error::Signature(
                 "signing requires a secret key".to_string(),
