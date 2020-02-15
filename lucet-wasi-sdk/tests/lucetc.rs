@@ -45,7 +45,7 @@ mod lucetc_tests {
         let v = Validator::parse("").expect("empty validation environment");
         let mut builder = Compiler::builder();
         let c = builder
-            .validator(&Some(v))
+            .with_validator(Some(v))
             .create(&m, &b)
             .expect("compile empty");
         let mdata = c.module_data().unwrap();
@@ -82,7 +82,7 @@ mod lucetc_tests {
         let v = Validator::parse("").expect("empty validation environment");
         let mut builder = Compiler::builder();
         let c = builder
-            .validator(&Some(v))
+            .with_validator(Some(v))
             .create(&m, &b)
             .expect("compile c");
         let mdata = c.module_data().unwrap();
@@ -106,7 +106,7 @@ mod lucetc_tests {
         .expect("empty validation environment");
         let mut builder = Compiler::builder();
         let c = builder
-            .validator(&Some(v))
+            .with_validator(Some(v))
             .create(&m, &b)
             .expect("compile d");
         let mdata = c.module_data().unwrap();
@@ -126,7 +126,7 @@ mod lucetc_tests {
         let v = Validator::parse("").expect("empty validation environment");
         let mut builder = Compiler::builder();
         let c = builder
-            .validator(&Some(v))
+            .with_validator(Some(v))
             .create(&m, &b)
             .expect("compile c & d");
         let mdata = c.module_data().unwrap();
@@ -170,7 +170,7 @@ mod lucetc_tests {
         // Compiler will only unwrap if the Validator defined above accepts the module
         let mut builder = Compiler::builder();
         let c = builder
-            .validator(&Some(v))
+            .with_validator(Some(v))
             .create(&m, &b)
             .expect("compile empty");
         let mdata = c.module_data().unwrap();

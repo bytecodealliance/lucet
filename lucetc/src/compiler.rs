@@ -70,17 +70,17 @@ impl CompilerBuilder {
         }
     }
 
-    pub fn target(&mut self, target: Triple) -> &mut Self {
+    pub fn with_target(&mut self, target: Triple) -> &mut Self {
         self.target = target;
         self
     }
 
-    pub fn opt_level(&mut self, opt_level: OptLevel) -> &mut Self {
+    pub fn with_opt_level(&mut self, opt_level: OptLevel) -> &mut Self {
         self.opt_level = opt_level;
         self
     }
 
-    pub fn cpu_features(&mut self, cpu_features: CpuFeatures) -> &mut Self {
+    pub fn with_cpu_features(&mut self, cpu_features: CpuFeatures) -> &mut Self {
         self.cpu_features = cpu_features;
         self
     }
@@ -89,7 +89,7 @@ impl CompilerBuilder {
         &mut self.cpu_features
     }
 
-    pub fn heap_settings(&mut self, heap_settings: HeapSettings) -> &mut Self {
+    pub fn with_heap_settings(&mut self, heap_settings: HeapSettings) -> &mut Self {
         self.heap_settings = heap_settings;
         self
     }
@@ -98,18 +98,18 @@ impl CompilerBuilder {
         &mut self.heap_settings
     }
 
-    pub fn count_instructions(&mut self, count_instructions: bool) -> &mut Self {
+    pub fn with_count_instructions(&mut self, count_instructions: bool) -> &mut Self {
         self.count_instructions = count_instructions;
         self
     }
 
-    pub fn canonicalize_nans(&mut self, canonicalize_nans: bool) -> &mut Self {
+    pub fn with_canonicalize_nans(&mut self, canonicalize_nans: bool) -> &mut Self {
         self.canonicalize_nans = canonicalize_nans;
         self
     }
 
-    pub fn validator(&mut self, validator: &Option<Validator>) -> &mut Self {
-        self.validator = validator.clone();
+    pub fn with_validator(&mut self, validator: Option<Validator>) -> &mut Self {
+        self.validator = validator;
         self
     }
 
