@@ -1,4 +1,12 @@
-### Unreleased
+### 0.6.1 (2020-02-18)
+
+- Added metadata to compiled modules that record whether instruction counting instrumentation is present.
+
+- Made `lucetc` more flexible in its interpretation of the `LD` environment variable. It now accepts a space-separated set of tokens; the first token specifies the program to invoke, and the remaining tokens specifying arguments to be passed to that program. Thanks, @froydnj!
+
+- Added public `LucetcOpt` methods to configure the `canonicalize_nans` setting. Thanks, @roman-kashitsyn!
+
+- Fixed `lucet-runtime`'s use of CPUID to not look for extended features unless required by the module being loaded, avoiding a failure on older CPUs where that CPUID leaf is not present. Thanks, @shravanrn!
 
 ### 0.6.0 (2020-02-05)
 
