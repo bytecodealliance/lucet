@@ -55,6 +55,7 @@ mod lucetc_tests {
             false,
             &Some(v),
             false,
+            false,
         )
         .expect("compile empty");
         let mdata = c.module_data().unwrap();
@@ -101,6 +102,7 @@ mod lucetc_tests {
             false,
             &Some(v),
             false,
+            false,
         )
         .expect("compile c");
         let mdata = c.module_data().unwrap();
@@ -133,6 +135,7 @@ mod lucetc_tests {
             false,
             &Some(v),
             false,
+            false,
         )
         .expect("compile d");
         let mdata = c.module_data().unwrap();
@@ -160,6 +163,7 @@ mod lucetc_tests {
             h,
             false,
             &Some(v),
+            false,
             false,
         )
         .expect("compile c & d");
@@ -212,6 +216,7 @@ mod lucetc_tests {
             h,
             false,
             &Some(v),
+            false,
             false,
         )
         .expect("compile empty");
