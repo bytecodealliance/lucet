@@ -141,7 +141,7 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
 macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
-        use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGSEGV};
+        use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGBUS, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall, lucet_hostcall_terminate, lucet_internal_ensure_linked, DlModule,
@@ -441,8 +441,8 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *const siginfo_t,
                 _ucontext_ptr: *const c_void,
             ) -> SignalBehavior {
-                // Triggered by a SIGSEGV writing to protected page
-                assert!(signum == SIGSEGV);
+                // Triggered by a SIGSEGV writing to protected page, or SIGBUS on macos
+                assert!(signum == SIGSEGV || signum == SIGBUS);
 
                 // The fault was caused by writing to a protected page at `recoverable_ptr`.  Make that
                 // no longer be a fault
@@ -488,8 +488,8 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *const siginfo_t,
                 _ucontext_ptr: *const c_void,
             ) -> SignalBehavior {
-                // Triggered by a SIGSEGV writing to protected page
-                assert!(signum == SIGSEGV);
+                // Triggered by a SIGSEGV writing to protected page, or SIGBUS on macos
+                assert!(signum == SIGSEGV || signum == SIGBUS);
 
                 // Terminate guest
                 SignalBehavior::Terminate
@@ -550,8 +550,8 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *mut siginfo_t,
                 _ucontext_ptr: *mut c_void,
             ) {
-                // Triggered by a SIGSEGV writing to protected page
-                assert!(signum == SIGSEGV);
+                // Triggered by a SIGSEGV writing to protected page, or SIGBUS on macos
+                assert!(signum == SIGSEGV || signum == SIGBUS);
                 unsafe { recoverable_ptr_make_accessible() };
                 *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = true;
             }
@@ -571,6 +571,7 @@ macro_rules! guest_fault_tests {
                     SigSet::all(),
                 );
                 unsafe { sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds") };
+                unsafe { sigaction(Signal::SIGBUS, &sa).expect("sigaction succeeds") };
 
                 match inst.run("illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
@@ -617,8 +618,8 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *mut siginfo_t,
                 _ucontext_ptr: *mut c_void,
             ) {
-                // Triggered by a SIGSEGV writing to protected page
-                assert!(signum == SIGSEGV);
+                // Triggered by a SIGSEGV writing to protected page, or SIGBUS on macos
+                assert!(signum == SIGSEGV || signum == SIGBUS);
                 unsafe { recoverable_ptr_make_accessible() };
                 *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = true;
             }
@@ -638,8 +639,10 @@ macro_rules! guest_fault_tests {
                     SigSet::empty(),
                 );
 
-                let saved_sa =
+                let saved_sigsegv_sa =
                     unsafe { sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds") };
+                let saved_sigbus_sa =
+                    unsafe { sigaction(Signal::SIGBUS, &sa).expect("sigaction succeeds") };
 
                 // The original thread will run `sleepy_guest`, and the new thread will dereference a null
                 // pointer after a delay. This should lead to a sigsegv while the guest is running,
@@ -680,7 +683,12 @@ macro_rules! guest_fault_tests {
                 unsafe {
                     recoverable_ptr_teardown();
                     // sigaltstack(&saved_sigstack).expect("sigaltstack succeeds");
-                    sigaction(Signal::SIGSEGV, &saved_sa).expect("sigaction succeeds");
+                    sigaction(Signal::SIGSEGV, &saved_sigsegv_sa).expect("sigaction succeeds");
+                }
+                unsafe {
+                    recoverable_ptr_teardown();
+                    // sigaltstack(&saved_sigstack).expect("sigaltstack succeeds");
+                    sigaction(Signal::SIGBUS, &saved_sigbus_sa).expect("sigaction succeeds");
                 }
 
                 drop(recoverable_ptr_lock);
@@ -720,7 +728,7 @@ macro_rules! guest_fault_tests {
                     ForkResult::Parent { child } => {
                         match waitpid(Some(child), None).expect("can wait on child") {
                             WaitStatus::Signaled(_, sig, _) => {
-                                assert_eq!(sig, Signal::SIGSEGV);
+                                assert!(sig == Signal::SIGSEGV || sig == Signal::SIGBUS);
                             }
                             ws => panic!("unexpected wait status: {:?}", ws),
                         }
