@@ -120,6 +120,7 @@ pub struct Options {
     pub pk_path: Option<PathBuf>,
     pub sk_path: Option<PathBuf>,
     pub count_instructions: bool,
+    pub pinned_heap: bool,
     pub error_style: ErrorStyle,
     pub target: Triple,
 }
@@ -212,6 +213,7 @@ impl Options {
         let sk_path = m.value_of("sk_path").map(PathBuf::from);
         let pk_path = m.value_of("pk_path").map(PathBuf::from);
         let count_instructions = m.is_present("count_instructions");
+        let pinned_heap = m.is_present("pinned_heap");
 
         let error_style = match m.value_of("error_style") {
             None => ErrorStyle::default(),
@@ -240,6 +242,7 @@ impl Options {
             sk_path,
             pk_path,
             count_instructions,
+            pinned_heap,
             error_style,
             target,
         })
