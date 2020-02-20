@@ -286,11 +286,21 @@ impl KillState {
     }
 }
 
+/// Instance execution domains.
+///
+/// This enum allow us to distinguish what an appropriate mechanism to signal termination is.
+#[derive(Debug, PartialEq)]
 pub enum Domain {
+    /// Represents an instance that is not currently running.
+    /// FIXME KTM 2020-02-20: Maybe we should call this `Ready` or `Paused`.
     Pending,
+    /// Represents an instance that is executing guest code.
     Guest,
+    /// Represents an instance that is executing host code.
     Hostcall,
+    /// Represents an instance that has been signalled to terminate while running code.
     Terminated,
+    /// Represents an instance that has been cancelled before it began running code.
     Cancelled,
 }
 
