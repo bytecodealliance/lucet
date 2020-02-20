@@ -39,17 +39,17 @@
 .align 16
 lucet_context_bootstrap:
 _lucet_context_bootstrap:
-	// Move each of the argument values into the corresponding call
-	// argument register.
-  pop %r9
-  pop %r8
-  pop %rcx
-  pop %rdx
-  pop %rsi
-  pop %rdi
+    // Move each of the argument values into the corresponding call
+    // argument register.
+    pop %r9
+    pop %r8
+    pop %rcx
+    pop %rdx
+    pop %rsi
+    pop %rdi
 
-	/* the next thing on the stack is the guest function - return to it */
-	ret
+    /* the next thing on the stack is the guest function - return to it */
+    ret
 #ifdef __ELF__
 .size lucet_context_bootstrap,.-lucet_context_bootstrap
 #endif
@@ -66,7 +66,7 @@ lucet_context_backstop:
 _lucet_context_backstop:
     // Note that `rbp` here really has no relation to any stack!
     // Instead, it's a pointer to the guest context.
-    mov (10*8 + 8*16 + 8*2 + 16)(%rbp), %rdi // load the parent context to forward values in return value registers
+    mov (10*8 + 8*16 + 8*2 + 16)(%rbp), %rdi /* load the parent context to forward values in return value registers */
     mov %rax, (10*8 + 8*16 + 8*0)(%rbp) /* store return values before swapping back -- offset is offsetof(struct lucet_context, retvals) */
     mov %rdx, (10*8 + 8*16 + 8*1)(%rbp)
     movdqu %xmm0, (10*8 + 8*16 + 8*2)(%rbp) /* floating-point return value */
@@ -86,8 +86,8 @@ _lucet_context_backstop:
     call *%rsi
 
 no_backstop_callback:
-    mov %rbp, %rdi // load the guest context to the "from" argument
-    mov (10*8 + 8*16 + 8*2 + 16)(%rbp), %rsi // load the parent context to the "to" argument
+    mov %rbp, %rdi /* load the guest context to the "from" argument */
+    mov (10*8 + 8*16 + 8*2 + 16)(%rbp), %rsi /* load the parent context to the "to" argument */
 
 #ifdef __ELF__
     jmp lucet_context_swap@PLT
