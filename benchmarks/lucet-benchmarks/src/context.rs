@@ -347,7 +347,7 @@ fn context_pthread_sigmask(c: &mut Criterion) {
     use nix::sys::signal;
     c.bench_function("context_pthread_sigmask", |b| {
         b.iter_batched(
-            || signal::SigSet::empty(),
+            signal::SigSet::empty,
             |mut sigset| {
                 signal::pthread_sigmask(signal::SigmaskHow::SIG_SETMASK, None, Some(&mut sigset))
                     .unwrap()

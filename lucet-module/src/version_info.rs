@@ -25,7 +25,7 @@ pub struct VersionInfo {
 }
 
 impl fmt::Display for VersionInfo {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "{}.{}.{}", self.major, self.minor, self.patch)?;
         if u64::from_ne_bytes(self.version_hash) != 0 {
             write!(

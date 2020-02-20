@@ -441,27 +441,25 @@ unsafe fn mmap_aligned(
 
     {
         let unused_front = aligned - unaligned;
-        if unused_front != 0 {
-            if munmap(unaligned as *mut c_void, unused_front).is_err() {
-                // explicitly ignore failures now, as this is just a best-effort clean up after the last fail
-                let _ = munmap(unaligned as *mut c_void, padded_length);
-                return Err(Error::Unsupported("Could not align memory".to_string()));
-            }
+        if unused_front != 0 && munmap(unaligned as *mut c_void, unused_front).is_err() {
+            // explicitly ignore failures now, as this is just a best-effort clean up after the last fail
+            let _ = munmap(unaligned as *mut c_void, padded_length);
+            return Err(Error::Unsupported("Could not align memory".to_string()));
         }
     }
 
     {
         let unused_back = (unaligned + (padded_length - 1)) - (aligned + (requested_length - 1));
-        if unused_back != 0 {
-            if munmap((aligned + requested_length) as *mut c_void, unused_back).is_err() {
-                // explicitly ignore failures now, as this is just a best-effort clean up after the last fail
-                let _ = munmap(unaligned as *mut c_void, padded_length);
-                return Err(Error::Unsupported("Could not align memory".to_string()));
-            }
+        if unused_back != 0
+            && munmap((aligned + requested_length) as *mut c_void, unused_back).is_err()
+        {
+            // explicitly ignore failures now, as this is just a best-effort clean up after the last fail
+            let _ = munmap(unaligned as *mut c_void, padded_length);
+            return Err(Error::Unsupported("Could not align memory".to_string()));
         }
     }
 
-    return Ok(aligned as *mut c_void);
+    Ok(aligned as *mut c_void)
 }
 
 // TODO: remove this once `nix` PR https://github.com/nix-rust/nix/pull/991 is merged

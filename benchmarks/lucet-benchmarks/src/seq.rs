@@ -10,10 +10,10 @@ use tempfile::TempDir;
 /// Common definiton of OptLevel
 const BENCHMARK_OPT_LEVEL: OptLevel = OptLevel::SpeedAndSize;
 
-const DENSE_HEAP_SIZES_KB: &'static [usize] =
+const DENSE_HEAP_SIZES_KB: &[usize] =
     &[0, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2 * 1024, 4 * 1024];
 
-const SPARSE_HEAP_SIZES_KB: &'static [usize] = &[0, 256, 512, 1024, 2 * 1024, 4 * 1024];
+const SPARSE_HEAP_SIZES_KB: &[usize] = &[0, 256, 512, 1024, 2 * 1024, 4 * 1024];
 
 /// End-to-end instance instantiation.
 ///
@@ -140,7 +140,7 @@ fn hello_drop_instance<R: RegionCreate + 'static>(c: &mut Criterion) {
         move |b| {
             b.iter_batched(
                 || region.new_instance(module.clone()).unwrap(),
-                |inst| body(inst),
+                body,
                 criterion::BatchSize::PerIteration,
             )
         },
@@ -166,7 +166,7 @@ fn drop_instance_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
             let module = large_dense_heap_mock(heap_kb);
             b.iter_batched(
                 || region.clone().new_instance(module.clone()).unwrap(),
-                |inst| body(inst),
+                body,
                 criterion::BatchSize::PerIteration,
             )
         },
@@ -192,7 +192,7 @@ fn drop_instance_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) 
             let module = large_sparse_heap_mock(heap_kb, 8);
             b.iter_batched(
                 || region.clone().new_instance(module.clone()).unwrap(),
-                |inst| body(inst),
+                body,
                 criterion::BatchSize::PerIteration,
             )
         },

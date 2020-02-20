@@ -9,7 +9,7 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         123
     }
 
-    extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) -> () {
+    extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) {
         extern "C" {
             // actually is defined in this file
             fn hostcall_test(vmctx: *mut lucet_vmctx);
@@ -20,11 +20,11 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         }
     }
 
-    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) -> () {
+    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
         loop {}
     }
 
-    extern "C" fn fatal(vmctx: *mut lucet_vmctx) -> () {
+    extern "C" fn fatal(vmctx: *mut lucet_vmctx) {
         extern "C" {
             fn lucet_vmctx_get_heap(vmctx: *mut lucet_vmctx) -> *mut u8;
         }
@@ -37,11 +37,11 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
             // so that memory is unmapped. We assume no more than 16 instances are mapped
             // concurrently. This may change as the library, test configuration, linker, phase of
             // moon, etc change, but for now it works.
-            *heap_base.offset(0x200026000 * 16) = 0;
+            *heap_base.offset(0x0002_0002_6000 * 16) = 0;
         }
     }
 
-    extern "C" fn hit_sigstack_guard_page(vmctx: *mut lucet_vmctx) -> () {
+    extern "C" fn hit_sigstack_guard_page(vmctx: *mut lucet_vmctx) {
         extern "C" {
             fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut u8;
         }
@@ -54,7 +54,7 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
         }
     }
 
-    extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) -> () {
+    extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) {
         use std::os::raw::c_char;
         extern "C" {
             fn guest_recoverable_get_ptr() -> *mut c_char;
@@ -86,12 +86,12 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
     //
     // The offset below then should be 29, and the function length is 41.
 
-    static ILLEGAL_INSTR_TRAPS: &'static [TrapSite] = &[TrapSite {
+    static ILLEGAL_INSTR_TRAPS: &[TrapSite] = &[TrapSite {
         offset: 8,
         code: TrapCode::BadSignature,
     }];
 
-    static OOB_TRAPS: &'static [TrapSite] = &[TrapSite {
+    static OOB_TRAPS: &[TrapSite] = &[TrapSite {
         offset: 29,
         code: TrapCode::HeapOutOfBounds,
     }];

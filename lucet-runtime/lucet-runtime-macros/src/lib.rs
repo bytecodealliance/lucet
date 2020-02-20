@@ -62,7 +62,7 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     // replace the first argument to the raw hostcall with the vmctx pointer
-    if let Some(arg0) = raw_sig.inputs.iter_mut().nth(0) {
+    if let Some(arg0) = raw_sig.inputs.iter_mut().next() {
         let lucet_vmctx: syn::FnArg = syn::parse_quote!(vmctx_raw: *mut #vmctx_mod::lucet_vmctx);
         *arg0 = lucet_vmctx;
     }

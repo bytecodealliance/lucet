@@ -442,7 +442,7 @@ impl Limits {
     pub const fn default() -> Limits {
         Limits {
             heap_memory_size: 16 * 64 * 1024,
-            heap_address_space_size: 0x200000000,
+            heap_address_space_size: 0x0002_0000_0000,
             stack_size: 128 * 1024,
             globals_size: 4096,
             signal_stack_size: DEFAULT_SIGNAL_STACK_SIZE,

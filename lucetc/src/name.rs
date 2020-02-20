@@ -9,10 +9,7 @@ pub struct Name {
 
 impl Name {
     pub fn new(symbol: String, id: FuncOrDataId) -> Self {
-        Self {
-            symbol: symbol,
-            id: id,
-        }
+        Self { symbol, id }
     }
 
     pub fn new_func(symbol: String, id: FuncId) -> Self {

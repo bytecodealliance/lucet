@@ -5,7 +5,7 @@ fn run_core_spec_test(name: &str) {
     assert!(file.exists());
     let run = lucet_spectest::run_spec_test(&file).unwrap();
     run.report(); // Print to stdout
-    if run.failed().len() > 0 {
+    if !run.failed().is_empty() {
         panic!("{} had {} failures", name, run.failed().len());
     }
 }

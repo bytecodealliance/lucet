@@ -1,5 +1,3 @@
-use cc;
-
 fn main() {
     build_c_api_tests();
 }

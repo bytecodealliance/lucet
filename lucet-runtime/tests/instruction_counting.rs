@@ -43,7 +43,7 @@ pub fn check_instruction_count_off() {
     let files: Vec<DirEntry> = get_instruction_count_test_files();
 
     assert!(
-        files.len() > 0,
+        !files.is_empty(),
         "there are no test cases in the `instruction_counting` directory"
     );
 
@@ -72,7 +72,7 @@ pub fn check_instruction_count() {
     let files: Vec<DirEntry> = get_instruction_count_test_files();
 
     assert!(
-        files.len() > 0,
+        !files.is_empty(),
         "there are no test cases in the `instruction_counting` directory"
     );
 

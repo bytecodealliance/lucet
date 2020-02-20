@@ -122,14 +122,14 @@ impl Compile {
     pub fn compile<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
         let clang = wasm_clang();
         if !clang.exists() {
-            Err(CompileError::FileNotFound(
+            return Err(CompileError::FileNotFound(
                 clang.to_string_lossy().into_owned(),
-            ))?;
+            ));
         }
         if !self.input.exists() {
-            Err(CompileError::FileNotFound(
+            return Err(CompileError::FileNotFound(
                 self.input.to_string_lossy().into_owned(),
-            ))?;
+            ));
         }
         let mut cmd = Command::new(clang);
         cmd.arg(format!("--target={}", WASI_TARGET));
@@ -179,16 +179,16 @@ impl Link {
     pub fn link<P: AsRef<Path>>(&self, output: P) -> Result<(), CompileError> {
         let clang = wasm_clang();
         if !clang.exists() {
-            Err(CompileError::FileNotFound(
+            return Err(CompileError::FileNotFound(
                 clang.to_string_lossy().into_owned(),
-            ))?;
+            ));
         }
         let mut cmd = Command::new(clang);
         for input in self.input.iter() {
             if !input.exists() {
-                Err(CompileError::FileNotFound(
+                return Err(CompileError::FileNotFound(
                     input.to_string_lossy().into_owned(),
-                ))?;
+                ));
             }
             cmd.arg(input.clone());
         }
@@ -252,7 +252,7 @@ impl<'t> LinkOpt<'t> {
         match self {
             LinkOpt::AllowUndefinedAll => vec!["--allow-undefined".to_string()],
             LinkOpt::DefaultOpts => vec!["--no-threads".to_string()],
-            LinkOpt::Export(symbol) => vec![format!("--export={}", symbol).to_string()],
+            LinkOpt::Export(symbol) => vec![format!("--export={}", symbol)],
             LinkOpt::ExportAll => vec!["--export-all".to_string()],
             LinkOpt::NoDefaultEntryPoint => vec!["--no-entry".to_string()],
             LinkOpt::Shared => vec!["--shared".to_string()],

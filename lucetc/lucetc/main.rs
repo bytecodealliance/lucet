@@ -13,7 +13,7 @@ use lucetc::{
     Lucetc, LucetcOpts,
 };
 use serde::Serialize;
-use serde_json;
+
 use std::path::PathBuf;
 use std::process;
 
@@ -97,7 +97,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
             let validator = Validator::load(&opts.witx_specs[0])?.with_wasi_exe(opts.wasi_exe);
             c.validator(validator);
         }
-        _ => Err(format_err!("multiple witx specs not yet supported"))?,
+        _ => return Err(format_err!("multiple witx specs not yet supported")),
     }
 
     if let Some(ref builtins) = opts.builtins_path {
@@ -152,7 +152,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
 fn keygen(opts: &Options) -> Result<(), Error> {
     let (pk_path, sk_path) = match (&opts.pk_path, &opts.sk_path) {
         (Some(pk_path), Some(sk_path)) => (pk_path, sk_path),
-        _ => Err(format_err!("Keypair generation requires --signature-pk and --signature-sk to specify where the keys should be stored to"))?
+        _ => return Err(format_err!("Keypair generation requires --signature-pk and --signature-sk to specify where the keys should be stored to"))
     };
     signature::keygen(pk_path, sk_path)?;
     Ok(())

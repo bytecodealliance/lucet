@@ -39,7 +39,7 @@ impl<'a> GlobalSpec<'a> {
     }
 
     pub fn is_internal(&self) -> bool {
-        self.export_names.len() == 0
+        self.export_names.is_empty()
     }
 }
 

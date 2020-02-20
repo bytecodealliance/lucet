@@ -230,7 +230,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                     inst.state = State::Faulted {
                         details: FaultDetails {
                             fatal: unknown_fault || outside_guard,
-                            trapcode: trapcode,
+                            trapcode,
                             rip_addr,
                             // Details set to `None` here: have to wait until `verify_trap_safety` to
                             // fill in these details, because access may not be signal safe.
@@ -399,7 +399,6 @@ unsafe fn reraise_host_signal_in_handler(
             // don't do anything; if we hit this case, whatever program is hosting us is almost
             // certainly doing something wrong, because our set of signals requires intervention to
             // proceed
-            return;
         }
         SigHandler::Handler(f) => {
             // call the saved handler directly so there is no altstack confusion

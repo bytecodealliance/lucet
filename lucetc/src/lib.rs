@@ -33,7 +33,6 @@ use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};
 use target_lexicon::Triple;
-use tempfile;
 
 enum LucetcInput {
     Bytes(Vec<u8>),
@@ -425,7 +424,7 @@ where
             objpath.as_ref().to_str().unwrap(),
             String::from_utf8_lossy(&run_ld.stderr)
         );
-        Err(Error::LdError(message))?;
+        return Err(Error::LdError(message));
     }
     Ok(())
 }

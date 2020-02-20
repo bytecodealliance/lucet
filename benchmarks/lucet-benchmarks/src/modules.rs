@@ -49,7 +49,7 @@ pub fn large_dense_heap_mock(heap_kb: usize) -> Arc<dyn Module> {
     };
 
     let mut heap = vec![0x00; heap_len];
-    (0..heap_len).into_iter().for_each(|i| {
+    (0..heap_len).for_each(|i| {
         heap[i] = (i % 256) as u8;
     });
 
@@ -78,14 +78,11 @@ pub fn large_sparse_heap_mock(heap_kb: usize, stride: usize) -> Arc<dyn Module> 
     let mut heap = vec![0x00; heap_len];
 
     // fill every `stride`th page with data
-    (0..heap_len)
-        .into_iter()
-        .step_by(4096 * stride)
-        .for_each(|base| {
-            for i in base..base + 4096 {
-                heap[i] = (i % 256) as u8;
-            }
-        });
+    (0..heap_len).step_by(4096 * stride).for_each(|base| {
+        for i in base..base + 4096 {
+            heap[i] = (i % 256) as u8;
+        }
+    });
 
     MockModuleBuilder::new()
         .with_export_func(MockExportBuilder::new(
@@ -236,7 +233,7 @@ pub fn hostcalls_mock() -> Arc<dyn Module> {
         x14: u64,
         x15: u64,
         x16: u64,
-    ) -> () {
+    ) {
         vmctx.heap_mut()[0] =
             (x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + x11 + x12 + x13 + x14 + x15 + x16)
                 as u8;

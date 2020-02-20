@@ -32,7 +32,7 @@ fn parse_humansized(desc: &str) -> Result<u64, Error> {
             Ok(bytes.value() as u64)
         }
         Err(ParsingError::MissingMultiple) => Ok(desc.parse::<u64>()?),
-        Err(e) => Err(e)?,
+        Err(e) => Err(e.into()),
     }
 }
 

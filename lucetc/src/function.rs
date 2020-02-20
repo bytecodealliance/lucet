@@ -87,8 +87,8 @@ impl<'a> FuncInfo<'a> {
 
     fn update_instruction_count_instrumentation(
         &mut self,
-        op: &Operator,
-        builder: &mut FunctionBuilder,
+        op: &Operator<'_>,
+        builder: &mut FunctionBuilder<'_>,
         reachable: bool,
     ) -> WasmResult<()> {
         // So the operation counting works like this:
@@ -110,7 +110,7 @@ impl<'a> FuncInfo<'a> {
         // * Return corresponds to exactly one function call, so we can count it by resetting the
         // stack to 1 at return of a function.
 
-        fn flush_counter(environ: &mut FuncInfo, builder: &mut FunctionBuilder) {
+        fn flush_counter(environ: &mut FuncInfo<'_>, builder: &mut FunctionBuilder<'_>) {
             if environ.scope_costs.last() == Some(&0) {
                 return;
             }
@@ -137,7 +137,7 @@ impl<'a> FuncInfo<'a> {
                 ir::types::I64,
                 i64::from(*environ.scope_costs.last().unwrap()),
             );
-            let new_instr_count = builder.ins().iadd(cur_instr_count, update_const.into());
+            let new_instr_count = builder.ins().iadd(cur_instr_count, update_const);
             builder
                 .ins()
                 .store(trusted_mem, new_instr_count, addr, instr_count_offset);
@@ -494,8 +494,8 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn before_translate_operator(
         &mut self,
-        op: &Operator,
-        builder: &mut FunctionBuilder,
+        op: &Operator<'_>,
+        builder: &mut FunctionBuilder<'_>,
         state: &FuncTranslationState,
     ) -> WasmResult<()> {
         if self.count_instructions {

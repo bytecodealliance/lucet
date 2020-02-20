@@ -80,7 +80,6 @@ fn par_run<R: RegionCreate + 'static>(
         let region = R::create(instances_per_run, &Limits::default()).unwrap();
 
         (0..instances_per_run)
-            .into_iter()
             .map(|_| region.new_instance(module.clone()).unwrap())
             .collect::<Vec<InstanceHandle>>()
     };

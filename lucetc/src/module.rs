@@ -365,7 +365,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         match self.table_elems.entry(table_index) {
             Entry::Occupied(mut occ) => occ.get_mut().push(table_elems),
             Entry::Vacant(vac) => {
-                if self.tables.len() == 0 && table_index == TableIndex::new(0) {
+                if self.tables.is_empty() && table_index == TableIndex::new(0) {
                     let table = Table {
                         ty: TableElementType::Func,
                         minimum: 0,
