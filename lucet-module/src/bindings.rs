@@ -11,7 +11,7 @@ pub struct Bindings {
 
 impl Bindings {
     pub fn new(bindings: HashMap<String, HashMap<String, String>>) -> Bindings {
-        Self { bindings: bindings }
+        Self { bindings }
     }
 
     pub fn env(env: HashMap<String, String>) -> Bindings {
@@ -27,7 +27,7 @@ impl Bindings {
     pub fn from_json(v: &Value) -> Result<Bindings, Error> {
         match v.as_object() {
             Some(modules) => Self::parse_modules_json_obj(modules),
-            None => Err(Error::ParseJsonObjError)?,
+            None => Err(Error::ParseJsonObjError),
         }
     }
 
@@ -53,11 +53,11 @@ impl Bindings {
                             }
                             Entry::Occupied(e) => {
                                 if binding != e.get() {
-                                    Err(Error::RebindError {
+                                    return Err(Error::RebindError {
                                         key: e.key().to_owned(),
                                         binding: binding.to_owned(),
                                         attempt: e.get().to_owned(),
-                                    })?;
+                                    });
                                 }
                             }
                         }
@@ -96,10 +96,10 @@ impl Bindings {
                     res.insert(modulename.to_owned(), methodmap);
                 }
                 None => {
-                    Err(Error::ParseError {
+                    return Err(Error::ParseError {
                         key: modulename.to_owned(),
                         value: values.to_string(),
-                    })?;
+                    });
                 }
             }
         }
@@ -114,10 +114,10 @@ impl Bindings {
                     res.insert(method.to_owned(), importbinding.to_owned());
                 }
                 None => {
-                    Err(Error::ParseError {
+                    return Err(Error::ParseError {
                         key: method.to_owned(),
                         value: i.to_string(),
-                    })?;
+                    });
                 }
             }
         }

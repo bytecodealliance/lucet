@@ -370,7 +370,7 @@ impl<'a> ModuleDecls<'a> {
                         "module reserved size ({}) exceeds max reserved size ({})",
                         reserved_size, heap_settings.max_reserved_size
                     );
-                    Err(Error::MemorySpecs(message))?;
+                    return Err(Error::MemorySpecs(message));
                 }
                 // Find the max size permitted by the heap and the memory spec
                 let max_size = memory.maximum.map(|pages| pages as u64 * wasm_page);
@@ -383,7 +383,7 @@ impl<'a> ModuleDecls<'a> {
             }
             _ => Err(Error::Unsupported(
                 "lucetc only supports memory 0".to_string(),
-            ))?,
+            )),
         }
     }
     // ********************* Public Interface **************************
@@ -474,7 +474,7 @@ impl<'a> ModuleDecls<'a> {
         self.info
             .signature_mapping
             .get(signature_index)
-            .map(|x| *x)
+            .copied()
             .ok_or_else(|| {
                 let message = format!("signature out of bounds: {:?}", signature_index);
                 Error::Signature(message)

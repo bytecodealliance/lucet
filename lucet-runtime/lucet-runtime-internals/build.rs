@@ -2,8 +2,6 @@ use std::env;
 use std::fs::File;
 use std::path::Path;
 
-use cc;
-
 fn main() {
     cc::Build::new()
         .file("src/context/context_asm.S")

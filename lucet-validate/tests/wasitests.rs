@@ -3,7 +3,6 @@ mod lucet_validate_tests {
     use lucet_validate::Validator;
     use std::fs;
     use std::path::Path;
-    use wabt;
 
     fn c_to_wasm(c_path: &Path) -> Vec<u8> {
         use lucet_wasi_sdk::Link;
@@ -57,7 +56,7 @@ mod lucet_validate_tests {
             };
             validator
                 .validate(&entry_wasm)
-                .expect(&format!("validate {:?}", entry_path));
+                .unwrap_or_else(|_| panic!("validate {:?}", entry_path));
         }
     }
 }

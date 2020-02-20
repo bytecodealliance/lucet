@@ -12,4 +12,4 @@ pub use wasi::export_wasi_funcs;
 pub use wasi_common::{wasi::__wasi_exitcode_t, Error, WasiCtx, WasiCtxBuilder};
 
 // Wasi executables export the following symbol for the entry point:
-pub const START_SYMBOL: &'static str = "_start";
+pub const START_SYMBOL: &str = "_start";

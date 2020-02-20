@@ -28,7 +28,7 @@ pub unsafe extern "C" fn lucet_wasi_ctx_args(
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
     let args_raw = std::slice::from_raw_parts(argv, argc);
     let args: Result<Vec<&str>, _> = args_raw
-        .into_iter()
+        .iter()
         .map(|arg| CStr::from_ptr(*arg).to_str())
         .collect();
     let args = match args {

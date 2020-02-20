@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
 
-pub const LUCET_WASI_ROOT: &'static str = env!("CARGO_MANIFEST_DIR");
+pub const LUCET_WASI_ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 pub fn test_module_wasi<P: AsRef<Path>>(cfile: P) -> Result<Arc<dyn Module>, Error> {
     let c_path = guest_file(&cfile);

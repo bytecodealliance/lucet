@@ -86,14 +86,14 @@ impl<'a> Compiler<'a> {
 
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
-                WasmError::User(u) => Error::Input(u.to_string()),
+                WasmError::User(u) => Error::Input(u),
                 WasmError::InvalidWebAssembly { .. } => {
                     // Since wasmparser was already used to validate,
                     // reaching this case means there's a significant
                     // bug in either wasmparser or cranelift-wasm.
                     unreachable!();
                 }
-                WasmError::Unsupported(s) => Error::Unsupported(s.to_owned()),
+                WasmError::Unsupported(s) => Error::Unsupported(s),
                 WasmError::ImplLimitExceeded { .. } => Error::ClifWasmError(e),
             })?;
 

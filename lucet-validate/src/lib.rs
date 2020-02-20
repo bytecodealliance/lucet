@@ -4,7 +4,7 @@ mod types;
 use std::path::Path;
 use std::rc::Rc;
 use thiserror::Error;
-use wasmparser;
+
 use witx::{self, Id, Module};
 
 pub use self::moduletype::ModuleType;
@@ -94,12 +94,12 @@ impl Validator {
                 })?;
             let spec_type = FuncSignature::from(func.core_type());
             if spec_type != import.ty {
-                Err(Error::ImportTypeError {
+                return Err(Error::ImportTypeError {
                     module: import.module,
                     field: import.field,
                     got: import.ty,
                     expected: spec_type,
-                })?;
+                });
             }
         }
 

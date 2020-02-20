@@ -606,8 +606,10 @@ mod compile {
             &None,
             false,
         )
-        .expect(&format!("compile {}", file));
-        let _obj = c.object_file().expect(&format!("codegen {}", file));
+        .unwrap_or_else(|_| panic!("compile {}", file));
+        let _obj = c
+            .object_file()
+            .unwrap_or_else(|_| panic!("codegen {}", file));
     }
     macro_rules! compile_test {
         ($base_name:ident) => {

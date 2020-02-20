@@ -35,7 +35,7 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
     for initializer in decl.elems.iter() {
         if initializer.base.is_some() {
             let message = format!("table elements with global index base: {:?}", initializer);
-            Err(Error::Unsupported(message))?
+            return Err(Error::Unsupported(message));
         }
         let final_len = initializer.offset + initializer.elements.len();
         if final_len > elems.len() {

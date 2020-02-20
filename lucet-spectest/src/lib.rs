@@ -70,9 +70,9 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                 Err(ScriptError::ValidationError(_)) => Ok(()),
                 Ok(_) => {
                     script.delete_last();
-                    Err(Error::UnexpectedSuccess)?
+                    Err(Error::UnexpectedSuccess)
                 }
-                Err(e) => Err(unexpected_failure(e))?,
+                Err(e) => Err(unexpected_failure(e)),
             }
         }
 
@@ -81,8 +81,8 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
                 Err(ScriptError::ValidationError(_)) => Ok(()),
-                Ok(_) => Err(Error::UnexpectedSuccess)?,
-                Err(e) => Err(unexpected_failure(e))?,
+                Ok(_) => Err(Error::UnexpectedSuccess),
+                Err(e) => Err(unexpected_failure(e)),
             }
         }
 
@@ -91,8 +91,8 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
                 Err(ScriptError::InstantiateError(_)) => Ok(()),
-                Ok(_) => Err(Error::UnexpectedSuccess)?,
-                Err(e) => Err(unexpected_failure(e))?,
+                Ok(_) => Err(Error::UnexpectedSuccess),
+                Err(e) => Err(unexpected_failure(e)),
             }
         }
 
@@ -101,8 +101,8 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
             let module = module.clone().into_vec();
             match script.instantiate(&module, &None) {
                 Err(ScriptError::ValidationError(_)) => Ok(()),
-                Ok(_) => Err(Error::UnexpectedSuccess)?,
-                Err(e) => Err(unexpected_failure(e))?,
+                Ok(_) => Err(Error::UnexpectedSuccess),
+                Err(e) => Err(unexpected_failure(e)),
             }
         }
 
@@ -130,7 +130,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
             }
             _ => {
                 let message = format!("invoke {:?}", action);
-                Err(Error::UnsupportedCommand(message))?
+                Err(Error::UnsupportedCommand(message))
             }
         },
 
@@ -148,7 +148,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                 let args = translate_args(args);
                 let res = script.run(module, field, args);
                 match res {
-                    Ok(_) => Err(Error::UnexpectedSuccess)?,
+                    Ok(_) => Err(Error::UnexpectedSuccess),
 
                     Err(ScriptError::RuntimeError(RuntimeError::RuntimeFault(details))) => {
                         match details.trapcode {
@@ -156,17 +156,17 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                             e => {
                                 let message =
                                     format!("AssertExhaustion expects stack overflow, got {:?}", e);
-                                Err(Error::UnexpectedFailure(message))?
+                                Err(Error::UnexpectedFailure(message))
                             }
                         }
                     }
 
-                    Err(e) => Err(unexpected_failure(e))?,
+                    Err(e) => Err(unexpected_failure(e)),
                 }
             }
             _ => {
                 let message = format!("invoke {:?}", action);
-                Err(Error::UnsupportedCommand(message))?
+                Err(Error::UnsupportedCommand(message))
             }
         },
 
@@ -190,7 +190,7 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                 check_retval(expected, res)?;
                 Ok(())
             }
-            _ => Err(Error::UnsupportedCommand("non-invoke action".to_owned()))?,
+            _ => Err(Error::UnsupportedCommand("non-invoke action".to_owned())),
         },
         CommandKind::AssertReturnCanonicalNan { action }
         | CommandKind::AssertReturnArithmeticNan { action } => match action {
@@ -208,10 +208,10 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                     Ok(())
                 } else {
                     let message = format!("expected NaN, got {}", res);
-                    Err(Error::IncorrectResult(message))?
+                    Err(Error::IncorrectResult(message))
                 }
             }
-            _ => Err(Error::UnsupportedCommand("non-invoke action".to_owned()))?,
+            _ => Err(Error::UnsupportedCommand("non-invoke action".to_owned())),
         },
         CommandKind::AssertTrap { ref action, .. } => match action {
             Action::Invoke {
@@ -225,12 +225,12 @@ fn step(script: &mut ScriptEnv, cmd: &CommandKind) -> Result<(), Error> {
                 match res {
                     Err(ScriptError::RuntimeError(_luceterror)) => Ok(()),
                     Err(e) => Err(unexpected_failure(e)),
-                    Ok(_) => Err(Error::UnexpectedSuccess)?,
+                    Ok(_) => Err(Error::UnexpectedSuccess),
                 }
             }
             _ => {
                 let message = format!("invoke {:?}", action);
-                Err(Error::UnsupportedCommand(message))?
+                Err(Error::UnsupportedCommand(message))
             }
         },
     }
@@ -243,35 +243,35 @@ fn check_retval(expected: &[Value], got: UntypedRetVal) -> Result<(), Error> {
             Value::I32(expected) => {
                 if expected != got.as_i32() {
                     let message = format!("expected {}, got {}", expected, got.as_i32());
-                    Err(Error::IncorrectResult(message))?
+                    return Err(Error::IncorrectResult(message));
                 }
             }
             Value::I64(expected) => {
                 if expected != got.as_i64() {
                     let message = format!("expected {}, got {}", expected, got.as_i64());
-                    Err(Error::IncorrectResult(message))?
+                    return Err(Error::IncorrectResult(message));
                 }
             }
             Value::F32(expected) => {
                 if expected != got.as_f32() && !expected.is_nan() && !got.as_f32().is_nan() {
                     let message = format!("expected {}, got {}", expected, got.as_f32());
-                    Err(Error::IncorrectResult(message))?
+                    return Err(Error::IncorrectResult(message));
                 }
             }
             Value::F64(expected) => {
                 if expected != got.as_f64() && !expected.is_nan() && !got.as_f64().is_nan() {
                     let message = format!("expected {}, got {}", expected, got.as_f64());
-                    Err(Error::IncorrectResult(message))?
+                    return Err(Error::IncorrectResult(message));
                 }
             }
             Value::V128(v) => {
                 let message = format!("got unsupported SIMD V128 value: {}", v);
-                Err(Error::UnsupportedCommand(message))?;
+                return Err(Error::UnsupportedCommand(message));
             }
         },
         n => {
             let message = format!("{} expected return values not supported", n);
-            Err(Error::UnsupportedCommand(message))?
+            return Err(Error::UnsupportedCommand(message));
         }
     }
     Ok(())

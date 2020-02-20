@@ -1,5 +1,3 @@
-use cc;
-
 fn main() {
     // TODO: this should only be built for tests, but Cargo doesn't
     // currently let you specify different build.rs options for tests:

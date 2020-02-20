@@ -69,10 +69,12 @@ impl ModuleType {
                                 let ret = match returns.len() {
                                     0 => None,
                                     1 => Some(wasmparser_to_atomtype(&returns[0])?),
-                                    _ => Err(Error::Unsupported(format!(
-                                        "more than 1 return value: {:?}",
-                                        returns,
-                                    )))?,
+                                    _ => {
+                                        return Err(Error::Unsupported(format!(
+                                            "more than 1 return value: {:?}",
+                                            returns,
+                                        )))
+                                    }
                                 };
                                 let args = params
                                     .iter()
@@ -80,7 +82,7 @@ impl ModuleType {
                                     .collect::<Result<Vec<_>, _>>()?;
                                 module.types.push(FuncSignature { args, ret });
                             }
-                            _ => Err(Error::Unsupported("type section entry".to_string()))?,
+                            _ => return Err(Error::Unsupported("type section entry".to_string())),
                         }
                     }
                 }
@@ -98,22 +100,22 @@ impl ModuleType {
                                 });
                             }
                             ImportSectionEntryType::Memory(_) => {
-                                Err(Error::Unsupported(format!(
+                                return Err(Error::Unsupported(format!(
                                     "memory import {}:{}",
                                     import.module, import.field
-                                )))?;
+                                )));
                             }
                             ImportSectionEntryType::Table(_) => {
-                                Err(Error::Unsupported(format!(
+                                return Err(Error::Unsupported(format!(
                                     "table import {}:{}",
                                     import.module, import.field
-                                )))?;
+                                )));
                             }
                             ImportSectionEntryType::Global(_) => {
-                                Err(Error::Unsupported(format!(
+                                return Err(Error::Unsupported(format!(
                                     "global import {}:{}",
                                     import.module, import.field
-                                )))?;
+                                )));
                             }
                         }
                     }

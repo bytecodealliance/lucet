@@ -782,7 +782,7 @@ impl Instance {
     fn get_instance_implicits(&self) -> &InstanceRuntimeData {
         unsafe {
             let implicits_ptr = (self as *const _ as *const u8)
-                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<InstanceRuntimeData>()) as isize)
+                .add(HOST_PAGE_SIZE_EXPECTED - mem::size_of::<InstanceRuntimeData>())
                 as *const InstanceRuntimeData;
             mem::transmute::<*const InstanceRuntimeData, &InstanceRuntimeData>(implicits_ptr)
         }
@@ -792,7 +792,7 @@ impl Instance {
     fn get_instance_implicits_mut(&mut self) -> &mut InstanceRuntimeData {
         unsafe {
             let implicits_ptr = (self as *mut _ as *mut u8)
-                .offset((HOST_PAGE_SIZE_EXPECTED - mem::size_of::<InstanceRuntimeData>()) as isize)
+                .add(HOST_PAGE_SIZE_EXPECTED - mem::size_of::<InstanceRuntimeData>())
                 as *mut InstanceRuntimeData;
             mem::transmute::<*mut InstanceRuntimeData, &mut InstanceRuntimeData>(implicits_ptr)
         }
@@ -1040,11 +1040,7 @@ impl std::fmt::Display for FaultDetails {
 
         if let Some(ref addr_details) = self.rip_addr_details {
             if let Some(ref fname) = addr_details.file_name {
-                let sname = addr_details
-                    .sym_name
-                    .as_ref()
-                    .map(String::as_str)
-                    .unwrap_or("<unknown>");
+                let sname = addr_details.sym_name.as_deref().unwrap_or("<unknown>");
                 write!(f, " (symbol {}:{})", fname, sname)?;
             }
             if addr_details.in_module_code {

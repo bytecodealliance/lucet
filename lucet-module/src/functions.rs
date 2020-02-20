@@ -120,7 +120,7 @@ impl OwnedFunctionMetadata {
     pub fn to_ref(&self) -> FunctionMetadata<'_> {
         FunctionMetadata {
             signature: self.signature.clone(),
-            name: self.name.as_ref().map(|n| n.as_str()),
+            name: self.name.as_deref(),
         }
     }
 }

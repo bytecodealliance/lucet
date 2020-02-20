@@ -63,12 +63,12 @@ pub fn owned_sparse_data_from_initializers<'a>(
         if initializer.base.is_some() {
             let message =
                 "cannot create sparse data: data initializer uses global as base".to_owned();
-            Err(Error::Unsupported(message))?;
+            return Err(Error::Unsupported(message));
         }
         let chunks = split(initializer);
         for (pagenumber, chunk) in chunks {
             if pagenumber > heap.initial_size as usize / PAGE_SIZE {
-                Err(Error::InitData)?;
+                return Err(Error::InitData);
             }
             let base = chunk.offset as usize;
             let page = match pagemap.entry(pagenumber) {

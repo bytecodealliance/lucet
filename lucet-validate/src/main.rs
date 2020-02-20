@@ -7,7 +7,6 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process;
 use thiserror::Error;
-use witx;
 
 pub fn main() {
     // rebuild if env vars used by app_from_crate! change:

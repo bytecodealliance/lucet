@@ -21,7 +21,7 @@ use structopt::StructOpt;
 use tempfile::TempDir;
 use wait_timeout::ChildExt;
 
-const LUCET_WASI_FUZZ_ROOT: &'static str = env!("CARGO_MANIFEST_DIR");
+const LUCET_WASI_FUZZ_ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 type Seed = c_ulong;
 

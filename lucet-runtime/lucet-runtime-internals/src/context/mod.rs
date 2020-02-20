@@ -5,7 +5,7 @@ mod tests;
 
 use crate::instance::Instance;
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
-use nix;
+
 use nix::sys::signal;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::ptr::NonNull;

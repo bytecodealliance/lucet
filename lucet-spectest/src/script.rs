@@ -100,7 +100,7 @@ impl ScriptEnv {
                 String::from_utf8_lossy(&run_ld.stderr)
             );
 
-            Err(ScriptError::LdError(message))?;
+            return Err(ScriptError::LdError(message));
         }
 
         let lucet_module: Arc<dyn LucetModule> =

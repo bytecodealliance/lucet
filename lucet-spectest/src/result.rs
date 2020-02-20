@@ -42,7 +42,7 @@ impl SpecScriptResult {
 
     pub fn report(&self) {
         println!("{} passed", self.pass.len());
-        if self.skip.len() > 0 {
+        if !self.skip.is_empty() {
             println!("{} skipped:", self.skip.len());
             for (ref cmd, ref err) in &self.skip {
                 println!(
@@ -54,7 +54,7 @@ impl SpecScriptResult {
             }
         }
 
-        if self.fail.len() > 0 {
+        if !self.fail.is_empty() {
             println!("{} failures:", self.fail.len());
             for (ref cmd, ref err) in &self.fail {
                 println!(

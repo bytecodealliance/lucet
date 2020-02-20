@@ -20,7 +20,7 @@ fn main() -> Result<(), Error> {
 
     run.report();
 
-    if run.failed().len() > 0 {
+    if !run.failed().is_empty() {
         Err(Error::RunError(run.failed().len()))
     } else {
         Ok(())

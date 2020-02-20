@@ -88,9 +88,9 @@ pub unsafe extern "C" fn lucet_mmap_region_create(
         Ok(region) => {
             let region_thin = Arc::into_raw(Arc::new(region as Arc<dyn Region>));
             region_out.write(region_thin as _);
-            return lucet_error::Ok;
+            lucet_error::Ok
         }
-        Err(e) => return e.into(),
+        Err(e) => e.into(),
     }
 }
 
@@ -166,7 +166,7 @@ pub unsafe extern "C" fn lucet_instance_run(
         vec![]
     } else {
         std::slice::from_raw_parts(argv, argc)
-            .into_iter()
+            .iter()
             .map(|v| v.into())
             .collect()
     };
@@ -206,7 +206,7 @@ pub unsafe extern "C" fn lucet_instance_run_func_idx(
         vec![]
     } else {
         std::slice::from_raw_parts(argv, argc)
-            .into_iter()
+            .iter()
             .map(|v| v.into())
             .collect()
     };
@@ -432,7 +432,7 @@ pub unsafe extern "C" fn lucet_vmctx_get_func_from_idx(
 
 #[lucet_hostcall]
 #[no_mangle]
-pub unsafe extern "C" fn lucet_vmctx_terminate(_vmctx: &mut Vmctx, details: *mut c_void) -> () {
+pub unsafe extern "C" fn lucet_vmctx_terminate(_vmctx: &mut Vmctx, details: *mut c_void) {
     lucet_hostcall_terminate!(CTerminationDetails { details });
 }
 

@@ -32,7 +32,7 @@ fn parse_humansized(desc: &str) -> Result<u64, Error> {
             Ok(bytes.value() as u64)
         }
         Err(ParsingError::MissingMultiple) => Ok(desc.parse::<u64>()?),
-        Err(e) => Err(e)?,
+        Err(e) => Err(e.into()),
     }
 }
 
@@ -43,7 +43,7 @@ fn humansized(bytes: u64) -> String {
     mb.to_string()
 }
 
-fn cpu_features_from_args(cpu: Option<&str>, features: Values) -> Result<CpuFeatures, Error> {
+fn cpu_features_from_args(cpu: Option<&str>, features: Values<'_>) -> Result<CpuFeatures, Error> {
     use SpecificFeature::*;
     use TargetCpu::*;
     if cpu.is_none() && features.len() == 0 {
@@ -67,7 +67,7 @@ fn cpu_features_from_args(cpu: Option<&str>, features: Values) -> Result<CpuFeat
         };
         let specific_features = features
             .map(|fstr| {
-                let b = match fstr.chars().nth(0) {
+                let b = match fstr.chars().next() {
                     Some('+') => true,
                     Some('-') => false,
                     _ => unreachable!(

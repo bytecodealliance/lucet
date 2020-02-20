@@ -17,15 +17,14 @@ impl ModuleSignature {
     pub fn verify<P: AsRef<Path>>(
         so_path: P,
         pk: &PublicKey,
-        module_data: &ModuleData,
+        module_data: &ModuleData<'_>,
     ) -> Result<(), Error> {
         let signature_box: SignatureBox =
             SignatureBones::from_bytes(&module_data.get_module_signature())
-                .map_err(|e| ModuleSignatureError(e))?
+                .map_err(ModuleSignatureError)?
                 .into();
 
-        let mut raw_module_and_data =
-            RawModuleAndData::from_file(&so_path).map_err(|e| IOError(e))?;
+        let mut raw_module_and_data = RawModuleAndData::from_file(&so_path).map_err(IOError)?;
         let cleared_module_data_bin =
             ModuleData::clear_module_signature(raw_module_and_data.module_data_bin())?;
         raw_module_and_data.patch_module_data(&cleared_module_data_bin);
@@ -37,11 +36,11 @@ impl ModuleSignature {
             true,
             false,
         )
-        .map_err(|e| ModuleSignatureError(e))
+        .map_err(ModuleSignatureError)
     }
 
     pub fn sign<P: AsRef<Path>>(path: P, sk: &SecretKey) -> Result<(), Error> {
-        let raw_module_and_data = RawModuleAndData::from_file(&path).map_err(|e| IOError(e))?;
+        let raw_module_and_data = RawModuleAndData::from_file(&path).map_err(IOError)?;
         let signature_box = minisign::sign(
             None,
             sk,
@@ -50,7 +49,7 @@ impl ModuleSignature {
             None,
             None,
         )
-        .map_err(|e| ModuleSignatureError(e))?;
+        .map_err(ModuleSignatureError)?;
         let signature_bones: SignatureBones = signature_box.into();
         let patched_module_data_bin = ModuleData::patch_module_signature(
             raw_module_and_data.module_data_bin(),
@@ -58,7 +57,7 @@ impl ModuleSignature {
         )?;
         raw_module_and_data
             .write_patched_module_data(&path, &patched_module_data_bin)
-            .map_err(|e| IOError(e))?;
+            .map_err(IOError)?;
         Ok(())
     }
 }
@@ -103,7 +102,7 @@ impl RawModuleAndData {
         Ok(RawModuleAndData {
             obj_bin,
             module_data_offset: module_data_symbol_data.offset,
-            module_data_len: module_data_len,
+            module_data_len,
         })
     }
 

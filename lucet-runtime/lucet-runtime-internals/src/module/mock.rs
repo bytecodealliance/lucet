@@ -340,7 +340,7 @@ impl MockExportBuilder {
     pub fn new(name: &'static str, func: FunctionPointer) -> MockExportBuilder {
         MockExportBuilder {
             sym: name,
-            func: func,
+            func,
             func_len: None,
             traps: None,
             sig: Signature {
