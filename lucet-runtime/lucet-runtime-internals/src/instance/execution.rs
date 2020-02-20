@@ -149,12 +149,25 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
     match *current_domain {
         // We are about to start executing a guest. Set the execution domain accordingly.
         Domain::Pending => *current_domain = Domain::Guest,
+        // `Domain::Guest` is an error because it suggests we might send a SIGALRM before we've
+        // indicated that it safe to do so by `enable_termination`.
+        Domain::Guest => {
+            panic!(
+                "Invalid state: Instance marked as already in guest while entering a guest region."
+            );
+        }
+        Domain::Hostcall => {
+            panic!(
+                "Invalid state: Instance marked as in a hostcall while entering a guest region."
+            );
+        }
+        Domain::Terminated => {
+            panic!("Invalid state: Instance marked as terminated while entering a guest region.");
+        }
         // We are about to enter guest code for an instance that has already been terminated.
         // Instead, we should forgo entering the guest region entirely, terminate the instance, and
         // swap back to the host without any unwinding.
         Domain::Cancelled => (*instance).terminate(TerminationDetails::Remote),
-        // If we are in some other domain, do nothing. These variants are handled elsewhere.
-        _ => {}
     }
     // All systems go! Set the flag showing that we are now running guest code.
     (*instance).kill_state.enable_termination();
@@ -163,10 +176,15 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
 
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
+    let mut current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
+    if let Domain::Guest = *current_domain {
+        *current_domain = Domain::Pending;
+    }
     let terminable = (*instance)
         .kill_state
         .terminable
         .swap(false, Ordering::SeqCst);
+    mem::drop(current_domain);
     if !terminable {
         // Something else has taken the terminable flag, so it's not safe to actually exit a
         // guest context yet. Because this is called when exiting a guest context, the
