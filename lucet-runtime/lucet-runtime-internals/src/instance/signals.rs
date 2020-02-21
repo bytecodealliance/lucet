@@ -252,14 +252,23 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         // during execution in a guest region.
         //
         // In either case, we will need to unlock and update the execution domain ourselves.
-        // We can assume that we can acquire a lock on the execution domain, because a KillSwitch
-        // is not currently waiting for us.
         if switch_to_host {
-            let mut current_domain = inst
-                .kill_state
-                .try_execution_domain()
-                .expect("execution domain is unlocked");
-            *current_domain = execution::Domain::Terminated;
+            // This debug assert exists to make sure that this is not a blocking operation.
+            debug_assert_eq!(inst.kill_state.domain_is_locked(), false);
+            let current_domain = inst.kill_state.execution_domain();
+            match current_domain {
+                Ok(mut current_domain) => {
+                    // If we are here, we should still be in the guest domain.
+                    debug_assert_eq!(*current_domain, execution::Domain::Guest);
+                    *current_domain = execution::Domain::Terminated;
+                }
+                Err(poison_error) => {
+                    // Because a signal must never be sent while the host context is active, we
+                    // will update the domain even if the mutex has been poisoned.
+                    let mut current_domain = poison_error.into_inner();
+                    *current_domain = execution::Domain::Terminated;
+                }
+            };
         }
         switch_to_host
     });

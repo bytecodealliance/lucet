@@ -122,8 +122,7 @@ pub struct Context {
     parent_ctx: *mut Context,
     // TODO ACF 2019-10-23: make Instance into a generic parameter?
     backstop_callback: *const unsafe extern "C" fn(*mut Instance),
-    // FIXME KTM 2020-02-14: this should NOT be pub(crate)
-    pub(crate) backstop_data: *mut Instance,
+    callback_data: *mut Instance,
     sigset: signal::SigSet,
 }
 
@@ -137,9 +136,16 @@ impl Context {
             retval_fp: unsafe { _mm_setzero_ps() },
             parent_ctx: ptr::null_mut(),
             backstop_callback: Context::default_backstop_callback as *const _,
-            backstop_data: ptr::null_mut(),
+            callback_data: ptr::null_mut(),
             sigset: signal::SigSet::empty(),
         }
+    }
+
+    /// Get a raw pointer to the instance's callback data.
+    ///
+    /// REVIEW QUESTION: Should this be `unsafe fn` ? Can aliasing `*mut` lead to UB?
+    pub(crate) fn callback_data_ptr(&self) -> *mut Instance {
+        self.callback_data
     }
 }
 
@@ -384,12 +390,12 @@ impl Context {
     /// guest entrypoint returns.
     ///
     /// After the entrypoint function returns, but before swapping back to the parent context,
-    /// `backstop_callback` will be run with the single argument `backstop_data`.
+    /// `backstop_callback` will be run with the single argument `callback_data`.
     pub fn init_with_callback(
         stack: &mut [u64],
         child: &mut Context,
         backstop_callback: unsafe extern "C" fn(*mut Instance),
-        backstop_data: *mut Instance,
+        callback_data: *mut Instance,
         fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
@@ -399,7 +405,7 @@ impl Context {
 
         if backstop_callback != Context::default_backstop_callback {
             child.backstop_callback = backstop_callback as *const _;
-            child.backstop_data = backstop_data;
+            child.callback_data = callback_data;
         }
 
         let mut gp_args_ix = 0;

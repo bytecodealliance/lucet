@@ -78,7 +78,6 @@
 
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex, Weak};
 
 use crate::instance::{Instance, TerminationDetails};
@@ -327,11 +326,15 @@ impl KillState {
         }
     }
 
-    /// FIXME KTM: This can be merged into the above method. (We're being lazy right now)
-    pub(crate) fn try_execution_domain(
+    /// Acquire a lock on the execution domain.
+    ///
+    /// This is used by an [`Instance`](struct.KillState.html)'s signal handler to disable
+    /// termination before switching to the host context, for signals _other than_ a `SIGALRM`
+    /// that came from a kill switch, rather than some other source.
+    pub(crate) fn execution_domain(
         &self,
-    ) -> std::sync::TryLockResult<std::sync::MutexGuard<'_, Domain>> {
-        self.execution_domain.try_lock()
+    ) -> std::sync::LockResult<std::sync::MutexGuard<'_, Domain>> {
+        self.execution_domain.lock()
     }
 }
 

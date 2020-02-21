@@ -860,39 +860,28 @@ impl Instance {
             &args_with_vmctx,
         )?;
 
-        // Set up the guest to set itself as terminable, then continue to
-        // whatever guest code we want to run.
+        // Set up the guest to set itself as terminable, then continue to whatever guest code we
+        // want to run. `lucet_context_activate` takes three arguments in the following registers:
+        //   * rdi: pointer to the data for the entry function
+        //   * rsi: the address of the entry function
+        //   * rbx: the address of guest code to execute
         //
-        // `lucet_context_activate` takes two arguments:
-        // rsi: address of guest code to execute
-        // rdi: pointer to a bool that indicates the guest can be terminated
-        //
-        // The appropriate value for `rsi` is the top of the guest stack, which
-        // we would otherwise return to and start executing immediately. For
-        // `rdi`, we want to pass a pointer to the instance's `terminable` flag.
+        // The appropriate value for `rbx` is the top of the guest stack, which we would otherwise
+        // return to and start executing immediately. For `rdi`, we want to pass a raw pointer to
+        // the instance, which will be pass
         //
         // once we've set up arguments, swap out the guest return address with
         // `lucet_context_activate` so we start execution there.
-        //
-        // DEV KTM:
-        // in rdi, the data for the setup/frontstop
-        // in rsi, the address of the steup/"frontstop" callback
-        // in rbx, the address of the guest code to resume at.
         unsafe {
             let top_of_stack = self.ctx.gpr.rsp as *mut u64;
             // move the guest code address to rbx
             self.ctx.gpr.rbx = *top_of_stack;
             // replace it with the activation thunk
             *top_of_stack = crate::context::lucet_context_activate as u64;
-            // and store a pointer to indicate we're active
-            self.ctx.gpr.rdi = self.ctx.backstop_data as u64;
+            // store a pointer to pass to the context activation function
+            self.ctx.gpr.rdi = self.ctx.callback_data_ptr() as u64;
             // DEV KTM: Let's try and pass a function pointer!
             self.ctx.gpr.rsi = execution::enter_guest_region as u64;
-            // self.ctx.gpr.rbx = 0xFFFF;
-
-            // DEV KTM:
-            // Let's make `Domain` a u64, explicitly tag the pending and guest invariants.
-            // Then, we can change which invariant it is?
         }
 
         self.swap_and_return()

@@ -80,7 +80,7 @@ _lucet_context_backstop:
     jz no_backstop_callback
 #endif
 
-    // load `backstop_data`, arg 1
+    // load `callback_data`, arg 1
     mov (10*8 + 8*16 + 8*2 + 16 + 8 + 8)(%rbp), %rdi
     // call `backstop_callback`
     call *%rsi
@@ -199,14 +199,18 @@ _lucet_context_set:
 .globl _lucet_context_activate
 #endif
 .align 16
-// lucet_context_activate is essentially a function with three arguments:
-//     * `rdi`  -  the data for the activation setup function.
-//     * `rsi`  -  the address of the activation setup function.
-//     * `rbx`  -  the address of the guest code to resume at.
+// `lucet_context_activate` is essentially a function with three arguments:
+//   * rdi: the data for the entry function.
+//   * rsi: the address of the entry function.
+//   * rbx: the address of the guest code to resume at.
+//
+// First, we the function whose address is stored in `rsi`, passing along the
+// value of `rdi` as the first argument. Then, jump to the guest code at the
+// address in `rbx`.
 lucet_context_activate:
 _lucet_context_activate:
-    call *%rsi /* call `enter_guest_region`, passing along `rdi` */
-    jmp *%rbx /* jump to the guest code */
+    call *%rsi
+    jmp *%rbx
 #ifdef __ELF__
 .size lucet_context_activate,.-lucet_context_activate
 #endif
