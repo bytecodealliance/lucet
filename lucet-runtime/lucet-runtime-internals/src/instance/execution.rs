@@ -224,8 +224,14 @@ impl KillState {
         &self.terminable as *const AtomicBool
     }
 
+    /// Set the execution domain to signify that we are currently executing a hostcall.
+    ///
+    /// This method will panic if the execution domain is currently marked as anything but
+    /// `Domain::Guest`, because any other domain means that we have somehow entered an invalid
+    /// state.
+    ///
+    /// This method will also panic if the mutex on the execution domain has been poisoned.
     pub fn begin_hostcall(&self) {
-        // Lock the current execution domain, so we can update to `Hostcall`.
         let mut current_domain = self.execution_domain.lock().unwrap();
         match *current_domain {
             Domain::Pending => {
@@ -250,6 +256,14 @@ impl KillState {
         }
     }
 
+    /// Set the execution domain to signify that we are finished executing a hostcall.
+    ///
+    /// If the instance was terminated during the hostcall, then we will return termination details
+    /// to the caller signifying that we were remotely terminated. This method will panic if the
+    /// execution domain is currently marked as pending, in guest code, or as cancelled, because
+    /// each of these mean we have somehow entered an invalid state.
+    ///
+    /// This method will also panic if the mutex on the execution domain has been poisoned.
     pub fn end_hostcall(&self) -> Option<TerminationDetails> {
         let mut current_domain = self.execution_domain.lock().unwrap();
         match *current_domain {
