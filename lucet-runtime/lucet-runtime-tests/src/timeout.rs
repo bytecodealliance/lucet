@@ -150,11 +150,16 @@ macro_rules! timeout_tests {
             }
 
             let kill_switch = inst.kill_switch();
-            assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
+            assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled));
 
-            // after a timeout, can reset and run a normal function
+            // if terminated after running, the guest should not run again
+            match inst.run("onetwothree", &[]) {
+                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+                res => panic!("unexpected result: {:?}", res),
+            }
+
+            // after a timeout, can still reset and run a normal function
             inst.reset().expect("instance resets");
-
             run_onetwothree(&mut inst);
         }
 
@@ -256,7 +261,6 @@ macro_rules! timeout_tests {
             let kill_switch = inst.kill_switch();
 
             let t = thread::spawn(move || {
-                thread::sleep(Duration::from_millis(100));
                 assert!(kill_switch.terminate().is_ok()); // works
                 thread::sleep(Duration::from_millis(100));
                 assert!(kill_switch.terminate().is_err()); // fails

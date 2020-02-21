@@ -1,5 +1,6 @@
 use crate::context::Context;
 use crate::error::Error;
+use crate::instance::execution;
 use crate::instance::{
     siginfo_ext::SiginfoExt, FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE,
     HOST_CTX,
@@ -166,19 +167,20 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         };
 
         if signal == Signal::SIGALRM {
-            // if have gotten a SIGALRM, the killswitch that sent this signal must have also
-            // disabled the `terminable` flag. If this assert fails, the SIGALRM came from some
-            // other source, or we have a bug that allows SIGALRM to be sent when they should not.
+            // If have gotten a SIGALRM, the KillSwitch that sent this signal must have acquired a
+            // lock on the execution domain, and currently be waiting for the signal handler (us)
+            // to deschedule the instance. If this assert fails, the SIGALRM came from some other
+            // source, or we have a bug that allows SIGALRM to be sent when they should not.
             //
             // TODO: once we have a notion of logging in `lucet-runtime`, this should be a logged
             // error.
-            debug_assert!(!inst.kill_state.is_terminable());
-
+            debug_assert!(inst.kill_state.domain_is_locked());
+            // set the state before jumping back to the host context
             inst.state = State::Terminating {
                 details: TerminationDetails::Remote,
             };
             return true;
-        }
+        };
 
         let trapcode = inst.module.lookup_trapcode(rip);
 
@@ -245,12 +247,20 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 true
             }
         };
-
+        // If we are switching to the host context and we are not processing a SIGALRM from a
+        // KillSwitch, then we were either externally signalled in some other manner, or we faulted
+        // during execution in a guest region.
+        //
+        // In either case, we will need to unlock and update the execution domain ourselves.
+        // We can assume that we can acquire a lock on the execution domain, because a KillSwitch
+        // is not currently waiting for us.
         if switch_to_host {
-            // we must disable termination so no KillSwitch may fire in host code.
-            inst.kill_state.disable_termination();
+            let mut current_domain = inst
+                .kill_state
+                .try_execution_domain()
+                .expect("execution domain is unlocked");
+            *current_domain = execution::Domain::Terminated;
         }
-
         switch_to_host
     });
 
