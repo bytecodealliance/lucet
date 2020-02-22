@@ -122,7 +122,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn target(&mut self, target: Triple) {
-        self.as_lucetc().builder.with_target(target);
+        self.as_lucetc().builder.target(target);
     }
 
     fn with_target(mut self, target: Triple) -> Self {
@@ -131,7 +131,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn opt_level(&mut self, opt_level: OptLevel) {
-        self.as_lucetc().builder.with_opt_level(opt_level);
+        self.as_lucetc().builder.opt_level(opt_level);
     }
 
     fn with_opt_level(mut self, opt_level: OptLevel) -> Self {
@@ -140,7 +140,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn cpu_features(&mut self, cpu_features: CpuFeatures) {
-        self.as_lucetc().builder.with_cpu_features(cpu_features);
+        self.as_lucetc().builder.cpu_features(cpu_features);
     }
 
     fn with_cpu_features(mut self, cpu_features: CpuFeatures) -> Self {
@@ -160,7 +160,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     }
 
     fn validator(&mut self, validator: Validator) {
-        self.as_lucetc().builder.with_validator(Some(validator));
+        self.as_lucetc().builder.validator(Some(validator));
     }
 
     fn with_validator(mut self, validator: Validator) -> Self {
@@ -256,7 +256,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     fn count_instructions(&mut self, count_instructions: bool) {
         self.as_lucetc()
             .builder
-            .with_count_instructions(count_instructions);
+            .count_instructions(count_instructions);
     }
 
     fn with_count_instructions(mut self, count_instructions: bool) -> Self {
@@ -267,7 +267,7 @@ impl<T: AsLucetc> LucetcOpts for T {
     fn canonicalize_nans(&mut self, enable_nans_canonicalization: bool) {
         self.as_lucetc()
             .builder
-            .with_canonicalize_nans(enable_nans_canonicalization);
+            .canonicalize_nans(enable_nans_canonicalization);
     }
 
     fn with_canonicalize_nans(mut self, enable_nans_canonicalization: bool) -> Self {
@@ -356,7 +356,7 @@ impl Lucetc {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
-        link_so(objpath, self.builder.target(), &output)?;
+        link_so(objpath, self.builder.target_ref(), &output)?;
         if self.sign {
             let sk = self.sk.as_ref().ok_or(Error::Signature(
                 "signing requires a secret key".to_string(),

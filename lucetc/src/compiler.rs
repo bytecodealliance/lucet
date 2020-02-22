@@ -70,22 +70,34 @@ impl CompilerBuilder {
         }
     }
 
-    pub(crate) fn target(&self) -> &Triple {
+    pub(crate) fn target_ref(&self) -> &Triple {
         &self.target
     }
 
-    pub fn with_target(&mut self, target: Triple) -> &mut Self {
+    pub fn target(&mut self, target: Triple) {
         self.target = target;
+    }
+
+    pub fn with_target(mut self, target: Triple) -> Self {
+        self.target(target);
         self
     }
 
-    pub fn with_opt_level(&mut self, opt_level: OptLevel) -> &mut Self {
+    pub fn opt_level(&mut self, opt_level: OptLevel) {
         self.opt_level = opt_level;
+    }
+
+    pub fn with_opt_level(mut self, opt_level: OptLevel) -> Self {
+        self.opt_level(opt_level);
         self
     }
 
-    pub fn with_cpu_features(&mut self, cpu_features: CpuFeatures) -> &mut Self {
+    pub fn cpu_features(&mut self, cpu_features: CpuFeatures) {
         self.cpu_features = cpu_features;
+    }
+
+    pub fn with_cpu_features(mut self, cpu_features: CpuFeatures) -> Self {
+        self.cpu_features(cpu_features);
         self
     }
 
@@ -93,8 +105,12 @@ impl CompilerBuilder {
         &mut self.cpu_features
     }
 
-    pub fn with_heap_settings(&mut self, heap_settings: HeapSettings) -> &mut Self {
+    pub fn heap_settings(&mut self, heap_settings: HeapSettings) {
         self.heap_settings = heap_settings;
+    }
+
+    pub fn with_heap_settings(mut self, heap_settings: HeapSettings) -> Self {
+        self.heap_settings(heap_settings);
         self
     }
 
@@ -102,18 +118,30 @@ impl CompilerBuilder {
         &mut self.heap_settings
     }
 
-    pub fn with_count_instructions(&mut self, count_instructions: bool) -> &mut Self {
+    pub fn count_instructions(&mut self, count_instructions: bool) {
         self.count_instructions = count_instructions;
+    }
+
+    pub fn with_count_instructions(mut self, count_instructions: bool) -> Self {
+        self.count_instructions(count_instructions);
         self
     }
 
-    pub fn with_canonicalize_nans(&mut self, canonicalize_nans: bool) -> &mut Self {
+    pub fn canonicalize_nans(&mut self, canonicalize_nans: bool) {
         self.canonicalize_nans = canonicalize_nans;
+    }
+
+    pub fn with_canonicalize_nans(mut self, canonicalize_nans: bool) -> Self {
+        self.canonicalize_nans(canonicalize_nans);
         self
     }
 
-    pub fn with_validator(&mut self, validator: Option<Validator>) -> &mut Self {
+    pub fn validator(&mut self, validator: Option<Validator>) {
         self.validator = validator;
+    }
+
+    pub fn with_validator(mut self, validator: Option<Validator>) -> Self {
+        self.validator(validator);
         self
     }
 

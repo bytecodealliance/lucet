@@ -43,11 +43,8 @@ mod lucetc_tests {
         let m = module_from_c(&["empty"], &[]).expect("build module for empty");
         let b = Bindings::empty();
         let v = Validator::parse("").expect("empty validation environment");
-        let mut builder = Compiler::builder();
-        let c = builder
-            .with_validator(Some(v))
-            .create(&m, &b)
-            .expect("compile empty");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile empty");
         let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());
         // clang creates just 1 global:
@@ -80,11 +77,8 @@ mod lucetc_tests {
         let m = module_from_c(&["c"], &["c"]).expect("build module for c");
         let b = Bindings::empty();
         let v = Validator::parse("").expect("empty validation environment");
-        let mut builder = Compiler::builder();
-        let c = builder
-            .with_validator(Some(v))
-            .create(&m, &b)
-            .expect("compile c");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile c");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
         assert_eq!(mdata.export_functions().len(), 1, "export functions");
@@ -104,11 +98,8 @@ mod lucetc_tests {
             "(module $env (@interface func (export \"c\") (param $a1 s32) (result $r1 s32)))",
         )
         .expect("empty validation environment");
-        let mut builder = Compiler::builder();
-        let c = builder
-            .with_validator(Some(v))
-            .create(&m, &b)
-            .expect("compile d");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile d");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 1, "import functions");
         assert_eq!(mdata.export_functions().len(), 1, "export functions");
@@ -124,11 +115,8 @@ mod lucetc_tests {
         let m = module_from_c(&["c", "d"], &["c", "d"]).expect("build module for c & d");
         let b = Bindings::empty();
         let v = Validator::parse("").expect("empty validation environment");
-        let mut builder = Compiler::builder();
-        let c = builder
-            .with_validator(Some(v))
-            .create(&m, &b)
-            .expect("compile c & d");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile c & d");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.import_functions().len(), 0, "import functions");
         assert_eq!(mdata.export_functions().len(), 2, "export functions");
@@ -168,11 +156,8 @@ mod lucetc_tests {
             .expect("wasi spec validation")
             .with_wasi_exe(true);
         // Compiler will only unwrap if the Validator defined above accepts the module
-        let mut builder = Compiler::builder();
-        let c = builder
-            .with_validator(Some(v))
-            .create(&m, &b)
-            .expect("compile empty");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile empty");
         let mdata = c.module_data().unwrap();
         assert!(mdata.heap_spec().is_some());
     }
