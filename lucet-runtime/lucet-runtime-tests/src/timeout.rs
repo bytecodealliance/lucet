@@ -279,8 +279,8 @@ macro_rules! timeout_tests {
             t.join().unwrap();
         }
 
-        // after resetting, existing kill swtiches will not work. we can still run a function.
-        // FIXME KTM 2020-02-19: I did not see a way around this behavior. Bring this up in review.
+        /// This test ensures that we see a more informative kill error than `NotTerminable` when
+        /// attempting to terminate an instance that has been reset since issuing a kill switch.
         #[test]
         fn timeout_after_reset() {
             let module = mock_timeout_module();
@@ -290,7 +290,7 @@ macro_rules! timeout_tests {
                 .expect("instance can be created");
             let kill_switch = inst.kill_switch();
             inst.reset().expect("instance resets");
-            assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
+            assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
             run_onetwothree(&mut inst);
         }
 

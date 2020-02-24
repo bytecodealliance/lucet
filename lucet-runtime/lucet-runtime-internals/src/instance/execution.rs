@@ -364,9 +364,21 @@ pub enum KillSuccess {
     Cancelled,
 }
 
+/// A failure to terminate an instance.
+///
+/// This enum indicates why an instance could not be terminated by a call to
+/// [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate).
 #[derive(Debug, PartialEq)]
 pub enum KillError {
+    /// The instance cannot be terminated.
+    ///
+    /// This means that the isntance has been terminated by another killswitch, or was signalled to
+    /// terminate in some other manner.
     NotTerminable,
+    /// The [`KillState`](struct.KillState.html) is no longer valid.
+    ///
+    /// This means that instance already exited and was discarded, or that it was reset.
+    Invalid,
 }
 
 type KillResult = Result<KillSuccess, KillError>;
@@ -389,7 +401,7 @@ impl KillSwitch {
     pub fn terminate(&self) -> KillResult {
         // Get the underlying kill state. If this fails, it means the instance exited and was
         // discarded, so we can't terminate.
-        let state = self.state.upgrade().ok_or(KillError::NotTerminable)?;
+        let state = self.state.upgrade().ok_or(KillError::Invalid)?;
         // Now check what domain the instance is in. We can signal in guest code, but must avoid
         // signalling in host code lest we interrupt some function operating on guest/host shared
         // memory, and invalidate invariants. For example, interrupting in the middle of a resize
