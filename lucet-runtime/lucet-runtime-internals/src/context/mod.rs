@@ -142,8 +142,6 @@ impl Context {
     }
 
     /// Get a raw pointer to the instance's callback data.
-    ///
-    /// REVIEW QUESTION: Should this be `unsafe fn` ? Can aliasing `*mut` lead to UB?
     pub(crate) fn callback_data_ptr(&self) -> *mut Instance {
         self.callback_data
     }

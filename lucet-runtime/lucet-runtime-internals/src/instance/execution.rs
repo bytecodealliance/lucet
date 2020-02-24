@@ -121,7 +121,7 @@ pub struct KillState {
 
 /// Enter a guest region.
 ///
-/// This function is called by `lucet_context_activate` before entering a region of guest code.
+/// This function is called by `lucet_context_activate` when first entering an instance.
 ///
 /// This function is responsible for setting the execution domain in the instance's
 /// [`KillState`](struct.KillState.html), so that we can appropriately signal the instance to
@@ -135,20 +135,19 @@ pub struct KillState {
 /// not return, and we will swap back to the host context without unwinding.
 ///
 /// This function will panic if the `Instance`'s execution domain is marked as currently executing
-/// guest code, currently in a hostcall, or as cancelled.  Any of these domains mean that something
-/// has gone seriously wrong, and leaving the execution domain mutex in a poisoned state is the
-/// least of our concerns.
+/// guest code, currently in a hostcall, or as cancelled.  Attempting to enter an instance
+/// currently in one of these domains mean that something has gone seriously wrong.
 pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
     let mut current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
     match *current_domain {
         Domain::Pending => {
-            // All systems go!  We are about to start executing a guest. Set the execution domain
-            // accordingly, and proceed to the guest region.
+            // All systems go! We are about to start executing a guest. Set the execution domain
+            // accordingly, and then proceed to the guest region.
             *current_domain = Domain::Guest
         }
         Domain::Guest => {
-            // This is an error because it suggests we might send a SIGALRM before we've indicated
-            // that it safe to do so.
+            // This is an error because it suggests a KillSwitch could send a SIGALRM before
+            // we have indicated that it safe to do so.
             panic!(
                 "Invalid state: Instance marked as already in guest while entering a guest region."
             );
@@ -165,13 +164,10 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
         }
         #[allow(unreachable_code)]
         Domain::Cancelled => {
-            // Our `Instance` was terminated before it began executing guest code, so we should not
-            // enter the guest region. Instead, we will terminate the `Instance` and swap back to
-            // the host context. We explicitly explicitly release our lock because
-            // `Instance::terminate` will never return.
-            mem::drop(current_domain);
+            // A KillSwitch terminated our Instance before it began executing guest code. We should
+            // not enter the guest region. We will instead terminate the Instance, and then swap
+            // back to the host context. Note that `Instance::terminate` will never return.
             (*instance).terminate(TerminationDetails::Remote);
-            unreachable!(); // `Instance::terminate` should never never return.
         }
     }
 }
@@ -205,8 +201,8 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
             panic!("Invalid state: Instance marked as in a hostcall while exiting a guest region.");
         }
         Domain::Terminated => {
-            // Something else has signalled us to terminate, so it's not safe to actually exit the
-            // guest context yet. Because this is called when exiting a guest context, the
+            // Something else has indicated that we must stop, so it's not safe to actually exit
+            // the guest context yet. Because this is called when exiting a guest context, the
             // termination mechanism will be a signal, delivered at some point (hopefully soon!).
             // Further, because the termination mechanism will be a signal, we are constrained to
             // only signal-safe behavior.
@@ -315,7 +311,7 @@ impl KillState {
     /// acquiring a lock of the execution domain's mutex, would block the current thread. If
     /// so, return `true`. If the mutex is not locked, or is in a poisoned state, return false.
     ///
-    /// This is used by an [`Instance`](struct.KillState.html)'s signal handler to check that a
+    /// This is used by an [`Instance`](struct.Instance.html)'s signal handler to check that a
     /// `SIGALRM` received during execution came from a kill switch, rather than some other source.
     pub(crate) fn domain_is_locked(&self) -> bool {
         use std::sync::TryLockError::WouldBlock;
@@ -328,7 +324,7 @@ impl KillState {
 
     /// Acquire a lock on the execution domain.
     ///
-    /// This is used by an [`Instance`](struct.KillState.html)'s signal handler to disable
+    /// This is used by an [`Instance`](struct.Instance.html)'s signal handler to disable
     /// termination before switching to the host context, for signals _other than_ a `SIGALRM`
     /// that came from a kill switch, rather than some other source.
     pub(crate) fn execution_domain(
@@ -394,18 +390,14 @@ impl KillSwitch {
         // Get the underlying kill state. If this fails, it means the instance exited and was
         // discarded, so we can't terminate.
         let state = self.state.upgrade().ok_or(KillError::NotTerminable)?;
-
-        // we got it! we can signal the instance.
+        // Now check what domain the instance is in. We can signal in guest code, but must avoid
+        // signalling in host code lest we interrupt some function operating on guest/host shared
+        // memory, and invalidate invariants. For example, interrupting in the middle of a resize
+        // operation on a `Vec` could be extremely dangerous.
         //
-        // Now check what domain the instance is in. We can signal in guest code, but want
-        // to avoid signalling in host code lest we interrupt some function operating on
-        // guest/host shared memory, and invalidate invariants. For example, interrupting
-        // in the middle of a resize operation on a `Vec` could be extremely dangerous.
-        //
-        // Hold this lock through all signalling logic to prevent the instance from
-        // switching domains (and invalidating safety of whichever mechanism we choose here)
+        // Hold this lock through all signalling logic to prevent the instance from switching
+        // domains (and invalidating safety of whichever mechanism we choose here)
         let mut execution_domain = state.execution_domain.lock().unwrap();
-
         let result = match *execution_domain {
             Domain::Guest => {
                 let mut curr_tid = state.thread_id.lock().unwrap();
@@ -414,7 +406,6 @@ impl KillSwitch {
                     unsafe {
                         pthread_kill(thread_id, SIGALRM);
                     }
-
                     // wait for the SIGALRM handler to deschedule the instance
                     //
                     // this should never actually loop, which would indicate the instance

@@ -867,8 +867,9 @@ impl Instance {
         //   * rbx: the address of guest code to execute
         //
         // The appropriate value for `rbx` is the top of the guest stack, which we would otherwise
-        // return to and start executing immediately. For `rdi`, we want to pass a raw pointer to
-        // the instance, which will be pass
+        // return to and start executing immediately. For `rdi`, we want to pass our callback data
+        // (a raw pointer to the instance). This will be passed as the first argument to the entry
+        // function, whose address is given in `rsi`.
         //
         // once we've set up arguments, swap out the guest return address with
         // `lucet_context_activate` so we start execution there.
@@ -880,7 +881,7 @@ impl Instance {
             *top_of_stack = crate::context::lucet_context_activate as u64;
             // store a pointer to pass to the context activation function
             self.ctx.gpr.rdi = self.ctx.callback_data_ptr() as u64;
-            // DEV KTM: Let's try and pass a function pointer!
+            // pass a pointer to the guest-side entrypoint bootstrap code
             self.ctx.gpr.rsi = execution::enter_guest_region as u64;
         }
 

@@ -180,7 +180,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 details: TerminationDetails::Remote,
             };
             return true;
-        };
+        }
 
         let trapcode = inst.module.lookup_trapcode(rip);
 
