@@ -1,6 +1,5 @@
 use crate::context::Context;
 use crate::error::Error;
-use crate::instance::execution;
 use crate::instance::{
     siginfo_ext::SiginfoExt, FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE,
     HOST_CTX,
@@ -167,15 +166,9 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         };
 
         if signal == Signal::SIGALRM {
-            // If have gotten a SIGALRM, the KillSwitch that sent this signal must have acquired a
-            // lock on the execution domain, and currently be waiting for the signal handler (us)
-            // to deschedule the instance. If this assert fails, the SIGALRM came from some other
-            // source, or we have a bug that allows SIGALRM to be sent when they should not.
-            //
+            // set the state before jumping back to the host context
             // TODO: once we have a notion of logging in `lucet-runtime`, this should be a logged
             // error.
-            debug_assert!(inst.kill_state.domain_is_locked());
-            // set the state before jumping back to the host context
             inst.state = State::Terminating {
                 details: TerminationDetails::Remote,
             };
@@ -185,7 +178,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         let trapcode = inst.module.lookup_trapcode(rip);
 
         let behavior = (inst.signal_handler)(inst, &trapcode, signum, siginfo_ptr, ucontext_ptr);
-        let switch_to_host = match behavior {
+        match behavior {
             SignalBehavior::Continue => {
                 // return to the guest context without making any modifications to the instance
                 false
@@ -246,31 +239,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 thunk();
                 true
             }
-        };
-        // If we are switching to the host context and we are not processing a SIGALRM from a
-        // KillSwitch, then we were either externally signalled in some other manner, or we faulted
-        // during execution in a guest region.
-        //
-        // In either case, we will need to unlock and update the execution domain ourselves.
-        if switch_to_host {
-            // This debug assert exists to make sure that this is not a blocking operation.
-            debug_assert_eq!(inst.kill_state.domain_is_locked(), false);
-            let current_domain = inst.kill_state.execution_domain();
-            match current_domain {
-                Ok(mut current_domain) => {
-                    // If we are here, we should still be in the guest domain.
-                    debug_assert_eq!(*current_domain, execution::Domain::Guest);
-                    *current_domain = execution::Domain::Terminated;
-                }
-                Err(poison_error) => {
-                    // Because a signal must never be sent while the host context is active, we
-                    // will update the domain even if the mutex has been poisoned.
-                    let mut current_domain = poison_error.into_inner();
-                    *current_domain = execution::Domain::Terminated;
-                }
-            };
         }
-        switch_to_host
     });
 
     if switch_to_host {

@@ -166,7 +166,10 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
         Domain::Cancelled => {
             // A KillSwitch terminated our Instance before it began executing guest code. We should
             // not enter the guest region. We will instead terminate the Instance, and then swap
-            // back to the host context. Note that `Instance::terminate` will never return.
+            // back to the host context.
+            //
+            // Note that we manually drop the domain because`Instance::terminate` never returns.
+            mem::drop(current_domain);
             (*instance).terminate(TerminationDetails::Remote);
         }
     }
@@ -304,34 +307,6 @@ impl KillState {
         *self.thread_id.lock().unwrap() = None;
         self.tid_change_notifier.notify_all();
     }
-
-    /// Check if the execution domain is currently locked.
-    ///
-    /// This uses [`Mutex::try_lock`](std/sync/struct.Mutex.html#method.try_lock), to see if
-    /// acquiring a lock of the execution domain's mutex, would block the current thread. If
-    /// so, return `true`. If the mutex is not locked, or is in a poisoned state, return false.
-    ///
-    /// This is used by an [`Instance`](struct.Instance.html)'s signal handler to check that a
-    /// `SIGALRM` received during execution came from a kill switch, rather than some other source.
-    pub(crate) fn domain_is_locked(&self) -> bool {
-        use std::sync::TryLockError::WouldBlock;
-        if let Err(WouldBlock) = self.execution_domain.try_lock() {
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Acquire a lock on the execution domain.
-    ///
-    /// This is used by an [`Instance`](struct.Instance.html)'s signal handler to disable
-    /// termination before switching to the host context, for signals _other than_ a `SIGALRM`
-    /// that came from a kill switch, rather than some other source.
-    pub(crate) fn execution_domain(
-        &self,
-    ) -> std::sync::LockResult<std::sync::MutexGuard<'_, Domain>> {
-        self.execution_domain.lock()
-    }
 }
 
 /// Instance execution domains.
@@ -340,7 +315,6 @@ impl KillState {
 #[derive(Debug, PartialEq)]
 pub enum Domain {
     /// Represents an instance that is not currently running.
-    /// FIXME KTM 2020-02-20: Maybe we should call this `Ready` or `Paused`.
     Pending,
     /// Represents an instance that is executing guest code.
     Guest,
@@ -425,10 +399,12 @@ impl KillSwitch {
                     while curr_tid.is_some() {
                         curr_tid = state.tid_change_notifier.wait(curr_tid).unwrap();
                     }
+                    *execution_domain = Domain::Terminated;
                     Ok(KillSuccess::Signalled)
                 } else {
-                    // If we are here, we probably faulted without updating the execution domain.
-                    panic!("logic error: instance is terminable but not actually running.");
+                    // If the execution domain is marked as `Guest`, but there is not a thread
+                    // running that we wan signal, the guest most likely faulted.
+                    Err(KillError::NotTerminable)
                 }
             }
             Domain::Hostcall => {

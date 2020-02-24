@@ -100,10 +100,13 @@ macro_rules! timeout_tests {
 
             let kill_switch = inst.kill_switch();
 
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(100));
-                assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
-            });
+            thread::Builder::new()
+                .name("helper".to_owned())
+                .spawn(move || {
+                    thread::sleep(Duration::from_millis(100));
+                    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
+                })
+                .expect("can spawn a thread");
 
             match inst.run("infinite_loop", &[]) {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {
@@ -197,10 +200,13 @@ macro_rules! timeout_tests {
 
             let kill_switch = inst.kill_switch();
 
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(100));
-                assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Pending));
-            });
+            thread::Builder::new()
+                .name("helper".to_owned())
+                .spawn(move || {
+                    thread::sleep(Duration::from_millis(100));
+                    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Pending));
+                })
+                .expect("can spawn a thread");
 
             match inst.run("run_slow_hostcall", &[]) {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
@@ -223,10 +229,13 @@ macro_rules! timeout_tests {
 
             let kill_switch = inst.kill_switch();
 
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(100));
-                assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Pending));
-            });
+            thread::Builder::new()
+                .name("helper".to_owned())
+                .spawn(move || {
+                    thread::sleep(Duration::from_millis(100));
+                    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Pending));
+                })
+                .expect("can spawn a thread");
 
             match inst.run("run_yielding_hostcall", &[]) {
                 Ok(RunResult::Yielded(EmptyYieldVal)) => {}
@@ -260,23 +269,27 @@ macro_rules! timeout_tests {
 
             let kill_switch = inst.kill_switch();
 
-            let t = thread::spawn(move || {
-                assert!(kill_switch.terminate().is_ok()); // works
-                thread::sleep(Duration::from_millis(100));
-                assert!(kill_switch.terminate().is_err()); // fails
-            });
+            let helper = thread::Builder::new()
+                .name("helper".to_owned())
+                .spawn(move || {
+                    // This fires first, and will work properly, terminating the instance.
+                    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled));
+                    // Next, we will delay for 100ms and try to terminate the instance again.
+                    // This should fail, because we have already terminated the instance.
+                    thread::sleep(Duration::from_millis(100));
+                    assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
+                })
+                .expect("can spawn a thread");
 
             thread::sleep(Duration::from_millis(10));
 
             match inst.run("main", &[0u32.into(), 0u32.into()]) {
                 // the result we're expecting - the guest has been terminated!
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
-                res => {
-                    panic!("unexpected result: {:?}", res);
-                }
+                res => panic!("unexpected result: {:?}", res),
             };
 
-            t.join().unwrap();
+            helper.join().unwrap();
         }
 
         /// This test ensures that we see a more informative kill error than `NotTerminable` when
@@ -305,29 +318,37 @@ macro_rules! timeout_tests {
             let kill_switch = inst.kill_switch();
             let second_kill_switch = inst.kill_switch();
 
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(100));
-                assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
-            });
+            let helper_1 = thread::Builder::new()
+                .name("helper-1".to_owned())
+                .spawn(move || {
+                    thread::sleep(Duration::from_millis(100));
+                    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
+                })
+                .expect("can spawn a thread");
 
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(200));
-                assert_eq!(
-                    second_kill_switch.terminate(),
-                    Err(KillError::NotTerminable)
-                );
-            });
+            let helper_2 = thread::Builder::new()
+                .name("helper-2".to_owned())
+                .spawn(move || {
+                    thread::sleep(Duration::from_millis(200));
+                    assert_eq!(
+                        second_kill_switch.terminate(),
+                        Err(KillError::NotTerminable)
+                    );
+                })
+                .expect("can spawn a thread");
 
             match inst.run("infinite_loop", &[]) {
-                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {
-                    // this is what we want to see
-                }
+                // the result we're expecting - the guest has been terminated!
+                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
 
-            // after a timeout, can reset and run a normal function
-            inst.reset().expect("instance resets");
+            // Check that neither helper thread panicked.
+            helper_1.join().expect("helper_1 did not panic");
+            helper_2.join().expect("helper_2 did not panic");
 
+            // Check that we can reset the instance and run a function.
+            inst.reset().expect("instance resets");
             run_onetwothree(&mut inst);
         }
     };
