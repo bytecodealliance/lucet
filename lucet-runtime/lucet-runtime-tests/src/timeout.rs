@@ -121,7 +121,7 @@ macro_rules! timeout_tests {
                 })
                 .expect("can spawn a thread");
 
-            // Begin running the instance, which should be terminated remotely by the KillSwitch.
+            // Begin running the instance, which will be terminated remotely by the KillSwitch.
             match inst.run("infinite_loop", &[]) {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {
                     // this is what we want to see
@@ -130,7 +130,7 @@ macro_rules! timeout_tests {
             }
             t.join().unwrap();
 
-            // Another attempt to terminate the instance should fail.
+            // Another attempt to terminate the instance will fail.
             assert_eq!(
                 inst.kill_switch().terminate(),
                 Err(KillError::NotTerminable)
@@ -153,7 +153,7 @@ macro_rules! timeout_tests {
             // If terminated before running, the guest will be cancelled.
             assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled));
 
-            // Another attempt to terminate the instance should fail.
+            // Another attempt to terminate the instance will fail.
             assert_eq!(
                 inst.kill_switch().terminate(),
                 Err(KillError::NotTerminable)
@@ -179,14 +179,14 @@ macro_rules! timeout_tests {
                 .expect("instance can be created");
             let kill_switch = inst.kill_switch();
 
-            // The killswitch should fail if the instance has already finished running.
+            // The killswitch will fail if the instance has already finished running.
             match inst.run("do_nothing", &[]) {
                 Ok(_) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
             assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled)); // FIXME -> Invalid
 
-            // If terminated after running, the guest should not run again.
+            // If terminated after running, the guest will not run again.
             match inst.run("onetwothree", &[]) {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => panic!("unexpected result: {:?}", res),
@@ -240,14 +240,14 @@ macro_rules! timeout_tests {
                 })
                 .expect("can spawn a thread");
 
-            // Begin running the instance, which should be terminated remotely by the KillSwitch
+            // Begin running the instance, which will be terminated remotely by the KillSwitch
             // while inside a hostcall. See `slow_hostcall` above for more information.
             match inst.run("run_slow_hostcall", &[]) {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
 
-            // Another attempt to terminate the instance should fail.
+            // Another attempt to terminate the instance will fail.
             assert_eq!(
                 inst.kill_switch().terminate(),
                 Err(KillError::NotTerminable)
@@ -353,7 +353,7 @@ macro_rules! timeout_tests {
                 })
                 .expect("can spawn a thread");
 
-            // Start the instance, which should return an error having been remotely terminated.
+            // Start the instance, which will return an error having been remotely terminated.
             match inst.run("infinite_loop", &[]) {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => panic!("unexpected result: {:?}", res),
