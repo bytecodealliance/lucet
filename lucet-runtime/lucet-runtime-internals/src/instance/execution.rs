@@ -204,17 +204,7 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
             panic!("Invalid state: Instance marked as in a hostcall while exiting a guest region.");
         }
         Domain::Terminated => {
-            // Something else has indicated that we must stop, so it's not safe to actually exit
-            // the guest context yet. Because this is called when exiting a guest context, the
-            // termination mechanism will be a signal, delivered at some point (hopefully soon!).
-            // Further, because the termination mechanism will be a signal, we are constrained to
-            // only signal-safe behavior.
-            //
-            // For now, release our lock on the execution domain, and hang indefinitely, waiting
-            // for the sigalrm to arrive. So yes, clippy, we know that this loop is empty :)
-            mem::drop(current_domain);
-            #[allow(clippy::empty_loop)]
-            loop {}
+            panic!("Invalid state: Instance marked as terminated while exiting a guest region.");
         }
         Domain::Cancelled => {
             panic!("Invalid state: Instance marked as cancelled while exiting a guest region.");
