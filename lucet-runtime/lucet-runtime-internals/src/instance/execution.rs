@@ -1,20 +1,20 @@
 //! The `execution` module contains state for an instance's execution, and exposes functions
 //! building that state into something appropriate for safe use externally.
 //!
-//! So far as state tracked in this module is concerned, there are two key items: "terminability"
-//! and "execution domain".
-//!
-//! ## Terminability
-//! This specifically answers the question "is it safe to initiate termination of this instance
-//! right now?". An instance becomes terminable when it begins executing, and stops being
-//! terminable when it is terminated, or when it stops executing. Termination does not directly map
-//! to the idea of guest code currently executing on a processor, because termination can occur
-//! during host code, or while a guest has yielded execution. As a result, termination can only be
-//! treated as a best-effort to deschedule a guest, and is typically quick when it occurs during
-//! guest code execution, or immediately upon resuming execution of guest code (exiting host code,
-//! or resuming a yielded instance).
+//! So far as state tracked in this module is concerned, the key concept to understand is an
+//! "execution domain".
 //!
 //! ## Execution Domain
+//!
+//! This is used to answer the question "is it safe to initiate termination of this instance right
+//! now?". An instance becomes terminable when it is created, and stops being terminable when it is
+//! terminated, or when it stops executing. Termination does not directly map to the idea of guest
+//! code currently executing on a processor, because termination can occur during host code, or
+//! while a guest has yielded execution. As a result, termination can only be treated as a
+//! best-effort to deschedule a guest, and is typically quick when it occurs during guest code
+//! execution, or immediately upon resuming execution of guest code (exiting host code, or resuming
+//! a yielded instance).
+//!
 //! Execution domains allow us to distinguish what an appropriate mechanism to signal termination
 //! is. This means that changing of an execution domain must be atomic - it would be an error to
 //! read the current execution domain, continue with that domain to determine temination, and
@@ -96,7 +96,7 @@ use crate::instance::{Instance, TerminationDetails};
 /// "Stopped" is a particularly loose word here because it encompasses the worst case: trying to
 /// stop a guest that is currently in a critical section. Because the signal will only be checked
 /// when exiting the critical section, the latency is bounded by whatever embedder guarantees are
-/// made. In fact, it is possible for a kill signal to be successfully sent and still never
+/// made. In fact, it is possible for a kill signal to be successfully sent and still never be
 /// impactful, if a hostcall itself invokes `lucet_hostcall_terminate!`. In this circumstance, the
 /// hostcall would terminate the instance if it returned, but `lucet_hostcall_terminate!` will
 /// terminate the guest before the termination request would even be checked.
@@ -121,12 +121,14 @@ pub struct KillState {
 
 /// Enter a guest region.
 ///
-/// This function is called by `lucet_context_activate` when first entering an instance.
+/// This is the entry callback function installed on the [`Instance`](struct.Instance.html) for a
+/// guest. This is called by `lucet_context_activate` after a context switch, just before we begin
+/// execution in a guest region.
 ///
 /// This function is responsible for setting the execution domain in the instance's
 /// [`KillState`](struct.KillState.html), so that we can appropriately signal the instance to
-/// terminate if needed. If a pending instance was signalled before it started executing guest
-/// code, we will terminate the instance and swap back to its host context.
+/// terminate if needed. If the instance was already terminated, swap back to the host context
+/// rather than returning.
 ///
 /// # Safety
 ///
@@ -136,13 +138,13 @@ pub struct KillState {
 ///
 /// This function will panic if the `Instance`'s execution domain is marked as currently executing
 /// guest code, currently in a hostcall, or as cancelled.  Attempting to enter an instance
-/// currently in one of these domains mean that something has gone seriously wrong.
+/// currently in any of these domains mean that something has gone seriously wrong.
 pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
     let mut current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
     match *current_domain {
         Domain::Pending => {
             // All systems go! We are about to start executing a guest. Set the execution domain
-            // accordingly, and then proceed to the guest region.
+            // accordingly, and then return so we can jump to the guest code.
             *current_domain = Domain::Guest
         }
         Domain::Guest => {
@@ -162,7 +164,6 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
         Domain::Terminated => {
             panic!("Invalid state: Instance marked as terminated while entering a guest region.");
         }
-        #[allow(unreachable_code)]
         Domain::Cancelled => {
             // A KillSwitch terminated our Instance before it began executing guest code. We should
             // not enter the guest region. We will instead terminate the Instance, and then swap
@@ -301,7 +302,11 @@ impl KillState {
 
 /// Instance execution domains.
 ///
-/// This enum allow us to distinguish what an appropriate mechanism to signal termination is.
+/// This enum allow us to distinguish how to appropriately terminate an instance.
+///
+/// We can signal in guest code, but must avoid signalling in host code lest we interrupt some
+/// function operating on guest/host shared memory, and invalidate invariants. For example,
+/// interrupting in the middle of a resize operation on a `Vec` could be extremely dangerous.
 #[derive(Debug, PartialEq)]
 pub enum Domain {
     /// Represents an instance that is not currently running.
@@ -318,30 +323,38 @@ pub enum Domain {
 
 /// An object that can be used to terminate an instance's execution from a separate thread.
 pub struct KillSwitch {
+    /// A temporary, non-owning reference to the instance's kill state.
     state: Weak<KillState>,
 }
 
+/// A successful attempt to terminate an [`Instance`](struct.Instance.html).
+///
+/// See [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate) for more information.
 #[derive(Debug, PartialEq)]
 pub enum KillSuccess {
+    /// A `SIGALRM` was sent to the instance.
     Signalled,
+    /// The guest is in a hostcall and cannot currently be signalled to terminate safely.
+    ///
+    /// We have indicated the instance should terminate when it completes its hostcall.
     Pending,
+    /// The instance was terminated before it started running.
     Cancelled,
 }
 
-/// A failure to terminate an instance.
+/// A failed attempt to terminate an [`Instance`](struct.Instance.html).
 ///
-/// This enum indicates why an instance could not be terminated by a call to
-/// [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate).
+/// See [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate) for more information.
 #[derive(Debug, PartialEq)]
 pub enum KillError {
     /// The instance cannot be terminated.
     ///
-    /// This means that the isntance has been terminated by another killswitch, or was signalled to
-    /// terminate in some other manner.
+    /// This means that the instance has already been terminated by another killswitch, or was
+    /// signalled to terminate in some other manner, or possibly faulted during execution.
     NotTerminable,
-    /// The [`KillState`](struct.KillState.html) is no longer valid.
+    /// The associated instance is no longer valid.
     ///
-    /// This means that instance already exited and was discarded, or that it was reset.
+    /// This usually means that instance already exited and was discarded, or that it was reset.
     Invalid,
 }
 
@@ -366,10 +379,7 @@ impl KillSwitch {
         // Get the underlying kill state. If this fails, it means the instance exited and was
         // discarded, so we can't terminate.
         let state = self.state.upgrade().ok_or(KillError::Invalid)?;
-        // Now check what domain the instance is in. We can signal in guest code, but must avoid
-        // signalling in host code lest we interrupt some function operating on guest/host shared
-        // memory, and invalidate invariants. For example, interrupting in the middle of a resize
-        // operation on a `Vec` could be extremely dangerous.
+        // Now check what domain the instance is in.
         //
         // Hold this lock through all signalling logic to prevent the instance from switching
         // domains (and invalidating safety of whichever mechanism we choose here)

@@ -307,6 +307,20 @@ macro_rules! timeout_tests {
             run_onetwothree(&mut inst);
         }
 
+        /// This test ensures that we see an `Invalid` kill error if we are attempting to terminate
+        /// an instance that has since been dropped.
+        #[test]
+        fn timeout_after_drop() {
+            let module = mock_timeout_module();
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+            let kill_switch = inst.kill_switch();
+            std::mem::drop(inst);
+            assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
+        }
+
         #[test]
         fn double_timeout() {
             let module = mock_timeout_module();

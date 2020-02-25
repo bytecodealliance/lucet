@@ -870,9 +870,9 @@ impl Instance {
     /// terminable before continuing to whatever guest code we want to run.
     ///
     /// `lucet_context_activate` takes three arguments in the following registers:
-    ///   * rdi: the data for the entry function
-    ///   * rsi: the address of the entry function
-    ///   * rbx: the address of guest code to execute
+    ///   * rdi: the data for the entry callback.
+    ///   * rsi: the address of the entry callback.
+    ///   * rbx: the address of the guest code to execute.
     ///
     /// The appropriate value for `rbx` is the top of the guest stack, which we would otherwise
     /// return to and start executing immediately. For `rdi`, we want to pass our callback data

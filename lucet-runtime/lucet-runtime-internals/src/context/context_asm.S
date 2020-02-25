@@ -200,9 +200,9 @@ _lucet_context_set:
 #endif
 .align 16
 // `lucet_context_activate` is essentially a function with three arguments:
-//   * rdi: the data for the entry function.
-//   * rsi: the address of the entry function.
-//   * rbx: the address of the guest code to resume at.
+//   * rdi: the data for the entry callback.
+//   * rsi: the address of the entry callback.
+//   * rbx: the address of the guest code to execute.
 //
 // See `lucet_runtime_internals::context::lucet_context_activate` for more info.
 //
@@ -211,7 +211,7 @@ _lucet_context_set:
 // non-violatile register on Windows, which is a nice benefit.
 lucet_context_activate:
 _lucet_context_activate:
-    // First, we call the entry function whose address is stored in `rsi`,
+    // First, we call the entry callback whose address is stored in `rsi`,
     // passing along the value of `rdi` as the first argument.
     call *%rsi
     // Now, jump to the guest code at the address in `rbx`.

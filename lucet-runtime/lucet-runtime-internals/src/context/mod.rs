@@ -728,15 +728,15 @@ extern "C" {
     /// Never returns because the current context is discarded.
     fn lucet_context_set(to: *const Context) -> !;
 
-    /// Runs an activation function after performing a context switch. Implemented in assembly.
+    /// Runs an entry callback after performing a context switch. Implemented in assembly.
     ///
     /// In practice, this is used with `enter_guest_region` so that the guest will appropriately
     /// set itself to be terminable upon entry before continuing to any guest code.
     ///
     /// `lucet_context_activate` is essentially a function with three arguments:
-    ///   * rdi: the data for the entry function.
-    ///   * rsi: the address of the entry function.
-    ///   * rbx: the address of the guest code to resume at.
+    ///   * rdi: the data for the entry callback.
+    ///   * rsi: the address of the entry callback.
+    ///   * rbx: the address of the guest code to execute.
     ///
     /// We do not actually define `lucet_context_activate` as having these arguments because we
     /// manually load these arguments, as well as a pointer to this function, into the context's
