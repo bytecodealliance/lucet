@@ -4,16 +4,19 @@
 //! So far as state tracked in this module is concerned, the key concept to understand is an
 //! "execution domain".
 //!
+//! This is used to answer the question "is it safe to initiate termination of this instance right
+//! now?". An instance can be terminated when it is created, and stops being terminable when it is
+//! terminated, when it faults, or when it is dropped. An instance is terminable after it has been
+//! reset, but any outstanding kill switches will no longer be valid.
+//!
 //! ## Execution Domain
 //!
-//! This is used to answer the question "is it safe to initiate termination of this instance right
-//! now?". An instance becomes terminable when it is created, and stops being terminable when it is
-//! terminated, or when it stops executing. Termination does not directly map to the idea of guest
-//! code currently executing on a processor, because termination can occur during host code, or
-//! while a guest has yielded execution. As a result, termination can only be treated as a
-//! best-effort to deschedule a guest, and is typically quick when it occurs during guest code
-//! execution, or immediately upon resuming execution of guest code (exiting host code, or resuming
-//! a yielded instance).
+//! Termination does not directly map to the idea of guest code currently executing on a processor,
+//! because termination can occur either during host code, or while a guest has yielded execution.
+//!
+//! As a result, termination can only be treated as a best-effort to deschedule a guest. This is
+//! typically quick when it occurs during guest code execution, and otherwise happens immediately
+//! upon resuming execution of guest code (exiting host code, or resuming a yielded instance).
 //!
 //! Execution domains allow us to distinguish what an appropriate mechanism to signal termination
 //! is. This means that changing of an execution domain must be atomic - it would be an error to
@@ -25,57 +28,66 @@
 //!
 //! ## Instance Lifecycle and `KillState`
 //!
-//! And now we can enumerate interleavings of execution and timeout, to see the expected state at
-//! possible points of interest in an instance's lifecycle:
+//! And now we can enumerate interleavings of execution and terminability, to see the expected
+//! execution domain at possible points of interest in an instance's lifecycle:
 //!
 //! * `Instance created`
-//!   - terminable: `true`
+//!   - termination result: `Ok(KillSuccess::Cancelled)`
 //!   - execution_domain: `Pending`
-//! * `Instance::run called`
-//!   - terminable: `true`
-//!   - execution_domain: `Guest`
 //! * `Instance::run executing`
-//!   - terminable: `true, or false`
+//!   - termination result: `Ok(KillSuccess::Signalled)`, `Ok(KillSuccess::Pending)`, or
+//!     `Err(KillError::NotTerminable)`
 //!   - execution_domain: `Guest, Hostcall, or Terminated`
 //!   - `execution_domain` will only be `Guest` when executing guest code, only be `Hostcall` when
-//!   executing a hostcall, but may also be `Terminated` while in a hostcall to indicate that it
-//!   should exit when the hostcall completes.
-//!   - `terminable` will be false if and only if `execution_domain` is `Terminated`.
+//!     executing a hostcall, but may also be `Terminated` while in a hostcall to indicate that it
+//!     should exit when the hostcall completes.
+//!   - `KillSwitch::terminate` will succeed with `Signalled` when terminated while executing guest
+//!     code, `Pending` when terminateed while executing a hostcall, and will fail with
+//!     `NotTerminable` when the instance has already been terminated.
 //! * `Instance::run returns`
-//!   - terminable: `false`
 //!   - execution_domain: `Guest, Hostcall, or Terminated`
-//!   - `execution_domain` will be `Guest` when the initial guest function returns, `Hostcall` when
-//!   terminated by `lucet_hostcall_terminate!`, and `Terminated` when exiting due to a termination
-//!   request.
+//!   - `execution_domain` will be `Pending` when the initial guest function returns, `Hostcall`
+//!     when terminated by `lucet_hostcall_terminate!`, and `Terminated` when exiting due to a
+//!     termination request.
 //! * `Guest function executing`
-//!   - terminable: `true`
+//!   - termination result: `Ok(KillSuccess::Signalled)`
 //!   - execution_domain: `Guest`
 //! * `Guest function returns`
-//!   - terminable: `true`
+//!   - termination result: `Ok(KillSuccess::Pending)`
 //!   - execution_domain: `Guest`
+//!   - If the guest function has already returned, the instance will be placed into the
+//!     `Terminated` domain, and will not run any guest the next time it is run.
 //! * `Hostcall called`
-//!   - terminable: `true`
+//!   - termination result: `Ok(KillSuccess::Pending)`
 //!   - execution_domain: `Hostcall`
 //! * `Hostcall executing`
-//!   - terminable: `true`
+//!   - termination result: `Ok(KillSuccess::Pending)` or `Err(KillError::NotTerminable)`
 //!   - execution_domain: `Hostcall, or Terminated`
 //!   - `execution_domain` will typically be `Hostcall`, but may be `Terminated` if termination of
-//!   the instance is requested during the hostcall.
-//!   - `terminable` will be false if and only if `execution_domain` is `Terminated`.
-//! * `Hostcall yields`
-//!   - This is a specific point in "Hostcall executing" and has no further semantics.
-//! * `Hostcall resumes`
-//!   - This is a specific point in "Hostcall executing" and has no further semantics.
+//!     the instance is requested during the hostcall.
+//!   - `KillSwitch::terminate` will return `NotTerminable` if and only if the instance has already
+//!     been terminated.
+//! * `Hostcall yields`, or `Hostcall resumes`
+//!   - These are specific points in "Hostcall executing" and has no further semantics.
 //! * `Hostcall returns`
-//!   - terminable: `true`
+//!   - termination result: `Ok(KillSuccess::Signalled)`
 //!   - execution_domain: `Guest`
-//!   - `execution_domain` may be `Terminated` before returning, in which case `terminable` will be
-//!   false, but the hostcall would then exit. If a hostcall successfully returns to its caller it
-//!   was not terminated, so the only state an instance will have after returning from a hostcall
-//!   will be that it's executing terminable guest code.
+//!   - `execution_domain` may be `Terminated` before returning, in which case `terminate` will
+//!     return `NotTerminable`, but the hostcall would then exit. If a hostcall successfully
+//!     returns to its caller it was not terminated, so the only state an instance will have after
+//!     returning from a hostcall will be that it is executing terminable guest code.
+//! * `Instance::reset` or `Instance dropped`
+//!   - termination result: `Err(KillError::Invalid)`
+//!   - execution_domain: `Pending`
+//!   - If an instance is reset, outstanding `KillSwitch` objects will no longer hold a valid
+//!     reference to the instance. In that case, calls to `terminate` will return `Invalid`, and
+//!     have no bearing on further execution.
 //!
-//! FIXME KTM 2020-02-13: Some details in the documentation above will need to change.
-
+//! ## Further Reading
+//!
+//! For more information about kill state, execution domains, and instance termination, see
+//! [`KillState`](struct.KillState.html), [`Domain`](enum.Domain.html), and
+/// [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate), respectively.
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
 use std::sync::{Condvar, Mutex, Weak};
