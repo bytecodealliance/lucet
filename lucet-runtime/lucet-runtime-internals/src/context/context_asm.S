@@ -204,16 +204,17 @@ _lucet_context_set:
 //   * rsi: the address of the entry function.
 //   * rbx: the address of the guest code to resume at.
 //
-// First, we call the function whose address is stored in `rsi`, passing along
-// the value of `rdi` as the first argument. Then, jump to the guest code at
-// the address in `rbx`.
+// See `lucet_runtime_internals::context::lucet_context_activate` for more info.
 //
 // Note that `rbx` is used to store the address of the guest code because it is
 // a callee-saved register in the System V calling convention. It is also a
 // non-violatile register on Windows, which is a nice benefit.
 lucet_context_activate:
 _lucet_context_activate:
+    // First, we call the entry function whose address is stored in `rsi`,
+    // passing along the value of `rdi` as the first argument.
     call *%rsi
+    // Now, jump to the guest code at the address in `rbx`.
     jmp *%rbx
 #ifdef __ELF__
 .size lucet_context_activate,.-lucet_context_activate

@@ -728,9 +728,25 @@ extern "C" {
     /// Never returns because the current context is discarded.
     fn lucet_context_set(to: *const Context) -> !;
 
-    /// Enables termination for the instance, after performing a context switch.
+    /// Runs an activation function after performing a context switch. Implemented in assembly.
     ///
-    /// Takes the guest return address as an argument as a consequence of implementation details,
-    /// see `Instance::swap_and_return` for more.
+    /// In practice, this is used with `enter_guest_region` so that the guest will appropriately
+    /// set itself to be terminable upon entry before continuing to any guest code.
+    ///
+    /// `lucet_context_activate` is essentially a function with three arguments:
+    ///   * rdi: the data for the entry function.
+    ///   * rsi: the address of the entry function.
+    ///   * rbx: the address of the guest code to resume at.
+    ///
+    /// We do not actually define `lucet_context_activate` as having these arguments because we
+    /// manually load these arguments, as well as a pointer to this function, into the context's
+    /// registers. See `Instance::with_activation_routine` for more information.
+    ///
+    /// Note that `rbx` is used to store the address of the guest code because it is a callee-saved
+    /// register in the System V calling convention. It is also a non-violatile register on
+    /// Windows, which is a nice additional benefit.
+    ///
+    /// For more information, see `Instance::swap_and_return`, `Instance::with_activation_routine`,
+    /// `enter_guest_region`, and `lucet_context_activate`'s assembly implementation.
     pub(crate) fn lucet_context_activate();
 }

@@ -860,32 +860,41 @@ impl Instance {
             &args_with_vmctx,
         )?;
 
-        // Set up the guest to set itself as terminable, then continue to whatever guest code we
-        // want to run. `lucet_context_activate` takes three arguments in the following registers:
-        //   * rdi: pointer to the data for the entry function
-        //   * rsi: the address of the entry function
-        //   * rbx: the address of guest code to execute
-        //
-        // The appropriate value for `rbx` is the top of the guest stack, which we would otherwise
-        // return to and start executing immediately. For `rdi`, we want to pass our callback data
-        // (a raw pointer to the instance). This will be passed as the first argument to the entry
-        // function, whose address is given in `rsi`.
-        //
-        // once we've set up arguments, swap out the guest return address with
-        // `lucet_context_activate` so we start execution there.
-        unsafe {
-            let top_of_stack = self.ctx.gpr.rsp as *mut u64;
-            // move the guest code address to rbx
-            self.ctx.gpr.rbx = *top_of_stack;
-            // replace it with the activation thunk
-            *top_of_stack = crate::context::lucet_context_activate as u64;
-            // store a pointer to pass to the context activation function
-            self.ctx.gpr.rdi = self.ctx.callback_data_ptr() as u64;
-            // pass a pointer to the guest-side entrypoint bootstrap code
-            self.ctx.gpr.rsi = execution::enter_guest_region as u64;
-        }
+        self.with_terminability().swap_and_return()
+    }
 
-        self.swap_and_return()
+    /// Prepare the guest so that it will mark itself as terminable upon entry.
+    ///
+    /// This mutates the context's registers so that an activation function that will be run after
+    /// performing a context switch. This function (`enter_guest_region`) will mark the guest as
+    /// terminable before continuing to whatever guest code we want to run.
+    ///
+    /// `lucet_context_activate` takes three arguments in the following registers:
+    ///   * rdi: the data for the entry function
+    ///   * rsi: the address of the entry function
+    ///   * rbx: the address of guest code to execute
+    ///
+    /// The appropriate value for `rbx` is the top of the guest stack, which we would otherwise
+    /// return to and start executing immediately. For `rdi`, we want to pass our callback data
+    /// (a raw pointer to the instance). This will be passed as the first argument to the entry
+    /// function, which is responsible for updating the kill state's execution domain.
+    ///
+    /// See `lucet_runtime_internals::context::lucet_context_activate`, and
+    /// `execution::enter_guest_region` for more info.
+    fn with_terminability(&mut self) -> &mut Self {
+        unsafe {
+            // Get a raw pointer to the top of the guest stack.
+            let top_of_stack = self.ctx.gpr.rsp as *mut u64;
+            // Move the guest code address to rbx, and then put the address of the activation thunk
+            // at the top of the stack, so that we will start execution at `enter_guest_region`.
+            self.ctx.gpr.rbx = *top_of_stack;
+            *top_of_stack = crate::context::lucet_context_activate as u64;
+            // Pass a pointer to our guest-side entrypoint bootstrap code in `rsi`, and then put
+            // its first argument (a raw pointer to `self`) in `rdi`.
+            self.ctx.gpr.rsi = execution::enter_guest_region as u64;
+            self.ctx.gpr.rdi = self.ctx.callback_data_ptr() as u64;
+        }
+        self
     }
 
     /// The core routine for context switching into a guest, and extracting a result.
