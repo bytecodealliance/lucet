@@ -1,0 +1,17 @@
+[package]
+name = "lucet-wiggle"
+version = "0.6.2-dev"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Lucet team <lucet@fastly.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+wiggle-generate = { git = "https://github.com/kubkon/wiggle", branch = "pch/lib_generate" }
+witx = "0.8.3"
+syn = { version = "1.0", features = ["full"] }

@@ -15,6 +15,7 @@ members = [
   "lucet-wasi",
   "lucet-wasi-fuzz",
   "lucet-wasi-sdk",
+  "lucet-wiggle",
   "lucetc",
   "sightglass",
 ]
