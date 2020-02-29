@@ -1,10 +1,9 @@
 use crate::bindings;
 use lucet_runtime::{self, MmapRegion, Module as LucetModule, Region, UntypedRetVal, Val};
-use lucetc::{Compiler, CpuFeatures, Error as LucetcError, HeapSettings, OptLevel};
+use lucetc::{Compiler, CpuFeatures, Error as LucetcError};
 use std::io;
 use std::process::Command;
 use std::sync::Arc;
-use target_lexicon::Triple;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -64,18 +63,10 @@ impl ScriptEnv {
     }
     pub fn instantiate(&mut self, module: &[u8], name: &Option<String>) -> Result<(), ScriptError> {
         let bindings = bindings::spec_test_bindings();
-        let compiler = Compiler::new(
-            module,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::baseline(),
-            &bindings,
-            HeapSettings::default(),
-            true,
-            &None,
-            false,
-        )
-        .map_err(program_error)?;
+        let builder = Compiler::builder()
+            .with_cpu_features(CpuFeatures::baseline())
+            .with_count_instructions(true);
+        let compiler = builder.create(module, &bindings).map_err(program_error)?;
 
         let dir = tempfile::Builder::new().prefix("codegen").tempdir()?;
         let objfile_path = dir.path().join("a.o");
