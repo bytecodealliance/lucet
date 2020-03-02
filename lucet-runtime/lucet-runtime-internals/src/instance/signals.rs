@@ -167,8 +167,6 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
 
         if signal == Signal::SIGALRM {
             // set the state before jumping back to the host context
-            // TODO: once we have a notion of logging in `lucet-runtime`, this should be a logged
-            // error.
             inst.state = State::Terminating {
                 details: TerminationDetails::Remote,
             };

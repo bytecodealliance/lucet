@@ -12,11 +12,13 @@
 //! ## Execution Domain
 //!
 //! Termination does not directly map to the idea of guest code currently executing on a processor,
-//! because termination can occur either during host code, or while a guest has yielded execution.
+//! because termination can occur before the guest has started, during host code, or while a guest
+//! has yielded execution.
 //!
-//! As a result, termination can only be treated as a best-effort to deschedule a guest. This is
-//! typically quick when it occurs during guest code execution, and otherwise happens immediately
-//! upon resuming execution of guest code (exiting host code, or resuming a yielded instance).
+//! As a result, termination of a running instance can only be treated as a best-effort to
+//! deschedule a guest. This is typically quick when it occurs during guest code execution, and
+//! otherwise happens immediately upon resuming execution of guest code (exiting host code, or
+//! resuming a yielded instance).
 //!
 //! Execution domains allow us to distinguish what an appropriate mechanism to signal termination
 //! is. This means that changing of an execution domain must be atomic - it would be an error to
@@ -42,7 +44,7 @@
 //!     executing a hostcall, but may also be `Terminated` while in a hostcall to indicate that it
 //!     should exit when the hostcall completes.
 //!   - `KillSwitch::terminate` will succeed with `Signalled` when terminated while executing guest
-//!     code, `Pending` when terminateed while executing a hostcall, and will fail with
+//!     code, `Pending` when terminated while executing a hostcall, and will fail with
 //!     `NotTerminable` when the instance has already been terminated.
 //! * `Instance::run returns`
 //!   - execution_domain: `Guest, Hostcall, or Terminated`
@@ -78,7 +80,6 @@
 //!     returning from a hostcall will be that it is executing terminable guest code.
 //! * `Instance::reset` or `Instance dropped`
 //!   - termination result: `Err(KillError::Invalid)`
-//!   - execution_domain: `Pending`
 //!   - If an instance is reset, outstanding `KillSwitch` objects will no longer hold a valid
 //!     reference to the instance. In that case, calls to `terminate` will return `Invalid`, and
 //!     have no bearing on further execution.
@@ -149,8 +150,8 @@ pub struct KillState {
 /// not return, and we will swap back to the host context without unwinding.
 ///
 /// This function will panic if the `Instance`'s execution domain is marked as currently executing
-/// guest code, currently in a hostcall, or as cancelled.  Attempting to enter an instance
-/// currently in any of these domains mean that something has gone seriously wrong.
+/// guest code, currently in a hostcall, or as cancelled.  Attempting to enter an instance from any
+/// of these domains means that something has gone seriously wrong.
 pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
     let mut current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
     match *current_domain {
@@ -334,8 +335,10 @@ pub enum Domain {
 }
 
 /// An object that can be used to terminate an instance's execution from a separate thread.
+///
+/// A weak reference to the instance's kill state is used so that a `KillSwitch` can have an
+/// arbitrary lifetime unrelated to the [`Instance`](struct.Instance.html) it will terminate.
 pub struct KillSwitch {
-    /// A temporary, non-owning reference to the instance's kill state.
     state: Weak<KillState>,
 }
 
@@ -391,10 +394,6 @@ impl KillSwitch {
         // Get the underlying kill state. If this fails, it means the instance exited and was
         // discarded, so we can't terminate.
         let state = self.state.upgrade().ok_or(KillError::Invalid)?;
-        // Now check what domain the instance is in.
-        //
-        // Hold this lock through all signalling logic to prevent the instance from switching
-        // domains (and invalidating safety of whichever mechanism we choose here)
         let mut execution_domain = state.execution_domain.lock().unwrap();
         let result = match *execution_domain {
             Domain::Guest => {
@@ -415,7 +414,7 @@ impl KillSwitch {
                     Ok(KillSuccess::Signalled)
                 } else {
                     // If the execution domain is marked as `Guest`, but there is not a thread
-                    // running that we wan signal, the guest most likely faulted.
+                    // running that we can signal, the guest most likely faulted.
                     Err(KillError::NotTerminable)
                 }
             }

@@ -184,7 +184,7 @@ macro_rules! timeout_tests {
                 Ok(_) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
-            assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled)); // FIXME -> Invalid
+            assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled));
 
             // If terminated after running, the guest will not run again.
             match inst.run("onetwothree", &[]) {
@@ -332,8 +332,8 @@ macro_rules! timeout_tests {
 
             // Spawn a thread to terminate the instance after waiting for 100ms.
             let kill_switch = inst.kill_switch();
-            let helper_1 = thread::Builder::new()
-                .name("helper-1".to_owned())
+            let t1 = thread::Builder::new()
+                .name("killswitch_1".to_owned())
                 .spawn(move || {
                     thread::sleep(Duration::from_millis(100));
                     assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
@@ -342,8 +342,8 @@ macro_rules! timeout_tests {
 
             // Spawn a thread to terminate the instance after waiting for 200ms.
             let second_kill_switch = inst.kill_switch();
-            let helper_2 = thread::Builder::new()
-                .name("helper-2".to_owned())
+            let t2 = thread::Builder::new()
+                .name("killswitch_2".to_owned())
                 .spawn(move || {
                     thread::sleep(Duration::from_millis(200));
                     assert_eq!(
@@ -360,8 +360,8 @@ macro_rules! timeout_tests {
             }
 
             // Explicitly check that each helper thread's assertions succeeded.
-            helper_1.join().expect("helper_1 did not panic");
-            helper_2.join().expect("helper_2 did not panic");
+            t1.join().expect("killswitch_1 did not panic");
+            t2.join().expect("killswitch_2 did not panic");
 
             // Check that we can reset the instance and run a function.
             inst.reset().expect("instance resets");
