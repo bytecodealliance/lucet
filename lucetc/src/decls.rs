@@ -14,7 +14,7 @@ use cranelift_wasm::{
     Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
     TableIndex,
 };
-use lucet_module::bindings::Bindings;
+use lucet_module::bindings::{Bindings, UnknownBindings};
 use lucet_module::ModuleFeatures;
 use lucet_module::{
     owned::OwnedLinearMemorySpec, ExportFunction, FunctionIndex as LucetFunctionIndex,
@@ -147,7 +147,7 @@ impl<'a> ModuleDecls<'a> {
             func_ix: UniqueFuncIndex,
             decls: &mut ModuleDecls<'a>,
             bindings: &'a Bindings,
-        ) -> Result<Option<String>, Error> {
+        ) -> Result<Option<String>, lucet_module::Error> {
             if let Some((import_mod, import_field)) = decls.info.imported_funcs.get(func_ix) {
                 let import_symbol = bindings.translate(import_mod, import_field)?;
                 decls.imports.push(ImportFunction {
@@ -161,9 +161,17 @@ impl<'a> ModuleDecls<'a> {
             }
         }
 
+        let mut unknown_bindings = UnknownBindings::default();
         for ix in 0..decls.info.functions.len() {
             let func_index = UniqueFuncIndex::new(ix);
-            let import_info = import_name_for(func_index, decls, bindings)?;
+            let import_info = match import_name_for(func_index, decls, bindings) {
+                Err(e) => {
+                    unknown_bindings.push(e);
+                    continue;
+                }
+                Ok(import_info) => import_info,
+            };
+
             let export_info = export_name_for(func_index, decls);
 
             match (import_info, export_info) {
@@ -188,6 +196,9 @@ impl<'a> ModuleDecls<'a> {
                     decls.declare_function(clif_module, local_sym, Linkage::Local, func_index)?;
                 }
             }
+        }
+        if !unknown_bindings.is_empty() {
+            return Err(lucet_module::Error::UnknownBindings { unknown_bindings }.into());
         }
         Ok(())
     }

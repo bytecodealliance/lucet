@@ -1,8 +1,10 @@
 use crate::Error;
 use serde_json::{self, Map, Value};
 use std::collections::{hash_map::Entry, HashMap};
+use std::fmt;
 use std::fs;
 use std::path::Path;
+use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub struct Bindings {
@@ -150,5 +152,36 @@ impl Bindings {
             m.insert(methodname.to_owned(), Value::from(symbol.to_owned()));
         }
         m
+    }
+}
+
+#[derive(Debug, Error, Default)]
+pub struct UnknownBindings {
+    errors: Vec<Error>,
+}
+
+impl UnknownBindings {
+    pub fn push(&mut self, unknown: Error) {
+        match unknown {
+            Error::UnknownModule { .. } | Error::UnknownSymbol { .. } => {}
+            _ => panic!("Unexpected error type"),
+        };
+        self.errors.push(unknown);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+impl fmt::Display for UnknownBindings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let str = self
+            .errors
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}", str)
     }
 }

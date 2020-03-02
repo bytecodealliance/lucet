@@ -1,3 +1,4 @@
+use crate::bindings::UnknownBindings;
 use thiserror::Error;
 
 /// Module data (de)serialization errors.
@@ -31,4 +32,6 @@ pub enum Error {
     UnknownModule { module: String, symbol: String },
     #[error("Unknown symbol `{module}::{symbol}`")]
     UnknownSymbol { module: String, symbol: String },
+    #[error("Unknown bindings {unknown_bindings}")]
+    UnknownBindings { unknown_bindings: UnknownBindings },
 }
