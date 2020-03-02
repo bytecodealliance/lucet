@@ -198,7 +198,7 @@ impl<'a> ModuleDecls<'a> {
             }
         }
         if !unknown_bindings.is_empty() {
-            return Err(lucet_module::Error::UnknownBindings { unknown_bindings }.into());
+            return Err(lucet_module::Error::UnknownBindings(unknown_bindings).into());
         }
         Ok(())
     }

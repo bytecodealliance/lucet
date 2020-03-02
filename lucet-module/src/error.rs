@@ -32,6 +32,6 @@ pub enum Error {
     UnknownModule { module: String, symbol: String },
     #[error("Unknown symbol `{module}::{symbol}`")]
     UnknownSymbol { module: String, symbol: String },
-    #[error("Unknown bindings {unknown_bindings}")]
-    UnknownBindings { unknown_bindings: UnknownBindings },
+    #[error("Unknown bindings")]
+    UnknownBindings(#[from] UnknownBindings),
 }
