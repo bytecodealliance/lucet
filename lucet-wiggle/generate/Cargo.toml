@@ -1,0 +1,16 @@
+[package]
+name = "lucet-wiggle-generate"
+version = "0.6.2-dev"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Lucet team <lucet@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+wiggle-generate = { path = "../../../wiggle/crates/generate" }
+witx = "0.8.3"
+quote = "1.0"
+proc-macro2 = "1.0"
+heck = "*"

@@ -12,6 +12,12 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
-wiggle-generate = { git = "https://github.com/kubkon/wiggle", branch = "pch/lib_generate" }
+lucet-wiggle-generate = { path = "generate", version = "0.6.2-dev" }
+wiggle-generate = { path = "../../wiggle/crates/generate" }
 witx = "0.8.3"
 syn = { version = "1.0", features = ["full"] }
+
+[dev-dependencies]
+wiggle-runtime = { path = "../../wiggle/crates/runtime" }
+wiggle-test = { path = "../../wiggle/crates/test" }
+lucet-runtime = { path = "../lucet-runtime", version = "0.6.2-dev" }
