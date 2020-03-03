@@ -233,7 +233,7 @@ macro_rules! guest_fault_tests {
                         4096,
                         ProtFlags::PROT_NONE,
                         MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
-                        0,
+                        -1,
                         0,
                     )
                         .expect("mmap succeeds") as *mut libc::c_char;
