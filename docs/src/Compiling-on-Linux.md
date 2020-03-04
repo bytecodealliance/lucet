@@ -86,7 +86,7 @@ Install the WASI sysroot:
 
 ```sh
 mkdir -p /opt
-curl https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk-8.0-linux.tar.gz | \
+curl -L https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk-8.0-linux.tar.gz | \
 sudo tar x -zv -C /opt -f - wasi-sdk-8.0/share && \
   sudo ln -s /opt/wasi-sdk-*/share/wasi-sysroot /opt/wasi-sysroot
 ```
