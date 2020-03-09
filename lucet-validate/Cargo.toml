@@ -19,7 +19,7 @@ path = "src/main.rs"
 [dependencies]
 clap = "2"
 witx = "0.8.3"
-cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.51.0" }
+cranelift-entity = { path = "../wasmtime/cranelift/entity", version = "0.59.0" }
 thiserror = "1.0.4"
 wasmparser = "0.39.1"
 

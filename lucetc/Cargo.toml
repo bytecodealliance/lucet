@@ -16,13 +16,13 @@ path = "lucetc/main.rs"
 [dependencies]
 anyhow = "1"
 bincode = "1.1.4"
-cranelift-codegen = { path = "../cranelift/cranelift-codegen", version = "0.51.0" }
-cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.51.0" }
-cranelift-native = { path = "../cranelift/cranelift-native", version = "0.51.0" }
-cranelift-frontend = { path = "../cranelift/cranelift-frontend", version = "0.51.0" }
-cranelift-module = { path = "../cranelift/cranelift-module", version = "0.51.0" }
-cranelift-faerie = { path = "../cranelift/cranelift-faerie", version = "0.51.0" }
-cranelift-wasm = { path = "../cranelift/cranelift-wasm", version = "0.51.0" }
+cranelift-codegen = { path = "../wasmtime/cranelift/codegen", version = "0.59.0" }
+cranelift-entity = { path = "../wasmtime/cranelift/entity", version = "0.59.0" }
+cranelift-native = { path = "../wasmtime/cranelift/native", version = "0.59.0" }
+cranelift-frontend = { path = "../wasmtime/cranelift/frontend", version = "0.59.0" }
+cranelift-module = { path = "../wasmtime/cranelift/module", version = "0.59.0" }
+cranelift-faerie = { path = "../wasmtime/cranelift/faerie", version = "0.59.0" }
+cranelift-wasm = { path = "../wasmtime/cranelift/wasm", version = "0.59.0" }
 target-lexicon = "0.9"
 lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }
 lucet-validate = { path = "../lucet-validate", version = "=0.6.2-dev" }
