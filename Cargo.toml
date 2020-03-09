@@ -20,7 +20,7 @@ members = [
   "lucetc",
   "sightglass",
 ]
-exclude = ["cranelift"]
+exclude = ["wasmtime"]
 
 [profile.test]
 rpath = true
