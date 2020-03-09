@@ -11,8 +11,8 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
-    TableIndex,
+    Global, GlobalIndex, GlobalInit, MemoryIndex, SignatureIndex, Table,
+    TableIndex, TargetEnvironment
 };
 use lucet_module::bindings::Bindings;
 use lucet_module::ModuleFeatures;

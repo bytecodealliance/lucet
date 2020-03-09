@@ -6,7 +6,7 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
     FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, ModuleTranslationState,
-    SignatureIndex, Table, TableElementType, TableIndex, WasmResult,
+    SignatureIndex, Table, TableElementType, TableIndex, TargetEnvironment, WasmResult,
 };
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
@@ -141,11 +141,13 @@ impl<'a> ModuleInfo<'a> {
     }
 }
 
-impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
+impl<'a> TargetEnvironment for ModuleInfo<'a> {
     fn target_config(&self) -> TargetFrontendConfig {
         self.target_config
     }
+}
 
+impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
     fn declare_signature(&mut self, mut sig: ir::Signature) -> WasmResult<()> {
         sig.params.insert(
             0,

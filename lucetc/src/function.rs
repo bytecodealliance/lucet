@@ -9,7 +9,7 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_frontend::FunctionBuilder;
 use cranelift_wasm::{
     FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex, GlobalVariable, MemoryIndex,
-    SignatureIndex, TableIndex, WasmError, WasmResult,
+    SignatureIndex, TableIndex, TargetEnvironment, WasmError, WasmResult,
 };
 use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
@@ -265,11 +265,13 @@ impl<'a> FuncInfo<'a> {
     }
 }
 
-impl<'a> FuncEnvironment for FuncInfo<'a> {
+impl<'a> TargetEnvironment for FuncInfo<'a> {
     fn target_config(&self) -> TargetFrontendConfig {
         self.module_decls.target_config()
     }
-
+}
+    
+impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn make_global(
         &mut self,
         func: &mut ir::Function,
