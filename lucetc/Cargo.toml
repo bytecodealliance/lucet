@@ -27,7 +27,7 @@ target-lexicon = "0.9"
 lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }
 lucet-validate = { path = "../lucet-validate", version = "=0.6.2-dev" }
 lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.6.2-dev" }
-wasmparser = "0.39.1"
+wasmparser = "0.51.2"
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"
