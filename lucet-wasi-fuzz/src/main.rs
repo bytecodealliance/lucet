@@ -9,7 +9,7 @@ use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
 use rand::prelude::random;
 use rayon::prelude::*;
-use regex::Regex;
+use regex::{Regex, RegexSet};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::os::unix::prelude::{FromRawFd, IntoRawFd, OpenOptionsExt};
@@ -289,6 +289,8 @@ fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<
         .arg("-Werror=format")
         .arg("-Werror=uninitialized")
         .arg("-Werror=conditional-uninitialized")
+        .arg("-Werror=return-type")
+        .arg("-Werror=int-conversion")
         .arg("-I/usr/include/csmith")
         .arg(gen_c_path.as_ref())
         .arg("-o")
@@ -305,8 +307,29 @@ fn run_native<P: AsRef<Path>>(tmpdir: &TempDir, gen_c_path: P) -> Result<Option<
         );
     }
 
-    if String::from_utf8_lossy(&res.stderr).contains("too few arguments in call") {
-        bail!("saw \"too few arguments in call\" warning");
+    // filter clang output, based on the example from the creduce documentation
+    // <https://embed.cs.utah.edu/creduce/using/crash/test2.sh>
+    let output_filter = RegexSet::new(&[
+        "incompatible redeclaration",
+        "ordered comparison between pointer",
+        "eliding middle term",
+        "end of non-void function",
+        "invalid in C99",
+        "specifies type",
+        "should return a value",
+        "too few argument",
+        "too many argument",
+        "return type of 'main'",
+        "uninitialized",
+        "incompatible pointer to",
+        "incompatible integer to",
+        "type specifier missing",
+        "tentative array definition assumed to have one element",
+    ])
+    .unwrap();
+
+    if output_filter.is_match(&String::from_utf8_lossy(&res.stderr)) {
+        bail!("saw a clang warning that could indicate UB; rejecting test case");
     }
 
     let mut native_child = Command::new(&gen_path).stdout(Stdio::piped()).spawn()?;
