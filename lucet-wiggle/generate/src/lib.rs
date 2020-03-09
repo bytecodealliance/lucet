@@ -1,4 +1,5 @@
 use heck::SnakeCase;
+use lucet_module::bindings::Bindings;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
@@ -8,6 +9,9 @@ pub fn hostcall_name(m: &witx::Module, f: &witx::InterfaceFunc) -> String {
         m.name.as_str().to_snake_case(),
         f.name.as_str().to_snake_case()
     )
+}
+pub fn hostcall_bindings(doc: &witx::Document) -> Bindings {
+    unimplemented!()
 }
 
 pub fn generate(doc: &witx::Document, config: &wiggle_generate::Config) -> TokenStream {
@@ -42,7 +46,7 @@ pub fn generate(doc: &witx::Document, config: &wiggle_generate::Config) -> Token
                 pub fn #name(vmctx: &mut lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #rets {
                     let mut memory: wiggle_runtime::GuestMemory = unimplemented!();
                     let mut ctx: #ctx_type = unimplemented!();
-                    #mod_name::#method_name(&mut ctx, &mut memory, #(#call_args),*)
+                    #mod_name::#method_name(&ctx, &memory, #(#call_args),*)
                 }
             }
         });
