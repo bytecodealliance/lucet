@@ -1,3 +1,7 @@
+pub mod config;
+
+pub use config::Config;
+
 use heck::SnakeCase;
 use lucet_module::bindings::Bindings;
 use proc_macro2::TokenStream;
@@ -10,12 +14,12 @@ pub fn hostcall_name(m: &witx::Module, f: &witx::InterfaceFunc) -> String {
         f.name.as_str().to_snake_case()
     )
 }
-pub fn hostcall_bindings(doc: &witx::Document) -> Bindings {
+pub fn hostcall_bindings(_doc: &witx::Document) -> Bindings {
     unimplemented!()
 }
 
-pub fn generate(doc: &witx::Document, config: &wiggle_generate::Config) -> TokenStream {
-    let names = wiggle_generate::Names::new(config);
+pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
+    let names = wiggle_generate::Names::new(&config.wiggle);
     let fs = doc.modules().map(|m| {
         let fs = m.funcs().map(|f| {
             let name = format_ident!("{}", hostcall_name(&m, &f));
@@ -39,13 +43,14 @@ pub fn generate(doc: &witx::Document, config: &wiggle_generate::Config) -> Token
                 .unwrap_or(quote!(()));
             let mod_name = names.module(&m.name);
             let method_name = names.func(&f.name);
-            let ctx_type = config.ctx.name.clone();
+            let ctx_type = config.wiggle.ctx.name.clone();
+            let ctx_constructor = config.constructor.clone();
             quote! {
                 #[lucet_hostcall]
                 #[no_mangle]
                 pub fn #name(vmctx: &mut lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #rets {
-                    let mut memory: wiggle_runtime::GuestMemory = unimplemented!();
-                    let mut ctx: #ctx_type = unimplemented!();
+                    let memory= lucet_wiggle_runtime::LucetMemory::new(vmctx);
+                    let mut ctx: #ctx_type = #ctx_constructor;
                     #mod_name::#method_name(&ctx, &memory, #(#call_args),*)
                 }
             }

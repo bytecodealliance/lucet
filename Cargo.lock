@@ -1043,6 +1043,7 @@ dependencies = [
  "lucet-module 0.6.2-dev",
  "proc-macro2 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "wiggle-generate 0.1.0",
  "witx 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

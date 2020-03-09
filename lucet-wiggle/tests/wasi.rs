@@ -1,26 +1,42 @@
+use lucet_runtime::vmctx::Vmctx;
+use std::cell::RefCell;
 use wiggle_runtime::{GuestError, GuestErrorType, GuestPtr};
-use wiggle_test::WasiCtx;
+
+pub struct WasiCtx<'a> {
+    guest_errors: RefCell<Vec<GuestError>>,
+    vmctx: &'a mut Vmctx,
+}
+
+impl<'a> WasiCtx<'a> {
+    pub fn build(vmctx: &'a mut Vmctx) -> Self {
+        WasiCtx {
+            guest_errors: RefCell::new(Vec::new()),
+            vmctx,
+        }
+    }
+}
 
 lucet_wiggle::from_witx!({
     witx: ["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx"],
     ctx: WasiCtx,
+    constructor: { WasiCtx::build(&mut vmctx) },
 });
 
 type Result<T> = std::result::Result<T, types::Errno>;
 
-impl GuestErrorType for types::Errno {
-    type Context = WasiCtx;
+impl<'a> GuestErrorType<'a> for types::Errno {
+    type Context = WasiCtx<'a>;
     fn success() -> types::Errno {
         types::Errno::Success
     }
-    fn from_error(e: GuestError, ctx: &WasiCtx) -> types::Errno {
+    fn from_error(e: GuestError, ctx: &Self::Context) -> types::Errno {
         eprintln!("GUEST ERROR: {:?}", e);
-        ctx.guest_errors.borrow().push(e);
+        ctx.guest_errors.borrow_mut().push(e);
         types::Errno::Io
     }
 }
 
-impl crate::wasi_snapshot_preview1::WasiSnapshotPreview1 for WasiCtx {
+impl<'a> crate::wasi_snapshot_preview1::WasiSnapshotPreview1 for WasiCtx<'a> {
     fn args_get(&self, _argv: GuestPtr<GuestPtr<u8>>, _argv_buf: GuestPtr<u8>) -> Result<()> {
         unimplemented!("args_get")
     }

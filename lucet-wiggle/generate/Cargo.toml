@@ -15,3 +15,4 @@ witx = "0.8.3"
 quote = "1.0"
 proc-macro2 = "1.0"
 heck = "*"
+syn = { version = "1.0", features = ["full"] }
