@@ -340,7 +340,9 @@ impl<'a> ModuleDecls<'a> {
                         Err(Error::GlobalDeclarationError(ix.as_u32()))
                     }
                 }
-                GlobalInit::V128Const(_) => Err(Error::GlobalUnsupported(ix.as_u32())),
+                GlobalInit::V128Const(_)
+                    | GlobalInit::RefNullConst
+                    | GlobalInit::RefFunc(_) => Err(Error::GlobalUnsupported(ix.as_u32())),
             }?;
 
             globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));
