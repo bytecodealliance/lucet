@@ -5,7 +5,7 @@ use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap, SecondaryMap
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
-    FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, ModuleTranslationState,
+    DataIndex, ElemIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, ModuleTranslationState,
     SignatureIndex, Table, TableElementType, TableIndex, TargetEnvironment, WasmResult,
 };
 use lucet_module::UniqueSignatureIndex;
@@ -411,5 +411,13 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             .expect("function indices are valid");
         self.function_names[unique_func_index] = name;
         Ok(())
+    }
+
+    fn declare_passive_element(&mut self, _index: ElemIndex, _elements: Box<[FuncIndex]>) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    fn declare_passive_data(&mut self, _data_index: DataIndex, _data: &'a [u8]) -> WasmResult<()> {
+        unimplemented!();
     }
 }
