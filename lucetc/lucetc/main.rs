@@ -79,6 +79,11 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     };
 
     let mut bindings = Bindings::empty();
+    if opts.wiggle_bindings {
+        if let Some(ref v) = validator {
+            bindings.extend(&lucet_wiggle_generate::bindings(v.doc()))?;
+        }
+    }
     for file in opts.binding_files.iter() {
         let file_bindings = Bindings::from_file(file).map_err(|source| {
             let file = format!("{:?}", file);
@@ -89,11 +94,6 @@ pub fn run(opts: &Options) -> Result<(), Error> {
             let file = format!("{:?}", file);
             BindingError::ExtendError(source, file)
         })?;
-    }
-    if opts.wiggle_bindings {
-        if let Some(ref v) = validator {
-            bindings.extend(&lucet_wiggle_generate::bindings(v.doc()))?;
-        }
     }
 
     let mut c = Lucetc::new(PathBuf::from(input))
