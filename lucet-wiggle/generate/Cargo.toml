@@ -9,7 +9,7 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-wiggle-generate = { path = "../../../wiggle/crates/generate" }
+wiggle-generate = { git = "https://github.com/kubkon/wiggle" }
 lucet-module = { path = "../../lucet-module", version = "0.6.2-dev" }
 witx = "0.8.3"
 quote = "1.0"
