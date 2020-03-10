@@ -14,8 +14,19 @@ pub fn hostcall_name(m: &witx::Module, f: &witx::InterfaceFunc) -> String {
         f.name.as_str().to_snake_case()
     )
 }
-pub fn hostcall_bindings(_doc: &witx::Document) -> Bindings {
-    unimplemented!()
+pub fn hostcall_bindings(doc: &witx::Document) -> Bindings {
+    let bs = doc
+        .modules()
+        .map(|m| {
+            (
+                m.name.as_str().to_owned(),
+                m.funcs()
+                    .map(|f| (f.name.as_str().to_owned(), hostcall_name(&m, &f)))
+                    .collect(),
+            )
+        })
+        .collect();
+    Bindings::new(bs)
 }
 
 pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
