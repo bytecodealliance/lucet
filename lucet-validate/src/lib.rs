@@ -110,6 +110,10 @@ impl Validator {
         Ok(())
     }
 
+    pub fn doc(&self) -> &Document {
+        &self.witx
+    }
+
     fn witx_module(&self, module: &str) -> Result<Rc<Module>, Error> {
         self.witx
             .module(&Id::new(module))
