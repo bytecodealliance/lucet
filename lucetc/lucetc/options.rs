@@ -107,6 +107,7 @@ pub struct Options {
     pub binding_files: Vec<PathBuf>,
     pub witx_specs: Vec<PathBuf>,
     pub wasi_exe: bool,
+    pub wiggle_bindings: bool,
     pub builtins_path: Option<PathBuf>,
     pub min_reserved_size: Option<u64>,
     pub max_reserved_size: Option<u64>,
@@ -146,6 +147,7 @@ impl Options {
             .map(PathBuf::from)
             .collect();
         let wasi_exe = m.is_present("wasi_exe");
+        let wiggle_bindings = m.is_present("wiggle_bindings");
 
         let codegen = match m.value_of("emit") {
             None => CodegenOutput::SharedObj,
@@ -227,6 +229,7 @@ impl Options {
             binding_files,
             witx_specs,
             wasi_exe,
+            wiggle_bindings,
             builtins_path,
             min_reserved_size,
             max_reserved_size,
@@ -348,6 +351,12 @@ SSE3 but not AVX:
                     .multiple(true)
                     .number_of_values(1)
                     .help("path to bindings json file"),
+            )
+            .arg(
+                Arg::with_name("wiggle_bindings")
+                    .long("--wiggle-bindings")
+                    .takes_value(false)
+                    .help("use wiggle to calculate bindings"),
             )
             .arg(
                 Arg::with_name("witx_specs")

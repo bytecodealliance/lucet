@@ -72,6 +72,12 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         _ => Err(format_err!("provided too many inputs: {:?}", opts.input)),
     }?;
 
+    let mut validator = if !opts.witx_specs.is_empty() {
+        Some(Validator::load(&opts.witx_specs)?.with_wasi_exe(opts.wasi_exe))
+    } else {
+        None
+    };
+
     let mut bindings = Bindings::empty();
     for file in opts.binding_files.iter() {
         let file_bindings = Bindings::from_file(file).map_err(|source| {
@@ -84,6 +90,11 @@ pub fn run(opts: &Options) -> Result<(), Error> {
             BindingError::ExtendError(source, file)
         })?;
     }
+    if opts.wiggle_bindings {
+        if let Some(ref v) = validator {
+            bindings.extend(&lucet_wiggle_generate::bindings(v.doc()))?;
+        }
+    }
 
     let mut c = Lucetc::new(PathBuf::from(input))
         .with_bindings(bindings)
@@ -91,8 +102,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         .with_cpu_features(opts.cpu_features.clone())
         .with_target(opts.target.clone());
 
-    if !opts.witx_specs.is_empty() {
-        let validator = Validator::load(&opts.witx_specs)?.with_wasi_exe(opts.wasi_exe);
+    if let Some(validator) = validator.take() {
         c.validator(validator);
     }
 

@@ -14,7 +14,7 @@ pub fn hostcall_name(m: &witx::Module, f: &witx::InterfaceFunc) -> String {
         f.name.as_str().to_snake_case()
     )
 }
-pub fn hostcall_bindings(doc: &witx::Document) -> Bindings {
+pub fn bindings(doc: &witx::Document) -> Bindings {
     let bs = doc
         .modules()
         .map(|m| {
