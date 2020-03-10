@@ -492,6 +492,152 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         Ok(*pos.func.dfg.inst_results(inst).first().unwrap())
     }
 
+    fn translate_memory_copy(
+        &mut self,
+        pos: FuncCursor,
+        index: MemoryIndex,
+        heap: ir::Heap,
+        dst: ir::Value,
+        src: ir::Value,
+        len: ir::Value,
+    ) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    fn translate_memory_fill(
+        &mut self,
+        pos: FuncCursor,
+        index: MemoryIndex,
+        heap: ir::Heap,
+        dst: ir::Value,
+        val: ir::Value,
+        len: ir::Value,
+    ) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn translate_memory_init(
+        &mut self,
+        pos: FuncCursor,
+        index: MemoryIndex,
+        heap: ir::Heap,
+        seg_index: u32,
+        dst: ir::Value,
+        src: ir::Value,
+        len: ir::Value,
+    ) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    fn translate_data_drop(&mut self, pos: FuncCursor, seg_index: u32) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    fn translate_table_size(
+        &mut self,
+        pos: FuncCursor,
+        index: TableIndex,
+        table: ir::Table,
+    ) -> WasmResult<ir::Value> {
+        unimplemented!();
+    }
+
+    fn translate_table_grow(
+        &mut self,
+        pos: FuncCursor,
+        table_index: u32,
+        delta: ir::Value,
+        init_value: ir::Value,
+    ) -> WasmResult<ir::Value> {
+        unimplemented!();
+    }
+
+    fn translate_table_get(
+        &mut self,
+        pos: FuncCursor,
+        table_index: u32,
+        index: ir::Value,
+    ) -> WasmResult<ir::Value> {
+        unimplemented!();
+    }
+
+    fn translate_table_set(
+        &mut self,
+        pos: FuncCursor,
+        table_index: u32,
+        value: ir::Value,
+        index: ir::Value,
+    ) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn translate_table_copy(
+        &mut self,
+        pos: FuncCursor,
+        dst_table_index: TableIndex,
+        dst_table: ir::Table,
+        src_table_index: TableIndex,
+        src_table: ir::Table,
+        dst: ir::Value,
+        src: ir::Value,
+        len: ir::Value,
+    ) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    fn translate_table_fill(
+        &mut self,
+        pos: FuncCursor,
+        table_index: u32,
+        dst: ir::Value,
+        val: ir::Value,
+        len: ir::Value,
+    ) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    /// Translate a `table.init` WebAssembly instruction.
+    #[allow(clippy::too_many_arguments)]
+    fn translate_table_init(
+        &mut self,
+        pos: FuncCursor,
+        seg_index: u32,
+        table_index: TableIndex,
+        table: ir::Table,
+        dst: ir::Value,
+        src: ir::Value,
+        len: ir::Value,
+    ) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    fn translate_elem_drop(&mut self, pos: FuncCursor, seg_index: u32) -> WasmResult<()> {
+        unimplemented!();
+    }
+
+    fn translate_ref_func(&mut self, pos: FuncCursor, func_index: u32) -> WasmResult<ir::Value> {
+        unimplemented!();
+    }
+
+    fn translate_custom_global_get(
+        &mut self,
+        pos: FuncCursor,
+        global_index: GlobalIndex,
+    ) -> WasmResult<ir::Value> {
+        unimplemented!();
+    }
+
+    fn translate_custom_global_set(
+        &mut self,
+        pos: FuncCursor,
+        global_index: GlobalIndex,
+        val: ir::Value,
+    ) -> WasmResult<()> {
+        unimplemented!();
+    }
+
     fn before_translate_operator(
         &mut self,
         op: &Operator<'_>,
