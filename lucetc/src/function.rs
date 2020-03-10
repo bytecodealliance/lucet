@@ -66,23 +66,19 @@ impl<'a> FuncInfo<'a> {
         runtime_func: RuntimeFunc,
         func: &mut ir::Function,
     ) -> ir::FuncRef {
-        self.runtime_funcs
-            .get(&runtime_func)
-            .cloned()
-            .unwrap_or_else(|| {
-                let decl = self
-                    .module_decls
-                    .get_runtime(runtime_func)
-                    .expect("runtime function not available");
-                let signature = func.import_signature(decl.signature().to_owned());
-                let fref = func.import_function(ir::ExtFuncData {
-                    name: decl.name.into(),
-                    signature,
-                    colocated: false,
-                });
-                self.runtime_funcs.insert(runtime_func, fref);
-                fref
-            })
+        let decls = &self.module_decls;
+        *self.runtime_funcs.entry(runtime_func).or_insert_with(|| {
+            let decl = decls
+                .get_runtime(runtime_func)
+                .expect("runtime function not available");
+            let signature = func.import_signature(decl.signature().to_owned());
+            let fref = func.import_function(ir::ExtFuncData {
+                name: decl.name.into(),
+                signature,
+                colocated: false,
+            });
+            fref
+        })
     }
 
     fn update_instruction_count_instrumentation(
