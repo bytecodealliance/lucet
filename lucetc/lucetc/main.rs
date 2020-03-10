@@ -91,13 +91,9 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         .with_cpu_features(opts.cpu_features.clone())
         .with_target(opts.target.clone());
 
-    match opts.witx_specs.len() {
-        0 => {}
-        1 => {
-            let validator = Validator::load(&opts.witx_specs[0])?.with_wasi_exe(opts.wasi_exe);
-            c.validator(validator);
-        }
-        _ => return Err(format_err!("multiple witx specs not yet supported")),
+    if !opts.witx_specs.is_empty() {
+        let validator = Validator::load(&opts.witx_specs)?.with_wasi_exe(opts.wasi_exe);
+        c.validator(validator);
     }
 
     if let Some(ref builtins) = opts.builtins_path {
