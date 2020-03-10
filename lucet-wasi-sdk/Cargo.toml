@@ -19,4 +19,4 @@ thiserror = "1.0.4"
 [dev-dependencies]
 anyhow = "1"
 lucet-validate = { path = "../lucet-validate", version  = "=0.6.2-dev" }
-target-lexicon = "0.9"
+target-lexicon = "0.10"
