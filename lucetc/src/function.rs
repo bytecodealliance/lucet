@@ -494,148 +494,147 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn translate_memory_copy(
         &mut self,
-        pos: FuncCursor,
-        index: MemoryIndex,
-        heap: ir::Heap,
-        dst: ir::Value,
-        src: ir::Value,
-        len: ir::Value,
+        _pos: FuncCursor,
+        _index: MemoryIndex,
+        _heap: ir::Heap,
+        _dst: ir::Value,
+        _src: ir::Value,
+        _len: ir::Value,
     ) -> WasmResult<()> {
-        unimplemented!();
+        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
     }
 
     fn translate_memory_fill(
         &mut self,
-        pos: FuncCursor,
-        index: MemoryIndex,
-        heap: ir::Heap,
-        dst: ir::Value,
-        val: ir::Value,
-        len: ir::Value,
+        _pos: FuncCursor,
+        _index: MemoryIndex,
+        _heap: ir::Heap,
+        _dst: ir::Value,
+        _val: ir::Value,
+        _len: ir::Value,
     ) -> WasmResult<()> {
-        unimplemented!();
+        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
     }
 
     #[allow(clippy::too_many_arguments)]
     fn translate_memory_init(
         &mut self,
-        pos: FuncCursor,
-        index: MemoryIndex,
-        heap: ir::Heap,
-        seg_index: u32,
-        dst: ir::Value,
-        src: ir::Value,
-        len: ir::Value,
+        _pos: FuncCursor,
+        _index: MemoryIndex,
+        _heap: ir::Heap,
+        _seg_index: u32,
+        _dst: ir::Value,
+        _src: ir::Value,
+        _len: ir::Value,
     ) -> WasmResult<()> {
-        unimplemented!();
+        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
     }
 
-    fn translate_data_drop(&mut self, pos: FuncCursor, seg_index: u32) -> WasmResult<()> {
-        unimplemented!();
+    fn translate_data_drop(&mut self, _pos: FuncCursor, _seg_index: u32) -> WasmResult<()> {
+        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
     }
 
     fn translate_table_size(
         &mut self,
-        pos: FuncCursor,
-        index: TableIndex,
-        table: ir::Table,
+        _pos: FuncCursor,
+        _index: TableIndex,
+        _table: ir::Table,
     ) -> WasmResult<ir::Value> {
-        unimplemented!();
+        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
     }
 
     fn translate_table_grow(
         &mut self,
-        pos: FuncCursor,
-        table_index: u32,
-        delta: ir::Value,
-        init_value: ir::Value,
+        _pos: FuncCursor,
+        _table_index: u32,
+        _delta: ir::Value,
+        _init_value: ir::Value,
     ) -> WasmResult<ir::Value> {
-        unimplemented!();
+        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
     }
 
     fn translate_table_get(
         &mut self,
-        pos: FuncCursor,
-        table_index: u32,
-        index: ir::Value,
+        _pos: FuncCursor,
+        _table_index: u32,
+        _index: ir::Value,
     ) -> WasmResult<ir::Value> {
-        unimplemented!();
+        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
     }
 
     fn translate_table_set(
         &mut self,
-        pos: FuncCursor,
-        table_index: u32,
-        value: ir::Value,
-        index: ir::Value,
+        _pos: FuncCursor,
+        _table_index: u32,
+        _value: ir::Value,
+        _index: ir::Value,
     ) -> WasmResult<()> {
-        unimplemented!();
+        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
     }
 
     #[allow(clippy::too_many_arguments)]
     fn translate_table_copy(
         &mut self,
-        pos: FuncCursor,
-        dst_table_index: TableIndex,
-        dst_table: ir::Table,
-        src_table_index: TableIndex,
-        src_table: ir::Table,
-        dst: ir::Value,
-        src: ir::Value,
-        len: ir::Value,
+        _pos: FuncCursor,
+        _dst_table_index: TableIndex,
+        _dst_table: ir::Table,
+        _src_table_index: TableIndex,
+        _src_table: ir::Table,
+        _dst: ir::Value,
+        _src: ir::Value,
+        _len: ir::Value,
     ) -> WasmResult<()> {
-        unimplemented!();
+        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
     }
 
     fn translate_table_fill(
         &mut self,
-        pos: FuncCursor,
-        table_index: u32,
-        dst: ir::Value,
-        val: ir::Value,
-        len: ir::Value,
+        _pos: FuncCursor,
+        _table_index: u32,
+        _dst: ir::Value,
+        _val: ir::Value,
+        _len: ir::Value,
     ) -> WasmResult<()> {
-        unimplemented!();
+        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
     }
 
-    /// Translate a `table.init` WebAssembly instruction.
     #[allow(clippy::too_many_arguments)]
     fn translate_table_init(
         &mut self,
-        pos: FuncCursor,
-        seg_index: u32,
-        table_index: TableIndex,
-        table: ir::Table,
-        dst: ir::Value,
-        src: ir::Value,
-        len: ir::Value,
+        _pos: FuncCursor,
+        _seg_index: u32,
+        _table_index: TableIndex,
+        _table: ir::Table,
+        _dst: ir::Value,
+        _src: ir::Value,
+        _len: ir::Value,
     ) -> WasmResult<()> {
-        unimplemented!();
+        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
     }
 
-    fn translate_elem_drop(&mut self, pos: FuncCursor, seg_index: u32) -> WasmResult<()> {
-        unimplemented!();
+    fn translate_elem_drop(&mut self, _pos: FuncCursor, _seg_index: u32) -> WasmResult<()> {
+        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
     }
 
-    fn translate_ref_func(&mut self, pos: FuncCursor, func_index: u32) -> WasmResult<ir::Value> {
-        unimplemented!();
+    fn translate_ref_func(&mut self, _pos: FuncCursor, _func_index: u32) -> WasmResult<ir::Value> {
+        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
     }
 
     fn translate_custom_global_get(
         &mut self,
-        pos: FuncCursor,
-        global_index: GlobalIndex,
+        _pos: FuncCursor,
+        _global_index: GlobalIndex,
     ) -> WasmResult<ir::Value> {
-        unimplemented!();
+        Err(WasmError::Unsupported("custom global operations not supported yet".into()))
     }
 
     fn translate_custom_global_set(
         &mut self,
-        pos: FuncCursor,
-        global_index: GlobalIndex,
-        val: ir::Value,
+        _pos: FuncCursor,
+        _global_index: GlobalIndex,
+        _val: ir::Value,
     ) -> WasmResult<()> {
-        unimplemented!();
+        Err(WasmError::Unsupported("custom global operations not supported yet".into()))
     }
 
     fn before_translate_operator(
