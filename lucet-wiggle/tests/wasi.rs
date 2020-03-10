@@ -4,11 +4,11 @@ use wiggle_runtime::{GuestError, GuestErrorType, GuestPtr};
 
 pub struct WasiCtx<'a> {
     guest_errors: RefCell<Vec<GuestError>>,
-    vmctx: &'a mut Vmctx,
+    vmctx: &'a Vmctx,
 }
 
 impl<'a> WasiCtx<'a> {
-    pub fn build(vmctx: &'a mut Vmctx) -> Self {
+    pub fn build(vmctx: &'a Vmctx) -> Self {
         WasiCtx {
             guest_errors: RefCell::new(Vec::new()),
             vmctx,
@@ -19,7 +19,7 @@ impl<'a> WasiCtx<'a> {
 lucet_wiggle::from_witx!({
     witx: ["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx"],
     ctx: WasiCtx,
-    constructor: { WasiCtx::build(&mut vmctx) },
+    constructor: { WasiCtx::build(vmctx) },
 });
 
 type Result<T> = std::result::Result<T, types::Errno>;
