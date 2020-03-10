@@ -5,8 +5,9 @@ use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap, SecondaryMap
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
-    DataIndex, ElemIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment, ModuleTranslationState,
-    SignatureIndex, Table, TableElementType, TableIndex, TargetEnvironment, WasmResult,
+    DataIndex, ElemIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment,
+    ModuleTranslationState, SignatureIndex, Table, TableElementType, TableIndex, TargetEnvironment,
+    WasmResult,
 };
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
@@ -413,7 +414,11 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         Ok(())
     }
 
-    fn declare_passive_element(&mut self, _index: ElemIndex, _elements: Box<[FuncIndex]>) -> WasmResult<()> {
+    fn declare_passive_element(
+        &mut self,
+        _index: ElemIndex,
+        _elements: Box<[FuncIndex]>,
+    ) -> WasmResult<()> {
         unimplemented!();
     }
 

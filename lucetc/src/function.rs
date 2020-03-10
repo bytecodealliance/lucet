@@ -270,7 +270,7 @@ impl<'a> TargetEnvironment for FuncInfo<'a> {
         self.module_decls.target_config()
     }
 }
-    
+
 impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn make_global(
         &mut self,
@@ -501,7 +501,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _src: ir::Value,
         _len: ir::Value,
     ) -> WasmResult<()> {
-        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "bulk memory operations not supported yet".into(),
+        ))
     }
 
     fn translate_memory_fill(
@@ -513,7 +515,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _val: ir::Value,
         _len: ir::Value,
     ) -> WasmResult<()> {
-        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "bulk memory operations not supported yet".into(),
+        ))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -527,11 +531,15 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _src: ir::Value,
         _len: ir::Value,
     ) -> WasmResult<()> {
-        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "bulk memory operations not supported yet".into(),
+        ))
     }
 
     fn translate_data_drop(&mut self, _pos: FuncCursor, _seg_index: u32) -> WasmResult<()> {
-        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "bulk memory operations not supported yet".into(),
+        ))
     }
 
     fn translate_table_size(
@@ -540,7 +548,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _index: TableIndex,
         _table: ir::Table,
     ) -> WasmResult<ir::Value> {
-        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "reference type operations not supported yet".into(),
+        ))
     }
 
     fn translate_table_grow(
@@ -550,7 +560,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _delta: ir::Value,
         _init_value: ir::Value,
     ) -> WasmResult<ir::Value> {
-        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "reference type operations not supported yet".into(),
+        ))
     }
 
     fn translate_table_get(
@@ -559,7 +571,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _table_index: u32,
         _index: ir::Value,
     ) -> WasmResult<ir::Value> {
-        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "reference type operations not supported yet".into(),
+        ))
     }
 
     fn translate_table_set(
@@ -569,7 +583,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _value: ir::Value,
         _index: ir::Value,
     ) -> WasmResult<()> {
-        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "reference type operations not supported yet".into(),
+        ))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -584,7 +600,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _src: ir::Value,
         _len: ir::Value,
     ) -> WasmResult<()> {
-        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "reference type operations not supported yet".into(),
+        ))
     }
 
     fn translate_table_fill(
@@ -595,7 +613,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _val: ir::Value,
         _len: ir::Value,
     ) -> WasmResult<()> {
-        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "reference type operations not supported yet".into(),
+        ))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -609,15 +629,21 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _src: ir::Value,
         _len: ir::Value,
     ) -> WasmResult<()> {
-        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "reference type operations not supported yet".into(),
+        ))
     }
 
     fn translate_elem_drop(&mut self, _pos: FuncCursor, _seg_index: u32) -> WasmResult<()> {
-        Err(WasmError::Unsupported("bulk memory operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "bulk memory operations not supported yet".into(),
+        ))
     }
 
     fn translate_ref_func(&mut self, _pos: FuncCursor, _func_index: u32) -> WasmResult<ir::Value> {
-        Err(WasmError::Unsupported("reference type operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "reference type operations not supported yet".into(),
+        ))
     }
 
     fn translate_custom_global_get(
@@ -625,7 +651,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _pos: FuncCursor,
         _global_index: GlobalIndex,
     ) -> WasmResult<ir::Value> {
-        Err(WasmError::Unsupported("custom global operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "custom global operations not supported yet".into(),
+        ))
     }
 
     fn translate_custom_global_set(
@@ -634,7 +662,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _global_index: GlobalIndex,
         _val: ir::Value,
     ) -> WasmResult<()> {
-        Err(WasmError::Unsupported("custom global operations not supported yet".into()))
+        Err(WasmError::Unsupported(
+            "custom global operations not supported yet".into(),
+        ))
     }
 
     fn before_translate_operator(
