@@ -271,7 +271,7 @@ fn write_module_data<B: ClifBackend>(
     module_data_ctx.define(module_data_bytes.into_boxed_slice());
 
     let module_data_decl = clif_module
-        .declare_data(MODULE_DATA_SYM, Linkage::Local, true, None)
+        .declare_data(MODULE_DATA_SYM, Linkage::Local, true, false, None)
         .map_err(Error::ClifModuleError)?;
     clif_module
         .define_data(module_data_decl, &module_data_ctx)
@@ -288,7 +288,7 @@ fn write_startfunc_data<B: ClifBackend>(
 
     if let Some(func_ix) = decls.get_start_func() {
         let name = clif_module
-            .declare_data("guest_start", Linkage::Export, false, None)
+            .declare_data("guest_start", Linkage::Export, false, false, None)
             .map_err(Error::MetadataSerializer)?;
         let mut ctx = DataContext::new();
         ctx.define(vec![0u8; 8].into_boxed_slice());

@@ -318,11 +318,13 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             name: table_decl.contents_name.into(),
             offset: 0.into(),
             colocated: true,
+            tls: false,
         });
         let tables_list_gv = func.create_global_value(ir::GlobalValueData::Symbol {
             name: self.module_decls.get_tables_list_name().as_externalname(),
             offset: 0.into(),
             colocated: true,
+            tls: false,
         });
 
         let table_bound_offset = (TABLE_REF_SIZE as u32)
