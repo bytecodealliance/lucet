@@ -45,7 +45,8 @@ pub struct TestCtx {
 // wasi_snapshot_preview1`.
 //
 // `ctx`: Dispatch method calls to the LucetWasiCtx struct defined here.
-// `constructor`: Show how to construct a ctx struct. `vmctx` is in scope at use sites.
+// `constructor`: Show how to construct a ctx struct.
+// `vmctx` is in scope at use sites.
 lucet_wiggle::from_witx!({
     witx: ["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx"],
     ctx: LucetWasiCtx,
