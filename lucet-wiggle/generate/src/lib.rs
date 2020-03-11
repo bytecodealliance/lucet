@@ -80,6 +80,10 @@ pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
     quote! {
         use lucet_runtime::lucet_hostcall;
         #(#fs)*
+        /// Lucet-runtime expects hostcalls to be resolved by the runtime
+        /// linker (dlopen). By calling `init` in your program, we ensure that
+        /// each hostcall is reachable and not garbage-collected by the
+        /// compile-time linker (ld).
         pub fn init() {
             let funcs: &[*const extern "C" fn()] = &[
                 #(#init),*
