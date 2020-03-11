@@ -1,0 +1,13 @@
+[package]
+name = "lucet-wiggle-runtime"
+version = "0.6.2-dev"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Lucet team <lucet@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+lucet-runtime = { path = "../../lucet-runtime", version = "0.6.2-dev" }
+wiggle-runtime = { git = "https://github.com/bytecodealliance/wasmtime", branch = "pch/wiggle_relative_paths" }
