@@ -291,7 +291,7 @@ fn write_startfunc_data<B: ClifBackend>(
             .declare_data("guest_start", Linkage::Export, false, None)
             .map_err(Error::MetadataSerializer)?;
         let mut ctx = DataContext::new();
-        ctx.define_zeroinit(8);
+        ctx.define(vec![0u8; 8].into_boxed_slice());
 
         let start_func = decls
             .get_func(func_ix)
