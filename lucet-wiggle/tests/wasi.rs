@@ -38,10 +38,11 @@ pub struct TestCtx {
     times_called: usize,
 }
 
-// Invoke the lucet_wiggle proc macro!  Generate code from the snapshot 1 witx file in the Wasi
-// repo.  The Wasi snapshot 1 spec was selected for maximum coverage of the code generator (uses
-// each kind of type definable by witx).  Types described in the witx spec will end up in `pub mod
-// types`. Functions and the trait definition for the snapshot will end up in `pub mod
+// Invoke the lucet_wiggle proc macro!  Generate code from the snapshot 1 witx
+// file in the Wasi repo.  The Wasi snapshot 1 spec was selected for maximum
+// coverage of the code generator (uses each kind of type definable by witx).
+// Types described in the witx spec will end up in `pub mod types`. Functions
+// and the trait definition for the snapshot will end up in `pub mod
 // wasi_snapshot_preview1`.
 //
 // `ctx`: Dispatch method calls to the LucetWasiCtx struct defined here.
@@ -70,11 +71,11 @@ impl<'a> GuestErrorType<'a> for types::Errno {
     }
 }
 
-/// Implementation of thw wasi_snapshot_preview1 trait.
-/// The generated code defines this trait, and expects it to be implemented by `LucetWasiCtx`.
+/// Implementation of thw wasi_snapshot_preview1 trait.  The generated code
+/// defines this trait, and expects it to be implemented by `LucetWasiCtx`.
 ///
-/// Since this trait is huge, we don't actually implement very much of it. This test harness only
-/// ends up calling the `args_sizes_get` method.
+/// Since this trait is huge, we don't actually implement very much of it.
+/// This test harness only ends up calling the `args_sizes_get` method.
 impl<'a> crate::wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
     fn args_get(&self, _argv: GuestPtr<GuestPtr<u8>>, _argv_buf: GuestPtr<u8>) -> Result<()> {
         unimplemented!("args_get")
@@ -379,16 +380,16 @@ impl<'a> crate::wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a
 /// Test the above generated code by running Wasm code that calls into it.
 #[test]
 fn main() {
-    // The `init` function ensures that all of the host call functions are linked into the
-    // executable.
+    // The `init` function ensures that all of the host call functions are
+    // linked into the executable.
     crate::init();
 
     // Temporary directory for outputs.
     let workdir = TempDir::new().expect("create working directory");
 
-    // Build a C file into a Wasm module. Use the wasi-sdk compiler, but do not use the wasi libc
-    // or the ordinary start files,
-    // which will together expect various aspects of the Wasi trait to actually work. The C file
+    // Build a C file into a Wasm module. Use the wasi-sdk compiler, but do
+    // not use the wasi libc or the ordinary start files, which will together
+    // expect various aspects of the Wasi trait to actually work. The C file
     // only imports one function, `args_sizes_get`.
     let wasm_build = Link::new(&["tests/wasi_guest.c"])
         .with_cflag("-nostartfiles")
@@ -398,9 +399,9 @@ fn main() {
     let wasm_file = workdir.path().join("out.wasm");
     wasm_build.link(wasm_file.clone()).expect("link wasm");
 
-    // We used lucet_wiggle to define the hostcall functions, so we must use it to define our
-    // bindings as well. This is a good thing! No more bindings json files to keep in sync with
-    // implementations.
+    // We used lucet_wiggle to define the hostcall functions, so we must use
+    // it to define our bindings as well. This is a good thing! No more
+    // bindings json files to keep in sync with implementations.
     let witx_doc = witx::load(&["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx"])
         .expect("load snapshot 1 witx");
     let bindings = lucet_wiggle_generate::bindings(&witx_doc);
@@ -419,8 +420,8 @@ fn main() {
     let region = MmapRegion::create(1, &Limits::default()).expect("create region");
     let mut inst = region.new_instance(module).expect("create instance");
 
-    // Define the TestCtx. This gets put into the embed ctx and is usable from the trait method
-    // calls.
+    // Define the TestCtx. This gets put into the embed ctx and is usable from
+    // the trait method calls.
     let input_a: u32 = 123;
     let input_b: u32 = 567;
     let test_ctx = TestCtx {
@@ -431,10 +432,9 @@ fn main() {
 
     inst.insert_embed_ctx(test_ctx);
 
-    // Call the `sum_of_arg_sizes` func defined in our
-    // C file. It in turn calls `args_sizes_get`, and
-    // returns the sum of the two return values from that
-    // function.
+    // Call the `sum_of_arg_sizes` func defined in our C file. It in turn
+    // calls `args_sizes_get`, and returns the sum of the two return values
+    // from that function.
     let res = inst
         .run("sum_of_arg_sizes", &[])
         .expect("run sum_of_arg_sizes")
@@ -447,11 +447,11 @@ fn main() {
         .get_embed_ctx::<TestCtx>()
         .expect("get test ctx")
         .expect("borrow");
-    // The test ctx `a` and `b` fields should be the same
-    // as they were initialized to:
+    // The test ctx `a` and `b` fields should be the same as they were
+    // initialized to:
     assert_eq!(tctx.a, input_a);
     assert_eq!(tctx.b, input_b);
-    // The `arg_sizes_get` trait method implementation
-    // should have incremented `times_called` one time.
+    // The `arg_sizes_get` trait method implementation should have incremented
+    // `times_called` one time.
     assert_eq!(tctx.times_called, 1);
 }
