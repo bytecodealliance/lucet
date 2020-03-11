@@ -67,9 +67,9 @@ dependencies = [
 
 [[package]]
 name = "backtrace-sys"
-version = "0.1.33"
+version = "0.1.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e17b52e737c40a7d75abca20b29a19a0eb7ba9fc72c5a72dd282a0a3c2c0dc35"
+checksum = "ca797db0057bae1a7aa2eef3283a874695455cecf08a43bfb8507ee0ebc1ed69"
 dependencies = [
  "cc",
  "libc",
@@ -206,15 +206,6 @@ name = "byteorder"
 version = "1.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
-
-[[package]]
-name = "c2-chacha"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "214238caa1bf3a496ec3392968969cab8549f96ff30652c9e56885329315f6bb"
-dependencies = [
- "ppv-lite86",
-]
 
 [[package]]
 name = "cast"
@@ -1609,7 +1600,7 @@ checksum = "6a6b1679d49b24bbfe0c803429aa1874472f50d9b363131f0e89fc356b544d03"
 dependencies = [
  "getrandom",
  "libc",
- "rand_chacha 0.2.1",
+ "rand_chacha 0.2.2",
  "rand_core 0.5.1",
  "rand_hc 0.2.0",
 ]
@@ -1626,11 +1617,11 @@ dependencies = [
 
 [[package]]
 name = "rand_chacha"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03a2a90da8c7523f554344f921aa97283eadf6ac484a6d2a7d0212fa7f8d6853"
+checksum = "f4c8ed856279c9737206bf725bf36935d8666ead7aa69b52be55af369d193402"
 dependencies = [
- "c2-chacha",
+ "ppv-lite86",
  "rand_core 0.5.1",
 ]
 
@@ -2550,7 +2541,7 @@ dependencies = [
 [[package]]
 name = "wiggle-generate"
 version = "0.1.0"
-source = "git+https://github.com/kubkon/wiggle#cd484e49932d8dd8f1bd1a002e0717ad8bff07fb"
+source = "git+https://github.com/bytecodealliance/wasmtime?branch=pch/wiggle_relative_paths#edb39fd4a3e59c3d70bb3fae826ca48b6ceaad64"
 dependencies = [
  "anyhow",
  "heck",
@@ -2564,7 +2555,7 @@ dependencies = [
 [[package]]
 name = "wiggle-runtime"
 version = "0.1.0"
-source = "git+https://github.com/kubkon/wiggle#cd484e49932d8dd8f1bd1a002e0717ad8bff07fb"
+source = "git+https://github.com/bytecodealliance/wasmtime?branch=pch/wiggle_relative_paths#edb39fd4a3e59c3d70bb3fae826ca48b6ceaad64"
 dependencies = [
  "thiserror",
 ]
@@ -2572,7 +2563,7 @@ dependencies = [
 [[package]]
 name = "wiggle-test"
 version = "0.1.0"
-source = "git+https://github.com/kubkon/wiggle#cd484e49932d8dd8f1bd1a002e0717ad8bff07fb"
+source = "git+https://github.com/bytecodealliance/wasmtime?branch=pch/wiggle_relative_paths#edb39fd4a3e59c3d70bb3fae826ca48b6ceaad64"
 dependencies = [
  "proptest",
  "wiggle-runtime",
