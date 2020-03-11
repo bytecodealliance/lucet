@@ -12,7 +12,7 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
-lucet-wiggle-generate = { path = "generate", version = "0.6.2-dev" }
+lucet-wiggle-generate = { path = "./generate", version = "0.6.2-dev" }
 lucet-wiggle-runtime = { path = "./runtime", version = "0.6.2-dev" }
 wiggle-generate = { git = "https://github.com/bytecodealliance/wasmtime", branch = "pch/wiggle_relative_paths" }
 witx = "0.8.3"
