@@ -1113,9 +1113,12 @@ name = "lucet-wiggle"
 version = "0.6.2-dev"
 dependencies = [
  "lucet-runtime",
+ "lucet-wasi-sdk",
  "lucet-wiggle-generate",
  "lucet-wiggle-runtime",
+ "lucetc",
  "syn 1.0.16",
+ "tempfile",
  "wiggle-generate",
  "wiggle-runtime",
  "wiggle-test",

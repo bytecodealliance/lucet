@@ -22,3 +22,6 @@ syn = { version = "1.0", features = ["full"] }
 wiggle-runtime = { git = "https://github.com/kubkon/wiggle" }
 wiggle-test = { git = "https://github.com/kubkon/wiggle" }
 lucet-runtime = { path = "../lucet-runtime", version = "0.6.2-dev" }
+tempfile = "3.1"
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.6.2-dev" }
+lucetc = { path = "../lucetc", version = "0.6.2-dev" }
