@@ -32,7 +32,7 @@ pub enum Error {
     #[error("Artifact: {1}. {0:?}")]
     ArtifactError(ArtifactError, String),
     #[error("Failure: {1}. {0:?}")]
-    Failure(failure::Error, String),
+    Failure(anyhow::Error, String),
     #[error("Patcher: {0:?}")]
     Patcher(wasmonkey::WError),
     //
