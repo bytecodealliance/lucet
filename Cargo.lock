@@ -1098,7 +1098,6 @@ name = "lucet-wasi-sdk"
 version = "0.6.2-dev"
 dependencies = [
  "anyhow",
- "failure",
  "lucet-module",
  "lucet-validate",
  "lucetc",
