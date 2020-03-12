@@ -2541,7 +2541,7 @@ dependencies = [
 [[package]]
 name = "wiggle-generate"
 version = "0.1.0"
-source = "git+https://github.com/bytecodealliance/wasmtime?branch=pch/wiggle_relative_paths#edb39fd4a3e59c3d70bb3fae826ca48b6ceaad64"
+source = "git+https://github.com/bytecodealliance/wasmtime#6c33829543396a694b50458e9d7724492947aaf6"
 dependencies = [
  "anyhow",
  "heck",
@@ -2555,7 +2555,7 @@ dependencies = [
 [[package]]
 name = "wiggle-runtime"
 version = "0.1.0"
-source = "git+https://github.com/bytecodealliance/wasmtime?branch=pch/wiggle_relative_paths#edb39fd4a3e59c3d70bb3fae826ca48b6ceaad64"
+source = "git+https://github.com/bytecodealliance/wasmtime#6c33829543396a694b50458e9d7724492947aaf6"
 dependencies = [
  "thiserror",
 ]
@@ -2563,7 +2563,7 @@ dependencies = [
 [[package]]
 name = "wiggle-test"
 version = "0.1.0"
-source = "git+https://github.com/bytecodealliance/wasmtime?branch=pch/wiggle_relative_paths#edb39fd4a3e59c3d70bb3fae826ca48b6ceaad64"
+source = "git+https://github.com/bytecodealliance/wasmtime#6c33829543396a694b50458e9d7724492947aaf6"
 dependencies = [
  "proptest",
  "wiggle-runtime",

@@ -10,4 +10,4 @@ edition = "2018"
 
 [dependencies]
 lucet-runtime = { path = "../../lucet-runtime", version = "0.6.2-dev" }
-wiggle-runtime = { git = "https://github.com/bytecodealliance/wasmtime", branch = "pch/wiggle_relative_paths" }
+wiggle-runtime = { git = "https://github.com/bytecodealliance/wasmtime" }
