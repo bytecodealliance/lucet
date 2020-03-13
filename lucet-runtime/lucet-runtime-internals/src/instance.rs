@@ -860,10 +860,11 @@ impl Instance {
             &args_with_vmctx,
         )?;
 
-        self.with_terminability().swap_and_return()
+        self.install_activator();
+        self.swap_and_return()
     }
 
-    /// Prepare the guest so that it will mark itself as terminable upon entry.
+    /// Prepare the guest so that it will update its execution domain upon entry.
     ///
     /// This mutates the context's registers so that an activation function that will be run after
     /// performing a context switch. This function (`enter_guest_region`) will mark the guest as
@@ -881,7 +882,8 @@ impl Instance {
     ///
     /// See `lucet_runtime_internals::context::lucet_context_activate`, and
     /// `execution::enter_guest_region` for more info.
-    fn with_terminability(&mut self) -> &mut Self {
+    // TODO KTM 2020-03-13: This should be a method on `Context`.
+    fn install_activator(&mut self) {
         unsafe {
             // Get a raw pointer to the top of the guest stack.
             let top_of_stack = self.ctx.gpr.rsp as *mut u64;
@@ -894,7 +896,6 @@ impl Instance {
             self.ctx.gpr.rsi = execution::enter_guest_region as u64;
             self.ctx.gpr.rdi = self.ctx.callback_data_ptr() as u64;
         }
-        self
     }
 
     /// The core routine for context switching into a guest, and extracting a result.

@@ -1,15 +1,26 @@
 //! The `execution` module contains state for an instance's execution, and exposes functions
 //! building that state into something appropriate for safe use externally.
 //!
-//! So far as state tracked in this module is concerned, the key concept to understand is an
-//! "execution domain".
-//!
-//! This is used to answer the question "is it safe to initiate termination of this instance right
-//! now?". An instance can be terminated when it is created, and stops being terminable when it is
-//! terminated, when it faults, or when it is dropped. An instance is terminable after it has been
-//! reset, but any outstanding kill switches will no longer be valid.
+//! So far as state tracked in this module is concerned, there are two key items:
+//! "execution domain" and "terminability".
 //!
 //! ## Execution Domain
+//!
+//! Execution domains allow us to distinguish what an appropriate mechanism to signal termination
+//! is. This means that changing of an execution domain must be atomic - it would be an error to
+//! read the current execution domain, continue with that domain to determine temination, and
+//! simultaneously for execution to continue possibly into a different execution domain. For
+//! example, beginning termination directly at the start of a hostcall, where sending `SIGALRM` may
+//! be appropriate, while the domain switches to `Hostcall` and is no longer appropriate for
+//! signalling, would be an error.
+//!
+//! ## Terminability
+//!
+//! This is used to answer the question "is it safe to initiate termination of this instance right
+//! now?".  An instance is terminable when it is created or reset. An instance stops being
+//! terminable when it is terminated, when it faults, or when it is dropped. When an instance
+//! finishes running, it will once again be terminable, but existing [`KillSwitch`] objects will no
+//! longer be valid.
 //!
 //! Termination does not directly map to the idea of guest code currently executing on a processor,
 //! because termination can occur before the guest has started, during host code, or while a guest
@@ -20,41 +31,42 @@
 //! otherwise happens immediately upon resuming execution of guest code (exiting host code, or
 //! resuming a yielded instance).
 //!
-//! Execution domains allow us to distinguish what an appropriate mechanism to signal termination
-//! is. This means that changing of an execution domain must be atomic - it would be an error to
-//! read the current execution domain, continue with that domain to determine temination, and
-//! simultaneously for execution to continue possibly into a different execution domain. For
-//! example, beginning termination directly at the start of a hostcall, where sending `SIGALRM` may
-//! be appropriate, while the domain switches to `Hostcall` and is no longer appropriate for
-//! signalling, would be an error.
-//!
 //! ## Instance Lifecycle and `KillState`
 //!
 //! And now we can enumerate interleavings of execution and terminability, to see the expected
-//! execution domain at possible points of interest in an instance's lifecycle:
+//! state at possible points of interest in an instance's lifecycle:
 //!
 //! * `Instance created`
-//!   - termination result: `Ok(KillSuccess::Cancelled)`
+//!   - terminable: `true`
 //!   - execution_domain: `Pending`
+//!   - termination result: `Ok(KillSuccess::Cancelled)`
 //! * `Instance::run executing`
+//!   - terminable: `true` or `false`
 //!   - termination result: `Ok(KillSuccess::Signalled)`, `Ok(KillSuccess::Pending)`, or
 //!     `Err(KillError::NotTerminable)`
 //!   - execution_domain: `Guest, Hostcall, or Terminated`
 //!   - `execution_domain` will only be `Guest` when executing guest code, only be `Hostcall` when
 //!     executing a hostcall, but may also be `Terminated` while in a hostcall to indicate that it
 //!     should exit when the hostcall completes.
+//!   - `terminable` will be false if and only if `execution_domain` is `Terminated`.
 //!   - `KillSwitch::terminate` will succeed with `Signalled` when terminated while executing guest
 //!     code, `Pending` when terminated while executing a hostcall, and will fail with
 //!     `NotTerminable` when the instance has already been terminated.
 //! * `Instance::run returns`
+//!   - terminable: `true`
 //!   - execution_domain: `Guest, Hostcall, or Terminated`
+//!   - termination result: `Err(KillError::Invalid)`
 //!   - `execution_domain` will be `Pending` when the initial guest function returns, `Hostcall`
 //!     when terminated by `lucet_hostcall_terminate!`, and `Terminated` when exiting due to a
 //!     termination request.
+//!   - While `terminable` *is* true, it should be noted that [`KillState`] is reset here, and
+//!     existing `KillSwitch` objects will no longer hold a reference to the instance kill state.
 //! * `Guest function executing`
+//!   - terminable: `true`
 //!   - termination result: `Ok(KillSuccess::Signalled)`
 //!   - execution_domain: `Guest`
 //! * `Guest function returns`
+//!   - terminable: `true`
 //!   - termination result: `Ok(KillSuccess::Pending)`
 //!   - execution_domain: `Guest`
 //!   - If the guest function has already returned, the instance will be placed into the
@@ -80,15 +92,18 @@
 //!     returning from a hostcall will be that it is executing terminable guest code.
 //! * `Instance::reset` or `Instance dropped`
 //!   - termination result: `Err(KillError::Invalid)`
-//!   - If an instance is reset, outstanding `KillSwitch` objects will no longer hold a valid
-//!     reference to the instance. In that case, calls to `terminate` will return `Invalid`, and
-//!     have no bearing on further execution.
+//!
+//!   - If an instance is reset or finishes running, outstanding `KillSwitch` objects will no
+//!     longer hold a valid reference to the instance. In that case, calls to `terminate` will
+//!     return `Invalid`, and have no bearing on further execution.
 //!
 //! ## Further Reading
 //!
 //! For more information about kill state, execution domains, and instance termination, see
 //! [`KillState`](struct.KillState.html), [`Domain`](enum.Domain.html), and
 /// [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate), respectively.
+///
+/// For more information about signal-safe behavior, see `signal-safety(7)`.
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -227,9 +242,6 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
     } else {
         let current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
         match *current_domain {
-            Domain::Pending => {
-                panic!("Invalid state: Instance marked as pending while exiting a guest region.");
-            }
             Domain::Guest => {
                 // We finished executing the code in our guest region normally! We should reset
                 // the kill state, invalidating any existing killswitches' weak references. We
@@ -237,18 +249,16 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
                 (*instance).kill_state = Arc::new(KillState::default());
                 mem::forget(current_domain);
             }
-            Domain::Hostcall => {
+            ref domain @ Domain::Pending
+            | ref domain @ Domain::Cancelled
+            | ref domain @ Domain::Terminated
+            | ref domain @ Domain::Hostcall => {
+                // If we are exiting a guest that is currently marked as pending, cancelled,
+                // terminated, or in a hostcall, something has gone very wrong.
                 panic!(
-                    "Invalid state: Instance marked as in a hostcall while exiting a guest region."
+                    "Invalid state: Instance marked as {:?} while exiting a guest region.",
+                    domain
                 );
-            }
-            Domain::Terminated => {
-                panic!(
-                    "Invalid state: Instance marked as terminated while exiting a guest region."
-                );
-            }
-            Domain::Cancelled => {
-                panic!("Invalid state: Instance marked as cancelled while exiting a guest region.");
             }
         };
     }
@@ -340,7 +350,12 @@ impl KillState {
                 *current_domain = Domain::Guest;
                 None
             }
-            Domain::Terminated => Some(TerminationDetails::Remote),
+            Domain::Terminated => {
+                // The instance was stopped in the hostcall we were executing.
+                debug_assert!(!self.terminable.load(Ordering::SeqCst));
+                std::mem::drop(current_domain);
+                Some(TerminationDetails::Remote)
+            }
             Domain::Cancelled => {
                 panic!("Invalid state: Instance marked as cancelled while exiting a hostcall.");
             }
