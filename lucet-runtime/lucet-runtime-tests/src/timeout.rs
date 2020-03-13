@@ -169,7 +169,6 @@ macro_rules! timeout_tests {
             run_onetwothree(&mut inst);
         }
 
-        /// FIXME: This needs a subtle change.
         #[test]
         fn timeout_after_guest_runs() {
             let module = mock_timeout_module();
@@ -184,11 +183,12 @@ macro_rules! timeout_tests {
                 Ok(_) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
-            assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled));
 
-            // If terminated after running, the guest will not run again.
-            match inst.run("onetwothree", &[]) {
-                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+            // If we try to terminate after the instance ran, the kill switch will fail, and the
+            // the instance will run normally the next time around.
+            assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
+            match inst.run("do_nothing", &[]) {
+                Ok(_) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
 

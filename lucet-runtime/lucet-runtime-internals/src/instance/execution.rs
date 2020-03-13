@@ -91,7 +91,8 @@
 /// [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate), respectively.
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
-use std::sync::{Condvar, Mutex, Weak};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use crate::instance::{Instance, TerminationDetails};
 
@@ -114,6 +115,13 @@ use crate::instance::{Instance, TerminationDetails};
 /// hostcall would terminate the instance if it returned, but `lucet_hostcall_terminate!` will
 /// terminate the guest before the termination request would even be checked.
 pub struct KillState {
+    /// Can the instance be terminated? This must be `true` only when the instance can be stopped.
+    /// This may be false while the instance can safely be stopped, such as immediately after
+    /// completing a host->guest context swap. Regions such as this should be minimized, but are
+    /// not a problem of correctness.
+    ///
+    /// Typically, this is true while in any guest code, or hostcalls made from guest code.
+    terminable: AtomicBool,
     /// The kind of code is currently executing in the instance this `KillState` describes.
     ///
     /// This allows a `KillSwitch` to determine what the appropriate signalling mechanism is in
@@ -204,31 +212,52 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
 /// in a hostcall, or as cancelled.  Any of these domains mean that something has gone seriously
 /// wrong, and leaving the execution domain mutex in a poisoned state is the least of our concerns.
 pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
-    let mut current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
-    match *current_domain {
-        Domain::Pending => {
-            panic!("Invalid state: Instance marked as pending while exiting a guest region.");
-        }
-        Domain::Guest => {
-            // If we are here, we finished executing the code in our guest region as expected!
-            // Mark that we are pending once more, and then exit the guest context.
-            *current_domain = Domain::Pending;
-        }
-        Domain::Hostcall => {
-            panic!("Invalid state: Instance marked as in a hostcall while exiting a guest region.");
-        }
-        Domain::Terminated => {
-            panic!("Invalid state: Instance marked as terminated while exiting a guest region.");
-        }
-        Domain::Cancelled => {
-            panic!("Invalid state: Instance marked as cancelled while exiting a guest region.");
-        }
-    };
+    let terminable = (*instance)
+        .kill_state
+        .terminable
+        .swap(false, Ordering::SeqCst);
+    if !terminable {
+        // If we are here, something else has taken the terminable flag, so it's not safe to
+        // actually exit a guest context yet. Because this is called when exiting a guest context,
+        // the termination mechanism will be a signal, delivered at some point (hopefully soon!).
+        // Further, because the termination mechanism will be a signal, we are constrained to only
+        // signal-safe behavior. So, we will hang indefinitely waiting for the sigalrm to arrive.
+        #[allow(clippy::empty_loop)]
+        loop {}
+    } else {
+        let current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
+        match *current_domain {
+            Domain::Pending => {
+                panic!("Invalid state: Instance marked as pending while exiting a guest region.");
+            }
+            Domain::Guest => {
+                // We finished executing the code in our guest region normally! We should reset
+                // the kill state, invalidating any existing killswitches' weak references. We
+                // forget the mutex guard so that we don't invoke its destructor and segfault.
+                (*instance).kill_state = Arc::new(KillState::default());
+                mem::forget(current_domain);
+            }
+            Domain::Hostcall => {
+                panic!(
+                    "Invalid state: Instance marked as in a hostcall while exiting a guest region."
+                );
+            }
+            Domain::Terminated => {
+                panic!(
+                    "Invalid state: Instance marked as terminated while exiting a guest region."
+                );
+            }
+            Domain::Cancelled => {
+                panic!("Invalid state: Instance marked as cancelled while exiting a guest region.");
+            }
+        };
+    }
 }
 
 impl Default for KillState {
     fn default() -> Self {
         Self {
+            terminable: AtomicBool::new(true),
             tid_change_notifier: Condvar::new(),
             execution_domain: Mutex::new(Domain::Pending),
             thread_id: Mutex::new(None),
@@ -240,6 +269,22 @@ impl KillState {
     /// Construct a new `KillState`.
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn is_terminable(&self) -> bool {
+        self.terminable.load(Ordering::SeqCst)
+    }
+
+    pub fn enable_termination(&self) {
+        self.terminable.store(true, Ordering::SeqCst);
+    }
+
+    pub fn disable_termination(&self) {
+        self.terminable.store(false, Ordering::SeqCst);
+    }
+
+    pub fn terminable_ptr(&self) -> *const AtomicBool {
+        &self.terminable as *const AtomicBool
     }
 
     /// Set the execution domain to signify that we are currently executing a hostcall.
@@ -392,8 +437,23 @@ impl KillSwitch {
     /// would return `Ok(KillSuccess::Signalled)`.
     pub fn terminate(&self) -> KillResult {
         // Get the underlying kill state. If this fails, it means the instance exited and was
-        // discarded, so we can't terminate.
+        // discarded, so we can not terminate.
         let state = self.state.upgrade().ok_or(KillError::Invalid)?;
+        // Attempt to take the flag indicating the instance may terminate
+        let terminable = state.terminable.swap(false, Ordering::SeqCst);
+        if !terminable {
+            return Err(KillError::NotTerminable);
+        }
+
+        // we got it! we can signal the instance.
+        //
+        // Now check what domain the instance is in. We can signal in guest code, but want
+        // to avoid signalling in host code lest we interrupt some function operating on
+        // guest/host shared memory, and invalidate invariants. For example, interrupting
+        // in the middle of a resize operation on a `Vec` could be extremely dangerous.
+        //
+        // Hold this lock through all signalling logic to prevent the instance from
+        // switching domains (and invalidating safety of whichever mechanism we choose here)
         let mut execution_domain = state.execution_domain.lock().unwrap();
         let result = match *execution_domain {
             Domain::Guest => {
@@ -413,9 +473,7 @@ impl KillSwitch {
                     *execution_domain = Domain::Terminated;
                     Ok(KillSuccess::Signalled)
                 } else {
-                    // If the execution domain is marked as `Guest`, but there is not a thread
-                    // running that we can signal, the guest most likely faulted.
-                    Err(KillError::NotTerminable)
+                    panic!("logic error: instance is terminable but not actually running.");
                 }
             }
             Domain::Hostcall => {
