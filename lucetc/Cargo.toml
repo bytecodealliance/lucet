@@ -31,7 +31,7 @@ wasmparser = "0.51.2"
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"
-faerie = "0.14.0"
+faerie = "0.15.0"
 goblin = "0.0.24"
 byteorder = "1.2"
 # precisely pin wasmonkey, because the shared dependency on parity-wasm is very sensitive

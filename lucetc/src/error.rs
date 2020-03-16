@@ -27,12 +27,9 @@ pub enum Error {
     WasmValidation(#[from] wasmparser::BinaryReaderError),
     #[error("Wat input: {0}")]
     WatInput(#[from] wabt::Error),
-    //
+    #[error("Faerie artifact: {1}. {0:?}")]
+    FaerieArtifact(#[source] ArtifactError, String),
     // Cannot apply #[from] or #[source] to these error types due to missing traits.
-    #[error("Artifact: {1}. {0:?}")]
-    ArtifactError(ArtifactError, String),
-    #[error("Failure: {1}. {0:?}")]
-    Failure(anyhow::Error, String),
     #[error("Patcher: {0:?}")]
     Patcher(wasmonkey::WError),
     //
