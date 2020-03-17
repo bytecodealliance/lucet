@@ -327,14 +327,14 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "byteorder",
  "cranelift-bforest",
@@ -350,7 +350,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
@@ -358,15 +358,15 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.59.0"
+version = "0.60.0"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.59.0"
+version = "0.60.0"
 
 [[package]]
 name = "cranelift-faerie"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -378,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-codegen",
  "log",
@@ -388,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-module"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -399,7 +399,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-native"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-codegen",
  "raw-cpuid 7.0.3",
@@ -408,7 +408,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
