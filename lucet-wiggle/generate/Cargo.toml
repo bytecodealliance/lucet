@@ -9,7 +9,7 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-wiggle-generate = { git = "https://github.com/bytecodealliance/wasmtime" }
+wiggle-generate = { path = "../../wasmtime/crates/wiggle/crates/generate"}
 lucet-module = { path = "../../lucet-module", version = "0.6.2-dev" }
 witx = "0.8.3"
 quote = "1.0"
