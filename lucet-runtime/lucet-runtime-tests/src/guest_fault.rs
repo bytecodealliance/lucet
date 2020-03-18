@@ -267,7 +267,55 @@ macro_rules! guest_fault_tests {
 
                 run_onetwothree(&mut inst);
 
-                lucet_runtime::remove_lucet_signal_handler()
+                lucet_runtime::remove_lucet_signal_handler();
+            })
+        }
+
+        #[test]
+        /// Test that the Lucet signal handler runs correctly when installed manually, even when we
+        /// don't keep a 1:1 ratio between install/remove.
+        fn illegal_instr_manuals_signal() {
+            test_ex(|| {
+                let module = mock_traps_module();
+                let region =
+                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let mut inst = region
+                    .new_instance(module)
+                    .expect("instance can be created");
+                inst.ensure_signal_handler_installed(false);
+
+                lucet_runtime::install_lucet_signal_handler();
+                // call it a few times; it shouldn't matter!
+                lucet_runtime::install_lucet_signal_handler();
+                lucet_runtime::install_lucet_signal_handler();
+
+                match inst.run("illegal_instr", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                    }
+                    res => panic!("unexpected result: {:?}", res),
+                }
+
+                // after a fault, can reset and run a normal function
+                inst.reset().expect("instance resets");
+
+                run_onetwothree(&mut inst);
+
+                lucet_runtime::remove_lucet_signal_handler();
+                // call it a few times; it shouldn't matter!
+                lucet_runtime::remove_lucet_signal_handler();
+                lucet_runtime::remove_lucet_signal_handler();
+                lucet_runtime::remove_lucet_signal_handler();
+
+                // just reinstall once and make sure we catch the trap
+                lucet_runtime::install_lucet_signal_handler();
+
+                match inst.run("illegal_instr", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                    }
+                    res => panic!("unexpected result: {:?}", res),
+                }
             })
         }
 
