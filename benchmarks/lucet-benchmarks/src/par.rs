@@ -3,7 +3,7 @@ use criterion::Criterion;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, Module, Region, RegionCreate};
 use lucetc::OptLevel;
 use rayon::prelude::*;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
 /// Common definiton of OptLevel
@@ -119,79 +119,76 @@ fn par_run_manual_signals<R: RegionCreate + 'static>(
     module: Arc<dyn Module>,
     c: &mut Criterion,
 ) {
-    struct SignalState {
-        #[allow(unused)]
-        // this has to stick around so the sigstack remains valid memory
-        sigstack: Vec<u8>,
-        saved_sigstack: libc::stack_t,
-    }
+    /// A guard to set up the manual signal handler, and automatically remove it when the benchmark
+    /// is over.
+    struct SignalGuard;
 
-    impl SignalState {
+    impl SignalGuard {
         fn new() -> Self {
             lucet_runtime::install_lucet_signal_handler();
-
-            let mut sigstack = vec![0; lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE];
-            let sigstack_raw = libc::stack_t {
-                ss_sp: sigstack.as_mut_ptr() as *mut _,
-                ss_flags: 0,
-                ss_size: lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE,
-            };
-            let mut saved_sigstack = std::mem::MaybeUninit::<libc::stack_t>::uninit();
-            let saved_sigstack = unsafe {
-                libc::sigaltstack(&sigstack_raw, saved_sigstack.as_mut_ptr());
-                saved_sigstack.assume_init()
-            };
-
-            Self {
-                sigstack,
-                saved_sigstack,
-            }
+            Self
         }
     }
 
-    impl Drop for SignalState {
+    impl Drop for SignalGuard {
         fn drop(&mut self) {
             lucet_runtime::remove_lucet_signal_handler();
-            unsafe {
-                libc::sigaltstack(&self.saved_sigstack, std::ptr::null_mut());
-            }
         }
     }
 
-    let setup = move || {
-        let region = R::create(instances_per_run, &Limits::default()).unwrap();
-
-        (
-            (0..instances_per_run)
+    // make a vec full of ready-to-run instances, the Rayon thread pool, and intialize the `SignalGuard`
+    let setup = move |num_threads| {
+        move || {
+            let region = R::create(instances_per_run, &Limits::default()).unwrap();
+            let instances = (0..instances_per_run)
                 .map(|_| {
                     let mut inst = region.new_instance(module.clone()).unwrap();
                     inst.ensure_signal_handler_installed(false);
                     inst.ensure_sigstack_installed(false);
                     inst
                 })
-                .collect::<Vec<InstanceHandle>>(),
-            SignalState::new(),
-        )
-    };
-
-    fn body(num_threads: usize, handles: &mut [InstanceHandle]) {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build()
-            .unwrap()
-            .install(|| {
-                handles.par_iter_mut().for_each(|handle| {
-                    handle.run("f", &[]).unwrap();
+                .collect::<Vec<InstanceHandle>>();
+            let thread_pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(num_threads)
+                // install an appropriately-sized sigaltstack for each thread that Rayon will run
+                // instances on
+                .start_handler(|_| {
+                    thread_local! {
+                        static SIGSTACK: Mutex<Vec<u8>> =
+                            Mutex::new(vec![0; lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE]);
+                    }
+                    SIGSTACK.with(|sigstack| {
+                        let mut sigstack = sigstack.lock().unwrap();
+                        let sigstack_raw = libc::stack_t {
+                            ss_sp: sigstack.as_mut_ptr() as *mut _,
+                            ss_flags: 0,
+                            ss_size: lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE,
+                        };
+                        unsafe {
+                            libc::sigaltstack(&sigstack_raw, std::ptr::null_mut());
+                        }
+                    });
                 })
-            })
-    }
+                .build()
+                .unwrap();
+            let signal_guard = SignalGuard::new();
+
+            (instances, thread_pool, signal_guard)
+        }
+    };
 
     let bench = criterion::ParameterizedBenchmark::new(
         name,
         move |b, &num_threads| {
             b.iter_batched_ref(
-                setup.clone(),
-                |(handles, _)| body(num_threads, handles.as_mut_slice()),
+                setup.clone()(num_threads),
+                |(handles, thread_pool, _signal_guard)| {
+                    thread_pool.install(|| {
+                        handles.par_iter_mut().for_each(|handle| {
+                            handle.run("f", &[]).unwrap();
+                        })
+                    })
+                },
                 criterion::BatchSize::SmallInput,
             )
         },
