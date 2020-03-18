@@ -330,6 +330,16 @@
 //! not currently running a Lucet instance, the saved host signal handler is called. This means
 //! that, for example, a `SIGSEGV` on a non-Lucet thread of a host program will still likely abort
 //! the entire process.
+//!
+//! For advanced uses that require manual control over the installation and removal of the Lucet
+//! signal handler, you can use [`install_lucet_signal_handler()`][install-handler] and
+//! [`remove_lucet_signal_handler()`][remove-handler], and disable the automatic installation and
+//! removal on a per-instance basis by setting
+//! [instance.`ensure_signal_handler_installed(false)`][instance-ensure-installed]
+//!
+//! [install-handler]: fn.install_lucet_signal_handler.html
+//! [remove-handler]: fn.remove_lucet_signal_handler.html
+//! [instance-ensure-installed]: struct.Instance.html#method.ensure_signal_handler_installed.
 
 #![deny(bare_trait_objects)]
 
@@ -340,8 +350,11 @@ extern crate self as lucet_runtime;
 pub mod c_api;
 
 pub use lucet_module::{PublicKey, TrapCode};
-pub use lucet_runtime_internals::alloc::Limits;
+pub use lucet_runtime_internals::alloc::{Limits, DEFAULT_SIGNAL_STACK_SIZE};
 pub use lucet_runtime_internals::error::Error;
+pub use lucet_runtime_internals::instance::signals::{
+    install_lucet_signal_handler, remove_lucet_signal_handler,
+};
 pub use lucet_runtime_internals::instance::{
     FaultDetails, Instance, InstanceHandle, KillError, KillSuccess, KillSwitch, RunResult,
     SignalBehavior, TerminationDetails, YieldedVal,
