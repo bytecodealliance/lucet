@@ -112,6 +112,96 @@ fn par_run<R: RegionCreate + 'static>(
     c.bench("par", bench);
 }
 
+/// Run a function in parallel, controlling signal handlers and stacks manually.
+fn par_run_manual_signals<R: RegionCreate + 'static>(
+    name: &str,
+    instances_per_run: usize,
+    module: Arc<dyn Module>,
+    c: &mut Criterion,
+) {
+    struct SignalState {
+        #[allow(unused)]
+        // this has to stick around so the sigstack remains valid memory
+        sigstack: Vec<u8>,
+        saved_sigstack: libc::stack_t,
+    }
+
+    impl SignalState {
+        fn new() -> Self {
+            lucet_runtime::install_lucet_signal_handler();
+
+            let mut sigstack = vec![0; lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE];
+            let sigstack_raw = libc::stack_t {
+                ss_sp: sigstack.as_mut_ptr() as *mut _,
+                ss_flags: 0,
+                ss_size: lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE,
+            };
+            let mut saved_sigstack = std::mem::MaybeUninit::<libc::stack_t>::uninit();
+            let saved_sigstack = unsafe {
+                libc::sigaltstack(&sigstack_raw, saved_sigstack.as_mut_ptr());
+                saved_sigstack.assume_init()
+            };
+
+            Self {
+                sigstack,
+                saved_sigstack,
+            }
+        }
+    }
+
+    impl Drop for SignalState {
+        fn drop(&mut self) {
+            lucet_runtime::remove_lucet_signal_handler();
+            unsafe {
+                libc::sigaltstack(&self.saved_sigstack, std::ptr::null_mut());
+            }
+        }
+    }
+
+    let setup = move || {
+        let region = R::create(instances_per_run, &Limits::default()).unwrap();
+
+        (
+            (0..instances_per_run)
+                .map(|_| {
+                    let mut inst = region.new_instance(module.clone()).unwrap();
+                    inst.ensure_signal_handler_installed(false);
+                    inst.ensure_sigstack_installed(false);
+                    inst
+                })
+                .collect::<Vec<InstanceHandle>>(),
+            SignalState::new(),
+        )
+    };
+
+    fn body(num_threads: usize, handles: &mut [InstanceHandle]) {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .build()
+            .unwrap()
+            .install(|| {
+                handles.par_iter_mut().for_each(|handle| {
+                    handle.run("f", &[]).unwrap();
+                })
+            })
+    }
+
+    let bench = criterion::ParameterizedBenchmark::new(
+        name,
+        move |b, &num_threads| {
+            b.iter_batched_ref(
+                setup.clone(),
+                |(handles, _)| body(num_threads, handles.as_mut_slice()),
+                criterion::BatchSize::SmallInput,
+            )
+        },
+        (1..=num_cpus::get_physical()).collect::<Vec<usize>>(),
+    )
+    .sample_size(10);
+
+    c.bench("par", bench);
+}
+
 /// Run a trivial function in parallel.
 ///
 /// This measures how well the region handles concurrent executions from multiple threads. Since the
@@ -125,6 +215,12 @@ fn par_run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
         null_mock(),
         c,
     );
+    par_run_manual_signals::<R>(
+        &format!("par_run_null_manual_signals ({})", R::TYPE_NAME),
+        1000,
+        null_mock(),
+        c,
+    );
 }
 
 /// Run a computation-heavy function in parallel.
@@ -134,6 +230,12 @@ fn par_run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
 fn par_run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
     par_run::<R>(
         &format!("par_run_fib ({})", R::TYPE_NAME),
+        1000,
+        fib_mock(),
+        c,
+    );
+    par_run_manual_signals::<R>(
+        &format!("par_run_fib_manual_signals ({})", R::TYPE_NAME),
         1000,
         fib_mock(),
         c,

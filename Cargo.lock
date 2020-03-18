@@ -903,6 +903,7 @@ name = "lucet-benchmarks"
 version = "0.6.2-dev"
 dependencies = [
  "criterion",
+ "libc",
  "lucet-module",
  "lucet-runtime",
  "lucet-runtime-internals",
