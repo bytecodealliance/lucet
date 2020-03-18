@@ -1,5 +1,7 @@
 ### Unreleased
 
+- Added `install_lucet_signal_handler()` and `remove_lucet_signal_handler()`, along with `Instance::ensure_signal_handler_installed()` and `Instance::ensure_sigstack_installed()` options to control the automatic installation and removal of signal handlers and alternate signal stacks. The default behaviors have not changed.
+
 ### 0.6.1 (2020-02-18)
 
 - Added metadata to compiled modules that record whether instruction counting instrumentation is present.

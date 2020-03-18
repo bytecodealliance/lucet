@@ -330,6 +330,50 @@
 //! not currently running a Lucet instance, the saved host signal handler is called. This means
 //! that, for example, a `SIGSEGV` on a non-Lucet thread of a host program will still likely abort
 //! the entire process.
+//!
+//! For advanced uses that require manual control over the installation and removal of the Lucet
+//! signal handler, you can use [`install_lucet_signal_handler()`][install-handler] and
+//! [`remove_lucet_signal_handler()`][remove-handler], and disable the automatic installation and
+//! removal on a per-instance basis by setting
+//! [instance.`ensure_signal_handler_installed(false)`][instance-ensure-handler]
+//!
+//! [install-handler]: fn.install_lucet_signal_handler.html
+//! [remove-handler]: fn.remove_lucet_signal_handler.html
+//! [instance-ensure-handler]: struct.Instance.html#method.ensure_signal_handler_installed
+//!
+//! ## Signal Handler Stacks
+//!
+//! Lucet instances must run on threads that have an [alternate signal stack][sigaltstack]
+//! installed, otherwise a WebAssembly program that overflows its stack will cause a double fault,
+//! crashing the entire process. By default, Lucet instances install an alternate signal stack on
+//! their thread before running, and reinstall the preëxisting signal stack on exit. Space for this
+//! stack is reserved within the Lucet `Region` as defined by the `signal_stack_size` field of
+//! `Limits`. If `signal_stack_size` isn't large enough (see below), the automatic installation will
+//! fail with an `Error::InvalidArgument` value.
+//!
+//! For advanced uses, the automatic signal stack installation can be disabled on a per-instance
+//! basis by setting [`instance::ensure_sigstack_installed(false)`][instance-ensure-sigstack]. In
+//! debug mode, the runtime will still check that an alternate signal stack is present and of
+//! sufficient size, but in release mode no checks or extra system calls will be performed.
+//!
+//! [sigaltstack]: http://man7.org/linux/man-pages/man2/sigaltstack.2.html
+//! [instance-ensure-sigstack]: struct.Instance.html#method.ensure_sigstack_installed
+//!
+//! ### Signal Stack Size
+//!
+//! The alternate signal stack must be of a sufficient size to avoid stack overflows when running
+//! the signal handler, and to satisfy [`sigaltstack`][sigaltstack]'s requirements. This library
+//! provides the constant [`DEFAULT_SIGNAL_STACK_SIZE`][default-sigstack-size] as a recommendation
+//! for signal stack size, and uses this value as the default when creating `Limits`.
+//!
+//! With Rust optimizations enabled, as with `cargo build --release`, the `sigaltstack` requirement
+//! of `MINSIGSTKSZ` (defined in `<signal.h>`) provides sufficient space for the signal handler.
+//!
+//! With no optimizations, as with `cargo build`, the signal stack size must be at least 12KiB
+//! according to our experiments; since this is dependent on compiler-defined memory layout choices,
+//! this number could change between Lucet releases or even Rust compiler versions.
+//!
+//! [default-sigstack-size]: constant.DEFAULT_SIGNAL_STACK_SIZE.html
 
 #![deny(bare_trait_objects)]
 
@@ -340,8 +384,11 @@ extern crate self as lucet_runtime;
 pub mod c_api;
 
 pub use lucet_module::{PublicKey, TrapCode};
-pub use lucet_runtime_internals::alloc::Limits;
+pub use lucet_runtime_internals::alloc::{Limits, DEFAULT_SIGNAL_STACK_SIZE};
 pub use lucet_runtime_internals::error::Error;
+pub use lucet_runtime_internals::instance::signals::{
+    install_lucet_signal_handler, remove_lucet_signal_handler,
+};
 pub use lucet_runtime_internals::instance::{
     FaultDetails, Instance, InstanceHandle, KillError, KillSuccess, KillSwitch, RunResult,
     SignalBehavior, TerminationDetails, YieldedVal,

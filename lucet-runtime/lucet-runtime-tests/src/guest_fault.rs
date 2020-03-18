@@ -242,6 +242,142 @@ macro_rules! guest_fault_tests {
         }
 
         #[test]
+        /// Test that the Lucet signal handler runs correctly when installed manually.
+        fn illegal_instr_manual_signal() {
+            test_ex(|| {
+                let module = mock_traps_module();
+                let region =
+                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let mut inst = region
+                    .new_instance(module)
+                    .expect("instance can be created");
+                inst.ensure_signal_handler_installed(false);
+
+                lucet_runtime::install_lucet_signal_handler();
+
+                match inst.run("illegal_instr", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                    }
+                    res => panic!("unexpected result: {:?}", res),
+                }
+
+                // after a fault, can reset and run a normal function
+                inst.reset().expect("instance resets");
+
+                run_onetwothree(&mut inst);
+
+                lucet_runtime::remove_lucet_signal_handler();
+            })
+        }
+
+        #[test]
+        /// Test that the Lucet signal handler runs correctly when installed manually, even when we
+        /// don't keep a 1:1 ratio between install/remove.
+        fn illegal_instr_manuals_signal() {
+            test_ex(|| {
+                let module = mock_traps_module();
+                let region =
+                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let mut inst = region
+                    .new_instance(module)
+                    .expect("instance can be created");
+                inst.ensure_signal_handler_installed(false);
+
+                lucet_runtime::install_lucet_signal_handler();
+                // call it a few times; it shouldn't matter!
+                lucet_runtime::install_lucet_signal_handler();
+                lucet_runtime::install_lucet_signal_handler();
+
+                match inst.run("illegal_instr", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                    }
+                    res => panic!("unexpected result: {:?}", res),
+                }
+
+                // after a fault, can reset and run a normal function
+                inst.reset().expect("instance resets");
+
+                run_onetwothree(&mut inst);
+
+                lucet_runtime::remove_lucet_signal_handler();
+                // call it a few times; it shouldn't matter!
+                lucet_runtime::remove_lucet_signal_handler();
+                lucet_runtime::remove_lucet_signal_handler();
+                lucet_runtime::remove_lucet_signal_handler();
+
+                // just reinstall once and make sure we catch the trap
+                lucet_runtime::install_lucet_signal_handler();
+
+                match inst.run("illegal_instr", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                    }
+                    res => panic!("unexpected result: {:?}", res),
+                }
+            })
+        }
+
+        #[test]
+        /// Test that the Lucet signal handler runs correctly when the sigstack is provided by the
+        /// caller, rather than from the `Region`.
+        ///
+        /// The `signal_stack_size` of the `Region`'s limits is also set to zero, to show that we no
+        /// longer validate the signal stack size on region creation.
+        fn illegal_instr_manual_sigstack() {
+            use libc::*;
+            use std::mem::MaybeUninit;
+
+            test_nonex(|| {
+                let mut our_sigstack_alloc = vec![0; lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE];
+                let our_sigstack = stack_t {
+                    ss_sp: our_sigstack_alloc.as_mut_ptr() as *mut _,
+                    ss_flags: 0,
+                    ss_size: lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE,
+                };
+                let mut beforestack = MaybeUninit::<stack_t>::uninit();
+                let beforestack = unsafe {
+                    sigaltstack(&our_sigstack, beforestack.as_mut_ptr());
+                    beforestack.assume_init()
+                };
+
+                let module = mock_traps_module();
+                let limits_no_sigstack = Limits {
+                    signal_stack_size: 0,
+                    ..Limits::default()
+                };
+                let region =
+                    TestRegion::create(1, &limits_no_sigstack).expect("region can be created");
+                let mut inst = region
+                    .new_instance(module)
+                    .expect("instance can be created");
+
+                inst.ensure_sigstack_installed(false);
+
+                match inst.run("illegal_instr", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                    }
+                    res => panic!("unexpected result: {:?}", res),
+                }
+
+                // after a fault, can reset and run a normal function
+                inst.reset().expect("instance resets");
+
+                run_onetwothree(&mut inst);
+
+                let mut afterstack = MaybeUninit::<stack_t>::uninit();
+                let afterstack = unsafe {
+                    sigaltstack(&beforestack, afterstack.as_mut_ptr());
+                    afterstack.assume_init()
+                };
+
+                assert_eq!(afterstack.ss_sp, our_sigstack_alloc.as_mut_ptr() as *mut _);
+            })
+        }
+
+        #[test]
         fn oob() {
             test_nonex(|| {
                 let module = mock_traps_module();
