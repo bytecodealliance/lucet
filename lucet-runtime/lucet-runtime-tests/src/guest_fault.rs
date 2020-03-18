@@ -322,6 +322,9 @@ macro_rules! guest_fault_tests {
         #[test]
         /// Test that the Lucet signal handler runs correctly when the sigstack is provided by the
         /// caller, rather than from the `Region`.
+        ///
+        /// The `signal_stack_size` of the `Region`'s limits is also set to zero, to show that we no
+        /// longer validate the signal stack size on region creation.
         fn illegal_instr_manual_sigstack() {
             use libc::*;
             use std::mem::MaybeUninit;
@@ -340,8 +343,12 @@ macro_rules! guest_fault_tests {
                 };
 
                 let module = mock_traps_module();
+                let limits_no_sigstack = Limits {
+                    signal_stack_size: 0,
+                    ..Limits::default()
+                };
                 let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    TestRegion::create(1, &limits_no_sigstack).expect("region can be created");
                 let mut inst = region
                     .new_instance(module)
                     .expect("instance can be created");

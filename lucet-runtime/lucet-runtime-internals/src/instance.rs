@@ -726,8 +726,8 @@ impl Instance {
     /// The automatically-installed signal stack uses space allocated in the instance's `Region`,
     /// sized according to the `signal_stack_size` field of the region's `Limits`.
     ///
-    /// If you wish to instead provide your own signal stack, the stack size must be at least as big
-    /// as `DEFAULT_SIGNAL_STACK_SIZE`, which varies depending on platform and optimization level.
+    /// If you wish to instead provide your own signal stack, we recommend using a stack of size
+    /// `DEFAULT_SIGNAL_STACK_SIZE`, which varies depending on platform and optimization level.
     ///
     /// Signal stacks are installed on a per-thread basis, so any thread that runs this instance
     /// must have a signal stack installed.

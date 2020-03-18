@@ -1,3 +1,4 @@
+use crate::alloc::validate_sigstack_size;
 use crate::context::Context;
 use crate::error::Error;
 use crate::instance::{
@@ -125,6 +126,8 @@ impl Instance {
         F: FnOnce(&mut Instance) -> Result<R, Error>,
     {
         let previous_sigstack = if self.ensure_sigstack_installed {
+            validate_sigstack_size(self.alloc.slot().limits.signal_stack_size)?;
+
             // Set up the signal stack for this thread. Note that because signal stacks are per-thread,
             // rather than per-process, we do this for every run, while the signal handler is installed
             // only once per process.
@@ -152,7 +155,7 @@ impl Instance {
                     libc::sigaltstack(std::ptr::null(), current_sigstack.as_mut_ptr());
                     let current_sigstack = current_sigstack.assume_init();
                     debug_assert!(
-                        current_sigstack.ss_size >= crate::alloc::DEFAULT_SIGNAL_STACK_SIZE,
+                        validate_sigstack_size(current_sigstack.ss_size).is_ok(),
                         "signal stack must be large enough"
                     );
                 }

@@ -426,17 +426,30 @@ pub const MINSIGSTKSZ: usize = 32 * 1024;
 #[cfg(not(target_os = "macos"))]
 pub const MINSIGSTKSZ: usize = libc::MINSIGSTKSZ;
 
-// on Linux, `SIGSTKSZ` is too small for the signal handler when compiled in debug mode
-#[cfg(all(debug_assertions, not(target_os = "macos")))]
-pub const DEFAULT_SIGNAL_STACK_SIZE: usize = 12 * 1024;
+/// The recommended size of a signal handler stack for a Lucet instance.
+///
+/// This value is used as the `signal_stack_size` in `Limits::default()`.
+///
+/// The value of this constant depends on the platform, and on whether Rust optimizations are
+/// enabled. In release mode, it is equal to [`SIGSTKSIZE`][sigstksz]. In debug mode, it is equal to
+/// `SIGSTKSZ` or 12KiB, whichever is greater.
+///
+/// [sigstksz]: https://pubs.opengroup.org/onlinepubs/009695399/basedefs/signal.h.html
+pub const DEFAULT_SIGNAL_STACK_SIZE: usize = {
+    // on Linux, `SIGSTKSZ` is too small for the signal handler when compiled in debug mode
+    #[cfg(all(debug_assertions, not(target_os = "macos")))]
+    const SIZE: usize = 12 * 1024;
 
-// on Mac, `SIGSTKSZ` is way larger than we need; it would be nice to combine these debug cases once
-// `std::cmp::max` is a const fn
-#[cfg(all(debug_assertions, target_os = "macos"))]
-pub const DEFAULT_SIGNAL_STACK_SIZE: usize = libc::SIGSTKSZ;
+    // on Mac, `SIGSTKSZ` is way larger than we need; it would be nice to combine these debug cases once
+    // `std::cmp::max` is a const fn
+    #[cfg(all(debug_assertions, target_os = "macos"))]
+    const SIZE: usize = libc::SIGSTKSZ;
 
-#[cfg(not(debug_assertions))]
-pub const DEFAULT_SIGNAL_STACK_SIZE: usize = libc::SIGSTKSZ;
+    #[cfg(not(debug_assertions))]
+    const SIZE: usize = libc::SIGSTKSZ;
+
+    SIZE
+};
 
 impl Limits {
     pub const fn default() -> Limits {
@@ -505,14 +518,26 @@ impl Limits {
             return Err(Error::InvalidArgument("stack size must be greater than 0"));
         }
         if self.signal_stack_size < MINSIGSTKSZ {
-            return Err(Error::InvalidArgument(
-                "signal stack size must be at least MINSIGSTKSZ (defined in <signal.h>)",
-            ));
+            tracing::info!(
+                "signal stack size of {} requires manual configuration of signal stacks",
+                self.signal_stack_size
+            );
+            tracing::debug!(
+                "signal stack size must be at least MINSIGSTKSZ \
+                 (defined in <signal.h>; {} on this system)",
+                MINSIGSTKSZ,
+            );
         }
         if cfg!(debug_assertions) && self.signal_stack_size < 12 * 1024 {
-            return Err(Error::InvalidArgument(
-                "signal stack size must be at least 12KiB for debug builds",
-            ));
+            tracing::info!(
+                "signal stack size of {} requires manual configuration of signal stacks",
+                self.signal_stack_size
+            );
+            tracing::debug!(
+                "in debug mode, signal stack size must be at least MINSIGSTKSZ \
+                 (defined in <signal.h>; {} on this system) or 12KiB, whichever is larger",
+                MINSIGSTKSZ,
+            );
         }
         if self.signal_stack_size % host_page_size() != 0 {
             return Err(Error::InvalidArgument(
@@ -521,6 +546,20 @@ impl Limits {
         }
         Ok(())
     }
+}
+
+pub fn validate_sigstack_size(signal_stack_size: usize) -> Result<(), Error> {
+    if signal_stack_size < MINSIGSTKSZ {
+        return Err(Error::InvalidArgument(
+            "signal stack size must be at least MINSIGSTKSZ (defined in <signal.h>)",
+        ));
+    }
+    if cfg!(debug_assertions) && signal_stack_size < 12 * 1024 {
+        return Err(Error::InvalidArgument(
+            "signal stack size must be at least 12KiB for debug builds",
+        ));
+    }
+    Ok(())
 }
 
 pub mod tests;
