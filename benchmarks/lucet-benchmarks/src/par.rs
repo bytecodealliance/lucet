@@ -3,7 +3,8 @@ use criterion::Criterion;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, Module, Region, RegionCreate};
 use lucetc::OptLevel;
 use rayon::prelude::*;
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::sync::Arc;
 use tempfile::TempDir;
 
 /// Common definiton of OptLevel
@@ -154,13 +155,12 @@ fn par_run_manual_signals<R: RegionCreate + 'static>(
                 // instances on
                 .start_handler(|_| {
                     thread_local! {
-                        static SIGSTACK: Mutex<Vec<u8>> =
-                            Mutex::new(vec![0; lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE]);
+                        static SIGSTACK: RefCell<Box<[u8]>> =
+                            RefCell::new(vec![0; lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE].into_boxed_slice());
                     }
                     SIGSTACK.with(|sigstack| {
-                        let mut sigstack = sigstack.lock().unwrap();
                         let sigstack_raw = libc::stack_t {
-                            ss_sp: sigstack.as_mut_ptr() as *mut _,
+                            ss_sp: sigstack.borrow_mut().as_mut_ptr() as *mut _,
                             ss_flags: 0,
                             ss_size: lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE,
                         };
