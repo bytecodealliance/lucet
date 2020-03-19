@@ -77,19 +77,8 @@ mod module_data {
     fn multiple_import() {
         let m = load_wat_module("multiple_import");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compiling multiple_import");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compiling multiple_import");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -103,19 +92,8 @@ mod module_data {
     fn globals_export() {
         let m = load_wat_module("globals_export");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compiling globals_export");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compiling globals_export");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.globals_spec().len(), 1);
@@ -130,19 +108,8 @@ mod module_data {
     fn fibonacci() {
         let m = load_wat_module("fibonacci");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compiling fibonacci");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compiling fibonacci");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -155,19 +122,8 @@ mod module_data {
     fn arith() {
         let m = load_wat_module("arith");
         let b = Bindings::empty();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compiling arith");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compiling arith");
         let mdata = c.module_data().unwrap();
         assert_eq!(mdata.globals_spec().len(), 0);
 
@@ -183,19 +139,8 @@ mod module_data {
             "tests/bindings/duplicate_imports_bindings.json",
         ))
         .unwrap();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compile duplicate_imports");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compile duplicate_imports");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.import_functions().len(), 2);
@@ -220,19 +165,8 @@ mod module_data {
             "tests/bindings/icall_import_test_bindings.json",
         ))
         .unwrap();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compile icall");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compile icall");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.import_functions().len(), 1);
@@ -267,19 +201,8 @@ mod module_data {
     fn icall() {
         let m = load_wat_module("icall");
         let b = Bindings::empty();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compile icall");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compile icall");
         let _module_data = c.module_data().unwrap();
 
         /*  TODO can't express these with module data
@@ -303,19 +226,8 @@ mod module_data {
     fn icall_sparse() {
         let m = load_wat_module("icall_sparse");
         let b = Bindings::empty();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compile icall_sparse");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compile icall_sparse");
         let _module_data = c.module_data().unwrap();
 
         /*  TODO can't express these with module data
@@ -352,20 +264,8 @@ mod module_data {
         use lucet_module::Global as GlobalVariant;
         let m = load_wat_module("globals_import");
         let b = Bindings::empty();
-        let h = HeapSettings::default();
-
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compile globals_import");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compile globals_import");
         let module_data = c.module_data().unwrap();
         let gspec = module_data.globals_spec();
 
@@ -386,18 +286,8 @@ mod module_data {
         let m = load_wat_module("heap_spec_import");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h.clone(),
-            false,
-            &None,
-            false,
-        )
-        .expect("compiling heap_spec_import");
+        let builder = Compiler::builder().with_heap_settings(h.clone());
+        let c = builder.create(&m, &b).expect("compiling heap_spec_import");
 
         assert_eq!(
             c.module_data().unwrap().heap_spec(),
@@ -419,18 +309,10 @@ mod module_data {
         let m = load_wat_module("heap_spec_definition");
         let b = Bindings::empty();
         let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h.clone(),
-            false,
-            &None,
-            false,
-        )
-        .expect("compiling heap_spec_definition");
+        let builder = Compiler::builder().with_heap_settings(h.clone());
+        let c = builder
+            .create(&m, &b)
+            .expect("compiling heap_spec_definition");
 
         assert_eq!(
             c.module_data().unwrap().heap_spec(),
@@ -450,19 +332,8 @@ mod module_data {
     fn heap_spec_none() {
         let m = load_wat_module("heap_spec_none");
         let b = Bindings::empty();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compiling heap_spec_none");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compiling heap_spec_none");
         assert_eq!(c.module_data().unwrap().heap_spec(), None,);
     }
 
@@ -471,18 +342,8 @@ mod module_data {
         use lucetc::Error as LucetcError;
         let m = load_wat_module("oversize_data_segment");
         let b = Bindings::empty();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        );
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b);
         assert!(
             c.is_err(),
             "compilation error because data initializers are oversized"
@@ -509,18 +370,8 @@ mod module_data {
         file.read_to_end(&mut m).expect("read contents of module");
 
         let b = Bindings::empty();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        );
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b);
         assert!(
             c.is_err(),
             "compilation error because wasm module is invalid"
@@ -536,19 +387,8 @@ mod module_data {
     fn start_section() {
         let m = load_wat_module("start_section");
         let b = Bindings::empty();
-        let h = HeapSettings::default();
-        let _c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compile start_section");
+        let builder = Compiler::builder();
+        let _c = builder.create(&m, &b).expect("compile start_section");
         /*
         assert!(
             p.module().start_section().is_some(),
@@ -561,19 +401,8 @@ mod module_data {
     fn names_local() {
         let m = load_wat_module("names_local");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .expect("compile names_local");
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).expect("compile names_local");
         let mdata = c.module_data().unwrap();
 
         assert_eq!(mdata.import_functions().len(), 0);
@@ -589,24 +418,15 @@ mod module_data {
 mod compile {
     // Tests for compilation completion
     use super::load_wat_module;
-    use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel};
+    use lucetc::Compiler;
     use target_lexicon::Triple;
     fn run_compile_test(file: &str) {
         let m = load_wat_module(file);
         let b = super::test_bindings();
-        let h = HeapSettings::default();
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &None,
-            false,
-        )
-        .unwrap_or_else(|_| panic!("compile {}", file));
+        let builder = Compiler::builder();
+        let c = builder
+            .create(&m, &b)
+            .unwrap_or_else(|_| panic!("compile {}", file));
         let _obj = c
             .object_file()
             .unwrap_or_else(|_| panic!("codegen {}", file));
@@ -651,25 +471,13 @@ mod validate {
     fn validate_arith() {
         let m = load_wat_module("arith");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
 
         // Empty witx: arith module has no imports
         let v = Validator::parse("")
             .expect("empty witx validates")
             .with_wasi_exe(false);
-
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &Some(v),
-            false,
-        )
-        .expect("compile");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
     }
 
@@ -677,7 +485,6 @@ mod validate {
     fn validate_import() {
         let m = load_wat_module("import");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
 
         let witx = "
             (module $env
@@ -687,18 +494,8 @@ mod validate {
             .expect("witx validates")
             .with_wasi_exe(false);
 
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &Some(v),
-            false,
-        )
-        .expect("compile");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
     }
 
@@ -706,7 +503,6 @@ mod validate {
     fn validate_icall_import() {
         let m = load_wat_module("icall_import");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
 
         let witx = "
             (module $env
@@ -718,18 +514,8 @@ mod validate {
             .expect("witx validates")
             .with_wasi_exe(false);
 
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &Some(v),
-            false,
-        )
-        .expect("compile");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
     }
 
@@ -737,7 +523,6 @@ mod validate {
     fn validate_exported_import() {
         let m = load_wat_module("exported_import");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
 
         let witx = "
             (module $env
@@ -747,18 +532,8 @@ mod validate {
             .expect("witx validates")
             .with_wasi_exe(false);
 
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &Some(v),
-            false,
-        )
-        .expect("compile");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
     }
 
@@ -795,7 +570,6 @@ mod validate {
     fn validate_import_many() {
         let m = load_wat_module("import_many");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
 
         let witx = "
             (module $env
@@ -807,18 +581,8 @@ mod validate {
             .expect("witx validates")
             .with_wasi_exe(false);
 
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &Some(v),
-            false,
-        )
-        .expect("compile");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
     }
 
@@ -826,25 +590,14 @@ mod validate {
     fn validate_wasi_exe() {
         let m = load_wat_module("wasi_exe");
         let b = super::test_bindings();
-        let h = HeapSettings::default();
 
         let witx = "";
         let v = Validator::parse(witx)
             .expect("witx validates")
             .with_wasi_exe(true);
 
-        let c = Compiler::new(
-            &m,
-            Triple::host(),
-            OptLevel::default(),
-            CpuFeatures::default(),
-            &b,
-            h,
-            false,
-            &Some(v),
-            false,
-        )
-        .expect("compile");
+        let builder = Compiler::builder().with_validator(Some(v));
+        let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
     }
 }

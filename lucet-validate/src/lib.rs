@@ -44,6 +44,7 @@ impl From<wasmparser::BinaryReaderError> for Error {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Validator {
     witx: Document,
     wasi_exe: bool,

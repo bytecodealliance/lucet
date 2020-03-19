@@ -47,6 +47,123 @@ impl OptLevel {
     }
 }
 
+pub struct CompilerBuilder {
+    target: Triple,
+    opt_level: OptLevel,
+    cpu_features: CpuFeatures,
+    heap_settings: HeapSettings,
+    count_instructions: bool,
+    canonicalize_nans: bool,
+    validator: Option<Validator>,
+}
+
+impl CompilerBuilder {
+    pub fn new() -> Self {
+        Self {
+            target: Triple::host(),
+            opt_level: OptLevel::default(),
+            cpu_features: CpuFeatures::default(),
+            heap_settings: HeapSettings::default(),
+            count_instructions: false,
+            canonicalize_nans: false,
+            validator: None,
+        }
+    }
+
+    pub(crate) fn target_ref(&self) -> &Triple {
+        &self.target
+    }
+
+    pub fn target(&mut self, target: Triple) {
+        self.target = target;
+    }
+
+    pub fn with_target(mut self, target: Triple) -> Self {
+        self.target(target);
+        self
+    }
+
+    pub fn opt_level(&mut self, opt_level: OptLevel) {
+        self.opt_level = opt_level;
+    }
+
+    pub fn with_opt_level(mut self, opt_level: OptLevel) -> Self {
+        self.opt_level(opt_level);
+        self
+    }
+
+    pub fn cpu_features(&mut self, cpu_features: CpuFeatures) {
+        self.cpu_features = cpu_features;
+    }
+
+    pub fn with_cpu_features(mut self, cpu_features: CpuFeatures) -> Self {
+        self.cpu_features(cpu_features);
+        self
+    }
+
+    pub fn cpu_features_mut(&mut self) -> &mut CpuFeatures {
+        &mut self.cpu_features
+    }
+
+    pub fn heap_settings(&mut self, heap_settings: HeapSettings) {
+        self.heap_settings = heap_settings;
+    }
+
+    pub fn with_heap_settings(mut self, heap_settings: HeapSettings) -> Self {
+        self.heap_settings(heap_settings);
+        self
+    }
+
+    pub fn heap_settings_mut(&mut self) -> &mut HeapSettings {
+        &mut self.heap_settings
+    }
+
+    pub fn count_instructions(&mut self, count_instructions: bool) {
+        self.count_instructions = count_instructions;
+    }
+
+    pub fn with_count_instructions(mut self, count_instructions: bool) -> Self {
+        self.count_instructions(count_instructions);
+        self
+    }
+
+    pub fn canonicalize_nans(&mut self, canonicalize_nans: bool) {
+        self.canonicalize_nans = canonicalize_nans;
+    }
+
+    pub fn with_canonicalize_nans(mut self, canonicalize_nans: bool) -> Self {
+        self.canonicalize_nans(canonicalize_nans);
+        self
+    }
+
+    pub fn validator(&mut self, validator: Option<Validator>) {
+        self.validator = validator;
+    }
+
+    pub fn with_validator(mut self, validator: Option<Validator>) -> Self {
+        self.validator(validator);
+        self
+    }
+
+    pub fn create<'a>(
+        &'a self,
+        wasm_binary: &'a [u8],
+        bindings: &'a Bindings,
+    ) -> Result<Compiler<'a>, Error> {
+        Compiler::new(
+            wasm_binary,
+            self.target.clone(),
+            self.opt_level,
+            self.cpu_features.clone(),
+            bindings,
+            self.heap_settings.clone(),
+            self.count_instructions,
+            &self.validator,
+            self.canonicalize_nans,
+        )
+    }
+}
+
 pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
     clif_module: ClifModule<FaerieBackend>,
@@ -128,6 +245,10 @@ impl<'a> Compiler<'a> {
             target,
             canonicalize_nans,
         })
+    }
+
+    pub fn builder() -> CompilerBuilder {
+        CompilerBuilder::new()
     }
 
     pub fn module_features(&self) -> ModuleFeatures {
