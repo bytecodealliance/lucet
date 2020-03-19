@@ -327,14 +327,14 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "byteorder",
  "cranelift-bforest",
@@ -350,7 +350,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
@@ -358,15 +358,15 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.59.0"
+version = "0.60.0"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.59.0"
+version = "0.60.0"
 
 [[package]]
 name = "cranelift-faerie"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -378,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-codegen",
  "log",
@@ -388,8 +388,9 @@ dependencies = [
 
 [[package]]
 name = "cranelift-module"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
+ "anyhow",
  "cranelift-codegen",
  "cranelift-entity",
  "log",
@@ -398,7 +399,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-native"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-codegen",
  "raw-cpuid 7.0.3",
@@ -407,7 +408,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.59.0"
+version = "0.60.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -611,11 +612,10 @@ dependencies = [
 
 [[package]]
 name = "faerie"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74b9ed6159e4a6212c61d9c6a86bee01876b192a64accecf58d5b5ae3b667b52"
+checksum = "dfef65b0e94693295c5d2fe2506f0ee6f43465342d4b5331659936aee8b16084"
 dependencies = [
- "anyhow",
  "goblin 0.1.3",
  "indexmap",
  "log",
@@ -1100,7 +1100,6 @@ name = "lucet-wasi-sdk"
 version = "0.6.2-dev"
 dependencies = [
  "anyhow",
- "failure",
  "lucet-module",
  "lucet-validate",
  "lucetc",
