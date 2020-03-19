@@ -14,7 +14,7 @@ pub use witx::{AtomType, Document, WitxError};
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("WebAssembly validation error at offset {1}: {0}")]
-    WasmValidation(&'static str, usize),
+    WasmValidation(String, usize),
     #[error("Unsupported: {0}")]
     Unsupported(String),
     #[error("Module not found: {0}")]
@@ -40,7 +40,7 @@ pub enum Error {
 
 impl From<wasmparser::BinaryReaderError> for Error {
     fn from(e: wasmparser::BinaryReaderError) -> Error {
-        Error::WasmValidation(e.message, e.offset)
+        Error::WasmValidation(e.message().to_owned(), e.offset())
     }
 }
 
@@ -63,8 +63,8 @@ impl Validator {
         })
     }
 
-    pub fn load<P: AsRef<Path>>(source_path: P) -> Result<Self, WitxError> {
-        let witx = witx::load(&[source_path.as_ref()])?;
+    pub fn load<P: AsRef<Path>>(source_paths: &[P]) -> Result<Self, WitxError> {
+        let witx = witx::load(source_paths)?;
         Ok(Self {
             witx,
             wasi_exe: false,
@@ -109,6 +109,10 @@ impl Validator {
         }
 
         Ok(())
+    }
+
+    pub fn doc(&self) -> &Document {
+        &self.witx
     }
 
     fn witx_module(&self, module: &str) -> Result<Rc<Module>, Error> {

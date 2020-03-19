@@ -152,7 +152,7 @@ mod lucetc_tests {
 
         let b =
             Bindings::from_file("../lucet-wasi/bindings.json").expect("load lucet-wasi bindings");
-        let v = Validator::load("../wasi/phases/old/snapshot_0/witx/wasi_unstable.witx")
+        let v = Validator::load(&["../wasi/phases/old/snapshot_0/witx/wasi_unstable.witx"])
             .expect("wasi spec validation")
             .with_wasi_exe(true);
         // Compiler will only unwrap if the Validator defined above accepts the module

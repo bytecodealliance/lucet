@@ -33,7 +33,8 @@ test-packages:
             -p lucet-wasi-sdk \
             -p lucet-wasi \
             -p lucet-wasi-fuzz \
-            -p lucet-validate
+            -p lucet-validate \
+            -p lucet-wiggle
 
 .PHONY: test-full
 test-full: indent-check audit book test-except-fuzz test-fuzz

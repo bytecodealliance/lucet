@@ -50,6 +50,18 @@ enum Config {
 }
 
 fn main() {
+    eprintln!(
+        "⚠️⚠️⚠️ WARNING ⚠️⚠️⚠️
+
+This tool probably shouldn't be used at the moment.
+
+We don't currently trust the native `clang -m32` as an oracle for Wasm given
+the differences in alignment for `long long`s. See #445 for updates:
+
+  https://github.com/bytecodealliance/lucet/issues/445
+"
+    );
+
     lucet_runtime::lucet_internal_ensure_linked();
     lucet_wasi::export_wasi_funcs();
 

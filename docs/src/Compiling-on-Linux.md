@@ -18,7 +18,7 @@ You will need to install `wasi-sdk` as well. Note that you may need to run `dpkg
 privileges to install the package.
 
 ```sh
-curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk_8.0_amd64.deb \
+curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk_8.0_amd64.deb \
     && dpkg -i wasi-sdk_8.0_amd64.deb && rm -f wasi-sdk_8.0_amd64.deb
 ```
 
@@ -71,7 +71,7 @@ pacman -S curl clang lld cmake
 Next, install the WebAssembly compiler builtins:
 
 ```sh
-curl -sL https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
+curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
 sudo tar x -zf - -C /usr/lib/llvm-*/lib/clang/*
 ```
 
@@ -86,7 +86,7 @@ Install the WASI sysroot:
 
 ```sh
 mkdir -p /opt
-curl https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk-8.0-linux.tar.gz | \
+curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk-8.0-linux.tar.gz | \
 sudo tar x -zv -C /opt -f - wasi-sdk-8.0/share && \
   sudo ln -s /opt/wasi-sdk-*/share/wasi-sysroot /opt/wasi-sysroot
 ```

@@ -250,6 +250,12 @@ pub struct Instance {
         ) -> SignalBehavior,
     >,
 
+    /// Whether to ensure the Lucet signal handler is installed when running this instance.
+    ensure_signal_handler_installed: bool,
+
+    /// Whether to install an alternate signal stack while the instance is running.
+    ensure_sigstack_installed: bool,
+
     /// Pointer to the function used as the entrypoint (for use in backtraces)
     entrypoint: Option<FunctionPointer>,
 
@@ -690,6 +696,52 @@ impl Instance {
         self.c_fatal_handler = Some(handler);
     }
 
+    /// Set whether the Lucet signal handler is installed when running or resuming this instance
+    /// (`true` by default).
+    ///
+    /// If this is `true`, the Lucet runtime checks whether its signal handler is installed whenever
+    /// an instance runs, installing it if it is not present, and uninstalling it when there are no
+    /// longer any Lucet instances running. If this is `false`, that check is disabled, which can
+    /// improve performance when running or resuming an instance.
+    ///
+    /// Use `install_lucet_signal_handler()` and `remove_lucet_signal_handler()` to manually install
+    /// or remove the signal handler.
+    ///
+    /// # Safety
+    ///
+    /// If the Lucet signal handler is not installed when an instance runs, WebAssembly traps such
+    /// as division by zero, assertion failures, or out-of-bounds memory access will raise signals
+    /// to the default signal handlers, usually causing the entire process to crash.
+    pub fn ensure_signal_handler_installed(&mut self, ensure: bool) {
+        self.ensure_signal_handler_installed = ensure;
+    }
+
+    /// Set whether an alternate signal stack is installed for the current thread when running or
+    /// resuming this instance (`true` by default).
+    ///
+    /// If this is `true`, the Lucet runtime installs an alternate signal stack whenever an instance
+    /// runs, and uninstalls it afterwards. If this is `false`, the signal stack is not
+    /// automatically manipulated.
+    ///
+    /// The automatically-installed signal stack uses space allocated in the instance's `Region`,
+    /// sized according to the `signal_stack_size` field of the region's `Limits`.
+    ///
+    /// If you wish to instead provide your own signal stack, we recommend using a stack of size
+    /// `DEFAULT_SIGNAL_STACK_SIZE`, which varies depending on platform and optimization level.
+    ///
+    /// Signal stacks are installed on a per-thread basis, so any thread that runs this instance
+    /// must have a signal stack installed.
+    ///
+    /// # Safety
+    ///
+    /// If an alternate signal stack is not installed when an instance runs, there may not be enough
+    /// stack space for the Lucet signal handler to run. If the signal handler runs out of stack
+    /// space, a double fault could occur and crash the entire process, or the program could
+    /// continue with corrupted memory.
+    pub fn ensure_sigstack_installed(&mut self, ensure: bool) {
+        self.ensure_sigstack_installed = ensure;
+    }
+
     pub fn kill_switch(&self) -> KillSwitch {
         KillSwitch::new(Arc::downgrade(&self.kill_state))
     }
@@ -759,6 +811,8 @@ impl Instance {
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
             signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
+            ensure_signal_handler_installed: true,
+            ensure_sigstack_installed: true,
             entrypoint: None,
             resumed_val: None,
             _padding: (),

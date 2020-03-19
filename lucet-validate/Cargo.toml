@@ -18,10 +18,10 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2"
-witx = { path = "../wasi/tools/witx", version = "0.6.0" }
-cranelift-entity = { path = "../cranelift/cranelift-entity", version = "0.51.0" }
+witx = "0.8.3"
+cranelift-entity = { path = "../wasmtime/cranelift/entity", version = "0.59.0" }
 thiserror = "1.0.4"
-wasmparser = "0.39.1"
+wasmparser = "0.51.2"
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.6.2-dev" }
@@ -41,4 +41,8 @@ assets = [
      "/opt/fst-lucet-validate/share/wasi/snapshot_0/typenames.witx", "644"],
     ["../wasi/phases/old/snapshot_0/witx/wasi_unstable.witx",
      "/opt/fst-lucet-validate/share/wasi/snapshot_0/wasi_unstable.witx", "644"],
+    ["../wasi/phases/snapshot/witx/typenames.witx",
+     "/opt/fst-lucet-validate/share/wasi/snapshot_1/typenames.witx", "644"],
+    ["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx",
+     "/opt/fst-lucet-validate/share/wasi/snapshot_1/wasi_snapshot_preview1.witx", "644"],
 ]

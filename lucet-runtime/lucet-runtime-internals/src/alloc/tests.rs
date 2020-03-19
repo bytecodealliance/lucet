@@ -8,9 +8,12 @@ macro_rules! alloc_tests {
         use $crate::context::{Context, ContextHandle};
         use $crate::error::Error;
         use $crate::instance::InstanceInternal;
-        use $crate::module::{GlobalValue, HeapSpec, MockModuleBuilder};
+        use $crate::module::{
+            FunctionPointer, GlobalValue, HeapSpec, MockExportBuilder, MockModuleBuilder, Module,
+        };
         use $crate::region::Region;
         use $crate::val::Val;
+        use $crate::vmctx::lucet_vmctx;
 
         const LIMITS_HEAP_MEM_SIZE: usize = 16 * 64 * 1024;
         const LIMITS_HEAP_ADDRSPACE_SIZE: usize = 8 * 1024 * 1024;
@@ -715,6 +718,17 @@ macro_rules! alloc_tests {
             assert_eq!(region.used_slots(), 0);
         }
 
+        fn do_nothing_module() -> Arc<dyn Module> {
+            extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () {}
+
+            MockModuleBuilder::new()
+                .with_export_func(MockExportBuilder::new(
+                    "do_nothing",
+                    FunctionPointer::from_usize(do_nothing as usize),
+                ))
+                .build()
+        }
+
         #[test]
         fn reject_sigstack_smaller_than_min() {
             if MINSIGSTKSZ == 0 {
@@ -727,8 +741,11 @@ macro_rules! alloc_tests {
                     * host_page_size(),
                 ..Limits::default()
             };
-            let res = TestRegion::create(1, &limits);
-            match res {
+            let region = TestRegion::create(1, &limits).expect("region created");
+            let mut inst = region
+                .new_instance(do_nothing_module())
+                .expect("new_instance succeeds");
+            match inst.run("do_nothing", &[]) {
                 Err(Error::InvalidArgument(
                     "signal stack size must be at least MINSIGSTKSZ (defined in <signal.h>)",
                 )) => (),
@@ -750,8 +767,11 @@ macro_rules! alloc_tests {
                 signal_stack_size: 8192,
                 ..Limits::default()
             };
-            let res = TestRegion::create(1, &limits);
-            match res {
+            let region = TestRegion::create(1, &limits).expect("region created");
+            let mut inst = region
+                .new_instance(do_nothing_module())
+                .expect("new_instance succeeds");
+            match inst.run("do_nothing", &[]) {
                 Err(Error::InvalidArgument(
                     "signal stack size must be at least 12KiB for debug builds",
                 )) => (),

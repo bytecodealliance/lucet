@@ -11,8 +11,8 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    Global, GlobalIndex, GlobalInit, MemoryIndex, ModuleEnvironment, SignatureIndex, Table,
-    TableIndex,
+    Global, GlobalIndex, GlobalInit, MemoryIndex, SignatureIndex, Table, TableIndex,
+    TargetEnvironment,
 };
 use lucet_module::bindings::Bindings;
 use lucet_module::ModuleFeatures;
@@ -254,13 +254,14 @@ impl<'a> ModuleDecls<'a> {
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id =
-                clif_module.declare_data(&def_symbol, Linkage::Export, false, None)?;
+                clif_module.declare_data(&def_symbol, Linkage::Export, false, false, None)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             table_names.push(def_name);
         }
 
-        let tables_list_id = clif_module.declare_data(TABLE_SYM, Linkage::Export, false, None)?;
+        let tables_list_id =
+            clif_module.declare_data(TABLE_SYM, Linkage::Export, false, false, None)?;
         let tables_list = Name::new_data(TABLE_SYM.to_string(), tables_list_id);
 
         Ok((tables_list, table_names))
@@ -340,7 +341,9 @@ impl<'a> ModuleDecls<'a> {
                         Err(Error::GlobalDeclarationError(ix.as_u32()))
                     }
                 }
-                GlobalInit::V128Const(_) => Err(Error::GlobalUnsupported(ix.as_u32())),
+                GlobalInit::V128Const(_) | GlobalInit::RefNullConst | GlobalInit::RefFunc(_) => {
+                    Err(Error::GlobalUnsupported(ix.as_u32()))
+                }
             }?;
 
             globals.push(GlobalSpec::new(global, g_decl.export_names.clone()));

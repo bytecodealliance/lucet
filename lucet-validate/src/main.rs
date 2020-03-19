@@ -23,6 +23,7 @@ pub fn main() {
             Arg::with_name("witx")
                 .takes_value(true)
                 .required(true)
+                .multiple(true)
                 .help("validate against interface in this witx file"),
         )
         .arg(
@@ -48,7 +49,11 @@ pub fn main() {
 
     match run(
         &module_path,
-        Path::new(matches.value_of("witx").expect("witx path required")),
+        &matches
+            .values_of("witx")
+            .expect("witx path required")
+            .map(PathBuf::from)
+            .collect::<Vec<PathBuf>>(),
         matches.is_present("wasi-exe"),
     ) {
         Ok(()) => {
@@ -74,13 +79,13 @@ pub fn main() {
     }
 }
 
-fn run(module_path: &Path, witx_path: &Path, wasi_exe: bool) -> Result<(), Error> {
+fn run(module_path: &Path, witx_paths: &[PathBuf], wasi_exe: bool) -> Result<(), Error> {
     let mut module_contents = Vec::new();
     let mut file = File::open(module_path).map_err(|e| Error::Io(module_path.into(), e))?;
     file.read_to_end(&mut module_contents)
         .map_err(|e| Error::Io(module_path.into(), e))?;
 
-    let validator = Validator::load(witx_path)?.with_wasi_exe(wasi_exe);
+    let validator = Validator::load(witx_paths)?.with_wasi_exe(wasi_exe);
     validator.validate(&module_contents)?;
 
     Ok(())
