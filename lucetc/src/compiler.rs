@@ -290,7 +290,13 @@ impl<'a> Compiler<'a> {
                 })?;
         }
 
-        stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
+        let probe_id = stack_probe::declare(&mut self.decls, &mut self.clif_module)?;
+        let probe_func = self.decls.get_func(probe_id).unwrap();
+        self.clif_module.define_function_bytes(
+            probe_func.name.as_funcid().unwrap(),
+            stack_probe::STACK_PROBE_BINARY,
+            stack_probe::trap_sites(),
+        )?;
 
         let module_data_bytes = self.module_data()?.serialize()?;
 

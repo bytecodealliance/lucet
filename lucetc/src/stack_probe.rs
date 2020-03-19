@@ -12,11 +12,10 @@ use crate::decls::ModuleDecls;
 use crate::error::Error;
 use crate::module::UniqueFuncIndex;
 use cranelift_codegen::{
-    binemit,
     ir::{self, types, AbiParam, Signature},
     isa::CallConv,
 };
-use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
+use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule, TrapSite};
 
 /// Stack probe symbol name
 pub const STACK_PROBE_SYM: &str = "lucet_probestack";
@@ -38,20 +37,14 @@ pub(crate) const STACK_PROBE_BINARY: &[u8] = &[
     0x29, 0xdc, 0x48, 0x85, 0x64, 0x24, 0x08, 0x48, 0x01, 0xc4, 0xc3,
 ];
 
-pub struct MachinecodeTrapSite {
-    pub offset: binemit::CodeOffset,
-    pub srcloc: ir::SourceLoc,
-    pub code: ir::TrapCode,
-}
-
-pub fn trap_sites() -> Vec<MachinecodeTrapSite> {
+pub fn trap_sites() -> Vec<TrapSite> {
     vec![
-        MachinecodeTrapSite {
+        TrapSite {
             offset: 10, /* test %rsp,0x8(%rsp) */
             srcloc: ir::SourceLoc::default(),
             code: ir::TrapCode::StackOverflow,
         },
-        MachinecodeTrapSite {
+        TrapSite {
             offset: 34, /* test %rsp,0x8(%rsp) */
             srcloc: ir::SourceLoc::default(),
             code: ir::TrapCode::StackOverflow,
@@ -59,7 +52,7 @@ pub fn trap_sites() -> Vec<MachinecodeTrapSite> {
     ]
 }
 
-pub fn declare_metadata<'a, B: ClifBackend>(
+pub fn declare<'a, B: ClifBackend>(
     decls: &mut ModuleDecls<'a>,
     clif_module: &mut ClifModule<B>,
 ) -> Result<UniqueFuncIndex, Error> {

@@ -1,11 +1,10 @@
 use crate::error::Error;
 use crate::name::Name;
-use crate::stack_probe;
 use crate::table::TABLE_SYM;
 use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
-use cranelift_codegen::{binemit::TrapSink, ir, isa};
-use cranelift_faerie::traps::{FaerieTrapManifest, FaerieTrapSink};
+use cranelift_codegen::{ir, isa};
+use cranelift_faerie::traps::FaerieTrapManifest;
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
 use lucet_module::{
@@ -60,11 +59,9 @@ impl ObjectFile {
             artifact: product.artifact,
         };
 
-        let mut trap_manifest: FaerieTrapManifest = product
+        let trap_manifest: FaerieTrapManifest = product
             .trap_manifest
             .expect("trap manifest will be present");
-
-        obj.write_stack_probe(&mut trap_manifest, &mut function_manifest)?;
 
         // Now that we have trap information, we can fix up FunctionSpec entries to have
         // correct `trap_length` values
@@ -100,58 +97,6 @@ impl ObjectFile {
         )?;
 
         Ok(obj)
-    }
-
-    fn write_stack_probe(
-        &mut self,
-        traps: &mut FaerieTrapManifest,
-        function_manifest: &mut Vec<(String, FunctionSpec)>,
-    ) -> Result<(), Error> {
-        self.artifact
-            .declare_with(
-                stack_probe::STACK_PROBE_SYM,
-                Decl::function(),
-                stack_probe::STACK_PROBE_BINARY.to_vec(),
-            )
-            .map_err(|source| {
-                let message = format!("Error declaring {}", stack_probe::STACK_PROBE_SYM);
-                Error::FaerieArtifact(source, message)
-            })?;
-
-        {
-            let mut stack_probe_trap_sink = FaerieTrapSink::new(
-                stack_probe::STACK_PROBE_SYM,
-                stack_probe::STACK_PROBE_BINARY.len() as u32,
-            );
-            stack_probe::trap_sites()
-                .iter()
-                .for_each(|t| stack_probe_trap_sink.trap(t.offset, t.srcloc, t.code));
-            traps.add_sink(stack_probe_trap_sink);
-        }
-
-        // The stack probe never exists as clif, and as a result never exists a
-        // cranelift-compiled function. As a result, the declared length of the stack probe's
-        // "code" is 0. This is incorrect, and must be fixed up before writing out the function
-        // manifest.
-
-        // because the stack probe is the last declared function...
-        let last_idx = function_manifest.len() - 1;
-        let stack_probe_entry = function_manifest
-            .get_mut(last_idx)
-            .expect("function manifest has entries");
-        debug_assert!(stack_probe_entry.0 == stack_probe::STACK_PROBE_SYM);
-        debug_assert!(stack_probe_entry.1.code_len() == 0);
-        std::mem::swap(
-            &mut stack_probe_entry.1,
-            &mut FunctionSpec::new(
-                0, // there is no real address for the function until written to an object file
-                stack_probe::STACK_PROBE_BINARY.len() as u32,
-                0,
-                0, // fix up this FunctionSpec with trap info like any other
-            ),
-        );
-
-        Ok(())
     }
 
     ///
