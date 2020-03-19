@@ -1,14 +1,14 @@
 use crate::error::Error;
 use crate::name::Name;
 use crate::table::TABLE_SYM;
-use crate::traps::{translate_trapcode, trap_sym_for_func};
+use crate::traps::trap_sym_for_func;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
 use cranelift_faerie::traps::FaerieTrapManifest;
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
 use lucet_module::{
-    FunctionSpec, SerializedModule, TrapSite, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
+    FunctionSpec, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };
 use std::collections::HashMap;
 use std::fs::File;
@@ -85,7 +85,6 @@ impl ObjectFile {
             }
         }
 
-        obj.write_trap_tables(&trap_manifest)?;
         obj.write_function_manifest(function_manifest.as_slice())?;
 
         // And now write out the actual structure tying together all the data in this module.
@@ -157,47 +156,6 @@ impl ObjectFile {
                 let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
                 Error::FaerieArtifact(source, message)
             })?;
-
-        Ok(())
-    }
-
-    fn write_trap_tables(&mut self, manifest: &FaerieTrapManifest) -> Result<(), Error> {
-        for sink in manifest.sinks.iter() {
-            let func_sym = &sink.name;
-            let trap_sym = trap_sym_for_func(func_sym);
-
-            self.artifact
-                .declare(&trap_sym, Decl::data())
-                .map_err(|source| {
-                    let message = format!("Trap table error declaring {}", trap_sym);
-                    Error::FaerieArtifact(source, message)
-                })?;
-
-            // write the actual function-level trap table
-            let traps: Vec<TrapSite> = sink
-                .sites
-                .iter()
-                .map(|site| TrapSite {
-                    offset: site.offset,
-                    code: translate_trapcode(site.code),
-                })
-                .collect();
-
-            let trap_site_bytes = unsafe {
-                std::slice::from_raw_parts(
-                    traps.as_ptr() as *const u8,
-                    traps.len() * std::mem::size_of::<TrapSite>(),
-                )
-            };
-
-            // and write the function trap table into the object
-            self.artifact
-                .define(&trap_sym, trap_site_bytes.to_vec())
-                .map_err(|source| {
-                    let message = format!("Trap table error defining {}", trap_sym);
-                    Error::FaerieArtifact(source, message)
-                })?;
-        }
 
         Ok(())
     }

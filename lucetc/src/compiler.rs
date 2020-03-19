@@ -10,6 +10,7 @@ use crate::output::{CraneliftFuncs, ObjectFile};
 use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
+use crate::traps::{translate_trapcode, trap_sym_for_func};
 use cranelift_codegen::{
     ir,
     isa::TargetIsa,
@@ -17,7 +18,10 @@ use cranelift_codegen::{
     Context as ClifContext,
 };
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
-use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
+use cranelift_module::{
+    Backend as ClifBackend, DataContext as ClifDataContext, DataId, Linkage as ClifLinkage,
+    Module as ClifModule,
+};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use lucet_module::bindings::Bindings;
 use lucet_module::{FunctionSpec, ModuleData, ModuleFeatures, MODULE_DATA_SYM};
@@ -282,21 +286,30 @@ impl<'a> Compiler<'a> {
                     symbol: func.name.symbol().to_string(),
                     source,
                 })?;
-            self.clif_module
+            let compiled = self
+                .clif_module
                 .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
                 .map_err(|source| Error::FunctionDefinition {
                     symbol: func.name.symbol().to_string(),
                     source,
                 })?;
+
+            // Write out a trap table for the compiled function.
+            let trap_site_bytes = traps_to_module_traps(&compiled.traps);
+            let trap_data_id = write_trap_table(&mut self.clif_module, trap_site_bytes, func.name.symbol())?;
         }
 
         let probe_id = stack_probe::declare(&mut self.decls, &mut self.clif_module)?;
         let probe_func = self.decls.get_func(probe_id).unwrap();
-        self.clif_module.define_function_bytes(
-            probe_func.name.as_funcid().unwrap(),
+        let probe_func_id = probe_func.name.as_funcid().unwrap();
+        let compiled = self.clif_module.define_function_bytes(
+            probe_func_id,
             stack_probe::STACK_PROBE_BINARY,
             stack_probe::trap_sites(),
         )?;
+
+        let trap_site_bytes = traps_to_module_traps(&compiled.traps);
+        let trap_data_id = write_trap_table(&mut self.clif_module, trap_site_bytes, probe_func.name.symbol())?;
 
         let module_data_bytes = self.module_data()?.serialize()?;
 
@@ -431,4 +444,39 @@ fn write_startfunc_data<B: ClifBackend>(
             .map_err(Error::MetadataSerializer)?;
     }
     Ok(())
+}
+
+fn traps_to_module_traps(traps: &[cranelift_module::TrapSite]) -> Box<[u8]> {
+    let traps: Vec<lucet_module::TrapSite> = traps
+        .iter()
+        .map(|site| lucet_module::TrapSite {
+            offset: site.offset,
+            code: translate_trapcode(site.code),
+        })
+        .collect();
+
+    let trap_site_bytes = unsafe {
+        std::slice::from_raw_parts(
+            traps.as_ptr() as *const u8,
+            traps.len() * std::mem::size_of::<lucet_module::TrapSite>(),
+        )
+    };
+
+    trap_site_bytes.to_vec().into()
+}
+
+fn write_trap_table(
+    module: &mut ClifModule<FaerieBackend>,
+    trap_bytes: Box<[u8]>,
+    func_name: &str,
+) -> Result<DataId, Error> {
+    let trap_sym = trap_sym_for_func(func_name);
+    let mut trap_sym_ctx = ClifDataContext::new();
+    trap_sym_ctx.define(trap_bytes);
+
+    let trap_data_id = module.declare_data(&trap_sym, ClifLinkage::Export, false, false, None)?;
+
+    module.define_data(trap_data_id, &trap_sym_ctx)?;
+
+    Ok(trap_data_id)
 }
