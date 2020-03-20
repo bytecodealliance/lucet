@@ -1,3 +1,4 @@
+use crate::alloc::validate_sigstack_size;
 use crate::context::Context;
 use crate::error::Error;
 use crate::instance::{
@@ -12,12 +13,15 @@ use nix::sys::signal::{
     pthread_sigmask, raise, sigaction, SaFlags, SigAction, SigHandler, SigSet, SigmaskHow, Signal,
 };
 use std::mem::MaybeUninit;
+use std::ops::DerefMut;
 use std::panic;
 use std::sync::{Arc, Mutex};
 
 lazy_static! {
     // TODO: work out an alternative to this that is signal-safe for `reraise_host_signal_in_handler`
     static ref LUCET_SIGNAL_STATE: Mutex<Option<SignalState>> = Mutex::new(None);
+
+    static ref SIGNAL_HANDLER_MANUALLY_INSTALLED: Mutex<bool> = Mutex::new(false);
 }
 
 /// The value returned by
@@ -50,67 +54,141 @@ pub fn signal_handler_none(
     SignalBehavior::Default
 }
 
+/// Install the Lucet signal handler for the current process.
+///
+/// This happens automatically by default, but must be run manually before running instances where
+/// `instance.ensure_signal_handler_installed(false)` has been set.
+///
+/// Calling this function more than once without first calling `remove_lucet_signal_handler()` has
+/// no additional effect.
+pub fn install_lucet_signal_handler() {
+    let mut installed = SIGNAL_HANDLER_MANUALLY_INSTALLED.lock().unwrap();
+    if !*installed {
+        increment_lucet_signal_state();
+        *installed = true;
+    }
+}
+
+/// Increment the count of currently-running instances, and install the signal handler if it is
+/// currently missing.
+///
+/// The count only reflects running instances with `ensure_signal_handler_installed` set to `true`.
+fn increment_lucet_signal_state() {
+    let mut ostate = LUCET_SIGNAL_STATE.lock().unwrap();
+    if let Some(state) = ostate.deref_mut() {
+        state.counter += 1;
+    } else {
+        unsafe {
+            setup_guest_signal_state(&mut ostate);
+        }
+    }
+}
+
+/// Remove the Lucet signal handler for the current process, restoring the signal handler that was
+/// present when `install_lucet_signal_handler()` was called.
+///
+/// Calling this function without first calling `install_lucet_signal_handler()` has no effect.
+pub fn remove_lucet_signal_handler() {
+    let mut installed = SIGNAL_HANDLER_MANUALLY_INSTALLED.lock().unwrap();
+    if *installed {
+        decrement_lucet_signal_state();
+        *installed = false;
+    }
+}
+
+/// Decrement the count of currently-running instances, and remove the signal handler if the count
+/// reaches zero.
+///
+/// The count only reflects running instances with `ensure_signal_handler_installed` set to `true`.
+fn decrement_lucet_signal_state() {
+    let mut ostate = LUCET_SIGNAL_STATE.lock().unwrap();
+    let counter_zero = if let Some(state) = ostate.deref_mut() {
+        state.counter -= 1;
+        if state.counter == 0 {
+            unsafe {
+                restore_host_signal_state(state);
+            }
+            true
+        } else {
+            false
+        }
+    } else {
+        panic!("signal handlers weren't installed at decrement");
+    };
+    if counter_zero {
+        *ostate = None;
+    }
+}
+
 impl Instance {
     pub(crate) fn with_signals_on<F, R>(&mut self, f: F) -> Result<R, Error>
     where
         F: FnOnce(&mut Instance) -> Result<R, Error>,
     {
-        // Set up the signal stack for this thread. Note that because signal stacks are per-thread,
-        // rather than per-process, we do this for every run, while the signal handler is installed
-        // only once per process.
-        let guest_sigstack = SigStack::new(
-            self.alloc.slot().sigstack,
-            SigStackFlags::empty(),
-            self.alloc.slot().limits.signal_stack_size,
-        );
-        let previous_sigstack = unsafe { sigaltstack(Some(guest_sigstack)) }
-            .expect("enabling or changing the signal stack succeeds");
-        if let Some(previous_sigstack) = previous_sigstack {
-            assert!(
-                !previous_sigstack
-                    .flags()
-                    .contains(SigStackFlags::SS_ONSTACK),
-                "an instance was created with a signal stack"
+        let previous_sigstack = if self.ensure_sigstack_installed {
+            validate_sigstack_size(self.alloc.slot().limits.signal_stack_size)?;
+
+            // Set up the signal stack for this thread. Note that because signal stacks are per-thread,
+            // rather than per-process, we do this for every run, while the signal handler is installed
+            // only once per process.
+            let guest_sigstack = SigStack::new(
+                self.alloc.slot().sigstack,
+                SigStackFlags::empty(),
+                self.alloc.slot().limits.signal_stack_size,
+            );
+            let previous_sigstack = unsafe { sigaltstack(Some(guest_sigstack)) }
+                .expect("enabling or changing the signal stack succeeds");
+            if let Some(previous_sigstack) = previous_sigstack {
+                assert!(
+                    !previous_sigstack
+                        .flags()
+                        .contains(SigStackFlags::SS_ONSTACK),
+                    "an instance was created with a signal stack"
+                );
+            }
+            previous_sigstack
+        } else {
+            // in debug mode only, make sure the installed sigstack is of sufficient size
+            if cfg!(debug_assertions) {
+                unsafe {
+                    let mut current_sigstack = MaybeUninit::<libc::stack_t>::uninit();
+                    libc::sigaltstack(std::ptr::null(), current_sigstack.as_mut_ptr());
+                    let current_sigstack = current_sigstack.assume_init();
+                    debug_assert!(
+                        validate_sigstack_size(current_sigstack.ss_size).is_ok(),
+                        "signal stack must be large enough"
+                    );
+                }
+            }
+            None
+        };
+
+        if self.ensure_signal_handler_installed {
+            increment_lucet_signal_state();
+        } else if cfg!(debug_assertions) {
+            // in debug mode only, make sure the signal state is already present
+            debug_assert!(
+                LUCET_SIGNAL_STATE.lock().unwrap().is_some(),
+                "signal handler is installed"
             );
         }
-        let mut ostate = LUCET_SIGNAL_STATE.lock().unwrap();
-        if let Some(ref mut state) = *ostate {
-            state.counter += 1;
-        } else {
-            unsafe {
-                setup_guest_signal_state(&mut ostate);
-            }
-        }
-        drop(ostate);
 
         // run the body
         let res = f(self);
 
-        let mut ostate = LUCET_SIGNAL_STATE.lock().unwrap();
-        let counter_zero = if let Some(ref mut state) = *ostate {
-            state.counter -= 1;
-            if state.counter == 0 {
-                unsafe {
-                    restore_host_signal_state(state);
-                }
-                true
-            } else {
-                false
-            }
-        } else {
-            panic!("signal handlers weren't installed at instance exit");
-        };
-        if counter_zero {
-            *ostate = None;
+        if self.ensure_signal_handler_installed {
+            decrement_lucet_signal_state();
         }
 
-        unsafe {
-            // restore the host signal stack for this thread
-            if !altstack_flags()
-                .expect("the current stack flags could be retrieved")
-                .contains(SigStackFlags::SS_ONSTACK)
-            {
-                sigaltstack(previous_sigstack).expect("sigaltstack restoration succeeds");
+        if self.ensure_sigstack_installed {
+            unsafe {
+                // restore the host signal stack for this thread
+                if !altstack_flags()
+                    .expect("the current stack flags could be retrieved")
+                    .contains(SigStackFlags::SS_ONSTACK)
+                {
+                    sigaltstack(previous_sigstack).expect("sigaltstack restoration succeeds");
+                }
             }
         }
 
@@ -353,7 +431,7 @@ unsafe fn reraise_host_signal_in_handler(
     let saved_handler = {
         // TODO: avoid taking a mutex here, probably by having some static muts just for this
         // function
-        if let Some(ref state) = *LUCET_SIGNAL_STATE.lock().unwrap() {
+        if let Some(state) = LUCET_SIGNAL_STATE.lock().unwrap().as_ref() {
             match sig {
                 Signal::SIGBUS => state.saved_sigbus.clone(),
                 Signal::SIGFPE => state.saved_sigfpe.clone(),

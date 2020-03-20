@@ -115,7 +115,7 @@ impl ObjectFile {
             )
             .map_err(|source| {
                 let message = format!("Error declaring {}", stack_probe::STACK_PROBE_SYM);
-                Error::Failure(source, message)
+                Error::FaerieArtifact(source, message)
             })?;
 
         {
@@ -165,7 +165,7 @@ impl ObjectFile {
             .declare(FUNCTION_MANIFEST_SYM, Decl::data())
             .map_err(|source| {
                 let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
-                Error::ArtifactError(source, message)
+                Error::FaerieArtifact(source, message)
             })?;
 
         let mut manifest_buf: Cursor<Vec<u8>> = Cursor::new(Vec::with_capacity(
@@ -210,7 +210,7 @@ impl ObjectFile {
             .define(FUNCTION_MANIFEST_SYM, manifest_buf.into_inner())
             .map_err(|source| {
                 let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
-                Error::ArtifactError(source, message)
+                Error::FaerieArtifact(source, message)
             })?;
 
         Ok(())
@@ -225,7 +225,7 @@ impl ObjectFile {
                 .declare(&trap_sym, Decl::data())
                 .map_err(|source| {
                     let message = format!("Trap table error declaring {}", trap_sym);
-                    Error::ArtifactError(source, message)
+                    Error::FaerieArtifact(source, message)
                 })?;
 
             // write the actual function-level trap table
@@ -250,7 +250,7 @@ impl ObjectFile {
                 .define(&trap_sym, trap_site_bytes.to_vec())
                 .map_err(|source| {
                     let message = format!("Trap table error defining {}", trap_sym);
-                    Error::ArtifactError(source, message)
+                    Error::FaerieArtifact(source, message)
                 })?;
         }
 
@@ -265,7 +265,7 @@ impl ObjectFile {
         let file = File::create(path)?;
         self.artifact
             .write(file)
-            .map_err(|source| Error::Failure(source, "Write error".to_owned()))?;
+            .map_err(|source| Error::FaerieArtifact(source, "Write error".to_owned()))?;
         Ok(())
     }
 }
@@ -280,7 +280,7 @@ fn write_module(
     obj.declare(LUCET_MODULE_SYM, Decl::data().global())
         .map_err(|source| {
             let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
-            Error::ArtifactError(source, message)
+            Error::FaerieArtifact(source, message)
         })?;
 
     let version =
@@ -313,7 +313,7 @@ fn write_module(
     obj.define(LUCET_MODULE_SYM, native_data.into_inner())
         .map_err(|source| {
             let message = format!("Manifest error defining {}", FUNCTION_MANIFEST_SYM);
-            Error::ArtifactError(source, message)
+            Error::FaerieArtifact(source, message)
         })?;
 
     Ok(())
@@ -351,7 +351,7 @@ pub(crate) fn write_relocated_slice(
             )
             .map_err(|source| {
                 let message = format!("Manifest error linking {}", to);
-                Error::Failure(source, message)
+                Error::FaerieArtifact(source, message)
             })?;
         }
         (Some(to), _len) => {
@@ -363,7 +363,7 @@ pub(crate) fn write_relocated_slice(
             })
             .map_err(|source| {
                 let message = format!("Manifest error linking {}", to);
-                Error::Failure(source, message)
+                Error::FaerieArtifact(source, message)
             })?;
         }
         (None, len) => {
