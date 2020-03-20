@@ -8,6 +8,9 @@ use crate::module::Module;
 use std::any::Any;
 use std::sync::Arc;
 
+// TLC: Most of the time, there is going to be some default memory
+// size that works perfectly fine for most instances.  Where might
+// this value be defined?
 const LIMITS_HEAP_MEM_SIZE: usize = 16 * 64 * 1024;
 
 /// A memory region in which Lucet instances are created and run.
@@ -26,13 +29,13 @@ pub trait Region: RegionInternal {
     ///
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
-    fn new_instance(&self, module: Arc<dyn Module>) -> Result<InstanceHandle, Error> {
-        self.new_instance_builder(module).build()
+    fn new_instance(&self, module: Arc<dyn Module>, heap_memory_size: usize) -> Result<InstanceHandle, Error> {
+        self.new_instance_builder(module, heap_memory_size).build()
     }
 
     /// Return an [`InstanceBuilder`](struct.InstanceBuilder.html) for the given module.
-    fn new_instance_builder<'a>(&'a self, module: Arc<dyn Module>) -> InstanceBuilder<'a> {
-        InstanceBuilder::new(self.as_dyn_internal(), module, LIMITS_HEAP_MEM_SIZE)
+    fn new_instance_builder<'a>(&'a self, module: Arc<dyn Module>, heap_memory_size: usize) -> InstanceBuilder<'a> {
+        InstanceBuilder::new(self.as_dyn_internal(), module, heap_memory_size)
     }
 
     /// Return the number of instance slots that are currently free in the region.
