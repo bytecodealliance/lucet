@@ -25,7 +25,7 @@ use cranelift_module::{
 };
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use lucet_module::bindings::Bindings;
-use lucet_module::{ModuleData, ModuleFeatures, MODULE_DATA_SYM};
+use lucet_module::{ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM};
 use lucet_validate::Validator;
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -332,9 +332,9 @@ impl<'a> Compiler<'a> {
 
         let module_data_len = module_data_bytes.len();
 
-        write_module_data(&mut self.clif_module, module_data_bytes)?;
+        let module_data_id = write_module_data(&mut self.clif_module, module_data_bytes)?;
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
-        let table_len = write_table_data(&mut self.clif_module, &self.decls)?;
+        let (table_id, table_len) = write_table_data(&mut self.clif_module, &self.decls)?;
 
         // The function manifest must be written out in the order that
         // cranelift-module is going to lay out the functions.  We also
@@ -374,11 +374,45 @@ impl<'a> Compiler<'a> {
                                       None)?;
         self.clif_module.define_data(manifest_data_id, &function_manifest_ctx)?;
 
+        // Write out the structure tying everything together.
+        let mut native_data = Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
+        let mut native_data_ctx = ClifDataContext::new();
+        let native_data_id = self.clif_module.declare_data(LUCET_MODULE_SYM,
+                                                           ClifLinkage::Export,
+                                                           false,
+                                                           false,
+                                                           None)?;
+
+        let version =
+            VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
+
+        version.write_to(&mut native_data)?;
+
+        fn write_slice(module: &mut ClifModule<FaerieBackend>,
+                       mut ctx: &mut ClifDataContext,
+                       bytes: &mut Cursor<Vec<u8>>,
+                       id: DataId,
+                       len: usize) -> Result<(), Error> {
+            let data_ref = module.declare_data_in_data(id, &mut ctx);
+            let offset = bytes.position() as u32;
+            ctx.write_data_addr(offset, data_ref, 0);
+            bytes.write_u64::<LittleEndian>(0 as u64)?;
+            bytes.write_u64::<LittleEndian>(len as u64)?;
+            Ok(())
+        }
+
+        write_slice(&mut self.clif_module, &mut native_data_ctx, &mut native_data,
+                    module_data_id, module_data_len)?;
+        write_slice(&mut self.clif_module, &mut native_data_ctx, &mut native_data,
+                    table_id, table_len)?;
+        write_slice(&mut self.clif_module, &mut native_data_ctx, &mut native_data,
+                    manifest_data_id, function_manifest_len)?;
+
+        native_data_ctx.define(native_data.into_inner().into());
+        self.clif_module.define_data(native_data_id, &native_data_ctx)?;
+
         let obj = ObjectFile::new(
             self.clif_module.finish(),
-            module_data_len,
-            function_manifest_len,
-            table_len,
         )?;
 
         Ok(obj)
@@ -441,7 +475,7 @@ impl<'a> Compiler<'a> {
 fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     module_data_bytes: Vec<u8>,
-) -> Result<(), Error> {
+) -> Result<DataId, Error> {
     use cranelift_module::{DataContext, Linkage};
 
     let mut module_data_ctx = DataContext::new();
@@ -454,7 +488,7 @@ fn write_module_data<B: ClifBackend>(
         .define_data(module_data_decl, &module_data_ctx)
         .map_err(Error::ClifModuleError)?;
 
-    Ok(())
+    Ok(module_data_decl)
 }
 
 fn write_startfunc_data<B: ClifBackend>(
