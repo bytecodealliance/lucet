@@ -950,30 +950,33 @@ impl Instance {
 
         self.kill_state.schedule(unsafe { pthread_self() });
 
-        // there should never be another instance running on this thread when we enter this function
-        CURRENT_INSTANCE.with(|current_instance| {
-            let mut current_instance = current_instance.borrow_mut();
-            assert!(
-                current_instance.is_none(),
-                "no other instance is running on this thread"
-            );
-            // safety: `self` is not null if we are in this function
-            *current_instance = Some(unsafe { NonNull::new_unchecked(self) });
-        });
-
-        self.with_signals_on(|i| {
-            HOST_CTX.with(|host_ctx| {
-                // Save the current context into `host_ctx`, and jump to the guest context. The
-                // lucet context is linked to host_ctx, so it will return here after it finishes,
-                // successfully or otherwise.
-                unsafe { Context::swap(&mut *host_ctx.get(), &mut i.ctx) };
-                Ok(())
+        let res = self.with_current_instance(|i| {
+            i.with_signals_on(|i| {
+                HOST_CTX.with(|host_ctx| {
+                    // Save the current context into `host_ctx`, and jump to the guest context. The
+                    // lucet context is linked to host_ctx, so it will return here after it finishes,
+                    // successfully or otherwise.
+                    unsafe { Context::swap(&mut *host_ctx.get(), &mut i.ctx) };
+                    Ok(())
+                })
             })
-        })?;
-
-        CURRENT_INSTANCE.with(|current_instance| {
-            *current_instance.borrow_mut() = None;
         });
+
+        if let Err(e) = res {
+            // Something went wrong setting up or tearing down the signal handlers and signal
+            // stack. This is an error, but we don't want it to mask an error that may have arisen
+            // due to a guest fault or guest termination. So, we set the state back to `Ready` only
+            // if it is still `Running`, which likely indicates we never even made it into the
+            // guest.
+            //
+            // As of 2020-03-20, the only early return points in the code above happen before the
+            // guest would be able to run, so this should always transition from running to ready if
+            // there's an error.
+            if let State::Running = self.state {
+                self.state = State::Ready;
+            }
+            return Err(e);
+        }
 
         // Sandbox has jumped back to the host process, indicating it has either:
         //
@@ -1047,6 +1050,29 @@ impl Instance {
                 lucet_format_err!("\"impossible\" state found in `swap_and_return()`: {}", st),
             ),
         }
+    }
+
+    fn with_current_instance<F, R>(&mut self, f: F) -> Result<R, Error>
+    where
+        F: FnOnce(&mut Instance) -> Result<R, Error>,
+    {
+        CURRENT_INSTANCE.with(|current_instance| {
+            let mut current_instance = current_instance.borrow_mut();
+            lucet_ensure!(
+                current_instance.is_none(),
+                "no instance must already be running on this thread"
+            ); // safety: `self` is not null if we are in this function
+            *current_instance = Some(unsafe { NonNull::new_unchecked(self) });
+            Ok(())
+        })?;
+
+        let res = f(self);
+
+        CURRENT_INSTANCE.with(|current_instance| {
+            *current_instance.borrow_mut() = None;
+        });
+
+        res
     }
 
     fn run_start(&mut self) -> Result<(), Error> {

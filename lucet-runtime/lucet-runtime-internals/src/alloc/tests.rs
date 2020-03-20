@@ -745,13 +745,27 @@ macro_rules! alloc_tests {
             let mut inst = region
                 .new_instance(do_nothing_module())
                 .expect("new_instance succeeds");
-            match inst.run("do_nothing", &[]) {
-                Err(Error::InvalidArgument(
-                    "signal stack size must be at least MINSIGSTKSZ (defined in <signal.h>)",
-                )) => (),
-                Err(e) => panic!("unexpected error: {}", e),
-                Ok(_) => panic!("unexpected success"),
+
+            // run the bad one a bunch of times, in case there's some bad state left over following
+            // a failure
+            for _ in 0..5 {
+                match inst.run("do_nothing", &[]) {
+                    Err(Error::InvalidArgument(
+                        "signal stack size must be at least MINSIGSTKSZ (defined in <signal.h>)",
+                    )) => (),
+                    Err(e) => panic!("unexpected error: {}", e),
+                    Ok(_) => panic!("unexpected success"),
+                }
+                assert!(inst.is_ready());
             }
+
+            // now make sure that we can run an instance with reasonable limits on this same thread,
+            // to make sure the `CURRENT_INSTANCE` thread-local isn't left in a bad state
+            let region = TestRegion::create(1, &Limits::default()).expect("region created");
+            let mut inst = region
+                .new_instance(do_nothing_module())
+                .expect("new_instance succeeds");
+            inst.run("do_nothing", &[]).expect("run succeeds");
         }
 
         /// This test ensures that a signal stack smaller than 12KiB is rejected when Lucet is
@@ -778,6 +792,15 @@ macro_rules! alloc_tests {
                 Err(e) => panic!("unexpected error: {}", e),
                 Ok(_) => panic!("unexpected success"),
             }
+            assert!(inst.is_ready());
+
+            // now make sure that we can run an instance with reasonable limits on this same thread,
+            // to make sure the `CURRENT_INSTANCE` thread-local isn't left in a bad state
+            let region = TestRegion::create(1, &Limits::default()).expect("region created");
+            let mut inst = region
+                .new_instance(do_nothing_module())
+                .expect("new_instance succeeds");
+            inst.run("do_nothing", &[]).expect("run succeeds");
         }
 
         #[test]
