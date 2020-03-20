@@ -133,7 +133,9 @@ pub fn write_table_data<B: ClifBackend>(
 
     table_ctx.define(inner.into_boxed_slice());
 
-    let table_id = decls.get_tables_list_name().as_dataid()
+    let table_id = decls
+        .get_tables_list_name()
+        .as_dataid()
         .expect("lucet_tables is declared as data");
     clif_module.define_data(table_id, &table_ctx)?;
     Ok((table_id, table_len))

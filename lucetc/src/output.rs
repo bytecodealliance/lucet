@@ -40,9 +40,7 @@ pub struct ObjectFile {
     artifact: Artifact,
 }
 impl ObjectFile {
-    pub fn new(
-        product: FaerieProduct,
-    ) -> Result<Self, Error> {
+    pub fn new(product: FaerieProduct) -> Result<Self, Error> {
         let obj = Self {
             artifact: product.artifact,
         };

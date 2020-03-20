@@ -20,12 +20,14 @@ use cranelift_codegen::{
 };
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
 use cranelift_module::{
-    Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, Linkage as ClifLinkage,
-    Module as ClifModule, FuncOrDataId,
+    Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, FuncOrDataId,
+    Linkage as ClifLinkage, Module as ClifModule,
 };
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use lucet_module::bindings::Bindings;
-use lucet_module::{ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM};
+use lucet_module::{
+    ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
+};
 use lucet_validate::Validator;
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -305,7 +307,8 @@ impl<'a> Compiler<'a> {
             let n_traps = compiled.traps.len();
 
             let trap_site_bytes = traps_to_module_traps(&compiled.traps);
-            let trap_data_id = write_trap_table(&mut self.clif_module, trap_site_bytes, func.name.symbol())?;
+            let trap_data_id =
+                write_trap_table(&mut self.clif_module, trap_site_bytes, func.name.symbol())?;
 
             function_map.insert(func_id, (size, trap_data_id, n_traps));
         }
@@ -324,7 +327,11 @@ impl<'a> Compiler<'a> {
         let n_traps = compiled.traps.len();
 
         let trap_site_bytes = traps_to_module_traps(&compiled.traps);
-        let trap_data_id = write_trap_table(&mut self.clif_module, trap_site_bytes, probe_func.name.symbol())?;
+        let trap_data_id = write_trap_table(
+            &mut self.clif_module,
+            trap_site_bytes,
+            probe_func.name.symbol(),
+        )?;
 
         function_map.insert(probe_func_id, (size, trap_data_id, n_traps));
 
@@ -341,7 +348,9 @@ impl<'a> Compiler<'a> {
         // have to be careful to write function manifest entries for VM
         // functions, which will not be represented in function_map.
 
-        let ids: Vec<FuncId> = self.clif_module.declared_functions()
+        let ids: Vec<FuncId> = self
+            .clif_module
+            .declared_functions()
             .map(|f| {
                 let func_id = match self.clif_module.get_name(&f.decl.name).unwrap() {
                     FuncOrDataId::Func(id) => id,
@@ -354,45 +363,58 @@ impl<'a> Compiler<'a> {
 
         for func_id in ids {
             let (size, trap_data_id, traps_len) = match function_map.get(&func_id) {
-                Some((ref size, ref trap_data_id, ref traps_len)) => (*size, Some(*trap_data_id), *traps_len),
+                Some((ref size, ref trap_data_id, ref traps_len)) => {
+                    (*size, Some(*trap_data_id), *traps_len)
+                }
                 None => (0 as u32, None, 0 as usize),
             };
 
-            write_function_spec(&mut self.clif_module,
-                                &mut function_manifest_ctx,
-                                &mut function_manifest_bytes,
-                                func_id,
-                                size,
-                                trap_data_id,
-                                traps_len)?;
+            write_function_spec(
+                &mut self.clif_module,
+                &mut function_manifest_ctx,
+                &mut function_manifest_bytes,
+                func_id,
+                size,
+                trap_data_id,
+                traps_len,
+            )?;
         }
 
         function_manifest_ctx.define(function_manifest_bytes.into_inner().into());
-        let manifest_data_id = self.clif_module.declare_data(FUNCTION_MANIFEST_SYM, ClifLinkage::Export,
-                                      false,
-                                      false,
-                                      None)?;
-        self.clif_module.define_data(manifest_data_id, &function_manifest_ctx)?;
+        let manifest_data_id = self.clif_module.declare_data(
+            FUNCTION_MANIFEST_SYM,
+            ClifLinkage::Export,
+            false,
+            false,
+            None,
+        )?;
+        self.clif_module
+            .define_data(manifest_data_id, &function_manifest_ctx)?;
 
         // Write out the structure tying everything together.
-        let mut native_data = Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
+        let mut native_data =
+            Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
         let mut native_data_ctx = ClifDataContext::new();
-        let native_data_id = self.clif_module.declare_data(LUCET_MODULE_SYM,
-                                                           ClifLinkage::Export,
-                                                           false,
-                                                           false,
-                                                           None)?;
+        let native_data_id = self.clif_module.declare_data(
+            LUCET_MODULE_SYM,
+            ClifLinkage::Export,
+            false,
+            false,
+            None,
+        )?;
 
         let version =
             VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
 
         version.write_to(&mut native_data)?;
 
-        fn write_slice(module: &mut ClifModule<FaerieBackend>,
-                       mut ctx: &mut ClifDataContext,
-                       bytes: &mut Cursor<Vec<u8>>,
-                       id: DataId,
-                       len: usize) -> Result<(), Error> {
+        fn write_slice(
+            module: &mut ClifModule<FaerieBackend>,
+            mut ctx: &mut ClifDataContext,
+            bytes: &mut Cursor<Vec<u8>>,
+            id: DataId,
+            len: usize,
+        ) -> Result<(), Error> {
             let data_ref = module.declare_data_in_data(id, &mut ctx);
             let offset = bytes.position() as u32;
             ctx.write_data_addr(offset, data_ref, 0);
@@ -401,19 +423,33 @@ impl<'a> Compiler<'a> {
             Ok(())
         }
 
-        write_slice(&mut self.clif_module, &mut native_data_ctx, &mut native_data,
-                    module_data_id, module_data_len)?;
-        write_slice(&mut self.clif_module, &mut native_data_ctx, &mut native_data,
-                    table_id, table_len)?;
-        write_slice(&mut self.clif_module, &mut native_data_ctx, &mut native_data,
-                    manifest_data_id, function_manifest_len)?;
+        write_slice(
+            &mut self.clif_module,
+            &mut native_data_ctx,
+            &mut native_data,
+            module_data_id,
+            module_data_len,
+        )?;
+        write_slice(
+            &mut self.clif_module,
+            &mut native_data_ctx,
+            &mut native_data,
+            table_id,
+            table_len,
+        )?;
+        write_slice(
+            &mut self.clif_module,
+            &mut native_data_ctx,
+            &mut native_data,
+            manifest_data_id,
+            function_manifest_len,
+        )?;
 
         native_data_ctx.define(native_data.into_inner().into());
-        self.clif_module.define_data(native_data_id, &native_data_ctx)?;
+        self.clif_module
+            .define_data(native_data_id, &native_data_ctx)?;
 
-        let obj = ObjectFile::new(
-            self.clif_module.finish(),
-        )?;
+        let obj = ObjectFile::new(self.clif_module.finish())?;
 
         Ok(obj)
     }
