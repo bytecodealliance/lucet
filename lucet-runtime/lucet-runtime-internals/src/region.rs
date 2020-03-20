@@ -29,12 +29,20 @@ pub trait Region: RegionInternal {
     ///
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
-    fn new_instance(&self, module: Arc<dyn Module>, heap_memory_size: usize) -> Result<InstanceHandle, Error> {
+    fn new_instance(
+        &self,
+        module: Arc<dyn Module>,
+        heap_memory_size: usize,
+    ) -> Result<InstanceHandle, Error> {
         self.new_instance_builder(module, heap_memory_size).build()
     }
 
     /// Return an [`InstanceBuilder`](struct.InstanceBuilder.html) for the given module.
-    fn new_instance_builder<'a>(&'a self, module: Arc<dyn Module>, heap_memory_size: usize) -> InstanceBuilder<'a> {
+    fn new_instance_builder<'a>(
+        &'a self,
+        module: Arc<dyn Module>,
+        heap_memory_size: usize,
+    ) -> InstanceBuilder<'a> {
         InstanceBuilder::new(self.as_dyn_internal(), module, heap_memory_size)
     }
 
