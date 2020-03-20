@@ -1,19 +1,16 @@
 use crate::error::Error;
 use crate::name::Name;
 use crate::table::TABLE_SYM;
-use crate::traps::trap_sym_for_func;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{ir, isa};
-use cranelift_faerie::traps::FaerieTrapManifest;
 use cranelift_faerie::FaerieProduct;
 use faerie::{Artifact, Decl, Link};
 use lucet_module::{
-    FunctionSpec, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
+    SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Cursor, Write};
-use std::mem::size_of;
 use std::path::Path;
 use target_lexicon::BinaryFormat;
 
@@ -52,112 +49,22 @@ impl ObjectFile {
     pub fn new(
         product: FaerieProduct,
         module_data_len: usize,
-        mut function_manifest: Vec<(String, FunctionSpec)>,
+        function_manifest_len: usize,
         table_manifest_len: usize,
     ) -> Result<Self, Error> {
         let mut obj = Self {
             artifact: product.artifact,
         };
 
-        let trap_manifest: FaerieTrapManifest = product
-            .trap_manifest
-            .expect("trap manifest will be present");
-
-        // Now that we have trap information, we can fix up FunctionSpec entries to have
-        // correct `trap_length` values
-        let mut function_map: HashMap<String, u32> = HashMap::new();
-        for (i, (name, _)) in function_manifest.iter().enumerate() {
-            function_map.insert(name.clone(), i as u32);
-        }
-
-        for sink in trap_manifest.sinks.iter() {
-            if let Some(idx) = function_map.get(&sink.name) {
-                let (_, fn_spec) = &mut function_manifest
-                    .get_mut(*idx as usize)
-                    .expect("index is valid");
-
-                std::mem::replace::<FunctionSpec>(
-                    fn_spec,
-                    FunctionSpec::new(0, fn_spec.code_len(), 0, sink.sites.len() as u64),
-                );
-            } else {
-                return Err(Error::TrapRecord(sink.name.to_owned()));
-            }
-        }
-
-        obj.write_function_manifest(function_manifest.as_slice())?;
-
         // And now write out the actual structure tying together all the data in this module.
         write_module(
             module_data_len,
             table_manifest_len,
-            function_manifest.len(),
+            function_manifest_len,
             &mut obj.artifact,
         )?;
 
         Ok(obj)
-    }
-
-    ///
-    /// Writes a manifest of functions, with relocations, to the artifact.
-    ///
-    fn write_function_manifest(
-        &mut self,
-        functions: &[(String, FunctionSpec)],
-    ) -> Result<(), Error> {
-        self.artifact
-            .declare(FUNCTION_MANIFEST_SYM, Decl::data())
-            .map_err(|source| {
-                let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
-                Error::FaerieArtifact(source, message)
-            })?;
-
-        let mut manifest_buf: Cursor<Vec<u8>> = Cursor::new(Vec::with_capacity(
-            functions.len() * size_of::<FunctionSpec>(),
-        ));
-
-        for (fn_name, fn_spec) in functions.iter() {
-            /*
-             * This has implicit knowledge of the layout of `FunctionSpec`!
-             *
-             * Each iteraction writes out bytes with relocations that will
-             * result in data forming a valid FunctionSpec when this is loaded.
-             *
-             * Because the addresses don't exist until relocations are applied
-             * when the artifact is loaded, we can't just populate the fields
-             * and transmute, unfortunately.
-             */
-            // Writes a (ptr, len) pair with relocation for code
-            write_relocated_slice(
-                &mut self.artifact,
-                &mut manifest_buf,
-                FUNCTION_MANIFEST_SYM,
-                Some(fn_name),
-                fn_spec.code_len() as u64,
-            )?;
-            // Writes a (ptr, len) pair with relocation for this function's trap table
-            let trap_sym = trap_sym_for_func(fn_name);
-            write_relocated_slice(
-                &mut self.artifact,
-                &mut manifest_buf,
-                FUNCTION_MANIFEST_SYM,
-                if fn_spec.traps_len() > 0 {
-                    Some(&trap_sym)
-                } else {
-                    None
-                },
-                fn_spec.traps_len() as u64,
-            )?;
-        }
-
-        self.artifact
-            .define(FUNCTION_MANIFEST_SYM, manifest_buf.into_inner())
-            .map_err(|source| {
-                let message = format!("Manifest error declaring {}", FUNCTION_MANIFEST_SYM);
-                Error::FaerieArtifact(source, message)
-            })?;
-
-        Ok(())
     }
 
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
