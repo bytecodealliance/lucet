@@ -78,7 +78,7 @@ impl RegionInternal for MmapRegion {
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
-	heap_memory_size: usize,
+        heap_memory_size: usize,
     ) -> Result<InstanceHandle, Error> {
         let slot = self
             .freelist
@@ -91,17 +91,17 @@ impl RegionInternal for MmapRegion {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
 
-	// TLC: It gets the limits from the slot.  But there are incoming
-	// limits, too.  These need to be reconciled. 
+        // TLC: It gets the limits from the slot.  But there are incoming
+        // limits, too.  These need to be reconciled.
         let limits = &slot.limits;
 
-	// TLC: Would it be worthwhile to add limit checks here?
-	// For example, we must make sure the local limit is smaller than
-	// the global limit.
-	module.validate_runtime_spec(limits)?;
+        // TLC: Would it be worthwhile to add limit checks here?
+        // For example, we must make sure the local limit is smaller than
+        // the global limit.
+        module.validate_runtime_spec(limits)?;
 
-	// The limits are correct with respect to the spec, so record
-	// them for this instance.
+        // The limits are correct with respect to the spec, so record
+        // them for this instance.
         for (ptr, len) in [
             // make the stack read/writable
             (slot.stack, limits.stack_size),
