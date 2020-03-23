@@ -15,7 +15,7 @@ macro_rules! alloc_tests {
         use $crate::val::Val;
         use $crate::vmctx::lucet_vmctx;
 
-        const LIMITS_HEAP_MEM_SIZE: usize = 16 * 1024 * 1024;
+        const LIMITS_HEAP_MEM_SIZE: usize = 16 * 64 * 1024;
         const LIMITS_HEAP_ADDRSPACE_SIZE: usize = 8 * 1024 * 1024;
         const LIMITS_STACK_SIZE: usize = 64 * 1024;
         const LIMITS_GLOBALS_SIZE: usize = 4 * 1024;
