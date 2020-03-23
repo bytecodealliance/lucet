@@ -60,6 +60,8 @@ pub struct MmapRegion {
 }
 
 impl Region for MmapRegion {
+    const DEFAULT_HEAP_MEM_SIZE: usize = 16 * 64 * 1024;
+
     fn free_slots(&self) -> usize {
         self.freelist.read().unwrap().len()
     }
@@ -78,7 +80,7 @@ impl RegionInternal for MmapRegion {
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
-        heap_memory_size: usize,
+        _heap_memory_size: usize,
     ) -> Result<InstanceHandle, Error> {
         let slot = self
             .freelist

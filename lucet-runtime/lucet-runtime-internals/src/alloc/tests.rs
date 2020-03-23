@@ -15,7 +15,7 @@ macro_rules! alloc_tests {
         use $crate::val::Val;
         use $crate::vmctx::lucet_vmctx;
 
-        const LIMITS_HEAP_MEM_SIZE: usize = 16 * 64 * 1024;
+        const LIMITS_HEAP_MEM_SIZE: usize = 16 * 1024 * 1024;
         const LIMITS_HEAP_ADDRSPACE_SIZE: usize = 8 * 1024 * 1024;
         const LIMITS_STACK_SIZE: usize = 64 * 1024;
         const LIMITS_GLOBALS_SIZE: usize = 4 * 1024;
@@ -62,6 +62,7 @@ macro_rules! alloc_tests {
                     MockModuleBuilder::new()
                         .with_heap_spec(ONE_PAGE_HEAP)
                         .build(),
+                    LIMITS_HEAP_MEM_SIZE,
                 )
                 .expect("new_instance succeeds");
 
@@ -102,7 +103,7 @@ macro_rules! alloc_tests {
                 .with_heap_spec(heap_spec.clone())
                 .build();
             let mut inst = region
-                .new_instance(module.clone())
+                .new_instance(module.clone(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
@@ -131,7 +132,7 @@ macro_rules! alloc_tests {
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
             let mut inst = region
-                .new_instance(module.clone())
+                .new_instance(module.clone(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
@@ -171,7 +172,7 @@ macro_rules! alloc_tests {
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
             let mut inst = region
-                .new_instance(module.clone())
+                .new_instance(module.clone(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
@@ -210,7 +211,7 @@ macro_rules! alloc_tests {
                 .with_heap_spec(EXPAND_PAST_LIMIT_SPEC)
                 .build();
             let mut inst = region
-                .new_instance(module.clone())
+                .new_instance(module.clone(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
@@ -257,6 +258,7 @@ macro_rules! alloc_tests {
                 MockModuleBuilder::new()
                     .with_heap_spec(INITIAL_OVERSIZE_HEAP)
                     .build(),
+                LIMITS_HEAP_MEM_SIZE,
             );
             assert!(res.is_err(), "new_instance fails");
         }
@@ -292,6 +294,7 @@ macro_rules! alloc_tests {
                     MockModuleBuilder::new()
                         .with_heap_spec(SMALL_GUARD_HEAP)
                         .build(),
+                    SPEC_HEAP_RESERVED_SIZE as usize,
                 )
                 .expect("new_instance succeeds");
         }
@@ -312,6 +315,7 @@ macro_rules! alloc_tests {
                 MockModuleBuilder::new()
                     .with_heap_spec(LARGE_GUARD_HEAP)
                     .build(),
+                LIMITS_HEAP_MEM_SIZE,
             );
             assert!(res.is_err(), "new_instance fails");
         }
@@ -326,6 +330,7 @@ macro_rules! alloc_tests {
                         MockModuleBuilder::new()
                             .with_heap_spec(ONE_PAGE_HEAP)
                             .build(),
+                        LIMITS_HEAP_MEM_SIZE,
                     )
                     .expect("new_instance succeeds");
 
@@ -398,7 +403,7 @@ macro_rules! alloc_tests {
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
             let mut inst = region
-                .new_instance(module.clone())
+                .new_instance(module.clone(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
@@ -444,7 +449,7 @@ macro_rules! alloc_tests {
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
             let mut inst = region
-                .new_instance(module.clone())
+                .new_instance(module.clone(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
 
             let heap_len = inst.alloc().heap_len();
@@ -509,6 +514,7 @@ macro_rules! alloc_tests {
                     MockModuleBuilder::new()
                         .with_heap_spec(GUARDLESS_HEAP)
                         .build(),
+                    LIMITS_HEAP_MEM_SIZE,
                 )
                 .expect("new_instance succeeds");
 
@@ -603,6 +609,7 @@ macro_rules! alloc_tests {
                     MockModuleBuilder::new()
                         .with_heap_spec(CONTEXT_TEST_HEAP)
                         .build(),
+                    LIMITS_HEAP_MEM_SIZE,
                 )
                 .expect("new_instance succeeds");
 
@@ -652,6 +659,7 @@ macro_rules! alloc_tests {
                     MockModuleBuilder::new()
                         .with_heap_spec(CONTEXT_TEST_HEAP)
                         .build(),
+                    LIMITS_HEAP_MEM_SIZE,
                 )
                 .expect("new_instance succeeds");
 
@@ -683,7 +691,7 @@ macro_rules! alloc_tests {
         fn drop_region_first() {
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let inst = region
-                .new_instance(MockModuleBuilder::new().build())
+                .new_instance(MockModuleBuilder::new().build(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
             drop(region);
             drop(inst);
@@ -699,12 +707,14 @@ macro_rules! alloc_tests {
             assert_eq!(region.free_slots(), 2);
             assert_eq!(region.used_slots(), 0);
             let inst1 = region
-                .new_instance(module.clone())
+                .new_instance(module.clone(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
             assert_eq!(region.capacity(), 2);
             assert_eq!(region.free_slots(), 1);
             assert_eq!(region.used_slots(), 1);
-            let inst2 = region.new_instance(module).expect("new_instance succeeds");
+            let inst2 = region
+                .new_instance(module, LIMITS_HEAP_MEM_SIZE)
+                .expect("new_instance succeeds");
             assert_eq!(region.capacity(), 2);
             assert_eq!(region.free_slots(), 0);
             assert_eq!(region.used_slots(), 2);
@@ -743,7 +753,7 @@ macro_rules! alloc_tests {
             };
             let region = TestRegion::create(1, &limits).expect("region created");
             let mut inst = region
-                .new_instance(do_nothing_module())
+                .new_instance(do_nothing_module(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
 
             // run the bad one a bunch of times, in case there's some bad state left over following
@@ -763,7 +773,7 @@ macro_rules! alloc_tests {
             // to make sure the `CURRENT_INSTANCE` thread-local isn't left in a bad state
             let region = TestRegion::create(1, &Limits::default()).expect("region created");
             let mut inst = region
-                .new_instance(do_nothing_module())
+                .new_instance(do_nothing_module(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
             inst.run("do_nothing", &[]).expect("run succeeds");
         }
@@ -783,7 +793,7 @@ macro_rules! alloc_tests {
             };
             let region = TestRegion::create(1, &limits).expect("region created");
             let mut inst = region
-                .new_instance(do_nothing_module())
+                .new_instance(do_nothing_module(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
             match inst.run("do_nothing", &[]) {
                 Err(Error::InvalidArgument(
@@ -798,7 +808,7 @@ macro_rules! alloc_tests {
             // to make sure the `CURRENT_INSTANCE` thread-local isn't left in a bad state
             let region = TestRegion::create(1, &Limits::default()).expect("region created");
             let mut inst = region
-                .new_instance(do_nothing_module())
+                .new_instance(do_nothing_module(), LIMITS_HEAP_MEM_SIZE)
                 .expect("new_instance succeeds");
             inst.run("do_nothing", &[]).expect("run succeeds");
         }

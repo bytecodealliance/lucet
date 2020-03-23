@@ -8,17 +8,21 @@ use crate::module::Module;
 use std::any::Any;
 use std::sync::Arc;
 
-// TLC: Most of the time, there is going to be some default memory
-// size that works perfectly fine for most instances.  Where might
-// this value be defined?
-const LIMITS_HEAP_MEM_SIZE: usize = 16 * 64 * 1024;
-
 /// A memory region in which Lucet instances are created and run.
 ///
 /// These methods return an [`InstanceHandle`](struct.InstanceHandle.html) smart pointer rather than
 /// the `Instance` itself. This allows the region implementation complete control of where the
 /// instance metadata is stored.
 pub trait Region: RegionInternal {
+    // TLC: Most of the time, there is going to be some default memory
+    // size that works perfectly fine for most instances.  Where might
+    // this value be defined?
+    //
+    // Rust Traits have associated constants.  The constant name is
+    // defined in the Trait and the value is defined in the
+    // implementation.
+    const DEFAULT_HEAP_MEM_SIZE: usize; // = 16 * 64 * 1024;
+
     /// Create a new instance within the region.
     ///
     /// Calling `region.new_instance(module)` is shorthand for

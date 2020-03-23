@@ -48,7 +48,7 @@ macro_rules! sparse_page_data_tests {
             let module = mock_sparse_module();
             let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
             let inst = region
-                .new_instance(module)
+                .new_instance(module, 16 * 1024 * 1024) // TLC to replace with constant.
                 .expect("instance can be created");
 
             // The test data initializers result in two strings getting copied into linear memory; see
