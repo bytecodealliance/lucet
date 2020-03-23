@@ -57,6 +57,7 @@ pub trait RegionInternal: Send + Sync {
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
+        heap_memory_size: usize,
     ) -> Result<InstanceHandle, Error>;
 
     /// Unmaps the heap, stack, and globals of an `Alloc`, while retaining the virtual address
@@ -90,6 +91,7 @@ pub struct InstanceBuilder<'a> {
     region: &'a dyn RegionInternal,
     module: Arc<dyn Module>,
     embed_ctx: CtxMap,
+    heap_memory_size: usize,
 }
 
 impl<'a> InstanceBuilder<'a> {
@@ -98,8 +100,12 @@ impl<'a> InstanceBuilder<'a> {
             region,
             module,
             embed_ctx: CtxMap::default(),
+	    heap_memory_size: 16 * 64 * 1024,
         }
     }
+
+    /// Add a custom limit for the heap memory size to the built instance.
+    pub fn with_heap_size_limit() {}
 
     /// Add an embedder context to the built instance.
     ///
@@ -117,6 +123,6 @@ impl<'a> InstanceBuilder<'a> {
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     pub fn build(self) -> Result<InstanceHandle, Error> {
-        self.region.new_instance_with(self.module, self.embed_ctx)
+        self.region.new_instance_with(self.module, self.embed_ctx, self.heap_memory_size)
     }
 }
