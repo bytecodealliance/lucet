@@ -4,7 +4,7 @@ use crate::module::UniqueFuncIndex;
 use crate::pointer::NATIVE_POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
-use cranelift_module::{Backend as ClifBackend, DataContext, Module as ClifModule};
+use cranelift_module::{Backend as ClifBackend, DataContext, DataId, Module as ClifModule};
 use cranelift_wasm::{TableElementType, TableIndex};
 use std::io::Cursor;
 
@@ -52,7 +52,7 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
 pub fn write_table_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     decls: &ModuleDecls<'_>,
-) -> Result<usize, Error> {
+) -> Result<(DataId, usize), Error> {
     let mut tables_vec = Cursor::new(Vec::new());
     let mut table_ctx = DataContext::new();
     let mut table_len = 0;
@@ -133,12 +133,10 @@ pub fn write_table_data<B: ClifBackend>(
 
     table_ctx.define(inner.into_boxed_slice());
 
-    clif_module.define_data(
-        decls
-            .get_tables_list_name()
-            .as_dataid()
-            .expect("lucet_tables is declared as data"),
-        &table_ctx,
-    )?;
-    Ok(table_len)
+    let table_id = decls
+        .get_tables_list_name()
+        .as_dataid()
+        .expect("lucet_tables is declared as data");
+    clif_module.define_data(table_id, &table_ctx)?;
+    Ok((table_id, table_len))
 }
