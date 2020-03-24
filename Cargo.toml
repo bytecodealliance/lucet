@@ -24,3 +24,10 @@ exclude = ["wasmtime"]
 
 [profile.test]
 rpath = true
+
+[patch.crates-io]
+# ACF 2020-03-25: this is temporary until we can use a newer wasmtime revision. There are some
+# changes underway in https://github.com/bytecodealliance/wasmtime/pull/1389 that make it
+# impractical to quickly adopt the new stuff, but this solves the conflicting witx problems we're
+# experiencing now.
+witx = { path = 'wasmtime/crates/wasi-common/wig/WASI/tools/witx' }
