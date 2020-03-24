@@ -599,15 +599,16 @@ macro_rules! alloc_tests {
 
             let region = TestRegion::create(1, &CONTEXT_TEST_LIMITS).expect("region created");
 
-	    let mut inst = region
-		.new_instance_builder(
-		    MockModuleBuilder::new()
-			.with_heap_spec(CONTEXT_TEST_HEAP)
-                        .build(),)
-		.with_heap_size_limit(4096)
-		.build()
-		.expect("new_instance succeeds");
-	    
+            let mut inst = region
+                .new_instance_builder(
+                    MockModuleBuilder::new()
+                        .with_heap_spec(CONTEXT_TEST_HEAP)
+                        .build(),
+                )
+                .with_heap_size_limit(4096)
+                .build()
+                .expect("new_instance succeeds");
+
             let mut parent = ContextHandle::new();
             unsafe {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
@@ -650,11 +651,12 @@ macro_rules! alloc_tests {
 
             let region = TestRegion::create(1, &CONTEXT_TEST_LIMITS).expect("region created");
 
-	    let mut inst = region
+            let mut inst = region
                 .new_instance_builder(
                     MockModuleBuilder::new()
                         .with_heap_spec(CONTEXT_TEST_HEAP)
-                        .build(),)
+                        .build(),
+                )
                 .with_heap_size_limit(4096)
                 .build()
                 .expect("new_instance succeeds");
@@ -819,6 +821,27 @@ macro_rules! alloc_tests {
             match res {
                 Err(Error::InvalidArgument(
                     "signal stack size must be a multiple of host page size",
+                )) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+                Ok(_) => panic!("unexpected success"),
+            }
+        }
+
+        #[test]
+        fn reject_too_large_heap_memory_size() {
+            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let res = region
+                .new_instance_builder(
+                    MockModuleBuilder::new()
+                        .with_heap_spec(CONTEXT_TEST_HEAP)
+                        .build(),
+                )
+                .with_heap_size_limit(&LIMITS.heap_memory_size * 2)
+                .build();
+
+            match res {
+                Err(Error::InvalidArgument(
+                    "heap memory size requested for instance is larger than slot allows",
                 )) => (),
                 Err(e) => panic!("unexpected error: {}", e),
                 Ok(_) => panic!("unexpected success"),

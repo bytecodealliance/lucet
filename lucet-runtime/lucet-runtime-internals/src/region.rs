@@ -100,7 +100,7 @@ impl<'a> InstanceBuilder<'a> {
             region,
             module,
             embed_ctx: CtxMap::default(),
-	    heap_memory_size: 16 * 64 * 1024,
+            heap_memory_size: 16 * 64 * 1024,
         }
     }
 
@@ -108,8 +108,8 @@ impl<'a> InstanceBuilder<'a> {
     /// This call is not necessary if the default heap memory size is adequate
     /// for the new instance.
     pub fn with_heap_size_limit(mut self, heap_memory_size: usize) -> Self {
-	self.heap_memory_size = heap_memory_size;
-	self
+        self.heap_memory_size = heap_memory_size;
+        self
     }
 
     /// Add an embedder context to the built instance.
@@ -128,6 +128,7 @@ impl<'a> InstanceBuilder<'a> {
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     pub fn build(self) -> Result<InstanceHandle, Error> {
-        self.region.new_instance_with(self.module, self.embed_ctx, self.heap_memory_size)
+        self.region
+            .new_instance_with(self.module, self.embed_ctx, self.heap_memory_size)
     }
 }

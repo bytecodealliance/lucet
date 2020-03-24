@@ -79,7 +79,7 @@ impl RegionInternal for MmapRegion {
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
-	heap_memory_size: usize
+        heap_memory_size: usize,
     ) -> Result<InstanceHandle, Error> {
         let slot = self
             .freelist
@@ -92,34 +92,23 @@ impl RegionInternal for MmapRegion {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
 
-	let limits = &slot.limits;
+        let mut limits = slot.limits.clone();
 
-	// Affirm that any custom heap memory size supplied to this
-	// builder does not exceed the slot limits.
-	if let Ordering::Greater =
-	    heap_memory_size.cmp(&slot.limits.heap_memory_size) {
-		return Err(Error::LimitsExceeded("heap memory size limit is larger than slot allows".to_owned()))
-	    }
+        // Affirm that any custom heap memory size supplied to this
+        // builder does not exceed the slot limits.
+        if let Ordering::Greater = heap_memory_size.cmp(&slot.limits.heap_memory_size) {
+            return Err(Error::InvalidArgument(
+                "heap memory size requested for instance is larger than slot allows",
+            ));
+        }
 
+        // If a custom heap memory size is supplied, augment the limits
+        // with the value so that it may be validated.
+        if let Ordering::Less = heap_memory_size.cmp(&slot.limits.heap_memory_size) {
+            limits.heap_memory_size = heap_memory_size;
+        }
 
-	/*
-
-	let limits = match heap_memory_size.cmp(&slot.limits.heap_memory_size) {
-	    Ordering::Less => {
-		Limits {
-		    heap_memory_size,
-		    heap_address_space_size: slot.limits.heap_address_space_size,
-		    stack_size: slot.limits.stack_size,
-		    globals_size: slot.limits.globals_size,
-		    signal_stack_size: slot.limits.signal_stack_size,
-		}
-	    },
-	    Ordering::Equal => &slot.limits,
-	    
-	};
-*/
-	
-        module.validate_runtime_spec(limits)?;
+        module.validate_runtime_spec(&limits)?;
 
         for (ptr, len) in [
             // make the stack read/writable
