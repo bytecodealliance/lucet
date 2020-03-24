@@ -68,7 +68,8 @@ pub trait RegionInternal: Send + Sync {
     fn expand_heap(&self, slot: &Slot, start: u32, len: u32) -> Result<(), Error>;
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error>;
-
+    fn heap_memory_size_limit(&self) -> usize;
+	
     fn as_dyn_internal(&self) -> &dyn RegionInternal;
 }
 
@@ -100,7 +101,7 @@ impl<'a> InstanceBuilder<'a> {
             region,
             module,
             embed_ctx: CtxMap::default(),
-            heap_memory_size: 16 * 64 * 1024,
+            heap_memory_size: region.heap_memory_size_limit(), // 16 * 64 * 1024, // TLC The default limit should match the slot limit?
         }
     }
 

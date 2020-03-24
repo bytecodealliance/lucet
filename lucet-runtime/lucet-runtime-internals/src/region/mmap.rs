@@ -273,6 +273,10 @@ impl RegionInternal for MmapRegion {
         Ok(())
     }
 
+    fn heap_memory_size_limit(&self) -> usize {
+	self.limits.heap_memory_size
+    }
+
     fn as_dyn_internal(&self) -> &dyn RegionInternal {
         self
     }
