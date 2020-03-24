@@ -8,6 +8,7 @@ use libc::c_void;
 #[cfg(not(target_os = "linux"))]
 use libc::memset;
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
+use std::cmp::Ordering;
 use std::ptr;
 use std::sync::{Arc, RwLock, Weak};
 
@@ -91,7 +92,33 @@ impl RegionInternal for MmapRegion {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
 
-        let limits = &slot.limits;
+	let limits = &slot.limits;
+
+	// Affirm that any custom heap memory size supplied to this
+	// builder does not exceed the slot limits.
+	if let Ordering::Greater =
+	    heap_memory_size.cmp(&slot.limits.heap_memory_size) {
+		return Err(Error::LimitsExceeded("heap memory size limit is larger than slot allows".to_owned()))
+	    }
+
+
+	/*
+
+	let limits = match heap_memory_size.cmp(&slot.limits.heap_memory_size) {
+	    Ordering::Less => {
+		Limits {
+		    heap_memory_size,
+		    heap_address_space_size: slot.limits.heap_address_space_size,
+		    stack_size: slot.limits.stack_size,
+		    globals_size: slot.limits.globals_size,
+		    signal_stack_size: slot.limits.signal_stack_size,
+		}
+	    },
+	    Ordering::Equal => &slot.limits,
+	    
+	};
+*/
+	
         module.validate_runtime_spec(limits)?;
 
         for (ptr, len) in [

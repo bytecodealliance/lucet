@@ -105,7 +105,12 @@ impl<'a> InstanceBuilder<'a> {
     }
 
     /// Add a custom limit for the heap memory size to the built instance.
-    pub fn with_heap_size_limit() {}
+    /// This call is not necessary if the default heap memory size is adequate
+    /// for the new instance.
+    pub fn with_heap_size_limit(mut self, heap_memory_size: usize) -> Self {
+	self.heap_memory_size = heap_memory_size;
+	self
+    }
 
     /// Add an embedder context to the built instance.
     ///
