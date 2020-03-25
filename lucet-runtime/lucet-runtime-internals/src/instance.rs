@@ -954,10 +954,12 @@ impl Instance {
         match st {
             State::Running => {
                 let retval = self.ctx.get_untyped_retval();
+                self.kill_state = Arc::new(KillState::default());
                 self.state = State::Ready;
                 Ok(RunResult::Returned(retval))
             }
             State::Terminating { details, .. } => {
+                self.kill_state = Arc::new(KillState::default());
                 self.state = State::Terminated;
                 Err(Error::RuntimeTerminated(details))
             }
@@ -978,6 +980,8 @@ impl Instance {
                 details.rip_addr_details = self
                     .module
                     .addr_details(details.rip_addr as *const c_void)?;
+
+                self.kill_state = Arc::new(KillState::default());
 
                 // fill the state back in with the updated details in case fatal handlers need it
                 self.state = State::Faulted {
