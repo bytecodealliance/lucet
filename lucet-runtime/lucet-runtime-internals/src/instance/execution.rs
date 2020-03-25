@@ -107,7 +107,7 @@
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Condvar, Mutex, Weak};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use crate::instance::{Instance, TerminationDetails};
 
@@ -226,7 +226,7 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
 /// This function will panic if the `Instance`'s execution domain is marked as pending, currently
 /// in a hostcall, or as cancelled.  Any of these domains mean that something has gone seriously
 /// wrong, and leaving the execution domain mutex in a poisoned state is the least of our concerns.
-pub unsafe extern "C" fn exit_guest_region(instance: *const Instance) {
+pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
     let terminable = (*instance)
         .kill_state
         .terminable
@@ -243,8 +243,11 @@ pub unsafe extern "C" fn exit_guest_region(instance: *const Instance) {
         let current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
         match *current_domain {
             Domain::Guest => {
-                // We finished executing the code in our guest region normally!
-                // Nothing to do, we can return the host now.
+                // We finished executing the code in our guest region normally! We should reset
+                // the kill state, invalidating any existing killswitches' weak references. We
+                // forget the mutex guard so that we don't invoke its destructor and segfault.
+                (*instance).kill_state = Arc::new(KillState::default());
+                mem::forget(current_domain);
             }
             ref domain @ Domain::Pending
             | ref domain @ Domain::Cancelled
