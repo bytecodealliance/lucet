@@ -101,7 +101,7 @@ impl<'a> InstanceBuilder<'a> {
             region,
             module,
             embed_ctx: CtxMap::default(),
-            heap_memory_size_limit: region.heap_memory_size_limit(),
+            heap_memory_size_limit: region.get_limits().heap_memory_size,
         }
     }
 
