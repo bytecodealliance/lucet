@@ -69,7 +69,7 @@ pub trait RegionInternal: Send + Sync {
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error>;
     fn heap_memory_size_limit(&self) -> usize;
-	
+
     fn as_dyn_internal(&self) -> &dyn RegionInternal;
 }
 
