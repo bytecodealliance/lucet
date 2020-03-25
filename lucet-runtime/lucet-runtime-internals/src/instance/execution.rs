@@ -54,7 +54,7 @@
 //!     `NotTerminable` when the instance has already been terminated.
 //! * `Instance::run returns`
 //!   - terminable: `true`
-//!   - execution_domain: `Guest, Hostcall, or Terminated`
+//!   - execution_domain: `Pending, Hostcall, or Terminated`
 //!   - termination result: `Err(KillError::Invalid)`
 //!   - `execution_domain` will be `Pending` when the initial guest function returns, `Hostcall`
 //!     when terminated by `lucet_hostcall_terminate!`, and `Terminated` when exiting due to a
