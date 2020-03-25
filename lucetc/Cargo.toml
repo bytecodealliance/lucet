@@ -42,7 +42,7 @@ bimap = "0.2"
 human-size = "0.4"
 # must match wasmonkey's version specifier
 parity-wasm = "0.41"
-minisign = "0.5.11"
+minisign = "0.5.15"
 memoffset = "0.5.1"
 serde = "1.0"
 serde_json = "1.0"
