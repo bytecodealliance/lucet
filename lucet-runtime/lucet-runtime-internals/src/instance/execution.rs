@@ -227,10 +227,8 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
 /// in a hostcall, or as cancelled.  Any of these domains mean that something has gone seriously
 /// wrong, and leaving the execution domain mutex in a poisoned state is the least of our concerns.
 pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
-    let terminable = (*instance)
-        .kill_state
-        .terminable
-        .swap(false, Ordering::SeqCst);
+    let instance = instance.as_mut().expect("instance pointer cannot be null");
+    let terminable = instance.kill_state.terminable.swap(false, Ordering::SeqCst);
     if !terminable {
         // If we are here, something else has taken the terminable flag, so it's not safe to
         // actually exit a guest context yet. Because this is called when exiting a guest context,
@@ -240,14 +238,13 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
         #[allow(clippy::empty_loop)]
         loop {}
     } else {
-        let current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
+        let current_domain = instance.kill_state.execution_domain.lock().unwrap();
         match *current_domain {
             Domain::Guest => {
                 // We finished executing the code in our guest region normally! We should reset
-                // the kill state, invalidating any existing killswitches' weak references. We
-                // forget the mutex guard so that we don't invoke its destructor and segfault.
-                (*instance).kill_state = Arc::new(KillState::default());
-                mem::forget(current_domain);
+                // the kill state, invalidating any existing killswitches' weak references.
+                mem::drop(current_domain);
+                instance.kill_state = Arc::new(KillState::default());
             }
             ref domain @ Domain::Pending
             | ref domain @ Domain::Cancelled
