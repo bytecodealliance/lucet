@@ -92,7 +92,7 @@ pub struct InstanceBuilder<'a> {
     region: &'a dyn RegionInternal,
     module: Arc<dyn Module>,
     embed_ctx: CtxMap,
-    heap_memory_size: usize,
+    heap_memory_size_limit: usize,
 }
 
 impl<'a> InstanceBuilder<'a> {
@@ -101,15 +101,16 @@ impl<'a> InstanceBuilder<'a> {
             region,
             module,
             embed_ctx: CtxMap::default(),
-            heap_memory_size: region.heap_memory_size_limit(),
+            heap_memory_size_limit: region.heap_memory_size_limit(),
         }
     }
 
     /// Add a custom limit for the heap memory size to the built instance.
+    ///
     /// This call is not necessary if the default heap memory size is adequate
     /// for the new instance.
-    pub fn with_heap_size_limit(mut self, heap_memory_size: usize) -> Self {
-        self.heap_memory_size = heap_memory_size;
+    pub fn with_heap_size_limit(mut self, heap_memory_size_limit: usize) -> Self {
+        self.heap_memory_size_limit = heap_memory_size_limit;
         self
     }
 
@@ -130,6 +131,6 @@ impl<'a> InstanceBuilder<'a> {
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     pub fn build(self) -> Result<InstanceHandle, Error> {
         self.region
-            .new_instance_with(self.module, self.embed_ctx, self.heap_memory_size)
+            .new_instance_with(self.module, self.embed_ctx, self.heap_memory_size_limit)
     }
 }

@@ -600,13 +600,11 @@ macro_rules! alloc_tests {
             let region = TestRegion::create(1, &CONTEXT_TEST_LIMITS).expect("region created");
 
             let mut inst = region
-                .new_instance_builder(
+                .new_instance(
                     MockModuleBuilder::new()
                         .with_heap_spec(CONTEXT_TEST_HEAP)
                         .build(),
                 )
-                .with_heap_size_limit(4096)
-                .build()
                 .expect("new_instance succeeds");
 
             let mut parent = ContextHandle::new();
@@ -652,13 +650,11 @@ macro_rules! alloc_tests {
             let region = TestRegion::create(1, &CONTEXT_TEST_LIMITS).expect("region created");
 
             let mut inst = region
-                .new_instance_builder(
+                .new_instance(
                     MockModuleBuilder::new()
                         .with_heap_spec(CONTEXT_TEST_HEAP)
                         .build(),
                 )
-                .with_heap_size_limit(4096)
-                .build()
                 .expect("new_instance succeeds");
 
             let mut parent = ContextHandle::new();
