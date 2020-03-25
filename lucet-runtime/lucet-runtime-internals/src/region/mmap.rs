@@ -92,7 +92,7 @@ impl RegionInternal for MmapRegion {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
 
-        let mut limits = slot.limits.clone();
+        let mut limits = slot.limits;
 
         // Affirm that any custom heap memory size supplied to this
         // builder does not exceed the slot limits.
