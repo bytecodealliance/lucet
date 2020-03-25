@@ -6,22 +6,31 @@ use crate::error::Error;
 use crate::function::FuncInfo;
 use crate::heap::HeapSettings;
 use crate::module::ModuleInfo;
-use crate::output::{CraneliftFuncs, ObjectFile};
+use crate::output::{CraneliftFuncs, ObjectFile, FUNCTION_MANIFEST_SYM};
 use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
+use crate::traps::{translate_trapcode, trap_sym_for_func};
+use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
-    ir,
+    binemit, ir,
     isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
 };
 use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
-use cranelift_module::{Backend as ClifBackend, Module as ClifModule};
+use cranelift_module::{
+    Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, FuncOrDataId,
+    Linkage as ClifLinkage, Module as ClifModule,
+};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use lucet_module::bindings::Bindings;
-use lucet_module::{FunctionSpec, ModuleData, ModuleFeatures, MODULE_DATA_SYM};
+use lucet_module::{
+    ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
+};
 use lucet_validate::Validator;
+use std::collections::HashMap;
+use std::io::Cursor;
 use target_lexicon::Triple;
 
 #[derive(Debug, Clone, Copy)]
@@ -263,6 +272,9 @@ impl<'a> Compiler<'a> {
 
     pub fn object_file(mut self) -> Result<ObjectFile, Error> {
         let mut func_translator = FuncTranslator::new();
+        let mut function_manifest_ctx = ClifDataContext::new();
+        let mut function_manifest_bytes = Cursor::new(Vec::new());
+        let mut function_map: HashMap<FuncId, (u32, DataId, usize)> = HashMap::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
             let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
@@ -282,53 +294,167 @@ impl<'a> Compiler<'a> {
                     symbol: func.name.symbol().to_string(),
                     source,
                 })?;
-            self.clif_module
-                .define_function(func.name.as_funcid().unwrap(), &mut clif_context)
+            let func_id = func.name.as_funcid().unwrap();
+            let compiled = self
+                .clif_module
+                .define_function(func_id, &mut clif_context)
                 .map_err(|source| Error::FunctionDefinition {
                     symbol: func.name.symbol().to_string(),
                     source,
                 })?;
+
+            let size = compiled.size;
+            let n_traps = compiled.traps.len();
+
+            let trap_site_bytes = traps_to_module_traps(&compiled.traps);
+            let trap_data_id =
+                write_trap_table(&mut self.clif_module, trap_site_bytes, func.name.symbol())?;
+
+            function_map.insert(func_id, (size, trap_data_id, n_traps));
         }
 
-        stack_probe::declare_metadata(&mut self.decls, &mut self.clif_module).unwrap();
+        // Write out the stack probe and associated data.
+        let probe_id = stack_probe::declare(&mut self.decls, &mut self.clif_module)?;
+        let probe_func = self.decls.get_func(probe_id).unwrap();
+        let probe_func_id = probe_func.name.as_funcid().unwrap();
+        let compiled = self.clif_module.define_function_bytes(
+            probe_func_id,
+            stack_probe::STACK_PROBE_BINARY,
+            stack_probe::trap_sites(),
+        )?;
+
+        let size = compiled.size;
+        let n_traps = compiled.traps.len();
+
+        let trap_site_bytes = traps_to_module_traps(&compiled.traps);
+        let trap_data_id = write_trap_table(
+            &mut self.clif_module,
+            trap_site_bytes,
+            probe_func.name.symbol(),
+        )?;
+
+        function_map.insert(probe_func_id, (size, trap_data_id, n_traps));
 
         let module_data_bytes = self.module_data()?.serialize()?;
 
         let module_data_len = module_data_bytes.len();
 
-        write_module_data(&mut self.clif_module, module_data_bytes)?;
+        let module_data_id = write_module_data(&mut self.clif_module, module_data_bytes)?;
         write_startfunc_data(&mut self.clif_module, &self.decls)?;
-        let table_len = write_table_data(&mut self.clif_module, &self.decls)?;
+        let (table_id, table_len) = write_table_data(&mut self.clif_module, &self.decls)?;
 
-        let function_manifest: Vec<(String, FunctionSpec)> = self
+        // The function manifest must be written out in the order that
+        // cranelift-module is going to lay out the functions.  We also
+        // have to be careful to write function manifest entries for VM
+        // functions, which will not be represented in function_map.
+
+        let ids: Vec<FuncId> = self
             .clif_module
             .declared_functions()
             .map(|f| {
-                (
-                    f.decl.name.to_owned(), // this copy is only necessary because `clif_module` is moved in `finish, below`
-                    FunctionSpec::new(
-                        0,
-                        f.compiled.as_ref().map(|c| c.code_length()).unwrap_or(0),
-                        0,
-                        0,
-                    ),
-                )
+                let func_id = match self.clif_module.get_name(&f.decl.name).unwrap() {
+                    FuncOrDataId::Func(id) => id,
+                    _ => panic!(),
+                };
+                func_id
             })
             .collect();
+        let function_manifest_len = ids.len();
 
-        let obj = ObjectFile::new(
-            self.clif_module.finish(),
+        for func_id in ids {
+            let (size, trap_data_id, traps_len) = match function_map.get(&func_id) {
+                Some((ref size, ref trap_data_id, ref traps_len)) => {
+                    (*size, Some(*trap_data_id), *traps_len)
+                }
+                None => (0 as u32, None, 0 as usize),
+            };
+
+            write_function_spec(
+                &mut self.clif_module,
+                &mut function_manifest_ctx,
+                &mut function_manifest_bytes,
+                func_id,
+                size,
+                trap_data_id,
+                traps_len,
+            )?;
+        }
+
+        function_manifest_ctx.define(function_manifest_bytes.into_inner().into());
+        let manifest_data_id = self.clif_module.declare_data(
+            FUNCTION_MANIFEST_SYM,
+            ClifLinkage::Export,
+            false,
+            false,
+            None,
+        )?;
+        self.clif_module
+            .define_data(manifest_data_id, &function_manifest_ctx)?;
+
+        // Write out the structure tying everything together.
+        let mut native_data =
+            Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
+        let mut native_data_ctx = ClifDataContext::new();
+        let native_data_id = self.clif_module.declare_data(
+            LUCET_MODULE_SYM,
+            ClifLinkage::Export,
+            false,
+            false,
+            None,
+        )?;
+
+        let version =
+            VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
+
+        version.write_to(&mut native_data)?;
+
+        fn write_slice(
+            module: &mut ClifModule<FaerieBackend>,
+            mut ctx: &mut ClifDataContext,
+            bytes: &mut Cursor<Vec<u8>>,
+            id: DataId,
+            len: usize,
+        ) -> Result<(), Error> {
+            let data_ref = module.declare_data_in_data(id, &mut ctx);
+            let offset = bytes.position() as u32;
+            ctx.write_data_addr(offset, data_ref, 0);
+            bytes.write_u64::<LittleEndian>(0 as u64)?;
+            bytes.write_u64::<LittleEndian>(len as u64)?;
+            Ok(())
+        }
+
+        write_slice(
+            &mut self.clif_module,
+            &mut native_data_ctx,
+            &mut native_data,
+            module_data_id,
             module_data_len,
-            function_manifest,
+        )?;
+        write_slice(
+            &mut self.clif_module,
+            &mut native_data_ctx,
+            &mut native_data,
+            table_id,
             table_len,
         )?;
+        write_slice(
+            &mut self.clif_module,
+            &mut native_data_ctx,
+            &mut native_data,
+            manifest_data_id,
+            function_manifest_len,
+        )?;
+
+        native_data_ctx.define(native_data.into_inner().into());
+        self.clif_module
+            .define_data(native_data_id, &native_data_ctx)?;
+
+        let obj = ObjectFile::new(self.clif_module.finish())?;
 
         Ok(obj)
     }
 
     pub fn cranelift_funcs(self) -> Result<CraneliftFuncs, Error> {
-        use std::collections::HashMap;
-
         let mut funcs = HashMap::new();
         let mut func_translator = FuncTranslator::new();
 
@@ -385,7 +511,7 @@ impl<'a> Compiler<'a> {
 fn write_module_data<B: ClifBackend>(
     clif_module: &mut ClifModule<B>,
     module_data_bytes: Vec<u8>,
-) -> Result<(), Error> {
+) -> Result<DataId, Error> {
     use cranelift_module::{DataContext, Linkage};
 
     let mut module_data_ctx = DataContext::new();
@@ -398,7 +524,7 @@ fn write_module_data<B: ClifBackend>(
         .define_data(module_data_decl, &module_data_ctx)
         .map_err(Error::ClifModuleError)?;
 
-    Ok(())
+    Ok(module_data_decl)
 }
 
 fn write_startfunc_data<B: ClifBackend>(
@@ -424,5 +550,71 @@ fn write_startfunc_data<B: ClifBackend>(
             .define_data(name, &ctx)
             .map_err(Error::MetadataSerializer)?;
     }
+    Ok(())
+}
+
+fn traps_to_module_traps(traps: &[cranelift_module::TrapSite]) -> Box<[u8]> {
+    let traps: Vec<lucet_module::TrapSite> = traps
+        .iter()
+        .map(|site| lucet_module::TrapSite {
+            offset: site.offset,
+            code: translate_trapcode(site.code),
+        })
+        .collect();
+
+    let trap_site_bytes = unsafe {
+        std::slice::from_raw_parts(
+            traps.as_ptr() as *const u8,
+            traps.len() * std::mem::size_of::<lucet_module::TrapSite>(),
+        )
+    };
+
+    trap_site_bytes.to_vec().into()
+}
+
+fn write_trap_table(
+    module: &mut ClifModule<FaerieBackend>,
+    trap_bytes: Box<[u8]>,
+    func_name: &str,
+) -> Result<DataId, Error> {
+    let trap_sym = trap_sym_for_func(func_name);
+    let mut trap_sym_ctx = ClifDataContext::new();
+    trap_sym_ctx.define(trap_bytes);
+
+    let trap_data_id = module.declare_data(&trap_sym, ClifLinkage::Export, false, false, None)?;
+
+    module.define_data(trap_data_id, &trap_sym_ctx)?;
+
+    Ok(trap_data_id)
+}
+
+fn write_function_spec(
+    module: &mut ClifModule<FaerieBackend>,
+    mut manifest_ctx: &mut ClifDataContext,
+    manifest_bytes: &mut Cursor<Vec<u8>>,
+    func_id: FuncId,
+    size: binemit::CodeOffset,
+    trap_data_id: Option<DataId>,
+    n_traps: usize,
+) -> Result<(), Error> {
+    // This code has implicit knowledge of the layout of `FunctionSpec`!
+    //
+    // Write a (ptr, len) pair with relocation for the code.
+    let func_ref = module.declare_func_in_data(func_id, &mut manifest_ctx);
+    let offset = manifest_bytes.position() as u32;
+    manifest_ctx.write_function_addr(offset, func_ref);
+    manifest_bytes.write_u64::<LittleEndian>(0 as u64)?;
+    manifest_bytes.write_u64::<LittleEndian>(size as u64)?;
+    // Write a (ptr, len) pair with relocation for the trap table.
+    if let Some(trap_data_id) = trap_data_id {
+        if n_traps > 0 {
+            let data_ref = module.declare_data_in_data(trap_data_id, &mut manifest_ctx);
+            let offset = manifest_bytes.position() as u32;
+            manifest_ctx.write_data_addr(offset, data_ref, 0);
+        }
+    }
+    manifest_bytes.write_u64::<LittleEndian>(0 as u64)?;
+    manifest_bytes.write_u64::<LittleEndian>(n_traps as u64)?;
+
     Ok(())
 }
