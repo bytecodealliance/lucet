@@ -121,8 +121,8 @@ pub struct Context {
     retval_fp: __m128,
     parent_ctx: *mut Context,
     // TODO ACF 2019-10-23: make Instance into a generic parameter?
-    backstop_callback: *const unsafe extern "C" fn(*mut Instance),
-    callback_data: *mut Instance,
+    backstop_callback: *const unsafe extern "C" fn(*const Instance),
+    callback_data: *const Instance,
     sigset: signal::SigSet,
 }
 
@@ -142,7 +142,7 @@ impl Context {
     }
 
     /// Get a raw pointer to the instance's callback data.
-    pub(crate) fn callback_data_ptr(&self) -> *mut Instance {
+    pub(crate) fn callback_data_ptr(&self) -> *const Instance {
         self.callback_data
     }
 }
@@ -382,7 +382,7 @@ impl Context {
     }
 
     /// The default backstop callback does nothing, and is just a marker.
-    extern "C" fn default_backstop_callback(_: *mut Instance) {}
+    extern "C" fn default_backstop_callback(_: *const Instance) {}
 
     /// Similar to `Context::init()`, but allows setting a callback function to be run when the
     /// guest entrypoint returns.
@@ -392,8 +392,8 @@ impl Context {
     pub fn init_with_callback(
         stack: &mut [u64],
         child: &mut Context,
-        backstop_callback: unsafe extern "C" fn(*mut Instance),
-        callback_data: *mut Instance,
+        backstop_callback: unsafe extern "C" fn(*const Instance),
+        callback_data: *const Instance,
         fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
