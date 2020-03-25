@@ -101,7 +101,7 @@ impl<'a> InstanceBuilder<'a> {
             region,
             module,
             embed_ctx: CtxMap::default(),
-            heap_memory_size: region.heap_memory_size_limit(), // 16 * 64 * 1024, // TLC The default limit should match the slot limit?
+            heap_memory_size: region.heap_memory_size_limit(),
         }
     }
 
