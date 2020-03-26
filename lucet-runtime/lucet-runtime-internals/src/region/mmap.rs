@@ -79,7 +79,7 @@ impl RegionInternal for MmapRegion {
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
-        heap_memory_size: usize,
+        heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error> {
         let slot = self
             .freelist
@@ -94,13 +94,13 @@ impl RegionInternal for MmapRegion {
 
         let mut limits;
 
-        match heap_memory_size.cmp(&slot.limits.heap_memory_size) {
+        match heap_memory_size_limit.cmp(&slot.limits.heap_memory_size) {
             Ordering::Less => {
                 // The supplied heap_memory_size is smaller than
                 // default. Augment the new instance limits with this
                 // // custom value so that it may be validated.
                 limits = slot.limits;
-                limits.heap_memory_size = heap_memory_size;
+                limits.heap_memory_size = heap_memory_size_limit;
             }
             Ordering::Equal => limits = slot.limits,
             Ordering::Greater => {
