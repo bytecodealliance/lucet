@@ -419,7 +419,6 @@ mod compile {
     // Tests for compilation completion
     use super::load_wat_module;
     use lucetc::Compiler;
-    use target_lexicon::Triple;
     fn run_compile_test(file: &str) {
         let m = load_wat_module(file);
         let b = super::test_bindings();
