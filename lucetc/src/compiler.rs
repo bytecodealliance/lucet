@@ -18,7 +18,7 @@ use cranelift_codegen::{
     settings::{self, Configurable},
     Context as ClifContext,
 };
-use cranelift_faerie::{FaerieBackend, FaerieBuilder, FaerieTrapCollection};
+use cranelift_faerie::{FaerieBackend, FaerieBuilder};
 use cranelift_module::{
     Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, FuncOrDataId,
     Linkage as ClifLinkage, Module as ClifModule,
@@ -228,12 +228,8 @@ impl<'a> Compiler<'a> {
             _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
-        let mut clif_module: ClifModule<FaerieBackend> = ClifModule::new(FaerieBuilder::new(
-            isa,
-            "lucet_guest".to_owned(),
-            FaerieTrapCollection::Enabled,
-            libcalls,
-        )?);
+        let mut clif_module: ClifModule<FaerieBackend> =
+            ClifModule::new(FaerieBuilder::new(isa, "lucet_guest".to_owned(), libcalls)?);
 
         let runtime = Runtime::lucet(frontend_config);
         let decls = ModuleDecls::new(
@@ -295,45 +291,37 @@ impl<'a> Compiler<'a> {
                     source,
                 })?;
             let func_id = func.name.as_funcid().unwrap();
+            let mut traps = TrapSites::new();
             let compiled = self
                 .clif_module
-                .define_function(func_id, &mut clif_context)
+                .define_function(func_id, &mut clif_context, &mut traps)
                 .map_err(|source| Error::FunctionDefinition {
                     symbol: func.name.symbol().to_string(),
                     source,
                 })?;
 
             let size = compiled.size;
-            let n_traps = compiled.traps.len();
 
-            let trap_site_bytes = traps_to_module_traps(&compiled.traps);
-            let trap_data_id =
-                write_trap_table(&mut self.clif_module, trap_site_bytes, func.name.symbol())?;
+            let trap_data_id = traps.write(&mut self.clif_module, func.name.symbol())?;
 
-            function_map.insert(func_id, (size, trap_data_id, n_traps));
+            function_map.insert(func_id, (size, trap_data_id, traps.len()));
         }
 
         // Write out the stack probe and associated data.
         let probe_id = stack_probe::declare(&mut self.decls, &mut self.clif_module)?;
         let probe_func = self.decls.get_func(probe_id).unwrap();
         let probe_func_id = probe_func.name.as_funcid().unwrap();
-        let compiled = self.clif_module.define_function_bytes(
-            probe_func_id,
-            stack_probe::STACK_PROBE_BINARY,
-            stack_probe::trap_sites(),
-        )?;
+        let compiled = self
+            .clif_module
+            .define_function_bytes(probe_func_id, stack_probe::STACK_PROBE_BINARY)?;
 
         let size = compiled.size;
-        let n_traps = compiled.traps.len();
+        let stack_probe_traps: TrapSites = stack_probe::trap_sites().into();
 
-        let trap_site_bytes = traps_to_module_traps(&compiled.traps);
-        let trap_data_id = write_trap_table(
-            &mut self.clif_module,
-            trap_site_bytes,
-            probe_func.name.symbol(),
-        )?;
+        let trap_data_id =
+            stack_probe_traps.write(&mut self.clif_module, probe_func.name.symbol())?;
 
-        function_map.insert(probe_func_id, (size, trap_data_id, n_traps));
+        function_map.insert(probe_func_id, (size, trap_data_id, stack_probe_traps.len()));
 
         let module_data_bytes = self.module_data()?.serialize()?;
 
@@ -553,39 +541,78 @@ fn write_startfunc_data<B: ClifBackend>(
     Ok(())
 }
 
-fn traps_to_module_traps(traps: &[cranelift_module::TrapSite]) -> Box<[u8]> {
-    let traps: Vec<lucet_module::TrapSite> = traps
-        .iter()
-        .map(|site| lucet_module::TrapSite {
-            offset: site.offset,
-            code: translate_trapcode(site.code),
-        })
-        .collect();
-
-    let trap_site_bytes = unsafe {
-        std::slice::from_raw_parts(
-            traps.as_ptr() as *const u8,
-            traps.len() * std::mem::size_of::<lucet_module::TrapSite>(),
-        )
-    };
-
-    trap_site_bytes.to_vec().into()
+/// Collect traps from cranelift_module codegen:
+struct TrapSites {
+    traps: Vec<cranelift_module::TrapSite>,
 }
 
-fn write_trap_table(
-    module: &mut ClifModule<FaerieBackend>,
-    trap_bytes: Box<[u8]>,
-    func_name: &str,
-) -> Result<DataId, Error> {
-    let trap_sym = trap_sym_for_func(func_name);
-    let mut trap_sym_ctx = ClifDataContext::new();
-    trap_sym_ctx.define(trap_bytes);
+/// Convert from representation in stack_probe:
+impl From<Vec<cranelift_module::TrapSite>> for TrapSites {
+    fn from(traps: Vec<cranelift_module::TrapSite>) -> TrapSites {
+        TrapSites { traps }
+    }
+}
 
-    let trap_data_id = module.declare_data(&trap_sym, ClifLinkage::Export, false, false, None)?;
+impl TrapSites {
+    /// Empty
+    fn new() -> Self {
+        Self { traps: Vec::new() }
+    }
+    /// Serialize for lucet_module:
+    fn serialize(&self) -> Box<[u8]> {
+        let traps: Vec<lucet_module::TrapSite> = self
+            .traps
+            .iter()
+            .map(|site| lucet_module::TrapSite {
+                offset: site.offset,
+                code: translate_trapcode(site.code),
+            })
+            .collect();
 
-    module.define_data(trap_data_id, &trap_sym_ctx)?;
+        let trap_site_bytes = unsafe {
+            std::slice::from_raw_parts(
+                traps.as_ptr() as *const u8,
+                traps.len() * std::mem::size_of::<lucet_module::TrapSite>(),
+            )
+        };
 
-    Ok(trap_data_id)
+        trap_site_bytes.to_vec().into()
+    }
+    /// Write traps for a given function into the cranelift module:
+    pub fn write(
+        &self,
+        module: &mut ClifModule<FaerieBackend>,
+        func_name: &str,
+    ) -> Result<DataId, Error> {
+        let trap_sym = trap_sym_for_func(func_name);
+        let mut trap_sym_ctx = ClifDataContext::new();
+        trap_sym_ctx.define(self.serialize());
+
+        let trap_data_id =
+            module.declare_data(&trap_sym, ClifLinkage::Export, false, false, None)?;
+
+        module.define_data(trap_data_id, &trap_sym_ctx)?;
+
+        Ok(trap_data_id)
+    }
+    pub fn len(&self) -> usize {
+        self.traps.len()
+    }
+}
+
+impl cranelift_codegen::binemit::TrapSink for TrapSites {
+    fn trap(
+        &mut self,
+        offset: cranelift_codegen::binemit::CodeOffset,
+        srcloc: cranelift_codegen::ir::SourceLoc,
+        code: cranelift_codegen::ir::TrapCode,
+    ) {
+        self.traps.push(cranelift_module::TrapSite {
+            offset,
+            srcloc,
+            code,
+        })
+    }
 }
 
 fn write_function_spec(
