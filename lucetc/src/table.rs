@@ -30,16 +30,27 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
         }
     }?;
 
-    let mut elems = Vec::new();
+    let mut elems = vec![Elem::Empty; decl.table.minimum as usize];
 
     for initializer in decl.elems.iter() {
         if initializer.base.is_some() {
             let message = format!("table elements with global index base: {:?}", initializer);
             return Err(Error::Unsupported(message));
         }
-        let final_len = initializer.offset + initializer.elements.len();
+
+        let final_len = initializer
+            .offset
+            .checked_add(initializer.elements.len())
+            // `offset` comes from a Wasm i32, so it can't be very big. To observe overflow,
+            // `initializer.elements.len()` would have to be greater than `usize::MAX - u32::MAX`,
+            // which would require an unfeasibly large Wasm binary
+            .expect("table length overflowed usize");
+
         if final_len > elems.len() {
-            elems.resize(final_len, Elem::Empty);
+            return Err(Error::ElementInitializerOutOfRange(
+                initializer.clone(),
+                decl.table.clone(),
+            ));
         }
         for (ix, func_ix) in initializer.elements.iter().enumerate() {
             elems[initializer.offset + ix] = Elem::Func(*func_ix);

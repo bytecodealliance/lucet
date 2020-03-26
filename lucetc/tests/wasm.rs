@@ -355,6 +355,19 @@ mod module_data {
         });
     }
 
+    #[test]
+    fn element_out_of_range() {
+        use lucetc::Error as LucetcError;
+        let m = load_wat_module("element_out_of_range");
+        let b = Bindings::empty();
+        let builder = Compiler::builder();
+        let c = builder.create(&m, &b).unwrap();
+        match c.object_file() {
+            Err(LucetcError::ElementInitializerOutOfRange(_, _)) => (),
+            Ok(_) | Err(_) => panic!("unexpected result"),
+        }
+    }
+
     // XXX adding more negative tests like the one above is valuable - lets do it
 
     #[test]
