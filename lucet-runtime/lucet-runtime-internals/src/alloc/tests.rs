@@ -598,7 +598,6 @@ macro_rules! alloc_tests {
             }
 
             let region = TestRegion::create(1, &CONTEXT_TEST_LIMITS).expect("region created");
-
             let mut inst = region
                 .new_instance(
                     MockModuleBuilder::new()
