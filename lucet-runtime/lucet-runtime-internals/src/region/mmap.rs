@@ -92,20 +92,22 @@ impl RegionInternal for MmapRegion {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
 
-        let mut limits = slot.limits;
+        let mut limits;
 
-        // Affirm that any custom heap memory size supplied to this
-        // builder does not exceed the slot limits.
-        if let Ordering::Greater = heap_memory_size.cmp(&slot.limits.heap_memory_size) {
-            return Err(Error::InvalidArgument(
-                "heap memory size requested for instance is larger than slot allows",
-            ));
-        }
-
-        // If a custom heap memory size is supplied, augment the limits
-        // with the value so that it may be validated.
-        if let Ordering::Less = heap_memory_size.cmp(&slot.limits.heap_memory_size) {
-            limits.heap_memory_size = heap_memory_size;
+        match heap_memory_size.cmp(&slot.limits.heap_memory_size) {
+            Ordering::Less => {
+                // The supplied heap_memory_size is smaller than
+                // default. Augment the new instance limits with this
+                // // custom value so that it may be validated.
+                limits = slot.limits;
+                limits.heap_memory_size = heap_memory_size;
+            }
+            Ordering::Equal => limits = slot.limits,
+            Ordering::Greater => {
+                return Err(Error::InvalidArgument(
+                    "heap memory size requested for instance is larger than slot allows",
+                ))
+            }
         }
 
         module.validate_runtime_spec(&limits)?;
