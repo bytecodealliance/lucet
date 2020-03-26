@@ -8,7 +8,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
       with:
-        submodules: true
+        submodules: 'recursive'
 
     # Testing uses the development environment Docker container.
     # This action builds the container and executes the test suite inside it.
@@ -25,7 +25,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
       with:
-        submodules: true
+        submodules: 'recursive'
 
     # Testing uses the development environment Docker container.
     # This action builds the container and executes the test suite inside it.
@@ -43,7 +43,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
       with:
-        submodules: true
+        submodules: 'recursive'
     - name: Install Rust (rustup)
       run: |
         rustup update
