@@ -98,5 +98,5 @@ pub unsafe extern "C" fn lucet_region_new_instance_with_wasi_ctx(
 #[no_mangle]
 #[doc(hidden)]
 pub extern "C" fn lucet_wasi_internal_ensure_linked() {
-    crate::wasi::export_wasi_funcs();
+    crate::export_wasi_funcs();
 }

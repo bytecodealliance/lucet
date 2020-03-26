@@ -1,6 +1,6 @@
 use anyhow::{bail, Error};
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
-use lucet_wasi::{self, WasiCtx, WasiCtxBuilder, __wasi_exitcode_t};
+use lucet_wasi::{self, types::Exitcode, WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
 use std::fs::File;
@@ -65,7 +65,9 @@ pub fn wasi_load<P: AsRef<Path>>(
     workdir: &TempDir,
     wasm_file: P,
 ) -> Result<Arc<dyn Module>, Error> {
-    let native_build = Lucetc::new(wasm_file).with_bindings(lucet_wasi::bindings());
+    let native_build = Lucetc::new(wasm_file)
+        .with_bindings(lucet_wasi::bindings())
+        .with_validator(lucet_validate::Validator::new(lucet_wasi::document(), true));
 
     let so_file = workdir.path().join("out.so");
 
@@ -76,7 +78,7 @@ pub fn wasi_load<P: AsRef<Path>>(
     Ok(dlmodule as Arc<dyn Module>)
 }
 
-pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, Error> {
+pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<Exitcode, Error> {
     let region = MmapRegion::create(1, &Limits::default())?;
     let module = test_module_wasi(path)?;
 
@@ -91,7 +93,7 @@ pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, E
         Err(lucet_runtime::Error::RuntimeTerminated(
             lucet_runtime::TerminationDetails::Provided(any),
         )) => Ok(*any
-            .downcast_ref::<__wasi_exitcode_t>()
+            .downcast_ref::<Exitcode>()
             .expect("termination yields an exitcode")),
         Err(e) => bail!("runtime error: {}", e),
     }
@@ -99,11 +101,12 @@ pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<__wasi_exitcode_t, E
 
 pub fn run_with_stdout<P: AsRef<Path>>(
     path: P,
-    ctx: WasiCtxBuilder,
-) -> Result<(__wasi_exitcode_t, String), Error> {
+    ctx: &mut WasiCtxBuilder,
+) -> Result<(Exitcode, String), Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = ctx.stdout(unsafe { File::from_raw_fd(pipe_in) }).build()?;
+    ctx.stdout(unsafe { File::from_raw_fd(pipe_in) });
+    let ctx = ctx.build()?;
 
     let exitcode = run(path, ctx)?;
 
@@ -117,11 +120,12 @@ pub fn run_with_stdout<P: AsRef<Path>>(
 
 pub fn run_with_null_stdin<P: AsRef<Path>>(
     path: P,
-    ctx: WasiCtxBuilder,
-) -> Result<__wasi_exitcode_t, Error> {
+    ctx: &mut WasiCtxBuilder,
+) -> Result<Exitcode, Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = ctx.stdin(unsafe { File::from_raw_fd(pipe_out) }).build()?;
+    ctx.stdin(unsafe { File::from_raw_fd(pipe_out) });
+    let ctx = ctx.build()?;
 
     let exitcode = run(path, ctx)?;
 

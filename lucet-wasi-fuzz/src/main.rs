@@ -4,7 +4,7 @@ use anyhow::{bail, format_err, Error};
 use libc::c_ulong;
 use lucet_module::bindings::Bindings;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
-use lucet_wasi::{WasiCtx, WasiCtxBuilder, __wasi_exitcode_t};
+use lucet_wasi::{types::Exitcode, WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
 use rand::prelude::random;
@@ -379,12 +379,14 @@ fn run_one(seed: Option<Seed>) -> Result<TestResult, Error> {
 fn run_with_stdout<P: AsRef<Path>>(
     tmpdir: &TempDir,
     path: P,
-) -> Result<(__wasi_exitcode_t, Vec<u8>), Error> {
-    let ctx = WasiCtxBuilder::new().args(&["gen"]);
+) -> Result<(Exitcode, Vec<u8>), Error> {
+    let mut ctx = WasiCtxBuilder::new();
+    ctx.args(&["gen"]);
 
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    let ctx = ctx.stdout(unsafe { File::from_raw_fd(pipe_in) }).build()?;
+    ctx.stdout(unsafe { File::from_raw_fd(pipe_in) });
+    let ctx = ctx.build()?;
 
     let exitcode = run(tmpdir, path, ctx)?;
 
@@ -396,11 +398,7 @@ fn run_with_stdout<P: AsRef<Path>>(
     Ok((exitcode, stdout))
 }
 
-fn run<P: AsRef<Path>>(
-    tmpdir: &TempDir,
-    path: P,
-    ctx: WasiCtx,
-) -> Result<__wasi_exitcode_t, Error> {
+fn run<P: AsRef<Path>>(tmpdir: &TempDir, path: P, ctx: WasiCtx) -> Result<Exitcode, Error> {
     let region = MmapRegion::create(1, &Limits::default())?;
     let module = wasi_test(tmpdir, path)?;
 
@@ -415,7 +413,7 @@ fn run<P: AsRef<Path>>(
         Err(lucet_runtime::Error::RuntimeTerminated(
             lucet_runtime::TerminationDetails::Provided(any),
         )) => Ok(*any
-            .downcast_ref::<__wasi_exitcode_t>()
+            .downcast_ref::<Exitcode>()
             .expect("termination yields an exitcode")),
         Err(e) => bail!("runtime error: {}", e),
     }

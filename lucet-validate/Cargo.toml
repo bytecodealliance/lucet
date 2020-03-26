@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2"
-witx = { path = "../wasmtime/crates/wasi-common/WASI/tools/witx", version = "0.8.4" }
+witx = { path = "../wasmtime/crates/wasi-common/WASI/tools/witx", version = "0.8.5" }
 cranelift-entity = { path = "../wasmtime/cranelift/entity", version = "0.62.0" }
 thiserror = "1.0.4"
 wasmparser = "0.51.2"
