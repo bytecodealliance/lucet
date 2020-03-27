@@ -241,8 +241,6 @@ impl Alloc {
         }
         // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let
         // the heap expand beyond that:
-        // TLC: I'm not actually updating the slot limits.  I am updating my copy of
-        // the slot limits.  Which isn't cool.
         if self.heap_accessible_size + expand_pagealigned as usize > slot.limits.heap_memory_size {
             bail_limits_exceeded!(
                 "expansion would exceed runtime-specified heap limit: {:?}",

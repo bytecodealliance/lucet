@@ -192,8 +192,8 @@ macro_rules! alloc_tests {
         }
 
         /// This test exercises custom limits on the heap_memory_size.
-        /// In this scenario, the Region has a default limit on the
-        /// heap memory size, but the instance has a smaller limit.
+        /// In this scenario, the Region has a limit on the heap
+        /// memory size, but the instance has a smaller limit.
         /// Attemps to expand the heap fail, but the existing heap can
         /// still be used. This test uses a region with multiple slots
         /// in order to exercise more edge cases with adjacent managed
@@ -864,13 +864,17 @@ macro_rules! alloc_tests {
             }
         }
 
+	/// This test exercises custom limits on the heap_memory_size.
+        /// In this scenario, the Region has a limit on the heap
+        /// memory size, but the instance has a larger limit.  An
+	/// instance's custom limit must not exceed the Region's.
         #[test]
-        fn reject_too_large_heap_memory_size() {
+        fn reject_heap_memory_size_exeeds_region_limits() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let res = region
                 .new_instance_builder(
                     MockModuleBuilder::new()
-                        .with_heap_spec(CONTEXT_TEST_HEAP)
+                        .with_heap_spec(THREE_PAGE_MAX_HEAP)
                         .build(),
                 )
                 .with_heap_size_limit(&LIMITS.heap_memory_size * 2)
@@ -883,6 +887,25 @@ macro_rules! alloc_tests {
                 Err(e) => panic!("unexpected error: {}", e),
                 Ok(_) => panic!("unexpected success"),
             }
+        }
+
+	/// This test exercises custom limits on the heap_memory_size.
+        /// In this scenario, the HeapSpec has a limit on the initial
+        /// heap memory size, but the instance has a smaller limit.
+        /// An instance's custom limit must not exceed the HeapSpec.
+	#[test]
+	fn reject_heap_memory_size_exeeds_instance_limits() {
+            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let res = region
+                .new_instance_builder(
+                    MockModuleBuilder::new()
+                        .with_heap_spec(THREE_PAGE_MAX_HEAP)
+                        .build(),
+                )
+                .with_heap_size_limit((THREE_PAGE_MAX_HEAP.initial_size / 2) as usize)
+                .build();
+
+	    assert!(res.is_err(), "new_instance fails");	    
         }
     };
 }
