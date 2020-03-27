@@ -213,7 +213,7 @@ macro_rules! alloc_tests {
             let heap_len = inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
 
-            // expand the heap within the heap spec limit but past the
+            // Expand the heap within the Region limit but past the
             // instance limit.
             let new_heap_area = inst.alloc_mut().expand_heap(
                 (THREEPAGE_MAX_SIZE - THREEPAGE_INITIAL_SIZE) as u32,
@@ -223,6 +223,15 @@ macro_rules! alloc_tests {
                 new_heap_area.is_err(),
                 "heap expansion past instance limit fails"
             );
+
+            // Affirm that the existing heap can still be used.
+            let new_heap_len = inst.alloc().heap_len();
+            assert_eq!(new_heap_len, heap_len);
+
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
+            assert_eq!(heap[new_heap_len - 1], 0);
+            heap[new_heap_len - 1] = 0xFF;
+            assert_eq!(heap[new_heap_len - 1], 0xFF);
         }
 
         const EXPANDPASTLIMIT_INITIAL_SIZE: u64 = LIMITS_HEAP_MEM_SIZE as u64 - (64 * 1024);
