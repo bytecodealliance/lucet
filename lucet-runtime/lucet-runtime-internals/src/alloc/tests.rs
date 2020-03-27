@@ -864,10 +864,10 @@ macro_rules! alloc_tests {
             }
         }
 
-	/// This test exercises custom limits on the heap_memory_size.
+        /// This test exercises custom limits on the heap_memory_size.
         /// In this scenario, the Region has a limit on the heap
         /// memory size, but the instance has a larger limit.  An
-	/// instance's custom limit must not exceed the Region's.
+        /// instance's custom limit must not exceed the Region's.
         #[test]
         fn reject_heap_memory_size_exeeds_region_limits() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
@@ -889,12 +889,12 @@ macro_rules! alloc_tests {
             }
         }
 
-	/// This test exercises custom limits on the heap_memory_size.
+        /// This test exercises custom limits on the heap_memory_size.
         /// In this scenario, the HeapSpec has a limit on the initial
         /// heap memory size, but the instance has a smaller limit.
         /// An instance's custom limit must not exceed the HeapSpec.
-	#[test]
-	fn reject_heap_memory_size_exeeds_instance_limits() {
+        #[test]
+        fn reject_heap_memory_size_exeeds_instance_limits() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let res = region
                 .new_instance_builder(
@@ -905,7 +905,7 @@ macro_rules! alloc_tests {
                 .with_heap_size_limit((THREE_PAGE_MAX_HEAP.initial_size / 2) as usize)
                 .build();
 
-	    assert!(res.is_err(), "new_instance fails");	    
+            assert!(res.is_err(), "new_instance fails");
         }
     };
 }
