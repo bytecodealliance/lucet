@@ -8,12 +8,12 @@ The Lucet project aims to provide support for secure execution of untrusted code
 
 At a high level, this jointly-constructed security architecture aims to prevent untrusted input, data, and activity from compromising the security of trusted components. It also aims to prevent an untrusted actor from compromising the security (e.g. data and activity) of another untrusted actor. For example, one user of a Lucet embedding should not be able to affect the security of another user of the same Lucet embedding.
 
-Some security requirements for the Lucet project have not been implemented yet. See the remainder of this document as well as [project Github issues](https://github.com/bytecodealliance/lucet/issues) for more information. Note that even when lucet project security goals have been met, overall system security requirements will vary by embedding.
+Some security requirements for the Lucet project have not been implemented yet. See the remainder of this document as well as [project Github issues](https://github.com/bytecodealliance/lucet/issues) for more information. Note that even when Lucet project security goals have been met, overall system security requirements will vary by embedding.
 
 The Lucet security model can be summarized via two simplified execution scenarios: compiling/loading of sandboxed guest code and execution of untrusted guest programs. These scenarios are described in terms of the following levels.
 
 - Trusted: refers to code, processes, or inputs that are fully trusted and generally controlled by the administrator of a system that runs or embeds Lucet components.
-- Untrusted: refers to code, processes, or inputs that are completely untrusted and generally supplied by a third party. For example, user-supplied WASM code is untrusted.
+- Untrusted: refers to code, processes, or inputs that are completely untrusted and generally supplied by a third party. For example, user-supplied Wasm code is untrusted.
 
 The scenarios are modeled as simplified data flow diagrams below. [draw.io](https://draw.io) diagram source files are available [here](../../assets/lucet_dfds.xml).
 
