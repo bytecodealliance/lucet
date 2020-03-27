@@ -128,15 +128,6 @@ pub trait ModuleInternal: Send + Sync {
                 bail_limits_exceeded!("heap spec initial size: {:?}", heap);
             }
 		
-	    /*
-            if heap.reserved_size > limits.heap_memory_size as u64 {
-                bail_limits_exceeded!(
-                    "heap spec reserved size exceeds heap memory size limits: {:?}",
-                    heap
-                );
-            }
-	     */
-
             if heap.initial_size > heap.reserved_size {
                 return Err(lucet_incorrect_module!(
                     "initial heap size greater than reserved size: {:?}",
