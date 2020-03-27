@@ -135,15 +135,6 @@ pub trait ModuleInternal: Send + Sync {
                 ));
             }
 
-	    if let Some(max_size) = heap.max_size {
-		if max_size > heap.reserved_size {
-                    return Err(lucet_incorrect_module!(
-			"maximum heap size greater than reserved size: {:?}",
-			heap
-                    ));
-		}
-	    }
-
         }
 
         if self.globals().len() * std::mem::size_of::<u64>() > limits.globals_size {
