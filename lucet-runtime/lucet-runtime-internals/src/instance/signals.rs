@@ -346,7 +346,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         // TODO: `rdi` is only correct for SysV (unixy) calling conventions! For Windows x86_64 this
         // would be `rcx`, with other architectures being their own question.
         ctx.set_ip(crate::context::lucet_context_set as *const c_void);
-        HOST_CTX.with(|host_ctx| unsafe {
+        HOST_CTX.with(|host_ctx| {
             ctx.set_rdi(host_ctx.get() as u64);
         })
     }
