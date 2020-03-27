@@ -127,6 +127,15 @@ pub trait ModuleInternal: Send + Sync {
             if heap.initial_size as usize > limits.heap_memory_size {
                 bail_limits_exceeded!("heap spec initial size: {:?}", heap);
             }
+		
+	    /*
+            if heap.reserved_size > limits.heap_memory_size as u64 {
+                bail_limits_exceeded!(
+                    "heap spec reserved size exceeds heap memory size limits: {:?}",
+                    heap
+                );
+            }
+	     */
 
             if heap.initial_size > heap.reserved_size {
                 return Err(lucet_incorrect_module!(
@@ -134,6 +143,16 @@ pub trait ModuleInternal: Send + Sync {
                     heap
                 ));
             }
+
+	    if let Some(max_size) = heap.max_size {
+		if max_size > heap.reserved_size {
+                    return Err(lucet_incorrect_module!(
+			"maximum heap size greater than reserved size: {:?}",
+			heap
+                    ));
+		}
+	    }
+
         }
 
         if self.globals().len() * std::mem::size_of::<u64>() > limits.globals_size {
