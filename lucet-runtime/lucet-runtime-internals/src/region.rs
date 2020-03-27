@@ -57,7 +57,7 @@ pub trait RegionInternal: Send + Sync {
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
-        heap_memory_size: usize,
+        heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error>;
 
     /// Unmaps the heap, stack, and globals of an `Alloc`, while retaining the virtual address
@@ -68,6 +68,8 @@ pub trait RegionInternal: Send + Sync {
     fn expand_heap(&self, slot: &Slot, start: u32, len: u32) -> Result<(), Error>;
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error>;
+
+    /// Get the runtime memory size limits 
     fn get_limits(&self) -> &Limits;
 
     fn as_dyn_internal(&self) -> &dyn RegionInternal;
