@@ -149,6 +149,13 @@ pub struct KillState {
     /// `tid_change_notifier` allows functions that may cause a change in `thread_id` to wait,
     /// without spinning, for the signal to be processed.
     tid_change_notifier: Condvar,
+    /// `ignore_alarm` indicates if a SIGALRM directed at this KillState's instance must be
+    /// ignored. This is necessary for a specific race where a timeout occurs right around when a
+    /// Lucet guest, or hostcall the guest made, handles some other signal: if the timeout occurs
+    /// during handling of a signal that arose from guest code, a SIGALRM will either be pending,
+    /// masked by Lucet's sigaction's signal mask, OR a SIGLARM will be imminent after handling the
+    /// signal.
+    ignore_alarm: AtomicBool,
     #[cfg(feature = "concurrent_testpoints")]
     /// When testing race permutations, `KillState` keeps a reference to the `LockTestpoints` its
     /// associated instance holds.
@@ -312,6 +319,7 @@ impl Default for KillState {
             tid_change_notifier: Condvar::new(),
             execution_domain: Mutex::new(Domain::Pending),
             thread_id: Mutex::new(None),
+            ignore_alarm: AtomicBool::new(false),
         }
     }
 }
@@ -330,6 +338,7 @@ impl KillState {
             tid_change_notifier: Condvar::new(),
             execution_domain: Mutex::new(Domain::Pending),
             thread_id: Mutex::new(None),
+            ignore_alarm: AtomicBool::new(false),
             lock_testpoints,
         }
     }
@@ -342,12 +351,20 @@ impl KillState {
         self.terminable.store(true, Ordering::SeqCst);
     }
 
-    pub fn disable_termination(&self) {
-        self.terminable.store(false, Ordering::SeqCst);
+    pub fn disable_termination(&self) -> bool {
+        self.terminable.swap(false, Ordering::SeqCst)
     }
 
     pub fn terminable_ptr(&self) -> *const AtomicBool {
         &self.terminable as *const AtomicBool
+    }
+
+    pub fn silence_alarm(&self) -> bool {
+        self.ignore_alarm.swap(true, Ordering::SeqCst)
+    }
+
+    pub fn alarm_active(&self) -> bool {
+        !self.ignore_alarm.load(Ordering::SeqCst)
     }
 
     /// Set the execution domain to signify that we are currently executing a hostcall.
@@ -450,6 +467,28 @@ impl KillState {
     pub fn deschedule(&self) {
         *self.thread_id.lock().unwrap() = None;
         self.tid_change_notifier.notify_all();
+
+        // This is a load-bearing lock in that it forces descheduling to wait for a possibly
+        // in-flight termination to complete. If a KillSwitch was firing exactly when an instance
+        // returned it was either through a signal handler, or `lucet_context_backstop`.
+        //
+        // In the backstop case, termination is disabled (no KillSwitch fires), or failed to
+        // disable and waited for a KillSwitch to signal. No work necessary here.
+        //
+        // In the signal handler case, we cannot guarantee no KillSwitch attempted to fire before
+        // or during the signal handler, only that no KillSwitch fires after the signal handler
+        // completes. If a KillSwitch began firing in a signal handler and fired by sending a
+        // signal it would arrive either immediately at unmask, or some point later if it did not
+        // become pending during the signal handler's execution. Lock here to bound "some point
+        // later" to this descheduling - terminate() will not release this lock until termination
+        // is complete, so in the noisiest form of termination (SIGALRM to this instance's thread)
+        // we prevent the risk of this instance being descheduled, a KillSwitch firing to this TID,
+        // a new instance being scheduled, and spuriously receiving an old instance's timeout
+        // SIGALRM.
+        //
+        // This must occur *after* notifing `tid_change_notifier` so that we indicate to the
+        // `KillSwitch` that the instance was actually descheduled.
+        let _ = self.execution_domain.lock().unwrap();
     }
 }
 

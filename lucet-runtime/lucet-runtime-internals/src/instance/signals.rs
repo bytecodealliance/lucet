@@ -244,18 +244,16 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         };
 
         if signal == Signal::SIGALRM {
-            // if have gotten a SIGALRM, the killswitch that sent this signal must have also
-            // disabled the `terminable` flag. If this assert fails, the SIGALRM came from some
-            // other source, or we have a bug that allows SIGALRM to be sent when they should not.
-            //
-            // TODO: once we have a notion of logging in `lucet-runtime`, this should be a logged
-            // error.
-            debug_assert!(!inst.kill_state.is_terminable());
-            // set the state before jumping back to the host context
-            inst.state = State::Terminating {
-                details: TerminationDetails::Remote,
-            };
-            return true;
+            if inst.kill_state.alarm_active() {
+                inst.state = State::Terminating {
+                    details: TerminationDetails::Remote,
+                };
+                return true;
+            } else {
+                // Ignore the alarm - this mean we don't even want to change the signal context,
+                // just act as if it never occurred.
+                return false;
+            }
         }
 
         let trapcode = inst.module.lookup_trapcode(rip);
@@ -332,12 +330,30 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
 
             // we must disable termination so no KillSwitch for this execution may fire in host
             // code.
-            inst.kill_state.disable_termination();
+            let can_terminate = inst.kill_state.disable_termination();
 
-            #[cfg(feature = "concurrent_testpoints")]
-            inst.lock_testpoints
-                .signal_handler_after_disabling_termination
-                .check();
+            if !can_terminate {
+                #[cfg(feature = "concurrent_testpoints")]
+                inst.lock_testpoints
+                    .signal_handler_after_unable_to_disable_termination
+                    .check();
+
+                // A killswitch began firing, but we're already going to switch to the host for a
+                // more severe reason. Record that this instance's alarm must now be ignored.
+                let ignored = inst.kill_state.silence_alarm();
+
+                // If we'd already decided to ignore this instance's alarm, we must have already
+                // signalled in a fatal way, *and* successfully disabled termination more than once
+                // (which itself should be impossible).
+                assert!(!ignored, "runtime must decide to ignore an instance's alarm at most once");
+            } else {
+                // We are terminating this instance on account of `switch_to_host`, and we disabled
+                // termination. Check in at the appropriate testpoint and continue.
+                #[cfg(feature = "concurrent_testpoints")]
+                inst.lock_testpoints
+                    .signal_handler_after_disabling_termination
+                    .check();
+            }
         }
 
         switch_to_host
