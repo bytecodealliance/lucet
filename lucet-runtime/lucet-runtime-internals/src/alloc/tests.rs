@@ -726,29 +726,29 @@ macro_rules! alloc_tests {
             initial_size: REJECTMAX_INITIAL_SIZE,
             max_size: Some(REJECTMAX_MAX_SIZE),
         };
-	
-	#[test]
-	fn reject_max_larger_than_reserved() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
-	    let res = region.new_instance(
-                    MockModuleBuilder::new()
-                        .with_heap_spec(REJECT_MAX_LIMIT_HEAP_SPEC)
-                        .build(),
-            );
-	    assert!(res.is_err(), "new_instance fails");
-	}
 
-	fn do_nothing_module() -> Arc<dyn Module> {
+        #[test]
+        fn reject_max_larger_than_reserved() {
+            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let res = region.new_instance(
+                MockModuleBuilder::new()
+                    .with_heap_spec(REJECT_MAX_LIMIT_HEAP_SPEC)
+                    .build(),
+            );
+            assert!(res.is_err(), "new_instance fails");
+        }
+
+        fn do_nothing_module() -> Arc<dyn Module> {
             extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () {}
-	    
+
             MockModuleBuilder::new()
                 .with_export_func(MockExportBuilder::new(
                     "do_nothing",
                     FunctionPointer::from_usize(do_nothing as usize),
                 ))
                 .build()
-	}
-	
+        }
+
         #[test]
         fn reject_sigstack_smaller_than_min() {
             if MINSIGSTKSZ == 0 {
