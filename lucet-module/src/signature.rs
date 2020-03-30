@@ -6,7 +6,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use memoffset::offset_of;
 pub use minisign::{PublicKey, SecretKey};
 use minisign::{SignatureBones, SignatureBox};
-use object::*;
+use object::{read::ObjectSection, NativeFile as ObjectFile, Object, SymbolKind};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -146,7 +146,7 @@ impl RawModuleAndData {
         symbol_name: &str,
         _mangle: bool,
     ) -> Result<Option<SymbolData>, io::Error> {
-        let obj = object::ElfFile::parse(obj_bin)
+        let obj = ObjectFile::parse(obj_bin)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
         let symbol_map = obj.symbol_map();
         for symbol in symbol_map
@@ -154,13 +154,22 @@ impl RawModuleAndData {
             .iter()
             .filter(|sym| sym.kind() == SymbolKind::Data)
             .filter(|sym| sym.name() == Some(symbol_name))
+            .filter(|sym| sym.section_index().is_some())
         {
-            if let Some(section_index) = symbol.section_index() {
-                let section = &obj.elf().section_headers[section_index.0];
-                let offset = (symbol.address() - section.sh_addr + section.sh_offset) as usize;
-                let len = symbol.size() as usize;
-                return Ok(Some(SymbolData { offset, len }));
-            }
+            let section_index = symbol.section_index().unwrap();
+            let section = &obj.section_by_index(section_index).unwrap();
+            let section_address = section.address();
+            let section_offset = match section.file_range() {
+                Some((offset, _)) => offset,
+                None => Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "symbol has no associated data",
+                ))?,
+            };
+
+            let offset = (symbol.address() - section_address + section_offset) as usize;
+            let len = symbol.size() as usize;
+            return Ok(Some(SymbolData { offset, len }));
         }
         Ok(None)
     }
@@ -172,7 +181,7 @@ impl RawModuleAndData {
         symbol_name: &str,
         mangle: bool,
     ) -> Result<Option<SymbolData>, io::Error> {
-        let obj = object::File::parse(obj_bin)
+        let obj = ObjectFile::parse(obj_bin)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
         let symbol_map = obj.symbol_map();
         let mangled_symbol_name = format!("_{}", symbol_name);
