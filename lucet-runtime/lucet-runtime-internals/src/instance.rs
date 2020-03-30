@@ -535,7 +535,7 @@ impl Instance {
     ///
     /// This will also reinitialize the kill state, which means that any outstanding
     /// [`KillSwitch`](struct.KillSwitch.html) objects will be unable to terminate this instance.
-    /// It is the embedder's responsibility to initialize new killswitches after resetting an
+    /// It is the embedder's responsibility to initialize new `KillSwitch`es after resetting an
     /// instance.
     ///
     /// # Safety
