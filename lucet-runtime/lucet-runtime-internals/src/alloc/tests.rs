@@ -866,7 +866,7 @@ macro_rules! alloc_tests {
         /// memory size, but the instance has a larger limit.  An
         /// instance's custom limit must not exceed the Region's.
         #[test]
-        fn reject_heap_memory_size_exeeds_region_limits() {
+        fn reject_heap_memory_size_exceeds_region_limits() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
