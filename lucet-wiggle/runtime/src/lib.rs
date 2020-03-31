@@ -1,6 +1,6 @@
 use lucet_runtime::vmctx::Vmctx;
 use std::cell::RefMut;
-use wiggle_runtime::GuestMemory;
+use wiggle::GuestMemory;
 
 pub struct LucetMemory<'a> {
     mem: RefMut<'a, [u8]>,

@@ -4,7 +4,7 @@ use lucet_wasi_sdk::{CompileOpts, Link, LinkOpt, LinkOpts};
 use lucetc::{Lucetc, LucetcOpts};
 use std::cell::{RefCell, RefMut};
 use tempfile::TempDir;
-use wiggle_runtime::{GuestError, GuestErrorType, GuestPtr};
+use wiggle::{GuestError, GuestErrorType, GuestPtr};
 
 /// Context struct used to implement the wiggle trait:
 pub struct LucetWasiCtx<'a> {
