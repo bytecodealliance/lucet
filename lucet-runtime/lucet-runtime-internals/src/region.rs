@@ -1,4 +1,5 @@
 pub mod mmap;
+pub mod uffd;
 
 use crate::alloc::{Alloc, Limits, Slot};
 use crate::embed_ctx::CtxMap;
