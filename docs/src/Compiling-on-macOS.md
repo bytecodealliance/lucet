@@ -10,8 +10,8 @@ In order to compile applications to WebAssembly, builtins need to be installed
 as well:
 
 ```sh
-curl -sL https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
-sudo tar x -zf - -C /usr/local/opt/llvm/lib/clang/9*
+curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
+sudo tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
 ```
 
 Fetch, compile and install the WASI libc:
@@ -39,7 +39,7 @@ Set relevant environment variables:
 
 ```sh
 export WASI_SYSROOT=/opt/wasi-sysroot
-export CLANG_ROOT="$(echo /usr/local/opt/llvm/lib/clang/9*)"
+export CLANG_ROOT="$(echo /usr/local/opt/llvm/lib/clang/10*)"
 export CLANG=/usr/local/opt/llvm/bin/clang
 ```
 
