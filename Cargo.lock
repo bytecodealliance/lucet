@@ -107,6 +107,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.51.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebd71393f1ec0509b553aa012b9b58e81dadbdff7130bd3b8cba576e69b32f75"
+dependencies = [
+ "bitflags 1.2.1",
+ "cexpr",
+ "cfg-if",
+ "clang-sys",
+ "clap",
+ "env_logger",
+ "lazy_static",
+ "log",
+ "peeking_take_while",
+ "proc-macro2 1.0.10",
+ "quote 1.0.3",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "which",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -200,10 +223,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d87b23d6a92cd03af510a5ade527033f6aa6fa92161e2d5863a907d4c5e31d"
 
 [[package]]
+name = "cexpr"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fce5b5fb86b0c57c20c834c1b412fd09c77c8a59b9473f86272709e78874cd1d"
+dependencies = [
+ "nom",
+]
+
+[[package]]
 name = "cfg-if"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
+
+[[package]]
+name = "clang-sys"
+version = "0.28.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81de550971c976f176130da4b2978d3b524eaa0fd9ac31f3ceb5ae1231fb4853"
+dependencies = [
+ "glob 0.3.0",
+ "libc",
+ "libloading",
+]
 
 [[package]]
 name = "clap"
@@ -662,6 +705,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8be18de09a56b60ed0edf84bc9df007e30040691af7acd1c41874faac5895bfb"
 
 [[package]]
+name = "glob"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
+
+[[package]]
 name = "goblin"
 version = "0.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -802,6 +851,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "linux-version"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "nix 0.13.1",
+ "semver",
+]
+
+[[package]]
 name = "log"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -822,7 +880,7 @@ dependencies = [
  "lucet-wasi",
  "lucet-wasi-sdk",
  "lucetc",
- "nix",
+ "nix 0.17.0",
  "num_cpus",
  "rayon",
  "tempfile",
@@ -883,7 +941,7 @@ dependencies = [
  "lucet-runtime-tests",
  "lucet-wasi-sdk",
  "lucetc",
- "nix",
+ "nix 0.17.0",
  "num-derive",
  "num-traits",
  "rayon",
@@ -913,13 +971,14 @@ dependencies = [
  "lucet-module",
  "lucet-runtime-macros",
  "memoffset",
- "nix",
+ "nix 0.17.0",
  "num-derive",
  "num-traits",
  "rand 0.7.3",
  "raw-cpuid 6.1.0",
  "thiserror",
  "tracing",
+ "userfaultfd",
 ]
 
 [[package]]
@@ -993,7 +1052,7 @@ dependencies = [
  "lucet-wasi-sdk",
  "lucet-wiggle",
  "lucetc",
- "nix",
+ "nix 0.17.0",
  "rand 0.6.5",
  "tempfile",
  "wasi-common",
@@ -1011,7 +1070,7 @@ dependencies = [
  "lucet-wasi",
  "lucet-wasi-sdk",
  "lucetc",
- "nix",
+ "nix 0.17.0",
  "num_cpus",
  "progress",
  "rand 0.6.5",
@@ -1165,6 +1224,19 @@ dependencies = [
 
 [[package]]
 name = "nix"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dbdc256eaac2e3bd236d93ad999d3479ef775c863dbda3068c4006a92eec51b"
+dependencies = [
+ "bitflags 1.2.1",
+ "cc",
+ "cfg-if",
+ "libc",
+ "void",
+]
+
+[[package]]
+name = "nix"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50e4785f2c3b7589a0d0c1dd60285e1188adac4006e8abd6dd578e1567027363"
@@ -1174,6 +1246,16 @@ dependencies = [
  "cfg-if",
  "libc",
  "void",
+]
+
+[[package]]
+name = "nom"
+version = "4.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ad2a91a8e869eeb30b9cb3119ae87773a8f4ae617f41b1eb9c154b2905f7bd6"
+dependencies = [
+ "memchr",
+ "version_check 0.1.5",
 ]
 
 [[package]]
@@ -1274,6 +1356,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "peeking_take_while"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
+
+[[package]]
 name = "pkg-config"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1330,7 +1418,7 @@ dependencies = [
  "proc-macro2 1.0.10",
  "quote 1.0.3",
  "syn 1.0.18",
- "version_check",
+ "version_check 0.9.1",
 ]
 
 [[package]]
@@ -1343,7 +1431,7 @@ dependencies = [
  "quote 1.0.3",
  "syn 1.0.18",
  "syn-mid",
- "version_check",
+ "version_check 0.9.1",
 ]
 
 [[package]]
@@ -1838,6 +1926,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "shlex"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"
+
+[[package]]
 name = "sightglass"
 version = "0.1.0"
 dependencies = [
@@ -2102,10 +2196,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
 
 [[package]]
+name = "userfaultfd"
+version = "0.2.0-dev"
+dependencies = [
+ "bitflags 1.2.1",
+ "libc",
+ "nix 0.13.1",
+ "thiserror",
+ "userfaultfd-sys",
+]
+
+[[package]]
+name = "userfaultfd-sys"
+version = "0.2.0-dev"
+dependencies = [
+ "bindgen",
+ "cc",
+ "cfg-if",
+ "linux-version",
+]
+
+[[package]]
 name = "vec_map"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05c78687fb1a80548ae3250346c3db86a80a7cdd77bda190189f2d0a0987c81a"
+
+[[package]]
+name = "version_check"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "914b1a6776c4c929a602fafd8bc742e06365d4bcbe48c30f9cca5824f70dc9dd"
 
 [[package]]
 name = "version_check"
@@ -2139,7 +2260,7 @@ checksum = "23d7043ebb3e5d96fad7a8d3ca22ee9880748ff8c3e18092cfb2a49d3b8f9084"
 dependencies = [
  "cc",
  "cmake",
- "glob",
+ "glob 0.2.11",
 ]
 
 [[package]]
@@ -2265,6 +2386,15 @@ checksum = "2d6f51648d8c56c366144378a33290049eafdd784071077f6fe37dae64c1c4cb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "which"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d011071ae14a2f6671d0b74080ae0cd8ebf3a6f8c9589a2cd45f23126fe29724"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
