@@ -104,9 +104,9 @@ impl RegionInternal for MmapRegion {
             (slot.sigstack, limits.signal_stack_size),
         ]
         .iter()
-	{
-	    // TLC: Here is another early return from this function.  It feels
-	    // like it might be better to bail here, but I'd like to hear thoughts.
+        {
+            // TLC: Here is another early return from this function.  It feels
+            // like it might be better to bail here, but I'd like to hear thoughts.
             // eprintln!("setting r/w {:p}[{:x}]", *ptr, len);
             unsafe { mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)? };
         }
@@ -131,7 +131,7 @@ impl RegionInternal for MmapRegion {
             region,
         };
 
-	// TLC: Here is another early return from this function.  Hm.
+        // TLC: Here is another early return from this function.  Hm.
         let inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
 
         Ok(inst)
