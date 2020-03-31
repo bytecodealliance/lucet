@@ -891,7 +891,7 @@ macro_rules! alloc_tests {
         /// that a custom size doesn't somehow overwrite the default size.
         #[test]
         fn custom_size_does_not_break_default() {
-            let region = TestRegion::create(2, &LIMITS).expect("region created");
+            let region = TestRegion::create(1, &LIMITS).expect("region created");
 
             // Build an instance that is has custom limits that are big
             // enough to accommodate the HeapSpec.
