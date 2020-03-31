@@ -871,12 +871,11 @@ macro_rules! alloc_tests {
         #[test]
         fn reject_heap_memory_size_exeeds_region_limits() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let module = MockModuleBuilder::new()
+                .with_heap_spec(THREE_PAGE_MAX_HEAP)
+                .build();
             let res = region
-                .new_instance_builder(
-                    MockModuleBuilder::new()
-                        .with_heap_spec(THREE_PAGE_MAX_HEAP)
-                        .build(),
-                )
+                .new_instance_builder(module.clone())
                 .with_heap_size_limit(&LIMITS.heap_memory_size * 2)
                 .build();
 
@@ -887,6 +886,29 @@ macro_rules! alloc_tests {
                 Err(e) => panic!("unexpected error: {}", e),
                 Ok(_) => panic!("unexpected success"),
             }
+	}
+	
+        /// This test exercises custom limits on the heap_memory_size.
+        /// In this scenario, successfully create a custom-sized instance
+	/// and then a default-sized instance to affirm that a custom size
+	/// doesn't somehow overwrite the default size.
+        #[test]
+	fn custom_size_does_not_break_default() {    
+            let region = TestRegion::create(2, &LIMITS).expect("region created");
+            let module = MockModuleBuilder::new()
+                .with_heap_spec(THREE_PAGE_MAX_HEAP)
+                .build();
+
+	    // Build an instance that is within custom limits.
+	    let _custom_inst = region
+                .new_instance_builder(module.clone())
+                .with_heap_size_limit(THREEPAGE_INITIAL_SIZE as usize)
+		.build()
+		.expect("new instance succeeds");
+	    
+	    // Build a default-sized instance, to make sure the custom limits
+	    // didn't break the defaults.  let default_inst =
+	    let _default_inst = region.new_instance(module.clone()).expect("new_instance succeeds");
         }
 
         /// This test exercises custom limits on the heap_memory_size.
