@@ -79,13 +79,12 @@ impl RegionInternal for MmapRegion {
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
     ) -> Result<InstanceHandle, Error> {
-
-	// Affirm that the module, if instantiated, would not violate
-	// any runtime memory limits.
-	let limits = self.get_limits();
+        // Affirm that the module, if instantiated, would not violate
+        // any runtime memory limits.
+        let limits = self.get_limits();
         module.validate_runtime_spec(limits)?;
-	
-	let slot = self
+
+        let slot = self
             .freelist
             .write()
             .unwrap()
@@ -262,7 +261,7 @@ impl RegionInternal for MmapRegion {
     fn get_limits(&self) -> &Limits {
         &self.limits
     }
-    
+
     fn as_dyn_internal(&self) -> &dyn RegionInternal {
         self
     }

@@ -70,7 +70,7 @@ pub trait RegionInternal: Send + Sync {
 
     /// Get the runtime memory size limits
     fn get_limits(&self) -> &Limits;
-    
+
     fn as_dyn_internal(&self) -> &dyn RegionInternal;
 }
 
