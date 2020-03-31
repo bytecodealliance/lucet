@@ -193,8 +193,8 @@ macro_rules! alloc_tests {
 
         /// This test exercises custom limits on the heap_memory_size.
         /// In this scenario, the Region has a limit on the heap memory
-	/// size, but the instance has a smaller limit. Attemps to expand
-	/// the heap fail, but the existing heap can still be used.
+        /// size, but the instance has a smaller limit. Attemps to expand
+        /// the heap fail, but the existing heap can still be used.
         #[test]
         fn expand_past_spec_max_with_custom_limit() {
             let region = TestRegion::create(10, &LIMITS).expect("region created");
@@ -895,26 +895,26 @@ macro_rules! alloc_tests {
             let module = MockModuleBuilder::new()
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
-	    
+
             // Build an instance that is has custom limits that are big
-	    // enough to accommodate the HeapSpec.
+            // enough to accommodate the HeapSpec.
             let mut custom_inst = region
                 .new_instance_builder(module.clone())
-                .with_heap_size_limit(THREE_PAGE_MAX_HEAP.initial_size as usize)                        
+                .with_heap_size_limit(THREE_PAGE_MAX_HEAP.initial_size as usize)
                 .build()
                 .expect("new instance succeeds");
 
-	    // Affirm that its heap is the expected size.
+            // Affirm that its heap is the expected size.
             let heap_len = custom_inst.alloc().heap_len();
             assert_eq!(heap_len, THREE_PAGE_MAX_HEAP.initial_size as usize);
 
             // Build a default-sized instance, to make sure the custom limits
-            // didn't break the defaults.  
+            // didn't break the defaults.
             let default_inst = region
                 .new_instance(module.clone())
                 .expect("new_instance succeeds");
 
-	    // Affirm that its heap is the expected size.
+            // Affirm that its heap is the expected size.
             let heap_len = default_inst.alloc().heap_len();
             assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
         }
@@ -930,7 +930,7 @@ macro_rules! alloc_tests {
                     MockModuleBuilder::new()
                         .with_heap_spec(THREE_PAGE_MAX_HEAP)
                         .build(),
-                ) 
+                )
                 .with_heap_size_limit((THREE_PAGE_MAX_HEAP.initial_size / 2) as usize)
                 .build();
 
