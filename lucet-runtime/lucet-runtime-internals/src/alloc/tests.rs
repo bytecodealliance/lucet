@@ -690,7 +690,7 @@ macro_rules! alloc_tests {
         }
 
         #[test]
-        fn bad_instance_does_not_take_up_capacity() {
+        fn badly_specced_instance_does_not_take_up_capacity() {
             let module = MockModuleBuilder::new()
                 .with_heap_spec(LARGE_GUARD_HEAP)
                 .build();

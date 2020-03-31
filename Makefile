@@ -46,6 +46,8 @@ test-except-fuzz: test-packages
 	# run the benchmarks in debug mode
 	cargo test --benches -p lucet-benchmarks -- --test
 	helpers/lucet-toolchain-tests/signature.sh
+	cargo build -p lucet-objdump
+	helpers/lucet-toolchain-tests/objdump.sh
 
 # run a single seed through the fuzzer to stave off bitrot
 .PHONY: test-fuzz

@@ -251,7 +251,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             // TODO: once we have a notion of logging in `lucet-runtime`, this should be a logged
             // error.
             debug_assert!(!inst.kill_state.is_terminable());
-
+            // set the state before jumping back to the host context
             inst.state = State::Terminating {
                 details: TerminationDetails::Remote,
             };

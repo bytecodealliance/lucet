@@ -7,7 +7,7 @@ use lucet_module::{
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use colored::Colorize;
-use goblin::{elf, Object};
+use object::{Object, ObjectSection, SymbolKind, SymbolScope};
 use std::env;
 use std::fs::File;
 use std::io::Cursor;
@@ -17,8 +17,8 @@ use std::mem;
 #[derive(Debug)]
 struct ArtifactSummary<'a> {
     buffer: &'a Vec<u8>,
-    elf: &'a elf::Elf<'a>,
-    symbols: StandardSymbols,
+    obj: &'a object::File<'a>,
+    symbols: StandardSymbols<'a>,
     data_segments: Option<DataSegments>,
     serialized_module: Option<SerializedModule>,
     exported_functions: Vec<&'a str>,
@@ -26,8 +26,8 @@ struct ArtifactSummary<'a> {
 }
 
 #[derive(Debug)]
-struct StandardSymbols {
-    lucet_module: Option<elf::sym::Sym>,
+struct StandardSymbols<'a> {
+    lucet_module: Option<object::read::Symbol<'a>>,
 }
 
 #[derive(Debug)]
@@ -43,10 +43,10 @@ struct DataSegment {
 }
 
 impl<'a> ArtifactSummary<'a> {
-    fn new(buffer: &'a Vec<u8>, elf: &'a elf::Elf<'_>) -> Self {
+    fn new(buffer: &'a Vec<u8>, obj: &'a object::File<'_>) -> Self {
         Self {
             buffer: buffer,
-            elf: elf,
+            obj: obj,
             symbols: StandardSymbols { lucet_module: None },
             data_segments: None,
             serialized_module: None,
@@ -56,15 +56,11 @@ impl<'a> ArtifactSummary<'a> {
     }
 
     fn read_memory(&self, addr: u64, size: u64) -> Option<&'a [u8]> {
-        for header in &self.elf.program_headers {
-            if header.p_type == elf::program_header::PT_LOAD {
-                // Bounds check the entry
-                if addr >= header.p_vaddr && (addr + size) <= (header.p_vaddr + header.p_memsz) {
-                    let start = (addr - header.p_vaddr + header.p_offset) as usize;
-                    let end = start + size as usize;
-
-                    return Some(&self.buffer[start..end]);
-                }
+        // `addr` is really more of an offset from the start of the segment.
+        for section in self.obj.sections() {
+            let bytes = section.data_range(addr, size).ok().flatten();
+            if bytes.is_some() {
+                return bytes;
             }
         }
 
@@ -72,23 +68,19 @@ impl<'a> ArtifactSummary<'a> {
     }
 
     fn gather(&mut self) {
-        for ref sym in self.elf.syms.iter() {
-            let name = self
-                .elf
-                .strtab
-                .get(sym.st_name)
-                .unwrap_or(Ok("(no name)"))
-                .expect("strtab entry");
-
-            match name {
-                "lucet_module" => self.symbols.lucet_module = Some(sym.clone()),
+        for sym in self.obj.symbols() {
+            let sym = sym.1;
+            match sym.name() {
+                Some(ref name) if name == &"lucet_module" => {
+                    self.symbols.lucet_module = Some(sym.clone())
+                }
+                Some(ref name) if name == &"" => continue,
+                None => continue,
                 _ => {
-                    if sym.st_bind() == elf::sym::STB_GLOBAL {
-                        if sym.is_function() {
-                            self.exported_functions.push(name.clone());
-                        } else if sym.st_shndx == elf::section_header::SHN_UNDEF as usize {
-                            self.imported_symbols.push(name.clone());
-                        }
+                    if sym.kind() == SymbolKind::Text && sym.scope() == SymbolScope::Dynamic {
+                        self.exported_functions.push(sym.name().unwrap().into());
+                    } else if sym.scope() == SymbolScope::Unknown {
+                        self.imported_symbols.push(sym.name().unwrap().into());
                     }
                 }
             }
@@ -97,7 +89,7 @@ impl<'a> ArtifactSummary<'a> {
         self.serialized_module = self.symbols.lucet_module.as_ref().map(|module_sym| {
             let buffer = self
                 .read_memory(
-                    module_sym.st_value,
+                    module_sym.address(),
                     mem::size_of::<SerializedModule>() as u64,
                 )
                 .unwrap();
@@ -117,20 +109,11 @@ impl<'a> ArtifactSummary<'a> {
         });
     }
 
-    fn get_func_name_for_addr(&self, addr: u64) -> Option<&str> {
-        for ref sym in self.elf.syms.iter() {
-            if sym.is_function() && sym.st_value == addr {
-                let name = self
-                    .elf
-                    .strtab
-                    .get(sym.st_name)
-                    .unwrap_or(Ok("(no name)"))
-                    .expect("strtab entry");
-
-                return Some(name);
-            }
-        }
-        None
+    fn get_symbol_name_for_addr(&self, addr: u64) -> Option<&str> {
+        self.obj
+            .symbol_map()
+            .get(addr)
+            .map(|sym| sym.name().unwrap_or("(no name)"))
     }
 }
 
@@ -139,15 +122,11 @@ fn main() {
     let mut fd = File::open(path).expect("open");
     let mut buffer = Vec::new();
     fd.read_to_end(&mut buffer).expect("read");
-    let object = Object::parse(&buffer).expect("parse");
+    let object = object::File::parse(&buffer).expect("parse");
 
-    if let Object::Elf(eo) = object {
-        let mut summary = ArtifactSummary::new(&buffer, &eo);
-        summary.gather();
-        print_summary(summary);
-    } else {
-        println!("Expected Elf!");
-    }
+    let mut summary = ArtifactSummary::new(&buffer, &object);
+    summary.gather();
+    print_summary(summary);
 }
 
 /// Parse a trap manifest for function `f`, if it has one.
@@ -315,7 +294,7 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
     }
 
     for (i, f) in function_manifest.iter().enumerate() {
-        let header_name = summary.get_func_name_for_addr(f.ptr().as_usize() as u64);
+        let header_name = summary.get_symbol_name_for_addr(f.ptr().as_usize() as u64);
 
         if i >= module_data.function_info().len() {
             // This is one form of the above-mentioned bug case
