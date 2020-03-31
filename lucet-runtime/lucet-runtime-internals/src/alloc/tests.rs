@@ -892,31 +892,37 @@ macro_rules! alloc_tests {
         #[test]
         fn custom_size_does_not_break_default() {
             let region = TestRegion::create(2, &LIMITS).expect("region created");
-            let module = MockModuleBuilder::new()
-                .with_heap_spec(THREE_PAGE_MAX_HEAP)
-                .build();
 
             // Build an instance that is has custom limits that are big
             // enough to accommodate the HeapSpec.
-            let mut custom_inst = region
-                .new_instance_builder(module.clone())
-                .with_heap_size_limit(THREE_PAGE_MAX_HEAP.initial_size as usize)
+            let custom_inst = region
+                .new_instance_builder(
+                    MockModuleBuilder::new()
+                        .with_heap_spec(THREE_PAGE_MAX_HEAP)
+                        .build(),
+                )
+                .with_heap_size_limit((THREE_PAGE_MAX_HEAP.initial_size * 2) as usize)
                 .build()
                 .expect("new instance succeeds");
 
-            // Affirm that its heap is the expected size.
+            // Affirm that its heap is the expected size, the size
+            // specified in the HeapSpec.
             let heap_len = custom_inst.alloc().heap_len();
             assert_eq!(heap_len, THREE_PAGE_MAX_HEAP.initial_size as usize);
 
-            // Build a default-sized instance, to make sure the custom limits
-            // didn't break the defaults.
+            // Build a default heap-limited instance, to make sure the
+            // custom limits didn't break the defaults.
             let default_inst = region
-                .new_instance(module.clone())
+                .new_instance(
+                    MockModuleBuilder::new()
+                        .with_heap_spec(SMALL_GUARD_HEAP)
+                        .build(),
+                )
                 .expect("new_instance succeeds");
 
             // Affirm that its heap is the expected size.
             let heap_len = default_inst.alloc().heap_len();
-            assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
+            assert_eq!(heap_len, SMALL_GUARD_HEAP.initial_size as usize);
         }
 
         /// This test exercises custom limits on the heap_memory_size.
