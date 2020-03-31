@@ -28,6 +28,7 @@ rand = "0.7"
 raw-cpuid = "6.0.0"
 thiserror = "1.0.4"
 tracing = "0.1.12"
+userfaultfd = { path = "../../../userfaultfd-rs" }
 
 [dev-dependencies]
 byteorder = "1.2"
