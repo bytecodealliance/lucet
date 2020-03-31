@@ -79,7 +79,13 @@ impl RegionInternal for MmapRegion {
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
     ) -> Result<InstanceHandle, Error> {
-        let slot = self
+
+	// Affirm that the module, if instantiated, would not violate
+	// any runtime memory limits.
+	let limits = self.get_limits();
+        module.validate_runtime_spec(limits)?;
+	
+	let slot = self
             .freelist
             .write()
             .unwrap()
@@ -89,9 +95,6 @@ impl RegionInternal for MmapRegion {
         if slot.heap as usize % host_page_size() != 0 {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
-
-        let limits = &slot.limits;
-        module.validate_runtime_spec(limits)?;
 
         for (ptr, len) in [
             // make the stack read/writable
@@ -256,6 +259,10 @@ impl RegionInternal for MmapRegion {
         Ok(())
     }
 
+    fn get_limits(&self) -> &Limits {
+        &self.limits
+    }
+    
     fn as_dyn_internal(&self) -> &dyn RegionInternal {
         self
     }
