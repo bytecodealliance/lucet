@@ -190,7 +190,7 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
 
 #[macro_export]
 macro_rules! entrypoint_tests {
-    ( $( $TestRegion:path => $region_id:ident ),* ) => {
+    ( $( $region_id:ident => $TestRegion:path ),* ) => {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
