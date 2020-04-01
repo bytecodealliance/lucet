@@ -170,7 +170,7 @@ macro_rules! guest_fault_common_defs {
 
 #[macro_export]
 macro_rules! guest_fault_tests {
-    ( $TestRegion:path ) => {
+    ( $( $region_id:ident => $TestRegion:path ),* ) => {
         use lazy_static::lazy_static;
         use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGBUS, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
@@ -185,6 +185,7 @@ macro_rules! guest_fault_tests {
         use std::ptr;
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
+        use $crate::guest_fault::{mock_traps_module, with_unchanged_signal_handlers};
         use $crate::helpers::{
             test_ex, test_nonex, with_unchanged_signal_handlers, FunctionPointer,
             MockExportBuilder, MockModuleBuilder,
@@ -204,363 +205,355 @@ macro_rules! guest_fault_tests {
         #[cfg(not(target_os = "linux"))]
         const INVALID_PERMISSION_SIGNAL: Signal = Signal::SIGBUS;
 
-        unsafe fn recoverable_ptr_setup() {
-            assert!(RECOVERABLE_PTR.is_null());
-            RECOVERABLE_PTR = mmap(
-                ptr::null_mut(),
-                4096,
-                ProtFlags::PROT_NONE,
-                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
-                0,
-                0,
-            )
-            .expect("mmap succeeds") as *mut libc::c_char;
-            assert!(!RECOVERABLE_PTR.is_null());
+        static HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
+
+        #[no_mangle]
+        unsafe extern "C" fn guest_recoverable_get_ptr() -> *const libc::c_char {
+            RECOVERABLE_PTR
         }
 
-        unsafe fn recoverable_ptr_make_accessible() {
-            use nix::sys::mman::ProtFlags;
-
-            mprotect(
-                RECOVERABLE_PTR as *mut c_void,
-                4096,
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-            )
-            .expect("mprotect succeeds");
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_test(_vmctx: &mut Vmctx) {
+            lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
         }
 
-        unsafe fn recoverable_ptr_teardown() {
-            nix::sys::mman::munmap(RECOVERABLE_PTR as *mut c_void, 4096).expect("munmap succeeds");
-            RECOVERABLE_PTR = ptr::null_mut();
-        }
-
-        fn run_onetwothree(inst: &mut Instance) {
-            let retval = inst
-                .run("onetwothree", &[])
-                .expect("instance runs")
-                .unwrap_returned();
-            assert_eq!(libc::c_int::from(retval), 123);
-        }
-
-        #[test]
-        fn illegal_instr() {
-            test_nonex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                match inst.run("illegal_instr", &[]) {
-                    Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
-                    }
-                    res => panic!("unexpected result: {:?}", res),
-                }
-
-                // after a fault, can reset and run a normal function
-                inst.reset().expect("instance resets");
-
-                run_onetwothree(&mut inst);
-            })
-        }
-
-        #[test]
-        /// Test that the Lucet signal handler runs correctly when installed manually.
-        fn illegal_instr_manual_signal() {
-            test_ex(|| {
-                with_unchanged_signal_handlers(|| {
-                    let module = mock_traps_module();
-                    let region =
-                        TestRegion::create(1, &Limits::default()).expect("region can be created");
-                    let mut inst = region
-                        .new_instance(module)
-                        .expect("instance can be created");
-                    inst.ensure_signal_handler_installed(false);
-
-                    lucet_runtime::install_lucet_signal_handler();
-
-                    match inst.run("illegal_instr", &[]) {
-                        Err(Error::RuntimeFault(details)) => {
-                            assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
-                        }
-                        res => panic!("unexpected result: {:?}", res),
-                    }
-
-                    // after a fault, can reset and run a normal function
-                    inst.reset().expect("instance resets");
-
-                    run_onetwothree(&mut inst);
-
-                    lucet_runtime::remove_lucet_signal_handler();
-                });
-            })
-        }
-
-        #[test]
-        /// Test that the Lucet signal handler runs correctly when installed manually, even when we
-        /// don't keep a 1:1 ratio between install/remove.
-        fn illegal_instr_manuals_signal() {
-            test_ex(|| {
-                with_unchanged_signal_handlers(|| {
-                    let module = mock_traps_module();
-                    let region =
-                        TestRegion::create(1, &Limits::default()).expect("region can be created");
-                    let mut inst = region
-                        .new_instance(module)
-                        .expect("instance can be created");
-                    inst.ensure_signal_handler_installed(false);
-
-                    lucet_runtime::install_lucet_signal_handler();
-                    // call it a few times; it shouldn't matter!
-                    lucet_runtime::install_lucet_signal_handler();
-                    lucet_runtime::install_lucet_signal_handler();
-
-                    match inst.run("illegal_instr", &[]) {
-                        Err(Error::RuntimeFault(details)) => {
-                            assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
-                        }
-                        res => panic!("unexpected result: {:?}", res),
-                    }
-
-                    // after a fault, can reset and run a normal function
-                    inst.reset().expect("instance resets");
-
-                    run_onetwothree(&mut inst);
-
-                    lucet_runtime::remove_lucet_signal_handler();
-                    // call it a few times; it shouldn't matter!
-                    lucet_runtime::remove_lucet_signal_handler();
-                    lucet_runtime::remove_lucet_signal_handler();
-                    lucet_runtime::remove_lucet_signal_handler();
-
-                    // just reinstall once and make sure we catch the trap
-                    lucet_runtime::install_lucet_signal_handler();
-
-                    match inst.run("illegal_instr", &[]) {
-                        Err(Error::RuntimeFault(details)) => {
-                            assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
-                        }
-                        res => panic!("unexpected result: {:?}", res),
-                    }
-
-                    lucet_runtime::remove_lucet_signal_handler();
-                });
-            })
-        }
-
-        #[test]
-        /// Test that the Lucet signal handler runs correctly when the sigstack is provided by the
-        /// caller, rather than from the `Region`.
-        ///
-        /// The `signal_stack_size` of the `Region`'s limits is also set to zero, to show that we no
-        /// longer validate the signal stack size on region creation.
-        fn illegal_instr_manual_sigstack() {
-            use libc::*;
-            use std::mem::MaybeUninit;
-
-            test_nonex(|| {
-                let mut our_sigstack_alloc = vec![0; lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE];
-                let our_sigstack = stack_t {
-                    ss_sp: our_sigstack_alloc.as_mut_ptr() as *mut _,
-                    ss_flags: 0,
-                    ss_size: lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE,
+        $(
+            mod $region_id {
+                use lazy_static::lazy_static;
+                use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGBUS, SIGSEGV};
+                use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
+                use lucet_runtime::{
+                    lucet_hostcall, lucet_hostcall_terminate, lucet_internal_ensure_linked, DlModule,
+                    Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TerminationDetails,
+                    TrapCode,
                 };
-                let mut beforestack = MaybeUninit::<stack_t>::uninit();
-                let beforestack = unsafe {
-                    sigaltstack(&our_sigstack, beforestack.as_mut_ptr());
-                    beforestack.assume_init()
+                use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+                use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
+                use nix::sys::wait::{waitpid, WaitStatus};
+                use nix::unistd::{fork, ForkResult};
+                use std::ptr;
+                use std::sync::{Arc, Mutex};
+                use $TestRegion as TestRegion;
+                use $crate::guest_fault::{mock_traps_module, with_unchanged_signal_handlers};
+                use $crate::helpers::{
+                    test_ex, test_nonex, FunctionPointer, MockExportBuilder, MockModuleBuilder,
                 };
 
-                let module = mock_traps_module();
-                let limits_no_sigstack = Limits {
-                    signal_stack_size: 0,
-                    ..Limits::default()
-                };
-                let region =
-                    TestRegion::create(1, &limits_no_sigstack).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
 
-                inst.ensure_sigstack_installed(false);
-
-                match inst.run("illegal_instr", &[]) {
-                    Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
-                    }
-                    res => panic!("unexpected result: {:?}", res),
+                unsafe fn recoverable_ptr_setup() {
+                    assert!(super::RECOVERABLE_PTR.is_null());
+                    super::RECOVERABLE_PTR = mmap(
+                        ptr::null_mut(),
+                        4096,
+                        ProtFlags::PROT_NONE,
+                        MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
+                        0,
+                        0,
+                    )
+                        .expect("mmap succeeds") as *mut libc::c_char;
+                    assert!(!super::RECOVERABLE_PTR.is_null());
                 }
 
-                // after a fault, can reset and run a normal function
-                inst.reset().expect("instance resets");
+                unsafe fn recoverable_ptr_make_accessible() {
+                    use nix::sys::mman::ProtFlags;
 
-                run_onetwothree(&mut inst);
-
-                let mut afterstack = MaybeUninit::<stack_t>::uninit();
-                let afterstack = unsafe {
-                    sigaltstack(&beforestack, afterstack.as_mut_ptr());
-                    afterstack.assume_init()
-                };
-
-                assert_eq!(afterstack.ss_sp, our_sigstack_alloc.as_mut_ptr() as *mut _);
-            })
-        }
-
-        #[test]
-        fn oob() {
-            test_nonex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                match inst.run("oob", &[]) {
-                    Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
-                    }
-                    res => panic!("unexpected result: {:?}", res),
+                    mprotect(
+                        super::RECOVERABLE_PTR as *mut c_void,
+                        4096,
+                        ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                    )
+                        .expect("mprotect succeeds");
                 }
 
-                // after a fault, can reset and run a normal function
-                inst.reset().expect("instance resets");
-
-                run_onetwothree(&mut inst);
-            });
-        }
-
-        // Ensure that guests can be successfully run after an instance faults, but without
-        // resetting the guest.
-        #[test]
-        fn guest_after_fault_without_reset() {
-            test_nonex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                match inst.run("oob", &[]) {
-                    Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
-                    }
-                    res => panic!("unexpected result: {:?}", res),
+                unsafe fn recoverable_ptr_teardown() {
+                    nix::sys::mman::munmap(super::RECOVERABLE_PTR as *mut c_void, 4096).expect("munmap succeeds");
+                    super::RECOVERABLE_PTR = ptr::null_mut();
                 }
 
-                run_onetwothree(&mut inst);
-            });
-        }
-
-        #[test]
-        fn hostcall_error() {
-            test_nonex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                match inst.run("hostcall_main", &[]) {
-                    Err(Error::RuntimeTerminated(term)) => {
-                        assert_eq!(
-                            *term
-                                .provided_details()
-                                .expect("user terminated in hostcall")
-                                .downcast_ref::<&'static str>()
-                                .expect("error was str"),
-                            HOSTCALL_TEST_ERROR,
-                        );
-                    }
-                    res => panic!("unexpected result: {:?}", res),
+                fn run_onetwothree(inst: &mut Instance) {
+                    let retval = inst
+                        .run("onetwothree", &[])
+                        .expect("instance runs")
+                        .unwrap_returned();
+                    assert_eq!(libc::c_int::from(retval), 123);
                 }
 
-                // after a fault, can reset and run a normal function
-                inst.reset().expect("instance resets");
-
-                run_onetwothree(&mut inst);
-            });
-        }
-
-        #[test]
-        fn fatal_continue_signal_handler() {
-            fn signal_handler_continue(
-                _inst: &Instance,
-                _trapcode: &Option<TrapCode>,
-                signum: libc::c_int,
-                _siginfo_ptr: *const siginfo_t,
-                _ucontext_ptr: *const c_void,
-            ) -> SignalBehavior {
-                assert!(signum == INVALID_PERMISSION_FAULT);
-
-                // The fault was caused by writing to a protected page at `recoverable_ptr`.  Make that
-                // no longer be a fault
-                unsafe { recoverable_ptr_make_accessible() };
-
-                // Now the guest code can continue
-                SignalBehavior::Continue
-            }
-            test_nonex(|| {
-                // make sure only one test using RECOVERABLE_PTR is running at once
-                let lock = RECOVERABLE_PTR_LOCK.lock().unwrap();
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                // Install a signal handler that will override the fatal error and tell the sandbox to
-                // continue executing. Obviously this is dangerous, but for this test it should be harmless.
-                inst.set_signal_handler(signal_handler_continue);
-
-                // set `recoverable_ptr` to point to a page that is not read/writable
-                unsafe { recoverable_ptr_setup() };
-
-                // Child code will call `guest_recoverable_get_ptr` and write to the pointer it
-                // returns. This will initially cause a segfault. The signal handler will recover
-                // from the segfault, map the page to read/write, and then return to the child
-                // code. The child code will then succeed, and the instance will exit successfully.
-                inst.run("recoverable_fatal", &[]).expect("instance runs");
-
-                unsafe { recoverable_ptr_teardown() };
-                drop(lock);
-            });
-        }
-
-        #[test]
-        fn fatal_terminate_signal_handler() {
-            fn signal_handler_terminate(
-                _inst: &Instance,
-                _trapcode: &Option<TrapCode>,
-                signum: libc::c_int,
-                _siginfo_ptr: *const siginfo_t,
-                _ucontext_ptr: *const c_void,
-            ) -> SignalBehavior {
-                assert!(signum == INVALID_PERMISSION_FAULT);
-
-                // Terminate guest
-                SignalBehavior::Terminate
-            }
-            test_ex(|| {
-                // // make sure only one test using RECOVERABLE_PTR is running at once
-                let lock = RECOVERABLE_PTR_LOCK.lock().unwrap();
-                match fork().expect("can fork") {
-                    ForkResult::Child => {
+                #[test]
+                fn illegal_instr() {
+                    test_nonex(|| {
                         let module = mock_traps_module();
-                        let region = TestRegion::create(1, &Limits::default())
-                            .expect("region can be created");
+                        let region =
+                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        match inst.run("illegal_instr", &[]) {
+                            Err(Error::RuntimeFault(details)) => {
+                                assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        // after a fault, can reset and run a normal function
+                        inst.reset().expect("instance resets");
+
+                        run_onetwothree(&mut inst);
+                    })
+                }
+
+                #[test]
+                /// Test that the Lucet signal handler runs correctly when installed manually.
+                fn illegal_instr_manual_signal() {
+                    test_ex(|| {
+                        with_unchanged_signal_handlers(|| {
+                            let module = mock_traps_module();
+                            let region =
+                                TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            let mut inst = region
+                                .new_instance(module)
+                                .expect("instance can be created");
+                            inst.ensure_signal_handler_installed(false);
+
+                            lucet_runtime::install_lucet_signal_handler();
+
+                            match inst.run("illegal_instr", &[]) {
+                                Err(Error::RuntimeFault(details)) => {
+                                    assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                                }
+                                res => panic!("unexpected result: {:?}", res),
+                            }
+
+                            // after a fault, can reset and run a normal function
+                            inst.reset().expect("instance resets");
+
+                            run_onetwothree(&mut inst);
+
+                            lucet_runtime::remove_lucet_signal_handler();
+                        });
+                    })
+                }
+
+                #[test]
+                /// Test that the Lucet signal handler runs correctly when installed manually, even when we
+                /// don't keep a 1:1 ratio between install/remove.
+                fn illegal_instr_manuals_signal() {
+                    test_ex(|| {
+                        with_unchanged_signal_handlers(|| {
+                            let module = mock_traps_module();
+                            let region =
+                                TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            let mut inst = region
+                                .new_instance(module)
+                                .expect("instance can be created");
+                            inst.ensure_signal_handler_installed(false);
+
+                            lucet_runtime::install_lucet_signal_handler();
+                            // call it a few times; it shouldn't matter!
+                            lucet_runtime::install_lucet_signal_handler();
+                            lucet_runtime::install_lucet_signal_handler();
+
+                            match inst.run("illegal_instr", &[]) {
+                                Err(Error::RuntimeFault(details)) => {
+                                    assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                                }
+                                res => panic!("unexpected result: {:?}", res),
+                            }
+
+                            // after a fault, can reset and run a normal function
+                            inst.reset().expect("instance resets");
+
+                            run_onetwothree(&mut inst);
+
+                            lucet_runtime::remove_lucet_signal_handler();
+                            // call it a few times; it shouldn't matter!
+                            lucet_runtime::remove_lucet_signal_handler();
+                            lucet_runtime::remove_lucet_signal_handler();
+                            lucet_runtime::remove_lucet_signal_handler();
+
+                            // just reinstall once and make sure we catch the trap
+                            lucet_runtime::install_lucet_signal_handler();
+
+                            match inst.run("illegal_instr", &[]) {
+                                Err(Error::RuntimeFault(details)) => {
+                                    assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                                }
+                                res => panic!("unexpected result: {:?}", res),
+                            }
+
+                            lucet_runtime::remove_lucet_signal_handler();
+                        });
+                    })
+                }
+
+                #[test]
+                /// Test that the Lucet signal handler runs correctly when the sigstack is provided by the
+                /// caller, rather than from the `Region`.
+                ///
+                /// The `signal_stack_size` of the `Region`'s limits is also set to zero, to show that we no
+                /// longer validate the signal stack size on region creation.
+                fn illegal_instr_manual_sigstack() {
+                    use libc::*;
+                    use std::mem::MaybeUninit;
+
+                    test_nonex(|| {
+                        let mut our_sigstack_alloc = vec![0; lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE];
+                        let our_sigstack = stack_t {
+                            ss_sp: our_sigstack_alloc.as_mut_ptr() as *mut _,
+                            ss_flags: 0,
+                            ss_size: lucet_runtime::DEFAULT_SIGNAL_STACK_SIZE,
+                        };
+                        let mut beforestack = MaybeUninit::<stack_t>::uninit();
+                        let beforestack = unsafe {
+                            sigaltstack(&our_sigstack, beforestack.as_mut_ptr());
+                            beforestack.assume_init()
+                        };
+
+                        let module = mock_traps_module();
+                        let limits_no_sigstack = Limits {
+                            signal_stack_size: 0,
+                            ..Limits::default()
+                        };
+                        let region =
+                            TestRegion::create(1, &limits_no_sigstack).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        inst.ensure_sigstack_installed(false);
+
+                        match inst.run("illegal_instr", &[]) {
+                            Err(Error::RuntimeFault(details)) => {
+                                assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        // after a fault, can reset and run a normal function
+                        inst.reset().expect("instance resets");
+
+                        run_onetwothree(&mut inst);
+
+                        let mut afterstack = MaybeUninit::<stack_t>::uninit();
+                        let afterstack = unsafe {
+                            sigaltstack(&beforestack, afterstack.as_mut_ptr());
+                            afterstack.assume_init()
+                        };
+
+                        assert_eq!(afterstack.ss_sp, our_sigstack_alloc.as_mut_ptr() as *mut _);
+                    })
+                }
+
+                #[test]
+                fn oob() {
+                    test_nonex(|| {
+                        let module = mock_traps_module();
+                        let region =
+                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        match inst.run("oob", &[]) {
+                            Err(Error::RuntimeFault(details)) => {
+                                assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        // after a fault, can reset and run a normal function
+                        inst.reset().expect("instance resets");
+
+                        run_onetwothree(&mut inst);
+                    });
+                }
+
+                // Ensure that guests can be successfully run after an instance faults, but without
+                // resetting the guest.
+                #[test]
+                fn guest_after_fault_without_reset() {
+                    test_nonex(|| {
+                        let module = mock_traps_module();
+                        let region =
+                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        match inst.run("oob", &[]) {
+                            Err(Error::RuntimeFault(details)) => {
+                                assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        run_onetwothree(&mut inst);
+                    });
+                }
+
+                #[test]
+                fn hostcall_error() {
+                    test_nonex(|| {
+                        let module = mock_traps_module();
+                        let region =
+                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        match inst.run("hostcall_main", &[]) {
+                            Err(Error::RuntimeTerminated(term)) => {
+                                assert_eq!(
+                                    *term
+                                        .provided_details()
+                                        .expect("user terminated in hostcall")
+                                        .downcast_ref::<&'static str>()
+                                        .expect("error was str"),
+                                    super::HOSTCALL_TEST_ERROR,
+                                );
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        // after a fault, can reset and run a normal function
+                        inst.reset().expect("instance resets");
+
+                        run_onetwothree(&mut inst);
+                    });
+                }
+
+                #[test]
+                fn fatal_continue_signal_handler() {
+                    fn signal_handler_continue(
+                        _inst: &Instance,
+                        _trapcode: &Option<TrapCode>,
+                        signum: libc::c_int,
+                        _siginfo_ptr: *const siginfo_t,
+                        _ucontext_ptr: *const c_void,
+                    ) -> SignalBehavior {
+                        assert!(signum == super::INVALID_PERMISSION_FAULT);
+
+                        // The fault was caused by writing to a protected page at `recoverable_ptr`.  Make that
+                        // no longer be a fault
+                        unsafe { recoverable_ptr_make_accessible() };
+
+                        // Now the guest code can continue
+                        SignalBehavior::Continue
+                    }
+                    test_nonex(|| {
+                        // make sure only one test using super::RECOVERABLE_PTR is running at once
+                        let lock = super::RECOVERABLE_PTR_LOCK.lock().unwrap();
+                        let module = mock_traps_module();
+                        let region =
+                            TestRegion::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
 
                         // Install a signal handler that will override the fatal error and tell the sandbox to
-                        // exit, but with a nonfatal error (should be an unknown fault)
-                        inst.set_signal_handler(signal_handler_terminate);
+                        // continue executing. Obviously this is dangerous, but for this test it should be harmless.
+                        inst.set_signal_handler(signal_handler_continue);
 
                         // set `recoverable_ptr` to point to a page that is not read/writable
                         unsafe { recoverable_ptr_setup() };
@@ -569,365 +562,411 @@ macro_rules! guest_fault_tests {
                         // returns. This will initially cause a segfault. The signal handler will recover
                         // from the segfault, map the page to read/write, and then return to the child
                         // code. The child code will then succeed, and the instance will exit successfully.
-                        match inst.run("recoverable_fatal", &[]) {
-                            Err(Error::RuntimeTerminated(_)) => (),
-                            res => panic!("unexpected result: {:?}", res),
-                        }
+                        inst.run("recoverable_fatal", &[]).expect("instance runs");
 
                         unsafe { recoverable_ptr_teardown() };
-                        // don't want this child continuing to test harness code
-                        std::process::exit(0);
-                    }
-                    ForkResult::Parent { child } => {
-                        match waitpid(Some(child), None).expect("can wait on child") {
-                            WaitStatus::Exited(_, code) => {
-                                assert_eq!(code, 0);
-                            }
-                            ws => panic!("unexpected wait status: {:?}", ws),
-                        }
-                    }
-                }
-                drop(lock);
-            })
-        }
-
-        #[test]
-        fn sigsegv_handler_saved_restored() {
-            lazy_static! {
-                static ref HOST_FAULT_TRIGGERED: Mutex<bool> = Mutex::new(false);
-            }
-
-            extern "C" fn host_sigsegv_handler(
-                signum: libc::c_int,
-                _siginfo_ptr: *mut siginfo_t,
-                _ucontext_ptr: *mut c_void,
-            ) {
-                assert!(signum == INVALID_PERMISSION_FAULT);
-                unsafe { recoverable_ptr_make_accessible() };
-                *HOST_FAULT_TRIGGERED.lock().unwrap() = true;
-            }
-            test_ex(|| {
-                with_unchanged_signal_handlers(|| {
-                    // make sure only one test using RECOVERABLE_PTR is running at once
-                    let recoverable_ptr_lock = RECOVERABLE_PTR_LOCK.lock().unwrap();
-                    let module = mock_traps_module();
-                    let region =
-                        TestRegion::create(1, &Limits::default()).expect("region can be created");
-                    let mut inst = region
-                        .new_instance(module)
-                        .expect("instance can be created");
-
-                    let sa = SigAction::new(
-                        SigHandler::SigAction(host_sigsegv_handler),
-                        SaFlags::SA_RESTART,
-                        SigSet::all(),
-                    );
-                    let before_sa = unsafe {
-                        sigaction(INVALID_PERMISSION_SIGNAL, &sa).expect("sigaction succeeds")
-                    };
-
-                    match inst.run("illegal_instr", &[]) {
-                        Err(Error::RuntimeFault(details)) => {
-                            assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
-                        }
-                        res => panic!("unexpected result: {:?}", res),
-                    }
-
-                    // now make sure that the host sigaction has been restored
-                    unsafe {
-                        recoverable_ptr_setup();
-                    }
-                    *HOST_FAULT_TRIGGERED.lock().unwrap() = false;
-
-                    // accessing this should trigger the segfault
-                    unsafe {
-                        *RECOVERABLE_PTR = 0;
-                    }
-
-                    assert!(*HOST_FAULT_TRIGGERED.lock().unwrap());
-
-                    // clean up
-                    unsafe {
-                        recoverable_ptr_teardown();
-                        sigaction(INVALID_PERMISSION_SIGNAL, &before_sa)
-                            .expect("sigaction succeeds");
-                    }
-
-                    drop(recoverable_ptr_lock);
-                })
-            })
-        }
-
-        #[test]
-        fn sigsegv_handler_during_guest() {
-            lazy_static! {
-                static ref HOST_FAULT_TRIGGERED: Mutex<bool> = Mutex::new(false);
-            }
-
-            extern "C" fn host_sigsegv_handler(
-                signum: libc::c_int,
-                _siginfo_ptr: *mut siginfo_t,
-                _ucontext_ptr: *mut c_void,
-            ) {
-                assert!(signum == INVALID_PERMISSION_FAULT);
-                unsafe { recoverable_ptr_make_accessible() };
-                *HOST_FAULT_TRIGGERED.lock().unwrap() = true;
-            }
-
-            #[lucet_hostcall]
-            pub fn sleepy_guest(_vmctx: &mut Vmctx) {
-                std::thread::sleep(std::time::Duration::from_millis(20));
-            }
-
-            test_ex(|| {
-                with_unchanged_signal_handlers(|| {
-                    // make sure only one test using RECOVERABLE_PTR is running at once
-                    let recoverable_ptr_lock = RECOVERABLE_PTR_LOCK.lock().unwrap();
-
-                    let sa = SigAction::new(
-                        SigHandler::SigAction(host_sigsegv_handler),
-                        SaFlags::SA_RESTART,
-                        SigSet::empty(),
-                    );
-
-                    let saved_fault_sa = unsafe {
-                        sigaction(INVALID_PERMISSION_SIGNAL, &sa).expect("sigaction succeeds")
-                    };
-
-                    // The original thread will run `sleepy_guest`, and the new thread will dereference a null
-                    // pointer after a delay. This should lead to a sigsegv while the guest is running,
-                    // therefore testing that the host signal gets re-raised.
-                    let child = std::thread::spawn(|| {
-                        let module = MockModuleBuilder::new()
-                            .with_export_func(MockExportBuilder::new(
-                                "sleepy_guest",
-                                FunctionPointer::from_usize(sleepy_guest as usize),
-                            ))
-                            .build();
-                        let region = TestRegion::create(1, &Limits::default())
-                            .expect("region can be created");
-                        let mut inst = region
-                            .new_instance(module)
-                            .expect("instance can be created");
-
-                        inst.run("sleepy_guest", &[]).expect("instance runs");
+                        drop(lock);
                     });
+                }
 
-                    // now trigger a segfault in the middle of running the guest
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                    unsafe {
-                        recoverable_ptr_setup();
+                #[test]
+                fn fatal_terminate_signal_handler() {
+                    fn signal_handler_terminate(
+                        _inst: &Instance,
+                        _trapcode: &Option<TrapCode>,
+                        signum: libc::c_int,
+                        _siginfo_ptr: *const siginfo_t,
+                        _ucontext_ptr: *const c_void,
+                    ) -> SignalBehavior {
+                        assert!(signum == super::INVALID_PERMISSION_FAULT);
+
+                        // Terminate guest
+                        SignalBehavior::Terminate
                     }
-                    *HOST_FAULT_TRIGGERED.lock().unwrap() = false;
+                    test_ex(|| {
+                        // // make sure only one test using super::RECOVERABLE_PTR is running at once
+                        let lock = super::RECOVERABLE_PTR_LOCK.lock().unwrap();
+                        match fork().expect("can fork") {
+                            ForkResult::Child => {
+                                let module = mock_traps_module();
+                                let region = TestRegion::create(1, &Limits::default())
+                                    .expect("region can be created");
+                                let mut inst = region
+                                    .new_instance(module)
+                                    .expect("instance can be created");
 
-                    // accessing this should trigger the segfault
-                    unsafe {
-                        *RECOVERABLE_PTR = 0;
-                    }
+                                // Install a signal handler that will override the fatal error and tell the sandbox to
+                                // exit, but with a nonfatal error (should be an unknown fault)
+                                inst.set_signal_handler(signal_handler_terminate);
 
-                    assert!(*HOST_FAULT_TRIGGERED.lock().unwrap());
+                                // set `recoverable_ptr` to point to a page that is not read/writable
+                                unsafe { recoverable_ptr_setup() };
 
-                    child.join().expect("can join on child");
+                                // Child code will call `guest_recoverable_get_ptr` and write to the pointer it
+                                // returns. This will initially cause a segfault. The signal handler will recover
+                                // from the segfault, map the page to read/write, and then return to the child
+                                // code. The child code will then succeed, and the instance will exit successfully.
+                                match inst.run("recoverable_fatal", &[]) {
+                                    Err(Error::RuntimeTerminated(_)) => (),
+                                    res => panic!("unexpected result: {:?}", res),
+                                }
 
-                    // clean up
-                    unsafe {
-                        recoverable_ptr_teardown();
-                        // sigaltstack(&saved_sigstack).expect("sigaltstack succeeds");
-                        sigaction(INVALID_PERMISSION_SIGNAL, &saved_fault_sa)
-                            .expect("sigaction succeeds");
-                    }
-
-                    drop(recoverable_ptr_lock);
-                })
-            })
-        }
-
-        #[test]
-        fn handle_host_signal() {
-            test_ex(|| {
-                match fork().expect("can fork") {
-                    ForkResult::Child => {
-                        unsafe {
-                            recoverable_ptr_setup();
+                                unsafe { recoverable_ptr_teardown() };
+                                // don't want this child continuing to test harness code
+                                std::process::exit(0);
+                            }
+                            ForkResult::Parent { child } => {
+                                match waitpid(Some(child), None).expect("can wait on child") {
+                                    WaitStatus::Exited(_, code) => {
+                                        assert_eq!(code, 0);
+                                    }
+                                    ws => panic!("unexpected wait status: {:?}", ws),
+                                }
+                            }
                         }
-                        // Child code will fork a new thread. The original thread will run `infinite_loop`,
-                        // and the new thread will dereference a null pointer after 500ms. This should lead
-                        // to a sigsegv while the guest is running, therefore testing that the host signal
-                        // gets re-raised.
-                        std::thread::spawn(|| {
+                        drop(lock);
+                    })
+                }
+
+                #[test]
+                fn sigsegv_handler_saved_restored() {
+                    lazy_static! {
+                        static ref HOST_FAULT_TRIGGERED: Mutex<bool> = Mutex::new(false);
+                    }
+
+                    extern "C" fn host_sigsegv_handler(
+                        signum: libc::c_int,
+                        _siginfo_ptr: *mut siginfo_t,
+                        _ucontext_ptr: *mut c_void,
+                    ) {
+                        assert!(signum == super::INVALID_PERMISSION_FAULT);
+                        unsafe { recoverable_ptr_make_accessible() };
+                        *HOST_FAULT_TRIGGERED.lock().unwrap() = true;
+                    }
+                    test_ex(|| {
+                        with_unchanged_signal_handlers(|| {
+                            // make sure only one test using super::RECOVERABLE_PTR is running at once
+                            let recoverable_ptr_lock = super::RECOVERABLE_PTR_LOCK.lock().unwrap();
                             let module = mock_traps_module();
-                            let region = TestRegion::create(1, &Limits::default())
-                                .expect("region can be created");
+                            let region =
+                                TestRegion::create(1, &Limits::default()).expect("region can be created");
                             let mut inst = region
                                 .new_instance(module)
                                 .expect("instance can be created");
 
-                            inst.run("infinite_loop", &[]).expect("instance runs");
-                            unreachable!()
-                        });
+                            let sa = SigAction::new(
+                                SigHandler::SigAction(host_sigsegv_handler),
+                                SaFlags::SA_RESTART,
+                                SigSet::all(),
+                            );
+                            let before_sa = unsafe {
+                                sigaction(super::INVALID_PERMISSION_SIGNAL, &sa).expect("sigaction succeeds")
+                            };
 
-                        std::thread::sleep(std::time::Duration::from_millis(500));
-                        // accessing this should trigger the segfault
-                        unsafe {
-                            *RECOVERABLE_PTR = 0;
-                        }
-                    }
-                    ForkResult::Parent { child } => {
-                        match waitpid(Some(child), None).expect("can wait on child") {
-                            WaitStatus::Signaled(_, sig, _) => {
-                                assert_eq!(sig, INVALID_PERMISSION_SIGNAL);
+                            match inst.run("illegal_instr", &[]) {
+                                Err(Error::RuntimeFault(details)) => {
+                                    assert_eq!(details.trapcode, Some(TrapCode::BadSignature));
+                                }
+                                res => panic!("unexpected result: {:?}", res),
                             }
-                            ws => panic!("unexpected wait status: {:?}", ws),
-                        }
-                    }
-                }
-            })
-        }
 
-        #[test]
-        fn fatal_abort() {
-            fn handler(_inst: &Instance) -> ! {
-                std::process::abort()
+                            // now make sure that the host sigaction has been restored
+                            unsafe {
+                                recoverable_ptr_setup();
+                            }
+                            *HOST_FAULT_TRIGGERED.lock().unwrap() = false;
+
+                            // accessing this should trigger the segfault
+                            unsafe {
+                                *super::RECOVERABLE_PTR = 0;
+                            }
+
+                            assert!(*HOST_FAULT_TRIGGERED.lock().unwrap());
+
+                            // clean up
+                            unsafe {
+                                recoverable_ptr_teardown();
+                                sigaction(super::INVALID_PERMISSION_SIGNAL, &before_sa)
+                                    .expect("sigaction succeeds");
+                            }
+
+                            drop(recoverable_ptr_lock);
+                        })
+                    })
+                }
+
+                #[test]
+                fn sigsegv_handler_during_guest() {
+                    lazy_static! {
+                        static ref HOST_FAULT_TRIGGERED: Mutex<bool> = Mutex::new(false);
+                    }
+
+                    extern "C" fn host_sigsegv_handler(
+                        signum: libc::c_int,
+                        _siginfo_ptr: *mut siginfo_t,
+                        _ucontext_ptr: *mut c_void,
+                    ) {
+                        assert!(signum == super::INVALID_PERMISSION_FAULT);
+                        unsafe { recoverable_ptr_make_accessible() };
+                        *HOST_FAULT_TRIGGERED.lock().unwrap() = true;
+                    }
+
+                    #[lucet_hostcall]
+                    pub fn sleepy_guest(_vmctx: &mut Vmctx) {
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                    }
+
+                    test_ex(|| {
+                        with_unchanged_signal_handlers(|| {
+                            // make sure only one test using super::RECOVERABLE_PTR is running at once
+                            let recoverable_ptr_lock = super::RECOVERABLE_PTR_LOCK.lock().unwrap();
+
+                            let sa = SigAction::new(
+                                SigHandler::SigAction(host_sigsegv_handler),
+                                SaFlags::SA_RESTART,
+                                SigSet::empty(),
+                            );
+
+                            let saved_fault_sa = unsafe {
+                                sigaction(super::INVALID_PERMISSION_SIGNAL, &sa).expect("sigaction succeeds")
+                            };
+
+                            // The original thread will run `sleepy_guest`, and the new thread will dereference a null
+                            // pointer after a delay. This should lead to a sigsegv while the guest is running,
+                            // therefore testing that the host signal gets re-raised.
+                            let child = std::thread::spawn(|| {
+                                let module = MockModuleBuilder::new()
+                                    .with_export_func(MockExportBuilder::new(
+                                        "sleepy_guest",
+                                        FunctionPointer::from_usize(sleepy_guest as usize),
+                                    ))
+                                    .build();
+                                let region = TestRegion::create(1, &Limits::default())
+                                    .expect("region can be created");
+                                let mut inst = region
+                                    .new_instance(module)
+                                    .expect("instance can be created");
+
+                                inst.run("sleepy_guest", &[]).expect("instance runs");
+                            });
+
+                            // now trigger a segfault in the middle of running the guest
+                            std::thread::sleep(std::time::Duration::from_millis(10));
+                            unsafe {
+                                recoverable_ptr_setup();
+                            }
+                            *HOST_FAULT_TRIGGERED.lock().unwrap() = false;
+
+                            // accessing this should trigger the segfault
+                            unsafe {
+                                *super::RECOVERABLE_PTR = 0;
+                            }
+
+                            assert!(*HOST_FAULT_TRIGGERED.lock().unwrap());
+
+                            child.join().expect("can join on child");
+
+                            // clean up
+                            unsafe {
+                                recoverable_ptr_teardown();
+                                // sigaltstack(&saved_sigstack).expect("sigaltstack succeeds");
+                                sigaction(super::INVALID_PERMISSION_SIGNAL, &saved_fault_sa)
+                                    .expect("sigaction succeeds");
+                            }
+
+                            drop(recoverable_ptr_lock);
+                        })
+                    })
+                }
+
+                #[test]
+                fn handle_host_signal() {
+                    test_ex(|| {
+                        match fork().expect("can fork") {
+                            ForkResult::Child => {
+                                unsafe {
+                                    recoverable_ptr_setup();
+                                }
+                                // Child code will fork a new thread. The original thread will run `infinite_loop`,
+                                // and the new thread will dereference a null pointer after 500ms. This should lead
+                                // to a sigsegv while the guest is running, therefore testing that the host signal
+                                // gets re-raised.
+                                std::thread::spawn(|| {
+                                    let module = mock_traps_module();
+                                    let region = TestRegion::create(1, &Limits::default())
+                                        .expect("region can be created");
+                                    let mut inst = region
+                                        .new_instance(module)
+                                        .expect("instance can be created");
+
+                                    inst.run("infinite_loop", &[]).expect("instance runs");
+                                    unreachable!()
+                                });
+
+                                std::thread::sleep(std::time::Duration::from_millis(500));
+                                // accessing this should trigger the segfault
+                                unsafe {
+                                    *super::RECOVERABLE_PTR = 0;
+                                }
+                            }
+                            ForkResult::Parent { child } => {
+                                match waitpid(Some(child), None).expect("can wait on child") {
+                                    WaitStatus::Signaled(_, sig, _) => {
+                                        assert_eq!(sig, super::INVALID_PERMISSION_SIGNAL);
+                                    }
+                                    ws => panic!("unexpected wait status: {:?}", ws),
+                                }
+                            }
+                        }
+                    })
+                }
+
+                #[test]
+                fn fatal_abort() {
+                    fn handler(_inst: &Instance) -> ! {
+                        std::process::abort()
+                    }
+                    test_ex(|| {
+                        let module = mock_traps_module();
+                        let region =
+                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        match fork().expect("can fork") {
+                            ForkResult::Child => {
+                                // Child code should run code that will make an OOB beyond the guard page. This will
+                                // cause the entire process to abort before returning from `run`
+                                inst.set_fatal_handler(handler);
+                                inst.run("fatal", &[]).expect("instance runs");
+                                // Show that we never get here:
+                                std::process::exit(1);
+                            }
+                            ForkResult::Parent { child } => {
+                                match waitpid(Some(child), None).expect("can wait on child") {
+                                    WaitStatus::Signaled(_, sig, _) => {
+                                        assert_eq!(sig, Signal::SIGABRT);
+                                    }
+                                    ws => panic!("unexpected wait status: {:?}", ws),
+                                }
+                            }
+                        }
+                    })
+                }
+
+                #[test]
+                fn hit_sigstack_guard_page() {
+                    fn handler(_inst: &Instance) -> ! {
+                        std::process::abort()
+                    }
+                    test_ex(|| {
+                        let module = mock_traps_module();
+                        match fork().expect("can fork") {
+                            ForkResult::Child => {
+                                let region =
+                                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                                let mut inst = region
+                                    .new_instance(module)
+                                    .expect("instance can be created");
+
+                                // Child code should run code that will hit the signal stack's guard
+                                // page. This will cause the entire process to abort before returning from
+                                // `run`
+                                inst.set_fatal_handler(handler);
+                                inst.run("hit_sigstack_guard_page", &[])
+                                    .expect("instance runs");
+                                // Show that we never get here:
+                                std::process::exit(1);
+                            }
+                            ForkResult::Parent { child } => {
+                                match waitpid(Some(child), None).expect("can wait on child") {
+                                    WaitStatus::Signaled(_, sig, _) => {
+                                        assert_eq!(sig, Signal::SIGABRT);
+                                    }
+                                    ws => panic!("unexpected wait status: {:?}", ws),
+                                }
+                            }
+                        }
+                    })
+                }
+
+                fn fatal_handler_exit(_inst: &Instance) -> ! {
+                    std::process::exit(42)
+                }
+
+                #[test]
+                fn fatal_handler() {
+                    test_ex(|| {
+                        let module = mock_traps_module();
+                        let region =
+                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        match fork().expect("can fork") {
+                            ForkResult::Child => {
+                                // Child code should run code that will make an OOB beyond the guard page. This will
+                                // cause the entire process to abort before returning from `run`
+                                inst.set_fatal_handler(fatal_handler_exit);
+                                inst.run("fatal", &[]).expect("instance runs");
+                                // Show that we never get here:
+                                std::process::exit(1);
+                            }
+                            ForkResult::Parent { child } => {
+                                match waitpid(Some(child), None).expect("can wait on child") {
+                                    WaitStatus::Exited(_, code) => {
+                                        assert_eq!(code, 42);
+                                    }
+                                    ws => panic!("unexpected wait status: {:?}", ws),
+                                }
+                            }
+                        }
+                    })
+                }
+
+                #[test]
+                fn sigaltstack_restores() {
+                    use libc::*;
+                    use std::mem::MaybeUninit;
+
+                    test_nonex(|| {
+                        // any alternate stack present before a thread runs an instance should be restored
+                        // after the instance returns
+                        let mut beforestack = MaybeUninit::<stack_t>::uninit();
+                        let beforestack = unsafe {
+                            sigaltstack(std::ptr::null(), beforestack.as_mut_ptr());
+                            beforestack.assume_init()
+                        };
+
+                        let module = mock_traps_module();
+                        let region =
+                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+                        run_onetwothree(&mut inst);
+
+                        let mut afterstack = MaybeUninit::<stack_t>::uninit();
+                        let afterstack = unsafe {
+                            sigaltstack(std::ptr::null(), afterstack.as_mut_ptr());
+                            afterstack.assume_init()
+                        };
+
+                        assert_eq!(beforestack.ss_sp, afterstack.ss_sp);
+                    })
+                }
+
+                // TODO: remove this once `nix` PR https://github.com/nix-rust/nix/pull/991 is merged
+                pub unsafe fn mprotect(
+                    addr: *mut c_void,
+                    length: libc::size_t,
+                    prot: ProtFlags,
+                ) -> nix::Result<()> {
+                    nix::errno::Errno::result(libc::mprotect(addr, length, prot.bits())).map(drop)
+                }
             }
-            test_ex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                match fork().expect("can fork") {
-                    ForkResult::Child => {
-                        // Child code should run code that will make an OOB beyond the guard page. This will
-                        // cause the entire process to abort before returning from `run`
-                        inst.set_fatal_handler(handler);
-                        inst.run("fatal", &[]).expect("instance runs");
-                        // Show that we never get here:
-                        std::process::exit(1);
-                    }
-                    ForkResult::Parent { child } => {
-                        match waitpid(Some(child), None).expect("can wait on child") {
-                            WaitStatus::Signaled(_, sig, _) => {
-                                assert_eq!(sig, Signal::SIGABRT);
-                            }
-                            ws => panic!("unexpected wait status: {:?}", ws),
-                        }
-                    }
-                }
-            })
-        }
-
-        #[test]
-        fn hit_sigstack_guard_page() {
-            fn handler(_inst: &Instance) -> ! {
-                std::process::abort()
-            }
-            test_ex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                match fork().expect("can fork") {
-                    ForkResult::Child => {
-                        // Child code should run code that will hit the signal stack's guard
-                        // page. This will cause the entire process to abort before returning from
-                        // `run`
-                        inst.set_fatal_handler(handler);
-                        inst.run("hit_sigstack_guard_page", &[])
-                            .expect("instance runs");
-                        // Show that we never get here:
-                        std::process::exit(1);
-                    }
-                    ForkResult::Parent { child } => {
-                        match waitpid(Some(child), None).expect("can wait on child") {
-                            WaitStatus::Signaled(_, sig, _) => {
-                                assert_eq!(sig, Signal::SIGABRT);
-                            }
-                            ws => panic!("unexpected wait status: {:?}", ws),
-                        }
-                    }
-                }
-            })
-        }
-
-        fn fatal_handler_exit(_inst: &Instance) -> ! {
-            std::process::exit(42)
-        }
-
-        #[test]
-        fn fatal_handler() {
-            test_ex(|| {
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                match fork().expect("can fork") {
-                    ForkResult::Child => {
-                        // Child code should run code that will make an OOB beyond the guard page. This will
-                        // cause the entire process to abort before returning from `run`
-                        inst.set_fatal_handler(fatal_handler_exit);
-                        inst.run("fatal", &[]).expect("instance runs");
-                        // Show that we never get here:
-                        std::process::exit(1);
-                    }
-                    ForkResult::Parent { child } => {
-                        match waitpid(Some(child), None).expect("can wait on child") {
-                            WaitStatus::Exited(_, code) => {
-                                assert_eq!(code, 42);
-                            }
-                            ws => panic!("unexpected wait status: {:?}", ws),
-                        }
-                    }
-                }
-            })
-        }
-
-        #[test]
-        fn sigaltstack_restores() {
-            use libc::*;
-            use std::mem::MaybeUninit;
-
-            test_nonex(|| {
-                // any alternate stack present before a thread runs an instance should be restored
-                // after the instance returns
-                let mut beforestack = MaybeUninit::<stack_t>::uninit();
-                let beforestack = unsafe {
-                    sigaltstack(std::ptr::null(), beforestack.as_mut_ptr());
-                    beforestack.assume_init()
-                };
-
-                let module = mock_traps_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-                run_onetwothree(&mut inst);
-
-                let mut afterstack = MaybeUninit::<stack_t>::uninit();
-                let afterstack = unsafe {
-                    sigaltstack(std::ptr::null(), afterstack.as_mut_ptr());
-                    afterstack.assume_init()
-                };
-
-                assert_eq!(beforestack.ss_sp, afterstack.ss_sp);
-            })
-        }
-
-        // TODO: remove this once `nix` PR https://github.com/nix-rust/nix/pull/991 is merged
-        pub unsafe fn mprotect(
-            addr: *mut c_void,
-            length: libc::size_t,
-            prot: ProtFlags,
-        ) -> nix::Result<()> {
-            nix::errno::Errno::result(libc::mprotect(addr, length, prot.bits())).map(drop)
-        }
+        )*
     };
 }

@@ -9,9 +9,10 @@ use crate::instance::{new_instance_handle, Instance, InstanceHandle, InstanceInt
 use crate::module::Module;
 use crate::region::{Region, RegionCreate, RegionInternal};
 use crate::{lucet_bail, lucet_ensure, lucet_format_err};
-use libc::{c_void, SIGSTKSZ};
+use libc::c_void;
 use nix::poll;
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
+use std::cmp::Ordering;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
 use std::sync::{Arc, Mutex, Weak};
@@ -184,7 +185,33 @@ impl RegionInternal for UffdRegion {
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
+        heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error> {
+        let custom_limits;
+        let mut limits = self.get_limits();
+
+        // Affirm that the module, if instantiated, would not violate
+        // any runtime memory limits.
+        match heap_memory_size_limit.cmp(&limits.heap_memory_size) {
+            Ordering::Less => {
+                // The supplied heap_memory_size is smaller than
+                // default. Augment the limits with this custom value
+                // so that it may be validated.
+                custom_limits = Limits {
+                    heap_memory_size: heap_memory_size_limit,
+                    ..*limits
+                };
+                limits = &custom_limits;
+            }
+            Ordering::Equal => (),
+            Ordering::Greater => {
+                return Err(Error::InvalidArgument(
+                    "heap memory size requested for instance is larger than slot allows",
+                ))
+            }
+        }
+        module.validate_runtime_spec(&limits)?;
+
         let slot = self
             .freelist
             .lock()
@@ -237,6 +264,7 @@ impl RegionInternal for UffdRegion {
                 .map(|h| h.initial_size as usize)
                 .unwrap_or(0),
             heap_inaccessible_size: slot.limits.heap_address_space_size,
+            heap_memory_size_limit,
             slot: Some(slot),
             region,
         };
@@ -293,6 +321,10 @@ impl RegionInternal for UffdRegion {
         alloc.heap_accessible_size = initial_size;
         alloc.heap_inaccessible_size = alloc.slot().limits.heap_address_space_size - initial_size;
         Ok(())
+    }
+
+    fn get_limits(&self) -> &Limits {
+        &self.limits
     }
 
     fn as_dyn_internal(&self) -> &dyn RegionInternal {
