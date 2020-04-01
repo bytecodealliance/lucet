@@ -184,8 +184,9 @@ macro_rules! timeout_tests {
                 res => panic!("unexpected result: {:?}", res),
             }
 
-            // If we try to terminate after the instance ran, the kill switch will fail, and the
-            // the instance will run normally the next time around.
+            // If we try to terminate after the instance ran, the kill switch will fail - the
+            // function we called is no longer running - and the the instance will run normally the
+            // next time around.
             assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
             match inst.run("do_nothing", &[]) {
                 Ok(_) => {}
@@ -215,7 +216,7 @@ macro_rules! timeout_tests {
             }
 
             // An instance that has faulted is not terminable.
-            assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
+            assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
 
             // Check that we can reset the instance and run a normal function.
             inst.reset().expect("instance resets");
