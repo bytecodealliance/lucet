@@ -909,7 +909,7 @@ macro_rules! alloc_tests {
             // specified in the HeapSpec.
             let heap_len = custom_inst.alloc().heap_len();
             assert_eq!(heap_len, THREE_PAGE_MAX_HEAP.initial_size as usize);
-
+            drop(custom_inst);
             // Build a default heap-limited instance, to make sure the
             // custom limits didn't break the defaults.
             let default_inst = region
