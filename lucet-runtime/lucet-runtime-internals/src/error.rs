@@ -57,7 +57,7 @@ pub enum Error {
 
     #[error("Start function yielded")]
     StartYielded,
-
+    
     /// A catch-all for internal errors that are likely unrecoverable by the runtime user.
     ///
     /// As the API matures, these will likely become rarer, replaced by new variants of this enum,

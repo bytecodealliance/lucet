@@ -105,10 +105,15 @@ impl RegionInternal for MmapRegion {
         ]
         .iter()
         {
-            // TLC: Here is another early return from this function.  It feels
-            // like it might be better to bail here, but I'd like to hear thoughts.
-            // eprintln!("setting r/w {:p}[{:x}]", *ptr, len);
-            unsafe { mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)? };
+            unsafe {
+		let res = mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE);
+
+		// If the mprotect() call failed, manually return the slot.
+		if let Err(e) = res {
+		    self.freelist.write().unwrap().push(slot);
+		    return Err(Error::InternalError(e.into()));
+		}
+	    };
         }
 
         // note: the initial heap will be made read/writable when `new_instance_handle` calls `reset`
@@ -131,7 +136,8 @@ impl RegionInternal for MmapRegion {
             region,
         };
 
-        // TLC: Here is another early return from this function.  Hm.
+	// Though this is a potential early return from the function, the Drop impl
+	// on the Alloc will put the slot back on the freelist.
         let inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
 
         Ok(inst)
