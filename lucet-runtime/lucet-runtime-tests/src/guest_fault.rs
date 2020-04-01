@@ -401,6 +401,29 @@ macro_rules! guest_fault_tests {
             });
         }
 
+        // Ensure that guests can be successfully run after an instance faults, but without
+        // resetting the guest.
+        #[test]
+        fn guest_after_fault_without_reset() {
+            test_nonex(|| {
+                let module = mock_traps_module();
+                let region =
+                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let mut inst = region
+                    .new_instance(module)
+                    .expect("instance can be created");
+
+                match inst.run("oob", &[]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
+                    }
+                    res => panic!("unexpected result: {:?}", res),
+                }
+
+                run_onetwothree(&mut inst);
+            });
+        }
+
         #[test]
         fn hostcall_error() {
             test_nonex(|| {
