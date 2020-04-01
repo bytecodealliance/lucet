@@ -113,11 +113,22 @@ fn uffd_handler(
                     lucet_bail!("instance magic incorrect");
                 }
 
-                match inst.alloc().addr_location(fault_addr as *const c_void) {
-                    AddrLocation::InaccessibleHeap => {
+                let loc = inst.alloc().addr_location(fault_addr as *const c_void);
+                match loc {
+                    AddrLocation::InaccessibleHeap | AddrLocation::StackGuard => {
                         // eprintln!("fault in heap guard!");
                         // page fault occurred out of bounds; trigger a fault by waking the faulting
                         // thread without copying or zeroing
+                        uffd.wake(fault_page as *mut c_void, host_page_size())
+                            .map_err(|e| Error::InternalError(e.into()))?;
+                    }
+                    AddrLocation::SigStackGuard | AddrLocation::Unknown => {
+                        tracing::error!("UFFD pagefault at fatal location: {:?}", loc);
+                        uffd.wake(fault_page as *mut c_void, host_page_size())
+                            .map_err(|e| Error::InternalError(e.into()))?;
+                    }
+                    AddrLocation::Stack | AddrLocation::Globals | AddrLocation::SigStack => {
+                        tracing::error!("UFFD pagefault at unexpected location: {:?}", loc);
                         uffd.wake(fault_page as *mut c_void, host_page_size())
                             .map_err(|e| Error::InternalError(e.into()))?;
                     }
@@ -145,7 +156,6 @@ fn uffd_handler(
                             }
                         }
                     }
-                    location => panic!("unexpected uffd fault location: {:?}", location),
                 }
             }
             Ok(Some(ev)) => panic!("unexpected uffd event: {:?}", ev),
@@ -195,7 +205,7 @@ impl RegionInternal for UffdRegion {
             // zero the globals
             (slot.globals, limits.globals_size),
             // zero the sigstack
-            (slot.sigstack, SIGSTKSZ),
+            (slot.sigstack, limits.signal_stack_size),
         ]
         .into_iter()
         {
@@ -333,7 +343,7 @@ impl Drop for UffdRegion {
 impl UffdRegion {
     pub fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error> {
         assert!(
-            SIGSTKSZ % host_page_size() == 0,
+            limits.signal_stack_size % host_page_size() == 0,
             "signal stack size is a multiple of host page size"
         );
         if instance_capacity == 0 {
@@ -442,9 +452,9 @@ impl UffdRegion {
             (region.start as usize + (index * region.limits.total_memory_size())) as *mut c_void;
         // lay out the other sections in memory
         let heap = start as usize + instance_heap_offset();
-        let stack = heap + region.limits.heap_address_space_size;
-        let globals = stack + region.limits.stack_size + host_page_size();
-        let sigstack = globals + host_page_size();
+        let stack = heap + region.limits.heap_address_space_size + host_page_size();
+        let globals = stack + region.limits.stack_size;
+        let sigstack = globals + region.limits.globals_size + host_page_size();
 
         // turn on the `Instance` page
         // eprintln!("zeroing {:p}[{:x}]", start, host_page_size());
