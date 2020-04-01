@@ -6,7 +6,6 @@ mod tests;
 use crate::instance::Instance;
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 
-use nix::sys::signal;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::ptr::NonNull;
 use std::{mem, ptr};
@@ -123,7 +122,6 @@ pub struct Context {
     // TODO ACF 2019-10-23: make Instance into a generic parameter?
     backstop_callback: *const unsafe extern "C" fn(*mut Instance),
     callback_data: *mut Instance,
-    sigset: signal::SigSet,
 }
 
 impl Context {
@@ -137,7 +135,6 @@ impl Context {
             parent_ctx: ptr::null_mut(),
             backstop_callback: Context::default_backstop_callback as *const _,
             callback_data: ptr::null_mut(),
-            sigset: signal::SigSet::empty(),
         }
     }
 
@@ -468,22 +465,15 @@ impl Context {
 
         let (stack, stack_start) = stack_builder.into_inner();
 
-        // RSP, RBP, and sigset still remain to be initialized.
         // Stack pointer: this points to the return address that will be used by `swap`, in place
         // of the original (eg, in the host) return address. The return address this points to is
         // the address of the first function to run on `swap`: `lucet_context_bootstrap`.
         child.gpr.rsp = &mut stack[stack.len() - stack_start] as *mut u64 as u64;
 
+        // Base pointer: `rbp` will be saved through all guest code, and preserved for when we
+        // reach the backstop. This allows us to prepare an argument for `lucet_context_backstop`
+        // even at the entrypoint of the guest.
         child.gpr.rbp = child as *const Context as u64;
-
-        // Read the mask to be restored if we ever need to jump out of a signal handler. If this
-        // isn't possible, die.
-        signal::pthread_sigmask(
-            signal::SigmaskHow::SIG_SETMASK,
-            None,
-            Some(&mut child.sigset),
-        )
-        .expect("pthread_sigmask could not be retrieved");
 
         Ok(())
     }
@@ -629,16 +619,6 @@ impl Context {
         lucet_context_set(to as *const Context);
     }
 
-    /// Like `set`, but also manages the return from a signal handler.
-    ///
-    /// TODO: the return type of this function should really be `Result<!, nix::Error>`, but using
-    /// `!` as a type like that is currently experimental.
-    #[inline]
-    pub unsafe fn set_from_signal(to: &Context) -> Result<(), nix::Error> {
-        signal::pthread_sigmask(signal::SigmaskHow::SIG_SETMASK, Some(&to.sigset), None)?;
-        Context::set(to)
-    }
-
     /// Clear (zero) return values.
     pub fn clear_retvals(&mut self) {
         self.retvals_gp = [0; 2];
@@ -726,7 +706,7 @@ extern "C" {
     /// Performs the context switch; implemented in assembly.
     ///
     /// Never returns because the current context is discarded.
-    fn lucet_context_set(to: *const Context) -> !;
+    pub(crate) fn lucet_context_set(to: *const Context) -> !;
 
     /// Runs an entry callback after performing a context switch. Implemented in assembly.
     ///

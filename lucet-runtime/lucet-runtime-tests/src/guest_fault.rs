@@ -141,7 +141,7 @@ pub fn mock_traps_module() -> Arc<dyn Module> {
 macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
-        use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGSEGV};
+        use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGBUS, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall, lucet_hostcall_terminate, lucet_internal_ensure_linked, DlModule,
@@ -165,6 +165,16 @@ macro_rules! guest_fault_tests {
         }
 
         static mut RECOVERABLE_PTR: *mut libc::c_char = ptr::null_mut();
+
+        #[cfg(target_os = "linux")]
+        const INVALID_PERMISSION_FAULT: libc::c_int = SIGSEGV;
+        #[cfg(not(target_os = "linux"))]
+        const INVALID_PERMISSION_FAULT: libc::c_int = SIGBUS;
+
+        #[cfg(target_os = "linux")]
+        const INVALID_PERMISSION_SIGNAL: Signal = Signal::SIGSEGV;
+        #[cfg(not(target_os = "linux"))]
+        const INVALID_PERMISSION_SIGNAL: Signal = Signal::SIGBUS;
 
         unsafe fn recoverable_ptr_setup() {
             assert!(RECOVERABLE_PTR.is_null());
@@ -441,8 +451,7 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *const siginfo_t,
                 _ucontext_ptr: *const c_void,
             ) -> SignalBehavior {
-                // Triggered by a SIGSEGV writing to protected page
-                assert!(signum == SIGSEGV);
+                assert!(signum == INVALID_PERMISSION_FAULT);
 
                 // The fault was caused by writing to a protected page at `recoverable_ptr`.  Make that
                 // no longer be a fault
@@ -488,8 +497,7 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *const siginfo_t,
                 _ucontext_ptr: *const c_void,
             ) -> SignalBehavior {
-                // Triggered by a SIGSEGV writing to protected page
-                assert!(signum == SIGSEGV);
+                assert!(signum == INVALID_PERMISSION_FAULT);
 
                 // Terminate guest
                 SignalBehavior::Terminate
@@ -542,7 +550,7 @@ macro_rules! guest_fault_tests {
         #[test]
         fn sigsegv_handler_saved_restored() {
             lazy_static! {
-                static ref HOST_SIGSEGV_TRIGGERED: Mutex<bool> = Mutex::new(false);
+                static ref HOST_FAULT_TRIGGERED: Mutex<bool> = Mutex::new(false);
             }
 
             extern "C" fn host_sigsegv_handler(
@@ -550,10 +558,9 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *mut siginfo_t,
                 _ucontext_ptr: *mut c_void,
             ) {
-                // Triggered by a SIGSEGV writing to protected page
-                assert!(signum == SIGSEGV);
+                assert!(signum == INVALID_PERMISSION_FAULT);
                 unsafe { recoverable_ptr_make_accessible() };
-                *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = true;
+                *HOST_FAULT_TRIGGERED.lock().unwrap() = true;
             }
             test_ex(|| {
                 // make sure only one test using RECOVERABLE_PTR is running at once
@@ -570,7 +577,7 @@ macro_rules! guest_fault_tests {
                     SaFlags::SA_RESTART,
                     SigSet::all(),
                 );
-                unsafe { sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds") };
+                unsafe { sigaction(INVALID_PERMISSION_SIGNAL, &sa).expect("sigaction succeeds") };
 
                 match inst.run("illegal_instr", &[]) {
                     Err(Error::RuntimeFault(details)) => {
@@ -583,20 +590,20 @@ macro_rules! guest_fault_tests {
                 unsafe {
                     recoverable_ptr_setup();
                 }
-                *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = false;
+                *HOST_FAULT_TRIGGERED.lock().unwrap() = false;
 
                 // accessing this should trigger the segfault
                 unsafe {
                     *RECOVERABLE_PTR = 0;
                 }
 
-                assert!(*HOST_SIGSEGV_TRIGGERED.lock().unwrap());
+                assert!(*HOST_FAULT_TRIGGERED.lock().unwrap());
 
                 // clean up
                 unsafe {
                     recoverable_ptr_teardown();
                     sigaction(
-                        Signal::SIGSEGV,
+                        INVALID_PERMISSION_SIGNAL,
                         &SigAction::new(SigHandler::SigDfl, SaFlags::SA_RESTART, SigSet::empty()),
                     )
                     .expect("sigaction succeeds");
@@ -609,7 +616,7 @@ macro_rules! guest_fault_tests {
         #[test]
         fn sigsegv_handler_during_guest() {
             lazy_static! {
-                static ref HOST_SIGSEGV_TRIGGERED: Mutex<bool> = Mutex::new(false);
+                static ref HOST_FAULT_TRIGGERED: Mutex<bool> = Mutex::new(false);
             }
 
             extern "C" fn host_sigsegv_handler(
@@ -617,10 +624,9 @@ macro_rules! guest_fault_tests {
                 _siginfo_ptr: *mut siginfo_t,
                 _ucontext_ptr: *mut c_void,
             ) {
-                // Triggered by a SIGSEGV writing to protected page
-                assert!(signum == SIGSEGV);
+                assert!(signum == INVALID_PERMISSION_FAULT);
                 unsafe { recoverable_ptr_make_accessible() };
-                *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = true;
+                *HOST_FAULT_TRIGGERED.lock().unwrap() = true;
             }
 
             #[lucet_hostcall]
@@ -638,8 +644,9 @@ macro_rules! guest_fault_tests {
                     SigSet::empty(),
                 );
 
-                let saved_sa =
-                    unsafe { sigaction(Signal::SIGSEGV, &sa).expect("sigaction succeeds") };
+                let saved_fault_sa = unsafe {
+                    sigaction(INVALID_PERMISSION_SIGNAL, &sa).expect("sigaction succeeds")
+                };
 
                 // The original thread will run `sleepy_guest`, and the new thread will dereference a null
                 // pointer after a delay. This should lead to a sigsegv while the guest is running,
@@ -665,14 +672,14 @@ macro_rules! guest_fault_tests {
                 unsafe {
                     recoverable_ptr_setup();
                 }
-                *HOST_SIGSEGV_TRIGGERED.lock().unwrap() = false;
+                *HOST_FAULT_TRIGGERED.lock().unwrap() = false;
 
                 // accessing this should trigger the segfault
                 unsafe {
                     *RECOVERABLE_PTR = 0;
                 }
 
-                assert!(*HOST_SIGSEGV_TRIGGERED.lock().unwrap());
+                assert!(*HOST_FAULT_TRIGGERED.lock().unwrap());
 
                 child.join().expect("can join on child");
 
@@ -680,7 +687,8 @@ macro_rules! guest_fault_tests {
                 unsafe {
                     recoverable_ptr_teardown();
                     // sigaltstack(&saved_sigstack).expect("sigaltstack succeeds");
-                    sigaction(Signal::SIGSEGV, &saved_sa).expect("sigaction succeeds");
+                    sigaction(INVALID_PERMISSION_SIGNAL, &saved_fault_sa)
+                        .expect("sigaction succeeds");
                 }
 
                 drop(recoverable_ptr_lock);
@@ -720,7 +728,7 @@ macro_rules! guest_fault_tests {
                     ForkResult::Parent { child } => {
                         match waitpid(Some(child), None).expect("can wait on child") {
                             WaitStatus::Signaled(_, sig, _) => {
-                                assert_eq!(sig, Signal::SIGSEGV);
+                                assert_eq!(sig, INVALID_PERMISSION_SIGNAL);
                             }
                             ws => panic!("unexpected wait status: {:?}", ws),
                         }

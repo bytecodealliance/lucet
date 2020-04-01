@@ -118,54 +118,59 @@ pub struct ucontext_t {
     pub uc_stack: sigaltstack,
     pub uc_link: *const ucontext_t,
     pub uc_mcsize: size_t,
-    pub uc_mcontext: *const mcontext64,
+    pub uc_mcontext: *mut mcontext64,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct UContextPtr(*const ucontext_t);
+pub struct UContextPtr(*mut ucontext_t);
 
 impl UContextPtr {
     #[inline]
-    pub fn new(ptr: *const c_void) -> Self {
+    pub fn new(ptr: *mut c_void) -> Self {
         assert!(!ptr.is_null(), "non-null context");
-        UContextPtr(ptr as *const ucontext_t)
+        UContextPtr(ptr as *mut ucontext_t)
     }
 
     #[inline]
     pub fn get_ip(self) -> *const c_void {
-        let mcontext = &unsafe { *(*self.0).uc_mcontext };
+        let mcontext = unsafe { (*self.0).uc_mcontext.as_ref().unwrap() };
         mcontext.ss.rip as *const _
+    }
+
+    #[inline]
+    pub fn set_ip(self, new_ip: *const c_void) {
+        let mcontext: &mut mcontext64 = unsafe { &mut (*self.0).uc_mcontext.as_mut().unwrap() };
+        mcontext.ss.rip = new_ip as u64;
+    }
+
+    #[inline]
+    pub fn set_rdi(self, new_rdi: u64) {
+        let mcontext: &mut mcontext64 = unsafe { &mut (*self.0).uc_mcontext.as_mut().unwrap() };
+        mcontext.ss.rdi = new_rdi;
     }
 }
 
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct UContext {
-    context: ucontext_t,
-    mcontext: mcontext64,
+    context: *mut ucontext_t,
 }
 
 impl UContext {
     #[inline]
-    pub fn new(ptr: *const c_void) -> Self {
-        let context = *unsafe {
-            (ptr as *const ucontext_t)
-                .as_ref()
-                .expect("non-null context")
-        };
-        let mcontext = unsafe { *context.uc_mcontext };
-        UContext { context, mcontext }
+    pub fn new(ptr: *mut c_void) -> Self {
+        let context = unsafe { (ptr as *mut ucontext_t).as_mut().expect("non-null context") };
+        UContext { context }
     }
 
     pub fn as_ptr(&mut self) -> UContextPtr {
-        self.context.uc_mcontext = &self.mcontext;
-        UContextPtr::new(&self.context as *const _ as *const _)
+        UContextPtr::new(self.context as *mut _ as *mut _)
     }
 }
 
 impl Into<UContext> for UContextPtr {
     #[inline]
     fn into(self) -> UContext {
-        UContext::new(self.0 as *const _)
+        UContext::new(self.0 as *mut _)
     }
 }
