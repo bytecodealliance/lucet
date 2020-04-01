@@ -65,12 +65,6 @@
 //!   - terminable: `true`
 //!   - termination result: `Ok(KillSuccess::Signalled)`
 //!   - execution_domain: `Guest`
-//! * `Guest function returns`
-//!   - terminable: `true`
-//!   - termination result: `Ok(KillSuccess::Pending)`
-//!   - execution_domain: `Guest`
-//!   - If the guest function has already returned, the instance will be placed into the
-//!     `Terminated` domain, and will not run any guest the next time it is run.
 //! * `Hostcall called`
 //!   - termination result: `Ok(KillSuccess::Pending)`
 //!   - execution_domain: `Hostcall`
@@ -90,12 +84,12 @@
 //!     return `NotTerminable`, but the hostcall would then exit. If a hostcall successfully
 //!     returns to its caller it was not terminated, so the only state an instance will have after
 //!     returning from a hostcall will be that it is executing terminable guest code.
-//! * `Instance::reset` or `Instance dropped`
+//! * `Guest faults`, `Hostcall faults`, `Guest returns`, `Instance::reset` or `Instance dropped`
 //!   - termination result: `Err(KillError::Invalid)`
 //!
-//!   - If an instance is reset or finishes running, outstanding `KillSwitch` objects will no
-//!     longer hold a valid reference to the instance. In that case, calls to `terminate` will
-//!     return `Invalid`, and have no bearing on further execution.
+//!   - If an instance is reset or finishes running (through fault or normal return), outstanding
+//!   `KillSwitch` objects will no longer hold a valid reference to the instance. In that case,
+//!   calls to `terminate` will return `Invalid`, and have no bearing on further execution.
 //!
 //! ## Further Reading
 //!
@@ -247,7 +241,7 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
                 // There should be only one strong reference to `kill_state`, so as a consistency
                 // check ensure that's still true. This is necessary so that when we drop this
                 // `Arc`, weak refs are no longer valid. If this assert fails, something cloned
-                // `KillState`, or a `KillSwitch` has upgraded it's ref - both of these are errors!
+                // `KillState`, or a `KillSwitch` has upgraded its ref - both of these are errors!
                 assert_eq!(Arc::strong_count(&instance.kill_state), 1);
                 instance.kill_state = Arc::new(KillState::default());
             }
@@ -427,11 +421,11 @@ pub enum KillError {
     /// The instance cannot be terminated.
     ///
     /// This means that the instance has already been terminated by another killswitch, or was
-    /// signalled to terminate in some other manner, or possibly faulted during execution.
+    /// signalled to terminate in some other manner.
     NotTerminable,
     /// The associated instance is no longer valid.
     ///
-    /// This usually means that instance already exited and was discarded, or that it was reset.
+    /// This usually means the instance exited by fault or by normal return.
     Invalid,
 }
 
