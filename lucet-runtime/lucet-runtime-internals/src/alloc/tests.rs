@@ -193,7 +193,7 @@ macro_rules! alloc_tests {
 
         /// This test exercises custom limits on the heap_memory_size.
         /// In this scenario, the Region has a limit on the heap memory
-        /// size, but the instance has a smaller limit. Attemps to expand
+        /// size, but the instance has a smaller limit. Attempts to expand
         /// the heap fail, but the existing heap can still be used.
         #[test]
         fn expand_past_spec_max_with_custom_limit() {
@@ -903,8 +903,9 @@ macro_rules! alloc_tests {
 
         /// This test exercises custom limits on the heap_memory_size.
         /// In this scenario, successfully create a custom-sized
-        /// instance followed by a default-sized instance to affirm
-        /// that a custom size doesn't somehow overwrite the default size.
+        /// instance, drop it, then create a default-sized instance to
+        /// affirm that a custom size doesn't somehow overwrite the
+        /// default size.
         #[test]
         fn custom_size_does_not_break_default() {
             let region = TestRegion::create(1, &LIMITS).expect("region created");
