@@ -107,10 +107,10 @@ impl<'a> InstanceBuilder<'a> {
         }
     }
 
-    /// Add a custom limit for the heap memory size to the built instance.
+    /// Add a smaller, custom limit for the heap memory size to the built instance.
     ///
-    /// This call is not necessary if the default heap memory size is adequate
-    /// for the new instance.
+    /// This call is optional. Attempts to create a new instance fail if the
+    /// limit supplied by with_heap_size_limit() exceeds that of the RegionInternal.
     pub fn with_heap_size_limit(mut self, heap_memory_size_limit: usize) -> Self {
         self.heap_memory_size_limit = heap_memory_size_limit;
         self
