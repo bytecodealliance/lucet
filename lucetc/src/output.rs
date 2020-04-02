@@ -1,8 +1,8 @@
 use crate::error::Error;
 use crate::name::Name;
 use cranelift_codegen::{ir, isa};
-use cranelift_faerie::FaerieProduct;
-use faerie::Artifact;
+use cranelift_object::ObjectProduct;
+use object::write::Object;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -37,12 +37,12 @@ impl CraneliftFuncs {
 }
 
 pub struct ObjectFile {
-    artifact: Artifact,
+    object: Object,
 }
 impl ObjectFile {
-    pub fn new(product: FaerieProduct) -> Result<Self, Error> {
+    pub fn new(product: ObjectProduct) -> Result<Self, Error> {
         let obj = Self {
-            artifact: product.artifact,
+            object: product.object,
         };
 
         Ok(obj)
@@ -53,10 +53,12 @@ impl ObjectFile {
             let message = format!("Path must be filename {:?}", path.as_ref());
             Error::Input(message);
         });
-        let file = File::create(path)?;
-        self.artifact
-            .write(file)
-            .map_err(|source| Error::FaerieArtifact(source, "Write error".to_owned()))?;
+        let mut file = File::create(path)?;
+        let bytes = self
+            .object
+            .write()
+            .map_err(|source| Error::ObjectArtifact(source, "Write error".to_owned()))?;
+        file.write_all(&bytes)?;
         Ok(())
     }
 }

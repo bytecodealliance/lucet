@@ -21,7 +21,7 @@ cranelift-entity = { path = "../wasmtime/cranelift/entity", version = "0.62.0" }
 cranelift-native = { path = "../wasmtime/cranelift/native", version = "0.62.0" }
 cranelift-frontend = { path = "../wasmtime/cranelift/frontend", version = "0.62.0" }
 cranelift-module = { path = "../wasmtime/cranelift/module", version = "0.62.0" }
-cranelift-faerie = { path = "../wasmtime/cranelift/faerie", version = "0.62.0" }
+cranelift-object = { path = "../wasmtime/cranelift/object", version = "0.62.0" }
 cranelift-wasm = { path = "../wasmtime/cranelift/wasm", version = "0.62.0" }
 target-lexicon = "0.10"
 lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }
@@ -31,7 +31,7 @@ wasmparser = "0.51.2"
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"
-faerie = "0.15.0"
+object = { version = "0.18.0", default-features = false, features = ["write"] }
 goblin = "0.0.24"
 byteorder = "1.2"
 # precisely pin wasmonkey, because the shared dependency on parity-wasm is very sensitive
