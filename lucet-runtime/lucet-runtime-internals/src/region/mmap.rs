@@ -106,13 +106,8 @@ impl RegionInternal for MmapRegion {
         .iter()
         {
             unsafe {
-                let res = mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE);
-
-                // If the mprotect() call failed, manually return the slot.
-                if let Err(e) = res {
-                    self.freelist.write().unwrap().push(slot);
-                    return Err(Error::InternalError(e.into()));
-                }
+                mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)
+                    .expect("mprotect() call succeeds");
             };
         }
 
