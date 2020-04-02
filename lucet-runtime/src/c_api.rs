@@ -1,4 +1,4 @@
-use crate::{DlModule, Instance, Limits, MmapRegion, Module, Region};
+use crate::{DlModule, Instance, Limits, MmapRegion, Module, Region, UffdRegion};
 use libc::{c_char, c_int, c_void};
 use lucet_module::TrapCode;
 use lucet_runtime_internals::c_api::*;
@@ -87,6 +87,27 @@ pub unsafe extern "C" fn lucet_mmap_region_create(
         .map(|l| l.into())
         .unwrap_or(Limits::default());
     match MmapRegion::create(instance_capacity as usize, &limits) {
+        Ok(region) => {
+            let region_thin = Arc::into_raw(Arc::new(region as Arc<dyn Region>));
+            region_out.write(region_thin as _);
+            lucet_error::Ok
+        }
+        Err(e) => e.into(),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn lucet_uffd_region_create(
+    instance_capacity: u64,
+    limits: *const lucet_alloc_limits,
+    region_out: *mut *mut lucet_region,
+) -> lucet_error {
+    assert_nonnull!(region_out);
+    let limits = limits
+        .as_ref()
+        .map(|l| l.into())
+        .unwrap_or(Limits::default());
+    match UffdRegion::create(instance_capacity as usize, &limits) {
         Ok(region) => {
             let region_thin = Arc::into_raw(Arc::new(region as Arc<dyn Region>));
             region_out.write(region_thin as _);
@@ -487,12 +508,13 @@ mod tests {
     use tempfile::TempDir;
 
     extern "C" {
-        fn lucet_runtime_test_expand_heap(module: *mut lucet_dl_module) -> bool;
+        fn lucet_runtime_test_mmap_expand_heap(module: *mut lucet_dl_module) -> bool;
+        fn lucet_runtime_test_uffd_expand_heap(module: *mut lucet_dl_module) -> bool;
         fn lucet_runtime_test_yield_resume(module: *mut lucet_dl_module) -> bool;
     }
 
     #[test]
-    fn expand_heap() {
+    fn mmap_expand_heap() {
         let workdir = TempDir::new().expect("create working directory");
 
         let native_build = Lucetc::new(&["tests/guests/null.c"])
@@ -508,7 +530,30 @@ mod tests {
         let dlmodule = DlModule::load(so_file).unwrap();
 
         unsafe {
-            assert!(lucet_runtime_test_expand_heap(
+            assert!(lucet_runtime_test_mmap_expand_heap(
+                Arc::into_raw(dlmodule) as *mut lucet_dl_module
+            ));
+        }
+    }
+
+    #[test]
+    fn uffd_expand_heap() {
+        let workdir = TempDir::new().expect("create working directory");
+
+        let native_build = Lucetc::new(&["tests/guests/null.c"])
+            .with_cflag("-nostartfiles")
+            .with_link_opt(LinkOpt::NoDefaultEntryPoint)
+            .with_link_opt(LinkOpt::AllowUndefinedAll)
+            .with_link_opt(LinkOpt::ExportAll);
+
+        let so_file = workdir.path().join("null.so");
+
+        native_build.build(so_file.clone()).unwrap();
+
+        let dlmodule = DlModule::load(so_file).unwrap();
+
+        unsafe {
+            assert!(lucet_runtime_test_uffd_expand_heap(
                 Arc::into_raw(dlmodule) as *mut lucet_dl_module
             ));
         }
