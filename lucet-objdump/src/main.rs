@@ -146,7 +146,7 @@ fn parse_trap_manifest<'a>(
     if let Some(faulty_trap_manifest) = f.traps() {
         let trap_ptr = faulty_trap_manifest.traps.as_ptr();
         let traps_count = faulty_trap_manifest.traps.len();
-        let traps_byte_count = traps_count * std::mem::size_of::<TrapManifest<'_>>();
+        let traps_byte_count = traps_count * std::mem::size_of::<TrapSite>();
         if let Some(traps_byte_slice) =
             summary.read_memory(trap_ptr as u64, traps_byte_count as u64)
         {
