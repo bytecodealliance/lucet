@@ -81,7 +81,7 @@ impl RegionInternal for MmapRegion {
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error> {
-        let mut slot = self
+        let slot = self
             .freelist
             .write()
             .unwrap()
@@ -92,12 +92,13 @@ impl RegionInternal for MmapRegion {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
 
+        let mut limits = slot.limits;
         match heap_memory_size_limit.cmp(&slot.limits.heap_memory_size) {
             Ordering::Less => {
                 // The supplied heap_memory_size is smaller than
-                // default. Augment the new instance limits with this
-                // custom value so that it may be validated.
-                slot.limits.heap_memory_size = heap_memory_size_limit;
+                // default. Augment the limits with this custom value
+                // so that it may be validated.
+                limits.heap_memory_size = heap_memory_size_limit;
             }
             Ordering::Equal => (),
             Ordering::Greater => {
@@ -106,8 +107,6 @@ impl RegionInternal for MmapRegion {
                 ))
             }
         }
-
-        let limits = &slot.limits;
         module.validate_runtime_spec(&limits)?;
 
         for (ptr, len) in [
@@ -140,6 +139,7 @@ impl RegionInternal for MmapRegion {
         let alloc = Alloc {
             heap_accessible_size: 0, // the `reset` call in `new_instance_handle` will set this
             heap_inaccessible_size: slot.limits.heap_address_space_size,
+	    heap_memory_size_limit,
             slot: Some(slot),
             region,
         };

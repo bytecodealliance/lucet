@@ -907,7 +907,7 @@ macro_rules! alloc_tests {
         /// that a custom size doesn't somehow overwrite the default size.
         #[test]
         fn custom_size_does_not_break_default() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = TestRegion::create(2, &LIMITS).expect("region created");
 
             // Build an instance that is has custom limits that are big
             // enough to accommodate the HeapSpec.
@@ -926,6 +926,7 @@ macro_rules! alloc_tests {
             let heap_len = custom_inst.alloc().heap_len();
             assert_eq!(heap_len, THREE_PAGE_MAX_HEAP.initial_size as usize);
             drop(custom_inst);
+	    
             // Build a default heap-limited instance, to make sure the
             // custom limits didn't break the defaults.
             let default_inst = region
@@ -939,6 +940,7 @@ macro_rules! alloc_tests {
             // Affirm that its heap is the expected size.
             let heap_len = default_inst.alloc().heap_len();
             assert_eq!(heap_len, SMALL_GUARD_HEAP.initial_size as usize);
+	    
         }
 
         /// This test exercises custom limits on the heap_memory_size.

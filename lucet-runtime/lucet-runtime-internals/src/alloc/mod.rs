@@ -101,6 +101,7 @@ impl Slot {
 pub struct Alloc {
     pub heap_accessible_size: usize,
     pub heap_inaccessible_size: usize,
+    pub heap_memory_size_limit: usize,
     pub slot: Option<Slot>,
     pub region: Arc<dyn RegionInternal>,
 }
@@ -241,7 +242,7 @@ impl Alloc {
         }
         // The runtime sets a limit on how much of the heap can be backed by real memory. Don't let
         // the heap expand beyond that:
-        if self.heap_accessible_size + expand_pagealigned as usize > slot.limits.heap_memory_size {
+        if self.heap_accessible_size + expand_pagealigned as usize > self.heap_memory_size_limit {
             bail_limits_exceeded!(
                 "expansion would exceed runtime-specified heap limit: {:?}",
                 slot.limits
@@ -396,7 +397,7 @@ impl Alloc {
 /// Runtime limits for the various memories that back a Lucet instance.
 ///
 /// Each value is specified in bytes, and must be evenly divisible by the host page size (4K).
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct Limits {
     /// Max size of the heap, which can be backed by real memory. (default 1M)
