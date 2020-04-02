@@ -139,7 +139,7 @@ impl RegionInternal for MmapRegion {
         let alloc = Alloc {
             heap_accessible_size: 0, // the `reset` call in `new_instance_handle` will set this
             heap_inaccessible_size: slot.limits.heap_address_space_size,
-	    heap_memory_size_limit,
+            heap_memory_size_limit,
             slot: Some(slot),
             region,
         };
