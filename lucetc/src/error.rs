@@ -72,6 +72,8 @@ pub enum Error {
     Signature(String),
     #[error("Table index is out of bounds: {0}")]
     TableIndexError(String),
+    #[error("Initializer {0:?} out of range for {1:?}")]
+    ElementInitializerOutOfRange(crate::module::TableElems, cranelift_wasm::Table),
     #[error("Trap records are present for function {0} but the function does not exist.")]
     TrapRecord(String),
     #[error("Unsupported: {0}")]

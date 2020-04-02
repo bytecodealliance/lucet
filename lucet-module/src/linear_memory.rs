@@ -69,9 +69,8 @@ pub struct HeapSpec {
     /// This is not necessarily the same as `reserved_size` - we want to be able to tune the check
     /// bound there separately than the declaration of a max size in the client program.
     ///
-    /// The program may optionally define this value. If it does, it must be less than the
-    /// `reserved_size`. If it does not, the max size is left up to the runtime, and is allowed to
-    /// be less than `reserved_size`.
+    /// The program may optionally define this value. If it does not, the max size is left up to
+    /// the runtime, and is allowed to be less than `reserved_size`.
     pub max_size: Option<u64>,
 }
 

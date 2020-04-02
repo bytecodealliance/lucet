@@ -539,10 +539,15 @@ impl Instance {
     /// modified by this call; it is the embedder's responsibility to clear or reset their state if
     /// necessary.
     ///
+    /// This will also reinitialize the kill state, which means that any outstanding
+    /// [`KillSwitch`](struct.KillSwitch.html) objects will be unable to terminate this instance.
+    /// It is the embedder's responsibility to initialize new `KillSwitch`es after resetting an
+    /// instance.
+    ///
     /// # Safety
     ///
-    /// This function runs the guest code for the WebAssembly `start` section, and running any guest
-    /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
+    /// This function runs the guest code for the WebAssembly `start` section, and running any
+    /// guest code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     pub fn reset(&mut self) -> Result<(), Error> {
         self.alloc.reset_heap(self.module.as_ref())?;
         let globals = unsafe { self.alloc.globals_mut() };
@@ -560,9 +565,8 @@ impl Instance {
         }
 
         self.state = State::Ready;
-
+        self.kill_state = Arc::new(KillState::new());
         self.run_start()?;
-
         Ok(())
     }
 
@@ -910,30 +914,42 @@ impl Instance {
             &args_with_vmctx,
         )?;
 
-        // Set up the guest to set itself as terminable, then continue to
-        // whatever guest code we want to run.
-        //
-        // `lucet_context_activate` takes two arguments:
-        // rsi: address of guest code to execute
-        // rdi: pointer to a bool that indicates the guest can be terminated
-        //
-        // The appropriate value for `rsi` is the top of the guest stack, which
-        // we would otherwise return to and start executing immediately. For
-        // `rdi`, we want to pass a pointer to the instance's `terminable` flag.
-        //
-        // once we've set up arguments, swap out the guest return address with
-        // `lucet_context_activate` so we start execution there.
-        unsafe {
-            let top_of_stack = self.ctx.gpr.rsp as *mut u64;
-            // move the guest code address to rsi
-            self.ctx.gpr.rsi = *top_of_stack;
-            // replace it with the activation thunk
-            *top_of_stack = crate::context::lucet_context_activate as u64;
-            // and store a pointer to indicate we're active
-            self.ctx.gpr.rdi = self.kill_state.terminable_ptr() as u64;
-        }
-
+        self.install_activator();
         self.swap_and_return()
+    }
+
+    /// Prepare the guest so that it will update its execution domain upon entry.
+    ///
+    /// This mutates the context's registers so that an activation function that will be run after
+    /// performing a context switch. This function (`enter_guest_region`) will mark the guest as
+    /// terminable before continuing to whatever guest code we want to run.
+    ///
+    /// `lucet_context_activate` takes three arguments in the following registers:
+    ///   * rdi: the data for the entry callback.
+    ///   * rsi: the address of the entry callback.
+    ///   * rbx: the address of the guest code to execute.
+    ///
+    /// The appropriate value for `rbx` is the top of the guest stack, which we would otherwise
+    /// return to and start executing immediately. For `rdi`, we want to pass our callback data
+    /// (a raw pointer to the instance). This will be passed as the first argument to the entry
+    /// function, which is responsible for updating the kill state's execution domain.
+    ///
+    /// See `lucet_runtime_internals::context::lucet_context_activate`, and
+    /// `execution::enter_guest_region` for more info.
+    // TODO KTM 2020-03-13: This should be a method on `Context`.
+    fn install_activator(&mut self) {
+        unsafe {
+            // Get a raw pointer to the top of the guest stack.
+            let top_of_stack = self.ctx.gpr.rsp as *mut u64;
+            // Move the guest code address to rbx, and then put the address of the activation thunk
+            // at the top of the stack, so that we will start execution at `enter_guest_region`.
+            self.ctx.gpr.rbx = *top_of_stack;
+            *top_of_stack = crate::context::lucet_context_activate as u64;
+            // Pass a pointer to our guest-side entrypoint bootstrap code in `rsi`, and then put
+            // its first argument (a raw pointer to `self`) in `rdi`.
+            self.ctx.gpr.rsi = execution::enter_guest_region as u64;
+            self.ctx.gpr.rdi = self.ctx.callback_data_ptr() as u64;
+        }
     }
 
     /// The core routine for context switching into a guest, and extracting a result.

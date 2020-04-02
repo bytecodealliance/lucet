@@ -1,6 +1,6 @@
 use crate::alloc::validate_sigstack_size;
-use crate::context::Context;
 use crate::error::Error;
+use crate::instance::execution::KillState;
 use crate::instance::{
     siginfo_ext::SiginfoExt, FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE,
     HOST_CTX,
@@ -251,7 +251,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             // TODO: once we have a notion of logging in `lucet-runtime`, this should be a logged
             // error.
             debug_assert!(!inst.kill_state.is_terminable());
-
+            // set the state before jumping back to the host context
             inst.state = State::Terminating {
                 details: TerminationDetails::Remote,
             };
@@ -325,19 +325,35 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         };
 
         if switch_to_host {
-            // we must disable termination so no KillSwitch may fire in host code.
+            // we must disable termination so no KillSwitch for this execution may fire in host
+            // code.
             inst.kill_state.disable_termination();
+            // and reset `kill_state` so that subsequent executions use a fresh KillState (not the
+            // stale one for the execution that just faulted)
+            inst.kill_state = Arc::new(KillState::default());
         }
 
         switch_to_host
     });
 
     if switch_to_host {
-        HOST_CTX.with(|host_ctx| unsafe {
-            Context::set_from_signal(&*host_ctx.get())
-                .expect("can successfully switch back to the host context");
-        });
-        unreachable!()
+        // Switch to host by preparing the context to switch when we return from the signal andler.
+        // We must return from the signal handler for POSIX reasons, so instead prepare the context
+        // that the signal handler will resume the program as if a call were made. First, by
+        // pointing the instruction pointer at `lucet_context_set`, then by preparing the argument
+        // that `lucet_context_set` should read from `rdi` - the context to switch to.
+        //
+        // NOTE: it is absolutely critical that `lucet_context_set` does not use the guest stack!
+        // If it did, and the signal being handled were a segfault from reaching the guard page,
+        // there would be no stack available for the function we return to. By not using stack
+        // space, `lucet_context_set` is safe for use even in handling guard page faults.
+        //
+        // TODO: `rdi` is only correct for SysV (unixy) calling conventions! For Windows x86_64 this
+        // would be `rcx`, with other architectures being their own question.
+        ctx.set_ip(crate::context::lucet_context_set as *const c_void);
+        HOST_CTX.with(|host_ctx| {
+            ctx.set_rdi(host_ctx.get() as u64);
+        })
     }
 }
 

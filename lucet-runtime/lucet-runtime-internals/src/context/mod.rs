@@ -6,7 +6,6 @@ mod tests;
 use crate::instance::Instance;
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
 
-use nix::sys::signal;
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::ptr::NonNull;
 use std::{mem, ptr};
@@ -26,7 +25,7 @@ use thiserror::Error;
 /// `u64`, this should be fine?
 #[repr(C)]
 pub(crate) struct GpRegs {
-    rbx: u64,
+    pub(crate) rbx: u64,
     pub(crate) rsp: u64,
     rbp: u64,
     pub(crate) rdi: u64,
@@ -122,8 +121,7 @@ pub struct Context {
     parent_ctx: *mut Context,
     // TODO ACF 2019-10-23: make Instance into a generic parameter?
     backstop_callback: *const unsafe extern "C" fn(*mut Instance),
-    backstop_data: *mut Instance,
-    sigset: signal::SigSet,
+    callback_data: *mut Instance,
 }
 
 impl Context {
@@ -136,9 +134,13 @@ impl Context {
             retval_fp: unsafe { _mm_setzero_ps() },
             parent_ctx: ptr::null_mut(),
             backstop_callback: Context::default_backstop_callback as *const _,
-            backstop_data: ptr::null_mut(),
-            sigset: signal::SigSet::empty(),
+            callback_data: ptr::null_mut(),
         }
+    }
+
+    /// Get a raw pointer to the instance's callback data.
+    pub(crate) fn callback_data_ptr(&self) -> *mut Instance {
+        self.callback_data
     }
 }
 
@@ -383,12 +385,12 @@ impl Context {
     /// guest entrypoint returns.
     ///
     /// After the entrypoint function returns, but before swapping back to the parent context,
-    /// `backstop_callback` will be run with the single argument `backstop_data`.
+    /// `backstop_callback` will be run with the single argument `callback_data`.
     pub fn init_with_callback(
         stack: &mut [u64],
         child: &mut Context,
         backstop_callback: unsafe extern "C" fn(*mut Instance),
-        backstop_data: *mut Instance,
+        callback_data: *mut Instance,
         fptr: usize,
         args: &[Val],
     ) -> Result<(), Error> {
@@ -398,7 +400,7 @@ impl Context {
 
         if backstop_callback != Context::default_backstop_callback {
             child.backstop_callback = backstop_callback as *const _;
-            child.backstop_data = backstop_data;
+            child.callback_data = callback_data;
         }
 
         let mut gp_args_ix = 0;
@@ -463,22 +465,15 @@ impl Context {
 
         let (stack, stack_start) = stack_builder.into_inner();
 
-        // RSP, RBP, and sigset still remain to be initialized.
         // Stack pointer: this points to the return address that will be used by `swap`, in place
         // of the original (eg, in the host) return address. The return address this points to is
         // the address of the first function to run on `swap`: `lucet_context_bootstrap`.
         child.gpr.rsp = &mut stack[stack.len() - stack_start] as *mut u64 as u64;
 
+        // Base pointer: `rbp` will be saved through all guest code, and preserved for when we
+        // reach the backstop. This allows us to prepare an argument for `lucet_context_backstop`
+        // even at the entrypoint of the guest.
         child.gpr.rbp = child as *const Context as u64;
-
-        // Read the mask to be restored if we ever need to jump out of a signal handler. If this
-        // isn't possible, die.
-        signal::pthread_sigmask(
-            signal::SigmaskHow::SIG_SETMASK,
-            None,
-            Some(&mut child.sigset),
-        )
-        .expect("pthread_sigmask could not be retrieved");
 
         Ok(())
     }
@@ -624,16 +619,6 @@ impl Context {
         lucet_context_set(to as *const Context);
     }
 
-    /// Like `set`, but also manages the return from a signal handler.
-    ///
-    /// TODO: the return type of this function should really be `Result<!, nix::Error>`, but using
-    /// `!` as a type like that is currently experimental.
-    #[inline]
-    pub unsafe fn set_from_signal(to: &Context) -> Result<(), nix::Error> {
-        signal::pthread_sigmask(signal::SigmaskHow::SIG_SETMASK, Some(&to.sigset), None)?;
-        Context::set(to)
-    }
-
     /// Clear (zero) return values.
     pub fn clear_retvals(&mut self) {
         self.retvals_gp = [0; 2];
@@ -721,11 +706,27 @@ extern "C" {
     /// Performs the context switch; implemented in assembly.
     ///
     /// Never returns because the current context is discarded.
-    fn lucet_context_set(to: *const Context) -> !;
+    pub(crate) fn lucet_context_set(to: *const Context) -> !;
 
-    /// Enables termination for the instance, after performing a context switch.
+    /// Runs an entry callback after performing a context switch. Implemented in assembly.
     ///
-    /// Takes the guest return address as an argument as a consequence of implementation details,
-    /// see `Instance::swap_and_return` for more.
+    /// In practice, this is used with `enter_guest_region` so that the guest will appropriately
+    /// set itself to be terminable upon entry before continuing to any guest code.
+    ///
+    /// `lucet_context_activate` is essentially a function with three arguments:
+    ///   * rdi: the data for the entry callback.
+    ///   * rsi: the address of the entry callback.
+    ///   * rbx: the address of the guest code to execute.
+    ///
+    /// We do not actually define `lucet_context_activate` as having these arguments because we
+    /// manually load these arguments, as well as a pointer to this function, into the context's
+    /// registers. See `Instance::with_activation_routine` for more information.
+    ///
+    /// Note that `rbx` is used to store the address of the guest code because it is a callee-saved
+    /// register in the System V calling convention. It is also a non-violatile register on
+    /// Windows, which is a nice additional benefit.
+    ///
+    /// For more information, see `Instance::swap_and_return`, `Instance::with_activation_routine`,
+    /// `enter_guest_region`, and `lucet_context_activate`'s assembly implementation.
     pub(crate) fn lucet_context_activate();
 }

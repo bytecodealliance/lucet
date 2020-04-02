@@ -730,6 +730,22 @@ macro_rules! alloc_tests {
         }
 
         #[test]
+        fn bad_instance_takes_up_capacity() {
+            let module = MockModuleBuilder::new()
+                .with_heap_spec(LARGE_GUARD_HEAP)
+                .build();
+            let region = TestRegion::create(2, &LIMITS).expect("region created");
+            assert_eq!(region.capacity(), 2);
+            assert_eq!(region.free_slots(), 2);
+            assert_eq!(region.used_slots(), 0);
+            let bad_inst_res = region.new_instance(module.clone());
+            assert!(bad_inst_res.is_err());
+            assert_eq!(region.capacity(), 2);
+            assert_eq!(region.free_slots(), 1);
+            assert_eq!(region.used_slots(), 1);
+        }
+
+        #[test]
         fn slot_counts_work() {
             let module = MockModuleBuilder::new()
                 .with_heap_spec(ONE_PAGE_HEAP)

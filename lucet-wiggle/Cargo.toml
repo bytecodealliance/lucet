@@ -14,13 +14,13 @@ proc-macro = true
 [dependencies]
 lucet-wiggle-generate = { path = "./generate", version = "0.6.2-dev" }
 lucet-wiggle-runtime = { path = "./runtime", version = "0.6.2-dev" }
-wiggle-generate = { git = "https://github.com/bytecodealliance/wasmtime"}
-witx = "0.8.3"
+wiggle-generate = { path = "../wasmtime/crates/wiggle/crates/generate", version = "0.1.0" }
+witx = { path = "../wasmtime/crates/wasi-common/wig/WASI/tools/witx", version = "0.8.4" }
 syn = { version = "1.0", features = ["full"] }
 
 [dev-dependencies]
-wiggle-runtime = { git = "https://github.com/bytecodealliance/wasmtime" }
-wiggle-test = { git = "https://github.com/bytecodealliance/wasmtime" }
+wiggle-runtime =  { path = "../wasmtime/crates/wiggle/crates/runtime", version = "0.1.0" }
+wiggle-test = { path = "../wasmtime/crates/wiggle/crates/test", version = "0.1.0" }
 lucet-runtime = { path = "../lucet-runtime", version = "0.6.2-dev" }
 tempfile = "3.1"
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.6.2-dev" }

@@ -10,7 +10,7 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-goblin="0.0.24"
+object = "0.18"
 byteorder="1.2.1"
 colored="1.8.0"
 lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }

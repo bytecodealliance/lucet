@@ -397,9 +397,16 @@ impl MmapRegion {
 
         // lay out the other sections in memory
         let heap = mem as usize + instance_heap_offset();
-        let stack = heap + region.limits.heap_address_space_size + host_page_size();
+        let stack_guard = heap + region.limits.heap_address_space_size;
+        let stack = stack_guard + host_page_size();
         let globals = stack + region.limits.stack_size;
         let sigstack = globals + region.limits.globals_size + host_page_size();
+
+        // ensure we've accounted for all space
+        assert_eq!(
+            sigstack + region.limits.signal_stack_size - mem as usize,
+            region.limits.total_memory_size()
+        );
 
         Ok(Slot {
             start: mem,

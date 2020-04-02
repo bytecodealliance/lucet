@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
       with:
-        submodules: true
+        submodules: 'recursive'
 
     - name: Install Rust (rustup)
       run: rustup update

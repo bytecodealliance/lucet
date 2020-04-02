@@ -30,16 +30,27 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
         }
     }?;
 
-    let mut elems = Vec::new();
+    let mut elems = vec![Elem::Empty; decl.table.minimum as usize];
 
     for initializer in decl.elems.iter() {
         if initializer.base.is_some() {
             let message = format!("table elements with global index base: {:?}", initializer);
             return Err(Error::Unsupported(message));
         }
-        let final_len = initializer.offset + initializer.elements.len();
+
+        let final_len = initializer
+            .offset
+            .checked_add(initializer.elements.len())
+            // `offset` comes from a Wasm i32, so it can't be very big. To observe overflow,
+            // `initializer.elements.len()` would have to be greater than `usize::MAX - u32::MAX`,
+            // which would require an unfeasibly large Wasm binary
+            .expect("table length overflowed usize");
+
         if final_len > elems.len() {
-            elems.resize(final_len, Elem::Empty);
+            return Err(Error::ElementInitializerOutOfRange(
+                initializer.clone(),
+                decl.table.clone(),
+            ));
         }
         for (ix, func_ix) in initializer.elements.iter().enumerate() {
             elems[initializer.offset + ix] = Elem::Func(*func_ix);
@@ -55,7 +66,7 @@ pub fn write_table_data<B: ClifBackend>(
 ) -> Result<(DataId, usize), Error> {
     let mut tables_vec = Cursor::new(Vec::new());
     let mut table_ctx = DataContext::new();
-    let mut table_len = 0;
+    let mut tables_count = 0;
 
     if let Ok(table_decl) = decls.get_table(TableIndex::new(0)) {
         // Indirect calls are performed by looking up the callee function and type in a table that
@@ -123,10 +134,10 @@ pub fn write_table_data<B: ClifBackend>(
         tables_vec.write_u64::<LittleEndian>(0).unwrap();
 
         // Define the length of the table as a u64:
-        table_len = elements.len();
         tables_vec
-            .write_u64::<LittleEndian>(table_len as u64)
+            .write_u64::<LittleEndian>(elements.len() as u64)
             .unwrap();
+        tables_count += 1;
     }
 
     let inner = tables_vec.into_inner();
@@ -138,5 +149,5 @@ pub fn write_table_data<B: ClifBackend>(
         .as_dataid()
         .expect("lucet_tables is declared as data");
     clif_module.define_data(table_id, &table_ctx)?;
-    Ok((table_id, table_len))
+    Ok((table_id, tables_count))
 }
