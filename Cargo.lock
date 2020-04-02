@@ -281,20 +281,20 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.60.0"
+version = "0.62.0"
 dependencies = [
- "cranelift-entity 0.60.0",
+ "cranelift-entity 0.62.0",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.60.0"
+version = "0.62.0"
 dependencies = [
  "byteorder 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "cranelift-bforest 0.60.0",
- "cranelift-codegen-meta 0.60.0",
- "cranelift-codegen-shared 0.60.0",
- "cranelift-entity 0.60.0",
+ "cranelift-bforest 0.62.0",
+ "cranelift-codegen-meta 0.62.0",
+ "cranelift-codegen-shared 0.62.0",
+ "cranelift-entity 0.62.0",
  "gimli 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "smallvec 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -304,27 +304,27 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.60.0"
+version = "0.62.0"
 dependencies = [
- "cranelift-codegen-shared 0.60.0",
- "cranelift-entity 0.60.0",
+ "cranelift-codegen-shared 0.62.0",
+ "cranelift-entity 0.62.0",
 ]
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.60.0"
+version = "0.62.0"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.60.0"
+version = "0.62.0"
 
 [[package]]
 name = "cranelift-faerie"
-version = "0.60.0"
+version = "0.62.0"
 dependencies = [
  "anyhow 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
- "cranelift-codegen 0.60.0",
- "cranelift-module 0.60.0",
+ "cranelift-codegen 0.62.0",
+ "cranelift-module 0.62.0",
  "faerie 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "goblin 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "target-lexicon 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -332,9 +332,9 @@ dependencies = [
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.60.0"
+version = "0.62.0"
 dependencies = [
- "cranelift-codegen 0.60.0",
+ "cranelift-codegen 0.62.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "smallvec 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "target-lexicon 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -342,31 +342,31 @@ dependencies = [
 
 [[package]]
 name = "cranelift-module"
-version = "0.60.0"
+version = "0.62.0"
 dependencies = [
  "anyhow 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
- "cranelift-codegen 0.60.0",
- "cranelift-entity 0.60.0",
+ "cranelift-codegen 0.62.0",
+ "cranelift-entity 0.62.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror 1.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "cranelift-native"
-version = "0.60.0"
+version = "0.62.0"
 dependencies = [
- "cranelift-codegen 0.60.0",
+ "cranelift-codegen 0.62.0",
  "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "target-lexicon 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.60.0"
+version = "0.62.0"
 dependencies = [
- "cranelift-codegen 0.60.0",
- "cranelift-entity 0.60.0",
- "cranelift-frontend 0.60.0",
+ "cranelift-codegen 0.62.0",
+ "cranelift-entity 0.62.0",
+ "cranelift-frontend 0.62.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror 1.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasmparser 0.51.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -828,7 +828,7 @@ dependencies = [
  "anyhow 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "cranelift-entity 0.60.0",
+ "cranelift-entity 0.62.0",
  "derivative 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "memoffset 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "minisign 0.5.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -948,7 +948,7 @@ name = "lucet-validate"
 version = "0.6.2-dev"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cranelift-entity 0.60.0",
+ "cranelift-entity 0.62.0",
  "lucet-wasi-sdk 0.6.2-dev",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror 1.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1025,9 +1025,9 @@ dependencies = [
  "lucetc 0.6.2-dev",
  "syn 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "wiggle-generate 0.1.0",
- "wiggle-runtime 0.1.0",
- "wiggle-test 0.1.0",
+ "wiggle 0.15.0",
+ "wiggle-generate 0.15.0",
+ "wiggle-test 0.15.0",
  "witx 0.8.4",
 ]
 
@@ -1040,7 +1040,7 @@ dependencies = [
  "proc-macro2 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "wiggle-generate 0.1.0",
+ "wiggle-generate 0.15.0",
  "witx 0.8.4",
 ]
 
@@ -1049,7 +1049,7 @@ name = "lucet-wiggle-runtime"
 version = "0.6.2-dev"
 dependencies = [
  "lucet-runtime 0.6.2-dev",
- "wiggle-runtime 0.1.0",
+ "wiggle 0.15.0",
 ]
 
 [[package]]
@@ -1061,13 +1061,13 @@ dependencies = [
  "bincode 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cranelift-codegen 0.60.0",
- "cranelift-entity 0.60.0",
- "cranelift-faerie 0.60.0",
- "cranelift-frontend 0.60.0",
- "cranelift-module 0.60.0",
- "cranelift-native 0.60.0",
- "cranelift-wasm 0.60.0",
+ "cranelift-codegen 0.62.0",
+ "cranelift-entity 0.62.0",
+ "cranelift-faerie 0.62.0",
+ "cranelift-frontend 0.62.0",
+ "cranelift-module 0.62.0",
+ "cranelift-native 0.62.0",
+ "cranelift-wasm 0.62.0",
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "faerie 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "goblin 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2249,31 +2249,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "wiggle"
+version = "0.15.0"
+dependencies = [
+ "thiserror 1.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wiggle-macro 0.15.0",
+ "witx 0.8.4",
+]
+
+[[package]]
 name = "wiggle-generate"
-version = "0.1.0"
+version = "0.15.0"
 dependencies = [
  "anyhow 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro2 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "wiggle-runtime 0.1.0",
  "witx 0.8.4",
 ]
 
 [[package]]
-name = "wiggle-runtime"
-version = "0.1.0"
+name = "wiggle-macro"
+version = "0.15.0"
 dependencies = [
- "thiserror 1.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wiggle-generate 0.15.0",
+ "witx 0.8.4",
 ]
 
 [[package]]
 name = "wiggle-test"
-version = "0.1.0"
+version = "0.15.0"
 dependencies = [
  "proptest 0.9.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "wiggle-runtime 0.1.0",
+ "wiggle 0.15.0",
 ]
 
 [[package]]
