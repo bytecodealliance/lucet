@@ -919,6 +919,7 @@ dependencies = [
  "anyhow 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module 0.6.2-dev",
  "lucet-runtime-internals 0.6.2-dev",
  "lucet-wasi-sdk 0.6.2-dev",
