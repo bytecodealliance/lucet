@@ -244,6 +244,10 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         };
 
         if signal == Signal::SIGALRM {
+            #[cfg(feature = "concurrent_testpoints")]
+            inst.lock_testpoints
+                .signal_handler_before_checking_alarm
+                .check();
             if inst.kill_state.alarm_active() {
                 inst.state = State::Terminating {
                     details: TerminationDetails::Remote,
@@ -328,8 +332,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 .signal_handler_before_disabling_termination
                 .check();
 
-            // we must disable termination so no KillSwitch for this execution may fire in host
-            // code.
+            // we must disable termination so no KillSwitch may fire in host code.
             let can_terminate = inst.kill_state.disable_termination();
 
             if !can_terminate {

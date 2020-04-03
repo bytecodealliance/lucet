@@ -83,6 +83,7 @@ pub struct LockTestpoints {
     pub signal_handler_after_acquiring_termination: Syncpoint,
     pub signal_handler_after_disabling_termination: Syncpoint,
     pub signal_handler_after_unable_to_disable_termination: Syncpoint,
+    pub signal_handler_before_checking_alarm: Syncpoint,
     pub signal_handler_before_disabling_termination: Syncpoint,
     pub signal_handler_before_returning: Syncpoint,
 }
@@ -112,6 +113,7 @@ impl LockTestpoints {
             signal_handler_after_acquiring_termination: Syncpoint::new(),
             signal_handler_after_disabling_termination: Syncpoint::new(),
             signal_handler_after_unable_to_disable_termination: Syncpoint::new(),
+            signal_handler_before_checking_alarm: Syncpoint::new(),
             signal_handler_before_disabling_termination: Syncpoint::new(),
             signal_handler_before_returning: Syncpoint::new(),
         }
