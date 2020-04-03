@@ -1,4 +1,6 @@
-use crate::{DlModule, Instance, Limits, MmapRegion, Module, Region, UffdRegion};
+#[cfg(feature = "uffd")]
+use crate::UffdRegion;
+use crate::{DlModule, Instance, Limits, MmapRegion, Module, Region};
 use libc::{c_char, c_int, c_void};
 use lucet_module::TrapCode;
 use lucet_runtime_internals::c_api::*;
@@ -102,18 +104,27 @@ pub unsafe extern "C" fn lucet_uffd_region_create(
     limits: *const lucet_alloc_limits,
     region_out: *mut *mut lucet_region,
 ) -> lucet_error {
-    assert_nonnull!(region_out);
-    let limits = limits
-        .as_ref()
-        .map(|l| l.into())
-        .unwrap_or(Limits::default());
-    match UffdRegion::create(instance_capacity as usize, &limits) {
-        Ok(region) => {
-            let region_thin = Arc::into_raw(Arc::new(region as Arc<dyn Region>));
-            region_out.write(region_thin as _);
-            lucet_error::Ok
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "uffd")] {
+            assert_nonnull!(region_out);
+            let limits = limits
+                .as_ref()
+                .map(|l| l.into())
+                .unwrap_or(Limits::default());
+            match UffdRegion::create(instance_capacity as usize, &limits) {
+                Ok(region) => {
+                    let region_thin = Arc::into_raw(Arc::new(region as Arc<dyn Region>));
+                    region_out.write(region_thin as _);
+                    lucet_error::Ok
+                }
+                Err(e) => e.into(),
+            }
+        } else {
+            let _ = instance_capacity;
+            let _ = limits;
+            let _ = region_out;
+            lucet_error::Unsupported
         }
-        Err(e) => e.into(),
     }
 }
 

@@ -397,6 +397,7 @@ pub use lucet_runtime_internals::instance::{
 pub use lucet_runtime_internals::lucet_hostcalls;
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
+#[cfg(feature = "uffd")]
 pub use lucet_runtime_internals::region::uffd::UffdRegion;
 pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
