@@ -10,6 +10,7 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
+cfg-if = "0.1"
 libc = "0.2.65"
 lucet-runtime-internals = { path = "lucet-runtime-internals", version = "=0.6.2-dev" }
 lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }
@@ -46,3 +47,6 @@ assets = [
     ["target/release/liblucet_runtime.so", "/opt/fst-lucet-runtime/lib/", "755"],
     ["include/*.h", "/opt/fst-lucet-runtime/include/", "644"],
 ]
+
+[features]
+uffd = ["lucet-runtime-internals/uffd"]

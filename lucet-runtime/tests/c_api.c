@@ -65,7 +65,10 @@ bool lucet_runtime_test_uffd_expand_heap(struct lucet_dl_module *mod)
     enum lucet_error err;
 
     err = lucet_uffd_region_create(1, &limits, &region);
-    if (err != lucet_error_ok) {
+    if (err == lucet_error_unsupported) {
+        fprintf(stderr, "UFFD not supported in this build\n");
+        return true;
+    } else if (err != lucet_error_ok) {
         fprintf(stderr, "failed to create region\n");
         goto fail1;
     }

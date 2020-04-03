@@ -1,6 +1,12 @@
 use lucet_runtime_tests::entrypoint_tests;
 
-entrypoint_tests!(
-    mmap => lucet_runtime::MmapRegion,
-    uffd => lucet_runtime::UffdRegion
-);
+cfg_if::cfg_if! {
+    if #[cfg(feature = "uffd")] {
+        entrypoint_tests!(
+            mmap => lucet_runtime::MmapRegion,
+            uffd => lucet_runtime::UffdRegion
+        );
+    } else {
+        entrypoint_tests!(mmap => lucet_runtime::MmapRegion);
+    }
+}

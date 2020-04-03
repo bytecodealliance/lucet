@@ -1,4 +1,6 @@
 pub mod mmap;
+
+#[cfg(feature = "uffd")]
 pub mod uffd;
 
 use crate::alloc::{Alloc, Limits, Slot};
