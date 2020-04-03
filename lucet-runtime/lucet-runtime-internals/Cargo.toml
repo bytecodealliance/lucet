@@ -28,7 +28,7 @@ rand = "0.7"
 raw-cpuid = "6.0.0"
 thiserror = "1.0.4"
 tracing = "0.1.12"
-userfaultfd = { path = "../../../userfaultfd-rs" }
+userfaultfd = { path = "../../../userfaultfd-rs", optional = true }
 
 [dev-dependencies]
 byteorder = "1.2"
@@ -40,3 +40,4 @@ cc = "1.0"
 default = []
 
 concurrent_testpoints = []
+uffd = ["userfaultfd"]

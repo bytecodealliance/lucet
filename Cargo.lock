@@ -934,6 +934,7 @@ dependencies = [
  "anyhow",
  "byteorder",
  "cc",
+ "cfg-if",
  "lazy_static",
  "libc",
  "lucet-module",
