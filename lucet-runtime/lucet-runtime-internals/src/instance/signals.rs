@@ -12,6 +12,7 @@ use lucet_module::TrapCode;
 use nix::sys::signal::{
     pthread_sigmask, raise, sigaction, SaFlags, SigAction, SigHandler, SigSet, SigmaskHow, Signal,
 };
+use std::convert::TryFrom;
 use std::mem::MaybeUninit;
 use std::ops::DerefMut;
 use std::panic;
@@ -202,7 +203,7 @@ impl Instance {
 /// hardware instruction from the faulting WASM thread. It thus safely assumes the signal is
 /// directed specifically at this thread (i.e. not a different thread or the process as a whole).
 extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext_ptr: *mut c_void) {
-    let signal = Signal::from_c_int(signum).expect("signum is a valid signal");
+    let signal = Signal::try_from(signum).expect("signum is a valid signal");
     if !(signal == Signal::SIGBUS
         || signal == Signal::SIGSEGV
         || signal == Signal::SIGILL
