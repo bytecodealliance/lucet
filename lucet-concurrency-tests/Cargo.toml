@@ -1,0 +1,15 @@
+[package]
+name = "lucet-concurrency-tests"
+version = "0.6.2-dev"
+description = "Tests for lucet-runtime that depend on conditionally-defined locks to force timing permutations."
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Lucet team <lucet@fastly.com>"]
+edition = "2018"
+
+[dependencies]
+lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }
+lucet-runtime = { path = "../lucet-runtime", version = "=0.6.2-dev", features = ["concurrent_testpoints"] }
+lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "=0.6.2-dev", features = ["concurrent_testpoints"] }

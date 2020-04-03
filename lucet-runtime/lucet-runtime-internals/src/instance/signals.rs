@@ -325,12 +325,29 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         };
 
         if switch_to_host {
+            #[cfg(feature = "concurrent_testpoints")]
+            inst.lock_testpoints
+                .signal_handler_before_disabling_termination
+                .check();
+
             // we must disable termination so no KillSwitch for this execution may fire in host
             // code.
             inst.kill_state.disable_termination();
             // and reset `kill_state` so that subsequent executions use a fresh KillState (not the
             // stale one for the execution that just faulted)
-            inst.kill_state = Arc::new(KillState::default());
+            #[cfg(feature = "concurrent_testpoints")]
+            {
+                inst.kill_state = Arc::new(KillState::new(Arc::clone(&inst.lock_testpoints)));
+            }
+            #[cfg(not(feature = "concurrent_testpoints"))]
+            {
+                inst.kill_state = Arc::new(KillState::new());
+            }
+
+            #[cfg(feature = "concurrent_testpoints")]
+            inst.lock_testpoints
+                .signal_handler_after_disabling_termination
+                .check();
         }
 
         switch_to_host
@@ -355,6 +372,26 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             ctx.set_rdi(host_ctx.get() as u64);
         })
     }
+
+    #[cfg(feature = "concurrent_testpoints")]
+    CURRENT_INSTANCE.with(|current_instance| {
+        let mut current_instance = current_instance.borrow_mut();
+
+        // If we're switching to the host, there must be an instance, because we are switching away
+        // from it.
+        let inst = unsafe {
+            current_instance
+                .as_mut()
+                .expect("current instance exists")
+                .as_mut()
+        };
+
+        // and the entire reason we're grabbing the instance again: lock for any races we're
+        // testing with last-stretch signal handling.
+        inst.lock_testpoints
+            .signal_handler_lock_before_returning
+            .check();
+    });
 }
 
 struct SignalState {
