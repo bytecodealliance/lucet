@@ -751,6 +751,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lucet-concurrency-tests"
+version = "0.6.2-dev"
+dependencies = [
+ "lucet-module 0.6.2-dev",
+ "lucet-runtime 0.6.2-dev",
+ "lucet-runtime-internals 0.6.2-dev",
+]
+
+[[package]]
 name = "lucet-module"
 version = "0.6.2-dev"
 dependencies = [

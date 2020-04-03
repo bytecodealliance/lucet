@@ -19,6 +19,8 @@ pub mod c_api;
 pub mod context;
 pub mod embed_ctx;
 pub mod instance;
+#[cfg(feature = "concurrent_testpoints")]
+pub mod lock_testpoints;
 pub mod module;
 pub mod region;
 pub mod sysdeps;

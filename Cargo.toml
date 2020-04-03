@@ -2,6 +2,7 @@
 members = [
   "benchmarks/lucet-benchmarks",
   "docs/lucet-runtime-example",
+  "lucet-concurrency-tests",
   "lucet-module",
   "lucet-objdump",
   "lucet-runtime",

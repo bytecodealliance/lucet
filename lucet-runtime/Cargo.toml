@@ -46,3 +46,8 @@ assets = [
     ["target/release/liblucet_runtime.so", "/opt/fst-lucet-runtime/lib/", "755"],
     ["include/*.h", "/opt/fst-lucet-runtime/include/", "644"],
 ]
+
+[features]
+default = []
+
+concurrent_testpoints = []
