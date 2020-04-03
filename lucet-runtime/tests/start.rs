@@ -1,6 +1,12 @@
 use lucet_runtime_tests::start_tests;
 
-start_tests!(
-    mmap => lucet_runtime::MmapRegion,
-    uffd => lucet_runtime::UffdRegion
-);
+cfg_if::cfg_if! {
+    if #[cfg(feature = "uffd")] {
+        start_tests!(
+            mmap => lucet_runtime::MmapRegion,
+            uffd => lucet_runtime::UffdRegion
+        );
+    } else {
+        start_tests!(mmap => lucet_runtime::MmapRegion);
+    }
+}
