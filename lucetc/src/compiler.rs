@@ -371,7 +371,7 @@ impl<'a> Compiler<'a> {
         function_manifest_ctx.define(function_manifest_bytes.into_inner().into());
         let manifest_data_id = self.clif_module.declare_data(
             FUNCTION_MANIFEST_SYM,
-            ClifLinkage::Export,
+            ClifLinkage::Local,
             false,
             false,
             None,
@@ -589,7 +589,7 @@ impl TrapSites {
         trap_sym_ctx.define(self.serialize());
 
         let trap_data_id =
-            module.declare_data(&trap_sym, ClifLinkage::Export, false, false, None)?;
+            module.declare_data(&trap_sym, ClifLinkage::Local, false, false, None)?;
 
         module.define_data(trap_data_id, &trap_sym_ctx)?;
 

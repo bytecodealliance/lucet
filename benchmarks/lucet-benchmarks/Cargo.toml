@@ -18,7 +18,7 @@ lucet-runtime = { path = "../../lucet-runtime" }
 lucet-runtime-internals = { path = "../../lucet-runtime/lucet-runtime-internals" }
 lucet-wasi = { path = "../../lucet-wasi" }
 lucet-wasi-sdk = { path = "../../lucet-wasi-sdk" }
-nix = "0.15"
+nix = "0.17"
 num_cpus = "1.0"
 rayon = "1.0"
 tempfile = "3.0"

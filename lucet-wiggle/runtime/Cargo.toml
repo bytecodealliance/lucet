@@ -10,4 +10,4 @@ edition = "2018"
 
 [dependencies]
 lucet-runtime = { path = "../../lucet-runtime", version = "0.6.2-dev" }
-wiggle-runtime =  { path = "../../wasmtime/crates/wiggle/crates/runtime", version = "0.1.0" }
+wiggle =  { path = "../../wasmtime/crates/wiggle", version = "0.15.0" }

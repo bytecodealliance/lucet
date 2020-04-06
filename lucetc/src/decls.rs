@@ -254,14 +254,14 @@ impl<'a> ModuleDecls<'a> {
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id =
-                clif_module.declare_data(&def_symbol, Linkage::Export, false, false, None)?;
+                clif_module.declare_data(&def_symbol, Linkage::Local, false, false, None)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             table_names.push(def_name);
         }
 
         let tables_list_id =
-            clif_module.declare_data(TABLE_SYM, Linkage::Export, false, false, None)?;
+            clif_module.declare_data(TABLE_SYM, Linkage::Local, false, false, None)?;
         let tables_list = Name::new_data(TABLE_SYM.to_string(), tables_list_id);
 
         Ok((tables_list, table_names))
