@@ -690,7 +690,7 @@ macro_rules! alloc_tests {
         }
 
         #[test]
-        fn bad_instance_takes_up_capacity() {
+        fn badly_specced_instance_does_not_take_up_capacity() {
             let module = MockModuleBuilder::new()
                 .with_heap_spec(LARGE_GUARD_HEAP)
                 .build();
@@ -701,8 +701,8 @@ macro_rules! alloc_tests {
             let bad_inst_res = region.new_instance(module.clone());
             assert!(bad_inst_res.is_err());
             assert_eq!(region.capacity(), 2);
-            assert_eq!(region.free_slots(), 1);
-            assert_eq!(region.used_slots(), 1);
+            assert_eq!(region.free_slots(), 2);
+            assert_eq!(region.used_slots(), 0);
         }
 
         #[test]
