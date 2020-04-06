@@ -191,6 +191,46 @@ macro_rules! alloc_tests {
             assert_eq!(heap[new_heap_len - 1], 0xFF);
         }
 
+        /// This test exercises custom limits on the heap_memory_size.
+        /// In this scenario, the Region has a limit on the heap memory
+        /// size, but the instance has a smaller limit. Attempts to expand
+        /// the heap fail, but the existing heap can still be used.
+        #[test]
+        fn expand_past_spec_max_with_custom_limit() {
+            let region = TestRegion::create(10, &LIMITS).expect("region created");
+            let module = MockModuleBuilder::new()
+                .with_heap_spec(THREE_PAGE_MAX_HEAP)
+                .build();
+            let mut inst = region
+                .new_instance_builder(module.clone())
+                .with_heap_size_limit((THREEPAGE_INITIAL_SIZE) as usize)
+                .build()
+                .expect("new_instance succeeds");
+
+            let heap_len = inst.alloc().heap_len();
+            assert_eq!(heap_len, THREEPAGE_INITIAL_SIZE as usize);
+
+            // Expand the heap within the Region limit but past the
+            // instance limit.
+            let new_heap_area = inst.alloc_mut().expand_heap(
+                (THREEPAGE_MAX_SIZE - THREEPAGE_INITIAL_SIZE) as u32,
+                module.as_ref(),
+            );
+            assert!(
+                new_heap_area.is_err(),
+                "heap expansion past instance limit fails"
+            );
+
+            // Affirm that the existing heap can still be used.
+            let new_heap_len = inst.alloc().heap_len();
+            assert_eq!(new_heap_len, heap_len);
+
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
+            assert_eq!(heap[new_heap_len - 1], 0);
+            heap[new_heap_len - 1] = 0xFF;
+            assert_eq!(heap[new_heap_len - 1], 0xFF);
+        }
+
         const EXPANDPASTLIMIT_INITIAL_SIZE: u64 = LIMITS_HEAP_MEM_SIZE as u64 - (64 * 1024);
         const EXPANDPASTLIMIT_MAX_SIZE: u64 = LIMITS_HEAP_MEM_SIZE as u64 + (64 * 1024);
         const EXPAND_PAST_LIMIT_SPEC: HeapSpec = HeapSpec {
@@ -835,6 +875,90 @@ macro_rules! alloc_tests {
                 Err(e) => panic!("unexpected error: {}", e),
                 Ok(_) => panic!("unexpected success"),
             }
+        }
+
+        /// This test exercises custom limits on the heap_memory_size.
+        /// In this scenario, the Region has a limit on the heap
+        /// memory size, but the instance has a larger limit.  An
+        /// instance's custom limit must not exceed the Region's.
+        #[test]
+        fn reject_heap_memory_size_exceeds_region_limits() {
+            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let module = MockModuleBuilder::new()
+                .with_heap_spec(THREE_PAGE_MAX_HEAP)
+                .build();
+            let res = region
+                .new_instance_builder(module.clone())
+                .with_heap_size_limit(&LIMITS.heap_memory_size * 2)
+                .build();
+
+            match res {
+                Err(Error::InvalidArgument(
+                    "heap memory size requested for instance is larger than slot allows",
+                )) => (),
+                Err(e) => panic!("unexpected error: {}", e),
+                Ok(_) => panic!("unexpected success"),
+            }
+        }
+
+        /// This test exercises custom limits on the heap_memory_size.
+        /// In this scenario, successfully create a custom-sized
+        /// instance, drop it, then create a default-sized instance to
+        /// affirm that a custom size doesn't somehow overwrite the
+        /// default size.
+        #[test]
+        fn custom_size_does_not_break_default() {
+            let region = TestRegion::create(1, &LIMITS).expect("region created");
+
+            // Build an instance that is has custom limits that are big
+            // enough to accommodate the HeapSpec.
+            let custom_inst = region
+                .new_instance_builder(
+                    MockModuleBuilder::new()
+                        .with_heap_spec(THREE_PAGE_MAX_HEAP)
+                        .build(),
+                )
+                .with_heap_size_limit((THREE_PAGE_MAX_HEAP.initial_size * 2) as usize)
+                .build()
+                .expect("new instance succeeds");
+
+            // Affirm that its heap is the expected size, the size
+            // specified in the HeapSpec.
+            let heap_len = custom_inst.alloc().heap_len();
+            assert_eq!(heap_len, THREE_PAGE_MAX_HEAP.initial_size as usize);
+            drop(custom_inst);
+
+            // Build a default heap-limited instance, to make sure the
+            // custom limits didn't break the defaults.
+            let default_inst = region
+                .new_instance(
+                    MockModuleBuilder::new()
+                        .with_heap_spec(SMALL_GUARD_HEAP)
+                        .build(),
+                )
+                .expect("new_instance succeeds");
+
+            // Affirm that its heap is the expected size.
+            let heap_len = default_inst.alloc().heap_len();
+            assert_eq!(heap_len, SMALL_GUARD_HEAP.initial_size as usize);
+        }
+
+        /// This test exercises custom limits on the heap_memory_size.
+        /// In this scenario, the HeapSpec has an expectation for the
+        /// initial heap memory size, but the instance's limit is too small.
+        #[test]
+        fn reject_heap_memory_size_exeeds_instance_limits() {
+            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let res = region
+                .new_instance_builder(
+                    MockModuleBuilder::new()
+                        .with_heap_spec(THREE_PAGE_MAX_HEAP)
+                        .build(),
+                )
+                .with_heap_size_limit((THREE_PAGE_MAX_HEAP.initial_size / 2) as usize)
+                .build();
+
+            assert!(res.is_err(), "new_instance fails");
         }
     };
 }
