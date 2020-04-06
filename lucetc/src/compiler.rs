@@ -18,11 +18,11 @@ use cranelift_codegen::{
     settings::{self, Configurable},
     Context as ClifContext,
 };
-use cranelift_faerie::{FaerieBackend, FaerieBuilder};
 use cranelift_module::{
     Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, FuncOrDataId,
     Linkage as ClifLinkage, Module as ClifModule,
 };
+use cranelift_object::{ObjectBackend, ObjectBuilder};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use lucet_module::bindings::Bindings;
 use lucet_module::{
@@ -175,7 +175,7 @@ impl CompilerBuilder {
 
 pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
-    clif_module: ClifModule<FaerieBackend>,
+    clif_module: ClifModule<ObjectBackend>,
     target: Triple,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
@@ -228,8 +228,9 @@ impl<'a> Compiler<'a> {
             _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
-        let mut clif_module: ClifModule<FaerieBackend> =
-            ClifModule::new(FaerieBuilder::new(isa, "lucet_guest".to_owned(), libcalls)?);
+        let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls);
+        builder.function_alignment(16);
+        let mut clif_module: ClifModule<ObjectBackend> = ClifModule::new(builder);
 
         let runtime = Runtime::lucet(frontend_config);
         let decls = ModuleDecls::new(
@@ -397,7 +398,7 @@ impl<'a> Compiler<'a> {
         version.write_to(&mut native_data)?;
 
         fn write_slice(
-            module: &mut ClifModule<FaerieBackend>,
+            module: &mut ClifModule<ObjectBackend>,
             mut ctx: &mut ClifDataContext,
             bytes: &mut Cursor<Vec<u8>>,
             id: DataId,
@@ -581,7 +582,7 @@ impl TrapSites {
     /// Write traps for a given function into the cranelift module:
     pub fn write(
         &self,
-        module: &mut ClifModule<FaerieBackend>,
+        module: &mut ClifModule<ObjectBackend>,
         func_name: &str,
     ) -> Result<DataId, Error> {
         let trap_sym = trap_sym_for_func(func_name);
@@ -616,7 +617,7 @@ impl cranelift_codegen::binemit::TrapSink for TrapSites {
 }
 
 fn write_function_spec(
-    module: &mut ClifModule<FaerieBackend>,
+    module: &mut ClifModule<ObjectBackend>,
     mut manifest_ctx: &mut ClifDataContext,
     manifest_bytes: &mut Cursor<Vec<u8>>,
     func_id: FuncId,
