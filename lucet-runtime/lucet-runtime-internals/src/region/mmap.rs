@@ -8,6 +8,7 @@ use libc::c_void;
 #[cfg(not(target_os = "linux"))]
 use libc::memset;
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
+use rand::Rng;
 use std::cmp::Ordering;
 use std::ptr;
 use std::sync::{Arc, RwLock, Weak};
@@ -106,6 +107,8 @@ impl RegionInternal for MmapRegion {
         }
         module.validate_runtime_spec(&limits)?;
 
+	let random_idx = 
+	    
         let slot = self
             .freelist
             .write()
