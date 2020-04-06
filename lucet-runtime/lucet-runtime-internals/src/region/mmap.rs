@@ -73,7 +73,7 @@ impl Region for MmapRegion {
         self.capacity
     }
 }
-
+    
 impl RegionInternal for MmapRegion {
     fn new_instance_with(
         &self,
@@ -81,11 +81,31 @@ impl RegionInternal for MmapRegion {
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error> {
-        // Affirm that the module, if instantiated, would not violate
-        // any runtime memory limits.
-        let limits = self.get_limits();
-        module.validate_runtime_spec(limits)?;
+	let custom_limits;
+	let mut limits = self.get_limits();
 
+	// Affirm that the module, if instantiated, would not violate
+        // any runtime memory limits.
+	match heap_memory_size_limit.cmp(&limits.heap_memory_size) {
+            Ordering::Less => {
+                // The supplied heap_memory_size is smaller than
+                // default. Augment the limits with this custom value
+                // so that it may be validated.
+		custom_limits = Limits {
+		    heap_memory_size: heap_memory_size_limit,
+		    .. *limits
+		} ;
+		limits = &custom_limits;
+            }
+            Ordering::Equal => (),
+            Ordering::Greater => {
+                return Err(Error::InvalidArgument(
+                    "heap memory size requested for instance is larger than slot allows",
+                ))
+            }
+        }
+	module.validate_runtime_spec(&limits)?;
+	
         let slot = self
             .freelist
             .write()
@@ -96,23 +116,6 @@ impl RegionInternal for MmapRegion {
         if slot.heap as usize % host_page_size() != 0 {
             lucet_bail!("heap is not page-aligned; this is a bug");
         }
-
-        let mut limits = slot.limits;
-        match heap_memory_size_limit.cmp(&slot.limits.heap_memory_size) {
-            Ordering::Less => {
-                // The supplied heap_memory_size is smaller than
-                // default. Augment the limits with this custom value
-                // so that it may be validated.
-                limits.heap_memory_size = heap_memory_size_limit;
-            }
-            Ordering::Equal => (),
-            Ordering::Greater => {
-                return Err(Error::InvalidArgument(
-                    "heap memory size requested for instance is larger than slot allows",
-                ))
-            }
-        }
-        module.validate_runtime_spec(&limits)?;
 
         for (ptr, len) in [
             // make the stack read/writable
