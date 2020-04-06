@@ -81,6 +81,11 @@ impl RegionInternal for MmapRegion {
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error> {
+        // Affirm that the module, if instantiated, would not violate
+        // any runtime memory limits.
+        let limits = self.get_limits();
+        module.validate_runtime_spec(limits)?;
+
         let slot = self
             .freelist
             .write()
@@ -119,8 +124,10 @@ impl RegionInternal for MmapRegion {
         ]
         .iter()
         {
-            // eprintln!("setting r/w {:p}[{:x}]", *ptr, len);
-            unsafe { mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)? };
+            unsafe {
+                mprotect(*ptr, *len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)
+                    .expect("mprotect() call succeeds");
+            };
         }
 
         // note: the initial heap will be made read/writable when `new_instance_handle` calls `reset`
@@ -144,6 +151,8 @@ impl RegionInternal for MmapRegion {
             region,
         };
 
+        // Though this is a potential early return from the function, the Drop impl
+        // on the Alloc will put the slot back on the freelist.
         let inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
 
         Ok(inst)
