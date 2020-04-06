@@ -1,7 +1,6 @@
 use crate::error::Error;
 use crate::module::Module;
 use crate::region::RegionInternal;
-use anyhow::format_err;
 use libc::c_void;
 use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
