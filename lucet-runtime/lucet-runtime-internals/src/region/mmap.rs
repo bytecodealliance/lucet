@@ -73,7 +73,7 @@ impl Region for MmapRegion {
         self.capacity
     }
 }
-    
+
 impl RegionInternal for MmapRegion {
     fn new_instance_with(
         &self,
@@ -81,21 +81,21 @@ impl RegionInternal for MmapRegion {
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error> {
-	let custom_limits;
-	let mut limits = self.get_limits();
+        let custom_limits;
+        let mut limits = self.get_limits();
 
-	// Affirm that the module, if instantiated, would not violate
+        // Affirm that the module, if instantiated, would not violate
         // any runtime memory limits.
-	match heap_memory_size_limit.cmp(&limits.heap_memory_size) {
+        match heap_memory_size_limit.cmp(&limits.heap_memory_size) {
             Ordering::Less => {
                 // The supplied heap_memory_size is smaller than
                 // default. Augment the limits with this custom value
                 // so that it may be validated.
-		custom_limits = Limits {
-		    heap_memory_size: heap_memory_size_limit,
-		    .. *limits
-		} ;
-		limits = &custom_limits;
+                custom_limits = Limits {
+                    heap_memory_size: heap_memory_size_limit,
+                    ..*limits
+                };
+                limits = &custom_limits;
             }
             Ordering::Equal => (),
             Ordering::Greater => {
@@ -104,8 +104,8 @@ impl RegionInternal for MmapRegion {
                 ))
             }
         }
-	module.validate_runtime_spec(&limits)?;
-	
+        module.validate_runtime_spec(&limits)?;
+
         let slot = self
             .freelist
             .write()
