@@ -91,9 +91,8 @@ impl RegionInternal for MmapRegion {
             .pop()
             .ok_or(Error::RegionFull(self.capacity))?;
 
-        if slot.heap as usize % host_page_size() != 0 {
-            lucet_bail!("heap is not page-aligned; this is a bug");
-        }
+        slot.is_heap_page_aligned()
+            .expect("Heap must be page aligned");
 
         for (ptr, len) in [
             // make the stack read/writable

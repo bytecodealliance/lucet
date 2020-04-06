@@ -4,7 +4,7 @@ macro_rules! alloc_tests {
         use libc::c_void;
         use std::sync::Arc;
         use $TestRegion as TestRegion;
-        use $crate::alloc::{host_page_size, Limits, MINSIGSTKSZ};
+        use $crate::alloc::{host_page_size, Limits, Slot, MINSIGSTKSZ};
         use $crate::context::{Context, ContextHandle};
         use $crate::error::Error;
         use $crate::instance::InstanceInternal;

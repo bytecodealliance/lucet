@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::module::Module;
 use crate::region::RegionInternal;
+use anyhow::format_err;
 use libc::c_void;
 use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
@@ -91,6 +92,15 @@ unsafe impl Sync for Slot {}
 impl Slot {
     pub fn stack_top(&self) -> *mut c_void {
         (self.stack as usize + self.limits.stack_size) as *mut c_void
+    }
+
+    pub fn is_heap_page_aligned(&self) -> Result<(), Error> {
+        if self.heap as usize % host_page_size() == 0 {
+            return Ok(());
+        }
+        Err(Error::InternalError(format_err!(
+            "heap is not page-aligned; this is a bug"
+        )))
     }
 }
 
