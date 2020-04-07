@@ -3,13 +3,13 @@ export GUEST_MODULE_PREFIX:=$(abspath .)
 .PHONY: build-dev
 build-dev:
 	@echo Creating a DEBUG build
-	cargo build --all
+	cargo build --workspace
 	make -C lucet-builtins
 
 .PHONY: build
 build:
 	@echo Creating a RELEASE build
-	cargo build --all --release --bins --lib
+	cargo build --workspace --release --bins --lib
 	make -C lucet-builtins
 
 .PHONY: install
