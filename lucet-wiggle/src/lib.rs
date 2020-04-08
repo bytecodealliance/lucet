@@ -17,8 +17,7 @@ pub fn from_witx(args: TokenStream) -> TokenStream {
         &doc,
         &config.wiggle.ctx.name,
         &config.constructor,
-        &quote!(self),
+        &quote!(super),
     ));
-
     TokenStream::from(ts)
 }
