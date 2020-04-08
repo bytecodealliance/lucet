@@ -1000,6 +1000,7 @@ dependencies = [
  "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module 0.6.2-dev",
  "lucet-validate 0.6.2-dev",
+ "lucet-wasi 0.6.2-dev",
  "lucetc 0.6.2-dev",
  "target-lexicon 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
