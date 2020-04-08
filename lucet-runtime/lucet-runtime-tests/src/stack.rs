@@ -122,6 +122,11 @@ macro_rules! stack_tests {
         }
 
         #[test]
+        fn ensure_linked() {
+            lucet_runtime::lucet_internal_ensure_linked();
+        }
+
+        #[test]
         fn expect_ok_locals3_1() {
             expect_ok(stack_testcase(3).expect("generate stack_testcase 3"), 1);
         }
