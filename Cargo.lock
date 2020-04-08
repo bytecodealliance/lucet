@@ -853,6 +853,8 @@ dependencies = [
 [[package]]
 name = "linux-version"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c85966c8171cf471b2ac0fa33b9e45b9fbc48e75e462a8cb2a315ebdb0e244d1"
 dependencies = [
  "bindgen",
  "nix 0.13.1",
@@ -2198,7 +2200,9 @@ checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
 
 [[package]]
 name = "userfaultfd"
-version = "0.2.0-dev"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45f718200831909259d1f05beafb64dfc6b7d1781662eb38279619607f725860"
 dependencies = [
  "bitflags 1.2.1",
  "libc",
@@ -2209,7 +2213,9 @@ dependencies = [
 
 [[package]]
 name = "userfaultfd-sys"
-version = "0.2.0-dev"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c6e183d6d9a20a44491bf60e2743b309231255e818a107b1e9c94c4094fe28d"
 dependencies = [
  "bindgen",
  "cc",
