@@ -1,0 +1,48 @@
+digraph G {
+  init [shape=plaintext, label=<
+    <table cellborder='1'>
+      <tr><td>A</td><td>instance initializtion</td></tr>
+      <tr><td>domain</td><td>Domain::Pending</td></tr>
+      <tr><td>terminable</td><td>true</td></tr>
+    </table>
+  >];
+  guest [shape=plaintext, label=<
+    <table cellborder='1'>
+      <tr><td>B</td><td>executing guest</td></tr>
+      <tr><td>domain</td><td>Domain::Guest</td></tr>
+      <tr><td>terminable</td><td>true</td></tr>
+    </table>
+  >];
+  hostcall [shape=plaintext, label=<
+    <table cellborder='1'>
+      <tr><td>C</td><td>executing hostcall</td></tr>
+      <tr><td>domain</td><td>Domain::Hostcall</td></tr>
+      <tr><td>terminable</td><td>true</td></tr>
+    </table>
+  >];
+  cancelled [shape=plaintext, label=<
+    <table cellborder='1'>
+      <tr><td>D</td><td>stopped before running guest</td></tr>
+      <tr><td>domain</td><td>Domain::Cancelled</td></tr>
+      <tr><td>terminable</td><td>false</td></tr>
+    </table>
+  >];
+  terminated [shape=plaintext, label=<
+    <table cellborder='1'>
+      <tr><td>E</td><td>post-run cleanup</td></tr>
+      <tr><td>domain</td><td>Guest | Hostcall | Cancelled</td></tr>
+      <tr><td>terminable</td><td>true | false</td></tr>
+    </table>
+  >];
+
+  init -> guest [label="run guest"];
+  init -> cancelled [label="timeout before execution"];
+  guest -> hostcall [label="guest makes hostcall"];
+  guest -> terminated [label="guest faults or times out"];
+  guest -> terminated [label="guest exits normally"];
+  hostcall -> terminated [label="hostcall terminates instance"];
+  hostcall -> terminated [label="timeout in hostcall observed"];
+  hostcall -> guest [label="hostcall returns normally"];
+  cancelled -> terminated [label="cancelled instance is run"];
+  terminated -> init [label="Instance::run cleans up and exits"];
+}
