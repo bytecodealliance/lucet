@@ -151,8 +151,8 @@ install -d -v "$LUCET_LIBEXEC_DIR" || exit 1
 install -p -v "${LUCET_SRC_PREFIX}/lucet-builtins/build/libbuiltins.so" \
     "${LUCET_LIBEXEC_DIR}/libbuiltins.${DYLIB_SUFFIX}"
 
-devenv_setenv_file="$(mktemp)"
-cat >"$devenv_setenv_file" <<EOT
+setenv_file="$(mktemp)"
+cat >"$setenv_file" <<EOT
 #! /bin/sh
 
 export PATH="${LUCET_BIN_DIR}:\${PATH}"
@@ -164,8 +164,8 @@ if [ \$# -gt 0 ]; then
 fi
 EOT
 
-install -p -v "$devenv_setenv_file" "${LUCET_BIN_DIR}/devenv_setenv.sh"
-rm -f "$devenv_setenv_file"
+install -p -v "$setenv_file" "${LUCET_BIN_DIR}/setenv.sh"
+rm -f "$setenv_file"
 
 install -d -v "${LUCET_EXAMPLES_DIR}/sightglass" || exit 1
 install -p -v -m 0644 "${LUCET_SRC_PREFIX}/sightglass/sightglass.toml" "${LUCET_EXAMPLES_DIR}/sightglass/sightglass.toml"
@@ -230,7 +230,7 @@ if test -t 0; then
     if [ "$(basename $SHELL)" = "fish" ]; then
         echo "Add ${LUCET_BIN_DIR} to your shell's search paths."
     else
-        echo "Type 'source ${LUCET_BIN_DIR}/devenv_setenv.sh' to add the Lucet paths to your environment."
+        echo "Type 'source ${LUCET_BIN_DIR}/setenv.sh' to add the Lucet paths to your environment."
     fi
     echo "That command can also be added to your shell configuration."
     echo
