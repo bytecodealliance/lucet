@@ -2,7 +2,6 @@
 
 use anyhow::{bail, format_err, Error};
 use libc::c_ulong;
-use lucet_module::bindings::Bindings;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::{types::Exitcode, WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
@@ -20,8 +19,6 @@ use std::time::Duration;
 use structopt::StructOpt;
 use tempfile::TempDir;
 use wait_timeout::ChildExt;
-
-const LUCET_WASI_FUZZ_ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 type Seed = c_ulong;
 
@@ -426,15 +423,7 @@ fn wasi_test<P: AsRef<Path>>(tmpdir: &TempDir, c_file: P) -> Result<Arc<dyn Modu
 
     wasm_build.link(wasm_file.clone())?;
 
-    let bindings = Bindings::from_file(
-        Path::new(LUCET_WASI_FUZZ_ROOT)
-            .parent()
-            .unwrap()
-            .join("lucet-wasi")
-            .join("bindings.json"),
-    )?;
-
-    let native_build = Lucetc::new(wasm_file).with_bindings(bindings);
+    let native_build = Lucetc::new(wasm_file).with_bindings(lucet_wasi::bindings());
 
     let so_file = tmpdir.path().join("out.so");
 
