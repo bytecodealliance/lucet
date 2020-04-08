@@ -75,7 +75,7 @@ guest.
 
 There are two other pieces of information attached to `KillState` that support
 the specific case where we need to send a `SIGALRM`: the thread ID we need to
-signal, and a [Condvar][condvar] we can wait on to know when the instance has
+signal, and a [`Condvar`][condvar] we can wait on to know when the instance has
 been stopped. The thread ID is necessary because we don't record _where_ the
 instance is running anywhere else, and we keep it here because, so far,
 `KillState` is the only place we actually need to care. Meanwhile, the
