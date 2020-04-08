@@ -259,5 +259,7 @@ A timeout while observing a cancelled guest will have no effect - a timeout
 must have occurred already, so the `KillSwitch` that fired will not acquire
 `terminable`, and will return without ceremony.
 
+
 [1]: For exampe, the code we would _like_ to interrupt may hold locks, which we can't necessarily guarantee drop. In a non-locking example, the host code could be resizing a `Vec` shared outside that function, where interrupting the resize could yield various forms of broken behavior.
+
 [condvar]: https://doc.rust-lang.org/1.40.0/std/sync/struct.Condvar.html
