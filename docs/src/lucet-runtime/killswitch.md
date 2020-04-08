@@ -75,7 +75,7 @@ guest.
 
 There are two other pieces of information attached to `KillState` that support
 the specific case where we need to send a `SIGALRM`: the thread ID we need to
-signal, and a [`Condvar`][condvar] we can wait on to know when the instance has
+signal, and a [Condvar][condvar] we can wait on to know when the instance has
 been stopped. The thread ID is necessary because we don't record _where_ the
 instance is running anywhere else, and we keep it here because, so far,
 `KillState` is the only place we actually need to care. Meanwhile, the
@@ -115,7 +115,7 @@ exit, then do so. Finally, back in `lucet_runtime`, we can
 `KillState::deschedule` to tear down the last of the run-specific state - the
 `thread_id`.
 
-## Implementation Complexitiex (A Scheduler Full Of Demons)
+## Implementation Complexities (When You Have A Scheduler Full Of Demons)
 
 Many devils live in the details. The rest of this chapter will discuss the numerous edge cases and implementation concerns that Lucet's asynchronous signal implementation must consider, and arguments for its correctness in the face of these.
 
