@@ -419,7 +419,7 @@ fn ldflags_default(target: &Triple) -> String {
 
 Please define the LDFLAGS environment variable with the necessary command-line
 flags for generating shared libraries.",
-            Triple::host()
+            target
         ),
     }
     .into()
