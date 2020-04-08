@@ -1,11 +1,6 @@
 # Your first Lucet application
 
-Ensure the Lucet command-line tools are available in your shell, either by using the [Docker-based
-development environment](./Docker-based-development.md), or by [compiling them
-yourself](./Compiling.md).
-
-If you are using the Docker environment, note that container has limited visibility into the host's
-filesystem—it can only see files under the `lucet` repository.
+Ensure the Lucet command-line tools are [installed on your machine](./Compiling.md)
 
 Create a new work directory in the `lucet` directory:
 
