@@ -6,7 +6,7 @@ extern crate clap;
 use anyhow::{format_err, Error};
 use clap::Arg;
 use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region, RunResult};
-use lucet_wasi::{self, WasiCtxBuilder, __wasi_exitcode_t};
+use lucet_wasi::{self, types::Exitcode, WasiCtxBuilder};
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -235,12 +235,12 @@ fn run(config: Config<'_>) {
         let args = std::iter::once(config.lucet_module)
             .chain(config.guest_args.into_iter())
             .collect::<Vec<&str>>();
-        let mut ctx = WasiCtxBuilder::new()
-            .args(args.iter())
-            .inherit_stdio()
-            .inherit_env();
+        let mut ctx = WasiCtxBuilder::new();
+        ctx.args(args.iter());
+        ctx.inherit_stdio();
+        ctx.inherit_env();
         for (dir, guest_path) in config.preopen_dirs {
-            ctx = ctx.preopened_dir(dir, guest_path);
+            ctx.preopened_dir(dir, guest_path);
         }
         let mut inst = region
             .new_instance_builder(module as Arc<dyn Module>)
@@ -266,7 +266,7 @@ fn run(config: Config<'_>) {
             Err(lucet_runtime::Error::RuntimeTerminated(
                 lucet_runtime::TerminationDetails::Provided(any),
             )) => *any
-                .downcast_ref::<__wasi_exitcode_t>()
+                .downcast_ref::<Exitcode>()
                 .expect("termination yields an exitcode"),
             Err(lucet_runtime::Error::RuntimeTerminated(
                 lucet_runtime::TerminationDetails::Remote,

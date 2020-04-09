@@ -59,14 +59,16 @@ type Result<T> = std::result::Result<T, types::Errno>;
 
 /// Required implementation: show wiggle how to convert
 /// its GuestError into the Errno returned by these calls.
-impl<'a> GuestErrorType<'a> for types::Errno {
-    type Context = LucetWasiCtx<'a>;
+impl GuestErrorType for types::Errno {
     fn success() -> types::Errno {
         types::Errno::Success
     }
-    fn from_error(e: GuestError, ctx: &Self::Context) -> types::Errno {
+}
+
+impl<'a> types::GuestErrorConversion for LucetWasiCtx<'a> {
+    fn into_errno(&self, e: GuestError) -> types::Errno {
         eprintln!("GUEST ERROR: {:?}", e);
-        ctx.guest_errors.borrow_mut().push(e);
+        self.guest_errors.borrow_mut().push(e);
         types::Errno::Io
     }
 }
@@ -382,7 +384,7 @@ impl<'a> crate::wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a
 fn main() {
     // The `init` function ensures that all of the host call functions are
     // linked into the executable.
-    crate::init();
+    crate::hostcalls::init();
 
     // Temporary directory for outputs.
     let workdir = TempDir::new().expect("create working directory");

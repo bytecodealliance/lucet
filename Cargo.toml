@@ -13,6 +13,7 @@ members = [
   "lucet-spectest",
   "lucet-validate",
   "lucet-wasi",
+  "lucet-wasi/generate",
   "lucet-wasi-fuzz",
   "lucet-wasi-sdk",
   "lucet-wiggle",

@@ -5,21 +5,16 @@ use lucet_runtime_internals::module::{
     FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder, Module,
 };
 use lucet_wasi_sdk::{CompileOpts, Lucetc};
-use lucetc::{Bindings, LucetcOpts, OptLevel};
+use lucetc::{LucetcOpts, OptLevel};
 use std::path::Path;
 use std::sync::Arc;
-
-fn wasi_bindings() -> Bindings {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lucet-wasi/bindings.json");
-    Bindings::from_file(&path).unwrap()
-}
 
 pub fn compile_hello<P: AsRef<Path>>(so_file: P, opt_level: OptLevel) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("guests/hello.c");
     let wasm_build = Lucetc::new(&[&path])
         .with_cflag("-Wall")
         .with_cflag("-Werror")
-        .with_bindings(wasi_bindings())
+        .with_bindings(lucet_wasi::bindings())
         .with_opt_level(opt_level);
 
     wasm_build.build(&so_file).unwrap();

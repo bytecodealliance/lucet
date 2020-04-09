@@ -27,6 +27,8 @@ target-lexicon = "0.10"
 lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }
 lucet-validate = { path = "../lucet-validate", version = "=0.6.2-dev" }
 lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.6.2-dev" }
+# lucet-wasi dep must have default-features off to avoid dep on lucet-runtime:
+lucet-wasi = { path = "../lucet-wasi", version = "=0.6.2-dev", default-features = false, features = [] }
 wasmparser = "0.51.2"
 clap="2.32"
 log = "0.4"

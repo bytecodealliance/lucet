@@ -1,0 +1,21 @@
+[package]
+name = "lucet-wasi-generate"
+version = "0.6.2-dev"
+homepage = "https://github.com/fastly/lucet"
+repository = "https://github.com/fastly/lucet"
+license = "Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+authors = ["Lucet team <lucet@fastly.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+lucet-wiggle-generate = { path = "../../lucet-wiggle/generate", version = "0.6.2-dev" }
+lucet-wiggle-runtime = { path = "../../lucet-wiggle/runtime", version = "0.6.2-dev" }
+wasi-common = { path = "../../wasmtime/crates/wasi-common",  version = "0.15.0", features = ["wiggle_metadata"] }
+wiggle-generate = { path = "../../wasmtime/crates/wiggle/generate",  version = "0.15.0" }
+syn = { version = "1.0", features = ["full"] }
+quote = "1.0"
+proc-macro2 = "1.0"

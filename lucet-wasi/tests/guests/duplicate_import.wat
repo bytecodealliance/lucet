@@ -3,19 +3,19 @@
   (type (func))
 
   ;; import fd_read, this is fine.
-  (func $read (import "wasi_unstable" "fd_read") (type 0))
+  (func $read (import "wasi_snapshot_preview1" "fd_read") (type 0))
 
   ;; import fd_write, this is also fine.
-  (func $write (import "wasi_unstable" "fd_write") (type 0))
+  (func $write (import "wasi_snapshot_preview1" "fd_write") (type 0))
 
   ;; import fd_read, again, under a different name!
   ;; this is to test that we join together the imports.
   ;; the .wat would be invalid if their types disagree, so there
   ;; is no observable difference between $read and $read_2
-  (func $read_2 (import "wasi_unstable" "fd_read") (type 0))
+  (func $read_2 (import "wasi_snapshot_preview1" "fd_read") (type 0))
 
   ;; import fd_write again for grins.
-  (import "wasi_unstable" "fd_write" (func (type 0)))
+  (import "wasi_snapshot_preview1" "fd_write" (func (type 0)))
   (memory 1)
   (data (i32.const 0) "duplicate import works!\0a")
   (data (i32.const 64) "\00\00\00\00\18\00\00\00")
