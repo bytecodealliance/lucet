@@ -128,11 +128,15 @@ fn uffd_handler(
                         uffd.wake(fault_page as *mut c_void, host_page_size())
                             .map_err(|e| Error::InternalError(e.into()))?;
                     }
-                    AddrLocation::Stack | AddrLocation::Globals | AddrLocation::SigStack => {
+                    AddrLocation::Globals | AddrLocation::SigStack => {
                         tracing::error!("UFFD pagefault at unexpected location: {:?}", loc);
                         uffd.wake(fault_page as *mut c_void, host_page_size())
                             .map_err(|e| Error::InternalError(e.into()))?;
                     }
+                    AddrLocation::Stack => unsafe {
+                        uffd.zeropage(fault_page as *mut c_void, host_page_size(), true)
+                            .map_err(|e| Error::InternalError(e.into()))?;
+                    },
                     AddrLocation::Heap => {
                         // page fault occurred in the heap; copy or zero
                         let pages_into_heap =
@@ -227,8 +231,6 @@ impl RegionInternal for UffdRegion {
         module.validate_runtime_spec(limits)?;
 
         for (ptr, len) in [
-            // zero the stack
-            (slot.stack, limits.stack_size),
             // zero the globals
             (slot.globals, limits.globals_size),
             // zero the sigstack
