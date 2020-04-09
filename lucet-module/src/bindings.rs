@@ -4,7 +4,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use std::fs;
 use std::path::Path;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Bindings {
     bindings: HashMap<String, HashMap<String, String>>,
 }
@@ -150,5 +150,9 @@ impl Bindings {
             m.insert(methodname.to_owned(), Value::from(symbol.to_owned()));
         }
         m
+    }
+
+    pub fn hash_map(&self) -> &HashMap<String, HashMap<String, String>> {
+        &self.bindings
     }
 }
