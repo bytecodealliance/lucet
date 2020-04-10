@@ -240,9 +240,9 @@ macro_rules! alloc_tests {
             max_size: Some(EXPANDPASTLIMIT_MAX_SIZE),
         };
 
-        /// This test shows that a heap refuses to grow past the alloc limits, even if the runtime
-        /// spec says it can grow bigger. This test uses a region with multiple slots in order to
-        /// exercise more edge cases with adjacent managed memory.
+        /// This test shows that a heap refuses to grow past the region's limits, even if the
+        /// runtime spec says it can grow bigger. This test uses a region with multiple slots in
+        /// order to exercise more edge cases with adjacent managed memory.
         #[test]
         fn expand_past_heap_limit() {
             let region = TestRegion::create(10, &LIMITS).expect("region created");
@@ -273,6 +273,55 @@ macro_rules! alloc_tests {
 
             let still_heap_len = inst.alloc().heap_len();
             assert_eq!(still_heap_len, LIMITS_HEAP_MEM_SIZE);
+
+            let heap = unsafe { inst.alloc_mut().heap_mut() };
+            assert_eq!(heap[new_heap_len - 1], 0);
+            heap[new_heap_len - 1] = 0xFF;
+            assert_eq!(heap[new_heap_len - 1], 0xFF);
+        }
+
+        /// This test shows that a heap refuses to grow past the instance-specific heap limit, even
+        /// if both the region's limits and the runtime spec says it can grow bigger. This test uses
+        /// a region with multiple slots in order to exercise more edge cases with adjacent managed
+        /// memory.
+        #[test]
+        fn expand_past_instance_heap_limit() {
+            const INSTANCE_LIMIT: usize = LIMITS.heap_memory_size / 2;
+            const SPEC: HeapSpec = HeapSpec {
+                initial_size: INSTANCE_LIMIT as u64 - 64 * 1024,
+                ..EXPAND_PAST_LIMIT_SPEC
+            };
+            assert_eq!(INSTANCE_LIMIT % host_page_size(), 0);
+
+            let region = TestRegion::create(10, &LIMITS).expect("region created");
+            let module = MockModuleBuilder::new().with_heap_spec(SPEC).build();
+            let mut inst = region
+                .new_instance_builder(module.clone())
+                .with_heap_size_limit(INSTANCE_LIMIT)
+                .build()
+                .expect("instantiation succeeds");
+
+            let heap_len = inst.alloc().heap_len();
+            assert_eq!(heap_len, SPEC.initial_size as usize);
+
+            // fill up the rest of the per-instance limit area
+            let new_heap_area = inst
+                .alloc_mut()
+                .expand_heap(64 * 1024, module.as_ref())
+                .expect("expand_heap succeeds");
+            assert_eq!(heap_len, new_heap_area as usize);
+
+            let new_heap_len = inst.alloc().heap_len();
+            assert_eq!(new_heap_len, INSTANCE_LIMIT);
+
+            let past_limit_heap_area = inst.alloc_mut().expand_heap(64 * 1024, module.as_ref());
+            assert!(
+                past_limit_heap_area.is_err(),
+                "heap expansion past limit fails"
+            );
+
+            let still_heap_len = inst.alloc().heap_len();
+            assert_eq!(still_heap_len, INSTANCE_LIMIT);
 
             let heap = unsafe { inst.alloc_mut().heap_mut() };
             assert_eq!(heap[new_heap_len - 1], 0);
@@ -964,4 +1013,11 @@ macro_rules! alloc_tests {
 }
 
 #[cfg(test)]
-alloc_tests!(crate::region::mmap::MmapRegion);
+mod mmap {
+    alloc_tests!(crate::region::mmap::MmapRegion);
+}
+
+#[cfg(all(test, feature = "uffd"))]
+mod uffd {
+    alloc_tests!(crate::region::uffd::UffdRegion);
+}

@@ -8,7 +8,6 @@ use libc::c_void;
 #[cfg(not(target_os = "linux"))]
 use libc::memset;
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
-use std::cmp::Ordering;
 use std::ptr;
 use std::sync::{Arc, RwLock, Weak};
 
@@ -81,30 +80,9 @@ impl RegionInternal for MmapRegion {
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error> {
-        let custom_limits;
-        let mut limits = self.get_limits();
+        let limits = self.get_limits();
 
-        // Affirm that the module, if instantiated, would not violate
-        // any runtime memory limits.
-        match heap_memory_size_limit.cmp(&limits.heap_memory_size) {
-            Ordering::Less => {
-                // The supplied heap_memory_size is smaller than
-                // default. Augment the limits with this custom value
-                // so that it may be validated.
-                custom_limits = Limits {
-                    heap_memory_size: heap_memory_size_limit,
-                    ..*limits
-                };
-                limits = &custom_limits;
-            }
-            Ordering::Equal => (),
-            Ordering::Greater => {
-                return Err(Error::InvalidArgument(
-                    "heap memory size requested for instance is larger than slot allows",
-                ))
-            }
-        }
-        module.validate_runtime_spec(&limits)?;
+        module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
 
         let slot = self
             .freelist

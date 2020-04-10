@@ -12,7 +12,6 @@ use crate::{lucet_bail, lucet_ensure, lucet_format_err};
 use libc::c_void;
 use nix::poll;
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
-use std::cmp::Ordering;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
 use std::sync::{Arc, Mutex, Weak};
@@ -217,30 +216,8 @@ impl RegionInternal for UffdRegion {
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error> {
-        let custom_limits;
-        let mut limits = self.get_limits();
-
-        // Affirm that the module, if instantiated, would not violate
-        // any runtime memory limits.
-        match heap_memory_size_limit.cmp(&limits.heap_memory_size) {
-            Ordering::Less => {
-                // The supplied heap_memory_size is smaller than
-                // default. Augment the limits with this custom value
-                // so that it may be validated.
-                custom_limits = Limits {
-                    heap_memory_size: heap_memory_size_limit,
-                    ..*limits
-                };
-                limits = &custom_limits;
-            }
-            Ordering::Equal => (),
-            Ordering::Greater => {
-                return Err(Error::InvalidArgument(
-                    "heap memory size requested for instance is larger than slot allows",
-                ))
-            }
-        }
-        module.validate_runtime_spec(&limits)?;
+        let limits = self.get_limits();
+        module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
 
         let slot = self
             .freelist
@@ -249,12 +226,11 @@ impl RegionInternal for UffdRegion {
             .pop()
             .ok_or(Error::RegionFull(self.instance_capacity))?;
 
-        if slot.heap as usize % host_page_size() != 0 {
-            lucet_bail!("heap is not page-aligned; this is a bug");
-        }
-
-        let limits = &slot.limits;
-        module.validate_runtime_spec(limits)?;
+        assert_eq!(
+            slot.heap as usize % host_page_size(),
+            0,
+            "heap must be page-aligned"
+        );
 
         for (ptr, len) in [
             // zero the globals
@@ -270,7 +246,7 @@ impl RegionInternal for UffdRegion {
                 unsafe {
                     self.uffd
                         .zeropage(*ptr, *len, true)
-                        .map_err(|e| Error::InternalError(e.into()))?;
+                        .expect("uffd.zeropage succeeds");
                 }
             }
         }
@@ -410,10 +386,6 @@ impl UffdRegion {
     /// This also creates and starts a separate thread that is responsible for handling page faults
     /// that occur within the memory region.
     pub fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error> {
-        assert!(
-            limits.signal_stack_size % host_page_size() == 0,
-            "signal stack size is a multiple of host page size"
-        );
         if instance_capacity == 0 {
             return Err(Error::InvalidArgument(
                 "region must be able to hold at least one instance",

@@ -103,7 +103,17 @@ pub trait ModuleInternal: Send + Sync {
     ///
     /// Returns a `Result<(), Error>` rather than a boolean in order to provide a richer accounting
     /// of what may be invalid.
-    fn validate_runtime_spec(&self, limits: &Limits) -> Result<(), Error> {
+    fn validate_runtime_spec(
+        &self,
+        limits: &Limits,
+        instance_heap_limit: usize,
+    ) -> Result<(), Error> {
+        if instance_heap_limit > limits.heap_memory_size {
+            return Err(Error::InvalidArgument(
+                "heap memory size requested for instance is larger than slot allows",
+            ));
+        }
+        let heap_memory_size = std::cmp::min(limits.heap_memory_size, instance_heap_limit);
         // Modules without heap specs will not access the heap
         if let Some(heap) = self.heap_spec() {
             // Assure that the total reserved + guard regions fit in the address space.
@@ -124,7 +134,7 @@ pub trait ModuleInternal: Send + Sync {
                 bail_limits_exceeded!("heap spec reserved and guard size: {:?}", heap);
             }
 
-            if heap.initial_size as usize > limits.heap_memory_size {
+            if heap.initial_size as usize > heap_memory_size {
                 bail_limits_exceeded!("heap spec initial size: {:?}", heap);
             }
 
