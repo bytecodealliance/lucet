@@ -43,4 +43,8 @@ byteorder = "1.2"
 cc = "1.0"
 
 [features]
+default-features = []
 uffd = ["userfaultfd"]
+
+[package.metadata.docs.rs]
+features = ["uffd"]

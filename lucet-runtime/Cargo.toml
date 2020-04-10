@@ -49,4 +49,8 @@ assets = [
 ]
 
 [features]
+default-features = []
 uffd = ["lucet-runtime-internals/uffd"]
+
+[package.metadata.docs.rs]
+features = ["uffd"]
