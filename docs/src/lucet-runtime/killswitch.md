@@ -16,8 +16,34 @@ shared state by which `KillSwitch` signal is replaced, and an attempt to
 
 ## Example
 
+This example taken from `lucet_runtime_tests::timeout::timeout_in_guest`:
 ```rust
-TODO
+let module = mock_timeout_module();
+let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+let mut inst = region
+    .new_instance(module)
+    .expect("instance can be created");
+let kill_switch = inst.kill_switch();
+
+// Spawn a thread to terminate the instance after waiting for 100ms.
+let t = thread::Builder::new()
+    .name("killswitch".to_owned())
+    .spawn(move || {
+        thread::sleep(Duration::from_millis(100));
+        assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
+    })
+    .expect("can spawn a thread");
+
+// Begin running the instance, which will be terminated remotely by the KillSwitch.
+match inst.run("infinite_loop", &[]) {
+    Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {
+        // the result of a guest that was remotely terminated (a KillSwitch at work)
+    }
+    res => panic!("unexpected result: {:?}", res),
+}
+
+// wait for the KillSwitch-firing thread to complete
+t.join().unwrap();
 ```
 
 ## Implementation
@@ -28,13 +54,21 @@ no `lucet-runtime` paths for these items, this section will occasionally
 use fully-qualified paths to the `lucet_runtime_internals` path where.
 they are originally defined.
 
-As much as is possible, `KillSwitch` tries to be self-contained; no members are public, and it tries to avoid leaking details of its state-keeping into public interfaces.
+As much as is possible, `KillSwitch` tries to be self-contained; no members are
+public, and it tries to avoid leaking details of its state-keeping into public
+interfaces. Currently, `lucet-runtime` is heavily dependent on POSIX
+thread-directed signals to implement guest timeouts - for non-POSIX platforms
+alternate implementations may be plausible, but need careful consideration of
+the race conditions that can arise from other platform-specific functionality.
 
 `KillSwitch` fundamentally relies on two piece of state for safe operation,
 which are encapsulated in a `KillState` held by the `lucet_runtime::Instance`
 it terminates:
 * `execution_domain`, a `Domain` that describes the kind of execution that is
-  currently happening in the `Instance`. This is kept in a `Mutex` since in many cases it will need to be accessed either by a `KillSwitch` or `KillState`, and for the duration either are considering the domain, it must block other users.
+  currently happening in the `Instance`. This is kept in a `Mutex` since in
+  many cases it will need to be accessed either by a `KillSwitch` or
+  `KillState`, and for the duration either are considering the domain, it must
+  block other users.
 * `terminable`, an `AtomicBool` that indicates if the `Instance` may stop
   executing.
 
@@ -117,7 +151,10 @@ exit, then do so. Finally, back in `lucet_runtime`, we can
 
 ## Implementation Complexities (When You Have A Scheduler Full Of Demons)
 
-Many devils live in the details. The rest of this chapter will discuss the numerous edge cases and implementation concerns that Lucet's asynchronous signal implementation must consider, and arguments for its correctness in the face of these.
+Many devils live in the details. The rest of this chapter will discuss the
+numerous edge cases and implementation concerns that Lucet's asynchronous
+signal implementation must consider, and arguments for its correctness in the
+face of these.
 
 First, a flow chart of the various states and their transitions:
 ![state flow chart](states.png)
@@ -137,6 +174,7 @@ For reference later, the possible state transitions are:
 * `C -> B`
 * `C -> E` (hostcall terminates instance)
 * `C -> E` (hostcall observes timeout)
+  - not an internal state but we will also discuss timeouts during a hostcall fault
 * `D -> E`
 
 ### `A -> B` timeout
@@ -198,7 +236,31 @@ the `Terminated` domain is observed.
 
 ### `B -> E` timeout, during guest fault or timeout
 
-this is where it gets hard
+In this sub-section we assume that the Lucet signal handler is being used, and
+will discuss the properties it requires from any signal handler for
+correctness.
+
+The `KillSwitch` that fires attempts to acquire `terminable`. Because a guest
+fault or timeout has occurred, the guest is actually in
+`lucet_runtime_internals::instance::signals::handle_signal`, and `terminable`
+may be `true` (guest fault), or `false` (handling a timeout). If the guest is
+currently handling a timeout signal, the `KillSwitch` trying to fire will fail
+to acquire `terminable` and exit with an err. However..
+
+#### Timeout while handling a guest fault
+
+In the case that a timeout occurs during a guest fault, the `KillSwitch` may
+acquire `terminable`. POSIX signal handlers are highgly constrained, see `man 7
+signal-safety` for details. The functional constraint imposed on signal
+handlers used with Lucet is that they may not lock on `KillState`'s
+`execution_domain`. As a consequence, a `KillSwitch` may fire during the
+handling of a guest fault - `sigaction` must mask `SIGALRM` so that a signal
+fired before the handler exits is discarded. If the signal behavior is to
+continue without effect, leave termination in place and continue to the guest.
+If, however, the signal handler determines it must return to the host, it
+disables termination on the instance to avoid the case where a timeout occurs
+immediately after swapping to the host context (preventing an erroneous SIGALRM
+in the host context).
 
 ### `B -> E` timeout, during guest exit
 
@@ -227,7 +289,8 @@ not proceed, so that whenever an imminent `SIGALRM` from the corresponding
 `KillSwitch` arrives, it will be in a guaranteed-to-be-safe spin loop, or on
 its way there with only signal-safe state.
 
-The `KillSwitch` itself will signal the guest as any other `Domain::Guest` interruption.
+The `KillSwitch` itself will signal the guest as any other `Domain::Guest`
+interruption.
 
 ### `C -> B` timeout
 
@@ -259,7 +322,20 @@ A timeout while observing a cancelled guest will have no effect - a timeout
 must have occurred already, so the `KillSwitch` that fired will not acquire
 `terminable`, and will return without ceremony.
 
+### Timeout in hostcall fault
 
-[1]: For exampe, the code we would _like_ to interrupt may hold locks, which we can't necessarily guarantee drop. In a non-locking example, the host code could be resizing a `Vec` shared outside that function, where interrupting the resize could yield various forms of broken behavior.
+As promised, a note about what happens when a timeout occurs directly when a
+hostcall faults: since by definition the instance's `execution_domain` is
+`Domain::Hostcall`, the `KillSwitch` may or may not fire before the signal
+handler disables termination. Even if it does fire, it will lock the shared
+`execution_domain` and see `Domain::Hostcall`. It then will update this to
+`Domain::Terminated`, but since the hostcall will not resume, `end_hostcall`
+will never see that the instance should stop, and no further effect will be
+had.
+
+[1]: For exampe, the code we would _like_ to interrupt may hold locks, which we
+can't necessarily guarantee drop. In a non-locking example, the host code could
+be resizing a `Vec` shared outside that function, where interrupting the resize
+could yield various forms of broken behavior.
 
 [condvar]: https://doc.rust-lang.org/1.40.0/std/sync/struct.Condvar.html
