@@ -82,6 +82,7 @@ impl RegionInternal for MmapRegion {
         mut alloc_strategy: AllocStrategy,
     ) -> Result<InstanceHandle, Error> {
         let limits = self.get_limits();
+
         module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
 
         // Use the supplied alloc_strategy to get the next available slot
