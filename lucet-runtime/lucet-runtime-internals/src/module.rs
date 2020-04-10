@@ -118,7 +118,6 @@ pub trait ModuleInternal: Send + Sync {
             ));
         }
         let heap_memory_size = std::cmp::min(limits.heap_memory_size, instance_heap_limit);
-
         // Modules without heap specs will not access the heap
         if let Some(heap) = self.heap_spec() {
             // Assure that the total reserved + guard regions fit in the address space.
