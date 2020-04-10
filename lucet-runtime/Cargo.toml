@@ -49,7 +49,9 @@ assets = [
 ]
 
 [features]
-default = []
-
-concurrent_testpoints = []
+default-features = []
 uffd = ["lucet-runtime-internals/uffd"]
+concurrent_testpoints = []
+
+[package.metadata.docs.rs]
+features = ["uffd"]
