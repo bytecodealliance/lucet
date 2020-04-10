@@ -37,7 +37,10 @@ byteorder = "1.2"
 cc = "1.0"
 
 [features]
-default = []
+default-features = []
 
-concurrent_testpoints = []
 uffd = ["userfaultfd"]
+concurrent_testpoints = []
+
+[package.metadata.docs.rs]
+features = ["uffd"]

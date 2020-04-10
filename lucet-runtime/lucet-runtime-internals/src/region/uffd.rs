@@ -1,7 +1,3 @@
-//! Region backend for `lucet-runtime` backed by
-//! [`userfaultfd(2)`](http://man7.org/linux/man-pages/man2/userfaultfd.2.html) via the
-//! `userfaultfd-rs` crate.
-
 use crate::alloc::{host_page_size, instance_heap_offset, AddrLocation, Alloc, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
@@ -18,32 +14,32 @@ use std::sync::{Arc, Mutex, Weak};
 use std::thread::{self, JoinHandle};
 use userfaultfd::{IoctlFlags, Uffd, UffdBuilder};
 
-/// A [`Region`](../trait.Region.html) backed by `mmap` and managed by `userfaultfd`.
+/// A [`Region`](trait.Region.html) backed by `mmap` and managed by `userfaultfd`.
 ///
-/// Much like [`MmapRegion`](../mmap/struct.MmapRegion.html) `UffdRegion` lays out virtual memory
-/// in a contiguous block. See [`MmapRegion`](../mmap/struct.MmapRegion.html) for details of the
-/// memory layout.
+/// Much like [`MmapRegion`](struct.MmapRegion.html) `UffdRegion` lays out virtual memory in a
+/// contiguous block. See [`MmapRegion`](struct.MmapRegion.html) for details of the memory layout.
 ///
-/// The difference is that `UffdRegion` is lazy. Only the minimum required physical memory is set
-/// up to back that virtual memory before an `Instance` begins running. The stack and the heap
-/// are both lazily allocated at runtime.
+/// The difference is that `UffdRegion` is lazy. Only the minimum required physical memory is set up
+/// to back that virtual memory before an `Instance` begins running. The stack and the heap are both
+/// lazily allocated at runtime.
 ///
-/// That lazy allocation is handled by the [`userfaultfd`](http://man7.org/linux/man-pages/man2/userfaultfd.2.html)
-/// system in recent Linux kernels. The entire Region is registered with `userfaultfd` handle.
-/// When page faults occur due to attempts by the `Guest` to access the lazy memory, the `Guest`
-/// thread is paused and a message is sent over the `userfaultfd` handle.
+/// That lazy allocation is handled by the [`userfaultfd`][userfaultfd] system, using extensions
+/// available in Linux version 4.11 or newer. The entire `Region` is registered with `userfaultfd`
+/// handle.  When page faults occur due to attempts by the guest to access the lazy memory, the
+/// guest thread is paused and a message is sent over the `userfaultfd` handle.
 ///
-/// That message is picked up a separate thread which has the job of handling page faults. How
-/// it is handled is dependent on where the page fault occurred. In the case where it occurs in
-/// the stack, we just zero out the page. In the case it occurs in the heap, it is handled
-/// differently depending on whether the page should contain data defined in the WebAssembly
-/// module. In the case it should be blank we again just zero it out. In the case that it should
-/// contain data, we copy the data into the page. In any case we finish by reawakening the `Guest`
-/// thread.
+/// That message is picked up a separate thread which has the job of handling page faults. How it is
+/// handled is dependent on where the page fault occurred. In the case where it occurs in the stack,
+/// we just zero out the page. In the case it occurs in the heap, it is handled differently
+/// depending on whether the page should contain data defined in the WebAssembly module. In the case
+/// it should be blank we again just zero it out. In the case that it should contain data, we copy
+/// the data into the page. In any case we finish by reawakening the guest thread.
 ///
 /// If the fault occurs in a guard page, we do nothing, and reawaken the thread without allocating
-/// the backing physical memory. This ends up causing the `Guest` thread to throw a SIGBUS. Which
-/// is caught and handled as normal.
+/// the backing physical memory. This ends up causing the guest thread to raise a SIGBUS, which is
+/// treated as a fatal error by the Lucet signal handler.
+///
+/// [userfaultfd]: http://man7.org/linux/man-pages/man2/userfaultfd.2.html
 pub struct UffdRegion {
     uffd: Arc<Uffd>,
     start: *mut c_void,
@@ -380,7 +376,7 @@ impl UffdRegion {
     /// Create a new `UffdRegion` that can support a given number of instances, each subject to the
     /// same runtime limits.
     ///
-    /// The region is turned in an `Arc`, because any instances created from it carry a reference
+    /// The region is returned in an `Arc`, because any instances created from it carry a reference
     /// back to the region.
     ///
     /// This also creates and starts a separate thread that is responsible for handling page faults
@@ -406,7 +402,7 @@ impl UffdRegion {
             if let Some(sz) = instance_capacity.checked_mul(limits.total_memory_size()) {
                 sz
             } else {
-                lucet_bail!("region size overflowed");
+                return Err(Error::InvalidArgument("requested region size too large"));
             };
         let start = unsafe {
             mmap(
@@ -424,7 +420,7 @@ impl UffdRegion {
             .register(start, total_region_size)
             .map_err(|e| Error::InternalError(e.into()))?;
         if !ioctls.contains(IoctlFlags::WAKE | IoctlFlags::COPY | IoctlFlags::ZEROPAGE) {
-            lucet_bail!("required uffd ioctls not supported; found: {:?}", ioctls);
+            panic!("required uffd ioctls not supported; found: {:?}", ioctls);
         }
 
         let (handler_pipe_recv, handler_pipe) = nix::unistd::pipe()?;
@@ -464,7 +460,7 @@ impl UffdRegion {
                 }
                 res
             })
-            .map_err(|e| lucet_format_err!("error spawning uffd region handler: {}", e))?;
+            .expect("error spawning uffd region handler");
 
         let region = Arc::new(UffdRegion {
             uffd,
