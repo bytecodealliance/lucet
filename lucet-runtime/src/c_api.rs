@@ -1,4 +1,4 @@
-#[cfg(feature = "uffd")]
+#[cfg(all(target_os = "linux", feature = "uffd"))]
 use crate::UffdRegion;
 use crate::{DlModule, Instance, Limits, MmapRegion, Module, Region};
 use libc::{c_char, c_int, c_void};
@@ -103,7 +103,7 @@ pub unsafe extern "C" fn lucet_uffd_region_create(
     region_out: *mut *mut lucet_region,
 ) -> lucet_error {
     cfg_if::cfg_if! {
-        if #[cfg(feature = "uffd")] {
+        if #[cfg(all(target_os = "linux", feature = "uffd"))] {
             assert_nonnull!(region_out);
             let limits = limits
                 .as_ref()

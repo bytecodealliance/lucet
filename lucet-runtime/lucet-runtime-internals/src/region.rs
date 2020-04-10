@@ -1,6 +1,6 @@
 pub mod mmap;
 
-#[cfg(feature = "uffd")]
+#[cfg(all(target_os = "linux", feature = "uffd"))]
 pub mod uffd;
 
 use crate::alloc::{Alloc, Limits, Slot};

@@ -386,7 +386,14 @@
 //! `Instance`, reducing startup time. Instance stack pages can also be lazily initialized, reducing
 //! the memory footprint of instances that only use a small portion of their available stack space.
 //!
-//! To use `UffdRegion`, enable the `uffd` Cargo feature, which is off by default.
+//! `UffdRegion` is enabled by default on Linux platforms, but can be disabled by disabling default
+//! features for this crate and `lucet-runtime-internals`:
+//!
+//! ```toml
+//! [dependencies]
+//! lucet-runtime = { version = "0.6.1", default-features = false }
+//! lucet-runtime-internals = { version = "0.6.1", default-features = false }
+//! ```
 
 #![deny(bare_trait_objects)]
 
@@ -410,7 +417,7 @@ pub use lucet_runtime_internals::instance::{
 pub use lucet_runtime_internals::lucet_hostcalls;
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
-#[cfg(feature = "uffd")]
+#[cfg(all(target_os = "linux", feature = "uffd"))]
 pub use lucet_runtime_internals::region::uffd::UffdRegion;
 pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
