@@ -23,7 +23,10 @@
 //! [`InstanceHandle`](struct.InstanceHandle.html) smart pointer.
 //!
 //! - [`Region`](trait.Region.html): the memory from which instances are created. This crate
-//! includes [`MmapRegion`](struct.MmapRegion.html), an implementation backed by `mmap`.
+//! includes [`MmapRegion`](struct.MmapRegion.html), an implementation backed by `mmap`, and
+//! optionally [`UffdRegion`](struct.UffdRegion.html), which is backed by the
+//! [`userfaultfd`](http://man7.org/linux/man-pages/man2/userfaultfd.2.html) feature available on
+//! newer Linux kernels ([see below](index.html#userfaultfd-backed-region)).
 //!
 //! - [`Limits`](struct.Limits.html): upper bounds for the resources a Lucet instance may
 //! consume. These may be larger or smaller than the limits described in the WebAssembly module
@@ -374,6 +377,16 @@
 //! this number could change between Lucet releases or even Rust compiler versions.
 //!
 //! [default-sigstack-size]: constant.DEFAULT_SIGNAL_STACK_SIZE.html
+//!
+//! ## `userfaultfd`-Backed Region
+//!
+//! [`UffdRegion`](struct.UffdRegion.html) is a [`Region`](trait.Region.html) backed by the
+//! [`userfaultfd`](http://man7.org/linux/man-pages/man2/userfaultfd.2.html) feature available in
+//! newer Linux kernels. It allows Lucet instances to lazily copy in the initial heap contents of an
+//! `Instance`, reducing startup time. Instance stack pages can also be lazily initialized, reducing
+//! the memory footprint of instances that only use a small portion of their available stack space.
+//!
+//! To use `UffdRegion`, enable the `uffd` Cargo feature, which is off by default.
 
 #![deny(bare_trait_objects)]
 
