@@ -1,5 +1,7 @@
 FROM ubuntu:bionic
 
+# This env variable makes sure installing the tzdata package doesn't hang in prompt
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
 	build-essential \
