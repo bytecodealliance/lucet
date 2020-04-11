@@ -1,9 +1,10 @@
-use crate::alloc::{host_page_size, instance_heap_offset, AddrLocation, Alloc, Limits, Slot};
+use crate::alloc::{instance_heap_offset, AddrLocation, Alloc, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle, InstanceInternal};
 use crate::module::Module;
 use crate::region::{Region, RegionCreate, RegionInternal};
+use crate::sysdeps::host_page_size;
 use crate::{lucet_bail, lucet_ensure, lucet_format_err};
 use libc::c_void;
 use nix::poll;
