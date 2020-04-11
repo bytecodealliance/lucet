@@ -1,3 +1,5 @@
+extern crate rand;
+
 use crate::alloc::{host_page_size, instance_heap_offset, Alloc, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
@@ -75,7 +77,21 @@ impl Region for MmapRegion {
     }
 }
 
+fn fussy(v: Vec<Slot>) -> Result<Slot, Error>{
+    
+    let len =  v.len();
+    if len == 0 {
+	return Err(Error::RegionFull(5));
+    }
+    
+    Ok(v.swap_remove(rand::thread_rng().gen_range(0, len)))
+}
+
 impl RegionInternal for MmapRegion {
+    fn get_random_slot(&self,) {
+
+    }
+	
     fn new_instance_with(
         &self,
         module: Arc<dyn Module>,
@@ -107,14 +123,21 @@ impl RegionInternal for MmapRegion {
         }
         module.validate_runtime_spec(&limits)?;
 
-	let random_idx = 
+//	let rng = rand::thread_rng();
+
 	    
+	// TLC: This has to happen in a single go since we don't want to
+	// check the length, have another instance made, and the make a random one
+	// possibly falling off the end of the vector.
+
+	//	let rnd_idx = 
+	// 
         let slot = self
             .freelist
             .write()
             .unwrap()
-            .pop()
-            .ok_or(Error::RegionFull(self.capacity))?;
+	    .fussy()
+	    .ok_or(Error::RegionFull(self.capacity));
 
         if slot.heap as usize % host_page_size() != 0 {
             lucet_bail!("heap is not page-aligned; this is a bug");
