@@ -2,6 +2,9 @@ FROM ubuntu:bionic
 
 # This env variable makes sure installing the tzdata package doesn't hang in prompt
 ENV DEBIAN_FRONTEND=noninteractive
+
+# This env variable makes sure installing the tzdata package doesn't hang in prompt
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
 	build-essential \
@@ -21,9 +24,11 @@ RUN apt-get update \
 	creduce \
 	gcc-multilib \
 	clang-6.0 \
+	llvm-6.0 \
 	&& rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
+RUN update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-6.0 100
 
 # Setting a consistent LD_LIBRARY_PATH across the entire environment prevents unnecessary Cargo
 # rebuilds.
@@ -48,7 +53,7 @@ ENV BINARYEN_DIR=/opt/binaryen
 ENV BINARYEN_VERSION=86
 RUN curl -sS -L "https://github.com/WebAssembly/binaryen/archive/version_${BINARYEN_VERSION}.tar.gz" | tar xzf - && \
     mkdir -p binaryen-build && ( cd binaryen-build && cmake "../binaryen-version_${BINARYEN_VERSION}" && \
-    make wasm-opt wasm-reduce ) && \
+    make -j wasm-opt wasm-reduce ) && \
     install -d -v "${BINARYEN_DIR}/bin" && \
     for tool in wasm-opt wasm-reduce; do install -v "binaryen-build/bin/${tool}" "${BINARYEN_DIR}/bin/"; done && \
     rm -fr binaryen-build binaryen-version_${BINARYEN_VERSION}

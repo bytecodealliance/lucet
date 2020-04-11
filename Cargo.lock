@@ -116,17 +116,13 @@ dependencies = [
  "cexpr",
  "cfg-if",
  "clang-sys",
- "clap",
- "env_logger",
  "lazy_static",
- "log",
  "peeking_take_while",
  "proc-macro2 1.0.10",
  "quote 1.0.3",
  "regex",
  "rustc-hash",
  "shlex",
- "which",
 ]
 
 [[package]]
@@ -851,17 +847,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "linux-version"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c85966c8171cf471b2ac0fa33b9e45b9fbc48e75e462a8cb2a315ebdb0e244d1"
-dependencies = [
- "bindgen",
- "nix 0.13.1",
- "semver",
-]
-
-[[package]]
 name = "log"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -882,7 +867,7 @@ dependencies = [
  "lucet-wasi",
  "lucet-wasi-sdk",
  "lucetc",
- "nix 0.17.0",
+ "nix",
  "num_cpus",
  "rayon",
  "tempfile",
@@ -944,7 +929,7 @@ dependencies = [
  "lucet-runtime-tests",
  "lucet-wasi-sdk",
  "lucetc",
- "nix 0.17.0",
+ "nix",
  "num-derive",
  "num-traits",
  "rayon",
@@ -974,7 +959,7 @@ dependencies = [
  "lucet-module",
  "lucet-runtime-macros",
  "memoffset",
- "nix 0.17.0",
+ "nix",
  "num-derive",
  "num-traits",
  "rand 0.7.3",
@@ -1055,7 +1040,7 @@ dependencies = [
  "lucet-wasi-sdk",
  "lucet-wiggle",
  "lucetc",
- "nix 0.17.0",
+ "nix",
  "rand 0.6.5",
  "tempfile",
  "wasi-common",
@@ -1073,7 +1058,7 @@ dependencies = [
  "lucet-wasi",
  "lucet-wasi-sdk",
  "lucetc",
- "nix 0.17.0",
+ "nix",
  "num_cpus",
  "progress",
  "rand 0.6.5",
@@ -1223,19 +1208,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa679ff6578b1cddee93d7e82e263b94a575e0bfced07284eb0c037c1d2416a5"
 dependencies = [
  "adler32",
-]
-
-[[package]]
-name = "nix"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dbdc256eaac2e3bd236d93ad999d3479ef775c863dbda3068c4006a92eec51b"
-dependencies = [
- "bitflags 1.2.1",
- "cc",
- "cfg-if",
- "libc",
- "void",
 ]
 
 [[package]]
@@ -2200,27 +2172,26 @@ checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
 
 [[package]]
 name = "userfaultfd"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45f718200831909259d1f05beafb64dfc6b7d1781662eb38279619607f725860"
+checksum = "e394bc3ecd454f68f04803a7b527b36956413120fa06420dc1329cda49340763"
 dependencies = [
  "bitflags 1.2.1",
  "libc",
- "nix 0.13.1",
+ "nix",
  "thiserror",
  "userfaultfd-sys",
 ]
 
 [[package]]
 name = "userfaultfd-sys"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c6e183d6d9a20a44491bf60e2743b309231255e818a107b1e9c94c4094fe28d"
+checksum = "3e34081f6dafe78988982f6139db289dd147ce1ac1d1dce208ae94e37650ac03"
 dependencies = [
  "bindgen",
  "cc",
  "cfg-if",
- "linux-version",
 ]
 
 [[package]]
@@ -2393,15 +2364,6 @@ checksum = "2d6f51648d8c56c366144378a33290049eafdd784071077f6fe37dae64c1c4cb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "which"
-version = "3.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d011071ae14a2f6671d0b74080ae0cd8ebf3a6f8c9589a2cd45f23126fe29724"
-dependencies = [
- "libc",
 ]
 
 [[package]]
