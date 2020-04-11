@@ -80,7 +80,6 @@ impl RegionInternal for MmapRegion {
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
     ) -> Result<InstanceHandle, Error> {
-
         let limits = self.get_limits();
         module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
 
