@@ -2,8 +2,7 @@
 
 - [Overview](./Overview.md)
 - [Using Lucet](./Using-lucet.md)
-  - [Docker-based development](./Docker-based-development.md)
-  - [Compiling Lucet from scratch](./Compiling.md)
+  - [Compiling Lucet](./Compiling.md)
     - [Compiling on Linux](./Compiling-on-Linux.md)
     - [Compiling on macOS](./Compiling-on-macOS.md)
   - [Lucet "Hello World"](./Your-first-Lucet-application.md)

@@ -94,6 +94,13 @@ impl Slot {
     }
 }
 
+/// The strategy by which a Region selects an allocation to
+/// back an `Instance`.
+pub enum AllocStrategy {
+    Linear,
+    Random,
+}
+
 /// The structure that manages the allocations backing an `Instance`.
 ///
 /// `Alloc`s are not to be created directly, but rather are created by `Region`s during instance

@@ -32,6 +32,7 @@ pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use target_lexicon::Triple;
 
 enum LucetcInput {
@@ -374,8 +375,6 @@ where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
-    use std::process::Command;
-
     // Let `LD` be something like "clang --target=... ..." for convenience.
     let env_ld = env::var("LD").unwrap_or(LD_DEFAULT.into());
     let mut ld_iter = env_ld.split_whitespace();
@@ -390,8 +389,8 @@ where
     for flag in env_ldflags.split_whitespace() {
         cmd_ld.arg(flag);
     }
-    cmd_ld.arg("-o");
-    cmd_ld.arg(sopath.as_ref());
+
+    output_arg_for(&mut cmd_ld, target, sopath);
 
     let run_ld = cmd_ld.output()?;
 
@@ -404,6 +403,24 @@ where
         return Err(Error::LdError(message));
     }
     Ok(())
+}
+
+fn output_arg_for<P>(cmd_ld: &mut Command, target: &Triple, sopath: P)
+where
+    P: AsRef<Path>,
+{
+    use target_lexicon::{Environment, OperatingSystem};
+
+    if target.operating_system != OperatingSystem::Windows || target.environment == Environment::Gnu
+    {
+        cmd_ld.arg("-o");
+        cmd_ld.arg(sopath.as_ref());
+        return;
+    }
+
+    assert!(target.environment == Environment::Msvc);
+
+    cmd_ld.arg(format!("/out:{:?}", sopath.as_ref()));
 }
 
 fn ldflags_default(target: &Triple) -> String {
@@ -419,7 +436,7 @@ fn ldflags_default(target: &Triple) -> String {
 
 Please define the LDFLAGS environment variable with the necessary command-line
 flags for generating shared libraries.",
-            Triple::host()
+            target
         ),
     }
     .into()

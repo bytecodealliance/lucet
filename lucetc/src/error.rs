@@ -1,8 +1,8 @@
 use crate::types::SignatureError;
 use cranelift_module::ModuleError as ClifModuleError;
 use cranelift_wasm::WasmError as ClifWasmError;
-use faerie::ArtifactError;
 use lucet_module::error::Error as LucetModuleError;
+use object;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -27,8 +27,8 @@ pub enum Error {
     WasmValidation(#[from] wasmparser::BinaryReaderError),
     #[error("Wat input: {0}")]
     WatInput(#[from] wabt::Error),
-    #[error("Faerie artifact: {1}. {0:?}")]
-    FaerieArtifact(#[source] ArtifactError, String),
+    #[error("Object artifact: {1}. {0:?}")]
+    ObjectArtifact(#[source] object::write::Error, String),
     // Cannot apply #[from] or #[source] to these error types due to missing traits.
     #[error("Patcher: {0:?}")]
     Patcher(wasmonkey::WError),

@@ -111,5 +111,13 @@ Finally, install the Lucet toolchain with:
 make install
 ```
 
+and update your shell's environment variables:
+
+```sh
+source /opt/lucet/bin/setenv.sh
+```
+
+You may want to add these environment variables to your shell's configuration.
+
 The standard system compiler can be used to compile to WebAssembly, simply by adding
 `--host=wasm32-wasi` to the compilation flags.

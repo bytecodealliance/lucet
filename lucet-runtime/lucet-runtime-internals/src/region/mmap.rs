@@ -1,6 +1,6 @@
 extern crate rand;
 
-use crate::alloc::{host_page_size, instance_heap_offset, Alloc, Limits, Slot};
+use crate::alloc::{host_page_size, instance_heap_offset, Alloc, AllocStrategy, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle};
@@ -11,7 +11,6 @@ use libc::c_void;
 use libc::memset;
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
 use rand::Rng;
-use std::cmp::Ordering;
 use std::ptr;
 use std::sync::{Arc, RwLock, Weak};
 
@@ -77,71 +76,56 @@ impl Region for MmapRegion {
     }
 }
 
-fn fussy(v: Vec<Slot>) -> Result<Slot, Error>{
-    
-    let len =  v.len();
-    if len == 0 {
-	return Err(Error::RegionFull(5));
-    }
-    
-    Ok(v.swap_remove(rand::thread_rng().gen_range(0, len)))
-}
-
 impl RegionInternal for MmapRegion {
-    fn get_random_slot(&self,) {
+    /*
+        fn get_random_slot(&self) {
 
+
+
+        fn fussy(v: Vec<Slot>) -> Result<Slot, Error>{
+
+        let len =  v.len();
+        if len == 0 {
+        return Err(Error::RegionFull(5));
+        }
+
+        Ok(v.swap_remove(rand::thread_rng().gen_range(0, len)))
     }
-	
+
+
+        }
+         */
+
     fn new_instance_with(
         &self,
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
+        alloc_strategy: AllocStrategy,
     ) -> Result<InstanceHandle, Error> {
-        let custom_limits;
-        let mut limits = self.get_limits();
+        let limits = self.get_limits();
+        module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
 
-        // Affirm that the module, if instantiated, would not violate
-        // any runtime memory limits.
-        match heap_memory_size_limit.cmp(&limits.heap_memory_size) {
-            Ordering::Less => {
-                // The supplied heap_memory_size is smaller than
-                // default. Augment the limits with this custom value
-                // so that it may be validated.
-                custom_limits = Limits {
-                    heap_memory_size: heap_memory_size_limit,
-                    ..*limits
-                };
-                limits = &custom_limits;
-            }
-            Ordering::Equal => (),
-            Ordering::Greater => {
-                return Err(Error::InvalidArgument(
-                    "heap memory size requested for instance is larger than slot allows",
-                ))
-            }
-        }
-        module.validate_runtime_spec(&limits)?;
+        //	let rng = rand::thread_rng();
 
-//	let rng = rand::thread_rng();
+        // TLC: This has to happen in a single go since we don't want to
+        // check the length, have another instance made, and the make a random one
+        // possibly falling off the end of the vector.
 
-	    
-	// TLC: This has to happen in a single go since we don't want to
-	// check the length, have another instance made, and the make a random one
-	// possibly falling off the end of the vector.
-
-	//	let rnd_idx = 
-	// 
+        //	let rnd_idx =
+        //
         let slot = self
             .freelist
             .write()
             .unwrap()
-	    .fussy()
-	    .ok_or(Error::RegionFull(self.capacity));
+            .pop()
+            .ok_or(Error::RegionFull(self.capacity))?;
 
-        if slot.heap as usize % host_page_size() != 0 {
-            lucet_bail!("heap is not page-aligned; this is a bug");
-        }
+        assert_eq!(
+            slot.heap as usize % host_page_size(),
+            0,
+            "heap must be page-aligned"
+        );
 
         for (ptr, len) in [
             // make the stack read/writable

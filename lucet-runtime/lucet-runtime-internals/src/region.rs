@@ -1,6 +1,6 @@
 pub mod mmap;
 
-use crate::alloc::{Alloc, Limits, Slot};
+use crate::alloc::{Alloc, AllocStrategy, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::InstanceHandle;
@@ -58,6 +58,7 @@ pub trait RegionInternal: Send + Sync {
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
+        alloc_strategy: AllocStrategy,
     ) -> Result<InstanceHandle, Error>;
 
     /// Unmaps the heap, stack, and globals of an `Alloc`, while retaining the virtual address
@@ -132,7 +133,11 @@ impl<'a> InstanceBuilder<'a> {
     /// This function runs the guest code for the WebAssembly `start` section, and running any guest
     /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     pub fn build(self) -> Result<InstanceHandle, Error> {
-        self.region
-            .new_instance_with(self.module, self.embed_ctx, self.heap_memory_size_limit)
+        self.region.new_instance_with(
+            self.module,
+            self.embed_ctx,
+            self.heap_memory_size_limit,
+            AllocStrategy::Linear,
+        )
     }
 }
