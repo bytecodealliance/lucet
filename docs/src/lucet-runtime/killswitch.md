@@ -4,10 +4,15 @@
 asynchronously request, very sternly, that an instance be disabled from
 running. If the instance is currently running, it will be stopped as soon as
 possible, and if the instance has not yet run, it will immediately exit with
-error when the `lucet` embedder attempts to run it. In this chapter we will
-describe both a typical usage of `KillSwitch` as a mechanism to enforce
-execution time limits, and the implementation complexities underlying
-`KillSwitch` correctness.
+error when the `lucet` embedder attempts to run it. In some circumstances,
+however, a `KillSwitch` may successfully fire to no actual effect at any point
+in the program - one such example is a timeout in a hostcall that eventually
+faults; since timeouts cannot preempt hostcalls, the timeout may never be
+witnessed if the fault causes the host to never resume the Lucet instance.
+
+In this chapter we will describe both a typical usage of `KillSwitch` as a
+mechanism to enforce execution time limits, and the implementation complexities
+underlying `KillSwitch` correctness.
 
 `KillSwitch` are valid for termination only on the instance call after they are
 created, and until an instance is reset. When a call into a guest returns, the
