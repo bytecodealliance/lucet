@@ -106,7 +106,7 @@ impl<'a> InstanceBuilder<'a> {
             module,
             embed_ctx: CtxMap::default(),
             heap_memory_size_limit: region.get_limits().heap_memory_size,
-	    alloc_strategy: AllocStrategy::Linear,
+            alloc_strategy: AllocStrategy::Linear,
         }
     }
 
@@ -116,11 +116,10 @@ impl<'a> InstanceBuilder<'a> {
     /// strategy instead of the linear default strategy which simply selects
     /// the next available alloc.
     pub fn with_random_alloc(mut self, alloc_strategy: AllocStrategy) -> Self {
-	self.alloc_strategy = alloc_strategy;
-	self
+        self.alloc_strategy = alloc_strategy;
+        self
     }
-    
-    
+
     /// Add a smaller, custom limit for the heap memory size to the built instance.
     ///
     /// This call is optional. Attempts to build a new instance fail if the
