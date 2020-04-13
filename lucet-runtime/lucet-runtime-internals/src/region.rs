@@ -112,9 +112,9 @@ impl<'a> InstanceBuilder<'a> {
 
     /// Allocate the instance using a random strategy
     ///
-    /// This call is optional.  Allocates a new instance using a random
-    /// strategy instead of the linear default strategy which simply selects
-    /// the next available alloc.
+    /// This call is optional.  Allocates a new instance using a
+    /// random strategy instead of the linear default strategy which
+    /// selects the next available alloc.
     pub fn with_random_alloc(mut self, alloc_strategy: AllocStrategy) -> Self {
         self.alloc_strategy = alloc_strategy;
         self
