@@ -8,7 +8,7 @@ pub mod runtime;
 #[cfg(feature = "runtime")]
 pub use runtime::*;
 // Wasi-common re-exports:
-pub use wasi_common::{WasiCtx, WasiCtxBuilder};
+pub use wasi_common::{WasiCtx, WasiCtxBuilder, WasiCtxBuilderError};
 
 // Wasi executables export the following symbol for the entry point:
 pub const START_SYMBOL: &str = "_start";
