@@ -150,7 +150,7 @@ impl<'a> InstanceBuilder<'a> {
             self.module,
             self.embed_ctx,
             self.heap_memory_size_limit,
-            AllocStrategy::Linear,
+            self.alloc_strategy,
         )
     }
 }
