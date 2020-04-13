@@ -1186,7 +1186,7 @@ mod mmap {
     alloc_tests!(crate::region::mmap::MmapRegion);
 }
 
-#[cfg(all(test, feature = "uffd"))]
+#[cfg(all(test, target_os = "linux", feature = "uffd"))]
 mod uffd {
     alloc_tests!(crate::region::uffd::UffdRegion);
 }
