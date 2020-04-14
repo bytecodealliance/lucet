@@ -77,25 +77,6 @@ impl Region for MmapRegion {
 }
 
 impl RegionInternal for MmapRegion {
-    /*
-        fn get_random_slot(&self) {
-
-
-
-        fn fussy(v: Vec<Slot>) -> Result<Slot, Error>{
-
-        let len =  v.len();
-        if len == 0 {
-        return Err(Error::RegionFull(5));
-        }
-
-        Ok(v.swap_remove(rand::thread_rng().gen_range(0, len)))
-    }
-
-
-        }
-         */
-
     fn new_instance_with(
         &self,
         module: Arc<dyn Module>,
@@ -106,14 +87,6 @@ impl RegionInternal for MmapRegion {
         let limits = self.get_limits();
         module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
 
-        //	let rng = rand::thread_rng();
-
-        // TLC: This has to happen in a single go since we don't want to
-        // check the length, have another instance made, and the make a random one
-        // possibly falling off the end of the vector.
-
-        //	let rnd_idx =
-        //
         let slot;
         match alloc_strategy {
             AllocStrategy::Linear => {
