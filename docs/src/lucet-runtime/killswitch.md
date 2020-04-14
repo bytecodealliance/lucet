@@ -123,9 +123,8 @@ signal, and a [`Condvar`][condvar] we can wait on to know when the instance has
 been stopped. The thread ID is necessary because we don't record _where_ the
 instance is running anywhere else, and we keep it here because, so far,
 `KillState` is the only place we actually need to care. Meanwhile, the
-`Condvar` allows us to be smarter than a simple spin loop while waiting for
-signal handling machinery to actually terminate an `Instance` in
-`Domain::Guest`.
+`Condvar` allows `lucet_runtime` to avoid a spin loop while waiting for signal
+handling machinery to actually terminate an `Instance` in `Domain::Guest`.
 
 ### Lifecycle
 
