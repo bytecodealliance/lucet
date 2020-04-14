@@ -124,7 +124,17 @@ impl RegionInternal for MmapRegion {
                     .pop()
                     .ok_or(Error::RegionFull(self.capacity))?
             }
-            _ => panic!("Allocation strategy not implemented."),
+            _ => {
+                let mut free_slot_vector = self.freelist.write().unwrap();
+		if free_slot_vector.len() == 0 {
+                    return Err(Error::RegionFull(self.capacity));		
+	    }
+                // Instantiate a random number generator and get a random slot.
+                let mut rng = rand::thread_rng();
+		let rnd_idx = rng.gen_range(0, free_slot_vector.len());
+                slot = free_slot_vector
+                    .swap_remove(rnd_idx);
+            }
         }
 
         assert_eq!(
