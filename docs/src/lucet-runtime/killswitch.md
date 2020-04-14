@@ -66,7 +66,7 @@ thread-directed signals to implement guest timeouts - for non-POSIX platforms
 alternate implementations may be plausible, but need careful consideration of
 the race conditions that can arise from other platform-specific functionality.
 
-`KillSwitch` fundamentally relies on two piece of state for safe operation,
+`KillSwitch` fundamentally relies on two pieces of state for safe operation,
 which are encapsulated in a `KillState` held by the `lucet_runtime::Instance`
 it terminates:
 * `execution_domain`, a `Domain` that describes the kind of execution that is
@@ -93,8 +93,7 @@ distinction than `Domain` needs to make!
 ### Termination Mechanisms
 
 At a high level,`KillSwitch` picks one of several mechanisms to terminate an
-instance.  The choice of which mechanism depends on what kind of code is
-running in the guest, indicated by the `instance::execution::Domain` enum.
+instance. The mechanism selected depends on `instance::execution::Domain` enum:
 
 `Domain::Pending` is the easiest domain to stop execution in: we simply update
 the execution domain to `Cancelled` so when the instance is run we know that we
@@ -109,6 +108,12 @@ Lucet instance that currently is in guest code.
 code[1]. Instead, we set the execution domain to `Domain::Terminated` and wait
 for the host code to complete, at which point `lucet_runtime` will exit the
 guest.
+
+Other variants of `Domain` imply an instance state where there is no possible
+termination mechanism. For `Domain::Terminated`, the instance has already been
+terminated. For `Domain::Cancelled` the instance has been preemptively stopped,
+but there's nothing `lucet_runtime` can do to prevent some later attempted
+instance execution.
 
 #### Guest Signalling
 
