@@ -233,8 +233,8 @@ to be a race, one of the two will acquire `terminable` and actually update
 ### `B -> C` timeout - Timeout when guest makes a hostcall
 
 If a timeout occurs during a transition from guest (B) to hostcall (C) code,
-there are two circumstances also contingent on if the instance has or has not
-yet switched to `Domain::Hostcall`.
+there are two circumstances also contingent on whether the instance has
+switched to `Domain::Hostcall`.
 
 #### Before switching to `Domain::Hostcall`
 
@@ -257,27 +257,27 @@ the `Terminated` domain is observed.
 ### `B -> E` timeout - Timeout during guest fault or timeout
 
 In this sub-section we assume that the Lucet signal handler is being used, and
-will discuss the properties it requires from any signal handler for
+will discuss the properties `KillSwitch` requires from any signal handler for
 correctness.
 
 The `KillSwitch` that fires attempts to acquire `terminable`. Because a guest
 fault or timeout has occurred, the guest is actually in
-`lucet_runtime_internals::instance::signals::handle_signal`, and `terminable`
-may be `true` (guest fault), or `false` (handling a timeout). If the guest is
-currently handling a timeout signal, the `KillSwitch` trying to fire will fail
-to acquire `terminable` and exit with an err. However..
+`lucet_runtime_internals::instance::signals::handle_signal`. If the timeout
+occurs while the guest is already handling a timeout, `KillSwitch` will see
+`terminable` of `false` and quickly exit. Otherwise, `terminable` is `true` and
+we have to handle...
 
 #### Timeout while handling a guest fault
 
 In the case that a timeout occurs during a guest fault, the `KillSwitch` may
-acquire `terminable`. POSIX signal handlers are highgly constrained, see `man 7
+acquire `terminable`. POSIX signal handlers are highly constrained, see `man 7
 signal-safety` for details. The functional constraint imposed on signal
 handlers used with Lucet is that they may not lock on `KillState`'s
 `execution_domain`. As a consequence, a `KillSwitch` may fire during the
 handling of a guest fault - `sigaction` must mask `SIGALRM` so that a signal
 fired before the handler exits is discarded. If the signal behavior is to
 continue without effect, leave termination in place and continue to the guest.
-If, however, the signal handler determines it must return to the host, it
+Otherwise the signal handler has determined it must return to the host, and it
 disables termination on the instance to avoid the case where a timeout occurs
 immediately after swapping to the host context (preventing an erroneous SIGALRM
 in the host context).
@@ -345,15 +345,18 @@ must have occurred already, so the `KillSwitch` that fired will not acquire
 ### Timeout in hostcall fault
 
 As promised, a note about what happens when a timeout occurs directly when a
-hostcall faults: since by definition the instance's `execution_domain` is
-`Domain::Hostcall`, the `KillSwitch` may or may not fire before the signal
-handler disables termination. Even if it does fire, it will lock the shared
-`execution_domain` and see `Domain::Hostcall`. It then will update this to
-`Domain::Terminated`, but since the hostcall will not resume, `end_hostcall`
-will never see that the instance should stop, and no further effect will be
-had.
+hostcall faults! The instance's `execution_domain` must be `Domain::Hostcall`,
+as it's a hostcall that faulted. The `KillSwitch` may or may not fire before
+the signal handler disables termination. Even if it does fire, it will lock the
+shared `execution_domain` and see `Domain::Hostcall`, where the domain will be
+updated to `Domain::Terminated`.  Since the hostcall will not resume,
+`end_hostcall` will never see that the instance should stop, and no further
+effect will be had; regardless of `KillSwitch` effect, the instance will exit
+through the signal handler with a `Faulted` state. Additionally, because
+faulted instances cannot be resumed, `end_hostcall` will never witness the
+timeout.
 
-[1]: For exampe, the code we would _like_ to interrupt may hold locks, which we
+[1]: For example, the code we would _like_ to interrupt may hold locks, which we
 can't necessarily guarantee drop. In a non-locking example, the host code could
 be resizing a `Vec` shared outside that function, where interrupting the resize
 could yield various forms of broken behavior.
