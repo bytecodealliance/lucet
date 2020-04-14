@@ -15,7 +15,7 @@ mechanism to enforce execution time limits, and the implementation complexities
 underlying `KillSwitch` correctness.
 
 `KillSwitch` are valid for termination only on the instance call after they are
-created, and until an instance is reset. When a call into a guest returns, the
+created, or until an instance is reset. When a call into a guest returns, the
 shared state by which `KillSwitch` signal is replaced, and an attempt to
 `terminate` will fail with an `Err`.
 
@@ -106,8 +106,9 @@ At a high level,`KillSwitch` picks one of several mechanisms to terminate an
 instance. The mechanism selected depends on `instance::execution::Domain` enum:
 
 `Domain::Pending` is the easiest domain to stop execution in: we simply update
-the execution domain to `Cancelled` so when the instance is run we know that we
-in fact should not run it.
+the execution domain to `Cancelled` so in `enter_guest_region` that the
+instance is no longer eligible to run and exit before handing control to the
+guest.
 
 `Domain::Guest` is likely to be the next most-immediate termination form, where
 `lucet_runtime` will send a thread-directed `SIGARLM` to the thread running the
