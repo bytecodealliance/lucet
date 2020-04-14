@@ -114,12 +114,18 @@ impl RegionInternal for MmapRegion {
 
         //	let rnd_idx =
         //
-        let slot = self
-            .freelist
-            .write()
-            .unwrap()
-            .pop()
-            .ok_or(Error::RegionFull(self.capacity))?;
+        let slot;
+        match alloc_strategy {
+            AllocStrategy::Linear => {
+                slot = self
+                    .freelist
+                    .write()
+                    .unwrap()
+                    .pop()
+                    .ok_or(Error::RegionFull(self.capacity))?
+            }
+            _ => panic!("Allocation strategy not implemented."),
+        }
 
         assert_eq!(
             slot.heap as usize % host_page_size(),
