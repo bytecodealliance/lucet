@@ -53,11 +53,14 @@ t.join().unwrap();
 
 ## Implementation
 
-As this section discusses implementation details of `lucet-runtime`, it
-will refer to structures and enums that are unexported.  Since there are
-no `lucet-runtime` paths for these items, this section will occasionally
-use fully-qualified paths to the `lucet_runtime_internals` path where.
-they are originally defined.
+As this section discusses implementation details of `lucet_runtime`, it will
+refer to structures and enums that are unexported. For most components of
+Lucet's `KillSwitch` functionality, defintions live in
+`src/instance/execution.rs`. `KillState` and `Domain`, around which most of the
+implementation is centered, are both defined here and are internal to Lucet. As
+a result, fully qualified paths such as `instance::execution::Domain` may be
+used below, and not have corresponding rustdoc - these items exist in the crate
+source though!
 
 As much as is possible, `KillSwitch` tries to be self-contained; no members are
 public, and it tries to avoid leaking details of its state-keeping into public
@@ -70,12 +73,19 @@ the race conditions that can arise from other platform-specific functionality.
 which are encapsulated in a `KillState` held by the `lucet_runtime::Instance`
 it terminates:
 * `execution_domain`, a `Domain` that describes the kind of execution that is
-  currently happening in the `Instance`. This is kept in a `Mutex` since in
-  many cases it will need to be accessed either by a `KillSwitch` or
-  `KillState`, and for the duration either are considering the domain, it must
-  block other users.
+  currently happening in the `Instance`.
+  -  This is kept in a `Mutex` since in many cases it will need to be accessed
+     either by a `KillSwitch` or `KillState`, and for the duration either are
+     considering the domain, it must block other users.
 * `terminable`, an `AtomicBool` that indicates if the `Instance` may stop
   executing.
+  - `terminable` is in some ways a subset of the information expressed by
+    `Domain`. Even so, it is necessary for a correct implementation when signal
+    handlers are involved, because it is extremely inadvisable to take locks in
+    a signal handler. While a `Mutex` is can be dangerous, we can share an
+    `AtomicBool` in signal-safety-constrained code with impunity! See the
+    section `Timeout while handling a guest fault` for more details on working
+    under this constraint.
 
 The astute observer may notice that `Lucet` contains both an instance `Domain`
 and an instance `State`. These discuss different aspects of the instance's
@@ -171,7 +181,7 @@ First, a flow chart of the various states and their transitions:
 This graph describes the various states that reflect values of
 `execution_domain`, along with `terminable` for those states, with edges
 describing transitions between domains including timeouts in non-race
-scenarios. The rest of this section discusses the correcness of timeouts at
+scenarios. The rest of this section discusses the correctness of timeouts at
 boundaries where these state transitions occur.
 
 For reference later, the possible state transitions are:
