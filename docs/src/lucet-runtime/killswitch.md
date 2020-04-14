@@ -105,12 +105,7 @@ distinction than `Domain` needs to make!
 At a high level,`KillSwitch` picks one of several mechanisms to terminate an
 instance. The mechanism selected depends on `instance::execution::Domain` enum:
 
-`Domain::Pending` is the easiest domain to stop execution in: we simply update
-the execution domain to `Cancelled` so in `enter_guest_region` that the
-instance is no longer eligible to run and exit before handing control to the
-guest.
-
-`Domain::Guest` is likely to be the next most-immediate termination form, where
+`Domain::Guest` is likely to be the next most-immediate termination form.
 `lucet_runtime` will send a thread-directed `SIGARLM` to the thread running the
 Lucet instance that currently is in guest code.
 
@@ -118,6 +113,11 @@ Lucet instance that currently is in guest code.
 `lucet_runtime` can't know if it's safe to signal in arbitrary host-provided
 code[1]. Instead, we set the execution domain to `Domain::Terminated` and wait
 for the host code to complete, at which point `lucet_runtime` will exit the
+guest.
+
+`Domain::Pending` is the easiest domain to stop execution in: we simply update
+the execution domain to `Cancelled` so in `enter_guest_region` that the
+instance is no longer eligible to run and exit before handing control to the
 guest.
 
 Other variants of `Domain` imply an instance state where there is no possible
