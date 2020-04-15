@@ -1,5 +1,3 @@
-extern crate rand;
-
 use crate::alloc::{host_page_size, instance_heap_offset, Alloc, AllocStrategy, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
@@ -10,7 +8,7 @@ use libc::c_void;
 #[cfg(not(target_os = "linux"))]
 use libc::memset;
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use std::ptr;
 use std::sync::{Arc, RwLock, Weak};
 
@@ -97,13 +95,13 @@ impl RegionInternal for MmapRegion {
                     .pop()
                     .ok_or(Error::RegionFull(self.capacity))?
             }
-            _ => {
+            AllocStrategy::Random => {
                 let mut free_slot_vector = self.freelist.write().unwrap();
                 if free_slot_vector.len() == 0 {
                     return Err(Error::RegionFull(self.capacity));
                 }
                 // Instantiate a random number generator and get a random slot.
-                let mut rng = rand::thread_rng();
+                let mut rng = thread_rng();
                 let rnd_idx = rng.gen_range(0, free_slot_vector.len());
                 slot = free_slot_vector.swap_remove(rnd_idx);
             }
