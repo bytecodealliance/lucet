@@ -36,7 +36,7 @@ mod lucet_validate_tests {
 
     #[test]
     fn validate_lucet_wasi_test_guests() {
-        let validator = Validator::new(lucet_wasi::document(), true);
+        let validator = Validator::new(lucet_wasi::witx_document(), true);
 
         for entry in
             fs::read_dir("../lucet-wasi/tests/guests").expect("read lucet_wasi test guests dir")

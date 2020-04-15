@@ -151,7 +151,7 @@ mod lucetc_tests {
         };
 
         let b = lucet_wasi::bindings();
-        let v = Validator::new(lucet_wasi::document(), true);
+        let v = Validator::new(lucet_wasi::witx_document(), true);
         // Compiler will only unwrap if the Validator defined above accepts the module
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile empty");

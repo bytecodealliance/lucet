@@ -1,23 +1,24 @@
 #![deny(bare_trait_objects)]
 
-#[cfg(feature = "runtime")]
 pub mod c_api;
-#[cfg(feature = "runtime")]
 pub mod runtime;
 
-#[cfg(feature = "runtime")]
 pub use runtime::*;
 // Wasi-common re-exports:
 pub use wasi_common::{WasiCtx, WasiCtxBuilder, WasiCtxBuilderError};
 
-// Wasi executables export the following symbol for the entry point:
+/// Wasi executables export the following symbol for the entry point:
 pub const START_SYMBOL: &str = "_start";
 
+/// Bindings for the hostcalls exposed by this crate. These are identical to the bindings in
+/// `bindings.json`. These are exposed as part of a transition path away from bindings.json files.
 pub fn bindings() -> lucet_module::bindings::Bindings {
     lucet_wiggle_generate::bindings(&wasi_common::wasi::metadata::document())
 }
 
-pub fn document() -> wiggle::witx::Document {
+/// The witx document for the interface implemented by this crate. This is exposed as part of a
+/// transition path away from always loading witx documents from the filesystem.
+pub fn witx_document() -> wiggle::witx::Document {
     wasi_common::wasi::metadata::document()
 }
 

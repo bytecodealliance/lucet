@@ -67,7 +67,10 @@ pub fn wasi_load<P: AsRef<Path>>(
 ) -> Result<Arc<dyn Module>, Error> {
     let native_build = Lucetc::new(wasm_file)
         .with_bindings(lucet_wasi::bindings())
-        .with_validator(lucet_validate::Validator::new(lucet_wasi::document(), true));
+        .with_validator(lucet_validate::Validator::new(
+            lucet_wasi::witx_document(),
+            true,
+        ));
 
     let so_file = workdir.path().join("out.so");
 
