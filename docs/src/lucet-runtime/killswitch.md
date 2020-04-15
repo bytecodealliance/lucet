@@ -9,6 +9,11 @@ however, a `KillSwitch` may successfully fire to no actual effect at any point
 in the program - one such example is a timeout in a hostcall that eventually
 faults; since timeouts cannot preempt hostcalls, the timeout may never be
 witnessed if the fault causes the host to never resume the Lucet instance.
+Additionally, `KillSwitch` easily interoperates with Lucet's instance
+suspend/resume machinery: suspending an instance is, from the instance's point
+of view, just a (possibly very long) hostcall. Termination of a suspended
+instance behaves like termination in any other hostcall, witnessed when the
+instance is resumed and the hostcall exits.
 
 In this chapter we will describe both a typical usage of `KillSwitch` as a
 mechanism to enforce execution time limits, and the implementation complexities
