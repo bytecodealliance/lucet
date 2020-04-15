@@ -224,20 +224,20 @@ cases and ending with the race which has shown itself to have the most corners.
 Races involving `Domain::Guest` tend to be trickiest, and consequently are
 further down.
 
-### `A -> D` Termination before instance runs
+### `A -> D` - Termination before instance runs
 
 This is a timeout while another `KillSwitch` has already fired, timing out a
 guest before exeuction. Because another `KillSwitch` must have fired for there
 to be a race, one of the two will acquire `terminable` and actually update
 `execution_domain`, while the other simply exits.
 
-### `D -> E` Termination when cancelled guest is run
+### `D -> E` - Termination when cancelled guest is run
 
 Terminating a previously cancelled guest will have no effect - termination must
 have occurred already, so the `KillSwitch` that fired will not acquire
 `terminable`, and will return without ceremony.
 
-### `C -> B` Termination when hostcall returns to guest
+### `C -> B` - Termination when hostcall returns to guest
 
 The case of a `KillSwitch` firing while exiting from a hostcall is very similar
 to termination while entering a hostcall.
@@ -249,7 +249,7 @@ the latter case, the guest will be free to run when the `KillSwitch` returns,
 at which point it will have the same behavior as termination in any
 hostcall.
 
-### `C -> E` Termination during hostcall terminating instance
+### `C -> E` - Termination during hostcall terminating instance
 
 The `KillSwitch` that fires acquires `terminable` and then attempts to acquire
 a lock on `execution_domain`. The `KillSwitch` will see `Domain::Hostcall`, and
@@ -257,13 +257,13 @@ will update to `Domain::Terminated`. The shared `KillState` will be not used by
 `lucet_runtime` again in the future, because after returning to the host it
 will be replaced by a new `KillState`.
 
-### `C -> E` Termination repeatedly during hostcall
+### `C -> E` - Termination repeatedly during hostcall
 
 Termination while a hostcall is already observing an earlier termination will
 have no effect. The `KillSwitch` that fired last will not acquire
 `terminable`, and will return without ceremony.
 
-### `B -> C` Termination when guest makes a hostcall
+### `B -> C` - Termination when guest makes a hostcall
 
 If a `KillSwitch` fires during a transition from guest (B) to hostcall (C) code,
 there are two circumstances also contingent on whether the instance has
@@ -297,7 +297,7 @@ termination occur before or after the Lucet instance has switched to
 #### Before switching to `Domain::Guest`
 
 The `KillSwitch` that fires acquires `terminable` and then locks
-`execution_domain` to determine the proper termination  mechanism.  This is
+`execution_domain` to determine the appropriate termination  mechanism.  This is
 before the instance has locked it in `enter_guest_region`, so it will acquire
 the lock, with a state of `Domain::Pending`. Seeing a pending instance, the
 `KillSwitch` will update it to `Domain::Cancelled` and release the lock, at
@@ -307,14 +307,14 @@ which point the instance will acquire the lock, observe the instance is
 #### After switching to `Domain::Guest`
 
 The `KillSwitch` that fires acquires `terminable` and then attempts to acquire
-a lock on `execution_domain` to determine the proper termination mechanism.
+a lock on `execution_domain` to determine the appropriate termination mechanism.
 Because the instance has already locked `execution_domain` to update it to
 `Domain::Guest`, this blocks until the instance releases the lock (and guest
 code is running).  At this point, the instance is running guest code and it is
 safe for the `KillSwitch` to operate as if it were terminating any other guest
 code - with the same machinery as an instance in state `B` (a `SIGALRM`).
 
-### `B -> E` Termination during normal guest exit
+### `B -> E` - Termination during normal guest exit
 
 The `KillSwitch` that fires attempts to acquire `terminable`, but is in a race
 with the teardown in `lucet_context_backstop`. Both functions attempt to swap
@@ -344,7 +344,7 @@ its way there with only signal-safe state.
 The `KillSwitch` itself will signal the guest as any other `Domain::Guest`
 interruption.
 
-### `B -> E` - Terminated during guest fault, or terminated twice
+### `B -> E` - Termination during guest fault, or terminated twice
 
 In this sub-section we assume that the Lucet signal handler is being used, and
 will discuss the properties `KillSwitch` requires from any signal handler for
