@@ -1,19 +1,24 @@
 # `KillSwitch`
 
 `KillSwitch` is a mechanism by which users of `lucet-runtime` can
-asynchronously request, very sternly, that an instance be disabled from
-running. If the instance is currently running, it will be stopped as soon as
-possible, and if the instance has not yet run, it will immediately exit with
-error when the `lucet` embedder attempts to run it. In some circumstances,
-however, a `KillSwitch` may successfully fire to no actual effect at any point
-in the program - one such example is a timeout in a hostcall that eventually
-faults; since timeouts cannot preempt hostcalls, the timeout may never be
-witnessed if the fault causes the host to never resume the Lucet instance.
-Additionally, `KillSwitch` easily interoperates with Lucet's instance
-suspend/resume machinery: suspending an instance is, from the instance's point
-of view, just a (possibly very long) hostcall. Termination of a suspended
-instance behaves like termination in any other hostcall, witnessed when the
-instance is resumed and the hostcall exits.
+asynchronously request, very sternly, that an `lucet_runtime::Instance` be
+disabled from running.
+
+If the instance is currently running, it will be stopped as soon as possible.
+If the instance has not yet started running, it will immediately exit with
+an error when the `lucet` embedder attempts to run it.
+
+`KillSwitch` easily interoperates with Lucet's instance suspend/resume
+machinery: suspending an instance is, from the instance's point of view, just a
+(possibly very long) hostcall. Termination of a suspended instance behaves like
+termination in any other hostcall: witnessed when the instance is resumed and
+the "hostcall" exits.
+
+In some circumstances, a `KillSwitch` may successfully fire to no actual effect
+at any point in the program - one such example is a timeout in a hostcall that
+eventually faults; since timeouts cannot preempt hostcalls, the timeout may
+never be witnessed if the fault causes the host to never resume the Lucet
+instance.
 
 In this chapter we will describe a typical usage of `KillSwitch` as a mechanism
 to enforce execution time limits. Then, we will discuss the implementation
@@ -26,7 +31,8 @@ shared state by which `KillSwitch` signal is replaced, and an attempt to
 
 ## Example of `KillSwitch` used as a timeout
 
-This example taken from `lucet_runtime_tests::timeout::timeout_in_guest`:
+This example is taken from `lucet_runtime_tests::timeout::timeout_in_guest`:
+
 ```rust
 let module = mock_timeout_module();
 let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
@@ -61,27 +67,28 @@ t.join().unwrap();
 As this section discusses implementation details of `lucet_runtime`, it will
 refer to structures and enums that are unexported. For most components of
 Lucet's `KillSwitch` functionality, defintions live in
-`src/instance/execution.rs`. `KillState` and `Domain`, around which most of the
-implementation is centered, are both defined here and are internal to Lucet. As
-a result, fully qualified paths such as `instance::execution::Domain` may be
-used below, and not have corresponding rustdoc - these items exist in the crate
+`lucet-runtime-internals/src/instance/execution.rs`.
+
+`KillState` and `Domain`, around which most of the implementation is centered,
+are both defined here and are internal to Lucet. As a result, fully qualified
+paths such as `instance::execution::Domain` may be used below and not have
+corresponding entries visible in rustdoc - these items exist in the crate
 source though!
 
 As much as is possible, `KillSwitch` tries to be self-contained; no members are
 public, and it tries to avoid leaking details of its state-keeping into public
 interfaces. Currently, `lucet-runtime` is heavily dependent on POSIX
-thread-directed signals to implement guest timeouts - for non-POSIX platforms
+thread-directed signals to implement guest timeouts. For non-POSIX platforms
 alternate implementations may be plausible, but need careful consideration of
 the race conditions that can arise from other platform-specific functionality.
 
 `KillSwitch` fundamentally relies on two pieces of state for safe operation,
-which are encapsulated in a `KillState` held by the `lucet_runtime::Instance`
-it terminates:
+which are encapsulated in a `KillState` held by the `Instance` it terminates:
 * `execution_domain`, a `Domain` that describes the kind of execution that is
   currently happening in the `Instance`.
-  -  This is kept in a `Mutex` since in many cases it will need to be accessed
-     either by a `KillSwitch` or `KillState`, and for the duration either are
-     considering the domain, it must block other users.
+  - This is kept in a `Mutex` since in many cases it will need to be accessed
+    either by a `KillSwitch` or `KillState`, both of which must block other
+    users while they are considering the domain.
 * `terminable`, an `AtomicBool` that indicates if the `Instance` may stop
   executing.
   - `terminable` is in some ways a subset of the information expressed by
@@ -90,10 +97,10 @@ it terminates:
     active `Domain` at points we check `terminable` instead. Even though this
     is duplicative, it is necessary for a correct implementation when POSIX
     signal handlers are involved, because it is extremely inadvisable to take
-    locks in a signal handler. While a `Mutex` is can be dangerous, we can
-    share an `AtomicBool` in signal-safety-constrained code with impunity! See
-    the section `Timeout while handling a guest fault` for more details on
-    working under this constraint.
+    locks in a signal handler. While a `Mutex` can be dangerous, we can share
+    an `AtomicBool` in signal-safety-constrained code with impunity! See the
+    section `Timeout while handling a guest fault` for more details on working
+    under this constraint.
 
 The astute observer may notice that `Lucet` contains both an instance `Domain`
 and an instance `State`. These discuss different aspects of the instance's
@@ -102,21 +109,20 @@ lifecycle: `Domain` describes what the instance is doing right now, where
 This is fundamentally the reason why `State` does not and cannot describe a
 "making a hostcall" variant - this is not something `lucet_runtime` wants to
 expose, and at the moment we don't intend to make any commitments about being
-able to query instance-internal state like this.  Additionally, this is why
-`Domain::Terminated` only expresses that an instance has _stopped_ running, not
-if it successfully or unsuccessfully exited. From `Domain`'s perspective, the
-instance has stopped running, and that's all there is to it. For more
-information, the `Instance`'s `State` will describe how the instance stopped,
-and if that's by a return or a fault. TODO: there's even an argument that
-`Terminated` vs `Cancelled` is a stronger distinction than `Domain` needs to
-make!
+able to query instance-internal state like this.
+
+Additionally, this is why `Domain::Terminated` only expresses that an instance
+has _stopped_ running, not if it successfully or unsuccessfully exited. From
+`Domain`'s perspective, the instance has stopped running, and that's all there
+is to it. The `Instance`'s `State` will describe how the instance stopped, and
+if that's by a return or a fault.
 
 ### Termination Mechanisms
 
 At a high level,`KillSwitch` picks one of several mechanisms to terminate an
-instance. The mechanism selected depends on `instance::execution::Domain` enum:
+instance. The mechanism selected depends on the instance's current `Domain`:
 
-`Domain::Guest` is likely to be the next most-immediate termination form.
+`Domain::Guest` is likely to be the most common termination form.
 `lucet_runtime` will send a thread-directed `SIGARLM` to the thread running the
 Lucet instance that currently is in guest code.
 
@@ -127,26 +133,27 @@ for the host code to complete, at which point `lucet_runtime` will exit the
 guest.
 
 `Domain::Pending` is the easiest domain to stop execution in: we simply update
-the execution domain to `Cancelled` so in `enter_guest_region` that the
+the execution domain to `Cancelled`. In `enter_guest_region`, we see that the
 instance is no longer eligible to run and exit before handing control to the
 guest.
 
 Other variants of `Domain` imply an instance state where there is no possible
-termination mechanism. For `Domain::Terminated`, the instance has already been
-terminated. For `Domain::Cancelled` the instance has been preemptively stopped,
-but there's nothing `lucet_runtime` can do to prevent some later attempted
-instance execution.
+termination mechanism. `Domain::Terminated` indicates that the instance has
+already been terminated, and `Domain::Cancelled` indicates that the instance
+has already been preemptively stopped.
 
 #### Guest Signalling
 
 There are two other pieces of information attached to `KillState` that support
 the specific case where we need to send a `SIGALRM`: the thread ID we need to
 signal, and a [`Condvar`][condvar] we can wait on to know when the instance has
-been stopped. The thread ID is necessary because we don't record _where_ the
-instance is running anywhere else, and we keep it here because, so far,
-`KillState` is the only place we actually need to care. Meanwhile, the
-`Condvar` allows `lucet_runtime` to avoid a spin loop while waiting for signal
-handling machinery to actually terminate an `Instance` in `Domain::Guest`.
+been stopped.
+
+The thread ID is necessary because we don't record _where_ the instance is
+running anywhere else. We keep it here because, so far, `KillState` is the only
+place we actually need to care. `Condvar` allows `lucet_runtime` to avoid a
+spin loop while waiting for signal handling machinery to actually terminate an
+`Instance` in `Domain::Guest`.
 
 ### Lifecycle
 
