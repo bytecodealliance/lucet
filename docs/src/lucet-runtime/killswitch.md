@@ -213,31 +213,10 @@ For reference later, the possible state transitions are:
   - not an internal state but we will also discuss timeouts during a hostcall fault
 * `D -> E` (cancelled guest is run)
 
-### `A -> B` timeout - Timeout while entering guest code
-
-If a timeout occurs between instance initialization (A) and the start of guest
-execution (B), there are two circumstances to consider: does the timeout occur
-before or after the Lucet instance has switched to `Domain::Guest`?
-
-#### Before switching to `Domain::Guest`
-
-The `KillSwitch` that fires acquires `terminable` and then locks
-`execution_domain` to determine timeout mechanism. This is before the instance
-has locked it in `enter_guest_region`, so it will acquire the lock, with a
-state of `Domain::Pending`. Seeing a pending instance, the `KillSwitch` will
-update it to `Domain::Cancelled` and release the lock, at which point the
-instance will acquire the lock, observe the instance is `Cancelled`, and return
-to the host without executing any guest code.
-
-#### After switching to `Domain::Guest`
-
-The `KillSwitch` that fires acquires `terminable` and then attempts to acquire
-a lock on `execution_domain` to determine timeout mechanism. Because the
-instance has already locked `execution_domain` to update it to `Domain::Guest`,
-this blocks until the instance releases the lock (and guest code is running).
-At this point, the instance is running guest code and it is safe for the
-`KillSwitch` to operate as if it were terminating any other guest code - with
-the same machinery as an instance in state `B` (a `SIGALRM`).
+These will be coved in rough order of complexity, starting with the simplest
+cases and ending with the race which has shown itself to have the most corners.
+Races involving `Domain::Guest` tend to be trickiest, and consequently are
+further down.
 
 ### `A -> D` timeout - Timeout before instance runs
 
@@ -245,6 +224,36 @@ This is a timeout while another `KillSwitch` has already fired, timing out a
 guest before exeuction. Because another `KillSwitch` must have fired for there
 to be a race, one of the two will acquire `terminable` and actually update
 `execution_domain`, while the other simply exits.
+
+### `D -> E` timeout - Timeout when cancelled guest is run
+
+A timeout while observing a cancelled guest will have no effect - a timeout
+must have occurred already, so the `KillSwitch` that fired will not acquire
+`terminable`, and will return without ceremony.
+
+### `C -> B` timeout - Timeout when hostcall returns to guest
+
+The case of a timeout while exiting from a hostcall is very similar to timeouts
+while entering a hostcall. Either the `KillSwitch` sees a guest in
+`Domain::Guest`, prohibits a state change, and signals the guest, or
+`KillSwitch` sees a guest in `Domain::Hostcall` and updates the guest to
+`Domain::Terminated`. In the latter case, the guest will be free to run when
+the `KillSwitch` returns, at which point it will have the same behavior as
+observing a timeout in any hostcall.
+
+### `C -> E` timeout - Timeout during hostcall terminating instance
+
+The `KillSwitch` that fires acquires `terminable` and then attempts to acquire
+a lock on `execution_domain`. The `KillSwitch` will see `Domain::Hostcall`, and
+will update to `Domain::Terminated`. The shared `KillState` will be not used by
+`lucet_runtime` again in the future, because after returning to the host it
+will be replaced by a new `KillState`.
+
+### `C -> E` timeout - Timeout during hostcall observing timeout
+
+A timeout while a hostcall is observing an earlier timeout will have no effect
+- a timeout must have occurred already, so the `KillSwitch` that fired will not
+acquire `terminable`, and will return without ceremony.
 
 ### `B -> C` timeout - Timeout when guest makes a hostcall
 
@@ -270,33 +279,31 @@ style for hostcalls. It will update the execution domain to
 `Domain::Terminated` and the instance will return when the hostcall exits and
 the `Terminated` domain is observed.
 
-### `B -> E` timeout - Timeout during guest fault or timeout
+### `A -> B` timeout - Timeout while entering guest code
 
-In this sub-section we assume that the Lucet signal handler is being used, and
-will discuss the properties `KillSwitch` requires from any signal handler for
-correctness.
+If a timeout occurs between instance initialization (A) and the start of guest
+execution (B), there are two circumstances to consider: does the timeout occur
+before or after the Lucet instance has switched to `Domain::Guest`?
 
-The `KillSwitch` that fires attempts to acquire `terminable`. Because a guest
-fault or timeout has occurred, the guest is actually in
-`lucet_runtime_internals::instance::signals::handle_signal`. If the timeout
-occurs while the guest is already handling a timeout, `KillSwitch` will see
-`terminable` of `false` and quickly exit. Otherwise, `terminable` is `true` and
-we have to handle...
+#### Before switching to `Domain::Guest`
 
-#### Timeout while handling a guest fault
+The `KillSwitch` that fires acquires `terminable` and then locks
+`execution_domain` to determine timeout mechanism. This is before the instance
+has locked it in `enter_guest_region`, so it will acquire the lock, with a
+state of `Domain::Pending`. Seeing a pending instance, the `KillSwitch` will
+update it to `Domain::Cancelled` and release the lock, at which point the
+instance will acquire the lock, observe the instance is `Cancelled`, and return
+to the host without executing any guest code.
 
-In the case that a timeout occurs during a guest fault, the `KillSwitch` may
-acquire `terminable`. POSIX signal handlers are highly constrained, see `man 7
-signal-safety` for details. The functional constraint imposed on signal
-handlers used with Lucet is that they may not lock on `KillState`'s
-`execution_domain`. As a consequence, a `KillSwitch` may fire during the
-handling of a guest fault - `sigaction` must mask `SIGALRM` so that a signal
-fired before the handler exits is discarded. If the signal behavior is to
-continue without effect, leave termination in place and continue to the guest.
-Otherwise the signal handler has determined it must return to the host, and it
-disables termination on the instance to avoid the case where a timeout occurs
-immediately after swapping to the host context (preventing an erroneous SIGALRM
-in the host context).
+#### After switching to `Domain::Guest`
+
+The `KillSwitch` that fires acquires `terminable` and then attempts to acquire
+a lock on `execution_domain` to determine timeout mechanism. Because the
+instance has already locked `execution_domain` to update it to `Domain::Guest`,
+this blocks until the instance releases the lock (and guest code is running).
+At this point, the instance is running guest code and it is safe for the
+`KillSwitch` to operate as if it were terminating any other guest code - with
+the same machinery as an instance in state `B` (a `SIGALRM`).
 
 ### `B -> E` timeout - Timeout during normal guest exit
 
@@ -328,35 +335,33 @@ its way there with only signal-safe state.
 The `KillSwitch` itself will signal the guest as any other `Domain::Guest`
 interruption.
 
-### `C -> B` timeout - Timeout when hostcall returns to guest
+### `B -> E` timeout - Timeout during guest fault or timeout
 
-The case of a timeout while exiting from a hostcall is very similar to timeouts
-while entering a hostcall. Either the `KillSwitch` sees a guest in
-`Domain::Guest`, prohibits a state change, and signals the guest, or
-`KillSwitch` sees a guest in `Domain::Hostcall` and updates the guest to
-`Domain::Terminated`. In the latter case, the guest will be free to run when
-the `KillSwitch` returns, at which point it will have the same behavior as
-observing a timeout in any hostcall.
+In this sub-section we assume that the Lucet signal handler is being used, and
+will discuss the properties `KillSwitch` requires from any signal handler for
+correctness.
 
-### `C -> E` timeout - Timeout during hostcall terminating instance
+The `KillSwitch` that fires attempts to acquire `terminable`. Because a guest
+fault or timeout has occurred, the guest is actually in
+`lucet_runtime_internals::instance::signals::handle_signal`. If the timeout
+occurs while the guest is already handling a timeout, `KillSwitch` will see
+`terminable` of `false` and quickly exit. Otherwise, `terminable` is `true` and
+we have to handle...
 
-The `KillSwitch` that fires acquires `terminable` and then attempts to acquire
-a lock on `execution_domain`. The `KillSwitch` will see `Domain::Hostcall`, and
-will update to `Domain::Terminated`. The shared `KillState` will be not used by
-`lucet_runtime` again in the future, because after returning to the host it
-will be replaced by a new `KillState`.
+#### Timeout while handling a guest fault
 
-### `C -> E` timeout - Timeout during hostcall observing timeout
-
-A timeout while a hostcall is observing an earlier timeout will have no effect
-- a timeout must have occurred already, so the `KillSwitch` that fired will not
-acquire `terminable`, and will return without ceremony.
-
-### `D -> E` timeout - Timeout when cancelled guest is run
-
-A timeout while observing a cancelled guest will have no effect - a timeout
-must have occurred already, so the `KillSwitch` that fired will not acquire
-`terminable`, and will return without ceremony.
+In the case that a timeout occurs during a guest fault, the `KillSwitch` may
+acquire `terminable`. POSIX signal handlers are highly constrained, see `man 7
+signal-safety` for details. The functional constraint imposed on signal
+handlers used with Lucet is that they may not lock on `KillState`'s
+`execution_domain`. As a consequence, a `KillSwitch` may fire during the
+handling of a guest fault - `sigaction` must mask `SIGALRM` so that a signal
+fired before the handler exits is discarded. If the signal behavior is to
+continue without effect, leave termination in place and continue to the guest.
+Otherwise the signal handler has determined it must return to the host, and it
+disables termination on the instance to avoid the case where a timeout occurs
+immediately after swapping to the host context (preventing an erroneous SIGALRM
+in the host context).
 
 ### Timeout in hostcall fault
 
