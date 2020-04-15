@@ -15,8 +15,8 @@ termination in any other hostcall: witnessed when the instance is resumed and
 the "hostcall" exits.
 
 In some circumstances, a `KillSwitch` may successfully fire to no actual effect
-at any point in the program - one such example is a timeout in a hostcall that
-eventually faults; since timeouts cannot preempt hostcalls, the timeout may
+at any point in the program - one such example is termination in a hostcall that
+eventually faults; since termination cannot preempt hostcalls, the termination may
 never be witnessed if the fault causes the host to never resume the Lucet
 instance.
 
@@ -29,7 +29,7 @@ created, or until an instance is reset. When a call into a guest returns, the
 shared state by which `KillSwitch` signal is replaced, and an attempt to
 `terminate` will fail with an `Err`.
 
-## Example of `KillSwitch` used as a timeout
+## Example: `KillSwitch` used as a timeout mechanism
 
 This example is taken from `lucet_runtime_tests::timeout::timeout_in_guest`:
 
@@ -78,7 +78,7 @@ source though!
 As much as is possible, `KillSwitch` tries to be self-contained; no members are
 public, and it tries to avoid leaking details of its state-keeping into public
 interfaces. Currently, `lucet-runtime` is heavily dependent on POSIX
-thread-directed signals to implement guest timeouts. For non-POSIX platforms
+thread-directed signals to implement guest termination. For non-POSIX platforms
 alternate implementations may be plausible, but need careful consideration of
 the race conditions that can arise from other platform-specific functionality.
 
@@ -203,20 +203,20 @@ First, a flow chart of the various states and their transitions:
 
 This graph describes the various states that reflect values of
 `execution_domain` and `terminable` for those states, with edges describing
-transitions between domains including timeouts in non-race scenarios. The rest
-of this section discusses the correctness of termination at boundaries where
-these state transitions occur.
+transitions between domains including termination in non-race scenarios. The
+rest of this section discusses the correctness of termination at boundaries
+where these state transitions occur.
 
 For reference later, the possible state transitions are:
 * `A -> B` (instance runs guest code)
 * `A -> D` (KillSwitch fires before instance runs)
 * `B -> C` (guest makes a hostcall)
 * `B -> E` (normal guest exit)
-* `B -> E` (from a guest fault/timeout)
+* `B -> E` (from a guest fault/termination)
 * `C -> B` (hostcall returns to guest)
 * `C -> E` (hostcall terminates instance)
-* `C -> E` (hostcall observes timeout)
-  - not an internal state but we will also discuss timeouts during a hostcall fault
+* `C -> E` (hostcall observes termination)
+  - not an internal state but we will also discuss termination during a hostcall fault
 * `D -> E` (cancelled guest is run)
 
 These will be coved in rough order of complexity, starting with the simplest
@@ -224,30 +224,32 @@ cases and ending with the race which has shown itself to have the most corners.
 Races involving `Domain::Guest` tend to be trickiest, and consequently are
 further down.
 
-### `A -> D` timeout - Timeout before instance runs
+### `A -> D` Termination before instance runs
 
 This is a timeout while another `KillSwitch` has already fired, timing out a
 guest before exeuction. Because another `KillSwitch` must have fired for there
 to be a race, one of the two will acquire `terminable` and actually update
 `execution_domain`, while the other simply exits.
 
-### `D -> E` timeout - Timeout when cancelled guest is run
+### `D -> E` Termination when cancelled guest is run
 
-A timeout while observing a cancelled guest will have no effect - a timeout
-must have occurred already, so the `KillSwitch` that fired will not acquire
+Terminating a previously cancelled guest will have no effect - termination must
+have occurred already, so the `KillSwitch` that fired will not acquire
 `terminable`, and will return without ceremony.
 
-### `C -> B` timeout - Timeout when hostcall returns to guest
+### `C -> B` Termination when hostcall returns to guest
 
-The case of a timeout while exiting from a hostcall is very similar to timeouts
-while entering a hostcall. Either the `KillSwitch` sees a guest in
-`Domain::Guest`, prohibits a state change, and signals the guest, or
-`KillSwitch` sees a guest in `Domain::Hostcall` and updates the guest to
-`Domain::Terminated`. In the latter case, the guest will be free to run when
-the `KillSwitch` returns, at which point it will have the same behavior as
-observing a timeout in any hostcall.
+The case of a `KillSwitch` firing while exiting from a hostcall is very similar
+to termination while entering a hostcall.
 
-### `C -> E` timeout - Timeout during hostcall terminating instance
+The `KillSwitch` might observe a guest in `Domain::Guest`, prohibit a state
+change, and signal the guest. Alternatively, the `KillSwitch` can observe the
+guest in `Domain::Hostcall` and update the guest to `Domain::Terminated`. In
+the latter case, the guest will be free to run when the `KillSwitch` returns,
+at which point it will have the same behavior as termination in any
+hostcall.
+
+### `C -> E` Termination during hostcall terminating instance
 
 The `KillSwitch` that fires acquires `terminable` and then attempts to acquire
 a lock on `execution_domain`. The `KillSwitch` will see `Domain::Hostcall`, and
@@ -255,15 +257,15 @@ will update to `Domain::Terminated`. The shared `KillState` will be not used by
 `lucet_runtime` again in the future, because after returning to the host it
 will be replaced by a new `KillState`.
 
-### `C -> E` timeout - Timeout during hostcall observing timeout
+### `C -> E` Termination repeatedly during hostcall
 
-A timeout while a hostcall is observing an earlier timeout will have no effect
-- a timeout must have occurred already, so the `KillSwitch` that fired will not
-acquire `terminable`, and will return without ceremony.
+Termination while a hostcall is already observing an earlier termination will
+have no effect. The `KillSwitch` that fired last will not acquire
+`terminable`, and will return without ceremony.
 
-### `B -> C` timeout - Timeout when guest makes a hostcall
+### `B -> C` Termination when guest makes a hostcall
 
-If a timeout occurs during a transition from guest (B) to hostcall (C) code,
+If a `KillSwitch` fires during a transition from guest (B) to hostcall (C) code,
 there are two circumstances also contingent on whether the instance has
 switched to `Domain::Hostcall`.
 
@@ -285,33 +287,34 @@ style for hostcalls. It will update the execution domain to
 `Domain::Terminated` and the instance will return when the hostcall exits and
 the `Terminated` domain is observed.
 
-### `A -> B` timeout - Timeout while entering guest code
+### `A -> B` - Termination while entering guest code
 
-If a timeout occurs between instance initialization (A) and the start of guest
-execution (B), there are two circumstances to consider: does the timeout occur
-before or after the Lucet instance has switched to `Domain::Guest`?
+If a `KillSwitch` fires between instance initialization (A) and the start of
+guest execution (B), there are two circumstances to consider: does the
+termination occur before or after the Lucet instance has switched to
+`Domain::Guest`?
 
 #### Before switching to `Domain::Guest`
 
 The `KillSwitch` that fires acquires `terminable` and then locks
-`execution_domain` to determine timeout mechanism. This is before the instance
-has locked it in `enter_guest_region`, so it will acquire the lock, with a
-state of `Domain::Pending`. Seeing a pending instance, the `KillSwitch` will
-update it to `Domain::Cancelled` and release the lock, at which point the
-instance will acquire the lock, observe the instance is `Cancelled`, and return
-to the host without executing any guest code.
+`execution_domain` to determine the proper termination  mechanism.  This is
+before the instance has locked it in `enter_guest_region`, so it will acquire
+the lock, with a state of `Domain::Pending`. Seeing a pending instance, the
+`KillSwitch` will update it to `Domain::Cancelled` and release the lock, at
+which point the instance will acquire the lock, observe the instance is
+`Cancelled`, and return to the host without executing any guest code.
 
 #### After switching to `Domain::Guest`
 
 The `KillSwitch` that fires acquires `terminable` and then attempts to acquire
-a lock on `execution_domain` to determine timeout mechanism. Because the
-instance has already locked `execution_domain` to update it to `Domain::Guest`,
-this blocks until the instance releases the lock (and guest code is running).
-At this point, the instance is running guest code and it is safe for the
-`KillSwitch` to operate as if it were terminating any other guest code - with
-the same machinery as an instance in state `B` (a `SIGALRM`).
+a lock on `execution_domain` to determine the proper termination mechanism.
+Because the instance has already locked `execution_domain` to update it to
+`Domain::Guest`, this blocks until the instance releases the lock (and guest
+code is running).  At this point, the instance is running guest code and it is
+safe for the `KillSwitch` to operate as if it were terminating any other guest
+code - with the same machinery as an instance in state `B` (a `SIGALRM`).
 
-### `B -> E` timeout - Timeout during normal guest exit
+### `B -> E` Termination during normal guest exit
 
 The `KillSwitch` that fires attempts to acquire `terminable`, but is in a race
 with the teardown in `lucet_context_backstop`. Both functions attempt to swap
@@ -341,35 +344,36 @@ its way there with only signal-safe state.
 The `KillSwitch` itself will signal the guest as any other `Domain::Guest`
 interruption.
 
-### `B -> E` timeout - Timeout during guest fault or timeout
+### `B -> E` - Terminated during guest fault, or terminated twice
 
 In this sub-section we assume that the Lucet signal handler is being used, and
 will discuss the properties `KillSwitch` requires from any signal handler for
 correctness.
 
 The `KillSwitch` that fires attempts to acquire `terminable`. Because a guest
-fault or timeout has occurred, the guest is actually in
-`lucet_runtime_internals::instance::signals::handle_signal`. If the timeout
-occurs while the guest is already handling a timeout, `KillSwitch` will see
-`terminable` of `false` and quickly exit. Otherwise, `terminable` is `true` and
-we have to handle...
+fault or termination has occurred, the guest is actually in
+`lucet_runtime_internals::instance::signals::handle_signal`. If termination
+occurs while the guest is already responding to a previous `KillSwitch`'s
+termination, the second `KillSwitch` will see `terminable` of `false` and
+quickly exit.  Otherwise, `terminable` is `true` and we have to handle...
 
-#### Timeout while handling a guest fault
+#### Terminated while handling a guest fault
 
-In the case that a timeout occurs during a guest fault, the `KillSwitch` may
+In the case that a `KillSwitch` fires during a guest fault, the `KillSwitch` may
 acquire `terminable`. POSIX signal handlers are highly constrained, see `man 7
 signal-safety` for details. The functional constraint imposed on signal
 handlers used with Lucet is that they may not lock on `KillState`'s
-`execution_domain`. As a consequence, a `KillSwitch` may fire during the
-handling of a guest fault - `sigaction` must mask `SIGALRM` so that a signal
-fired before the handler exits is discarded. If the signal behavior is to
-continue without effect, leave termination in place and continue to the guest.
-Otherwise the signal handler has determined it must return to the host, and it
-disables termination on the instance to avoid the case where a timeout occurs
-immediately after swapping to the host context (preventing an erroneous SIGALRM
-in the host context).
+`execution_domain`.
 
-### Timeout in hostcall fault
+As a consequence, a `KillSwitch` may fire during the handling of a guest fault.
+`sigaction` must mask `SIGALRM` so that a signal fired before the handler exits
+is discarded. If the signal behavior is to continue without effect, leave
+termination in place and continue to the guest. Otherwise the signal handler
+has determined it must return to the host, and it disables termination on the
+instance to avoid sending an erroneous SIGALRM immediately after swapping to
+the host context.
+
+### Terminated in hostcall fault
 
 As promised, a note about what happens when a timeout occurs directly when a
 hostcall faults! The instance's `execution_domain` must be `Domain::Hostcall`,
