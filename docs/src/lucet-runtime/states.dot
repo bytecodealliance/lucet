@@ -1,3 +1,5 @@
+// After editing, re-generate with `dot states.dot -Tpng > states.png`!
+
 digraph G {
   init [shape=plaintext, label=<
     <table cellborder='1'>
@@ -30,8 +32,8 @@ digraph G {
   terminated [shape=plaintext, label=<
     <table cellborder='1'>
       <tr><td>E</td><td>post-run cleanup</td></tr>
-      <tr><td>domain</td><td>Guest | Hostcall | Cancelled</td></tr>
-      <tr><td>terminable</td><td>true | false</td></tr>
+      <tr><td>domain</td><td>N/A</td></tr>
+      <tr><td>terminable</td><td>N/A</td></tr>
     </table>
   >];
 
