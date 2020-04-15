@@ -161,36 +161,35 @@ Having described both `KillState` and the termination mechanisms it helps
 select, we can discuss the actual lifecycle of the `KillState` for a call into
 an `Instance` and see how these pieces begin to fit together.
 
-Because `KillState` only describe one call into an instance, an `Instance` may
+Because `KillState` only describes one call into an instance, an `Instance` may
 have many `KillState` over its lifetime. Even so, at one _specific_ time there
 is only one `KillState`, which describes the current, or imminent, call into
 the instance.
 
 Execution of a Lucet `Instance` begins with a default `KillState`: in the
-`Pending` domain, `terminable` set to `true`, and no `thread_id` as it's not
-currently running.  When a call is made to `Instance::run`, or more
-specifically, `Instance::run_func`, the `Instance`'s bootstrap context is set
-up and `KillState::schedule` is called to set up last-minute state before the
-instance begins running. In implementation, the only state to set up is the
-instance's thread ID - we assume that the instance won't be migrated between
-threads without `lucet_runtime`'s cooperation, so the thread ID at this point
-can be safely retained.
+`Pending` domain, `terminable` set to `true`, with no `thread_id` as it is not
+currently running.  When a call is made to `Instance::run`, the `Instance`'s
+bootstrap context is set up and `KillState::schedule` is called to set up
+last-minute state before the instance begins running.
 
 `lucet_runtime` shortly thereafter will switch to the `Instance` and begin
 executing its bootstrapping code. In `enter_guest_region` the guest will lock
 and update the execution domain to `Guest`, or see the instance is
 `Domain::Cancelled` and exit. If the instance could run, we proceed into the
-AOT-compiled wasm. At some point, the instance will likely make a hostcall to
-embedder-provided or `lucet_runtime`-provided code; correctly-implemented
-hostcalls are wrapped in `begin_hostcall` and `end_hostcall` to take care of
-runtime bookkeeping including updating `execution_domain` to `Domain::Hostcall`
-(`begin_hostcall`) and checking that the instance can return to guest code,
-setting `execution_domain` back to `Domain::Guest` (`end_hostcall`). At some
-point the instance will hopefully exit, where in `lucet_context_backstop` we
-check that the instance may stop exiting (`KillState::terminable`). If it can
-exit, then do so. Finally, back in `lucet_runtime`, we can
-`KillState::deschedule` to tear down the last of the run-specific state - the
-`thread_id`.
+AOT-compiled Wasm.
+
+At some point, the instance will likely make a hostcall to embedder-provided or
+`lucet_runtime`-provided code; correctly-implemented hostcalls are wrapped in
+`begin_hostcall` and `end_hostcall` to take care of runtime bookkeeping,
+including updating `execution_domain` to `Domain::Hostcall` (`begin_hostcall`)
+and afterwards checking that the instance can return to guest code, setting
+`execution_domain` back to `Domain::Guest` (`end_hostcall`).
+
+At some point the instance will hopefully exit, where in
+`lucet_context_backstop` we check that the instance may stop exiting
+(`KillState::terminable`). If it can exit, then do so. Finally, back in
+`lucet_runtime`, we can `KillState::deschedule` to tear down the last of the
+run-specific state - the `thread_id`.
 
 ## Implementation Complexities (When You Have A Scheduler Full Of Demons)
 
@@ -203,10 +202,10 @@ First, a flow chart of the various states and their transitions:
 ![state flow chart](states.png)
 
 This graph describes the various states that reflect values of
-`execution_domain`, along with `terminable` for those states, with edges
-describing transitions between domains including timeouts in non-race
-scenarios. The rest of this section discusses the correctness of timeouts at
-boundaries where these state transitions occur.
+`execution_domain` and `terminable` for those states, with edges describing
+transitions between domains including timeouts in non-race scenarios. The rest
+of this section discusses the correctness of termination at boundaries where
+these state transitions occur.
 
 For reference later, the possible state transitions are:
 * `A -> B` (instance runs guest code)
