@@ -15,16 +15,16 @@ of view, just a (possibly very long) hostcall. Termination of a suspended
 instance behaves like termination in any other hostcall, witnessed when the
 instance is resumed and the hostcall exits.
 
-In this chapter we will describe both a typical usage of `KillSwitch` as a
-mechanism to enforce execution time limits, and the implementation complexities
-underlying `KillSwitch` correctness.
+In this chapter we will describe a typical usage of `KillSwitch` as a mechanism
+to enforce execution time limits. Then, we will discuss the implementation
+complexities that `KillSwitch` must address to be correct.
 
 `KillSwitch` are valid for termination only on the instance call after they are
 created, or until an instance is reset. When a call into a guest returns, the
 shared state by which `KillSwitch` signal is replaced, and an attempt to
 `terminate` will fail with an `Err`.
 
-## Example
+## Example of `KillSwitch` used as a timeout
 
 This example taken from `lucet_runtime_tests::timeout::timeout_in_guest`:
 ```rust
@@ -85,25 +85,31 @@ it terminates:
 * `terminable`, an `AtomicBool` that indicates if the `Instance` may stop
   executing.
   - `terminable` is in some ways a subset of the information expressed by
-    `Domain`. Even so, it is necessary for a correct implementation when signal
-    handlers are involved, because it is extremely inadvisable to take locks in
-    a signal handler. While a `Mutex` is can be dangerous, we can share an
-    `AtomicBool` in signal-safety-constrained code with impunity! See the
-    section `Timeout while handling a guest fault` for more details on working
-    under this constraint.
+    `Domain`. It is true if and only if the instance is not obligated to a
+    specific exit mechanism yet, which could be determined by examing the
+    active `Domain` at points we check `terminable` instead. Even though this
+    is duplicative, it is necessary for a correct implementation when POSIX
+    signal handlers are involved, because it is extremely inadvisable to take
+    locks in a signal handler. While a `Mutex` is can be dangerous, we can
+    share an `AtomicBool` in signal-safety-constrained code with impunity! See
+    the section `Timeout while handling a guest fault` for more details on
+    working under this constraint.
 
 The astute observer may notice that `Lucet` contains both an instance `Domain`
 and an instance `State`. These discuss different aspects of the instance's
 lifecycle: `Domain` describes what the instance is doing right now, where
-`State` describes the state of the instance as visible outside
-`lucet_runtime`. This is fundamentally the reason why `State` does not and
-cannot describe a "making a hostcall" variant - this is not something
-`lucet_runtime` wants to expose, and at the moment we don't intend to make any
-commitments about being able to query instance-internal state like this.
-Additionally, this is why `Domain` only expresses that an instance has
-_stopped_ running, not if it successfully or unsuccessfully exited. TODO:
-there's even an argument that `Terminated` vs `Cancelled` is a stronger
-distinction than `Domain` needs to make!
+`State` describes the state of the instance as visible outside `lucet_runtime`.
+This is fundamentally the reason why `State` does not and cannot describe a
+"making a hostcall" variant - this is not something `lucet_runtime` wants to
+expose, and at the moment we don't intend to make any commitments about being
+able to query instance-internal state like this.  Additionally, this is why
+`Domain::Terminated` only expresses that an instance has _stopped_ running, not
+if it successfully or unsuccessfully exited. From `Domain`'s perspective, the
+instance has stopped running, and that's all there is to it. For more
+information, the `Instance`'s `State` will describe how the instance stopped,
+and if that's by a return or a fault. TODO: there's even an argument that
+`Terminated` vs `Cancelled` is a stronger distinction than `Domain` needs to
+make!
 
 ### Termination Mechanisms
 
@@ -145,18 +151,23 @@ handling machinery to actually terminate an `Instance` in `Domain::Guest`.
 ### Lifecycle
 
 Having described both `KillState` and the termination mechanisms it helps
-select, we can discuss the actual lifecycle of the `KillState` in a Lucet
-`Instance` and see how these pieces begin to fit together.
+select, we can discuss the actual lifecycle of the `KillState` for a call into
+an `Instance` and see how these pieces begin to fit together.
 
-A Lucet `Instance` begins with a default `KillState`: in the `Pending` domain,
-`terminable` set to `true`, and no `thread_id` as it's not currently running.
-When a call is made to `Instance::run`, or more specifically,
-`Instance::run_func`, the `Instance`'s bootstrap context is set up and
-`KillState::schedule` is called to set up last-minute state before the instance
-begins running. In implementation, the only state to set up is the instance's
-thread ID - we assume that the instance won't be migrated between threads
-without `lucet_runtime`'s cooperation, so the thread ID at this point can be
-safely retained.
+Because `KillState` only describe one call into an instance, an `Instance` may
+have many `KillState` over its lifetime. Even so, at one _specific_ time there
+is only one `KillState`, which describes the current, or imminent, call into
+the instance.
+
+Execution of a Lucet `Instance` begins with a default `KillState`: in the
+`Pending` domain, `terminable` set to `true`, and no `thread_id` as it's not
+currently running.  When a call is made to `Instance::run`, or more
+specifically, `Instance::run_func`, the `Instance`'s bootstrap context is set
+up and `KillState::schedule` is called to set up last-minute state before the
+instance begins running. In implementation, the only state to set up is the
+instance's thread ID - we assume that the instance won't be migrated between
+threads without `lucet_runtime`'s cooperation, so the thread ID at this point
+can be safely retained.
 
 `lucet_runtime` shortly thereafter will switch to the `Instance` and begin
 executing its bootstrapping code. In `enter_guest_region` the guest will lock
