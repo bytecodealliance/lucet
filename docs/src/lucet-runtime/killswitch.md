@@ -219,7 +219,7 @@ For reference later, the possible state transitions are:
   - not an internal state but we will also discuss termination during a hostcall fault
 * `D -> E` (cancelled guest is run)
 
-These will be coved in rough order of complexity, starting with the simplest
+These will be covered in rough order of complexity, starting with the simplest
 cases and ending with the race which has shown itself to have the most corners.
 Races involving `Domain::Guest` tend to be trickiest, and consequently are
 further down.
