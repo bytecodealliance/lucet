@@ -235,15 +235,13 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
         let current_domain = instance.kill_state.execution_domain.lock().unwrap();
         match *current_domain {
             Domain::Guest => {
-                // We finished executing the code in our guest region normally! We should reset
-                // the kill state, invalidating any existing killswitches' weak references.
-                mem::drop(current_domain);
+                // We finished executing the code in our guest region normally!
+                //
                 // There should be only one strong reference to `kill_state`, so as a consistency
                 // check ensure that's still true. This is necessary so that when we drop this
                 // `Arc`, weak refs are no longer valid. If this assert fails, something cloned
                 // `KillState`, or a `KillSwitch` has upgraded its ref - both of these are errors!
                 assert_eq!(Arc::strong_count(&instance.kill_state), 1);
-                instance.kill_state = Arc::new(KillState::default());
             }
             ref domain @ Domain::Pending
             | ref domain @ Domain::Cancelled

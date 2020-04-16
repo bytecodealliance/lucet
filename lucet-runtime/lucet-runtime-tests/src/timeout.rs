@@ -110,7 +110,7 @@ macro_rules! timeout_tests {
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
-            let kill_switch = inst.kill_switch();
+            let (kill_switch, outstanding_killswitch) = (inst.kill_switch(), inst.kill_switch());
 
             // Spawn a thread to terminate the instance after waiting for 100ms.
             let t = thread::Builder::new()
@@ -130,11 +130,11 @@ macro_rules! timeout_tests {
             }
             t.join().unwrap();
 
-            // Another attempt to terminate the instance will fail.
-            assert_eq!(
-                inst.kill_switch().terminate(),
-                Err(KillError::NotTerminable)
-            );
+            // Outstanding kill switches fail, because the kill state was reset.
+            assert_eq!(outstanding_killswitch.terminate(), Err(KillError::Invalid));
+
+            // A freshly acquired kill switch can cancel the next execution.
+            assert_eq!(inst.kill_switch().terminate(), Ok(KillSuccess::Cancelled));
 
             // Check that we can reset the instance and run a normal function.
             inst.reset().expect("instance resets");
@@ -148,10 +148,10 @@ macro_rules! timeout_tests {
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
-            let kill_switch = inst.kill_switch();
+            let outstanding_killswitch = inst.kill_switch();
 
             // If terminated before running, the guest will be cancelled.
-            assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled));
+            assert_eq!(inst.kill_switch().terminate(), Ok(KillSuccess::Cancelled));
 
             // Another attempt to terminate the instance will fail.
             assert_eq!(
@@ -163,6 +163,12 @@ macro_rules! timeout_tests {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
+
+            // Outstanding kill switches fail, because the kill state was reset.
+            assert_eq!(outstanding_killswitch.terminate(), Err(KillError::Invalid));
+
+            // A freshly acquired kill switch can cancel the next execution.
+            assert_eq!(inst.kill_switch().terminate(), Ok(KillSuccess::Cancelled));
 
             // Check that we can reset the instance and run a normal function.
             inst.reset().expect("instance resets");
@@ -230,7 +236,7 @@ macro_rules! timeout_tests {
             let mut inst = region
                 .new_instance(module)
                 .expect("instance can be created");
-            let kill_switch = inst.kill_switch();
+            let (kill_switch, outstanding_killswitch) = (inst.kill_switch(), inst.kill_switch());
 
             // Spawn a thread to terminate the instance after waiting for 100ms.
             thread::Builder::new()
@@ -248,11 +254,11 @@ macro_rules! timeout_tests {
                 res => panic!("unexpected result: {:?}", res),
             }
 
-            // Another attempt to terminate the instance will fail.
-            assert_eq!(
-                inst.kill_switch().terminate(),
-                Err(KillError::NotTerminable)
-            );
+            // Outstanding kill switches fail, because the kill state was reset.
+            assert_eq!(outstanding_killswitch.terminate(), Err(KillError::Invalid));
+
+            // A freshly acquired kill switch can cancel the next execution.
+            assert_eq!(inst.kill_switch().terminate(), Ok(KillSuccess::Cancelled));
 
             // Check that we can reset the instance and run a normal function.
             inst.reset().expect("instance resets");
@@ -332,37 +338,42 @@ macro_rules! timeout_tests {
                 .expect("instance can be created");
 
             // Spawn a thread to terminate the instance after waiting for 100ms.
-            let kill_switch = inst.kill_switch();
+            let kill_switch_1 = inst.kill_switch();
             let t1 = thread::Builder::new()
                 .name("killswitch_1".to_owned())
                 .spawn(move || {
                     thread::sleep(Duration::from_millis(100));
-                    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
+                    kill_switch_1.terminate()
                 })
                 .expect("can spawn a thread");
 
             // Spawn a thread to terminate the instance after waiting for 200ms.
-            let second_kill_switch = inst.kill_switch();
+            let kill_switch_2 = inst.kill_switch();
             let t2 = thread::Builder::new()
                 .name("killswitch_2".to_owned())
                 .spawn(move || {
                     thread::sleep(Duration::from_millis(200));
-                    assert_eq!(
-                        second_kill_switch.terminate(),
-                        Err(KillError::NotTerminable)
-                    );
+                    kill_switch_2.terminate()
                 })
                 .expect("can spawn a thread");
 
-            // Start the instance, which will return an error having been remotely terminated.
+            // Start the instance, which will return an error having been terminated by `t1`.
             match inst.run("infinite_loop", &[]) {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => panic!("unexpected result: {:?}", res),
             }
 
-            // Explicitly check that each helper thread's assertions succeeded.
-            t1.join().expect("killswitch_1 did not panic");
-            t2.join().expect("killswitch_2 did not panic");
+            // The first killswitch to fire should succeed, signalling the instance to stop.
+            let t1_result = t1.join().expect("killswitch_1 did not panic");
+            assert_eq!(t1_result, Ok(KillSuccess::Signalled));
+
+            // The second killswitch, having fired after the instance stopped, will fail because
+            // the instance's kill state has been reset.
+            let t2_result = t2.join().expect("killswitch_2 did not panic");
+            assert_eq!(t2_result, Err(KillError::Invalid));
+
+            // A freshly acquired kill switch can cancel the next execution.
+            assert_eq!(inst.kill_switch().terminate(), Ok(KillSuccess::Cancelled));
 
             // Check that we can reset the instance and run a function.
             inst.reset().expect("instance resets");
