@@ -352,8 +352,7 @@ impl KillState {
     /// This method will also panic if the mutex on the execution domain has been poisoned.
     pub fn end_hostcall(&self) -> Option<TerminationDetails> {
         #[cfg(feature = "concurrent_testpoints")]
-        self
-            .lock_testpoints
+        self.lock_testpoints
             .instance_lock_exiting_hostcall_before_domain_change
             .check();
 
@@ -381,8 +380,7 @@ impl KillState {
         };
 
         #[cfg(feature = "concurrent_testpoints")]
-        self
-            .lock_testpoints
+        self.lock_testpoints
             .instance_lock_exiting_hostcall_after_domain_change
             .check();
 

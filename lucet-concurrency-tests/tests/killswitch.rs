@@ -1,17 +1,20 @@
-use lucet_runtime::{lucet_hostcall, Error, Instance, InstanceHandle, Limits, KillError, KillSuccess, Region, RunResult, TerminationDetails, TrapCode};
 use lucet_runtime::vmctx::Vmctx;
-use std::time::Duration;
+use lucet_runtime::{
+    lucet_hostcall, Error, Instance, InstanceHandle, KillError, KillSuccess, Limits, Region,
+    RunResult, TerminationDetails, TrapCode,
+};
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 use lucet_module::FunctionPointer;
 use lucet_runtime::MmapRegion;
+use lucet_runtime_internals::lock_testpoints::Syncpoint;
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::module::{MockExportBuilder, MockModuleBuilder};
 use lucet_runtime_internals::vmctx::lucet_vmctx;
-use lucet_runtime_internals::lock_testpoints::Syncpoint;
-use lucet_runtime_tests::helpers::test_ex;
 use lucet_runtime_tests::build::test_module_c;
+use lucet_runtime_tests::helpers::test_ex;
 
 static mut ENTERING_GUEST: Option<Syncpoint> = None;
 
@@ -234,15 +237,16 @@ fn terminate_after_guest_fault() {
 fn terminate_in_hostcall() {
     test_instance_with_instrumented_guest_entry(|mut inst| {
         let kill_switch = inst.kill_switch();
-        let in_hostcall = inst.lock_testpoints.instance_lock_exiting_hostcall_before_domain_change.wait_at();
+        let in_hostcall = inst
+            .lock_testpoints
+            .instance_lock_exiting_hostcall_before_domain_change
+            .wait_at();
 
         let guest = thread::Builder::new()
             .name("guest".to_owned())
-            .spawn(move || {
-                match inst.run("run_slow_hostcall", &[]) {
-                    Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {},
-                    res => panic!("unexpectd result: {:?}", res),
-                }
+            .spawn(move || match inst.run("run_slow_hostcall", &[]) {
+                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+                res => panic!("unexpectd result: {:?}", res),
             })
             .expect("can spawn thread to run guest");
 
@@ -308,7 +312,9 @@ fn timeout_while_yielded() {
 
     // Start the instance, running a function that will yield.
     match inst.run("run_yielding_hostcall", &[]) {
-        Ok(RunResult::Yielded(val)) => { assert!(val.is_none()); }
+        Ok(RunResult::Yielded(val)) => {
+            assert!(val.is_none());
+        }
         res => panic!("unexpected result: {:?}", res),
     }
 
@@ -391,7 +397,6 @@ fn double_terminate() {
         guest.join().expect("guest stops running");
     })
 }
-
 
 #[test]
 fn timeout_before_guest_runs() {

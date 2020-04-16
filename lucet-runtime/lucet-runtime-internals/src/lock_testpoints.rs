@@ -48,10 +48,7 @@ impl Syncpoint {
 
         proceed.store(false, Ordering::SeqCst);
 
-        SyncWaiter {
-            arrived,
-            proceed,
-        }
+        SyncWaiter { arrived, proceed }
     }
 
     pub fn check(&self) {
