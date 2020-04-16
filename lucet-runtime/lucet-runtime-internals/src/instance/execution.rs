@@ -351,6 +351,12 @@ impl KillState {
     ///
     /// This method will also panic if the mutex on the execution domain has been poisoned.
     pub fn end_hostcall(&self) -> Option<TerminationDetails> {
+        #[cfg(feature = "concurrent_testpoints")]
+        self
+            .lock_testpoints
+            .instance_lock_before_exiting_hostcall
+            .check();
+
         let mut current_domain = self.execution_domain.lock().unwrap();
         match *current_domain {
             Domain::Pending => {

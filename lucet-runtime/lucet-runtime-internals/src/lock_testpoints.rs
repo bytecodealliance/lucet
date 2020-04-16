@@ -8,6 +8,14 @@ pub struct SyncWaiter {
 }
 
 impl SyncWaiter {
+    pub fn wait(&self) {
+        while !self.arrived.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+
+        self.proceed.store(true, Ordering::SeqCst);
+    }
+
     pub fn wait_and_then<U, F: FnOnce() -> U>(&self, f: F) -> U {
         while !self.arrived.load(Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(10));
@@ -56,6 +64,7 @@ impl Syncpoint {
 }
 
 pub struct LockTestpoints {
+    pub instance_lock_before_exiting_hostcall: Syncpoint,
     pub signal_handler_before_disabling_termination: Syncpoint,
     pub signal_handler_after_disabling_termination: Syncpoint,
     pub signal_handler_lock_before_returning: Syncpoint,
@@ -75,6 +84,7 @@ pub struct LockTestpoints {
 impl LockTestpoints {
     pub fn new() -> Self {
         LockTestpoints {
+            instance_lock_before_exiting_hostcall: Syncpoint::new(),
             signal_handler_before_disabling_termination: Syncpoint::new(),
             signal_handler_after_disabling_termination: Syncpoint::new(),
             signal_handler_lock_before_returning: Syncpoint::new(),
