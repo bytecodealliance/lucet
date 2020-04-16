@@ -1,10 +1,9 @@
 pub mod config;
-
 pub use config::Config;
 
 use heck::SnakeCase;
 use lucet_module::bindings::Bindings;
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
 pub fn hostcall_name(m: &witx::Module, f: &witx::InterfaceFunc) -> String {
@@ -29,8 +28,13 @@ pub fn bindings(doc: &witx::Document) -> Bindings {
     Bindings::new(bs)
 }
 
-pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
-    let names = wiggle_generate::Names::new(&config.wiggle);
+pub fn generate(
+    doc: &witx::Document,
+    ctx_type: &Ident,
+    ctx_constructor: &TokenStream,
+    wiggle_mod_path: &TokenStream,
+) -> TokenStream {
+    let names = wiggle_generate::Names::new(ctx_type);
     let fs = doc.modules().map(|m| {
         let fs = m.funcs().map(|f| {
             let name = format_ident!("{}", hostcall_name(&m, &f));
@@ -54,15 +58,13 @@ pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
                 .unwrap_or(quote!(()));
             let mod_name = names.module(&m.name);
             let method_name = names.func(&f.name);
-            let ctx_type = config.wiggle.ctx.name.clone();
-            let ctx_constructor = config.constructor.clone();
             quote! {
                 #[lucet_hostcall]
                 #[no_mangle]
                 pub fn #name(vmctx: &mut lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #rets {
                     let memory= lucet_wiggle_runtime::LucetMemory::new(vmctx);
                     let mut ctx: #ctx_type = #ctx_constructor;
-                    #mod_name::#method_name(&ctx, &memory, #(#call_args),*)
+                    super::#mod_name::#method_name(&ctx, &memory, #(#call_args),*)
                 }
             }
         });
@@ -78,17 +80,21 @@ pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
     });
 
     quote! {
-        use lucet_runtime::lucet_hostcall;
-        #(#fs)*
-        /// Lucet-runtime expects hostcalls to be resolved by the runtime
-        /// linker (dlopen). By calling `init` in your program, we ensure that
-        /// each hostcall is reachable and not garbage-collected by the
-        /// compile-time linker (ld).
-        pub fn init() {
-            let funcs: &[*const extern "C" fn()] = &[
-                #(#init),*
-            ];
-            ::std::mem::forget(::std::rc::Rc::new(funcs));
+        pub mod hostcalls {
+            use lucet_runtime::lucet_hostcall;
+            use super::#ctx_type;
+            use #wiggle_mod_path::types::*;
+            #(#fs)*
+            /// Lucet-runtime expects hostcalls to be resolved by the runtime
+            /// linker (dlopen). By calling `init` in your program, we ensure that
+            /// each hostcall is reachable and not garbage-collected by the
+            /// compile-time linker (ld).
+            pub fn init() {
+                let funcs: &[*const extern "C" fn()] = &[
+                    #(#init),*
+                ];
+                ::std::mem::forget(::std::rc::Rc::new(funcs));
+            }
         }
     }
 }

@@ -9,40 +9,28 @@ categories = ["wasm"]
 authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
-# `src/wasi_host.rs` is automatically generated using clang and
-# wasi-libc headers. This requires these to be present, and installed
-# at specific paths, which is not something we can rely on outside
-# of our environment.
-# So, we follow what most other tools using `bindgen` do, and provide
-# a pre-generated version of the file, along with a way to update it.
-# This is what the `update-bindings` feature do. It requires the WASI SDK
-# to be either installed in `/opt/wasi-sdk`, or at a location defined by
-# a `WASI_SDK` environment variable, as well as `clang` headers either
-# being part of `WASI_SDK`, or found in a path defined by a
-# `CLANG_ROOT` environment variable.
-[features]
-update-bindings = ["bindgen"]
-
 [dependencies]
 anyhow = "1"
 cast = "0.2"
 clap = "2.23"
 human-size = "0.4"
-lucet-runtime = { path = "../lucet-runtime", version = "=0.6.2-dev" }
+lucet-runtime = { path = "../lucet-runtime", version = "=0.6.2-dev"  }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "=0.6.2-dev" }
 lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }
+lucet-wasi-generate = { path = "./generate", version = "=0.6.2-dev" }
+lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.6.2-dev"  }
+lucet-wiggle-runtime = { path = "../lucet-wiggle/runtime", version = "=0.6.2-dev" }
+wiggle = { path = "../wasmtime/crates/wiggle", version = "0.15.0" }
 libc = "0.2.65"
 nix = "0.17"
 rand = "0.6"
-wasi-common = "0.7"
+wasi-common = { path = "../wasmtime/crates/wasi-common", version = "0.15.0", features = ["wiggle_metadata"] }
 
 [dev-dependencies]
-lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.6.2-dev" }
-lucetc = { path = "../lucetc", version = "=0.6.2-dev" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
+lucetc = { path = "../lucetc" }
+lucet-validate = { path = "../lucet-validate" }
 tempfile = "3.0"
-
-[build-dependencies]
-bindgen = { version = "0.51.1", optional = true }
 
 [lib]
 name = "lucet_wasi"
@@ -61,5 +49,4 @@ assets = [
     ["LICENSE", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
     ["LICENSE.wasmtime", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
     ["LICENSE.cloudabi-utils", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
-    ["bindings.json", "/opt/fst-lucet-wasi/share/", "644"],
 ]

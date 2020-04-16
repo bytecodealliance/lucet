@@ -35,7 +35,7 @@ pub unsafe extern "C" fn lucet_wasi_ctx_args(
         Ok(args) => args,
         Err(_) => return lucet_error::InvalidArgument,
     };
-    *b = b.args(args.iter());
+    b.args(args.iter());
     Box::into_raw(b);
     lucet_error::Ok
 }
@@ -44,7 +44,7 @@ pub unsafe extern "C" fn lucet_wasi_ctx_args(
 pub unsafe extern "C" fn lucet_wasi_ctx_inherit_env(wasi_ctx: *mut lucet_wasi_ctx) -> lucet_error {
     assert_nonnull!(wasi_ctx);
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
-    *b = b.inherit_env();
+    b.inherit_env();
     Box::into_raw(b);
     lucet_error::Ok
 }
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn lucet_wasi_ctx_inherit_stdio(
 ) -> lucet_error {
     assert_nonnull!(wasi_ctx);
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
-    *b = b.inherit_stdio();
+    b.inherit_stdio();
     Box::into_raw(b);
     lucet_error::Ok
 }
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn lucet_region_new_instance_with_wasi_ctx(
     assert_nonnull!(wasi_ctx);
     assert_nonnull!(inst_out);
     with_ffi_arcs!([region: dyn Region, module: DlModule], {
-        let wasi_ctx = *Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
+        let mut wasi_ctx = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
         region
             .new_instance_builder(module.clone() as Arc<dyn Module>)
             .with_embed_ctx(wasi_ctx.build())
@@ -98,5 +98,5 @@ pub unsafe extern "C" fn lucet_region_new_instance_with_wasi_ctx(
 #[no_mangle]
 #[doc(hidden)]
 pub extern "C" fn lucet_wasi_internal_ensure_linked() {
-    crate::wasi::export_wasi_funcs();
+    crate::export_wasi_funcs();
 }

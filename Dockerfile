@@ -1,5 +1,7 @@
-FROM ubuntu:xenial
+FROM ubuntu:bionic
 
+# This env variable makes sure installing the tzdata package doesn't hang in prompt
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
 	build-essential \
@@ -28,7 +30,7 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
 # Install our supported version of Rust, rustfmt, and the wasm32-wasi cross-compilation target
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.40.0 -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.42.0 -y
 ENV PATH=/root/.cargo/bin:$PATH
 RUN rustup component add rustfmt
 RUN rustup target add wasm32-wasi
@@ -36,8 +38,8 @@ RUN rustup target add wasm32-wasi
 # Optional additional Rust programs
 RUN cargo install --debug cargo-audit cargo-watch rsign2 cargo-deb mdbook
 
-RUN curl -sS -L -O https://github.com/CraneStation/wasi-sdk/releases/download/wasi-sdk-7/wasi-sdk_7.0_amd64.deb \
-	&& dpkg -i wasi-sdk_7.0_amd64.deb && rm -f wasi-sdk_7.0_amd64.deb
+RUN curl -sSLO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk_10.0_amd64.deb \
+	&& dpkg -i wasi-sdk_10.0_amd64.deb && rm -f wasi-sdk_10.0_amd64.deb
 
 ENV WASI_SDK=/opt/wasi-sdk
 
