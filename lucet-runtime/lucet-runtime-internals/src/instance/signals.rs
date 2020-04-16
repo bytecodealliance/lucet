@@ -1,6 +1,5 @@
 use crate::alloc::validate_sigstack_size;
 use crate::error::Error;
-use crate::instance::execution::KillState;
 use crate::instance::{
     siginfo_ext::SiginfoExt, FaultDetails, Instance, State, TerminationDetails, CURRENT_INSTANCE,
     HOST_CTX,
@@ -329,9 +328,6 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             // we must disable termination so no KillSwitch for this execution may fire in host
             // code.
             inst.kill_state.disable_termination();
-            // and reset `kill_state` so that subsequent executions use a fresh KillState (not the
-            // stale one for the execution that just faulted)
-            inst.kill_state = Arc::new(KillState::default());
         }
 
         switch_to_host

@@ -1008,6 +1008,12 @@ impl Instance {
         // Set transitioning state temporarily so that we can move values out of the current state
         let st = mem::replace(&mut self.state, State::Transitioning);
 
+        if !st.is_yielding() {
+            // If the instance is *not* yielding, initialize a fresh `KillState` for subsequent
+            // executions, which will invalidate any existing `KillSwitch`'s weak references.
+            self.kill_state = Arc::new(KillState::default());
+        }
+
         match st {
             State::Running => {
                 let retval = self.ctx.get_untyped_retval();
