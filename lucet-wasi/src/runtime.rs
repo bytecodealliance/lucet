@@ -5,7 +5,12 @@ use wasi_common::WasiCtx;
 use wiggle::{GuestError, GuestPtr};
 
 lucet_wasi_generate::bindings!({
+    // The context type, which we will implement the GuestErrorConversion and
+    // WasiSnapshotPreview1 traits.
     ctx: LucetWasiCtx,
+    // Describe how to construct the context type. The expression inside the first set
+    // of braces will be used each time LucetWasiCtx needs to be constructed.
+    // `vmctx: &mut Vmctx` is a free variable at the construction site.
     constructor: { LucetWasiCtx { vmctx } }
 });
 
