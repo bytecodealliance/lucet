@@ -64,7 +64,8 @@ impl Syncpoint {
 }
 
 pub struct LockTestpoints {
-    pub instance_lock_before_exiting_hostcall: Syncpoint,
+    pub instance_lock_exiting_hostcall_before_domain_change: Syncpoint,
+    pub instance_lock_exiting_hostcall_after_domain_change: Syncpoint,
     pub signal_handler_before_disabling_termination: Syncpoint,
     pub signal_handler_after_disabling_termination: Syncpoint,
     pub signal_handler_lock_before_returning: Syncpoint,
@@ -84,7 +85,8 @@ pub struct LockTestpoints {
 impl LockTestpoints {
     pub fn new() -> Self {
         LockTestpoints {
-            instance_lock_before_exiting_hostcall: Syncpoint::new(),
+            instance_lock_exiting_hostcall_before_domain_change: Syncpoint::new(),
+            instance_lock_exiting_hostcall_after_domain_change: Syncpoint::new(),
             signal_handler_before_disabling_termination: Syncpoint::new(),
             signal_handler_after_disabling_termination: Syncpoint::new(),
             signal_handler_lock_before_returning: Syncpoint::new(),

@@ -354,11 +354,11 @@ impl KillState {
         #[cfg(feature = "concurrent_testpoints")]
         self
             .lock_testpoints
-            .instance_lock_before_exiting_hostcall
+            .instance_lock_exiting_hostcall_before_domain_change
             .check();
 
         let mut current_domain = self.execution_domain.lock().unwrap();
-        match *current_domain {
+        let res = match *current_domain {
             Domain::Pending => {
                 panic!("Invalid state: Instance marked as pending while exiting a hostcall.");
             }
@@ -378,7 +378,15 @@ impl KillState {
             Domain::Cancelled => {
                 panic!("Invalid state: Instance marked as cancelled while exiting a hostcall.");
             }
-        }
+        };
+
+        #[cfg(feature = "concurrent_testpoints")]
+        self
+            .lock_testpoints
+            .instance_lock_exiting_hostcall_after_domain_change
+            .check();
+
+        res
     }
 
     pub fn schedule(&self, tid: pthread_t) {

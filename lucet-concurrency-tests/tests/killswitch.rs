@@ -1,4 +1,4 @@
-use lucet_runtime::{lucet_hostcall, Error, Instance, InstanceHandle, Limits, KillError, KillSuccess, Region, TerminationDetails, TrapCode};
+use lucet_runtime::{lucet_hostcall, Error, Instance, InstanceHandle, Limits, KillError, KillSuccess, Region, RunResult, TerminationDetails, TrapCode};
 use lucet_runtime::vmctx::Vmctx;
 use std::time::Duration;
 use std::sync::Arc;
@@ -25,7 +25,7 @@ fn run_onetwothree(inst: &mut Instance) {
     assert_eq!(libc::c_int::from(retval), 123);
 }
 
-pub fn mock_traps_module() -> Arc<dyn Module> {
+pub fn mock_killswitch_module() -> Arc<dyn Module> {
     extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
         123
     }
@@ -159,7 +159,7 @@ where
         unsafe {
             ENTERING_GUEST = Some(Syncpoint::new());
         }
-        let module = mock_traps_module();
+        let module = mock_killswitch_module();
         let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
 
         let inst = region
@@ -177,7 +177,7 @@ fn terminate_in_guest() {
     test_instance_with_instrumented_guest_entry(|mut inst| {
         let in_guest = unsafe { ENTERING_GUEST.as_ref().unwrap().wait_at() };
 
-        let kill_switch = inst.kill_switch();
+        let (kill_switch, outstanding_killswitch) = (inst.kill_switch(), inst.kill_switch());
 
         let t = thread::Builder::new()
             .name("guest".to_owned())
@@ -188,6 +188,10 @@ fn terminate_in_guest() {
                     }
                     res => panic!("unexpected result: {:?}", res),
                 }
+
+                // A freshly acquired kill switch can cancel the next execution.
+                // Test here rather than the outer test body because this closure moves `inst`.
+                assert_eq!(inst.kill_switch().terminate(), Ok(KillSuccess::Cancelled));
             })
             .expect("can spawn a thread");
 
@@ -199,6 +203,9 @@ fn terminate_in_guest() {
 
         t.join().unwrap();
         terminator.join().unwrap();
+
+        // Outstanding kill switches fail, because the kill state was reset.
+        assert_eq!(outstanding_killswitch.terminate(), Err(KillError::Invalid));
     })
 }
 
@@ -227,7 +234,7 @@ fn terminate_after_guest_fault() {
 fn terminate_in_hostcall() {
     test_instance_with_instrumented_guest_entry(|mut inst| {
         let kill_switch = inst.kill_switch();
-        let in_hostcall = inst.lock_testpoints.instance_lock_before_exiting_hostcall.wait_at();
+        let in_hostcall = inst.lock_testpoints.instance_lock_exiting_hostcall_before_domain_change.wait_at();
 
         let guest = thread::Builder::new()
             .name("guest".to_owned())
@@ -245,6 +252,84 @@ fn terminate_in_hostcall() {
 
         guest.join().expect("guest exits without panic");
     })
+}
+
+/// This test ensures that we see an `Invalid` kill error if we are attempting to terminate
+/// an instance that has since been dropped.
+#[test]
+fn terminate_after_guest_drop() {
+    let module = mock_killswitch_module();
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+    let inst = region
+        .new_instance(module)
+        .expect("instance can be created");
+    let kill_switch = inst.kill_switch();
+    std::mem::drop(inst);
+    assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
+}
+
+#[test]
+fn timeout_after_guest_runs() {
+    let module = mock_killswitch_module();
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+    let mut inst = region
+        .new_instance(module)
+        .expect("instance can be created");
+    let kill_switch = inst.kill_switch();
+
+    // The killswitch will fail if the instance has already finished running.
+    match inst.run("do_nothing", &[]) {
+        Ok(_) => {}
+        res => panic!("unexpected result: {:?}", res),
+    }
+
+    // If we try to terminate after the instance ran, the kill switch will fail - the
+    // function we called is no longer running - and the the instance will run normally the
+    // next time around.
+    assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
+    match inst.run("do_nothing", &[]) {
+        Ok(_) => {}
+        res => panic!("unexpected result: {:?}", res),
+    }
+
+    // Check that we can reset the instance and run a normal function.
+    inst.reset().expect("instance resets");
+    run_onetwothree(&mut inst);
+}
+
+#[test]
+fn timeout_while_yielded() {
+    let module = mock_killswitch_module();
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+    let mut inst = region
+        .new_instance(module)
+        .expect("instance can be created");
+    let kill_switch = inst.kill_switch();
+
+    // Start the instance, running a function that will yield.
+    match inst.run("run_yielding_hostcall", &[]) {
+        Ok(RunResult::Yielded(val)) => { assert!(val.is_none()); }
+        res => panic!("unexpected result: {:?}", res),
+    }
+
+    // A yielded instance can only be scheduled for termination.
+    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Pending));
+
+    // A second attempt to terminate a yielded instance will fail.
+    assert_eq!(
+        inst.kill_switch().terminate(),
+        Err(KillError::NotTerminable)
+    );
+
+    // Once resumed, the terminated instance will be terminated.
+    match inst.resume() {
+        Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+        res => panic!("unexpected result: {:?}", res),
+    }
+
+    // Check that we can reset the instance and run a normal function.
+    inst.reset().expect("instance resets");
+    run_onetwothree(&mut inst);
 }
 
 // Terminating an instance twice works, does not explode, and the second termination is an `Err`
@@ -274,6 +359,9 @@ fn double_terminate() {
                 // Check that we can reset the instance and run a function.
                 inst.reset().expect("instance resets");
                 run_onetwothree(&mut inst);
+
+                // Finally, check that a freshly acquired kill switch can cancel the next execution.
+                assert_eq!(inst.kill_switch().terminate(), Ok(KillSuccess::Cancelled));
             })
             .expect("can spawn the guest thread");
 
@@ -293,7 +381,7 @@ fn double_terminate() {
         // again and make sure there's no boom.
         assert_eq!(
             second_kill_switch.terminate(),
-            Err(KillError::NotTerminable)
+            Err(KillError::Invalid)
         );
 
         // Allow the instance to reset and run a new function after termination.
@@ -302,4 +390,48 @@ fn double_terminate() {
         // And after the instance successfully runs a test function, it exits without error.
         guest.join().expect("guest stops running");
     })
+}
+
+
+#[test]
+fn timeout_before_guest_runs() {
+    let module = mock_killswitch_module();
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+    let mut inst = region
+        .new_instance(module)
+        .expect("instance can be created");
+    let kill_switch = inst.kill_switch();
+
+    // If terminated before running, the guest will be cancelled.
+    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Cancelled));
+
+    // Another attempt to terminate the instance will fail.
+    assert_eq!(
+        inst.kill_switch().terminate(),
+        Err(KillError::NotTerminable)
+    );
+
+    match inst.run("onetwothree", &[]) {
+        Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+        res => panic!("unexpected result: {:?}", res),
+    }
+
+    // Check that we can reset the instance and run a normal function.
+    inst.reset().expect("instance resets");
+    run_onetwothree(&mut inst);
+}
+
+/// This test ensures that we see a more informative kill error than `NotTerminable` when
+/// attempting to terminate an instance that has been reset since issuing a kill switch.
+#[test]
+fn timeout_after_guest_reset() {
+    let module = mock_killswitch_module();
+    let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+    let mut inst = region
+        .new_instance(module)
+        .expect("instance can be created");
+    let kill_switch = inst.kill_switch();
+    inst.reset().expect("instance resets");
+    assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
+    run_onetwothree(&mut inst);
 }
