@@ -164,6 +164,14 @@ impl State {
             false
         }
     }
+
+    pub fn is_yielding(&self) -> bool {
+        if let State::Yielding { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 // TODO: PR into `libc`
