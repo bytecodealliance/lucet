@@ -9,12 +9,13 @@ use std::time::Duration;
 
 use lucet_module::FunctionPointer;
 use lucet_runtime::MmapRegion;
-use lucet_runtime_internals::lock_testpoints::Syncpoint;
+use lucet_runtime_internals::lock_testpoints::{SyncWaiter, Syncpoint};
 use lucet_runtime_internals::module::Module;
 use lucet_runtime_internals::module::{MockExportBuilder, MockModuleBuilder};
 use lucet_runtime_internals::vmctx::lucet_vmctx;
 use lucet_runtime_tests::build::test_module_c;
 use lucet_runtime_tests::helpers::test_ex;
+use lucet_runtime_tests::helpers::test_nonex;
 
 static mut ENTERING_GUEST: Option<Syncpoint> = None;
 
@@ -31,6 +32,12 @@ fn run_onetwothree(inst: &mut Instance) {
 pub fn mock_killswitch_module() -> Arc<dyn Module> {
     extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
         123
+    }
+
+    extern "C" fn run_guest(_vmctx: *mut lucet_vmctx) {
+        unsafe {
+            ENTERING_GUEST.as_ref().unwrap().check();
+        }
     }
 
     extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
@@ -72,7 +79,7 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
 
     extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () {}
 
-    extern "C" fn run_slow_hostcall(vmctx: *mut lucet_vmctx) -> bool {
+    extern "C" fn run_hostcall(vmctx: *mut lucet_vmctx) -> bool {
         extern "C" {
             fn slow_hostcall(vmctx: *mut lucet_vmctx) -> bool;
         }
@@ -96,12 +103,16 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
             FunctionPointer::from_usize(infinite_loop as usize),
         ))
         .with_export_func(MockExportBuilder::new(
+            "run_guest",
+            FunctionPointer::from_usize(run_guest as usize),
+        ))
+        .with_export_func(MockExportBuilder::new(
             "do_nothing",
             FunctionPointer::from_usize(do_nothing as usize),
         ))
         .with_export_func(MockExportBuilder::new(
-            "run_slow_hostcall",
-            FunctionPointer::from_usize(run_slow_hostcall as usize),
+            "run_hostcall",
+            FunctionPointer::from_usize(run_hostcall as usize),
         ))
         .with_export_func(MockExportBuilder::new(
             "run_yielding_hostcall",
@@ -154,7 +165,7 @@ where
     })
 }
 
-pub fn test_instance_with_instrumented_guest_entry<F, R>(f: F) -> R
+pub fn test_exclusive_instance_with_instrumented_guest_entry<F, R>(f: F) -> R
 where
     F: FnOnce(InstanceHandle) -> R,
 {
@@ -173,11 +184,30 @@ where
     })
 }
 
+pub fn test_instance_with_instrumented_guest_entry<F, R>(f: F) -> R
+where
+    F: FnOnce(InstanceHandle) -> R,
+{
+    test_nonex(|| {
+        unsafe {
+            ENTERING_GUEST = Some(Syncpoint::new());
+        }
+        let module = mock_killswitch_module();
+        let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
+
+        let inst = region
+            .new_instance(module)
+            .expect("instance can be created");
+
+        f(inst)
+    })
+}
+
 // Test that a timeout that occurs in a signal handler is handled cleanly without signalling the
 // Lucet embedder.
 #[test]
 fn terminate_in_guest() {
-    test_instance_with_instrumented_guest_entry(|mut inst| {
+    test_exclusive_instance_with_instrumented_guest_entry(|mut inst| {
         let in_guest = unsafe { ENTERING_GUEST.as_ref().unwrap().wait_at() };
 
         let (kill_switch, outstanding_killswitch) = (inst.kill_switch(), inst.kill_switch());
@@ -244,7 +274,7 @@ fn terminate_in_hostcall() {
 
         let guest = thread::Builder::new()
             .name("guest".to_owned())
-            .spawn(move || match inst.run("run_slow_hostcall", &[]) {
+            .spawn(move || match inst.run("run_hostcall", &[]) {
                 Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
                 res => panic!("unexpectd result: {:?}", res),
             })
@@ -342,7 +372,7 @@ fn timeout_while_yielded() {
 // because the instance is no longer terminable.
 #[test]
 fn double_terminate() {
-    test_instance_with_instrumented_guest_entry(|mut inst| {
+    test_exclusive_instance_with_instrumented_guest_entry(|mut inst| {
         let in_guest = unsafe { ENTERING_GUEST.as_ref().unwrap().wait_at() };
 
         let guest_exit = Syncpoint::new();

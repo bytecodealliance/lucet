@@ -61,6 +61,13 @@ impl Syncpoint {
 }
 
 pub struct LockTestpoints {
+    pub instance_lock_entering_guest_before_domain_change: Syncpoint,
+    pub instance_lock_entering_guest_after_domain_change: Syncpoint,
+    pub instance_lock_exiting_guest_before_acquiring_terminable: Syncpoint,
+    pub instance_lock_exiting_guest_without_terminable: Syncpoint,
+    pub instance_lock_exiting_guest_after_domain_change: Syncpoint,
+    pub instance_lock_entering_hostcall_before_domain_change: Syncpoint,
+    pub instance_lock_entering_hostcall_after_domain_change: Syncpoint,
     pub instance_lock_exiting_hostcall_before_domain_change: Syncpoint,
     pub instance_lock_exiting_hostcall_after_domain_change: Syncpoint,
     pub signal_handler_before_disabling_termination: Syncpoint,
@@ -82,6 +89,13 @@ pub struct LockTestpoints {
 impl LockTestpoints {
     pub fn new() -> Self {
         LockTestpoints {
+            instance_lock_entering_guest_before_domain_change: Syncpoint::new(),
+            instance_lock_entering_guest_after_domain_change: Syncpoint::new(),
+            instance_lock_exiting_guest_before_acquiring_terminable: Syncpoint::new(),
+            instance_lock_exiting_guest_without_terminable: Syncpoint::new(),
+            instance_lock_exiting_guest_after_domain_change: Syncpoint::new(),
+            instance_lock_entering_hostcall_before_domain_change: Syncpoint::new(),
+            instance_lock_entering_hostcall_after_domain_change: Syncpoint::new(),
             instance_lock_exiting_hostcall_before_domain_change: Syncpoint::new(),
             instance_lock_exiting_hostcall_after_domain_change: Syncpoint::new(),
             signal_handler_before_disabling_termination: Syncpoint::new(),
