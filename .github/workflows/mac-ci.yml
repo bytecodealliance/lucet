@@ -3,7 +3,7 @@ on: [push, pull_request]
 
 jobs:
   test:
-    name: Test
+    name: Test (MacOS)
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@master
