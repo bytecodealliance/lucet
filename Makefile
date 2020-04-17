@@ -37,17 +37,29 @@ test-packages:
             -p lucet-wiggle
 
 .PHONY: test-full
-test-full: indent-check audit book test-except-fuzz test-fuzz
+test-full: indent-check audit book test-ci test-benchmarks test-fuzz
 
-.PHONY: test-except-fuzz
-test-except-fuzz: test-packages
+.PHONY: test-ci
+test-ci: test-packages test-objdump test-bitrot test-signature test-objdump
+
+.PHONY: test-bitrot
+test-bitrot:
 	# check but do *not* build or run these packages to mitigate bitrot
 	cargo check -p lucet-spectest -p lucet-runtime-example
-	# run the benchmarks in debug mode
-	cargo test --benches -p lucet-benchmarks -- --test
+
+.PHONY: test-signature
+test-signature:
 	helpers/lucet-toolchain-tests/signature.sh
+
+.PHONY: test-objdump
+test-objdump:
 	cargo build -p lucet-objdump
 	helpers/lucet-toolchain-tests/objdump.sh
+
+.PHONY: test-benchmarks
+test-benchmarks:
+	# Smoke test of benchmarks:
+	cargo test --benches -p lucet-benchmarks -- --test
 
 # run a single seed through the fuzzer to stave off bitrot
 .PHONY: test-fuzz
