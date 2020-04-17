@@ -14,7 +14,41 @@ jobs:
     # This action builds the container and executes the test suite inside it.
     - uses: ./.github/actions/test
       with:
-        target: test-full
+        target: test-ci
+
+    - name: Ensure testing did not change sources
+      run: git diff --exit-code
+
+  smoke_test_benchmarks:
+    name: Smoke-test benchmarks
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: 'recursive'
+
+    # Testing uses the development environment Docker container.
+    # This action builds the container and executes the test suite inside it.
+    - uses: ./.github/actions/test
+      with:
+        target: test-benchmarks
+
+    - name: Ensure testing did not change sources
+      run: git diff --exit-code
+
+  smoke_test_fuzz:
+    name: Smoke-test fuzz
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: 'recursive'
+
+    # Testing uses the development environment Docker container.
+    # This action builds the container and executes the test suite inside it.
+    - uses: ./.github/actions/test
+      with:
+        target: test-fuzz
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code
@@ -39,7 +73,7 @@ jobs:
 
   rustfmt:
     name: Rustfmt
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
       with:
@@ -49,3 +83,31 @@ jobs:
         rustup update
         rustup component add rustfmt
     - run: make indent-check
+
+  audit:
+    name: Cargo audit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: 'recursive'
+    - name: Install Rust (rustup)
+      run: |
+        rustup update
+        rustup component add rustfmt
+    - run: cargo install cargo-audit
+    - run: cargo audit
+
+  docs:
+    name: Build docs
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: 'recursive'
+    - name: Install Rust (rustup)
+      run: |
+        rustup update
+        rustup component add rustfmt
+    - run: cargo install mdbook
+    - run: mdbook build docs
