@@ -5,7 +5,6 @@ use lucet_runtime::{
 };
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
 
 use lucet_module::FunctionPointer;
 use lucet_runtime::MmapRegion;
@@ -36,13 +35,19 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
 
     extern "C" fn run_guest(_vmctx: *mut lucet_vmctx) {
         unsafe {
-            ENTERING_GUEST.as_ref().unwrap().check();
+            // ENTERING_GUEST is only populated if the test requires this syncpoint be checked.
+            if let Some(entering_guest) = ENTERING_GUEST.as_ref() {
+                entering_guest.check();
+            }
         }
     }
 
     extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
         unsafe {
-            ENTERING_GUEST.as_ref().unwrap().check();
+            // ENTERING_GUEST is only populated if the test requires this syncpoint be checked.
+            if let Some(entering_guest) = ENTERING_GUEST.as_ref() {
+                entering_guest.check();
+            }
         }
         loop {}
     }
@@ -81,9 +86,9 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
 
     extern "C" fn run_hostcall(vmctx: *mut lucet_vmctx) -> bool {
         extern "C" {
-            fn slow_hostcall(vmctx: *mut lucet_vmctx) -> bool;
+            fn real_hostcall(vmctx: *mut lucet_vmctx) -> bool;
         }
-        unsafe { slow_hostcall(vmctx) }
+        unsafe { real_hostcall(vmctx) }
     }
 
     extern "C" fn run_yielding_hostcall(vmctx: *mut lucet_vmctx) -> () {
@@ -129,12 +134,12 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
         .build()
 }
 
-/// This test hostcall will wait for 200 milliseconds before returning `true`.
-/// This is used to make a window of time so we can timeout inside of a hostcall.
+/// This test hostcall just needs to exist so that we can call it. `LockTestpoints` provide points
+/// for us to ensure that tests that need to happen inside a hostcall, will happen inside a
+/// hostcall.
 #[lucet_hostcall]
 #[no_mangle]
-pub fn slow_hostcall(_vmctx: &mut Vmctx) -> bool {
-    thread::sleep(Duration::from_millis(200));
+pub fn real_hostcall(_vmctx: &mut Vmctx) -> bool {
     true
 }
 
@@ -189,9 +194,6 @@ where
     F: FnOnce(InstanceHandle) -> R,
 {
     test_nonex(|| {
-        unsafe {
-            ENTERING_GUEST = Some(Syncpoint::new());
-        }
         let module = mock_killswitch_module();
         let region = MmapRegion::create(1, &Limits::default()).expect("region can be created");
 
@@ -265,7 +267,7 @@ fn terminate_entering_guest() {
     .enumerate()
     {
         println!("testing racepoint {}", i);
-        test_instance_with_instrumented_guest_entry(|mut inst| {
+        test_exclusive_instance_with_instrumented_guest_entry(|mut inst| {
             let kill_switch = inst.kill_switch();
             let racepoint = racepoint_builder(&inst);
 
