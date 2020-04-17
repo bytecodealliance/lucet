@@ -288,6 +288,94 @@ fn terminate_in_hostcall() {
     })
 }
 
+#[test]
+fn terminate_exiting_hostcall() {
+    let test_exiting_hostcall_before_domain_change: fn(&Instance) -> SyncWaiter =
+        |inst: &Instance| -> SyncWaiter {
+            inst.lock_testpoints
+                .instance_lock_exiting_hostcall_before_domain_change
+                .wait_at()
+        };
+    let test_exiting_hostcall_after_domain_change: fn(&Instance) -> SyncWaiter =
+        |inst: &Instance| -> SyncWaiter {
+            inst.lock_testpoints
+                .instance_lock_exiting_hostcall_after_domain_change
+                .wait_at()
+        };
+
+    for (i, racepoint_builder) in [
+        test_exiting_hostcall_before_domain_change,
+        test_exiting_hostcall_after_domain_change,
+    ]
+    .iter()
+    .enumerate()
+    {
+        println!("testing racepoint {}", i);
+        test_instance_with_instrumented_guest_entry(|mut inst| {
+            let kill_switch = inst.kill_switch();
+            let racepoint = racepoint_builder(&inst);
+
+            let guest = thread::Builder::new()
+                .name("guest".to_owned())
+                .spawn(move || match inst.run("run_hostcall", &[]) {
+                    Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+                    res => panic!("unexpectd result: {:?}", res),
+                })
+                .expect("can spawn thread to run guest");
+
+            racepoint.wait_and_then(|| {
+                kill_switch.terminate().expect("can terminate in hostcall");
+            });
+
+            guest.join().expect("guest exits without panic");
+        })
+    }
+}
+
+#[test]
+fn terminate_entering_hostcall() {
+    let test_entering_hostcall_before_domain_change: fn(&Instance) -> SyncWaiter =
+        |inst: &Instance| -> SyncWaiter {
+            inst.lock_testpoints
+                .instance_lock_entering_hostcall_before_domain_change
+                .wait_at()
+        };
+    let test_entering_hostcall_after_domain_change: fn(&Instance) -> SyncWaiter =
+        |inst: &Instance| -> SyncWaiter {
+            inst.lock_testpoints
+                .instance_lock_entering_hostcall_after_domain_change
+                .wait_at()
+        };
+
+    for (i, racepoint_builder) in [
+        test_entering_hostcall_before_domain_change,
+        test_entering_hostcall_after_domain_change,
+    ]
+    .iter()
+    .enumerate()
+    {
+        println!("testing racepoint {}", i);
+        test_instance_with_instrumented_guest_entry(|mut inst| {
+            let kill_switch = inst.kill_switch();
+            let racepoint = racepoint_builder(&inst);
+
+            let guest = thread::Builder::new()
+                .name("guest".to_owned())
+                .spawn(move || match inst.run("run_hostcall", &[]) {
+                    Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+                    res => panic!("unexpectd result: {:?}", res),
+                })
+                .expect("can spawn thread to run guest");
+
+            racepoint.wait_and_then(|| {
+                kill_switch.terminate().expect("can terminate in hostcall");
+            });
+
+            guest.join().expect("guest exits without panic");
+        })
+    }
+}
+
 /// This test ensures that we see an `Invalid` kill error if we are attempting to terminate
 /// an instance that has since been dropped.
 #[test]
