@@ -17,8 +17,8 @@
   ;; import fd_write again for grins.
   (import "wasi_snapshot_preview1" "fd_write" (func (type 0)))
   (memory 1)
-  (data (i32.const 0) "duplicate import works!\0a")
-  (data (i32.const 64) "\00\00\00\00\18\00\00\00")
+  (data (i32.const 4) "duplicate import works!\0a")
+  (data (i32.const 64) "\04\00\00\00\18\00\00\00")
 
   (func $_setup (type 1)
     (drop (call $write (i32.const 1) (i32.const 64) (i32.const 1) (i32.const 0))))
