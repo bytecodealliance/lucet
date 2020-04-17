@@ -243,6 +243,177 @@ fn terminate_in_guest() {
 }
 
 #[test]
+fn terminate_entering_guest() {
+    let test_entering_guest_before_domain_change: fn(&Instance) -> SyncWaiter =
+        |inst: &Instance| -> SyncWaiter {
+            inst.lock_testpoints
+                .instance_lock_entering_guest_before_domain_change
+                .wait_at()
+        };
+    let test_entering_guest_after_domain_change: fn(&Instance) -> SyncWaiter =
+        |inst: &Instance| -> SyncWaiter {
+            inst.lock_testpoints
+                .instance_lock_entering_guest_after_domain_change
+                .wait_at()
+        };
+
+    for (i, racepoint_builder) in [
+        test_entering_guest_before_domain_change,
+        test_entering_guest_after_domain_change,
+    ]
+    .iter()
+    .enumerate()
+    {
+        println!("testing racepoint {}", i);
+        test_instance_with_instrumented_guest_entry(|mut inst| {
+            let kill_switch = inst.kill_switch();
+            let racepoint = racepoint_builder(&inst);
+
+            let guest = thread::Builder::new()
+                .name("guest".to_owned())
+                .spawn(move || match inst.run("run_guest", &[]) {
+                    Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+                    res => panic!("unexpectd result: {:?}", res),
+                })
+                .expect("can spawn thread to run guest");
+
+            racepoint.wait_and_then(|| {
+                kill_switch.terminate().expect("can terminate in guest");
+            });
+
+            guest.join().expect("guest exits without panic");
+        })
+    }
+}
+
+// Test a termination that completes right before `exit_guest_region` takes ownership of termination.
+#[test]
+fn terminate_exiting_guest_before_domain_change() {
+    test_instance_with_instrumented_guest_entry(|mut inst| {
+        let kill_switch = inst.kill_switch();
+        let racepoint = inst
+            .lock_testpoints
+            .instance_lock_exiting_guest_before_acquiring_terminable
+            .wait_at();
+
+        let guest = thread::Builder::new()
+            .name("guest".to_owned())
+            .spawn(move || match inst.run("run_guest", &[]) {
+                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+                res => panic!("unexpectd result: {:?}", res),
+            })
+            .expect("can spawn thread to run guest");
+
+        racepoint.wait_and_then(|| {
+            kill_switch
+                .terminate()
+                .expect("can terminate before exiting guest");
+        });
+
+        guest.join().expect("guest exits without panic");
+    })
+}
+
+#[test]
+fn terminate_exiting_guest_after_domain_change() {
+    test_instance_with_instrumented_guest_entry(|mut inst| {
+        let kill_switch = inst.kill_switch();
+        let racepoint = inst
+            .lock_testpoints
+            .instance_lock_exiting_guest_after_domain_change
+            .wait_at();
+
+        let guest = thread::Builder::new()
+            .name("guest".to_owned())
+            .spawn(move || {
+                match inst.run("run_guest", &[]) {
+                    Ok(RunResult::Returned(_)) => {
+                        // We intentionally have `KillState` lose this race, so the guest should
+                        // return normally.
+                    }
+                    res => panic!("unexpectd result: {:?}", res),
+                }
+            })
+            .expect("can spawn thread to run guest");
+
+        racepoint.wait_and_then(|| {
+            // We are terminating immediately after discarding the old `KillState`, so `KillSwitch`
+            // nwo has a `Weak<KillState>` that can not upgrade.
+            assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
+        });
+
+        guest.join().expect("guest exits without panic");
+    })
+}
+
+// Test a termination begins before `exit_guest_region`, so the guest checks `terminable` during an
+// in-flight termination.
+//
+// We want this specific sequence of events:
+// * guest reaches exit_guest_region
+// * killswitch fires, acquiring `terminable`
+// * guest observes `terminable` is false, so it must wait for termination
+// * killswitch terminates and completes while guest is waiting
+#[test]
+fn terminate_exiting_guest_during_terminable_check() {
+    test_instance_with_instrumented_guest_entry(|mut inst| {
+        let kill_switch = inst.kill_switch();
+        let exit_guest_region = inst
+            .lock_testpoints
+            .instance_lock_exiting_guest_before_acquiring_terminable
+            .wait_at();
+        let guest_wait_for_signal = inst
+            .lock_testpoints
+            .instance_lock_exiting_guest_without_terminable
+            .wait_at();
+        let killswitch_acquired_termination = inst
+            .lock_testpoints
+            .kill_switch_lock_after_acquiring_termination
+            .wait_at();
+        let killswitch_guest_signal = inst
+            .lock_testpoints
+            .kill_switch_lock_before_guest_alarm
+            .wait_at();
+
+        let guest = thread::Builder::new()
+            .name("guest".to_owned())
+            .spawn(move || match inst.run("run_guest", &[]) {
+                Err(Error::RuntimeTerminated(TerminationDetails::Remote)) => {}
+                res => panic!("unexpectd result: {:?}", res),
+            })
+            .expect("can spawn thread to run guest");
+
+        // When the instance has reached `exit_guest_region`, start a thread to terminate the
+        // guest, then wait for it to acquire `terminable`. This is all to ensure that `terminable`
+        // is false by the time we allow `exit_guest_region` to proceed.
+        let killswitch_thread = exit_guest_region.wait_and_then(|| {
+            let new_thread = thread::Builder::new()
+                .name("killswitch".to_owned())
+                .spawn(move || {
+                    kill_switch
+                        .terminate()
+                        .expect("can terminate before exiting guest")
+                })
+                .expect("can spawn killswitch thread");
+            killswitch_acquired_termination.wait();
+            new_thread
+        });
+
+        // When the `KillSwitch` is about to signal, make sure the guest has actually checked it
+        // cannot exit. Once it has, let the `KillSwitch` terminate the guest and complete our
+        // test!
+        killswitch_guest_signal.wait_and_then(|| {
+            guest_wait_for_signal.wait();
+        });
+
+        killswitch_thread
+            .join()
+            .expect("killswitch completes without panic");
+        guest.join().expect("guest exits without panic");
+    })
+}
+
+#[test]
 fn terminate_after_guest_fault() {
     test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
         let kill_switch = inst.kill_switch();
