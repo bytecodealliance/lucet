@@ -179,7 +179,8 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
     let instance = instance.as_mut().expect("instance pointer cannot be null");
 
     #[cfg(feature = "concurrent_testpoints")]
-    instance.lock_testpoints
+    instance
+        .lock_testpoints
         .instance_lock_entering_guest_before_domain_change
         .check();
 
@@ -194,7 +195,8 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
             mem::drop(current_domain);
 
             #[cfg(feature = "concurrent_testpoints")]
-            instance.lock_testpoints
+            instance
+                .lock_testpoints
                 .instance_lock_entering_guest_after_domain_change
                 .check();
         }
@@ -245,7 +247,8 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
     let instance = instance.as_mut().expect("instance pointer cannot be null");
 
     #[cfg(feature = "concurrent_testpoints")]
-    instance.lock_testpoints
+    instance
+        .lock_testpoints
         .instance_lock_exiting_guest_before_acquiring_terminable
         .check();
 
@@ -258,7 +261,8 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
         // signal-safe behavior. So, we will hang indefinitely waiting for the sigalrm to arrive.
 
         #[cfg(feature = "concurrent_testpoints")]
-        instance.lock_testpoints
+        instance
+            .lock_testpoints
             .instance_lock_exiting_guest_without_terminable
             .check();
 
