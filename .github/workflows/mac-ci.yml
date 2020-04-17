@@ -24,7 +24,7 @@ jobs:
         sudo mv wasi-sdk-10.0/* /opt/wasi-sdk/
 
     - name: Test Lucet
-      run: make test-except-fuzz
+      run: make test-ci
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code
