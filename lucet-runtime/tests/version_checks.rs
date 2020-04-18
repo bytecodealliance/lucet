@@ -19,3 +19,8 @@ pub fn reject_old_modules() {
         panic!("unexpected error loading module: {}", err);
     }
 }
+
+#[test]
+fn ensure_linked() {
+    lucet_runtime::lucet_internal_ensure_linked();
+}

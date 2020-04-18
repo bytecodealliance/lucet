@@ -109,3 +109,8 @@ pub fn check_instruction_count() {
         );
     });
 }
+
+#[test]
+fn ensure_linked() {
+    lucet_runtime::lucet_internal_ensure_linked();
+}

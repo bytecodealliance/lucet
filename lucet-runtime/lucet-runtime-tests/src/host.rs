@@ -12,6 +12,7 @@ macro_rules! host_tests {
         use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
         use $crate::helpers::{FunctionPointer, MockExportBuilder, MockModuleBuilder};
+
         #[test]
         fn load_module() {
             let _module = test_module_c("host", "trivial.c").expect("build and load module");
@@ -634,6 +635,11 @@ macro_rules! host_tests {
             .join()
             .unwrap();
             assert_eq!(u64::from(res), 42u64);
+        }
+
+        #[test]
+        fn ensure_linked() {
+            lucet_runtime::lucet_internal_ensure_linked();
         }
     };
 }
