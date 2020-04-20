@@ -93,7 +93,9 @@ pub fn generate(
                 let funcs: &[*const extern "C" fn()] = &[
                     #(#init),*
                 ];
-                ::std::mem::forget(::std::rc::Rc::new(funcs));
+                for func in funcs {
+                    assert_ne!(*func, std::ptr::null(), "hostcall address is not null");
+                }
             }
         }
     }

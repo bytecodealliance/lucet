@@ -1,170 +1,203 @@
-use crate::helpers::{MockExportBuilder, MockModuleBuilder};
-use lucet_module::{FunctionPointer, TrapCode, TrapSite};
-use lucet_runtime_internals::module::Module;
-use lucet_runtime_internals::vmctx::lucet_vmctx;
-use std::sync::Arc;
+#[macro_export]
+macro_rules! guest_fault_common_defs {
+    () => {
+        use common::{
+            mock_traps_module, with_unchanged_signal_handlers, HOSTCALL_TEST_ERROR, RECOVERABLE_PTR,
+        };
+        pub mod common {
+            use lucet_module::{FunctionPointer, TrapCode, TrapSite};
+            use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
+            use lucet_runtime::{lucet_hostcall, lucet_hostcall_terminate, Module};
+            use std::sync::Arc;
+            use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
 
-pub fn mock_traps_module() -> Arc<dyn Module> {
-    extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
-        123
-    }
+            pub const HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
 
-    extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) {
-        extern "C" {
-            // actually is defined in this file
-            fn hostcall_test(vmctx: *mut lucet_vmctx);
+            #[lucet_hostcall]
+            #[no_mangle]
+            pub fn hostcall_test(_vmctx: &mut Vmctx) {
+                lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
+            }
+
+            pub static mut RECOVERABLE_PTR: *mut libc::c_char = std::ptr::null_mut();
+
+            #[no_mangle]
+            pub unsafe extern "C" fn guest_recoverable_get_ptr() -> *const libc::c_char {
+                RECOVERABLE_PTR
+            }
+
+            pub fn mock_traps_module() -> Arc<dyn Module> {
+                extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
+                    123
+                }
+
+                extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) {
+                    extern "C" {
+                        // actually is defined in this file
+                        fn hostcall_test(vmctx: *mut lucet_vmctx);
+                    }
+                    unsafe {
+                        hostcall_test(vmctx);
+                        std::hint::unreachable_unchecked();
+                    }
+                }
+
+                extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
+                    loop {}
+                }
+
+                extern "C" fn fatal(vmctx: *mut lucet_vmctx) {
+                    extern "C" {
+                        fn lucet_vmctx_get_heap(vmctx: *mut lucet_vmctx) -> *mut u8;
+                    }
+
+                    unsafe {
+                        let heap_base = lucet_vmctx_get_heap(vmctx);
+
+                        // Using the default limits, each instance as of this writing takes up 0x200026000 bytes
+                        // worth of virtual address space. We want to access a point beyond all the instances,
+                        // so that memory is unmapped. We assume no more than 16 instances are mapped
+                        // concurrently. This may change as the library, test configuration, linker, phase of
+                        // moon, etc change, but for now it works.
+                        *heap_base.offset(0x0002_0002_6000 * 16) = 0;
+                    }
+                }
+
+                extern "C" fn hit_sigstack_guard_page(vmctx: *mut lucet_vmctx) {
+                    extern "C" {
+                        fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut u8;
+                    }
+
+                    unsafe {
+                        let globals_base = lucet_vmctx_get_globals(vmctx);
+
+                        // Using the default limits, the globals are a page; try to write just off the end
+                        *globals_base.offset(0x1000) = 0;
+                    }
+                }
+
+                extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) {
+                    use std::os::raw::c_char;
+                    extern "C" {
+                        fn guest_recoverable_get_ptr() -> *mut c_char;
+                    }
+
+                    unsafe {
+                        *guest_recoverable_get_ptr() = '\0' as c_char;
+                    }
+                }
+
+                // defined in `guest_fault/traps.S`
+                extern "C" {
+                    fn guest_func_illegal_instr(vmctx: *mut lucet_vmctx);
+                    fn guest_func_oob(vmctx: *mut lucet_vmctx);
+                }
+
+                // Note: manually creating a trap manifest structure like this is almost certain to fragile at
+                // best and flaky at worst. The test functions are provided in assembly in order to make it
+                // marginally easier to keep things stable, but the magic numbers below may need to be updated
+                // depending on the machine code that's generated.
+                //
+                // The easiest way I've found to update these is to use `layout asm` when running the tests in
+                // gdb, and use the offsets it prints when it catches the signal. For example:
+                //
+                // >│0x5555556f53bd <guest_func_oob+29> movb   $0x0,0x10001(%rax) │
+                //  │0x5555556f53c4 <guest_func_oob+36> add    $0x10,%rsp         │
+                //  │0x5555556f53c8 <guest_func_oob+40> pop    %rbp               │
+                //  │0x5555556f53c9 <guest_func_oob+41> retq                      |
+                //
+                // The offset below then should be 29, and the function length is 41.
+
+                static ILLEGAL_INSTR_TRAPS: &[TrapSite] = &[TrapSite {
+                    offset: 8,
+                    code: TrapCode::BadSignature,
+                }];
+
+                static OOB_TRAPS: &[TrapSite] = &[TrapSite {
+                    offset: 29,
+                    code: TrapCode::HeapOutOfBounds,
+                }];
+
+                MockModuleBuilder::new()
+                    .with_export_func(MockExportBuilder::new(
+                        "onetwothree",
+                        FunctionPointer::from_usize(onetwothree as usize),
+                    ))
+                    .with_export_func(
+                        MockExportBuilder::new(
+                            "illegal_instr",
+                            FunctionPointer::from_usize(guest_func_illegal_instr as usize),
+                        )
+                        .with_func_len(11)
+                        .with_traps(ILLEGAL_INSTR_TRAPS),
+                    )
+                    .with_export_func(
+                        MockExportBuilder::new(
+                            "oob",
+                            FunctionPointer::from_usize(guest_func_oob as usize),
+                        )
+                        .with_func_len(41)
+                        .with_traps(OOB_TRAPS),
+                    )
+                    .with_export_func(MockExportBuilder::new(
+                        "hostcall_main",
+                        FunctionPointer::from_usize(hostcall_main as usize),
+                    ))
+                    .with_export_func(MockExportBuilder::new(
+                        "infinite_loop",
+                        FunctionPointer::from_usize(infinite_loop as usize),
+                    ))
+                    .with_export_func(MockExportBuilder::new(
+                        "fatal",
+                        FunctionPointer::from_usize(fatal as usize),
+                    ))
+                    .with_export_func(MockExportBuilder::new(
+                        "hit_sigstack_guard_page",
+                        FunctionPointer::from_usize(hit_sigstack_guard_page as usize),
+                    ))
+                    .with_export_func(MockExportBuilder::new(
+                        "recoverable_fatal",
+                        FunctionPointer::from_usize(recoverable_fatal as usize),
+                    ))
+                    .build()
+            }
+
+            pub fn with_unchanged_signal_handlers<F: FnOnce()>(f: F) {
+                fn get_handlers() -> Vec<libc::sigaction> {
+                    use libc::*;
+                    use std::mem::MaybeUninit;
+                    const SIGNALS: &'static [c_int] = &[SIGBUS, SIGFPE, SIGILL, SIGSEGV, SIGALRM];
+
+                    SIGNALS
+                        .iter()
+                        .map(|sig| unsafe {
+                            let mut out = MaybeUninit::<sigaction>::uninit();
+                            sigaction(*sig, std::ptr::null(), out.as_mut_ptr());
+                            out.assume_init()
+                        })
+                        .collect()
+                }
+
+                let before = get_handlers();
+
+                f();
+
+                let after = get_handlers();
+
+                for (before, after) in before.into_iter().zip(after.into_iter()) {
+                    assert_eq!(
+                        before.sa_sigaction, after.sa_sigaction,
+                        "signal handlers match before and after"
+                    );
+                }
+            }
         }
-        unsafe {
-            hostcall_test(vmctx);
-            std::hint::unreachable_unchecked();
+
+        #[test]
+        fn ensure_linked() {
+            lucet_runtime::lucet_internal_ensure_linked();
         }
-    }
-
-    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
-        loop {}
-    }
-
-    extern "C" fn fatal(vmctx: *mut lucet_vmctx) {
-        extern "C" {
-            fn lucet_vmctx_get_heap(vmctx: *mut lucet_vmctx) -> *mut u8;
-        }
-
-        unsafe {
-            let heap_base = lucet_vmctx_get_heap(vmctx);
-
-            // Using the default limits, each instance as of this writing takes up 0x200026000 bytes
-            // worth of virtual address space. We want to access a point beyond all the instances,
-            // so that memory is unmapped. We assume no more than 16 instances are mapped
-            // concurrently. This may change as the library, test configuration, linker, phase of
-            // moon, etc change, but for now it works.
-            *heap_base.offset(0x0002_0002_6000 * 16) = 0;
-        }
-    }
-
-    extern "C" fn hit_sigstack_guard_page(vmctx: *mut lucet_vmctx) {
-        extern "C" {
-            fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut u8;
-        }
-
-        unsafe {
-            let globals_base = lucet_vmctx_get_globals(vmctx);
-
-            // Using the default limits, the globals are a page; try to write just off the end
-            *globals_base.offset(0x1000) = 0;
-        }
-    }
-
-    extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) {
-        use std::os::raw::c_char;
-        extern "C" {
-            fn guest_recoverable_get_ptr() -> *mut c_char;
-        }
-
-        unsafe {
-            *guest_recoverable_get_ptr() = '\0' as c_char;
-        }
-    }
-
-    // defined in `guest_fault/traps.S`
-    extern "C" {
-        fn guest_func_illegal_instr(vmctx: *mut lucet_vmctx);
-        fn guest_func_oob(vmctx: *mut lucet_vmctx);
-    }
-
-    // Note: manually creating a trap manifest structure like this is almost certain to fragile at
-    // best and flaky at worst. The test functions are provided in assembly in order to make it
-    // marginally easier to keep things stable, but the magic numbers below may need to be updated
-    // depending on the machine code that's generated.
-    //
-    // The easiest way I've found to update these is to use `layout asm` when running the tests in
-    // gdb, and use the offsets it prints when it catches the signal. For example:
-    //
-    // >│0x5555556f53bd <guest_func_oob+29> movb   $0x0,0x10001(%rax) │
-    //  │0x5555556f53c4 <guest_func_oob+36> add    $0x10,%rsp         │
-    //  │0x5555556f53c8 <guest_func_oob+40> pop    %rbp               │
-    //  │0x5555556f53c9 <guest_func_oob+41> retq                      |
-    //
-    // The offset below then should be 29, and the function length is 41.
-
-    static ILLEGAL_INSTR_TRAPS: &[TrapSite] = &[TrapSite {
-        offset: 8,
-        code: TrapCode::BadSignature,
-    }];
-
-    static OOB_TRAPS: &[TrapSite] = &[TrapSite {
-        offset: 29,
-        code: TrapCode::HeapOutOfBounds,
-    }];
-
-    MockModuleBuilder::new()
-        .with_export_func(MockExportBuilder::new(
-            "onetwothree",
-            FunctionPointer::from_usize(onetwothree as usize),
-        ))
-        .with_export_func(
-            MockExportBuilder::new(
-                "illegal_instr",
-                FunctionPointer::from_usize(guest_func_illegal_instr as usize),
-            )
-            .with_func_len(11)
-            .with_traps(ILLEGAL_INSTR_TRAPS),
-        )
-        .with_export_func(
-            MockExportBuilder::new("oob", FunctionPointer::from_usize(guest_func_oob as usize))
-                .with_func_len(41)
-                .with_traps(OOB_TRAPS),
-        )
-        .with_export_func(MockExportBuilder::new(
-            "hostcall_main",
-            FunctionPointer::from_usize(hostcall_main as usize),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            "infinite_loop",
-            FunctionPointer::from_usize(infinite_loop as usize),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            "fatal",
-            FunctionPointer::from_usize(fatal as usize),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            "hit_sigstack_guard_page",
-            FunctionPointer::from_usize(hit_sigstack_guard_page as usize),
-        ))
-        .with_export_func(MockExportBuilder::new(
-            "recoverable_fatal",
-            FunctionPointer::from_usize(recoverable_fatal as usize),
-        ))
-        .build()
-}
-
-pub fn with_unchanged_signal_handlers<F: FnOnce()>(f: F) {
-    fn get_handlers() -> Vec<libc::sigaction> {
-        use libc::*;
-        use std::mem::MaybeUninit;
-        const SIGNALS: &'static [c_int] = &[SIGBUS, SIGFPE, SIGILL, SIGSEGV, SIGALRM];
-
-        SIGNALS
-            .iter()
-            .map(|sig| unsafe {
-                let mut out = MaybeUninit::<sigaction>::uninit();
-                sigaction(*sig, std::ptr::null(), out.as_mut_ptr());
-                out.assume_init()
-            })
-            .collect()
-    }
-
-    let before = get_handlers();
-
-    f();
-
-    let after = get_handlers();
-
-    for (before, after) in before.into_iter().zip(after.into_iter()) {
-        assert_eq!(
-            before.sa_sigaction, after.sa_sigaction,
-            "signal handlers match before and after"
-        );
-    }
+    };
 }
 
 #[macro_export]
@@ -174,9 +207,8 @@ macro_rules! guest_fault_tests {
         use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGBUS, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall, lucet_hostcall_terminate, lucet_internal_ensure_linked, DlModule,
-            Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TerminationDetails,
-            TrapCode,
+            lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, FaultDetails, Instance,
+            Limits, Region, SignalBehavior, TerminationDetails, TrapCode,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -185,7 +217,6 @@ macro_rules! guest_fault_tests {
         use std::ptr;
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
-        use $crate::guest_fault::{mock_traps_module, with_unchanged_signal_handlers};
         use $crate::helpers::{
             test_ex, test_nonex, FunctionPointer, MockExportBuilder, MockModuleBuilder,
         };
@@ -193,8 +224,6 @@ macro_rules! guest_fault_tests {
         lazy_static! {
             static ref RECOVERABLE_PTR_LOCK: Mutex<()> = Mutex::new(());
         }
-
-        static mut RECOVERABLE_PTR: *mut libc::c_char = ptr::null_mut();
 
         #[cfg(target_os = "linux")]
         const INVALID_PERMISSION_FAULT: libc::c_int = SIGSEGV;
@@ -234,19 +263,6 @@ macro_rules! guest_fault_tests {
         unsafe fn recoverable_ptr_teardown() {
             nix::sys::mman::munmap(RECOVERABLE_PTR as *mut c_void, 4096).expect("munmap succeeds");
             RECOVERABLE_PTR = ptr::null_mut();
-        }
-
-        #[no_mangle]
-        unsafe extern "C" fn guest_recoverable_get_ptr() -> *const libc::c_char {
-            RECOVERABLE_PTR
-        }
-
-        static HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
-
-        #[lucet_hostcall]
-        #[no_mangle]
-        pub fn hostcall_test(_vmctx: &mut Vmctx) {
-            lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
         }
 
         fn run_onetwothree(inst: &mut Instance) {
@@ -801,7 +817,6 @@ macro_rules! guest_fault_tests {
 
         #[test]
         fn fatal_abort() {
-            lucet_internal_ensure_linked();
             fn handler(_inst: &Instance) -> ! {
                 std::process::abort()
             }
@@ -836,7 +851,6 @@ macro_rules! guest_fault_tests {
 
         #[test]
         fn hit_sigstack_guard_page() {
-            lucet_internal_ensure_linked();
             fn handler(_inst: &Instance) -> ! {
                 std::process::abort()
             }

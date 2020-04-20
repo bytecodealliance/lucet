@@ -922,5 +922,10 @@ macro_rules! entrypoint_tests {
                 .unwrap_returned();
             assert_eq!(u64::from(retval), 3);
         }
+
+        #[test]
+        fn ensure_linked() {
+            lucet_runtime::lucet_internal_ensure_linked();
+        }
     };
 }

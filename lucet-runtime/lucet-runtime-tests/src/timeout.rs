@@ -379,5 +379,10 @@ macro_rules! timeout_tests {
             inst.reset().expect("instance resets");
             run_onetwothree(&mut inst);
         }
+
+        #[test]
+        fn ensure_linked() {
+            lucet_runtime::lucet_internal_ensure_linked();
+        }
     };
 }
