@@ -339,9 +339,10 @@ fn terminate_exiting_guest_after_domain_change() {
             .expect("can spawn thread to run guest");
 
         racepoint.wait_and_then(|| {
-            // We are terminating immediately after discarding the old `KillState`, so `KillSwitch`
-            // nwo has a `Weak<KillState>` that can not upgrade.
-            assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
+            // We are terminating immediately after disabling termination, but the disabled
+            // `KillState` has not yet been dropped. We can determine this instance is not
+            // terminable, but has a valid `KillState` reference.
+            assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
         });
 
         guest.join().expect("guest exits without panic");

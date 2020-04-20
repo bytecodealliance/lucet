@@ -295,6 +295,12 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
                 );
             }
         };
+
+        #[cfg(feature = "concurrent_testpoints")]
+        instance
+            .lock_testpoints
+            .instance_lock_exiting_guest_after_domain_change
+            .check();
     }
 }
 
