@@ -360,28 +360,28 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
         ctx.set_ip(crate::context::lucet_context_set as *const c_void);
         HOST_CTX.with(|host_ctx| {
             ctx.set_rdi(host_ctx.get() as u64);
-        })
+        });
+
+        #[cfg(feature = "concurrent_testpoints")]
+        CURRENT_INSTANCE.with(|current_instance| {
+            let mut current_instance = current_instance.borrow_mut();
+
+            // If we're switching to the host, there must be an instance, because we are switching away
+            // from it.
+            let inst = unsafe {
+                current_instance
+                    .as_mut()
+                    .expect("current instance exists")
+                    .as_mut()
+            };
+
+            // and the entire reason we're grabbing the instance again: lock for any races we're
+            // testing with last-stretch signal handling.
+            inst.lock_testpoints
+                .signal_handler_lock_before_returning
+                .check();
+        });
     }
-
-    #[cfg(feature = "concurrent_testpoints")]
-    CURRENT_INSTANCE.with(|current_instance| {
-        let mut current_instance = current_instance.borrow_mut();
-
-        // If we're switching to the host, there must be an instance, because we are switching away
-        // from it.
-        let inst = unsafe {
-            current_instance
-                .as_mut()
-                .expect("current instance exists")
-                .as_mut()
-        };
-
-        // and the entire reason we're grabbing the instance again: lock for any races we're
-        // testing with last-stretch signal handling.
-        inst.lock_testpoints
-            .signal_handler_lock_before_returning
-            .check();
-    });
 }
 
 struct SignalState {
