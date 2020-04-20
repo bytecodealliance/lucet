@@ -676,10 +676,7 @@ fn double_terminate() {
 
         // At this point the first `KillSwitch` has completed terminating the instance. Now try
         // again and make sure there's no boom.
-        assert_eq!(
-            second_kill_switch.terminate(),
-            Err(KillError::Invalid)
-        );
+        assert_eq!(second_kill_switch.terminate(), Err(KillError::Invalid));
 
         // Allow the instance to reset and run a new function after termination.
         guest_exit_testpoint.wait();
