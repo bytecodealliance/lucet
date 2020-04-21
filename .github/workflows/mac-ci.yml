@@ -3,7 +3,7 @@ on: [push, pull_request]
 
 jobs:
   test:
-    name: Test
+    name: Test (MacOS)
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@master
@@ -18,13 +18,13 @@ jobs:
 
     - name: Install wasi-sdk (macos)
       run: |
-        curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk-8.0-macos.tar.gz
-        tar xf wasi-sdk-8.0-macos.tar.gz
+        curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk-10.0-macos.tar.gz
+        tar xf wasi-sdk-10.0-macos.tar.gz
         sudo mkdir -p /opt/wasi-sdk
-        sudo mv wasi-sdk-8.0/* /opt/wasi-sdk/
+        sudo mv wasi-sdk-10.0/* /opt/wasi-sdk/
 
     - name: Test Lucet
-      run: make test-except-fuzz
+      run: make test-ci
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code

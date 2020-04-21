@@ -17,6 +17,7 @@ lucet-wiggle-runtime = { path = "./runtime", version = "0.6.2-dev" }
 wiggle-generate = { path = "../wasmtime/crates/wiggle/generate", version = "0.15.0" }
 witx = { path = "../wasmtime/crates/wasi-common/WASI/tools/witx", version = "0.8.4" }
 syn = { version = "1.0", features = ["full"] }
+quote = "1.0"
 
 [dev-dependencies]
 wiggle =  { path = "../wasmtime/crates/wiggle", version = "0.15.0" }

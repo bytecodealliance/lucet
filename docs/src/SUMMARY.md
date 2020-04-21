@@ -12,6 +12,7 @@
   - [`lucetc`](./lucetc.md)
     - [`lucet-builtins`](./lucet-builtins.md)
   - [`lucet-runtime`](./lucet-runtime.md)
+    - [`KillSwitch`](./lucet-runtime/killswitch.md)
   - [`lucet-wasi`](./lucet-wasi.md)
   - [`lucet-objdump`](./lucet-objdump.md)
   - [`lucet-spectest`](./lucet-spectest.md)

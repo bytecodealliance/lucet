@@ -30,7 +30,13 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // determine whether we need to import from `lucet_runtime_internals`; this is useful if we want
     // to define a hostcall for a target (or tests, more concretely) that doesn't depend on
     // `lucet-runtime`
-    let in_internals = std::env::var("CARGO_PKG_NAME").unwrap() == "lucet-runtime-internals";
+    let from_internals = {
+        let pkg_name = std::env::var("CARGO_PKG_NAME").unwrap();
+        match pkg_name.as_str() {
+            "lucet-runtime-internals" | "lucet-runtime-tests" => true,
+            _ => false,
+        }
+    };
 
     let mut hostcall = syn::parse_macro_input!(item as syn::ItemFn);
     let hostcall_ident = hostcall.sig.ident.clone();
@@ -55,7 +61,7 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // hostcalls are always extern "C"
     raw_sig.abi = Some(syn::parse_quote!(extern "C"));
 
-    let vmctx_mod = if in_internals {
+    let vmctx_mod = if from_internals {
         quote! { lucet_runtime_internals::vmctx }
     } else {
         quote! { lucet_runtime::vmctx }
@@ -84,7 +90,7 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
         })
         .collect::<Vec<_>>();
 
-    let termination_details = if in_internals {
+    let termination_details = if from_internals {
         quote! { lucet_runtime_internals::instance::TerminationDetails }
     } else {
         quote! { lucet_runtime::TerminationDetails }

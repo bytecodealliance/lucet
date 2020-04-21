@@ -7,6 +7,11 @@ macro_rules! start_tests {
         use $crate::build::test_module_wasm;
 
         #[test]
+        fn ensure_linked() {
+            lucet_runtime::lucet_internal_ensure_linked();
+        }
+
+        #[test]
         fn global_init() {
             let module =
                 test_module_wasm("start", "global_init.wat").expect("module compiled and loaded");

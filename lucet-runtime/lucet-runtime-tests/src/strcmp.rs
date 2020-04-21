@@ -89,5 +89,10 @@ macro_rules! strcmp_tests {
                 res => panic!("unexpected result: {:?}", res),
             }
         }
+
+        #[test]
+        fn ensure_linked() {
+            lucet_runtime::lucet_internal_ensure_linked();
+        }
     };
 }
