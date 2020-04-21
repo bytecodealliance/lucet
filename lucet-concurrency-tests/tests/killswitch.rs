@@ -416,6 +416,48 @@ fn terminate_exiting_guest_during_terminable_check() {
     })
 }
 
+// If we terminate in the signal handler, but before termination has been disabled, a
+// signal will be sent to the guest. Lucet must correctly handle this case, lest the sigalrm be
+// delivered to disastrous effect to the host.
+#[test]
+fn terminate_during_guest_fault() {
+    test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
+        let kill_switch = inst.kill_switch();
+
+        // *before* termination is critical, since afterward the `KillSwitch` we test with will
+        // just take no action.
+        let unfortunate_time_to_terminate = inst.lock_testpoints.signal_handler_before_disabling_termination.wait_at();
+
+        let guest = thread::Builder::new()
+            .name("guest".to_owned())
+            .spawn(move || {
+                match inst.run("main", &[0u32.into(), 0u32.into()]) {
+                    Err(Error::RuntimeFault(details)) => {
+                        assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
+                    }
+                    res => panic!("unexpected result: {:?}", res),
+                }
+
+                // Check that we can reset the instance and run a normal function.
+                inst.reset().expect("instance resets");
+                run_onetwothree(&mut inst);
+            })
+            .expect("can spawn guest thread");
+
+        let termination_thread = unfortunate_time_to_terminate.wait_and_then(|| {
+            thread::Builder::new()
+                .name("killswitch".to_owned())
+                .spawn(move || {
+                    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
+                })
+                .expect("can spawn killswitch thread")
+        });
+
+        guest.join().expect("guest exits without panic");
+        termination_thread.join().expect("termination completes without panic");
+    })
+}
+
 #[test]
 fn terminate_after_guest_fault() {
     test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
