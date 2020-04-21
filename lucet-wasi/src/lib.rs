@@ -13,12 +13,12 @@ pub const START_SYMBOL: &str = "_start";
 /// Bindings for the hostcalls exposed by this crate. These are identical to the bindings in
 /// `bindings.json`. These are exposed as part of a transition path away from bindings.json files.
 pub fn bindings() -> lucet_module::bindings::Bindings {
-    lucet_wiggle_generate::bindings(&wasi_common::wasi::metadata::document())
+    lucet_wiggle::bindings(&wasi_common::wasi::metadata::document())
 }
 
 /// The witx document for the interface implemented by this crate. This is exposed as part of a
 /// transition path away from always loading witx documents from the filesystem.
-pub fn witx_document() -> wiggle::witx::Document {
+pub fn witx_document() -> lucet_wiggle::witx::Document {
     wasi_common::wasi::metadata::document()
 }
 

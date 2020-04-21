@@ -1,8 +1,8 @@
 use lucet_runtime::{lucet_hostcall_terminate, vmctx::Vmctx};
+use lucet_wiggle::{GuestError, GuestPtr};
 use std::cell::Ref;
 use wasi_common::wasi::wasi_snapshot_preview1::WasiSnapshotPreview1;
 use wasi_common::WasiCtx;
-use wiggle::{GuestError, GuestPtr};
 
 lucet_wasi_generate::bindings!({
     // The context type, which we will implement the GuestErrorConversion and
