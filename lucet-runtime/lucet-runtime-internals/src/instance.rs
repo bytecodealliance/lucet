@@ -1029,8 +1029,6 @@ impl Instance {
         //
         // The state should never be `Ready`, `Terminated`, `Yielded`, or `Transitioning` at this point
 
-        self.kill_state.deschedule();
-
         // Set transitioning state temporarily so that we can move values out of the current state
         let st = mem::replace(&mut self.state, State::Transitioning);
 

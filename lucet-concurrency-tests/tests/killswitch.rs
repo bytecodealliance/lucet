@@ -427,6 +427,11 @@ fn terminate_during_guest_fault() {
         // *before* termination is critical, since afterward the `KillSwitch` we test with will
         // just take no action.
         let unfortunate_time_to_terminate = inst.lock_testpoints.signal_handler_before_disabling_termination.wait_at();
+        // wait for the guest to reach a point we reaaallly don't want to signal at - somewhere in
+        // the signal handler.
+        let exiting_signal_handler = inst.lock_testpoints.signal_handler_before_returning.wait_at();
+        // and we need to know when we're ready to signal to ensure it races with.
+        let killswitch_send_signal = inst.lock_testpoints.kill_switch_after_guest_alarm.wait_at();
 
         let guest = thread::Builder::new()
             .name("guest".to_owned())
@@ -453,59 +458,10 @@ fn terminate_during_guest_fault() {
                 .expect("can spawn killswitch thread")
         });
 
-        guest.join().expect("guest exits without panic");
-        termination_thread.join().expect("termination completes without panic");
-    })
-}
-
-// A variant of `terminate_during_guest_fault` that tests a worst-case race where a signal is sent,
-// but only after CURRENT_INSTANCE has been cleared, leading to Lucet's signal handler reraising
-// the signal in the host handler, if the signal handler is even installed.
-#[test]
-fn terminate_during_guest_fault_worst_case() {
-    test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
-        let kill_switch = inst.kill_switch();
-
-        // *before* termination is critical, since afterward the `KillSwitch` we test with will
-        // just take no action.
-        let unfortunate_time_to_terminate = inst.lock_testpoints.signal_handler_before_disabling_termination.wait_at();
-        // wait for the guest to reach a point we reaaallly don't want to signal at..
-        let current_instance_cleared = inst.lock_testpoints.instance_after_clearing_current_instance.wait_at();
-        // and we need to know when we're ready to signal to ensure it's after
-        // current_instance_cleared.
-        let killswitch_send_signal = inst.lock_testpoints.kill_switch_before_guest_alarm.wait_at();
-
-        let guest = thread::Builder::new()
-            .name("guest".to_owned())
-            .spawn(move || {
-                match inst.run("main", &[0u32.into(), 0u32.into()]) {
-                    Err(Error::RuntimeFault(details)) => {
-                        assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
-                    }
-                    res => panic!("unexpected result: {:?}", res),
-                }
-
-                // Check that we can reset the instance and run a normal function.
-                inst.reset().expect("instance resets");
-                run_onetwothree(&mut inst);
-            })
-            .expect("can spawn guest thread");
-
-        let termination_thread = unfortunate_time_to_terminate.wait_and_then(|| {
-            thread::Builder::new()
-                .name("killswitch".to_owned())
-                .spawn(move || {
-                    assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
-                })
-                .expect("can spawn killswitch thread")
-        });
-
-        // we now have a race in progress: the guest will fault, and when the fault is reached a
-        // `KillSwitch` will fire at the worst moment. Now wait to send the signal until after the
-        // guest has cleared CURRENT_INSTANCE!
-        current_instance_cleared.wait();
-        // boom
+        // Get ready to signal...
         killswitch_send_signal.wait();
+        // and be sure that we haven't exited the signal handler until afterward
+        exiting_signal_handler.wait();
 
         guest.join().expect("guest exits without panic");
         termination_thread.join().expect("termination completes without panic");

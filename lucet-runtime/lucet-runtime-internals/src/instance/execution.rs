@@ -635,6 +635,13 @@ impl KillSwitch {
                     unsafe {
                         pthread_kill(thread_id, SIGALRM);
                     }
+
+                    #[cfg(feature = "concurrent_testpoints")]
+                    state
+                        .lock_testpoints
+                        .kill_switch_after_guest_alarm
+                        .check();
+
                     // wait for the SIGALRM handler to deschedule the instance
                     //
                     // this should never actually loop, which would indicate the instance
