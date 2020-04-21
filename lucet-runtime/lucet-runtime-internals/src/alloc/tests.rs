@@ -803,13 +803,13 @@ macro_rules! alloc_tests {
                 }
 
                 // It's not possible to allocate just one more.  Try
-		// it and affirm that the error is handled gracefully.
+                // it and affirm that the error is handled gracefully.
                 let wont_inst = region
                     .new_instance_builder(module.clone())
                     .with_alloc_strategy(AllocStrategy::Random)
                     .with_heap_size_limit((THREEPAGE_INITIAL_SIZE) as usize)
                     .build();
-		assert!(wont_inst.is_err());
+                assert!(wont_inst.is_err());
 
                 // Drop all of the slots in the region.
                 for i in (total_slots - 1)..=0 {
