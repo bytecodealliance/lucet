@@ -61,6 +61,7 @@ impl Syncpoint {
 }
 
 pub struct LockTestpoints {
+    pub instance_after_clearing_current_instance: Syncpoint,
     pub instance_entering_guest_after_domain_change: Syncpoint,
     pub instance_entering_guest_before_domain_change: Syncpoint,
     pub instance_entering_hostcall_after_domain_change: Syncpoint,
@@ -91,6 +92,7 @@ pub struct LockTestpoints {
 impl LockTestpoints {
     pub fn new() -> Self {
         LockTestpoints {
+            instance_after_clearing_current_instance: Syncpoint::new(),
             instance_entering_guest_after_domain_change: Syncpoint::new(),
             instance_entering_guest_before_domain_change: Syncpoint::new(),
             instance_entering_hostcall_after_domain_change: Syncpoint::new(),
