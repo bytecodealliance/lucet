@@ -181,7 +181,7 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
     #[cfg(feature = "concurrent_testpoints")]
     instance
         .lock_testpoints
-        .instance_lock_entering_guest_before_domain_change
+        .instance_entering_guest_before_domain_change
         .check();
 
     let mut current_domain = instance.kill_state.execution_domain.lock().unwrap();
@@ -197,7 +197,7 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
             #[cfg(feature = "concurrent_testpoints")]
             instance
                 .lock_testpoints
-                .instance_lock_entering_guest_after_domain_change
+                .instance_entering_guest_after_domain_change
                 .check();
         }
         Domain::Guest => {
@@ -249,7 +249,7 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
     #[cfg(feature = "concurrent_testpoints")]
     instance
         .lock_testpoints
-        .instance_lock_exiting_guest_before_acquiring_terminable
+        .instance_exiting_guest_before_acquiring_terminable
         .check();
 
     let terminable = instance.kill_state.terminable.swap(false, Ordering::SeqCst);
@@ -263,7 +263,7 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
         #[cfg(feature = "concurrent_testpoints")]
         instance
             .lock_testpoints
-            .instance_lock_exiting_guest_without_terminable
+            .instance_exiting_guest_without_terminable
             .check();
 
         #[allow(clippy::empty_loop)]
@@ -299,7 +299,7 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
         #[cfg(feature = "concurrent_testpoints")]
         instance
             .lock_testpoints
-            .instance_lock_exiting_guest_after_domain_change
+            .instance_exiting_guest_after_domain_change
             .check();
     }
 }
@@ -360,7 +360,7 @@ impl KillState {
     pub fn begin_hostcall(&self) {
         #[cfg(feature = "concurrent_testpoints")]
         self.lock_testpoints
-            .instance_lock_entering_hostcall_before_domain_change
+            .instance_entering_hostcall_before_domain_change
             .check();
 
         let mut current_domain = self.execution_domain.lock().unwrap();
@@ -391,7 +391,7 @@ impl KillState {
 
         #[cfg(feature = "concurrent_testpoints")]
         self.lock_testpoints
-            .instance_lock_entering_hostcall_after_domain_change
+            .instance_entering_hostcall_after_domain_change
             .check();
     }
 
@@ -406,7 +406,7 @@ impl KillState {
     pub fn end_hostcall(&self) -> Option<TerminationDetails> {
         #[cfg(feature = "concurrent_testpoints")]
         self.lock_testpoints
-            .instance_lock_exiting_hostcall_before_domain_change
+            .instance_exiting_hostcall_before_domain_change
             .check();
 
         let mut current_domain = self.execution_domain.lock().unwrap();
@@ -436,7 +436,7 @@ impl KillState {
 
         #[cfg(feature = "concurrent_testpoints")]
         self.lock_testpoints
-            .instance_lock_exiting_hostcall_after_domain_change
+            .instance_exiting_hostcall_after_domain_change
             .check();
 
         res
@@ -538,7 +538,7 @@ impl KillSwitch {
         #[cfg(feature = "concurrent_testpoints")]
         state
             .lock_testpoints
-            .kill_switch_lock_before_disabling_termination
+            .kill_switch_before_disabling_termination
             .check();
 
         // Attempt to take the flag indicating the instance may terminate
@@ -547,7 +547,7 @@ impl KillSwitch {
             #[cfg(feature = "concurrent_testpoints")]
             state
                 .lock_testpoints
-                .kill_switch_lock_after_forbidden_termination
+                .kill_switch_after_forbidden_termination
                 .check();
 
             return Err(KillError::NotTerminable);
@@ -556,7 +556,7 @@ impl KillSwitch {
         #[cfg(feature = "concurrent_testpoints")]
         state
             .lock_testpoints
-            .kill_switch_lock_after_acquiring_termination
+            .kill_switch_after_acquiring_termination
             .check();
 
         // we got it! we can signal the instance.
@@ -573,7 +573,7 @@ impl KillSwitch {
         #[cfg(feature = "concurrent_testpoints")]
         state
             .lock_testpoints
-            .kill_switch_lock_after_acquiring_domain_lock
+            .kill_switch_after_acquiring_domain_lock
             .check();
 
         let result = match *execution_domain {
@@ -581,7 +581,7 @@ impl KillSwitch {
                 #[cfg(feature = "concurrent_testpoints")]
                 state
                     .lock_testpoints
-                    .kill_switch_lock_before_guest_termination
+                    .kill_switch_before_guest_termination
                     .check();
 
                 let mut curr_tid = state.thread_id.lock().unwrap();
@@ -590,7 +590,7 @@ impl KillSwitch {
                     #[cfg(feature = "concurrent_testpoints")]
                     state
                         .lock_testpoints
-                        .kill_switch_lock_before_guest_alarm
+                        .kill_switch_before_guest_alarm
                         .check();
 
                     unsafe {
@@ -613,7 +613,7 @@ impl KillSwitch {
                 #[cfg(feature = "concurrent_testpoints")]
                 state
                     .lock_testpoints
-                    .kill_switch_lock_before_hostcall_termination
+                    .kill_switch_before_hostcall_termination
                     .check();
 
                 // the guest is in a hostcall, so the only thing we can do is indicate it
@@ -630,7 +630,7 @@ impl KillSwitch {
                 #[cfg(feature = "concurrent_testpoints")]
                 state
                     .lock_testpoints
-                    .kill_switch_lock_before_terminated_termination
+                    .kill_switch_before_terminated_termination
                     .check();
 
                 // Something else (another KillSwitch?) has already signalled this instance
@@ -642,7 +642,7 @@ impl KillSwitch {
         #[cfg(feature = "concurrent_testpoints")]
         state
             .lock_testpoints
-            .kill_switch_lock_before_releasing_domain
+            .kill_switch_before_releasing_domain
             .check();
 
         // explicitly drop the lock to be clear about how long we want to hold this lock, which is
@@ -652,7 +652,7 @@ impl KillSwitch {
         #[cfg(feature = "concurrent_testpoints")]
         state
             .lock_testpoints
-            .kill_switch_lock_after_releasing_domain
+            .kill_switch_after_releasing_domain
             .check();
 
         result

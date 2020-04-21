@@ -249,13 +249,13 @@ fn terminate_entering_guest() {
     let test_entering_guest_before_domain_change: fn(&Instance) -> SyncWaiter =
         |inst: &Instance| -> SyncWaiter {
             inst.lock_testpoints
-                .instance_lock_entering_guest_before_domain_change
+                .instance_entering_guest_before_domain_change
                 .wait_at()
         };
     let test_entering_guest_after_domain_change: fn(&Instance) -> SyncWaiter =
         |inst: &Instance| -> SyncWaiter {
             inst.lock_testpoints
-                .instance_lock_entering_guest_after_domain_change
+                .instance_entering_guest_after_domain_change
                 .wait_at()
         };
 
@@ -295,7 +295,7 @@ fn terminate_exiting_guest_before_domain_change() {
         let kill_switch = inst.kill_switch();
         let racepoint = inst
             .lock_testpoints
-            .instance_lock_exiting_guest_before_acquiring_terminable
+            .instance_exiting_guest_before_acquiring_terminable
             .wait_at();
 
         let guest = thread::Builder::new()
@@ -322,7 +322,7 @@ fn terminate_exiting_guest_after_domain_change() {
         let kill_switch = inst.kill_switch();
         let racepoint = inst
             .lock_testpoints
-            .instance_lock_exiting_guest_after_domain_change
+            .instance_exiting_guest_after_domain_change
             .wait_at();
 
         let guest = thread::Builder::new()
@@ -363,19 +363,19 @@ fn terminate_exiting_guest_during_terminable_check() {
         let kill_switch = inst.kill_switch();
         let exit_guest_region = inst
             .lock_testpoints
-            .instance_lock_exiting_guest_before_acquiring_terminable
+            .instance_exiting_guest_before_acquiring_terminable
             .wait_at();
         let guest_wait_for_signal = inst
             .lock_testpoints
-            .instance_lock_exiting_guest_without_terminable
+            .instance_exiting_guest_without_terminable
             .wait_at();
         let killswitch_acquired_termination = inst
             .lock_testpoints
-            .kill_switch_lock_after_acquiring_termination
+            .kill_switch_after_acquiring_termination
             .wait_at();
         let killswitch_guest_signal = inst
             .lock_testpoints
-            .kill_switch_lock_before_guest_alarm
+            .kill_switch_before_guest_alarm
             .wait_at();
 
         let guest = thread::Builder::new()
@@ -443,7 +443,7 @@ fn terminate_in_hostcall() {
         let kill_switch = inst.kill_switch();
         let in_hostcall = inst
             .lock_testpoints
-            .instance_lock_exiting_hostcall_before_domain_change
+            .instance_exiting_hostcall_before_domain_change
             .wait_at();
 
         let guest = thread::Builder::new()
@@ -467,13 +467,13 @@ fn terminate_exiting_hostcall() {
     let test_exiting_hostcall_before_domain_change: fn(&Instance) -> SyncWaiter =
         |inst: &Instance| -> SyncWaiter {
             inst.lock_testpoints
-                .instance_lock_exiting_hostcall_before_domain_change
+                .instance_exiting_hostcall_before_domain_change
                 .wait_at()
         };
     let test_exiting_hostcall_after_domain_change: fn(&Instance) -> SyncWaiter =
         |inst: &Instance| -> SyncWaiter {
             inst.lock_testpoints
-                .instance_lock_exiting_hostcall_after_domain_change
+                .instance_exiting_hostcall_after_domain_change
                 .wait_at()
         };
 
@@ -511,13 +511,13 @@ fn terminate_entering_hostcall() {
     let test_entering_hostcall_before_domain_change: fn(&Instance) -> SyncWaiter =
         |inst: &Instance| -> SyncWaiter {
             inst.lock_testpoints
-                .instance_lock_entering_hostcall_before_domain_change
+                .instance_entering_hostcall_before_domain_change
                 .wait_at()
         };
     let test_entering_hostcall_after_domain_change: fn(&Instance) -> SyncWaiter =
         |inst: &Instance| -> SyncWaiter {
             inst.lock_testpoints
-                .instance_lock_entering_hostcall_after_domain_change
+                .instance_entering_hostcall_after_domain_change
                 .wait_at()
         };
 

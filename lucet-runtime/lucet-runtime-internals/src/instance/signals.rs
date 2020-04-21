@@ -378,7 +378,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
             // and the entire reason we're grabbing the instance again: lock for any races we're
             // testing with last-stretch signal handling.
             inst.lock_testpoints
-                .signal_handler_lock_before_returning
+                .signal_handler_before_returning
                 .check();
         });
     }
