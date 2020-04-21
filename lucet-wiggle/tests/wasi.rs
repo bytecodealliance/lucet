@@ -385,6 +385,8 @@ fn main() {
     // The `init` function ensures that all of the host call functions are
     // linked into the executable.
     crate::hostcalls::init();
+    // Same for lucet-runtime:
+    lucet_runtime::lucet_internal_ensure_linked();
 
     // Temporary directory for outputs.
     let workdir = TempDir::new().expect("create working directory");
