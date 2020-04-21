@@ -774,6 +774,10 @@ macro_rules! alloc_tests {
             assert_eq!(region.used_slots(), 0);
         }
 
+        /// This test exercises the AllocStrategy::Random. In this scenario,
+        /// the Region has 10 slots which are randomly allocated up to capacity
+        /// and then dropped. The test is executed 100 times to exercise the
+        /// random nature of the allocation strategy.
         #[test]
         fn slot_counts_work_with_random_alloc() {
             for _ in 0..100 {
@@ -792,7 +796,6 @@ macro_rules! alloc_tests {
                     let inst = region
                         .new_instance_builder(module.clone())
                         .with_alloc_strategy(AllocStrategy::Random)
-                        .with_heap_size_limit((THREEPAGE_INITIAL_SIZE) as usize)
                         .build()
                         .expect("new_instance succeeds");
 
@@ -807,19 +810,93 @@ macro_rules! alloc_tests {
                 let wont_inst = region
                     .new_instance_builder(module.clone())
                     .with_alloc_strategy(AllocStrategy::Random)
-                    .with_heap_size_limit((THREEPAGE_INITIAL_SIZE) as usize)
                     .build();
                 assert!(wont_inst.is_err());
 
                 // Drop all of the slots in the region.
-                for i in (total_slots - 1)..=0 {
+                for i in 1..=total_slots {
                     drop(inst_vec.pop());
+                    assert_eq!(region.capacity(), total_slots);
+                    assert_eq!(region.free_slots(), total_slots - (total_slots - i));
+                    assert_eq!(region.used_slots(), total_slots - i);
+                }
+
+                // Allocate just one more to make sure the drops took place
+                // and the Region has capacity again.
+                let _final_inst = region
+                    .new_instance_builder(module.clone())
+                    .with_alloc_strategy(AllocStrategy::Random)
+                    .build()
+                    .expect("new_instance succeeds");
+            }
+        }
+
+        /// This test exercises a mixed AllocStrategy. In this scenario,
+        /// the Region has 10 slots which are randomly and linearly allocated
+        /// up to capacity and then dropped. The test is executed 100 times to
+        /// exercise the random nature of the allocation strategy.
+        #[test]
+        fn slot_counts_work_with_mixed_alloc() {
+            for _ in 0..100 {
+                let mut inst_vec = Vec::new();
+                let module = MockModuleBuilder::new()
+                    .with_heap_spec(ONE_PAGE_HEAP)
+                    .build();
+                let total_slots = 10;
+                let region = TestRegion::create(total_slots, &LIMITS).expect("region created");
+                assert_eq!(region.capacity(), total_slots);
+                assert_eq!(region.free_slots(), 10);
+                assert_eq!(region.used_slots(), 0);
+
+                // Allocate all of the slots in the region.
+                for i in 1..=total_slots {
+                    let inst;
+                    if i % 2 == 0 {
+                        inst = region
+                            .new_instance_builder(module.clone())
+                            .with_alloc_strategy(AllocStrategy::Random)
+                            .build()
+                            .expect("new_instance succeeds");
+                    } else {
+                        inst = region
+                            .new_instance_builder(module.clone())
+                            .with_alloc_strategy(AllocStrategy::Linear)
+                            .build()
+                            .expect("new_instance succeeds");
+                    }
+
                     assert_eq!(region.capacity(), total_slots);
                     assert_eq!(region.free_slots(), total_slots - i);
                     assert_eq!(region.used_slots(), i);
+                    inst_vec.push(inst);
                 }
+
+                // It's not possible to allocate just one more.  Try
+                // it and affirm that the error is handled gracefully.
+                let wont_inst = region
+                    .new_instance_builder(module.clone())
+                    .with_alloc_strategy(AllocStrategy::Random)
+                    .build();
+                assert!(wont_inst.is_err());
+
+                // Drop all of the slots in the region.
+                for i in 1..=total_slots {
+                    drop(inst_vec.pop());
+                    assert_eq!(region.capacity(), total_slots);
+                    assert_eq!(region.free_slots(), total_slots - (total_slots - i));
+                    assert_eq!(region.used_slots(), total_slots - i);
+                }
+
+                // Allocate just one more to make sure the drops took place
+                // and the Region has capacity again.
+                let _final_inst = region
+                    .new_instance_builder(module.clone())
+                    .with_alloc_strategy(AllocStrategy::Random)
+                    .build()
+                    .expect("new_instance succeeds");
             }
         }
+
         fn do_nothing_module() -> Arc<dyn Module> {
             extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () {}
 
