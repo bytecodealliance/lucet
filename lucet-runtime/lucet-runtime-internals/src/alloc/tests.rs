@@ -3,6 +3,8 @@ macro_rules! alloc_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
         use std::sync::Arc;
+	use rand::{Rng, SeedableRng, StdRng};
+
         use $TestRegion as TestRegion;
         use $crate::alloc::{host_page_size, AllocStrategy, Limits, MINSIGSTKSZ};
         use $crate::context::{Context, ContextHandle};
@@ -780,6 +782,10 @@ macro_rules! alloc_tests {
         /// random nature of the allocation strategy.
         #[test]
         fn slot_counts_work_with_random_alloc() {
+	    // Make me a pre-seeded rng.
+	    let seed: &[_] = &[1, 2, 3, 4];
+	    let mut rng: StdRng = SeedableRng::from_seed(seed);
+	    
             for _ in 0..100 {
                 let mut inst_vec = Vec::new();
                 let module = MockModuleBuilder::new()
@@ -795,7 +801,7 @@ macro_rules! alloc_tests {
                 for i in 1..=total_slots {
                     let inst = region
                         .new_instance_builder(module.clone())
-                        .with_alloc_strategy(AllocStrategy::Random)
+                        .with_alloc_strategy(AllocStrategy::CustomRandom(rng))
                         .build()
                         .expect("new_instance succeeds");
 
