@@ -4,6 +4,7 @@ use crate::region::RegionInternal;
 use libc::c_void;
 use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
+use rand::RngCore;
 use std::sync::{Arc, Once, Weak};
 
 pub const HOST_PAGE_SIZE_EXPECTED: usize = 4096;
@@ -94,11 +95,17 @@ impl Slot {
     }
 }
 
-/// The strategy by which a Region selects an allocation to
-/// back an `Instance`.
+/// The strategy by which a Region selects an allocation to back an `Instance`.
 pub enum AllocStrategy {
+    /// Allocate from the next slot available.
     Linear,
+    ///  Allocate randomly from the set of available slots.
     Random,
+    /// Allocate randomly from the set of available slots using the
+    /// supplied random number generator.
+    ///
+    /// This strategy is used to create deterministic random behavior for testing.
+    CustomRandom(Box<dyn RngCore>),
 }
 
 /// The structure that manages the allocations backing an `Instance`.
