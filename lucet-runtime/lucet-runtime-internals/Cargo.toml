@@ -29,7 +29,6 @@ rand_core = "0.5"
 raw-cpuid = "6.0.0"
 thiserror = "1.0.4"
 tracing = "0.1.12"
-xorshift = "0.1"
 
 # This is only a dependency to ensure that other crates don't pick a newer version as a transitive
 # dependency. `0.1.3 < getrandom <= 0.1.6` cause `lazy_static` to pull in spinlock implementations

@@ -5,7 +5,6 @@ macro_rules! alloc_tests {
         use rand::rngs::StdRng;
         use rand_core::SeedableRng;
         use std::sync::Arc;
-
         use $TestRegion as TestRegion;
         use $crate::alloc::{host_page_size, AllocStrategy, Limits, MINSIGSTKSZ};
         use $crate::context::{Context, ContextHandle};
