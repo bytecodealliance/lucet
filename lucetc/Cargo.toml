@@ -32,7 +32,6 @@ clap="2.32"
 log = "0.4"
 env_logger = "0.6"
 object = { version = "0.18.0", default-features = false, features = ["write"] }
-goblin = "0.0.24"
 byteorder = "1.2"
 # precisely pin wasmonkey, because the shared dependency on parity-wasm is very sensitive
 wasmonkey = "=0.1.9"

@@ -1018,7 +1018,6 @@ dependencies = [
  "cranelift-object 0.62.0",
  "cranelift-wasm 0.62.0",
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "goblin 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "human-size 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "lucet-module 0.6.2-dev",
