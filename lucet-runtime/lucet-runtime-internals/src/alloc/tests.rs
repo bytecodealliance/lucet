@@ -2,8 +2,9 @@
 macro_rules! alloc_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
+        use rand::rngs::StdRng;
+        use rand_core::SeedableRng;
         use std::sync::Arc;
-	use rand::{Rng, SeedableRng, StdRng};
 
         use $TestRegion as TestRegion;
         use $crate::alloc::{host_page_size, AllocStrategy, Limits, MINSIGSTKSZ};
@@ -777,15 +778,41 @@ macro_rules! alloc_tests {
         }
 
         /// This test exercises the AllocStrategy::Random. In this scenario,
+        /// the Region has a single slot which is "randomly" allocated and then dropped.
+        #[test]
+        fn slot_counts_work_with_random_alloc() {
+            let module = MockModuleBuilder::new()
+                .with_heap_spec(ONE_PAGE_HEAP)
+                .build();
+            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            assert_eq!(region.capacity(), 1);
+            assert_eq!(region.free_slots(), 1);
+            assert_eq!(region.used_slots(), 0);
+
+            let inst = region
+                .new_instance_builder(module.clone())
+                .with_alloc_strategy(AllocStrategy::Random)
+                .build()
+                .expect("new_instance succeeds");
+            assert_eq!(region.capacity(), 1);
+            assert_eq!(region.free_slots(), 0);
+            assert_eq!(region.used_slots(), 1);
+
+            drop(inst);
+            assert_eq!(region.capacity(), 1);
+            assert_eq!(region.free_slots(), 1);
+            assert_eq!(region.used_slots(), 0);
+        }
+
+        /// This test exercises the AllocStrategy::CustomRandom. In this scenario,
         /// the Region has 10 slots which are randomly allocated up to capacity
         /// and then dropped. The test is executed 100 times to exercise the
         /// random nature of the allocation strategy.
         #[test]
-        fn slot_counts_work_with_random_alloc() {
-	    // Make me a pre-seeded rng.
-	    let seed: &[_] = &[1, 2, 3, 4];
-	    let mut rng: StdRng = SeedableRng::from_seed(seed);
-	    
+        fn slot_counts_work_with_custom_random_alloc() {
+            // Make me a pre-seeded, deterministic rng.
+            let rng: StdRng = SeedableRng::seed_from_u64(0);
+
             for _ in 0..100 {
                 let mut inst_vec = Vec::new();
                 let module = MockModuleBuilder::new()
@@ -801,7 +828,7 @@ macro_rules! alloc_tests {
                 for i in 1..=total_slots {
                     let inst = region
                         .new_instance_builder(module.clone())
-                        .with_alloc_strategy(AllocStrategy::CustomRandom(rng))
+                        .with_alloc_strategy(AllocStrategy::CustomRandom(Box::new(rng.clone())))
                         .build()
                         .expect("new_instance succeeds");
 
@@ -815,7 +842,7 @@ macro_rules! alloc_tests {
                 // it and affirm that the error is handled gracefully.
                 let wont_inst = region
                     .new_instance_builder(module.clone())
-                    .with_alloc_strategy(AllocStrategy::Random)
+                    .with_alloc_strategy(AllocStrategy::CustomRandom(Box::new(rng.clone())))
                     .build();
                 assert!(wont_inst.is_err());
 
@@ -831,7 +858,7 @@ macro_rules! alloc_tests {
                 // and the Region has capacity again.
                 let _final_inst = region
                     .new_instance_builder(module.clone())
-                    .with_alloc_strategy(AllocStrategy::Random)
+                    .with_alloc_strategy(AllocStrategy::CustomRandom(Box::new(rng.clone())))
                     .build()
                     .expect("new_instance succeeds");
             }
@@ -843,6 +870,9 @@ macro_rules! alloc_tests {
         /// exercise the random nature of the allocation strategy.
         #[test]
         fn slot_counts_work_with_mixed_alloc() {
+            // Make me a pre-seeded, deterministic rng.
+            let rng: StdRng = SeedableRng::seed_from_u64(0);
+
             for _ in 0..100 {
                 let mut inst_vec = Vec::new();
                 let module = MockModuleBuilder::new()
@@ -860,7 +890,7 @@ macro_rules! alloc_tests {
                     if i % 2 == 0 {
                         inst = region
                             .new_instance_builder(module.clone())
-                            .with_alloc_strategy(AllocStrategy::Random)
+                            .with_alloc_strategy(AllocStrategy::CustomRandom(Box::new(rng.clone())))
                             .build()
                             .expect("new_instance succeeds");
                     } else {
