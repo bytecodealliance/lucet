@@ -588,10 +588,7 @@ impl KillSwitch {
                 // we're in guest code, so we can just send a signal.
                 if let Some(thread_id) = *curr_tid {
                     #[cfg(feature = "concurrent_testpoints")]
-                    state
-                        .lock_testpoints
-                        .kill_switch_before_guest_alarm
-                        .check();
+                    state.lock_testpoints.kill_switch_before_guest_alarm.check();
 
                     unsafe {
                         pthread_kill(thread_id, SIGALRM);
