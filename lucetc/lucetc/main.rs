@@ -106,10 +106,6 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.validator(validator);
     }
 
-    if let Some(ref builtins) = opts.builtins_path {
-        c.builtins(builtins);
-    }
-
     if let Some(min_reserved_size) = opts.min_reserved_size {
         c.min_reserved_size(min_reserved_size);
     }
