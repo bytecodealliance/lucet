@@ -10,7 +10,7 @@ mod config;
 pub fn bindings(args: TokenStream) -> TokenStream {
     let config = parse_macro_input!(args as config::Config);
     let doc = wasi_common::wasi::metadata::document();
-    let names = Names::new(&config.ctx_name);
+    let names = Names::new(&config.ctx_name, quote!(lucet_wiggle));
 
     let modules = doc.modules().map(|module| {
         let modname = names.module(&module.name);
@@ -34,7 +34,7 @@ pub fn bindings(args: TokenStream) -> TokenStream {
         #(#modules)*
     };
 
-    ts.extend(lucet_wiggle_generate::generate(
+    ts.extend(lucet_wiggle::generate::generate(
         &doc,
         &config.ctx_name,
         &config.constructor,
