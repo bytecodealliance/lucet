@@ -112,8 +112,8 @@ impl RegionInternal for MmapRegion {
                     return Err(Error::RegionFull(self.capacity));
                 }
                 // Get a random slot using the supplied random number generator.
-		let mut my_rng = rng.lock().unwrap();
-		let rnd_idx = my_rng.gen_range(0, free_slot_vector.len());
+                let mut my_rng = rng.lock().unwrap();
+                let rnd_idx = my_rng.gen_range(0, free_slot_vector.len());
                 slot = free_slot_vector.swap_remove(rnd_idx);
             }
         }
