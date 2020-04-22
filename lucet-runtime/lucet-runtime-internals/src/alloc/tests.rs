@@ -2,9 +2,9 @@
 macro_rules! alloc_tests {
     ( $TestRegion:path ) => {
         use libc::c_void;
+	use rand::{thread_rng, Rng, SeedableRng};
         use rand::rngs::StdRng;
-        use rand_core::SeedableRng;
-        use std::sync::Arc;
+        use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::alloc::{host_page_size, AllocStrategy, Limits, MINSIGSTKSZ};
         use $crate::context::{Context, ContextHandle};
@@ -809,9 +809,11 @@ macro_rules! alloc_tests {
         /// random nature of the allocation strategy.
         #[test]
         fn slot_counts_work_with_custom_random_alloc() {
-            // Make me a pre-seeded, deterministic rng.
-            let rng: StdRng = SeedableRng::seed_from_u64(0);
-
+	    let mut master_rng = thread_rng();
+	    let seed: u64 = master_rng.gen();
+	    let rng: StdRng = SeedableRng::seed_from_u64(seed);
+	    let shared_rng = Arc::new(Mutex::new(rng));
+	    
             for _ in 0..100 {
                 let mut inst_vec = Vec::new();
                 let module = MockModuleBuilder::new()
@@ -827,7 +829,7 @@ macro_rules! alloc_tests {
                 for i in 1..=total_slots {
                     let inst = region
                         .new_instance_builder(module.clone())
-                        .with_alloc_strategy(AllocStrategy::CustomRandom(Box::new(rng.clone())))
+                        .with_alloc_strategy(AllocStrategy::CustomRandom(shared_rng))
                         .build()
                         .expect("new_instance succeeds");
 
@@ -841,7 +843,7 @@ macro_rules! alloc_tests {
                 // it and affirm that the error is handled gracefully.
                 let wont_inst = region
                     .new_instance_builder(module.clone())
-                    .with_alloc_strategy(AllocStrategy::CustomRandom(Box::new(rng.clone())))
+                    .with_alloc_strategy(AllocStrategy::CustomRandom(shared_rng))
                     .build();
                 assert!(wont_inst.is_err());
 
@@ -857,7 +859,7 @@ macro_rules! alloc_tests {
                 // and the Region has capacity again.
                 let _final_inst = region
                     .new_instance_builder(module.clone())
-                    .with_alloc_strategy(AllocStrategy::CustomRandom(Box::new(rng.clone())))
+                    .with_alloc_strategy(AllocStrategy::CustomRandom(shared_rng))
                     .build()
                     .expect("new_instance succeeds");
             }
@@ -869,8 +871,10 @@ macro_rules! alloc_tests {
         /// exercise the random nature of the allocation strategy.
         #[test]
         fn slot_counts_work_with_mixed_alloc() {
-            // Make me a pre-seeded, deterministic rng.
-            let rng: StdRng = SeedableRng::seed_from_u64(0);
+	    let mut master_rng = thread_rng();
+	    let seed: u64 = master_rng.gen();
+	    let mut rng: StdRng = SeedableRng::seed_from_u64(seed);
+	    let shared_rng = Arc::new(Mutex::new(&mut rng));
 
             for _ in 0..100 {
                 let mut inst_vec = Vec::new();
@@ -889,7 +893,7 @@ macro_rules! alloc_tests {
                     if i % 2 == 0 {
                         inst = region
                             .new_instance_builder(module.clone())
-                            .with_alloc_strategy(AllocStrategy::CustomRandom(Box::new(rng.clone())))
+                            .with_alloc_strategy(AllocStrategy::CustomRandom(shared_rng))
                             .build()
                             .expect("new_instance succeeds");
                     } else {
@@ -910,7 +914,7 @@ macro_rules! alloc_tests {
                 // it and affirm that the error is handled gracefully.
                 let wont_inst = region
                     .new_instance_builder(module.clone())
-                    .with_alloc_strategy(AllocStrategy::Random)
+                    .with_alloc_strategy(AllocStrategy::CustomRandom(shared_rng))
                     .build();
                 assert!(wont_inst.is_err());
 
@@ -926,7 +930,7 @@ macro_rules! alloc_tests {
                 // and the Region has capacity again.
                 let _final_inst = region
                     .new_instance_builder(module.clone())
-                    .with_alloc_strategy(AllocStrategy::Random)
+		    .with_alloc_strategy(AllocStrategy::Linear)
                     .build()
                     .expect("new_instance succeeds");
             }

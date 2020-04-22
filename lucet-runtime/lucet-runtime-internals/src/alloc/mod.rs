@@ -5,7 +5,7 @@ use libc::c_void;
 use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
 use rand::RngCore;
-use std::sync::{Arc, Once, Weak};
+use std::sync::{Arc, Mutex, Once, Weak};
 
 pub const HOST_PAGE_SIZE_EXPECTED: usize = 4096;
 static mut HOST_PAGE_SIZE: usize = 0;
@@ -105,7 +105,7 @@ pub enum AllocStrategy {
     /// supplied random number generator.
     ///
     /// This strategy is used to create deterministic random behavior for testing.
-    CustomRandom(Box<dyn RngCore>),
+    CustomRandom(Arc<Mutex<dyn RngCore>>),
 }
 
 /// The structure that manages the allocations backing an `Instance`.

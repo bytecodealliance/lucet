@@ -907,7 +907,6 @@ dependencies = [
  "num-derive",
  "num-traits",
  "rand 0.7.3",
- "rand_core 0.5.1",
  "raw-cpuid 6.1.0",
  "thiserror",
  "tracing",
