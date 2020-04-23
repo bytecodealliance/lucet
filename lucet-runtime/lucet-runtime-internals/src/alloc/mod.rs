@@ -128,9 +128,6 @@ impl AllocStrategy {
                 // Get a random slot index using the supplied random
                 // number generator.
                 let mut my_rng = rng.lock().unwrap();
-
-                // TLC TODO: Be more paranoid here.  Don't just unwrap.
-
                 Ok(my_rng.gen_range(0, free_slots))
             }
         }

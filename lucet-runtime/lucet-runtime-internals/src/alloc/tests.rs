@@ -811,7 +811,10 @@ macro_rules! alloc_tests {
         fn slot_counts_work_with_custom_random_alloc() {
             let mut master_rng = thread_rng();
             let seed: u64 = master_rng.gen();
-	    eprintln!("Seeding slot_counts_work_with_custom_random_alloc() with {}", seed);
+            eprintln!(
+                "Seeding slot_counts_work_with_custom_random_alloc() with {}",
+                seed
+            );
 
             let rng: StdRng = SeedableRng::seed_from_u64(seed);
             let shared_rng = Arc::new(Mutex::new(rng));
@@ -875,7 +878,7 @@ macro_rules! alloc_tests {
         fn slot_counts_work_with_mixed_alloc() {
             let mut master_rng = thread_rng();
             let seed: u64 = master_rng.gen();
-	    eprintln!("Seeding slot_counts_work_with_mixed_alloc() with {}", seed);
+            eprintln!("Seeding slot_counts_work_with_mixed_alloc() with {}", seed);
 
             let rng: StdRng = SeedableRng::seed_from_u64(seed);
             let shared_rng = Arc::new(Mutex::new(rng));
