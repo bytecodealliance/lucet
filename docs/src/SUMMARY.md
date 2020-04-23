@@ -10,7 +10,6 @@
   - [Module integrity and authentication](./Integrity-and-authentication.md)
 - [Lucet components](./Lucet-components.md)
   - [`lucetc`](./lucetc.md)
-    - [`lucet-builtins`](./lucet-builtins.md)
   - [`lucet-runtime`](./lucet-runtime.md)
     - [`KillSwitch`](./lucet-runtime/killswitch.md)
   - [`lucet-wasi`](./lucet-wasi.md)

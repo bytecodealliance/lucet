@@ -6,13 +6,11 @@ CRATES_NOT_TESTED = lucet-spectest lucet-benchmarks lucet-runtime-example
 build-dev:
 	@echo Creating a DEBUG build
 	cargo build --workspace
-	make -C lucet-builtins
 
 .PHONY: build
 build:
 	@echo Creating a RELEASE build
 	cargo build --workspace --release --bins --lib
-	make -C lucet-builtins
 
 .PHONY: install
 install: build
@@ -93,7 +91,6 @@ audit:
 .PHONY: clean
 clean:
 	make -C benchmarks/shootout clean
-	make -C lucet-builtins clean
 	cargo clean
 
 .PHONY: indent
