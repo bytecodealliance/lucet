@@ -4,7 +4,7 @@ use crate::region::RegionInternal;
 use libc::c_void;
 use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
-use rand::RngCore;
+use rand::{thread_rng, Rng, RngCore};
 use std::sync::{Arc, Mutex, Once, Weak};
 
 pub const HOST_PAGE_SIZE_EXPECTED: usize = 4096;
@@ -106,6 +106,35 @@ pub enum AllocStrategy {
     ///
     /// This strategy is used to create deterministic random behavior for testing.
     CustomRandom(Arc<Mutex<dyn RngCore>>),
+}
+
+impl AllocStrategy {
+    /// For a given AllocStrategy, use the number of free_slots and
+    /// capacity of a Region to calculate and return the next slot
+    /// that ought to be used for Instance allocation.
+    pub fn next(&mut self, free_slots: usize, capacity: usize) -> Result<usize, Error> {
+        if free_slots == 0 {
+            return Err(Error::RegionFull(capacity));
+        }
+        match self {
+            AllocStrategy::Linear => Ok(free_slots - 1),
+            AllocStrategy::Random => {
+                // Instantiate a random number generator and get a
+                // random slot index.
+                let mut rng = thread_rng();
+                Ok(rng.gen_range(0, free_slots))
+            }
+            AllocStrategy::CustomRandom(rng) => {
+                // Get a random slot index using the supplied random
+                // number generator.
+                let mut my_rng = rng.lock().unwrap();
+
+                // TLC TODO: Be more paranoid here.  Don't just unwrap.
+
+                Ok(my_rng.gen_range(0, free_slots))
+            }
+        }
+    }
 }
 
 /// The structure that manages the allocations backing an `Instance`.

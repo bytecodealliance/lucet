@@ -8,7 +8,6 @@ use libc::c_void;
 #[cfg(not(target_os = "linux"))]
 use libc::memset;
 use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
-use rand::{thread_rng, Rng};
 use std::ptr;
 use std::sync::{Arc, RwLock, Weak};
 
@@ -80,43 +79,15 @@ impl RegionInternal for MmapRegion {
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
-        alloc_strategy: AllocStrategy,
+        mut alloc_strategy: AllocStrategy,
     ) -> Result<InstanceHandle, Error> {
         let limits = self.get_limits();
         module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
 
-        let slot;
-
-        match alloc_strategy {
-            AllocStrategy::Linear => {
-                slot = self
-                    .freelist
-                    .write()
-                    .unwrap()
-                    .pop()
-                    .ok_or(Error::RegionFull(self.capacity))?
-            }
-            AllocStrategy::Random => {
-                let mut free_slot_vector = self.freelist.write().unwrap();
-                if free_slot_vector.len() == 0 {
-                    return Err(Error::RegionFull(self.capacity));
-                }
-                // Instantiate a random number generator and get a random slot.
-                let mut rng = thread_rng();
-                let rnd_idx = rng.gen_range(0, free_slot_vector.len());
-                slot = free_slot_vector.swap_remove(rnd_idx);
-            }
-            AllocStrategy::CustomRandom(rng) => {
-                let mut free_slot_vector = self.freelist.write().unwrap();
-                if free_slot_vector.len() == 0 {
-                    return Err(Error::RegionFull(self.capacity));
-                }
-                // Get a random slot using the supplied random number generator.
-                let mut my_rng = rng.lock().unwrap();
-                let rnd_idx = my_rng.gen_range(0, free_slot_vector.len());
-                slot = free_slot_vector.swap_remove(rnd_idx);
-            }
-        }
+        // Get the next available slot according to the alloc_strategy.
+        let mut free_slot_vector = self.freelist.write().unwrap();
+        let slot_index = alloc_strategy.next(free_slot_vector.len(), self.capacity)?;
+        let slot = free_slot_vector.swap_remove(slot_index);
 
         assert_eq!(
             slot.heap as usize % host_page_size(),
