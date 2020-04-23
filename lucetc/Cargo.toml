@@ -26,22 +26,17 @@ cranelift-wasm = { path = "../wasmtime/cranelift/wasm", version = "0.62.0" }
 target-lexicon = "0.10"
 lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }
 lucet-validate = { path = "../lucet-validate", version = "=0.6.2-dev" }
-lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.6.2-dev" }
+lucet-wiggle = { path = "../lucet-wiggle", version = "=0.6.2-dev" }
 wasmparser = "0.51.2"
 clap="2.32"
 log = "0.4"
 env_logger = "0.6"
 object = { version = "0.18.0", default-features = false, features = ["write"] }
-goblin = "0.0.24"
 byteorder = "1.2"
-# precisely pin wasmonkey, because the shared dependency on parity-wasm is very sensitive
-wasmonkey = "=0.1.9"
 wabt = "0.9.2"
 tempfile = "3.0"
 bimap = "0.2"
 human-size = "0.4"
-# must match wasmonkey's version specifier
-parity-wasm = "0.41"
 minisign = "0.5.15"
 memoffset = "0.5.1"
 serde = "1.0"

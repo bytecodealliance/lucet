@@ -148,8 +148,6 @@ for lib in $LIBS; do
 done
 
 install -d -v "$LUCET_LIBEXEC_DIR" || exit 1
-install -p -v "${LUCET_SRC_PREFIX}/lucet-builtins/build/libbuiltins.so" \
-    "${LUCET_LIBEXEC_DIR}/libbuiltins.${DYLIB_SUFFIX}"
 
 setenv_file="$(mktemp)"
 cat >"$setenv_file" <<EOT

@@ -2,9 +2,6 @@
 
 * [`lucetc`](lucetc.md): the Lucet Compiler.
 
-  * [`lucet-builtins`](lucet-builtins.md): a C library that provides optimized native versions of
-    libc primitives.
-
 * [`lucet-runtime`](lucet-runtime.md): the runtime for WebAssembly modules compiled through
   `lucetc`.
 

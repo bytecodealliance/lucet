@@ -108,7 +108,6 @@ pub struct Options {
     pub witx_specs: Vec<PathBuf>,
     pub wasi_exe: bool,
     pub wiggle_bindings: bool,
-    pub builtins_path: Option<PathBuf>,
     pub min_reserved_size: Option<u64>,
     pub max_reserved_size: Option<u64>,
     pub reserved_size: Option<u64>,
@@ -156,8 +155,6 @@ impl Options {
             Some("so") => CodegenOutput::SharedObj,
             Some(_) => panic!("unknown value for emit"),
         };
-
-        let builtins_path = m.value_of("builtins").map(PathBuf::from);
 
         let min_reserved_size = if let Some(min_reserved_str) = m.value_of("min_reserved_size") {
             Some(parse_humansized(min_reserved_str)?)
@@ -230,7 +227,6 @@ impl Options {
             witx_specs,
             wasi_exe,
             wiggle_bindings,
-            builtins_path,
             min_reserved_size,
             max_reserved_size,
             reserved_size,
@@ -406,12 +402,6 @@ SSE3 but not AVX:
                         "size of linear memory guard. must be multiple of 4k. default: {}",
                         humansized(HeapSettings::default().guard_size)
                     )),
-            )
-            .arg(
-                Arg::with_name("builtins")
-                    .long("--builtins")
-                    .takes_value(true)
-                    .help("builtins file"),
             )
             .arg(
                 Arg::with_name("input")

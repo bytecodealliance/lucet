@@ -15,6 +15,7 @@ members = [
   "lucet-wasi-fuzz",
   "lucet-wasi-sdk",
   "lucet-wiggle",
+  "lucet-wiggle/macro",
   "lucet-wiggle/generate",
   "lucetc",
   "sightglass",

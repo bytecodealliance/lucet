@@ -9,7 +9,6 @@ mod load;
 mod module;
 mod name;
 mod output;
-mod patch;
 mod pointer;
 mod runtime;
 pub mod signature;
@@ -25,7 +24,6 @@ pub use crate::{
     error::Error,
     heap::HeapSettings,
     load::read_module,
-    patch::patch_module,
 };
 pub use lucet_module::bindings::Bindings;
 pub use lucet_validate::Validator;
@@ -43,7 +41,6 @@ enum LucetcInput {
 pub struct Lucetc {
     input: LucetcInput,
     bindings: Vec<Bindings>,
-    builtins_paths: Vec<PathBuf>,
     builder: CompilerBuilder,
     sk: Option<SecretKey>,
     pk: Option<PublicKey>,
@@ -73,9 +70,6 @@ pub trait LucetcOpts {
 
     fn cpu_features(&mut self, cpu_features: CpuFeatures);
     fn with_cpu_features(self, cpu_features: CpuFeatures) -> Self;
-
-    fn builtins<P: AsRef<Path>>(&mut self, builtins_path: P);
-    fn with_builtins<P: AsRef<Path>>(self, builtins_path: P) -> Self;
 
     fn validator(&mut self, validator: Validator);
     fn with_validator(self, validator: Validator) -> Self;
@@ -146,17 +140,6 @@ impl<T: AsLucetc> LucetcOpts for T {
 
     fn with_cpu_features(mut self, cpu_features: CpuFeatures) -> Self {
         self.cpu_features(cpu_features);
-        self
-    }
-
-    fn builtins<P: AsRef<Path>>(&mut self, builtins_path: P) {
-        self.as_lucetc()
-            .builtins_paths
-            .push(builtins_path.as_ref().to_owned());
-    }
-
-    fn with_builtins<P: AsRef<Path>>(mut self, builtins_path: P) -> Self {
-        self.builtins(builtins_path);
         self
     }
 
@@ -284,7 +267,6 @@ impl Lucetc {
             input: LucetcInput::Path(input.to_owned()),
             bindings: vec![],
             builder: Compiler::builder(),
-            builtins_paths: vec![],
             pk: None,
             sk: None,
             sign: false,
@@ -298,7 +280,6 @@ impl Lucetc {
             input: LucetcInput::Bytes(input),
             bindings: vec![],
             builder: Compiler::builder(),
-            builtins_paths: vec![],
             pk: None,
             sk: None,
             sign: false,
@@ -307,27 +288,14 @@ impl Lucetc {
     }
 
     fn build(&self) -> Result<(Vec<u8>, Bindings), Error> {
-        use parity_wasm::elements::{deserialize_buffer, serialize};
-
-        let mut builtins_bindings = vec![];
-        let mut module_binary = match &self.input {
+        let module_binary = match &self.input {
             LucetcInput::Bytes(bytes) => bytes.clone(),
             LucetcInput::Path(path) => read_module(&path, &self.pk, self.verify)?,
         };
 
-        if !self.builtins_paths.is_empty() {
-            let mut module = deserialize_buffer(&module_binary)?;
-            for builtins in self.builtins_paths.iter() {
-                let (newmodule, builtins_map) = patch_module(module, builtins)?;
-                module = newmodule;
-                builtins_bindings.push(Bindings::env(builtins_map));
-            }
-            module_binary = serialize(module)?;
-        }
-
+        // Collect set of Bindings into a single Bindings:
         let mut bindings = Bindings::empty();
-
-        for binding in builtins_bindings.iter().chain(self.bindings.iter()) {
+        for binding in self.bindings.iter() {
             bindings.extend(binding)?;
         }
 
