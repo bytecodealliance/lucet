@@ -525,7 +525,7 @@ impl Instance {
         self.swap_and_return()
     }
 
-    /// Run the module's [start function][start], if one exists.
+    /// Run the module's [Wasm start function][start], if one exists.
     ///
     /// If there is no start function in the module, this does nothing.
     ///
@@ -541,8 +541,12 @@ impl Instance {
     /// return `Error::StartYielded` if the start function attempts to yield. This should not arise
     /// as long as the start function does not attempt to use any imported functions.
     ///
-    /// This also returns `Error::StartAlreadyRun` if the start function has already run since the
+    /// This returns `Error::StartAlreadyRun` if the start function has already run since the
     /// instance was created or last reset.
+    ///
+    /// Wasm start functions are not allowed to call imported functions. If the start function
+    /// attempts to do so, the instance will be terminated with
+    /// `TerminationDetails::StartCalledImportFunc`.
     ///
     /// # Safety
     ///
