@@ -79,6 +79,10 @@ pub trait VmctxInternal {
     /// The dynamic type checks used by the other yield methods should make this explicit option
     /// type redundant, however this interface is used to avoid exposing a panic to the C API.
     fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&mut self, val: A) -> Option<R>;
+
+    fn is_running_start_func(&self) -> bool {
+        self.instance().state.is_running_start_func()
+    }
 }
 
 impl VmctxInternal for Vmctx {

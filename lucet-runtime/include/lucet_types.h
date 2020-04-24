@@ -30,6 +30,8 @@ enum lucet_error {
     lucet_error_dl,
     lucet_error_instance_not_returned,
     lucet_error_instance_not_yielded,
+    lucet_error_instance_needs_start,
+    lucet_error_start_already_run,
     lucet_error_start_yielded,
     lucet_error_internal,
     lucet_error_unsupported,
@@ -48,6 +50,7 @@ enum lucet_terminated_reason {
     lucet_terminated_reason_borrow_error,
     lucet_terminated_reason_provided,
     lucet_terminated_reason_remote,
+    lucet_terminated_reason_start_called_import_func,
 };
 
 enum lucet_trapcode {

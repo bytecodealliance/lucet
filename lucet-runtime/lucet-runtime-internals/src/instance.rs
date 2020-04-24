@@ -1011,7 +1011,7 @@ impl Instance {
                 || (self.state.is_faulted() && !self.state.is_fatal())
                 || self.state.is_yielded()
         );
-        self.state = State::Running;
+        self.state = State::Running { is_start_func };
 
         self.kill_state.schedule(unsafe { pthread_self() });
 
@@ -1037,7 +1037,7 @@ impl Instance {
             // As of 2020-03-20, the only early return points in the code above happen before the
             // guest would be able to run, so this should always transition from running to
             // ready or not started if there's an error.
-            if let State::Running = self.state {
+            if let State::Running { is_start_func } = self.state {
                 if is_start_func {
                     self.state = State::NotStarted;
                 } else {
@@ -1068,7 +1068,7 @@ impl Instance {
         }
 
         match st {
-            State::Running => {
+            State::Running { .. } => {
                 let retval = self.ctx.get_untyped_retval();
                 self.state = State::Ready;
                 Ok(RunResult::Returned(retval))
@@ -1205,10 +1205,6 @@ impl std::fmt::Display for FaultDetails {
 }
 
 /// Information about a terminated guest.
-///
-/// Guests are terminated either explicitly by `Vmctx::terminate()`, or implicitly by signal
-/// handlers that return `SignalBehavior::Terminate`. It usually indicates that an unrecoverable
-/// error has occurred in a hostcall, rather than in WebAssembly code.
 pub enum TerminationDetails {
     /// Returned when a signal handler terminates the instance.
     Signal,
@@ -1226,7 +1222,10 @@ pub enum TerminationDetails {
     BorrowError(&'static str),
     /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
     Provided(Box<dyn Any + 'static>),
+    /// The instance was terminated by its `KillSwitch`.
     Remote,
+    /// The instance's start function attempted to call an import function.
+    StartCalledImportFunc,
 }
 
 impl TerminationDetails {
@@ -1277,6 +1276,7 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::YieldTypeMismatch => write!(f, "YieldTypeMismatch"),
             TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
             TerminationDetails::Remote => write!(f, "Remote"),
+            TerminationDetails::StartCalledImportFunc => write!(f, "StartCalledImportFunc"),
         }
     }
 }

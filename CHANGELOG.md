@@ -2,9 +2,13 @@
 
 - Added `install_lucet_signal_handler()` and `remove_lucet_signal_handler()`, along with `Instance::ensure_signal_handler_installed()` and `Instance::ensure_sigstack_installed()` options to control the automatic installation and removal of signal handlers and alternate signal stacks. The default behaviors have not changed.
 
-- Added `Instance::run_start()` to the public API, which runs the Wasm start function if it is present in that instance's Wasm module. It does nothing if there is no start function.
+- Added `Instance::run_start()` to the public API, which runs the [Wasm start function][start-function] if it is present in that instance's Wasm module. It does nothing if there is no start function.
 
   Creating or resetting an instance no longer implicitly runs the start function. Embedders must ensure that `run_start()` is called before calling any other exported functions. `Instance::run()` will now return `Err(Error::InstanceNeedsStart)` if the start function is present but hasn't been run since the instance was created or reset.
+
+- Added a check that prevents [Wasm start functions][start-function] from calling imported functions. An instance that attempts to do so will fail with `Err(Error::RuntimeTerminated(TerminationDetails::StartCalledImportFunc))`.
+
+[start-function]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
 
 ### 0.6.1 (2020-02-18)
 

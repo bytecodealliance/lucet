@@ -1,1 +1,5 @@
-{}
+{
+    "env": {
+        "not_allowed_during_start": "not_allowed_during_start"
+    }
+}
