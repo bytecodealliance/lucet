@@ -84,10 +84,16 @@ impl RegionInternal for MmapRegion {
         let limits = self.get_limits();
         module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
 
-        // Get the next available slot according to the alloc_strategy.
-        let mut free_slot_vector = self.freelist.write().unwrap();
-        let slot_index = alloc_strategy.next(free_slot_vector.len(), self.capacity)?;
-        let slot = free_slot_vector.swap_remove(slot_index);
+        // Use the supplied alloc_strategy to get the next available slot
+        // for this new instance.
+        let slot;
+        {
+            let mut free_slot_vector = self.freelist.write().unwrap();
+            let slot_index = alloc_strategy
+                .next(free_slot_vector.len())
+                .map_err(|_| Error::RegionFull(self.capacity))?;
+            slot = free_slot_vector.swap_remove(slot_index);
+        }
 
         assert_eq!(
             slot.heap as usize % host_page_size(),

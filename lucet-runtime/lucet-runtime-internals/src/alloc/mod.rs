@@ -6,6 +6,7 @@ use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
 use rand::{thread_rng, Rng, RngCore};
 use std::sync::{Arc, Mutex, Once, Weak};
+use thiserror::Error;
 
 pub const HOST_PAGE_SIZE_EXPECTED: usize = 4096;
 static mut HOST_PAGE_SIZE: usize = 0;
@@ -95,6 +96,12 @@ impl Slot {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum AllocError {
+    #[error("There is no capacity to alloc an instance")]
+    NoCapacity,
+}
+
 /// The strategy by which a Region selects an allocation to back an `Instance`.
 pub enum AllocStrategy {
     /// Allocate from the next slot available.
@@ -109,12 +116,12 @@ pub enum AllocStrategy {
 }
 
 impl AllocStrategy {
-    /// For a given AllocStrategy, use the number of free_slots and
-    /// capacity of a Region to calculate and return the next slot
-    /// that ought to be used for Instance allocation.
-    pub fn next(&mut self, free_slots: usize, capacity: usize) -> Result<usize, Error> {
+    /// For a given AllocStrategy, use the number of free_slots to
+    /// calculate and return the next slot that ought to be used for
+    /// Instance allocation.
+    pub fn next(&mut self, free_slots: usize) -> Result<usize, AllocError> {
         if free_slots == 0 {
-            return Err(Error::RegionFull(capacity));
+            return Err(AllocError::NoCapacity);
         }
         match self {
             AllocStrategy::Linear => Ok(free_slots - 1),
