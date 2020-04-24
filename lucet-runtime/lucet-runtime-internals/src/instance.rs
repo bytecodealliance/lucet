@@ -541,6 +541,9 @@ impl Instance {
     /// return `Error::StartYielded` if the start function attempts to yield. This should not arise
     /// as long as the start function does not attempt to use any imported functions.
     ///
+    /// This also returns `Error::StartAlreadyRun` if the start function has already run since the
+    /// instance was created or last reset.
+    ///
     /// # Safety
     ///
     /// The foreign code safety caveat of [`Instance::run()`][run]
@@ -550,6 +553,9 @@ impl Instance {
     /// [start]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
     pub fn run_start(&mut self) -> Result<(), Error> {
         if let Some(start) = self.module.get_start_func()? {
+            if !self.is_not_started() {
+                return Err(Error::StartAlreadyRun);
+            }
             let res = self.run_func(start, &[])?;
             if res.is_yielded() {
                 return Err(Error::StartYielded);

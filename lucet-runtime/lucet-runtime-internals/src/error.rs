@@ -58,6 +58,9 @@ pub enum Error {
     #[error("`Instance::run_start()` must be run before running other exported functions")]
     InstanceNeedsStart,
 
+    #[error("`Instance::run_start()` called multiple times after a single instantiation or reset")]
+    StartAlreadyRun,
+
     #[error("Start function yielded")]
     StartYielded,
 

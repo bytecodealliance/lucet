@@ -70,6 +70,22 @@ macro_rules! start_tests {
         }
 
         #[test]
+        fn no_start_without_reset() {
+            let module = test_module_wasm("start", "start_and_call.wat")
+                .expect("module compiled and loaded");
+            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let mut inst = region
+                .new_instance(module)
+                .expect("instance can be created");
+
+            inst.run_start().expect("start section runs");
+            match inst.run_start().unwrap_err() {
+                Error::StartAlreadyRun => (),
+                e => panic!("unexpected error: {}", e),
+            }
+        }
+
+        #[test]
         fn start_and_reset() {
             let module = test_module_wasm("start", "start_and_call.wat")
                 .expect("module compiled and loaded");
