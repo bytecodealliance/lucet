@@ -1,5 +1,5 @@
 [package]
-name = "lucet-wasi-generate"
+name = "lucet-wiggle-macro"
 version = "0.7.0-dev"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
@@ -12,9 +12,8 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
-lucet-wiggle = { path = "../../lucet-wiggle", version = "0.7.0-dev" }
-wasi-common = { path = "../../wasmtime/crates/wasi-common",  version = "0.15.0", features = ["wiggle_metadata"] }
-wiggle-generate = { path = "../../wasmtime/crates/wiggle/generate",  version = "0.15.0" }
+lucet-wiggle-generate = { path = "../generate", version = "0.7.0-dev" }
+wiggle-generate = { path = "../../wasmtime/crates/wiggle/generate", version = "0.15.0" }
+witx = { path = "../../wasmtime/crates/wasi-common/WASI/tools/witx", version = "0.8.4" }
 syn = { version = "1.0", features = ["full"] }
 quote = "1.0"
-proc-macro2 = "1.0"

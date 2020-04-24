@@ -11,7 +11,6 @@ LUCET_RUNTIME:=$(LUCET_ROOT)/lucet-runtime
 LUCET_WASI:=$(LUCET_ROOT)/lucet-wasi
 SIGHTGLASS:=$(LUCET_ROOT)/sightglass
 
-LIBBUILTINS:=$(LUCET_ROOT)/lucet-builtins/build/libbuiltins.so
 
 SHOOTOUT:=$(LUCET_ROOT)/sightglass/benchmarks/shootout
 SHOOTOUT_SRCS:=$(shell ls $(SHOOTOUT)/*.c)
@@ -71,29 +70,19 @@ build/lucet/module.wasm.unoptimized: $(patsubst %.c, %.o, $(addprefix build/luce
 build/lucet/module.wasm: build/lucet/module.wasm.unoptimized
 	$(WASM_OPT) -mvp --disable-mutable-globals -O4 -o $@ $^
 
-# Don't emit the shared object, we need a saparate link step below.
-build/lucet/module.o: build/lucet/module.wasm $(LIBBUILTINS)
+build/lucet/module.so: build/lucet/module.wasm
 	@mkdir -p $(@D)
-	$(LUCETC) $(LUCETC_FLAGS) --emit=obj \
+	$(LUCETC) $(LUCETC_FLAGS) --emit=so \
 		--bindings=bindings.json \
 		--bindings=$(LUCET_WASI)/bindings.json \
-		--builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
+		-o $@
 
-build/lucet/module.clif: build/lucet/module.wasm $(LIBBUILTINS)
+build/lucet/module.clif: build/lucet/module.wasm
 	@mkdir -p $(@D)
 	$(LUCETC) $(LUCETC_FLAGS) --emit=clif \
 		--bindings=bindings.json \
 		--bindings=$(LUCET_WASI)/bindings.json \
-		--builtins=$(LIBBUILTINS) build/lucet/module.wasm -o $@
-
-# Because liblucet-runtime-c is dynamically loaded (transitively) by implementation.so, we
-# need to link the wasm object to the same libraries.
-build/lucet/module.so: build/lucet/module.o
-	@mkdir -p $(@D)
-	$(CC) -rdynamic -shared \
-		-L $(dir $(LIBBUILTINS)) \
-		-Wl,-rpath $(dir $(LIBBUILTINS)) \
-		build/lucet/module.o -lbuiltins -o $@
+		-o $@
 
 build/lucet/%.o: %.c
 	@mkdir -p $(@D)
@@ -108,21 +97,15 @@ build/lucet/implementation.so: $(LUCET_ROOT)/target/release/liblucet_runtime.so
 build/lucet/implementation.so: $(LUCET_ROOT)/target/release/liblucet_wasi.so
 build/lucet/implementation.so: build/lucet/wrapper.o
 build/lucet/implementation.so: build/lucet/hostcalls.o
-build/lucet/implementation.so: $(LIBBUILTINS)
 	@mkdir -p $(@D)
 	$(CC) -rdynamic -shared \
-		-L $(dir $(LIBBUILTINS)) \
-		-Wl,-rpath $(dir $(LIBBUILTINS)) \
 		build/lucet/wrapper.o build/lucet/hostcalls.o \
 		-L $(LUCET_ROOT)/target/release \
 		-Wl,-rpath $(LUCET_ROOT)/target/release \
-		-llucet_runtime -llucet_wasi -ldl -lbuiltins -o $@
+		-llucet_runtime -llucet_wasi -ldl -o $@
 
 $(LUCET_ROOT)/target/release/sightglass:
 	cargo build --release -p sightglass
-
-$(LIBBUILTINS):
-	make -C $(LUCET_ROOT)/lucet-builtins
 
 $(LUCETC):
 	cargo build --release -p lucetc

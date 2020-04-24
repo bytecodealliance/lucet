@@ -37,3 +37,33 @@ where
     drop(lock);
     r
 }
+
+pub fn with_unchanged_signal_handlers<F: FnOnce()>(f: F) {
+    fn get_handlers() -> Vec<libc::sigaction> {
+        use libc::*;
+        use std::mem::MaybeUninit;
+        const SIGNALS: &'static [c_int] = &[SIGBUS, SIGFPE, SIGILL, SIGSEGV, SIGALRM];
+
+        SIGNALS
+            .iter()
+            .map(|sig| unsafe {
+                let mut out = MaybeUninit::<sigaction>::uninit();
+                sigaction(*sig, std::ptr::null(), out.as_mut_ptr());
+                out.assume_init()
+            })
+            .collect()
+    }
+
+    let before = get_handlers();
+
+    f();
+
+    let after = get_handlers();
+
+    for (before, after) in before.into_iter().zip(after.into_iter()) {
+        assert_eq!(
+            before.sa_sigaction, after.sa_sigaction,
+            "signal handlers match before and after"
+        );
+    }
+}

@@ -1,6 +1,6 @@
 [package]
 name = "lucet-wasi-sdk"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 description = "A Rust interface to the wasi-sdk compiler and linker"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
@@ -10,13 +10,13 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-lucetc = { path = "../lucetc", version = "=0.6.2-dev" }
-lucet-module = { path = "../lucet-module", version = "=0.6.2-dev" }
+lucetc = { path = "../lucetc", version = "=0.7.0-dev" }
+lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 tempfile = "3.0"
 thiserror = "1.0.4"
 
 [dev-dependencies]
 anyhow = "1"
-lucet-validate = { path = "../lucet-validate", version  = "=0.6.2-dev" }
-lucet-wasi = { path = "../lucet-wasi", version  = "=0.6.2-dev" }
+lucet-validate = { path = "../lucet-validate", version  = "=0.7.0-dev" }
+lucet-wasi = { path = "../lucet-wasi", version  = "=0.7.0-dev" }
 target-lexicon = "0.10"

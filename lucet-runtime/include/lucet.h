@@ -33,6 +33,8 @@ uint32_t lucet_instance_heap_len(const struct lucet_instance *inst);
 
 void lucet_instance_release(struct lucet_instance *inst);
 
+enum lucet_error lucet_instance_run_start(struct lucet_instance *inst);
+
 enum lucet_error lucet_instance_reset(struct lucet_instance *inst);
 
 enum lucet_error lucet_instance_run(struct lucet_instance * inst,

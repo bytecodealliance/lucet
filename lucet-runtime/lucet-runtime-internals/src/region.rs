@@ -19,11 +19,6 @@ pub trait Region: RegionInternal {
     /// Calling `region.new_instance(module)` is shorthand for
     /// `region.new_instance_builder(module).build()` for use when further customization is
     /// unnecessary.
-    ///
-    /// # Safety
-    ///
-    /// This function runs the guest code for the WebAssembly `start` section, and running any guest
-    /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     fn new_instance(&self, module: Arc<dyn Module>) -> Result<InstanceHandle, Error> {
         self.new_instance_builder(module).build()
     }
@@ -126,11 +121,6 @@ impl<'a> InstanceBuilder<'a> {
     }
 
     /// Build the instance.
-    ///
-    /// # Safety
-    ///
-    /// This function runs the guest code for the WebAssembly `start` section, and running any guest
-    /// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
     pub fn build(self) -> Result<InstanceHandle, Error> {
         self.region
             .new_instance_with(self.module, self.embed_ctx, self.heap_memory_size_limit)

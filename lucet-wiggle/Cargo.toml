@@ -1,6 +1,6 @@
 [package]
 name = "lucet-wiggle"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
 license = "Apache-2.0 WITH LLVM-exception"
@@ -9,20 +9,15 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [lib]
-proc-macro = true
 
 [dependencies]
-lucet-wiggle-generate = { path = "./generate", version = "0.6.2-dev" }
-lucet-wiggle-runtime = { path = "./runtime", version = "0.6.2-dev" }
-wiggle-generate = { path = "../wasmtime/crates/wiggle/generate", version = "0.15.0" }
-witx = { path = "../wasmtime/crates/wasi-common/WASI/tools/witx", version = "0.8.4" }
-syn = { version = "1.0", features = ["full"] }
-quote = "1.0"
+lucet-wiggle-macro = { path = "./macro", version = "0.7.0-dev" }
+lucet-wiggle-generate = { path = "./generate", version = "0.7.0-dev" }
+lucet-runtime = { path = "../lucet-runtime", version = "0.7.0-dev" }
+wiggle =  { path = "../wasmtime/crates/wiggle", version = "0.15.0" }
 
 [dev-dependencies]
-wiggle =  { path = "../wasmtime/crates/wiggle", version = "0.15.0" }
 wiggle-test = { path = "../wasmtime/crates/wiggle/test-helpers" }
-lucet-runtime = { path = "../lucet-runtime", version = "0.6.2-dev" }
 tempfile = "3.1"
-lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.6.2-dev" }
-lucetc = { path = "../lucetc", version = "0.6.2-dev" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.7.0-dev" }
+lucetc = { path = "../lucetc", version = "0.7.0-dev" }

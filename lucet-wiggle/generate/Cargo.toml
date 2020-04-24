@@ -1,6 +1,6 @@
 [package]
 name = "lucet-wiggle-generate"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
 license = "Apache-2.0 WITH LLVM-exception"
@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 wiggle-generate = { path = "../../wasmtime/crates/wiggle/generate", version = "0.15.0" }
-lucet-module = { path = "../../lucet-module", version = "0.6.2-dev" }
+lucet-module = { path = "../../lucet-module", version = "0.7.0-dev" }
 witx = { path = "../../wasmtime/crates/wasi-common/WASI/tools/witx", version = "0.8.4" }
 quote = "1.0"
 proc-macro2 = "1.0"
