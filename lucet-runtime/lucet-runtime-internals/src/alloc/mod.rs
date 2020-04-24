@@ -109,8 +109,9 @@ pub enum AllocStrategy {
 }
 
 impl AllocStrategy {
-    /// For a given AllocStrategy, use the number of free_slots to
-    /// determine the next slot to allocate for an Instance.
+    /// For a given `AllocStrategy`, use the number of free_slots and
+    /// capacity to determine the next slot to allocate for an
+    /// `Instance`.
     pub fn next(&mut self, free_slots: usize, capacity: usize) -> Result<usize, Error> {
         if free_slots == 0 {
             return Err(Error::RegionFull(capacity));
