@@ -6,7 +6,6 @@ use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
 use rand::{thread_rng, Rng, RngCore};
 use std::sync::{Arc, Mutex, Once, Weak};
-use thiserror::Error;
 
 pub const HOST_PAGE_SIZE_EXPECTED: usize = 4096;
 static mut HOST_PAGE_SIZE: usize = 0;
@@ -96,13 +95,7 @@ impl Slot {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum AllocError {
-    #[error("There is no capacity to alloc an instance")]
-    NoCapacity,
-}
-
-/// The strategy by which a Region selects an allocation to back an `Instance`.
+/// The strategy by which a `Region` selects an allocation to back an `Instance`.
 pub enum AllocStrategy {
     /// Allocate from the next slot available.
     Linear,
@@ -111,17 +104,16 @@ pub enum AllocStrategy {
     /// Allocate randomly from the set of available slots using the
     /// supplied random number generator.
     ///
-    /// This strategy is used to create deterministic random behavior for testing.
+    /// This strategy is used to create reproducible behavior for testing.
     CustomRandom(Arc<Mutex<dyn RngCore>>),
 }
 
 impl AllocStrategy {
     /// For a given AllocStrategy, use the number of free_slots to
-    /// calculate and return the next slot that ought to be used for
-    /// Instance allocation.
-    pub fn next(&mut self, free_slots: usize) -> Result<usize, AllocError> {
+    /// determine the next slot to allocate for an Instance.
+    pub fn next(&mut self, free_slots: usize, capacity: usize) -> Result<usize, Error> {
         if free_slots == 0 {
-            return Err(AllocError::NoCapacity);
+            return Err(Error::RegionFull(capacity));
         }
         match self {
             AllocStrategy::Linear => Ok(free_slots - 1),
@@ -131,11 +123,11 @@ impl AllocStrategy {
                 let mut rng = thread_rng();
                 Ok(rng.gen_range(0, free_slots))
             }
-            AllocStrategy::CustomRandom(rng) => {
+            AllocStrategy::CustomRandom(custom_rng) => {
                 // Get a random slot index using the supplied random
                 // number generator.
-                let mut my_rng = rng.lock().unwrap();
-                Ok(my_rng.gen_range(0, free_slots))
+                let mut rng = custom_rng.lock().unwrap();
+                Ok(rng.gen_range(0, free_slots))
             }
         }
     }

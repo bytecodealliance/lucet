@@ -862,7 +862,7 @@ macro_rules! alloc_tests {
 
                 // Allocate just one more to make sure the drops took place
                 // and the Region has capacity again.
-                let _final_inst = region
+                region
                     .new_instance_builder(module.clone())
                     .with_alloc_strategy(AllocStrategy::CustomRandom(shared_rng.clone()))
                     .build()
@@ -935,7 +935,7 @@ macro_rules! alloc_tests {
 
                 // Allocate just one more to make sure the drops took place
                 // and the Region has capacity again.
-                let _final_inst = region
+                region
                     .new_instance_builder(module.clone())
                     .with_alloc_strategy(AllocStrategy::Linear)
                     .build()

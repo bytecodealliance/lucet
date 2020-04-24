@@ -89,9 +89,7 @@ impl RegionInternal for MmapRegion {
         let slot;
         {
             let mut free_slot_vector = self.freelist.write().unwrap();
-            let slot_index = alloc_strategy
-                .next(free_slot_vector.len())
-                .map_err(|_| Error::RegionFull(self.capacity))?;
+            let slot_index = alloc_strategy.next(free_slot_vector.len(), self.capacity)?;
             slot = free_slot_vector.swap_remove(slot_index);
         }
 
