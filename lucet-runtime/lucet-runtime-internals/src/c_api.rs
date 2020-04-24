@@ -315,10 +315,6 @@ pub mod lucet_result {
                                 reason: lucet_terminated_reason::Remote,
                                 provided: std::ptr::null_mut(),
                             },
-                            TerminationDetails::StartCalledImportFunc => lucet_terminated {
-                                reason: lucet_terminated_reason::StartCalledImportFunc,
-                                provided: std::ptr::null_mut(),
-                            },
                         },
                     },
                 },
@@ -373,7 +369,6 @@ pub mod lucet_result {
         BorrowError,
         Provided,
         Remote,
-        StartCalledImportFunc,
     }
 
     #[repr(C)]

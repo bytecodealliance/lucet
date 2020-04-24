@@ -21,15 +21,7 @@ pub enum State {
     ///
     /// Transitions to `Ready` when the guest function returns normally, or to `Faulted`,
     /// `Terminating`, or `Yielding` if the instance faults, terminates, or yields.
-    Running {
-        /// Indicates whether the instance is running due to `Instance::run_start()`.
-        ///
-        /// Certain elements of the runtime environment are not available during the start
-        /// function's execution, including imported functions. This flag allows us to detect when a
-        /// start function attempts to call an imported function, so that the instance can be
-        /// terminated.
-        is_start_func: bool,
-    },
+    Running,
 
     /// The instance has faulted, potentially fatally.
     ///
@@ -93,8 +85,7 @@ impl std::fmt::Display for State {
         match self {
             State::NotStarted => write!(f, "not started"),
             State::Ready => write!(f, "ready"),
-            State::Running { is_start_func } if *is_start_func => write!(f, "running start func"),
-            State::Running { .. } => write!(f, "running"),
+            State::Running => write!(f, "running"),
             State::Faulted {
                 details, siginfo, ..
             } => {
@@ -147,16 +138,8 @@ impl State {
     }
 
     pub fn is_running(&self) -> bool {
-        if let State::Running { .. } = self {
+        if let State::Running = self {
             true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_running_start_func(&self) -> bool {
-        if let State::Running { is_start_func } = self {
-            *is_start_func
         } else {
             false
         }

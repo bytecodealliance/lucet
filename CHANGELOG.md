@@ -6,8 +6,6 @@
 
   Creating or resetting an instance no longer implicitly runs the start function. Embedders must ensure that `run_start()` is called before calling any other exported functions. `Instance::run()` will now return `Err(Error::InstanceNeedsStart)` if the start function is present but hasn't been run since the instance was created or reset.
 
-- Added a check that prevents [Wasm start functions][start-function] from calling imported functions. An instance that attempts to do so will fail with `Err(Error::RuntimeTerminated(TerminationDetails::StartCalledImportFunc))`.
-
 [start-function]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
 
 ### 0.6.1 (2020-02-18)

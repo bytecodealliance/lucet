@@ -104,10 +104,6 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #hostcall
 
             let mut vmctx = #vmctx_mod::Vmctx::from_raw(vmctx_raw);
-            // import functions are not available during start func execution
-            if #vmctx_mod::VmctxInternal::is_running_start_func(&vmctx) {
-                vmctx.terminate_no_unwind(#termination_details::StartCalledImportFunc);
-            }
             #vmctx_mod::VmctxInternal::instance_mut(&mut vmctx).uninterruptable(|| {
                 let res = std::panic::catch_unwind(move || {
                     #hostcall_ident(&mut #vmctx_mod::Vmctx::from_raw(vmctx_raw), #(#impl_args),*)

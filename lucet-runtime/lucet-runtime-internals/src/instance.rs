@@ -525,7 +525,7 @@ impl Instance {
         self.swap_and_return()
     }
 
-    /// Run the module's [Wasm start function][start], if one exists.
+    /// Run the module's [start function][start], if one exists.
     ///
     /// If there is no start function in the module, this does nothing.
     ///
@@ -541,7 +541,7 @@ impl Instance {
     /// return `Error::StartYielded` if the start function attempts to yield. This should not arise
     /// as long as the start function does not attempt to use any imported functions.
     ///
-    /// This returns `Error::StartAlreadyRun` if the start function has already run since the
+    /// This also returns `Error::StartAlreadyRun` if the start function has already run since the
     /// instance was created or last reset.
     ///
     /// Wasm start functions are not allowed to call imported functions. If the start function
@@ -1015,7 +1015,7 @@ impl Instance {
                 || (self.state.is_faulted() && !self.state.is_fatal())
                 || self.state.is_yielded()
         );
-        self.state = State::Running { is_start_func };
+        self.state = State::Running;
 
         self.kill_state.schedule(unsafe { pthread_self() });
 
@@ -1041,7 +1041,7 @@ impl Instance {
             // As of 2020-03-20, the only early return points in the code above happen before the
             // guest would be able to run, so this should always transition from running to
             // ready or not started if there's an error.
-            if let State::Running { is_start_func } = self.state {
+            if let State::Running = self.state {
                 if is_start_func {
                     self.state = State::NotStarted;
                 } else {
@@ -1072,7 +1072,7 @@ impl Instance {
         }
 
         match st {
-            State::Running { .. } => {
+            State::Running => {
                 let retval = self.ctx.get_untyped_retval();
                 self.state = State::Ready;
                 Ok(RunResult::Returned(retval))
@@ -1228,8 +1228,6 @@ pub enum TerminationDetails {
     Provided(Box<dyn Any + 'static>),
     /// The instance was terminated by its `KillSwitch`.
     Remote,
-    /// The instance's start function attempted to call an import function.
-    StartCalledImportFunc,
 }
 
 impl TerminationDetails {
@@ -1280,7 +1278,6 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::YieldTypeMismatch => write!(f, "YieldTypeMismatch"),
             TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
             TerminationDetails::Remote => write!(f, "Remote"),
-            TerminationDetails::StartCalledImportFunc => write!(f, "StartCalledImportFunc"),
         }
     }
 }

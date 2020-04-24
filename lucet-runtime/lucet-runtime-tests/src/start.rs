@@ -1,19 +1,7 @@
 #[macro_export]
-macro_rules! start_common_defs {
-    () => {
-        use lucet_runtime::lucet_hostcall;
-        use lucet_runtime::vmctx::Vmctx;
-
-        #[lucet_hostcall]
-        #[no_mangle]
-        pub fn not_allowed_during_start(_vmctx: &mut Vmctx) {}
-    };
-}
-
-#[macro_export]
 macro_rules! start_tests {
     ( $TestRegion:path ) => {
-        use lucet_runtime::{DlModule, Error, Limits, Region, TerminationDetails};
+        use lucet_runtime::{DlModule, Error, Limits, Region};
         use std::sync::Arc;
         use $TestRegion as TestRegion;
         use $crate::build::test_module_wasm;
@@ -271,24 +259,6 @@ macro_rules! start_tests {
                 };
 
                 assert_eq!(afterstack.ss_sp, our_sigstack_alloc.as_mut_ptr() as *mut _);
-            });
-        }
-
-        #[test]
-        fn no_import_funcs_in_start() {
-            test_nonex(|| {
-                let module = test_module_wasm("start", "call_import_func.wat")
-                    .expect("module compiled and loaded");
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
-                let mut inst = region
-                    .new_instance(module)
-                    .expect("instance can be created");
-
-                match inst.run_start().unwrap_err() {
-                    Error::RuntimeTerminated(TerminationDetails::StartCalledImportFunc) => (),
-                    e => panic!("unexpected error: {}", e),
-                }
             });
         }
     };
