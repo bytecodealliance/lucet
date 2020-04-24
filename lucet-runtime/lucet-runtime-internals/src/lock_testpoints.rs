@@ -2,21 +2,27 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+/// A `SyncWaiter` is a handle to coordinate or execute some testing with respect to its
+/// corresponding `Syncpoint`.
+///
+/// A `SyncWaiter` corresponds to one `Syncpoint` and is created by its `wait_at`. A `SyncWaiter`
+/// can only be waited at once, which is why both `wait_and_then` and `wait` consume the waiter.
 pub struct SyncWaiter {
     arrived: Arc<AtomicBool>,
     proceed: Arc<AtomicBool>,
 }
 
 impl SyncWaiter {
-    pub fn wait(&self) {
-        while !self.arrived.load(Ordering::SeqCst) {
-            std::thread::sleep(Duration::from_millis(10));
-        }
-
-        self.proceed.store(true, Ordering::SeqCst);
+    /// Wait for the corresponding `Syncpoint` to be reached, then continue.
+    pub fn wait(self) {
+        self.wait_and_then(|| {})
     }
 
-    pub fn wait_and_then<U, F: FnOnce() -> U>(&self, f: F) -> U {
+    /// Wait for the corresponding `Syncpoint` to be reached, run the provided function, then
+    /// continue. This is useful for causing race conditions where a `Syncpoint` guarantees the
+    /// program under test has stopped at a location of interest, so the function provided to
+    /// `wait_and_then` is free to "race" with complete determinism.
+    pub fn wait_and_then<U, F: FnOnce() -> U>(self, f: F) -> U {
         while !self.arrived.load(Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(10));
         }
@@ -29,6 +35,15 @@ impl SyncWaiter {
     }
 }
 
+/// A `Syncpoint` is a tool to coordinate testing at specific locations in Lucet.
+///
+/// When `lock_testpoints` are compiled in, lucet-runtime will `check` unconditionally, where by
+/// default this is functionally a no-op. For `Syncpoint`s a test has indicated interest in, with
+/// `wait_at`, `check` becomes blocking until the test allows continuation through the
+/// corresponding `SyncWaiter` that `wait_at` constructed. This allows tests to be written that
+/// check race conditions in a deterministic manner: the runtime can execute "enter a guest", be
+/// blocked at a Syncpoint just before guest entry, and a test that termination is correct in this
+/// otherwise-unlikely circumstance can be performed.
 pub struct Syncpoint {
     arrived: Arc<AtomicBool>,
     proceed: Arc<AtomicBool>,

@@ -38,12 +38,12 @@ digraph G {
   >];
 
   init -> guest [label="run guest"];
-  init -> cancelled [label="timeout before execution"];
+  init -> cancelled [label="terminated before execution"];
   guest -> hostcall [label="guest makes hostcall"];
-  guest -> terminated [label="guest faults or times out"];
+  guest -> terminated [label="guest faults or terminated"];
   guest -> terminated [label="guest exits normally"];
   hostcall -> terminated [label="hostcall terminates instance"];
-  hostcall -> terminated [label="timeout in hostcall observed"];
+  hostcall -> terminated [label="termination in hostcall observed"];
   hostcall -> guest [label="hostcall returns normally"];
   cancelled -> terminated [label="cancelled instance is run"];
   terminated -> init [label="Instance::run cleans up and exits"];

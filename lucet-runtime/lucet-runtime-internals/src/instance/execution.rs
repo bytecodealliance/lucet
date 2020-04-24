@@ -95,9 +95,9 @@
 //!
 //! For more information about kill state, execution domains, and instance termination, see
 //! [`KillState`](struct.KillState.html), [`Domain`](enum.Domain.html), and
-/// [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate), respectively.
-///
-/// For more information about signal-safe behavior, see `signal-safety(7)`.
+//! [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate), respectively.
+//!
+//! For more information about signal-safe behavior, see `signal-safety(7)`.
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};

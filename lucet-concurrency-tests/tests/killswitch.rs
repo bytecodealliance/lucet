@@ -1,3 +1,10 @@
+//! `KillSwitch` has documentation about the correctness of its various edge cases as part of
+//! Lucet's wider documentation, see this section of the book for more:
+//! https://github.com/bytecodealliance/lucet/blob/master/docs/src/lucet-runtime/killswitch.md#implementation-complexities-when-you-have-a-scheduler-full-of-demons
+//!
+//! This module contains actual test cases exercising these conditions where possible. Phrasing
+//! from the above-mentioned section are re-used below in describing test cases. New tests should
+//! have corresponding cases in the Lucet `KillSwitch` chapter!
 use lucet_runtime::vmctx::Vmctx;
 use lucet_runtime::{
     lucet_hostcall, Error, Instance, InstanceHandle, KillError, KillSuccess, Limits, Region,
@@ -28,6 +35,15 @@ fn run_onetwothree(inst: &mut Instance) {
     assert_eq!(libc::c_int::from(retval), 123);
 }
 
+/// Construct a Lucet module with surface area for testing all kinds of KillSwitch termination
+/// cases.
+///
+/// This includes:
+/// * Normal guest execution
+/// * Hostcall execution
+/// * Yield/resume
+/// * Guest fault
+/// * Hostcall fault
 pub fn mock_killswitch_module() -> Arc<dyn Module> {
     extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
         123
@@ -170,6 +186,10 @@ where
     })
 }
 
+/// Run a test with excusive access to process-wide resources.
+///
+/// This function must wrap tests that use `ENTERING_GUEST` or rely on having a specific signal
+/// handler installed.
 pub fn test_exclusive_instance_with_instrumented_guest_entry<F, R>(f: F) -> R
 where
     F: FnOnce(InstanceHandle) -> R,
@@ -189,6 +209,10 @@ where
     })
 }
 
+/// Run a test with shared access to process-wide resources.
+///
+/// This wrapper can be used to execute tests that do not reference `ENTERING_GUEST` or rely on
+/// signal handler details. This is preferential to allow tests to run in parallel.
 pub fn test_instance_with_instrumented_guest_entry<F, R>(f: F) -> R
 where
     F: FnOnce(InstanceHandle) -> R,
@@ -205,8 +229,10 @@ where
     })
 }
 
-// Test that a timeout that occurs in a signal handler is handled cleanly without signalling the
-// Lucet embedder.
+// Test that termination in a guest works without signalling the embedder.
+//
+// This corresponds to the documentation's State B -> State E transition due to guest
+// fault/termination.
 #[test]
 fn terminate_in_guest() {
     test_exclusive_instance_with_instrumented_guest_entry(|mut inst| {
@@ -244,6 +270,9 @@ fn terminate_in_guest() {
     })
 }
 
+// Test that termination while entering a guest works without signalling the embedder.
+//
+// This corresponds to a race during the documentation's State A -> State B transition.
 #[test]
 fn terminate_entering_guest() {
     let test_entering_guest_before_domain_change: fn(&Instance) -> SyncWaiter =
@@ -289,6 +318,12 @@ fn terminate_entering_guest() {
 }
 
 // Test a termination that completes right before `exit_guest_region` takes ownership of termination.
+//
+// This corresponds to a race during the documentation's State B -> State E "due to normal exit"
+// transition.
+//
+// This test of race with a B->E transition is split into multiple test functions because there are
+// multiple kinds of races to test with different observed behaviors.
 #[test]
 fn terminate_exiting_guest_before_domain_change() {
     test_instance_with_instrumented_guest_entry(|mut inst| {
@@ -316,6 +351,14 @@ fn terminate_exiting_guest_before_domain_change() {
     })
 }
 
+// Test a termination that completes right after `exit_guest_region` finishes setting `KillState`
+// as an exited guest, but before actually returning to the host.
+//
+// This corresponds to a race during the documentation's State B -> State E "due to normal exit"
+// transition.
+//
+// This test of race with a B->E transition is split into multiple test functions because there are
+// multiple kinds of races to test with different observed behaviors.
 #[test]
 fn terminate_exiting_guest_after_domain_change() {
     test_instance_with_instrumented_guest_entry(|mut inst| {
@@ -357,6 +400,12 @@ fn terminate_exiting_guest_after_domain_change() {
 // * killswitch fires, acquiring `terminable`
 // * guest observes `terminable` is false, so it must wait for termination
 // * killswitch terminates and completes while guest is waiting
+//
+// This corresponds to a race during the documentation's State B -> State E "due to normal exit"
+// transition.
+//
+// This test of race with a B->E transition is split into multiple test functions because there are
+// multiple kinds of races to test with different observed behaviors.
 #[test]
 fn terminate_exiting_guest_during_terminable_check() {
     test_instance_with_instrumented_guest_entry(|mut inst| {
@@ -416,6 +465,8 @@ fn terminate_exiting_guest_during_terminable_check() {
     })
 }
 
+// This doesn't doesn't correspond to any state change in the documentation because it should have
+// no effect. The guest is in State E before, and should remain in State E after.
 #[test]
 fn terminate_after_guest_fault() {
     test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
@@ -437,6 +488,8 @@ fn terminate_after_guest_fault() {
     })
 }
 
+// This corresponds to the documentation's State C -> State E "terminate in hostcall observed"
+// transition.
 #[test]
 fn terminate_in_hostcall() {
     test_instance_with_instrumented_guest_entry(|mut inst| {
@@ -462,6 +515,8 @@ fn terminate_in_hostcall() {
     })
 }
 
+// This corresponds to a race during the documentation's State C -> State B "hostcall returns
+// normally" transition. On either side of this transition, the guest should terminate.
 #[test]
 fn terminate_exiting_hostcall() {
     let test_exiting_hostcall_before_domain_change: fn(&Instance) -> SyncWaiter =
@@ -506,6 +561,8 @@ fn terminate_exiting_hostcall() {
     }
 }
 
+// This corresponds to a race during the documentation's State B -> State C "guest makes hostcall"
+// transition. On either side of this transition, the guest should terminate.
 #[test]
 fn terminate_entering_hostcall() {
     let test_entering_hostcall_before_domain_change: fn(&Instance) -> SyncWaiter =
@@ -550,8 +607,10 @@ fn terminate_entering_hostcall() {
     }
 }
 
-/// This test ensures that we see an `Invalid` kill error if we are attempting to terminate
-/// an instance that has since been dropped.
+/// This test ensures that we see an `Invalid` kill error if we are attempting to terminate an
+/// instance that has since been dropped. It does not correspond to any state in the documentation
+/// because the documentation only concerns live instances, and terminating a dropped instance
+/// should have no effect either way.
 #[test]
 fn terminate_after_guest_drop() {
     let module = mock_killswitch_module();
@@ -564,6 +623,8 @@ fn terminate_after_guest_drop() {
     assert_eq!(kill_switch.terminate(), Err(KillError::Invalid));
 }
 
+// This doesn't doesn't correspond to any state change in the documentation because it should have
+// no effect. The guest is in State E before, and should remain in State E after.
 #[test]
 fn timeout_after_guest_runs() {
     let module = mock_killswitch_module();
@@ -593,6 +654,8 @@ fn timeout_after_guest_runs() {
     run_onetwothree(&mut inst);
 }
 
+// This corresponds to the documentation's State C -> State E "terminate in hostcall observed"
+// transition because instance yielding behaves the same as making a hostcall.
 #[test]
 fn timeout_while_yielded() {
     let module = mock_killswitch_module();
@@ -631,7 +694,9 @@ fn timeout_while_yielded() {
 }
 
 // Terminating an instance twice works, does not explode, and the second termination is an `Err`
-// because the instance is no longer terminable.
+// because the instance is no longer terminable. This does not correspond to any part of
+// `KillSwitch` because the instance is terminated and the second termination should have no
+// additional effect.
 #[test]
 fn double_terminate() {
     test_exclusive_instance_with_instrumented_guest_entry(|mut inst| {
@@ -687,6 +752,8 @@ fn double_terminate() {
     })
 }
 
+// This corresponds to the documentation's State A -> State D "terminate before execution"
+// transition.
 #[test]
 fn timeout_before_guest_runs() {
     let module = mock_killswitch_module();
@@ -716,7 +783,9 @@ fn timeout_before_guest_runs() {
 }
 
 /// This test ensures that we see a more informative kill error than `NotTerminable` when
-/// attempting to terminate an instance that has been reset since issuing a kill switch.
+/// attempting to terminate an instance that has been reset since issuing a kill switch. It does
+/// not correspond to any state in the documentation because the documentation only concerns live
+/// instances, and terminating a dropped instance should have no effect either way.
 #[test]
 fn timeout_after_guest_reset() {
     let module = mock_killswitch_module();
