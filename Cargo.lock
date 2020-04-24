@@ -735,16 +735,16 @@ dependencies = [
 
 [[package]]
 name = "lucet-benchmarks"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "criterion 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
- "lucet-runtime 0.6.2-dev",
- "lucet-runtime-internals 0.6.2-dev",
- "lucet-wasi 0.6.2-dev",
- "lucet-wasi-sdk 0.6.2-dev",
- "lucetc 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
+ "lucet-runtime 0.7.0-dev",
+ "lucet-runtime-internals 0.7.0-dev",
+ "lucet-wasi 0.7.0-dev",
+ "lucet-wasi-sdk 0.7.0-dev",
+ "lucetc 0.7.0-dev",
  "nix 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_cpus 1.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -753,7 +753,7 @@ dependencies = [
 
 [[package]]
 name = "lucet-module"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -773,28 +773,28 @@ dependencies = [
 
 [[package]]
 name = "lucet-objdump"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "byteorder 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "colored 1.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
  "object 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "lucet-runtime"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
- "lucet-runtime-internals 0.6.2-dev",
- "lucet-runtime-tests 0.6.2-dev",
- "lucet-wasi-sdk 0.6.2-dev",
- "lucetc 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
+ "lucet-runtime-internals 0.7.0-dev",
+ "lucet-runtime-tests 0.7.0-dev",
+ "lucet-wasi-sdk 0.7.0-dev",
+ "lucetc 0.7.0-dev",
  "nix 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -806,13 +806,13 @@ dependencies = [
 name = "lucet-runtime-example"
 version = "0.1.0"
 dependencies = [
- "lucet-runtime 0.6.2-dev",
- "lucet-wasi 0.6.2-dev",
+ "lucet-runtime 0.7.0-dev",
+ "lucet-wasi 0.7.0-dev",
 ]
 
 [[package]]
 name = "lucet-runtime-internals"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "bincode 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -823,8 +823,8 @@ dependencies = [
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)",
  "libloading 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
- "lucet-runtime-macros 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
+ "lucet-runtime-macros 0.7.0-dev",
  "memoffset 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "nix 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-derive 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -836,7 +836,7 @@ dependencies = [
 
 [[package]]
 name = "lucet-runtime-macros"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "quote 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -844,27 +844,27 @@ dependencies = [
 
 [[package]]
 name = "lucet-runtime-tests"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
- "lucet-runtime-internals 0.6.2-dev",
- "lucet-wasi-sdk 0.6.2-dev",
- "lucetc 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
+ "lucet-runtime-internals 0.7.0-dev",
+ "lucet-wasi-sdk 0.7.0-dev",
+ "lucetc 0.7.0-dev",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "lucet-spectest"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
- "lucet-runtime 0.6.2-dev",
- "lucetc 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
+ "lucet-runtime 0.7.0-dev",
+ "lucetc 0.7.0-dev",
  "serde 1.0.106 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.51 (registry+https://github.com/rust-lang/crates.io-index)",
  "target-lexicon 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -875,12 +875,12 @@ dependencies = [
 
 [[package]]
 name = "lucet-validate"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cranelift-entity 0.62.0",
- "lucet-wasi 0.6.2-dev",
- "lucet-wasi-sdk 0.6.2-dev",
+ "lucet-wasi 0.7.0-dev",
+ "lucet-wasi-sdk 0.7.0-dev",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "wabt 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -890,21 +890,21 @@ dependencies = [
 
 [[package]]
 name = "lucet-wasi"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "cast 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "human-size 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
- "lucet-runtime 0.6.2-dev",
- "lucet-runtime-internals 0.6.2-dev",
- "lucet-validate 0.6.2-dev",
- "lucet-wasi-generate 0.6.2-dev",
- "lucet-wasi-sdk 0.6.2-dev",
- "lucet-wiggle 0.6.2-dev",
- "lucetc 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
+ "lucet-runtime 0.7.0-dev",
+ "lucet-runtime-internals 0.7.0-dev",
+ "lucet-validate 0.7.0-dev",
+ "lucet-wasi-generate 0.7.0-dev",
+ "lucet-wasi-sdk 0.7.0-dev",
+ "lucet-wiggle 0.7.0-dev",
+ "lucetc 0.7.0-dev",
  "nix 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -913,16 +913,16 @@ dependencies = [
 
 [[package]]
 name = "lucet-wasi-fuzz"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
- "lucet-runtime 0.6.2-dev",
- "lucet-wasi 0.6.2-dev",
- "lucet-wasi-sdk 0.6.2-dev",
- "lucetc 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
+ "lucet-runtime 0.7.0-dev",
+ "lucet-wasi 0.7.0-dev",
+ "lucet-wasi-sdk 0.7.0-dev",
+ "lucetc 0.7.0-dev",
  "nix 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_cpus 1.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "progress 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -936,9 +936,9 @@ dependencies = [
 
 [[package]]
 name = "lucet-wasi-generate"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
- "lucet-wiggle 0.6.2-dev",
+ "lucet-wiggle 0.7.0-dev",
  "proc-macro2 1.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -948,13 +948,13 @@ dependencies = [
 
 [[package]]
 name = "lucet-wasi-sdk"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
- "lucet-validate 0.6.2-dev",
- "lucet-wasi 0.6.2-dev",
- "lucetc 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
+ "lucet-validate 0.7.0-dev",
+ "lucet-wasi 0.7.0-dev",
+ "lucetc 0.7.0-dev",
  "target-lexicon 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -962,13 +962,13 @@ dependencies = [
 
 [[package]]
 name = "lucet-wiggle"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
- "lucet-runtime 0.6.2-dev",
- "lucet-wasi-sdk 0.6.2-dev",
- "lucet-wiggle-generate 0.6.2-dev",
- "lucet-wiggle-macro 0.6.2-dev",
- "lucetc 0.6.2-dev",
+ "lucet-runtime 0.7.0-dev",
+ "lucet-wasi-sdk 0.7.0-dev",
+ "lucet-wiggle-generate 0.7.0-dev",
+ "lucet-wiggle-macro 0.7.0-dev",
+ "lucetc 0.7.0-dev",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "wiggle 0.15.0",
  "wiggle-test 0.15.0",
@@ -976,10 +976,10 @@ dependencies = [
 
 [[package]]
 name = "lucet-wiggle-generate"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
  "proc-macro2 1.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -989,9 +989,9 @@ dependencies = [
 
 [[package]]
 name = "lucet-wiggle-macro"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
- "lucet-wiggle-generate 0.6.2-dev",
+ "lucet-wiggle-generate 0.7.0-dev",
  "quote 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "wiggle-generate 0.15.0",
@@ -1000,7 +1000,7 @@ dependencies = [
 
 [[package]]
 name = "lucetc"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 dependencies = [
  "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "bimap 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1017,9 +1017,9 @@ dependencies = [
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "human-size 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "lucet-module 0.6.2-dev",
- "lucet-validate 0.6.2-dev",
- "lucet-wiggle 0.6.2-dev",
+ "lucet-module 0.7.0-dev",
+ "lucet-validate 0.7.0-dev",
+ "lucet-wiggle 0.7.0-dev",
  "memoffset 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "minisign 0.5.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "object 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",

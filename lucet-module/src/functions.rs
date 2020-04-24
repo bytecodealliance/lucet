@@ -125,9 +125,15 @@ impl OwnedFunctionMetadata {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct FunctionHandle {
     pub ptr: FunctionPointer,
     pub id: FunctionIndex,
+    /// This is `true` if and only if this handle was referenced through the start section.
+    ///
+    /// The same function may be referenced via other contexts, and will appear with `false` in this
+    /// field in those cases.
+    pub is_start_func: bool,
 }
 
 // The layout of this struct is very tightly coupled to lucetc's `write_function_manifest`!

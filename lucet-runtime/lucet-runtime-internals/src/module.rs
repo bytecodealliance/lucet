@@ -80,7 +80,11 @@ pub trait ModuleInternal: Send + Sync {
             .map(|(fn_id, _)| FunctionIndex::from_u32(fn_id as u32))
             .expect("valid function pointer");
 
-        FunctionHandle { ptr, id }
+        FunctionHandle {
+            ptr,
+            id,
+            is_start_func: false,
+        }
     }
 
     /// Look up an instruction pointer in the trap manifest.

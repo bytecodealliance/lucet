@@ -7,6 +7,11 @@ use std::ffi::{CStr, CString};
 
 /// The representation of a Lucet instance's state machine.
 pub enum State {
+    /// The instance is freshly-created, but needs to run the start section before running other entrypoints.
+    ///
+    /// Transitions to `Running` when the start section is run, and then to `Ready` if it succeeds.
+    NotStarted,
+
     /// The instance is ready to run.
     ///
     /// Transitions to `Running` when the instance is run, or to `Ready` when it's reset.
@@ -21,7 +26,8 @@ pub enum State {
     /// The instance has faulted, potentially fatally.
     ///
     /// Transitions to `Faulted` when filling in additional fault details, to `Running` if
-    /// re-running a non-fatally faulted instance, or to `Ready` when the instance is reset.
+    /// re-running a non-fatally faulted instance, or to `Ready` or `NotStarted` when the instance
+    /// is reset.
     Faulted {
         details: FaultDetails,
         siginfo: libc::siginfo_t,
@@ -36,7 +42,7 @@ pub enum State {
 
     /// The instance has terminated, and must be reset before running again.
     ///
-    /// Transitions to `Ready` if the instance is reset.
+    /// Transitions to `Ready` or `NotStarted` if the instance is reset.
     Terminated,
 
     /// The instance is in the process of yielding.
@@ -54,7 +60,8 @@ pub enum State {
 
     /// The instance has yielded.
     ///
-    /// Transitions to `Running` if the instance is resumed, or to `Ready` if the instance is reset.
+    /// Transitions to `Running` if the instance is resumed, or to `Ready` or `NotStarted` if the
+    /// instance is reset.
     Yielded {
         /// A phantom value carrying the type of the expected resumption value.
         ///
@@ -76,6 +83,7 @@ pub enum State {
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            State::NotStarted => write!(f, "not started"),
             State::Ready => write!(f, "ready"),
             State::Running => write!(f, "running"),
             State::Faulted {
@@ -113,6 +121,14 @@ impl std::fmt::Display for State {
 }
 
 impl State {
+    pub fn is_not_started(&self) -> bool {
+        if let State::NotStarted { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn is_ready(&self) -> bool {
         if let State::Ready { .. } = self {
             true
