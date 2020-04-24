@@ -11,6 +11,8 @@ use crate::alloc::{Alloc, HOST_PAGE_SIZE_EXPECTED};
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
+#[cfg(feature = "concurrent_testpoints")]
+use crate::lock_testpoints::LockTestpoints;
 use crate::module::{self, FunctionHandle, Global, GlobalValue, Module, TrapCode};
 use crate::region::RegionInternal;
 use crate::val::{UntypedRetVal, Val};
@@ -223,6 +225,10 @@ pub struct Instance {
 
     /// Small mutexed state used for remote kill switch functionality
     pub(crate) kill_state: Arc<KillState>,
+
+    #[cfg(feature = "concurrent_testpoints")]
+    /// Conditionally-present helpers to force permutations of possible races in testing.
+    pub lock_testpoints: Arc<LockTestpoints>,
 
     /// The memory allocated for this instance
     alloc: Alloc,
@@ -606,7 +612,15 @@ impl Instance {
             self.state = State::Ready;
         }
 
-        self.kill_state = Arc::new(KillState::new());
+        #[cfg(feature = "concurrent_testpoints")]
+        {
+            self.kill_state = Arc::new(KillState::new(Arc::clone(&self.lock_testpoints)));
+        }
+        #[cfg(not(feature = "concurrent_testpoints"))]
+        {
+            self.kill_state = Arc::new(KillState::new());
+        }
+
         Ok(())
     }
 
@@ -843,13 +857,23 @@ impl Instance {
     fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: CtxMap) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
 
+        #[cfg(feature = "concurrent_testpoints")]
+        let lock_testpoints = Arc::new(LockTestpoints::new());
+
+        #[cfg(feature = "concurrent_testpoints")]
+        let kill_state = Arc::new(KillState::new(Arc::clone(&lock_testpoints)));
+        #[cfg(not(feature = "concurrent_testpoints"))]
+        let kill_state = Arc::new(KillState::new());
+
         let mut inst = Instance {
             magic: LUCET_INSTANCE_MAGIC,
             embed_ctx,
             module,
             ctx: Context::new(),
             state: State::Ready,
-            kill_state: Arc::new(KillState::new()),
+            kill_state,
+            #[cfg(feature = "concurrent_testpoints")]
+            lock_testpoints,
             alloc,
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
@@ -1068,7 +1092,14 @@ impl Instance {
         if !st.is_yielding() {
             // If the instance is *not* yielding, initialize a fresh `KillState` for subsequent
             // executions, which will invalidate any existing `KillSwitch`'s weak references.
-            self.kill_state = Arc::new(KillState::default());
+            #[cfg(feature = "concurrent_testpoints")]
+            {
+                self.kill_state = Arc::new(KillState::new(Arc::clone(&self.lock_testpoints)));
+            }
+            #[cfg(not(feature = "concurrent_testpoints"))]
+            {
+                self.kill_state = Arc::new(KillState::default());
+            }
         }
 
         match st {

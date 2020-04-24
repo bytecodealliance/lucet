@@ -752,6 +752,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lucet-concurrency-tests"
+version = "0.7.0-dev"
+dependencies = [
+ "libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lucet-module 0.7.0-dev",
+ "lucet-runtime 0.7.0-dev",
+ "lucet-runtime-internals 0.7.0-dev",
+ "lucet-runtime-tests 0.7.0-dev",
+]
+
+[[package]]
 name = "lucet-module"
 version = "0.7.0-dev"
 dependencies = [
