@@ -55,6 +55,9 @@ pub enum Error {
     #[error("Instance not yielded")]
     InstanceNotYielded,
 
+    #[error("`Instance::run_start()` must be run before running other exported functions")]
+    InstanceNeedsStart,
+
     #[error("Start function yielded")]
     StartYielded,
 

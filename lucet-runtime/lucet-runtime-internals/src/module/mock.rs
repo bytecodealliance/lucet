@@ -308,9 +308,12 @@ impl ModuleInternal for MockModule {
     }
 
     fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error> {
-        Ok(self
-            .start_func
-            .map(|start| self.function_handle_from_ptr(start)))
+        let func = self.start_func.map(|start| {
+            let mut func = self.function_handle_from_ptr(start);
+            func.is_start_func = true;
+            func
+        });
+        Ok(func)
     }
 
     fn function_manifest(&self) -> &[FunctionSpec] {
