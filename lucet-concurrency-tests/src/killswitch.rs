@@ -6,13 +6,7 @@
 //! from the above-mentioned section are re-used below in describing test cases. New tests should
 //! have corresponding cases in the Lucet `KillSwitch` chapter!
 use lucet_runtime::vmctx::Vmctx;
-use lucet_runtime::{
-    // lucet_hostcall, Error,
-    lucet_hostcall,
-    Instance,
-    // InstanceHandle, KillError, KillSuccess, Limits, Region,
-    // RunResult, TerminationDetails, TrapCode,
-};
+use lucet_runtime::{lucet_hostcall, Instance};
 use std::sync::Arc;
 
 use lucet_module::FunctionPointer;
