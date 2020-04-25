@@ -254,7 +254,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 };
                 return true;
             } else {
-                // Ignore the alarm - this mean we don't even want to change the signal context,
+                // Ignore the alarm - this means we don't even want to change the signal context,
                 // just act as if it never occurred.
                 return false;
             }
