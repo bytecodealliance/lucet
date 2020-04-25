@@ -491,12 +491,19 @@ macro_rules! killswitch_tests {
 
                 // *before* termination is critical, since afterward the `KillSwitch` we test with will
                 // just take no action.
-                let unfortunate_time_to_terminate = inst.lock_testpoints.signal_handler_before_disabling_termination.wait_at();
+                let unfortunate_time_to_terminate = inst
+                    .lock_testpoints
+                    .signal_handler_before_disabling_termination
+                    .wait_at();
                 // wait for the guest to reach a point we reaaallly don't want to signal at - somewhere in
                 // the signal handler.
-                let exiting_signal_handler = inst.lock_testpoints.signal_handler_before_returning.wait_at();
+                let exiting_signal_handler = inst
+                    .lock_testpoints
+                    .signal_handler_before_returning
+                    .wait_at();
                 // and we need to know when we're ready to signal to ensure it races with.
-                let killswitch_send_signal = inst.lock_testpoints.kill_switch_after_guest_alarm.wait_at();
+                let killswitch_send_signal =
+                    inst.lock_testpoints.kill_switch_after_guest_alarm.wait_at();
 
                 let guest = thread::Builder::new()
                     .name("guest".to_owned())
@@ -529,7 +536,9 @@ macro_rules! killswitch_tests {
                 exiting_signal_handler.wait();
 
                 guest.join().expect("guest exits without panic");
-                termination_thread.join().expect("termination completes without panic");
+                termination_thread
+                    .join()
+                    .expect("termination completes without panic");
             })
         }
 
@@ -545,11 +554,20 @@ macro_rules! killswitch_tests {
 
                 // *before* termination is critical, since afterward the `KillSwitch` we test with will
                 // just take no action.
-                let unfortunate_time_to_terminate = inst.lock_testpoints.signal_handler_before_disabling_termination.wait_at();
+                let unfortunate_time_to_terminate = inst
+                    .lock_testpoints
+                    .signal_handler_before_disabling_termination
+                    .wait_at();
                 // we need to let the instance deschedule before our KillSwitch takes
                 // `execution_domain`.
-                let killswitch_acquire_domain = inst.lock_testpoints.kill_switch_after_acquiring_termination.wait_at();
-                let current_instance_cleared = inst.lock_testpoints.instance_after_clearing_current_instance.wait_at();
+                let killswitch_acquire_domain = inst
+                    .lock_testpoints
+                    .kill_switch_after_acquiring_termination
+                    .wait_at();
+                let current_instance_cleared = inst
+                    .lock_testpoints
+                    .instance_after_clearing_current_instance
+                    .wait_at();
 
                 let guest = thread::Builder::new()
                     .name("guest".to_owned())
@@ -582,7 +600,9 @@ macro_rules! killswitch_tests {
                 killswitch_acquire_domain.wait();
 
                 guest.join().expect("guest exits without panic");
-                termination_thread.join().expect("termination completes without panic");
+                termination_thread
+                    .join()
+                    .expect("termination completes without panic");
             })
         }
 

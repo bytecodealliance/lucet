@@ -349,7 +349,10 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 // If we'd already decided to ignore this instance's alarm, we must have already
                 // signalled in a fatal way, *and* successfully disabled termination more than once
                 // (which itself should be impossible).
-                assert!(!ignored, "runtime must decide to ignore an instance's alarm at most once");
+                assert!(
+                    !ignored,
+                    "runtime must decide to ignore an instance's alarm at most once"
+                );
             } else {
                 // We are terminating this instance on account of `switch_to_host`, and we disabled
                 // termination. Check in at the appropriate testpoint and continue.

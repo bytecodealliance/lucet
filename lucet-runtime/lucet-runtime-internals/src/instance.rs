@@ -1054,7 +1054,9 @@ impl Instance {
         });
 
         #[cfg(feature = "concurrent_testpoints")]
-        self.lock_testpoints.instance_after_clearing_current_instance.check();
+        self.lock_testpoints
+            .instance_after_clearing_current_instance
+            .check();
 
         if let Err(e) = res {
             // Something went wrong setting up or tearing down the signal handlers and signal

@@ -633,10 +633,7 @@ impl KillSwitch {
                     }
 
                     #[cfg(feature = "concurrent_testpoints")]
-                    state
-                        .lock_testpoints
-                        .kill_switch_after_guest_alarm
-                        .check();
+                    state.lock_testpoints.kill_switch_after_guest_alarm.check();
 
                     // wait for the SIGALRM handler to deschedule the instance
                     //
