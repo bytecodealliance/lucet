@@ -95,9 +95,9 @@
 //!
 //! For more information about kill state, execution domains, and instance termination, see
 //! [`KillState`](struct.KillState.html), [`Domain`](enum.Domain.html), and
-/// [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate), respectively.
-///
-/// For more information about signal-safe behavior, see `signal-safety(7)`.
+//! [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate), respectively.
+//!
+//! For more information about signal-safe behavior, see `signal-safety(7)`.
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -627,10 +627,7 @@ impl KillSwitch {
                 // we're in guest code, so we can just send a signal.
                 if let Some(thread_id) = *curr_tid {
                     #[cfg(feature = "concurrent_testpoints")]
-                    state
-                        .lock_testpoints
-                        .kill_switch_before_guest_alarm
-                        .check();
+                    state.lock_testpoints.kill_switch_before_guest_alarm.check();
 
                     unsafe {
                         pthread_kill(thread_id, SIGALRM);

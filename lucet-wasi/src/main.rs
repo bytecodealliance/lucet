@@ -258,6 +258,8 @@ fn run(config: Config<'_>) {
             });
         }
 
+        inst.run_start().expect("Wasm start function runs");
+
         match inst.run(config.entrypoint, &[]) {
             // normal termination implies 0 exit code
             Ok(RunResult::Returned(_)) => 0,

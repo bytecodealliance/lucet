@@ -1,9 +1,7 @@
 #[macro_export]
 macro_rules! guest_fault_common_defs {
     () => {
-        use common::{
-            mock_traps_module, with_unchanged_signal_handlers, HOSTCALL_TEST_ERROR, RECOVERABLE_PTR,
-        };
+        use common::{mock_traps_module, HOSTCALL_TEST_ERROR, RECOVERABLE_PTR};
         pub mod common {
             use lucet_module::{FunctionPointer, TrapCode, TrapSite};
             use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
@@ -161,36 +159,6 @@ macro_rules! guest_fault_common_defs {
                     ))
                     .build()
             }
-
-            pub fn with_unchanged_signal_handlers<F: FnOnce()>(f: F) {
-                fn get_handlers() -> Vec<libc::sigaction> {
-                    use libc::*;
-                    use std::mem::MaybeUninit;
-                    const SIGNALS: &'static [c_int] = &[SIGBUS, SIGFPE, SIGILL, SIGSEGV, SIGALRM];
-
-                    SIGNALS
-                        .iter()
-                        .map(|sig| unsafe {
-                            let mut out = MaybeUninit::<sigaction>::uninit();
-                            sigaction(*sig, std::ptr::null(), out.as_mut_ptr());
-                            out.assume_init()
-                        })
-                        .collect()
-                }
-
-                let before = get_handlers();
-
-                f();
-
-                let after = get_handlers();
-
-                for (before, after) in before.into_iter().zip(after.into_iter()) {
-                    assert_eq!(
-                        before.sa_sigaction, after.sa_sigaction,
-                        "signal handlers match before and after"
-                    );
-                }
-            }
         }
 
         #[test]
@@ -218,7 +186,8 @@ macro_rules! guest_fault_tests {
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
         use $crate::helpers::{
-            test_ex, test_nonex, FunctionPointer, MockExportBuilder, MockModuleBuilder,
+            test_ex, test_nonex, with_unchanged_signal_handlers, FunctionPointer,
+            MockExportBuilder, MockModuleBuilder,
         };
 
         lazy_static! {

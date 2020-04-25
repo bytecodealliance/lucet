@@ -7,10 +7,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    //
     // General #[from] implementations.
-    #[error("Builtins: {0}")]
-    Builtins(#[from] parity_wasm::elements::Error),
     #[error("Clif module: {0}")]
     ClifModuleError(#[from] ClifModuleError),
     #[error("Translating: {0}")]
@@ -29,10 +26,6 @@ pub enum Error {
     WatInput(#[from] wabt::Error),
     #[error("Object artifact: {1}. {0:?}")]
     ObjectArtifact(#[source] object::write::Error, String),
-    // Cannot apply #[from] or #[source] to these error types due to missing traits.
-    #[error("Patcher: {0:?}")]
-    Patcher(wasmonkey::WError),
-    //
     // And all the rest
     #[error("Function definition error in {symbol}")]
     FunctionDefinition {

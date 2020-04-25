@@ -1,23 +1,36 @@
-extern crate proc_macro;
-use proc_macro::TokenStream;
-use quote::quote;
-use syn::parse_macro_input;
+pub use lucet_wiggle_generate::bindings;
+pub use lucet_wiggle_macro::from_witx;
+pub use wiggle::{
+    witx, GuestBorrows, GuestError, GuestErrorType, GuestMemory, GuestPtr, GuestType,
+    GuestTypeTransparent, Pointee,
+};
 
-#[proc_macro]
-pub fn from_witx(args: TokenStream) -> TokenStream {
-    let mut config = parse_macro_input!(args as lucet_wiggle_generate::Config);
-    config.wiggle.witx.make_paths_relative_to(
-        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANFIEST_DIR env var"),
-    );
+pub mod generate {
+    pub use lucet_wiggle_generate::*;
+}
 
-    let doc = witx::load(&config.wiggle.witx.paths).expect("lucet loading witx");
+pub mod runtime {
+    use lucet_runtime::vmctx::Vmctx;
+    use std::cell::RefMut;
+    use wiggle::GuestMemory;
 
-    let mut ts = wiggle_generate::generate(&doc, &config.wiggle);
-    ts.extend(lucet_wiggle_generate::generate(
-        &doc,
-        &config.wiggle.ctx.name,
-        &config.constructor,
-        &quote!(super),
-    ));
-    TokenStream::from(ts)
+    pub struct LucetMemory<'a> {
+        mem: RefMut<'a, [u8]>,
+    }
+
+    impl<'a> LucetMemory<'a> {
+        pub fn new(vmctx: &Vmctx) -> LucetMemory {
+            LucetMemory {
+                mem: vmctx.heap_mut(),
+            }
+        }
+    }
+
+    unsafe impl<'a> GuestMemory for LucetMemory<'a> {
+        fn base(&self) -> (*mut u8, u32) {
+            let len = self.mem.len() as u32;
+            let ptr = self.mem.as_ptr();
+            (ptr as *mut u8, len)
+        }
+    }
 }

@@ -81,7 +81,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     let mut bindings = Bindings::empty();
     if opts.wiggle_bindings {
         if let Some(ref v) = validator {
-            bindings.extend(&lucet_wiggle_generate::bindings(v.doc()))?;
+            bindings.extend(&lucet_wiggle::bindings(v.doc()))?;
         }
     }
     for file in opts.binding_files.iter() {
@@ -104,10 +104,6 @@ pub fn run(opts: &Options) -> Result<(), Error> {
 
     if let Some(validator) = validator.take() {
         c.validator(validator);
-    }
-
-    if let Some(ref builtins) = opts.builtins_path {
-        c.builtins(builtins);
     }
 
     if let Some(min_reserved_size) = opts.min_reserved_size {

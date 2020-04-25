@@ -1,16 +1,16 @@
 export GUEST_MODULE_PREFIX:=$(abspath .)
 
+CRATES_NOT_TESTED = lucet-spectest lucet-benchmarks lucet-runtime-example
+
 .PHONY: build-dev
 build-dev:
 	@echo Creating a DEBUG build
 	cargo build --workspace
-	make -C lucet-builtins
 
 .PHONY: build
 build:
 	@echo Creating a RELEASE build
 	cargo build --workspace --release --bins --lib
-	make -C lucet-builtins
 
 .PHONY: install
 install: build
@@ -25,19 +25,22 @@ test: indent-check test-packages
 
 .PHONY: test-packages
 test-packages:
-	cargo test --no-fail-fast \
-            -p lucet-runtime-internals \
-            -p lucet-runtime \
-            -p lucet-module \
-            -p lucetc \
-            -p lucet-wasi-sdk \
-            -p lucet-wasi \
-            -p lucet-wasi-fuzz \
-            -p lucet-validate \
-            -p lucet-wiggle
+	cargo test --no-fail-fast --all $(CRATES_NOT_TESTED:%=--exclude %)
 
 .PHONY: test-full
 test-full: indent-check audit book test-ci test-benchmarks test-fuzz
+
+# The --release option runs the tests on an artifact built in release mode. We
+# have found regressions in release mode due to optimizations in the past.
+.PHONY: test-release
+test-release:
+	cargo test --release --no-fail-fast --all --exclude $(CRATES_NOT_TESTED:%=--exclude %)
+
+.PHONY: test-release-executables
+test-release-executables:
+	cargo build --release
+	helpers/lucet-toolchain-tests/signature.sh
+	helpers/lucet-toolchain-tests/objdump.sh
 
 .PHONY: test-ci
 test-ci: test-packages test-objdump test-bitrot test-signature test-objdump
@@ -88,7 +91,6 @@ audit:
 .PHONY: clean
 clean:
 	make -C benchmarks/shootout clean
-	make -C lucet-builtins clean
 	cargo clean
 
 .PHONY: indent
@@ -106,12 +108,4 @@ package:
 
 .PHONY: watch
 watch:
-	cargo watch --exec "test \
-            -p lucet-runtime-internals \
-            -p lucet-runtime \
-            -p lucet-module \
-            -p lucetc \
-            -p lucet-wasi-sdk \
-            -p lucet-wasi \
-            -p lucet-benchmarks \
-            -p lucet-validate"
+	cargo watch --exec "test --all --exclude $(CRATES_NOT_TESTED)"

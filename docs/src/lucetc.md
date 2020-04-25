@@ -37,7 +37,6 @@ FLAGS:
 
 OPTIONS:
         --bindings <bindings>...                   path to bindings json file
-        --builtins <builtins>                      builtins file
         --emit <emit>
             type of code to generate (default: so) [possible values: obj, so, clif]
 
@@ -115,8 +114,3 @@ all the symbols available in the `lucet-wasi` runtime.
 
 * `--opt-level 2` generates the fastest and smallest, but is compilation is about twice as slow as
   `0`.
-
-## Builtins
-
-`lucetc` can replace internal functions with calls to external, optimized implementations; see
-[`lucet-builtins`](./lucet-builtins.md).

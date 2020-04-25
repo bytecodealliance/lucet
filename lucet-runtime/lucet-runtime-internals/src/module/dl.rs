@@ -249,7 +249,11 @@ impl ModuleInternal for DlModule {
             .ok_or_else(|| Error::SymbolNotFound(sym.to_string()))
             .map(|id| {
                 let ptr = self.function_manifest()[id.as_u32() as usize].ptr();
-                FunctionHandle { ptr, id }
+                FunctionHandle {
+                    ptr,
+                    id,
+                    is_start_func: false,
+                }
             })
     }
 
@@ -274,9 +278,12 @@ impl ModuleInternal for DlModule {
             if start_func.is_null() {
                 lucet_incorrect_module!("`guest_start` is defined but null");
             }
-            Ok(Some(self.function_handle_from_ptr(
-                FunctionPointer::from_usize(unsafe { **start_func } as usize),
-            )))
+            let mut func = self
+                .function_handle_from_ptr(FunctionPointer::from_usize(
+                    unsafe { **start_func } as usize
+                ));
+            func.is_start_func = true;
+            Ok(Some(func))
         } else {
             Ok(None)
         }

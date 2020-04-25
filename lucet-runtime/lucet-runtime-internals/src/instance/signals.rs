@@ -332,7 +332,8 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                 .signal_handler_before_disabling_termination
                 .check();
 
-            // we must disable termination so no KillSwitch may fire in host code.
+            // we must disable termination so no KillSwitch for this execution may fire in host
+            // code.
             let can_terminate = inst.kill_state.disable_termination();
 
             if !can_terminate {
@@ -396,9 +397,7 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
 
             // and the entire reason we're grabbing the instance again: lock for any races we're
             // testing with last-stretch signal handling.
-            inst.lock_testpoints
-                .signal_handler_before_returning
-                .check();
+            inst.lock_testpoints.signal_handler_before_returning.check();
         });
     }
 }

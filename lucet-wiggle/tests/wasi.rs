@@ -1,10 +1,10 @@
 use lucet_runtime::vmctx::Vmctx;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
 use lucet_wasi_sdk::{CompileOpts, Link, LinkOpt, LinkOpts};
+use lucet_wiggle::{GuestError, GuestErrorType, GuestPtr};
 use lucetc::{Lucetc, LucetcOpts};
 use std::cell::{RefCell, RefMut};
 use tempfile::TempDir;
-use wiggle::{GuestError, GuestErrorType, GuestPtr};
 
 /// Context struct used to implement the wiggle trait:
 pub struct LucetWasiCtx<'a> {
@@ -13,7 +13,7 @@ pub struct LucetWasiCtx<'a> {
 }
 
 impl<'a> LucetWasiCtx<'a> {
-    /// Constructor from vmctx. Given to lucet_wiggle_generate by the `constructor` field in proc
+    /// Constructor from vmctx. Given to lucet_wiggle::generate by the `constructor` field in proc
     /// macro.
     pub fn build(vmctx: &'a Vmctx) -> Self {
         LucetWasiCtx {
@@ -385,6 +385,8 @@ fn main() {
     // The `init` function ensures that all of the host call functions are
     // linked into the executable.
     crate::hostcalls::init();
+    // Same for lucet-runtime:
+    lucet_runtime::lucet_internal_ensure_linked();
 
     // Temporary directory for outputs.
     let workdir = TempDir::new().expect("create working directory");
@@ -404,9 +406,10 @@ fn main() {
     // We used lucet_wiggle to define the hostcall functions, so we must use
     // it to define our bindings as well. This is a good thing! No more
     // bindings json files to keep in sync with implementations.
-    let witx_doc = witx::load(&["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx"])
-        .expect("load snapshot 1 witx");
-    let bindings = lucet_wiggle_generate::bindings(&witx_doc);
+    let witx_doc =
+        lucet_wiggle::witx::load(&["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx"])
+            .expect("load snapshot 1 witx");
+    let bindings = lucet_wiggle::generate::bindings(&witx_doc);
 
     // Build a shared object with Lucetc:
     let native_build = Lucetc::new(wasm_file).with_bindings(bindings);

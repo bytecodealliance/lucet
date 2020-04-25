@@ -1,6 +1,6 @@
 [package]
 name = "lucet-wasi-fuzz"
-version = "0.6.2-dev"
+version = "0.7.0-dev"
 description = "Test the Lucet toolchain against native code execution using Csmith"
 homepage = "https://github.com/fastly/lucet"
 repository = "https://github.com/fastly/lucet"
