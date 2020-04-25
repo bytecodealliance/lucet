@@ -468,27 +468,26 @@ impl KillState {
         *self.thread_id.lock().unwrap() = None;
         self.tid_change_notifier.notify_all();
 
-        // This is a load-bearing lock in that it forces descheduling to wait for a possibly
-        // in-flight termination to complete. If a KillSwitch was firing exactly when an instance
-        // returned it was either through a signal handler, or `lucet_context_backstop`.
+        // If a guest is being descheduled, this lock is load-bearing in two ways:
+        // * If a KillSwitch is in flight and already holds `execution_domain`, we must wait for
+        // it to complete. This prevents a SIGALRM from being sent at some point later in host
+        // execution.
+        // * If a KillSwitch has aqcuired `terminable`, but not `execution_domain`, we may win the
+        // race for this lock. We don't know when the KillSwitch will try to check
+        // `execution_domain`. Holding the lock, we can update it to `Terminated` - this reflects
+        // that the instance has exited, but also signals that the KillSwitch should take no
+        // effect.
         //
-        // In the backstop case, termination is disabled (no KillSwitch fires), or failed to
-        // disable and waited for a KillSwitch to signal. No work necessary here.
+        // This must occur *after* notifing `tid_change_notifier` so that we indicate to a
+        // `KillSwitch` that the instance was actually descheduled, if it was terminating a guest.
         //
-        // In the signal handler case, we cannot guarantee no KillSwitch attempted to fire before
-        // or during the signal handler, only that no KillSwitch fires after the signal handler
-        // completes. If a KillSwitch began firing in a signal handler and fired by sending a
-        // signal it would arrive either immediately at unmask, or some point later if it did not
-        // become pending during the signal handler's execution. Lock here to bound "some point
-        // later" to this descheduling - terminate() will not release this lock until termination
-        // is complete, so in the noisiest form of termination (SIGALRM to this instance's thread)
-        // we prevent the risk of this instance being descheduled, a KillSwitch firing to this TID,
-        // a new instance being scheduled, and spuriously receiving an old instance's timeout
-        // SIGALRM.
-        //
-        // This must occur *after* notifing `tid_change_notifier` so that we indicate to the
-        // `KillSwitch` that the instance was actually descheduled.
-        let _ = self.execution_domain.lock().unwrap();
+        // If any other state is being descheduled, either the instance faulted in another domain,
+        // or a hostcall called `yield`, and we must preserve the `Hostcall` domain, so don't
+        // change it.
+        let mut execution_domain = self.execution_domain.lock().unwrap();
+        if let Domain::Guest = *execution_domain {
+            *execution_domain = Domain::Terminated;
+        }
     }
 }
 

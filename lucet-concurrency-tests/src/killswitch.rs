@@ -533,6 +533,59 @@ macro_rules! killswitch_tests {
             })
         }
 
+        // Variant of the above where for scheduler reasons `terminable` and
+        // `execution_domain.lock()` happen on different sides of an instance descheduling.
+        //
+        // This corresponds to a race during the documentation's State B -> State E "guest faults
+        // or is terminated" transition.
+        #[test]
+        fn terminate_during_guest_fault_racing_deschedule() {
+            test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
+                let kill_switch = inst.kill_switch();
+
+                // *before* termination is critical, since afterward the `KillSwitch` we test with will
+                // just take no action.
+                let unfortunate_time_to_terminate = inst.lock_testpoints.signal_handler_before_disabling_termination.wait_at();
+                // we need to let the instance deschedule before our KillSwitch takes
+                // `execution_domain`.
+                let killswitch_acquire_domain = inst.lock_testpoints.kill_switch_after_acquiring_termination.wait_at();
+                let current_instance_cleared = inst.lock_testpoints.instance_after_clearing_current_instance.wait_at();
+
+                let guest = thread::Builder::new()
+                    .name("guest".to_owned())
+                    .spawn(move || {
+                        match inst.run("main", &[0u32.into(), 0u32.into()]) {
+                            Err(Error::RuntimeFault(details)) => {
+                                assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        // Check that we can reset the instance and run a normal function.
+                        inst.reset().expect("instance resets");
+                        run_onetwothree(&mut inst);
+                    })
+                    .expect("can spawn guest thread");
+
+                let termination_thread = unfortunate_time_to_terminate.wait_and_then(|| {
+                    let ks_thread = thread::Builder::new()
+                        .name("killswitch".to_owned())
+                        .spawn(move || {
+                            assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
+                        })
+                        .expect("can spawn killswitch thread");
+
+                    ks_thread
+                });
+
+                current_instance_cleared.wait();
+                killswitch_acquire_domain.wait();
+
+                guest.join().expect("guest exits without panic");
+                termination_thread.join().expect("termination completes without panic");
+            })
+        }
+
         // This doesn't doesn't correspond to any state change in the documentation because it should have
         // no effect. The guest is in State E before, and should remain in State E after.
         #[test]
