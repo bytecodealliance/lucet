@@ -367,9 +367,9 @@ handlers used with Lucet is that they may not lock on `KillState`'s
 
 As a consequence, a `KillSwitch` may fire during the handling of a guest fault.
 `sigaction` must mask `SIGALRM` so that a signal fired before the handler exits
-does not preempt the handler.  If the signal behavior is to continue without
+does not preempt the handler. If the signal behavior is to continue without
 effect, leave termination in place and continue to the guest. A pending SIGALRM
-will be raised at this point and the instance will exit.  Otherwise, the signal
+will be raised at this point and the instance will exit. Otherwise, the signal
 handler has determined it must return to the host, and must be sensitive to a
 possible in-flight `KillSwitch`..
 
@@ -382,21 +382,21 @@ In the case we know three things:
 
 First, we handle the risk of a `KillSwitch` firing: disable termination. If we
 acquire `terminable`, we know this is to the exclusion of any `KillSwitch`, and
-are safe to return. If we do not acquire `terminable`, a `KillSwitch` has, or
-is in the process of, signalling a guest termination. This means a `SIGALRM` is
+are safe to return. Otherwise, some `KillSwitch` has terminated, or is in the
+process of terminating, this guest's execution. This means a `SIGALRM` may be
 pending or imminent!
 
-A slightly simpler model is to consider that a `SIGALRM` will arrive in the
+A slightly simpler model is to consider that a `SIGALRM` may arrive in the
 future. For correctness, then, we only have to make sure we handle the signal
-we will be sent! We know that we must return to the host, and the guest fault
+we can be sent! We know that we must return to the host, and the guest fault
 that occurred is certainly more interesting than the guest termination, so we
 would like to preserve that information. There is no information or effect we
-want from the signal, so silence the alarm on `KillState`. This way, when we
-recieve the imminent `SIGARLM`, we know to ignore it.
+want from the signal, so silence the alarm on `KillState`. This way, if we
+recieve the possible `SIGARLM`, we know to ignore it.
 
-An important question to ask is "How do we know the imminent `SIGARLM` must be
-ignored? Could it not be for another instance?" The answer is, in short, "We
-ensure it cannot!"
+An important question to ask is "How do we know the possible `SIGARLM` must be
+ignored? Could it not be for another instance later on that thread?" The answer
+is, in short, "We ensure it cannot!"
 
 The `SIGARLM` is thread-directed, so to be an alarm for some other reason,
 another instance would have to run and be terminated. To prevent this, we must
