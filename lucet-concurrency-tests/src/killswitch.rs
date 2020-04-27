@@ -596,19 +596,20 @@ macro_rules! killswitch_tests {
                     })
                     .expect("can spawn guest thread");
 
-                let (termination_thread, killswitch_before_domain) = unfortunate_time_to_terminate.wait_and_then(|| {
-                    let ks_thread = thread::Builder::new()
-                        .name("killswitch".to_owned())
-                        .spawn(move || {
-                            assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
-                        })
-                        .expect("can spawn killswitch thread");
+                let (termination_thread, killswitch_before_domain) = unfortunate_time_to_terminate
+                    .wait_and_then(|| {
+                        let ks_thread = thread::Builder::new()
+                            .name("killswitch".to_owned())
+                            .spawn(move || {
+                                assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
+                            })
+                            .expect("can spawn killswitch thread");
 
-                    // Pause the KillSwitch thread right before it acquires `execution_domain`
-                    let killswitch_before_domain = killswitch_acquire_termination.pause();
+                        // Pause the KillSwitch thread right before it acquires `execution_domain`
+                        let killswitch_before_domain = killswitch_acquire_termination.pause();
 
-                    (ks_thread, killswitch_before_domain)
-                });
+                        (ks_thread, killswitch_before_domain)
+                    });
 
                 // `execution_domain` is not held, so instance descheduling will complete promptly.
                 current_instance_cleared.wait();
