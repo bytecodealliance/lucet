@@ -522,16 +522,17 @@ macro_rules! killswitch_tests {
                     .expect("can spawn guest thread");
 
                 let termination_thread = unfortunate_time_to_terminate.wait_and_then(|| {
-                    thread::Builder::new()
+                    let thread = thread::Builder::new()
                         .name("killswitch".to_owned())
                         .spawn(move || {
                             assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
                         })
-                        .expect("can spawn killswitch thread")
+                        .expect("can spawn killswitch thread");
+                    killswitch_send_signal.wait();
+                    thread
                 });
 
                 // Get ready to signal...
-                killswitch_send_signal.wait();
                 // and be sure that we haven't exited the signal handler until afterward
                 exiting_signal_handler.wait();
 
@@ -872,12 +873,12 @@ macro_rules! killswitch_tests {
 
                 ks1.join().expect("killswitch_1 did not panic");
 
-                // At this point the first `KillSwitch` has completed terminating the instance. Now try
-                // again and make sure there's no boom.
-                assert_eq!(second_kill_switch.terminate(), Err(KillError::Invalid));
-
                 // Allow the instance to reset and run a new function after termination.
-                guest_exit_testpoint.wait();
+                guest_exit_testpoint.wait_and_then(|| {
+                    // At this point the first `KillSwitch` has completed terminating the instance. Now try
+                    // again and make sure there's no boom.
+                    assert_eq!(second_kill_switch.terminate(), Err(KillError::Invalid));
+                });
 
                 // And after the instance successfully runs a test function, it exits without error.
                 guest.join().expect("guest stops running");
