@@ -95,15 +95,17 @@
 //!
 //! For more information about kill state, execution domains, and instance termination, see
 //! [`KillState`](struct.KillState.html), [`Domain`](enum.Domain.html), and
-/// [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate), respectively.
-///
-/// For more information about signal-safe behavior, see `signal-safety(7)`.
+//! [`KillSwitch::terminate`](struct.KillSwitch.html#method.terminate), respectively.
+//!
+//! For more information about signal-safe behavior, see `signal-safety(7)`.
 use libc::{pthread_kill, pthread_t, SIGALRM};
 use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use crate::instance::{Instance, TerminationDetails};
+#[cfg(feature = "concurrent_testpoints")]
+use crate::lock_testpoints::LockTestpoints;
 
 /// All instance state a remote kill switch needs to determine if and how to signal that execution
 /// should stop.
@@ -147,6 +149,10 @@ pub struct KillState {
     /// `tid_change_notifier` allows functions that may cause a change in `thread_id` to wait,
     /// without spinning, for the signal to be processed.
     tid_change_notifier: Condvar,
+    #[cfg(feature = "concurrent_testpoints")]
+    /// When testing race permutations, `KillState` keeps a reference to the `LockTestpoints` its
+    /// associated instance holds.
+    lock_testpoints: Arc<LockTestpoints>,
 }
 
 /// Enter a guest region.
@@ -170,12 +176,29 @@ pub struct KillState {
 /// guest code, currently in a hostcall, or as cancelled.  Attempting to enter an instance from any
 /// of these domains means that something has gone seriously wrong.
 pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
-    let mut current_domain = (*instance).kill_state.execution_domain.lock().unwrap();
+    let instance = instance.as_mut().expect("instance pointer cannot be null");
+
+    #[cfg(feature = "concurrent_testpoints")]
+    instance
+        .lock_testpoints
+        .instance_entering_guest_before_domain_change
+        .check();
+
+    let mut current_domain = instance.kill_state.execution_domain.lock().unwrap();
     match *current_domain {
         Domain::Pending => {
             // All systems go! We are about to start executing a guest. Set the execution domain
             // accordingly, and then return so we can jump to the guest code.
-            *current_domain = Domain::Guest
+            *current_domain = Domain::Guest;
+
+            // explicitly drop `current_domain` to release the lock before reaching testpoint
+            mem::drop(current_domain);
+
+            #[cfg(feature = "concurrent_testpoints")]
+            instance
+                .lock_testpoints
+                .instance_entering_guest_after_domain_change
+                .check();
         }
         Domain::Guest => {
             // This is an error because it suggests a KillSwitch could send a SIGALRM before
@@ -201,7 +224,7 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
             //
             // Note that we manually drop the domain because`Instance::terminate` never returns.
             mem::drop(current_domain);
-            (*instance).terminate(TerminationDetails::Remote);
+            instance.terminate(TerminationDetails::Remote);
         }
     }
 }
@@ -222,6 +245,13 @@ pub unsafe extern "C" fn enter_guest_region(instance: *mut Instance) {
 /// wrong, and leaving the execution domain mutex in a poisoned state is the least of our concerns.
 pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
     let instance = instance.as_mut().expect("instance pointer cannot be null");
+
+    #[cfg(feature = "concurrent_testpoints")]
+    instance
+        .lock_testpoints
+        .instance_exiting_guest_before_acquiring_terminable
+        .check();
+
     let terminable = instance.kill_state.terminable.swap(false, Ordering::SeqCst);
     if !terminable {
         // If we are here, something else has taken the terminable flag, so it's not safe to
@@ -229,18 +259,28 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
         // the termination mechanism will be a signal, delivered at some point (hopefully soon!).
         // Further, because the termination mechanism will be a signal, we are constrained to only
         // signal-safe behavior. So, we will hang indefinitely waiting for the sigalrm to arrive.
+
+        #[cfg(feature = "concurrent_testpoints")]
+        instance
+            .lock_testpoints
+            .instance_exiting_guest_without_terminable
+            .check();
+
         #[allow(clippy::empty_loop)]
         loop {}
     } else {
         let current_domain = instance.kill_state.execution_domain.lock().unwrap();
         match *current_domain {
             Domain::Guest => {
-                // We finished executing the code in our guest region normally!
+                // We finished executing the code in our guest region normally! We should reset
+                // the kill state, invalidating any existing killswitches' weak references.
                 //
-                // There should be only one strong reference to `kill_state`, so as a consistency
-                // check ensure that's still true. This is necessary so that when we drop this
-                // `Arc`, weak refs are no longer valid. If this assert fails, something cloned
-                // `KillState`, or a `KillSwitch` has upgraded its ref - both of these are errors!
+                // There should be only one strong reference to `kill_state`, since acquiring
+                // `terminable` prevents a `KillSwitch` from firing and serves as a witness that
+                // none are in the process of firing. As a consistency check, ensure that's still
+                // true. This is necessary so that when we drop this `Arc`, weak refs are no longer
+                // valid. If this assert fails, something cloned `KillState`, or a `KillSwitch` has
+                // upgraded its ref - both of these are errors!
                 assert_eq!(Arc::strong_count(&instance.kill_state), 1);
             }
             ref domain @ Domain::Pending
@@ -255,9 +295,16 @@ pub unsafe extern "C" fn exit_guest_region(instance: *mut Instance) {
                 );
             }
         };
+
+        #[cfg(feature = "concurrent_testpoints")]
+        instance
+            .lock_testpoints
+            .instance_exiting_guest_after_domain_change
+            .check();
     }
 }
 
+#[cfg(not(feature = "concurrent_testpoints"))]
 impl Default for KillState {
     fn default() -> Self {
         Self {
@@ -270,9 +317,21 @@ impl Default for KillState {
 }
 
 impl KillState {
+    #[cfg(not(feature = "concurrent_testpoints"))]
     /// Construct a new `KillState`.
     pub fn new() -> Self {
         Default::default()
+    }
+
+    #[cfg(feature = "concurrent_testpoints")]
+    pub fn new(lock_testpoints: Arc<LockTestpoints>) -> KillState {
+        KillState {
+            terminable: AtomicBool::new(true),
+            tid_change_notifier: Condvar::new(),
+            execution_domain: Mutex::new(Domain::Pending),
+            thread_id: Mutex::new(None),
+            lock_testpoints,
+        }
     }
 
     pub fn is_terminable(&self) -> bool {
@@ -299,6 +358,11 @@ impl KillState {
     ///
     /// This method will also panic if the mutex on the execution domain has been poisoned.
     pub fn begin_hostcall(&self) {
+        #[cfg(feature = "concurrent_testpoints")]
+        self.lock_testpoints
+            .instance_entering_hostcall_before_domain_change
+            .check();
+
         let mut current_domain = self.execution_domain.lock().unwrap();
         match *current_domain {
             Domain::Pending => {
@@ -321,6 +385,14 @@ impl KillState {
                 panic!("Invalid state: Instance marked as cancelled while in guest code. This should be an error.");
             }
         }
+
+        // explicitly drop `current_domain` to release the lock before reaching testpoint
+        mem::drop(current_domain);
+
+        #[cfg(feature = "concurrent_testpoints")]
+        self.lock_testpoints
+            .instance_entering_hostcall_after_domain_change
+            .check();
     }
 
     /// Set the execution domain to signify that we are finished executing a hostcall.
@@ -332,8 +404,13 @@ impl KillState {
     ///
     /// This method will also panic if the mutex on the execution domain has been poisoned.
     pub fn end_hostcall(&self) -> Option<TerminationDetails> {
+        #[cfg(feature = "concurrent_testpoints")]
+        self.lock_testpoints
+            .instance_exiting_hostcall_before_domain_change
+            .check();
+
         let mut current_domain = self.execution_domain.lock().unwrap();
-        match *current_domain {
+        let res = match *current_domain {
             Domain::Pending => {
                 panic!("Invalid state: Instance marked as pending while exiting a hostcall.");
             }
@@ -347,13 +424,22 @@ impl KillState {
             Domain::Terminated => {
                 // The instance was stopped in the hostcall we were executing.
                 debug_assert!(!self.terminable.load(Ordering::SeqCst));
-                std::mem::drop(current_domain);
                 Some(TerminationDetails::Remote)
             }
             Domain::Cancelled => {
                 panic!("Invalid state: Instance marked as cancelled while exiting a hostcall.");
             }
-        }
+        };
+
+        // explicitly drop `current_domain` to release the lock before reaching testpoint
+        std::mem::drop(current_domain);
+
+        #[cfg(feature = "concurrent_testpoints")]
+        self.lock_testpoints
+            .instance_exiting_hostcall_after_domain_change
+            .check();
+
+        res
     }
 
     pub fn schedule(&self, tid: pthread_t) {
@@ -448,11 +534,30 @@ impl KillSwitch {
         // Get the underlying kill state. If this fails, it means the instance exited and was
         // discarded, so we can not terminate.
         let state = self.state.upgrade().ok_or(KillError::Invalid)?;
+
+        #[cfg(feature = "concurrent_testpoints")]
+        state
+            .lock_testpoints
+            .kill_switch_before_disabling_termination
+            .check();
+
         // Attempt to take the flag indicating the instance may terminate
         let terminable = state.terminable.swap(false, Ordering::SeqCst);
         if !terminable {
+            #[cfg(feature = "concurrent_testpoints")]
+            state
+                .lock_testpoints
+                .kill_switch_after_forbidden_termination
+                .check();
+
             return Err(KillError::NotTerminable);
         }
+
+        #[cfg(feature = "concurrent_testpoints")]
+        state
+            .lock_testpoints
+            .kill_switch_after_acquiring_termination
+            .check();
 
         // we got it! we can signal the instance.
         //
@@ -464,11 +569,27 @@ impl KillSwitch {
         // Hold this lock through all signalling logic to prevent the instance from
         // switching domains (and invalidating safety of whichever mechanism we choose here)
         let mut execution_domain = state.execution_domain.lock().unwrap();
+
+        #[cfg(feature = "concurrent_testpoints")]
+        state
+            .lock_testpoints
+            .kill_switch_after_acquiring_domain_lock
+            .check();
+
         let result = match *execution_domain {
             Domain::Guest => {
+                #[cfg(feature = "concurrent_testpoints")]
+                state
+                    .lock_testpoints
+                    .kill_switch_before_guest_termination
+                    .check();
+
                 let mut curr_tid = state.thread_id.lock().unwrap();
                 // we're in guest code, so we can just send a signal.
                 if let Some(thread_id) = *curr_tid {
+                    #[cfg(feature = "concurrent_testpoints")]
+                    state.lock_testpoints.kill_switch_before_guest_alarm.check();
+
                     unsafe {
                         pthread_kill(thread_id, SIGALRM);
                     }
@@ -486,6 +607,12 @@ impl KillSwitch {
                 }
             }
             Domain::Hostcall => {
+                #[cfg(feature = "concurrent_testpoints")]
+                state
+                    .lock_testpoints
+                    .kill_switch_before_hostcall_termination
+                    .check();
+
                 // the guest is in a hostcall, so the only thing we can do is indicate it
                 // should terminate and wait.
                 *execution_domain = Domain::Terminated;
@@ -497,15 +624,34 @@ impl KillSwitch {
                 Ok(KillSuccess::Cancelled)
             }
             Domain::Cancelled | Domain::Terminated => {
+                #[cfg(feature = "concurrent_testpoints")]
+                state
+                    .lock_testpoints
+                    .kill_switch_before_terminated_termination
+                    .check();
+
                 // Something else (another KillSwitch?) has already signalled this instance
                 // to exit, either when it has completed its hostcall, or when it starts.
                 // In either case, there is nothing to do here.
                 Err(KillError::NotTerminable)
             }
         };
+        #[cfg(feature = "concurrent_testpoints")]
+        state
+            .lock_testpoints
+            .kill_switch_before_releasing_domain
+            .check();
+
         // explicitly drop the lock to be clear about how long we want to hold this lock, which is
         // until all signalling is complete.
         mem::drop(execution_domain);
+
+        #[cfg(feature = "concurrent_testpoints")]
+        state
+            .lock_testpoints
+            .kill_switch_after_releasing_domain
+            .check();
+
         result
     }
 }

@@ -48,6 +48,8 @@ pub extern "C" fn lucet_error_name(e: c_int) -> *const c_char {
             Dl => "lucet_error_dl\0".as_ptr() as _,
             InstanceNotReturned => "lucet_error_instance_not_returned\0".as_ptr() as _,
             InstanceNotYielded => "lucet_error_instance_not_yielded\0".as_ptr() as _,
+            InstanceNeedsStart => "lucet_error_instance_needs_start\0".as_ptr() as _,
+            StartAlreadyRun => "lucet_error_start_already_run\0".as_ptr() as _,
             StartYielded => "lucet_error_start_yielded\0".as_ptr() as _,
             Internal => "lucet_error_internal\0".as_ptr() as _,
             Unsupported => "lucet_error_unsupported\0".as_ptr() as _,
@@ -239,6 +241,15 @@ pub unsafe extern "C" fn lucet_instance_resume(
             std::ptr::write(result_out, res.into());
         }
         ret
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn lucet_instance_run_start(inst: *mut lucet_instance) -> lucet_error {
+    with_instance_ptr!(inst, {
+        inst.run_start()
+            .map(|_| lucet_error::Ok)
+            .unwrap_or_else(|e| e.into())
     })
 }
 

@@ -11,7 +11,9 @@ use crate::alloc::{Alloc, HOST_PAGE_SIZE_EXPECTED};
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
-use crate::module::{self, FunctionHandle, FunctionPointer, Global, GlobalValue, Module, TrapCode};
+#[cfg(feature = "concurrent_testpoints")]
+use crate::lock_testpoints::LockTestpoints;
+use crate::module::{self, FunctionHandle, Global, GlobalValue, Module, TrapCode};
 use crate::region::RegionInternal;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
@@ -67,11 +69,6 @@ unsafe impl Send for InstanceHandle {}
 ///
 /// This is not meant for public consumption, but rather is used to make implementations of
 /// `Region`.
-///
-/// # Safety
-///
-/// This function runs the guest code for the WebAssembly `start` section, and running any guest
-/// code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
 pub fn new_instance_handle(
     instance: *mut Instance,
     module: Arc<dyn Module>,
@@ -229,6 +226,10 @@ pub struct Instance {
     /// Small mutexed state used for remote kill switch functionality
     pub(crate) kill_state: Arc<KillState>,
 
+    #[cfg(feature = "concurrent_testpoints")]
+    /// Conditionally-present helpers to force permutations of possible races in testing.
+    pub lock_testpoints: Arc<LockTestpoints>,
+
     /// The memory allocated for this instance
     alloc: Alloc,
 
@@ -256,8 +257,8 @@ pub struct Instance {
     /// Whether to install an alternate signal stack while the instance is running.
     ensure_sigstack_installed: bool,
 
-    /// Pointer to the function used as the entrypoint (for use in backtraces)
-    entrypoint: Option<FunctionPointer>,
+    /// Pointer to the function used as the entrypoint.
+    entrypoint: Option<FunctionHandle>,
 
     /// The value passed back to the guest when resuming a yielded instance.
     pub(crate) resumed_val: Option<Box<dyn Any + 'static>>,
@@ -530,9 +531,53 @@ impl Instance {
         self.swap_and_return()
     }
 
+    /// Run the module's [start function][start], if one exists.
+    ///
+    /// If there is no start function in the module, this does nothing.
+    ///
+    /// If the module contains a start function, you must run it before running any other exported
+    /// functions. If an instance is reset, you must run the start function again.
+    ///
+    /// Start functions may assume that Wasm tables and memories are properly initialized, but may
+    /// not assume that imported functions or globals are available.
+    ///
+    /// # Errors
+    ///
+    /// In addition to the errors that can be returned from [`Instance::run()`][run], this can also
+    /// return `Error::StartYielded` if the start function attempts to yield. This should not arise
+    /// as long as the start function does not attempt to use any imported functions.
+    ///
+    /// This also returns `Error::StartAlreadyRun` if the start function has already run since the
+    /// instance was created or last reset.
+    ///
+    /// Wasm start functions are not allowed to call imported functions. If the start function
+    /// attempts to do so, the instance will be terminated with
+    /// `TerminationDetails::StartCalledImportFunc`.
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`][run]
+    /// applies.
+    ///
+    /// [run]: struct.Instance.html#method.run
+    /// [start]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
+    pub fn run_start(&mut self) -> Result<(), Error> {
+        if let Some(start) = self.module.get_start_func()? {
+            if !self.is_not_started() {
+                return Err(Error::StartAlreadyRun);
+            }
+            let res = self.run_func(start, &[])?;
+            if res.is_yielded() {
+                return Err(Error::StartYielded);
+            }
+        }
+        Ok(())
+    }
+
     /// Reset the instance's heap and global variables to their initial state.
     ///
-    /// The WebAssembly `start` section will also be run, if one exists.
+    /// The WebAssembly `start` section, if present, will need to be re-run with
+    /// [`Instance::run_start()`][run_start] before running any other exported functions.
     ///
     /// The embedder contexts present at instance creation or added with
     /// [`Instance::insert_embed_ctx()`](struct.Instance.html#method.insert_embed_ctx) are not
@@ -544,10 +589,7 @@ impl Instance {
     /// It is the embedder's responsibility to initialize new `KillSwitch`es after resetting an
     /// instance.
     ///
-    /// # Safety
-    ///
-    /// This function runs the guest code for the WebAssembly `start` section, and running any
-    /// guest code is potentially unsafe; see [`Instance::run()`](struct.Instance.html#method.run).
+    /// [run_start]: struct.Instance.html#method.run
     pub fn reset(&mut self) -> Result<(), Error> {
         self.alloc.reset_heap(self.module.as_ref())?;
         let globals = unsafe { self.alloc.globals_mut() };
@@ -564,9 +606,21 @@ impl Instance {
             };
         }
 
-        self.state = State::Ready;
-        self.kill_state = Arc::new(KillState::new());
-        self.run_start()?;
+        if self.module.get_start_func()?.is_some() {
+            self.state = State::NotStarted;
+        } else {
+            self.state = State::Ready;
+        }
+
+        #[cfg(feature = "concurrent_testpoints")]
+        {
+            self.kill_state = Arc::new(KillState::new(Arc::clone(&self.lock_testpoints)));
+        }
+        #[cfg(not(feature = "concurrent_testpoints"))]
+        {
+            self.kill_state = Arc::new(KillState::new());
+        }
+
         Ok(())
     }
 
@@ -637,11 +691,6 @@ impl Instance {
     /// Insert a context value.
     ///
     /// If a context value of the same type already existed, it is returned.
-    ///
-    /// **Note**: this method is intended for embedder contexts that need to be added _after_ an
-    /// instance is created and initialized. To add a context for an instance's entire lifetime,
-    /// including the execution of its `start` section, see
-    /// [`Region::new_instance_builder()`](trait.Region.html#method.new_instance_builder).
     pub fn insert_embed_ctx<T: Any>(&mut self, x: T) -> Option<T> {
         self.embed_ctx.insert(x)
     }
@@ -750,6 +799,10 @@ impl Instance {
         KillSwitch::new(Arc::downgrade(&self.kill_state))
     }
 
+    pub fn is_not_started(&self) -> bool {
+        self.state.is_not_started()
+    }
+
     pub fn is_ready(&self) -> bool {
         self.state.is_ready()
     }
@@ -804,13 +857,23 @@ impl Instance {
     fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: CtxMap) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
 
+        #[cfg(feature = "concurrent_testpoints")]
+        let lock_testpoints = Arc::new(LockTestpoints::new());
+
+        #[cfg(feature = "concurrent_testpoints")]
+        let kill_state = Arc::new(KillState::new(Arc::clone(&lock_testpoints)));
+        #[cfg(not(feature = "concurrent_testpoints"))]
+        let kill_state = Arc::new(KillState::new());
+
         let mut inst = Instance {
             magic: LUCET_INSTANCE_MAGIC,
             embed_ctx,
             module,
             ctx: Context::new(),
             state: State::Ready,
-            kill_state: Arc::new(KillState::new()),
+            kill_state,
+            #[cfg(feature = "concurrent_testpoints")]
+            lock_testpoints,
             alloc,
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
@@ -869,9 +932,17 @@ impl Instance {
 
     /// Run a function in guest context at the given entrypoint.
     fn run_func(&mut self, func: FunctionHandle, args: &[Val]) -> Result<RunResult, Error> {
-        if !(self.state.is_ready() || (self.state.is_faulted() && !self.state.is_fatal())) {
+        let needs_start = self.state.is_not_started() && !func.is_start_func;
+        if needs_start {
+            return Err(Error::InstanceNeedsStart);
+        }
+
+        let is_ready = self.state.is_ready();
+        let is_starting = self.state.is_not_started() && func.is_start_func;
+        let is_non_fatally_faulted = self.state.is_faulted() && !self.state.is_fatal();
+        if !(is_ready || is_starting || is_non_fatally_faulted) {
             return Err(Error::InvalidArgument(
-                "instance must be ready or non-fatally faulted",
+                "instance must be ready, starting, or non-fatally faulted",
             ));
         }
         if func.ptr.as_usize() == 0 {
@@ -899,7 +970,7 @@ impl Instance {
             }
         }
 
-        self.entrypoint = Some(func.ptr);
+        self.entrypoint = Some(func);
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
@@ -954,11 +1025,17 @@ impl Instance {
 
     /// The core routine for context switching into a guest, and extracting a result.
     ///
-    /// This must only be called for an instance in a ready, non-fatally faulted, or yielded
-    /// state. The public wrappers around this function should make sure the state is appropriate.
+    /// This must only be called for an instance in a ready, non-fatally faulted, or yielded state,
+    /// or in the not-started state on the start function. The public wrappers around this function
+    /// should make sure the state is appropriate.
     fn swap_and_return(&mut self) -> Result<RunResult, Error> {
+        let is_start_func = self
+            .entrypoint
+            .expect("we always have an entrypoint by now")
+            .is_start_func;
         debug_assert!(
             self.state.is_ready()
+                || self.state.is_not_started() && is_start_func
                 || (self.state.is_faulted() && !self.state.is_fatal())
                 || self.state.is_yielded()
         );
@@ -981,15 +1058,19 @@ impl Instance {
         if let Err(e) = res {
             // Something went wrong setting up or tearing down the signal handlers and signal
             // stack. This is an error, but we don't want it to mask an error that may have arisen
-            // due to a guest fault or guest termination. So, we set the state back to `Ready` only
-            // if it is still `Running`, which likely indicates we never even made it into the
-            // guest.
+            // due to a guest fault or guest termination. So, we set the state back to `Ready` or
+            // `NotStarted` only if it is still `Running`, which likely indicates we never even made
+            // it into the guest.
             //
             // As of 2020-03-20, the only early return points in the code above happen before the
-            // guest would be able to run, so this should always transition from running to ready if
-            // there's an error.
+            // guest would be able to run, so this should always transition from running to
+            // ready or not started if there's an error.
             if let State::Running = self.state {
-                self.state = State::Ready;
+                if is_start_func {
+                    self.state = State::NotStarted;
+                } else {
+                    self.state = State::Ready;
+                }
             }
             return Err(e);
         }
@@ -1011,7 +1092,14 @@ impl Instance {
         if !st.is_yielding() {
             // If the instance is *not* yielding, initialize a fresh `KillState` for subsequent
             // executions, which will invalidate any existing `KillSwitch`'s weak references.
-            self.kill_state = Arc::new(KillState::default());
+            #[cfg(feature = "concurrent_testpoints")]
+            {
+                self.kill_state = Arc::new(KillState::new(Arc::clone(&self.lock_testpoints)));
+            }
+            #[cfg(not(feature = "concurrent_testpoints"))]
+            {
+                self.kill_state = Arc::new(KillState::default());
+            }
         }
 
         match st {
@@ -1068,9 +1156,14 @@ impl Instance {
                     Err(Error::RuntimeFault(details))
                 }
             }
-            State::Ready | State::Terminated | State::Yielded { .. } | State::Transitioning => Err(
-                lucet_format_err!("\"impossible\" state found in `swap_and_return()`: {}", st),
-            ),
+            State::NotStarted
+            | State::Ready
+            | State::Terminated
+            | State::Yielded { .. }
+            | State::Transitioning => Err(lucet_format_err!(
+                "\"impossible\" state found in `swap_and_return()`: {}",
+                st
+            )),
         }
     }
 
@@ -1095,16 +1188,6 @@ impl Instance {
         });
 
         res
-    }
-
-    fn run_start(&mut self) -> Result<(), Error> {
-        if let Some(start) = self.module.get_start_func()? {
-            let res = self.run_func(start, &[])?;
-            if res.is_yielded() {
-                return Err(Error::StartYielded);
-            }
-        }
-        Ok(())
     }
 }
 
@@ -1157,10 +1240,6 @@ impl std::fmt::Display for FaultDetails {
 }
 
 /// Information about a terminated guest.
-///
-/// Guests are terminated either explicitly by `Vmctx::terminate()`, or implicitly by signal
-/// handlers that return `SignalBehavior::Terminate`. It usually indicates that an unrecoverable
-/// error has occurred in a hostcall, rather than in WebAssembly code.
 pub enum TerminationDetails {
     /// Returned when a signal handler terminates the instance.
     Signal,
@@ -1178,6 +1257,7 @@ pub enum TerminationDetails {
     BorrowError(&'static str),
     /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
     Provided(Box<dyn Any + 'static>),
+    /// The instance was terminated by its `KillSwitch`.
     Remote,
 }
 
