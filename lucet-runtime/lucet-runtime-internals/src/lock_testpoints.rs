@@ -23,15 +23,32 @@ impl SyncWaiter {
     /// program under test has stopped at a location of interest, so the function provided to
     /// `wait_and_then` is free to "race" with complete determinism.
     pub fn wait_and_then<U, F: FnOnce() -> U>(self, f: F) -> U {
+        let resumption = self.pause();
+
+        let res = f();
+
+        resumption.resume();
+
+        res
+    }
+
+    /// Wait for the corresponding `Syncpoint` to be reached, then return without permitting it to
+    /// continue. *If you do not resume from this `SyncWaiter` at some point you will likely
+    /// deadlock your test!*
+    #[must_use]
+    pub fn pause(self) -> Self {
         while !self.arrived.load(Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(10));
         }
 
-        let res = f();
+        self
+    }
 
+    /// Resume this `SyncWaiter`, consuming it as can have no further effect. A `SyncWaiter` may be
+    /// resumed before it is reached, in which case this behaves similarly to having never called
+    /// `wait_at()` on the corresponding `Syncpoint`.
+    pub fn resume(self) {
         self.proceed.store(true, Ordering::SeqCst);
-
-        res
     }
 }
 

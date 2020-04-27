@@ -548,6 +548,14 @@ macro_rules! killswitch_tests {
         //
         // This corresponds to a race during the documentation's State B -> State E "guest faults
         // or is terminated" transition.
+        //
+        // Specifically, we want:
+        // * signal handler fires, handling a guest fault
+        // * timeout fires, acquiring terminable
+        // * signal handler completes, locking in deschedule to serialize pending KillSwitch
+        // * KillSwitch is rescheduled, then fires
+        //
+        // And for all of this to complete without error!
         #[test]
         fn terminate_during_guest_fault_racing_deschedule() {
             test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
@@ -561,10 +569,12 @@ macro_rules! killswitch_tests {
                     .wait_at();
                 // we need to let the instance deschedule before our KillSwitch takes
                 // `execution_domain`.
-                let killswitch_acquire_domain = inst
+                let killswitch_acquire_termination = inst
                     .lock_testpoints
                     .kill_switch_after_acquiring_termination
                     .wait_at();
+                // and the entire test revolves around KillSwitch taking effect after
+                // `CURRENT_INSTANCE` is cleared!
                 let current_instance_cleared = inst
                     .lock_testpoints
                     .instance_after_clearing_current_instance
@@ -586,7 +596,7 @@ macro_rules! killswitch_tests {
                     })
                     .expect("can spawn guest thread");
 
-                let termination_thread = unfortunate_time_to_terminate.wait_and_then(|| {
+                let (termination_thread, killswitch_before_domain) = unfortunate_time_to_terminate.wait_and_then(|| {
                     let ks_thread = thread::Builder::new()
                         .name("killswitch".to_owned())
                         .spawn(move || {
@@ -594,11 +604,17 @@ macro_rules! killswitch_tests {
                         })
                         .expect("can spawn killswitch thread");
 
-                    ks_thread
+                    // Pause the KillSwitch thread right before it acquires `execution_domain`
+                    let killswitch_before_domain = killswitch_acquire_termination.pause();
+
+                    (ks_thread, killswitch_before_domain)
                 });
 
+                // `execution_domain` is not held, so instance descheduling will complete promptly.
                 current_instance_cleared.wait();
-                killswitch_acquire_domain.wait();
+
+                // Resume `KillSwitch`, which will acquire `execution_domain` and terminate.
+                killswitch_before_domain.resume();
 
                 guest.join().expect("guest exits without panic");
                 termination_thread
