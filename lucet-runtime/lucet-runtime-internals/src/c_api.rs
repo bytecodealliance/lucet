@@ -664,12 +664,27 @@ pub mod lucet_val {
                 fp: [0; 16],
                 gp: [0; 8],
             };
-            unsafe {
-                core::arch::x86_64::_mm_storeu_ps(
-                    v.fp.as_mut().as_mut_ptr() as *mut f32,
-                    retval.fp(),
-                );
-                *(v.gp.as_mut().as_mut_ptr() as *mut u64) = retval.gp();
+            use cfg_if::cfg_if;
+            cfg_if! {
+                if #[cfg(target_arch = "x86")] {
+                     unsafe {
+                        core::arch::x86::_mm_storeu_ps(
+                            v.fp.as_mut().as_mut_ptr() as *mut f32,
+                            retval.fp(),
+                        );
+                        *(v.gp.as_mut().as_mut_ptr() as *mut u32) = retval.gp();
+                    }
+               } else if #[cfg(target_arch = "x86_64")] {
+                    unsafe {
+                        core::arch::x86_64::_mm_storeu_ps(
+                            v.fp.as_mut().as_mut_ptr() as *mut f32,
+                            retval.fp(),
+                        );
+                        *(v.gp.as_mut().as_mut_ptr() as *mut u64) = retval.gp();
+                    }
+                } else {
+                    panic!("unsupported architecture!");
+                }
             }
             v
         }

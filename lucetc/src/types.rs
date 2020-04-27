@@ -67,7 +67,7 @@ pub fn to_lucet_signature(value: &ir::Signature) -> Result<Signature, SignatureE
                 extension: ir::ArgumentExtension::None,
                 location: ir::ArgumentLoc::Unassigned,
             } => {
-                if value.is_int() && value.bits() == 64 {
+                if value.is_int() && value.bits() == (crate::pointer::NATIVE_POINTER_SIZE as u16 * 8) {
                     // this is VMContext, so we can move on.
                 } else {
                     return Err(SignatureError::BadElement(

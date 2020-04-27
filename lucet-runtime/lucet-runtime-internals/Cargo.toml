@@ -13,6 +13,7 @@ edition = "2018"
 lucet-module = { path = "../../lucet-module", version = "=0.7.0-dev" }
 lucet-runtime-macros = { path = "../lucet-runtime-macros", version = "=0.7.0-dev" }
 
+cfg-if = "*"
 anyhow = "1.0"
 bitflags = "1.0"
 bincode = "1.1.4"

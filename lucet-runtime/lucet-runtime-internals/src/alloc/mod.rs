@@ -339,7 +339,8 @@ impl Alloc {
     /// Since the stack grows down, `alloc.stack_mut()[0]` is the top of the stack, and
     /// `alloc.stack_mut()[alloc.limits.stack_size - 1]` is the last word at the bottom of the
     /// stack.
-    pub unsafe fn stack_u64_mut(&mut self) -> &mut [u64] {
+    #[cfg(target_pointer_width = "64")]
+    pub unsafe fn stack_words_mut(&mut self) -> &mut [u64] {
         assert!(
             self.slot().stack as usize % 8 == 0,
             "stack is 8-byte aligned"
@@ -351,6 +352,21 @@ impl Alloc {
         std::slice::from_raw_parts_mut(
             self.slot().stack as *mut u64,
             self.slot().limits.stack_size / 8,
+        )
+    }
+    #[cfg(target_pointer_width = "32")]
+    pub unsafe fn stack_words_mut(&mut self) -> &mut [u32] {
+        assert!(
+            self.slot().stack as usize % 4 == 0,
+            "stack is 4-byte aligned"
+        );
+        assert!(
+            self.slot().limits.stack_size % 4 == 0,
+            "stack size is multiple of 4-bytes"
+        );
+        std::slice::from_raw_parts_mut(
+            self.slot().stack as *mut u32,
+            self.slot().limits.stack_size / 4,
         )
     }
 
@@ -454,12 +470,27 @@ pub const DEFAULT_SIGNAL_STACK_SIZE: usize = {
 
 impl Limits {
     pub const fn default() -> Limits {
-        Limits {
-            heap_memory_size: 16 * 64 * 1024,
-            heap_address_space_size: 0x0002_0000_0000,
-            stack_size: 128 * 1024,
-            globals_size: 4096,
-            signal_stack_size: DEFAULT_SIGNAL_STACK_SIZE,
+        use cfg_if::cfg_if;
+        cfg_if! {
+            if #[cfg(target_pointer_width = "64")] {
+                Limits {
+                    heap_memory_size: 16 * 64 * 1024,
+                    heap_address_space_size: 0x0002_0000_0000,
+                    stack_size: 128 * 1024,
+                    globals_size: 4096,
+                    signal_stack_size: DEFAULT_SIGNAL_STACK_SIZE,
+                }
+            } else if #[cfg(target_pointer_width = "32")] {
+                Limits {
+                    heap_memory_size: 16 * 64 * 1024,
+                    heap_address_space_size: 0xffff_ffff,
+                    stack_size: 128 * 1024,
+                    globals_size: 4096,
+                    signal_stack_size: DEFAULT_SIGNAL_STACK_SIZE,
+                }
+            } else {
+                panic!("unsupported architecture!");
+            }
         }
     }
 }

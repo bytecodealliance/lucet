@@ -24,7 +24,8 @@ pub mod lock_testpoints;
 pub mod module;
 pub mod region;
 pub mod sysdeps;
-pub mod val;
+pub mod archdeps;
+pub use archdeps::val as val;
 pub mod vmctx;
 
 /// The size of a page in WebAssembly heaps.

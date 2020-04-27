@@ -650,7 +650,7 @@ macro_rules! alloc_tests {
             unsafe {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
                 let mut child = ContextHandle::create_and_init(
-                    inst.alloc_mut().stack_u64_mut(),
+                    inst.alloc_mut().stack_words_mut(),
                     heap_touching_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )
@@ -699,7 +699,7 @@ macro_rules! alloc_tests {
             unsafe {
                 let heap_ptr = inst.alloc_mut().heap_mut().as_ptr() as *mut c_void;
                 let mut child = ContextHandle::create_and_init(
-                    inst.alloc_mut().stack_u64_mut(),
+                    inst.alloc_mut().stack_words_mut(),
                     stack_pattern_child as usize,
                     &[Val::CPtr(heap_ptr)],
                 )

@@ -100,7 +100,7 @@ impl ScriptEnv {
         let lucet_region = MmapRegion::create(
             1,
             &lucet_runtime::Limits {
-                heap_memory_size: 4 * 1024 * 1024 * 1024,
+                heap_memory_size: 1023 * 1024 * 1024,
                 ..lucet_runtime::Limits::default()
             },
         )

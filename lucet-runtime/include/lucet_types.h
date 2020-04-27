@@ -16,6 +16,8 @@
 #include <ucontext.h>
 #endif
 
+#include <signal.h>
+
 enum lucet_error {
     lucet_error_ok,
     lucet_error_invalid_argument,

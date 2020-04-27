@@ -977,7 +977,7 @@ impl Instance {
 
         let self_ptr = self as *mut _;
         Context::init_with_callback(
-            unsafe { self.alloc.stack_u64_mut() },
+            unsafe { self.alloc.stack_words_mut() },
             &mut self.ctx,
             execution::exit_guest_region,
             self_ptr,
@@ -1009,17 +1009,38 @@ impl Instance {
     /// `execution::enter_guest_region` for more info.
     // TODO KTM 2020-03-13: This should be a method on `Context`.
     fn install_activator(&mut self) {
-        unsafe {
-            // Get a raw pointer to the top of the guest stack.
-            let top_of_stack = self.ctx.gpr.rsp as *mut u64;
-            // Move the guest code address to rbx, and then put the address of the activation thunk
-            // at the top of the stack, so that we will start execution at `enter_guest_region`.
-            self.ctx.gpr.rbx = *top_of_stack;
-            *top_of_stack = crate::context::lucet_context_activate as u64;
-            // Pass a pointer to our guest-side entrypoint bootstrap code in `rsi`, and then put
-            // its first argument (a raw pointer to `self`) in `rdi`.
-            self.ctx.gpr.rsi = execution::enter_guest_region as u64;
-            self.ctx.gpr.rdi = self.ctx.callback_data_ptr() as u64;
+        use cfg_if::cfg_if;
+        cfg_if! {
+            if #[cfg(target_arch = "x86")] {
+                unsafe {
+                    // Get a raw pointer to the top of the guest stack.
+                    let top_of_stack = self.ctx.gpr.esp as *mut u32;
+                    // Move the guest code address to rbx, and then put the address of the activation thunk
+                    // at the top of the stack, so that we will start execution at `enter_guest_region`.
+                    self.ctx.gpr.ebx = *top_of_stack;
+                    *top_of_stack = crate::context::lucet_context_activate as u32;
+                    // Pass a pointer to our guest-side entrypoint bootstrap code in `rsi`, and then put
+                    // its first argument (a raw pointer to `self`) in `rdi`.
+                    self.ctx.gpr.esi = execution::enter_guest_region as u32;
+                    self.ctx.gpr.edi = self.ctx.callback_data_ptr() as u32;
+                }
+
+            } else if #[cfg(target_arch = "x86_64")] {
+                unsafe {
+                    // Get a raw pointer to the top of the guest stack.
+                    let top_of_stack = self.ctx.gpr.rsp as *mut u64;
+                    // Move the guest code address to rbx, and then put the address of the activation thunk
+                    // at the top of the stack, so that we will start execution at `enter_guest_region`.
+                    self.ctx.gpr.rbx = *top_of_stack;
+                    *top_of_stack = crate::context::lucet_context_activate as u64;
+                    // Pass a pointer to our guest-side entrypoint bootstrap code in `rsi`, and then put
+                    // its first argument (a raw pointer to `self`) in `rdi`.
+                    self.ctx.gpr.rsi = execution::enter_guest_region as u64;
+                    self.ctx.gpr.rdi = self.ctx.callback_data_ptr() as u64;
+                }
+            } else {
+                panic!("unsupported architecture");
+            }
         }
     }
 

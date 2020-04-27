@@ -3,8 +3,16 @@ use std::fs::File;
 use std::path::Path;
 
 fn main() {
+    let context_asm_arch = match env::var("CARGO_CFG_TARGET_ARCH").unwrap().as_str() {
+        "x86_64" => "x86_64",
+        "x86" => "i686",
+        arch => {
+            panic!("unsupported architecture {}", arch);
+        }
+    };
+
     cc::Build::new()
-        .file("src/context/context_asm.S")
+        .file(&format!("src/context/sysdep/{}/context_asm.S", context_asm_arch))
         .compile("context_context_asm");
     cc::Build::new()
         .file("src/instance/siginfo_ext.c")

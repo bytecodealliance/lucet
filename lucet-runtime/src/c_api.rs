@@ -351,12 +351,29 @@ pub unsafe extern "C" fn lucet_retval_gp(retval: *const lucet_untyped_retval) ->
     }
 }
 
+use cfg_if::cfg_if;
+cfg_if! {
+    if #[cfg(target_arch = "x86_64")] {
+        use core::arch::x86_64::_mm_storeu_ps;
+        use core::arch::x86_64::_mm_loadu_ps;
+        use core::arch::x86_64::_mm_storeu_pd;
+        use core::arch::x86_64::_mm_loadu_pd;
+    } else if #[cfg(target_arch = "x86")] {
+        use core::arch::x86::_mm_storeu_ps;
+        use core::arch::x86::_mm_loadu_ps;
+        use core::arch::x86::_mm_storeu_pd;
+        use core::arch::x86::_mm_loadu_pd;
+    } else {
+        panic!("unsupported architecture!");
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn lucet_retval_f32(retval: *const lucet_untyped_retval) -> f32 {
     let mut v = 0.0f32;
-    core::arch::x86_64::_mm_storeu_ps(
+    _mm_storeu_ps(
         &mut v as *mut f32,
-        core::arch::x86_64::_mm_loadu_ps((*retval).fp.as_ptr() as *const f32),
+        _mm_loadu_ps((*retval).fp.as_ptr() as *const f32),
     );
     v
 }
@@ -364,9 +381,9 @@ pub unsafe extern "C" fn lucet_retval_f32(retval: *const lucet_untyped_retval) -
 #[no_mangle]
 pub unsafe extern "C" fn lucet_retval_f64(retval: *const lucet_untyped_retval) -> f64 {
     let mut v = 0.0f64;
-    core::arch::x86_64::_mm_storeu_pd(
+    _mm_storeu_pd(
         &mut v as *mut f64,
-        core::arch::x86_64::_mm_loadu_pd((*retval).fp.as_ptr() as *const f64),
+        _mm_loadu_pd((*retval).fp.as_ptr() as *const f64),
     );
     v
 }
