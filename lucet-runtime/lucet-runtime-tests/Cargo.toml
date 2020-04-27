@@ -16,7 +16,7 @@ test = false
 
 [dependencies]
 anyhow = "1"
-lazy_static = "1.1"
+lazy_static = "1.4"
 libc = "0.2.65"
 tempfile = "3.0"
 lucet-module = { path = "../../lucet-module", version = "=0.7.0-dev" }
