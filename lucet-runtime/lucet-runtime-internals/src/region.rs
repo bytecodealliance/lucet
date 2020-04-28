@@ -1,6 +1,6 @@
 pub mod mmap;
 
-use crate::alloc::{Alloc, Limits, Slot};
+use crate::alloc::{Alloc, AllocStrategy, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::InstanceHandle;
@@ -53,6 +53,7 @@ pub trait RegionInternal: Send + Sync {
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
+        alloc_strategy: AllocStrategy,
     ) -> Result<InstanceHandle, Error>;
 
     /// Unmaps the heap, stack, and globals of an `Alloc`, while retaining the virtual address
@@ -90,6 +91,7 @@ pub struct InstanceBuilder<'a> {
     module: Arc<dyn Module>,
     embed_ctx: CtxMap,
     heap_memory_size_limit: usize,
+    alloc_strategy: AllocStrategy,
 }
 
 impl<'a> InstanceBuilder<'a> {
@@ -99,7 +101,19 @@ impl<'a> InstanceBuilder<'a> {
             module,
             embed_ctx: CtxMap::default(),
             heap_memory_size_limit: region.get_limits().heap_memory_size,
+            alloc_strategy: AllocStrategy::Linear,
         }
+    }
+
+    /// Allocate the instance using the supplied `AllocStrategy`.
+    ///
+    /// This call is optional.  The default allocation strategy for
+    /// Regions is Linear, which allocates the instance using next available
+    /// alloc.  If a different strategy is desired, choose from those
+    /// available in `AllocStrategy`.
+    pub fn with_alloc_strategy(mut self, alloc_strategy: AllocStrategy) -> Self {
+        self.alloc_strategy = alloc_strategy;
+        self
     }
 
     /// Add a smaller, custom limit for the heap memory size to the built instance.
@@ -122,7 +136,11 @@ impl<'a> InstanceBuilder<'a> {
 
     /// Build the instance.
     pub fn build(self) -> Result<InstanceHandle, Error> {
-        self.region
-            .new_instance_with(self.module, self.embed_ctx, self.heap_memory_size_limit)
+        self.region.new_instance_with(
+            self.module,
+            self.embed_ctx,
+            self.heap_memory_size_limit,
+            self.alloc_strategy,
+        )
     }
 }

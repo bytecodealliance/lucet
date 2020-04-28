@@ -4,7 +4,8 @@ use crate::region::RegionInternal;
 use libc::c_void;
 use lucet_module::GlobalValue;
 use nix::unistd::{sysconf, SysconfVar};
-use std::sync::{Arc, Once, Weak};
+use rand::{thread_rng, Rng, RngCore};
+use std::sync::{Arc, Mutex, Once, Weak};
 
 pub const HOST_PAGE_SIZE_EXPECTED: usize = 4096;
 static mut HOST_PAGE_SIZE: usize = 0;
@@ -91,6 +92,45 @@ unsafe impl Sync for Slot {}
 impl Slot {
     pub fn stack_top(&self) -> *mut c_void {
         (self.stack as usize + self.limits.stack_size) as *mut c_void
+    }
+}
+
+/// The strategy by which a `Region` selects an allocation to back an `Instance`.
+pub enum AllocStrategy {
+    /// Allocate from the next slot available.
+    Linear,
+    ///  Allocate randomly from the set of available slots.
+    Random,
+    /// Allocate randomly from the set of available slots using the
+    /// supplied random number generator.
+    ///
+    /// This strategy is used to create reproducible behavior for testing.
+    CustomRandom(Arc<Mutex<dyn RngCore>>),
+}
+
+impl AllocStrategy {
+    /// For a given `AllocStrategy`, use the number of free_slots and
+    /// capacity to determine the next slot to allocate for an
+    /// `Instance`.
+    pub fn next(&mut self, free_slots: usize, capacity: usize) -> Result<usize, Error> {
+        if free_slots == 0 {
+            return Err(Error::RegionFull(capacity));
+        }
+        match self {
+            AllocStrategy::Linear => Ok(free_slots - 1),
+            AllocStrategy::Random => {
+                // Instantiate a random number generator and get a
+                // random slot index.
+                let mut rng = thread_rng();
+                Ok(rng.gen_range(0, free_slots))
+            }
+            AllocStrategy::CustomRandom(custom_rng) => {
+                // Get a random slot index using the supplied random
+                // number generator.
+                let mut rng = custom_rng.lock().unwrap();
+                Ok(rng.gen_range(0, free_slots))
+            }
+        }
     }
 }
 
