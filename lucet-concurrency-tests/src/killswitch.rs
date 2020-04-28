@@ -489,19 +489,19 @@ macro_rules! killswitch_tests {
             test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
                 let kill_switch = inst.kill_switch();
 
-                // *before* termination is critical, since afterward the `KillSwitch` we test with will
+                // *Before* termination is critical, since afterward the `KillSwitch` we test with will
                 // just take no action.
                 let unfortunate_time_to_terminate = inst
                     .lock_testpoints
                     .signal_handler_before_disabling_termination
                     .wait_at();
-                // wait for the guest to reach a point we reaaallly don't want to signal at - somewhere in
+                // Wait for the guest to reach a point we reaaallly don't want to signal at - somewhere in
                 // the signal handler.
                 let exiting_signal_handler = inst
                     .lock_testpoints
                     .signal_handler_before_returning
                     .wait_at();
-                // and we need to know when we're ready to signal to ensure it races with.
+                // Finally, we need to know when we're ready to signal to ensure it races with.
                 let killswitch_send_signal =
                     inst.lock_testpoints.kill_switch_after_guest_alarm.wait_at();
 

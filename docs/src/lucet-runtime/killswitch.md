@@ -371,14 +371,14 @@ does not preempt the handler. If the signal behavior is to continue without
 effect, leave termination in place and continue to the guest. A pending SIGALRM
 will be raised at this point and the instance will exit. Otherwise, the signal
 handler has determined it must return to the host, and must be sensitive to a
-possible in-flight `KillSwitch`..
+possible in-flight `KillSwitch`...
 
 #### Instance-stopping guest fault with concurrent `KillSwitch`
 
-In the case we know three things:
-* The signal handler must return to host code
+In this case we must consider three constraints:
 * A `KillSwitch` may fire and deliver a `SIGALRM` at any point
 * A `SIGALRM` may already have been fired, pending on the handler returning
+* The signal handler must return to host code
 
 First, we handle the risk of a `KillSwitch` firing: disable termination. If we
 acquire `terminable`, we know this is to the exclusion of any `KillSwitch`, and
@@ -387,12 +387,12 @@ process of terminating, this guest's execution. This means a `SIGALRM` may be
 pending or imminent!
 
 A slightly simpler model is to consider that a `SIGALRM` may arrive in the
-future. For correctness, then, we only have to make sure we handle the signal
-we can be sent! We know that we must return to the host, and the guest fault
-that occurred is certainly more interesting than the guest termination, so we
-would like to preserve that information. There is no information or effect we
-want from the signal, so silence the alarm on `KillState`. This way, if we
-recieve the possible `SIGARLM`, we know to ignore it.
+future. This way, for correctness we only have to make sure we handle the
+signal we can be sent! We know that we must return to the host, and the guest
+fault that occurred is certainly more interesting than the guest termination,
+so we would like to preserve that information. There is no information or
+effect we want from the signal, so silence the alarm on `KillState`. This way,
+if we recieve the possible `SIGARLM`, we know to ignore it.
 
 An important question to ask is "How do we know the possible `SIGARLM` must be
 ignored? Could it not be for another instance later on that thread?" The answer

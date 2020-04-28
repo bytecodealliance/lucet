@@ -150,11 +150,11 @@ pub struct KillState {
     /// without spinning, for the signal to be processed.
     tid_change_notifier: Condvar,
     /// `ignore_alarm` indicates if a SIGALRM directed at this KillState's instance must be
-    /// ignored. This is necessary for a specific race where a timeout occurs right around when a
-    /// Lucet guest, or hostcall the guest made, handles some other signal: if the timeout occurs
-    /// during handling of a signal that arose from guest code, a SIGALRM will either be pending,
-    /// masked by Lucet's sigaction's signal mask, OR a SIGLARM will be imminent after handling the
-    /// signal.
+    /// ignored. This is necessary for a specific race where a termination occurs right around when
+    /// a Lucet guest, or hostcall the guest made, handles some other signal: if the termination
+    /// occurs during handling of a signal that arose from guest code, a SIGALRM will either be
+    /// pending, masked by Lucet's sigaction's signal mask, OR a SIGLARM will be imminent after
+    /// handling the signal.
     ignore_alarm: AtomicBool,
     #[cfg(feature = "concurrent_testpoints")]
     /// When testing race permutations, `KillState` keeps a reference to the `LockTestpoints` its
