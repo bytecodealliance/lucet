@@ -1041,8 +1041,6 @@ impl Instance {
         );
         self.state = State::Running;
 
-        self.kill_state.schedule(unsafe { pthread_self() });
-
         let res = self.with_current_instance(|i| {
             i.with_signals_on(|i| {
                 HOST_CTX.with(|host_ctx| {
@@ -1054,6 +1052,11 @@ impl Instance {
                 })
             })
         });
+
+        #[cfg(feature = "concurrent_testpoints")]
+        self.lock_testpoints
+            .instance_after_clearing_current_instance
+            .check();
 
         if let Err(e) = res {
             // Something went wrong setting up or tearing down the signal handlers and signal
@@ -1083,8 +1086,6 @@ impl Instance {
         // * terminated: state should be `Terminating`; transition to `Terminated` and return the termination details as an Err
         //
         // The state should never be `Ready`, `Terminated`, `Yielded`, or `Transitioning` at this point
-
-        self.kill_state.deschedule();
 
         // Set transitioning state temporarily so that we can move values out of the current state
         let st = mem::replace(&mut self.state, State::Transitioning);
@@ -1181,7 +1182,11 @@ impl Instance {
             Ok(())
         })?;
 
+        self.kill_state.schedule(unsafe { pthread_self() });
+
         let res = f(self);
+
+        self.kill_state.deschedule();
 
         CURRENT_INSTANCE.with(|current_instance| {
             *current_instance.borrow_mut() = None;

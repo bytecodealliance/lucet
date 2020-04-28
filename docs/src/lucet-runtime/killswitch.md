@@ -367,11 +367,66 @@ handlers used with Lucet is that they may not lock on `KillState`'s
 
 As a consequence, a `KillSwitch` may fire during the handling of a guest fault.
 `sigaction` must mask `SIGALRM` so that a signal fired before the handler exits
-is discarded. If the signal behavior is to continue without effect, leave
-termination in place and continue to the guest. Otherwise the signal handler
-has determined it must return to the host, and it disables termination on the
-instance to avoid sending an erroneous SIGALRM immediately after swapping to
-the host context.
+does not preempt the handler. If the signal behavior is to continue without
+effect, leave termination in place and continue to the guest. A pending SIGALRM
+will be raised at this point and the instance will exit. Otherwise, the signal
+handler has determined it must return to the host, and must be sensitive to a
+possible in-flight `KillSwitch`...
+
+#### Instance-stopping guest fault with concurrent `KillSwitch`
+
+In this case we must consider three constraints:
+* A `KillSwitch` may fire and deliver a `SIGALRM` at any point
+* A `SIGALRM` may already have been fired, pending on the handler returning
+* The signal handler must return to host code
+
+First, we handle the risk of a `KillSwitch` firing: disable termination. If we
+acquire `terminable`, we know this is to the exclusion of any `KillSwitch`, and
+are safe to return. Otherwise, some `KillSwitch` has terminated, or is in the
+process of terminating, this guest's execution. This means a `SIGALRM` may be
+pending or imminent!
+
+A slightly simpler model is to consider that a `SIGALRM` may arrive in the
+future. This way, for correctness we only have to make sure we handle the
+signal we can be sent! We know that we must return to the host, and the guest
+fault that occurred is certainly more interesting than the guest termination,
+so we would like to preserve that information. There is no information or
+effect we want from the signal, so silence the alarm on `KillState`. This way,
+if we recieve the possible `SIGARLM`, we know to ignore it.
+
+An important question to ask is "How do we know the possible `SIGARLM` must be
+ignored? Could it not be for another instance later on that thread?" The answer
+is, in short, "We ensure it cannot!"
+
+The `SIGARLM` is thread-directed, so to be an alarm for some other reason,
+another instance would have to run and be terminated. To prevent this, we must
+prevent another instance from running. Additionally, if a `SIGALRM` is _in
+flight_, we need to stop and wait anyway. Since `KillSwitch` maintains a lock
+on `execution_domain` as long as it's attempting to terminate a guest, we can
+achieve both of these goals by taking, and immediately dropping, a lock on
+`execution_domain` before descheduling an instance.
+
+Even taking this lock is interesting:
+0. This lock could be taken while racing a `KillSwitch`, after it has observed it may fire but before advancing to take this lock.
+1. This lock could be taken while racing a `KillSwitch`, after it has taken this lock.
+2. This lock could be taken without racing a `KillSwitch`.
+
+In the first case, we've won a race on `execution_domain`, but there might be a
+`KillSwitch` we're blocking with this. Disarm the `KillSwitch` by updating the
+domain to `Terminated`, which reflects the fact that this instance has exited.
+
+In the second case, descheduling until the `KillSwitch` has completed
+termination. The domain will be `Terminated`, and updating to `Terminated` has
+no effect. We simply use this lock to prevent continuting into the host until
+an in-flight `KillSwitch` completes.
+
+In the third case, we're not racing a `KillSwitch`, and any method of exiting
+the guest will have disabled termination. No `KillSwitch` will observe a
+changed `execution_domain`, so it's not incorrect to update it to `Terminated`.
+
+Taken together, this ensures that descheduling an instance serializes in-flight
+`KillSwitch` or prevents one from taking effect in a possibly-incorrect way, so
+we know this race is handled correctly.
 
 ### Terminated in hostcall fault
 

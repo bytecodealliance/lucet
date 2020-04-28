@@ -23,15 +23,32 @@ impl SyncWaiter {
     /// program under test has stopped at a location of interest, so the function provided to
     /// `wait_and_then` is free to "race" with complete determinism.
     pub fn wait_and_then<U, F: FnOnce() -> U>(self, f: F) -> U {
+        let resumption = self.pause();
+
+        let res = f();
+
+        resumption.resume();
+
+        res
+    }
+
+    /// Wait for the corresponding `Syncpoint` to be reached, then return without permitting it to
+    /// continue. *If you do not resume from this `SyncWaiter` at some point you will likely
+    /// deadlock your test!*
+    #[must_use]
+    pub fn pause(self) -> Self {
         while !self.arrived.load(Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(10));
         }
 
-        let res = f();
+        self
+    }
 
+    /// Resume this `SyncWaiter`, consuming it as can have no further effect. A `SyncWaiter` may be
+    /// resumed before it is reached, in which case this behaves similarly to having never called
+    /// `wait_at()` on the corresponding `Syncpoint`.
+    pub fn resume(self) {
         self.proceed.store(true, Ordering::SeqCst);
-
-        res
     }
 }
 
@@ -76,6 +93,7 @@ impl Syncpoint {
 }
 
 pub struct LockTestpoints {
+    pub instance_after_clearing_current_instance: Syncpoint,
     pub instance_entering_guest_after_domain_change: Syncpoint,
     pub instance_entering_guest_before_domain_change: Syncpoint,
     pub instance_entering_hostcall_after_domain_change: Syncpoint,
@@ -88,6 +106,7 @@ pub struct LockTestpoints {
     pub kill_switch_after_acquiring_domain_lock: Syncpoint,
     pub kill_switch_after_acquiring_termination: Syncpoint,
     pub kill_switch_after_forbidden_termination: Syncpoint,
+    pub kill_switch_after_guest_alarm: Syncpoint,
     pub kill_switch_after_releasing_domain: Syncpoint,
     pub kill_switch_before_disabling_termination: Syncpoint,
     pub kill_switch_before_guest_alarm: Syncpoint,
@@ -95,8 +114,9 @@ pub struct LockTestpoints {
     pub kill_switch_before_hostcall_termination: Syncpoint,
     pub kill_switch_before_releasing_domain: Syncpoint,
     pub kill_switch_before_terminated_termination: Syncpoint,
-    pub signal_handler_after_acquiring_termination: Syncpoint,
     pub signal_handler_after_disabling_termination: Syncpoint,
+    pub signal_handler_after_unable_to_disable_termination: Syncpoint,
+    pub signal_handler_before_checking_alarm: Syncpoint,
     pub signal_handler_before_disabling_termination: Syncpoint,
     pub signal_handler_before_returning: Syncpoint,
 }
@@ -104,6 +124,7 @@ pub struct LockTestpoints {
 impl LockTestpoints {
     pub fn new() -> Self {
         LockTestpoints {
+            instance_after_clearing_current_instance: Syncpoint::new(),
             instance_entering_guest_after_domain_change: Syncpoint::new(),
             instance_entering_guest_before_domain_change: Syncpoint::new(),
             instance_entering_hostcall_after_domain_change: Syncpoint::new(),
@@ -116,6 +137,7 @@ impl LockTestpoints {
             kill_switch_after_acquiring_domain_lock: Syncpoint::new(),
             kill_switch_after_acquiring_termination: Syncpoint::new(),
             kill_switch_after_forbidden_termination: Syncpoint::new(),
+            kill_switch_after_guest_alarm: Syncpoint::new(),
             kill_switch_after_releasing_domain: Syncpoint::new(),
             kill_switch_before_disabling_termination: Syncpoint::new(),
             kill_switch_before_guest_alarm: Syncpoint::new(),
@@ -123,8 +145,9 @@ impl LockTestpoints {
             kill_switch_before_hostcall_termination: Syncpoint::new(),
             kill_switch_before_releasing_domain: Syncpoint::new(),
             kill_switch_before_terminated_termination: Syncpoint::new(),
-            signal_handler_after_acquiring_termination: Syncpoint::new(),
             signal_handler_after_disabling_termination: Syncpoint::new(),
+            signal_handler_after_unable_to_disable_termination: Syncpoint::new(),
+            signal_handler_before_checking_alarm: Syncpoint::new(),
             signal_handler_before_disabling_termination: Syncpoint::new(),
             signal_handler_before_returning: Syncpoint::new(),
         }

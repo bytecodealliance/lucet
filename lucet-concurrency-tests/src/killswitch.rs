@@ -478,6 +478,152 @@ macro_rules! killswitch_tests {
             })
         }
 
+        // If we terminate in the signal handler, but before termination has been disabled, a
+        // signal will be sent to the guest. Lucet must correctly handle this case, lest the sigalrm be
+        // delivered to disastrous effect to the host.
+        //
+        // This corresponds to a race during the documentation's State B -> State E "guest faults
+        // or is terminated" transition.
+        #[test]
+        fn terminate_during_guest_fault() {
+            test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
+                let kill_switch = inst.kill_switch();
+
+                // *Before* termination is critical, since afterward the `KillSwitch` we test with will
+                // just take no action.
+                let unfortunate_time_to_terminate = inst
+                    .lock_testpoints
+                    .signal_handler_before_disabling_termination
+                    .wait_at();
+                // Wait for the guest to reach a point we reaaallly don't want to signal at - somewhere in
+                // the signal handler.
+                let exiting_signal_handler = inst
+                    .lock_testpoints
+                    .signal_handler_before_returning
+                    .wait_at();
+                // Finally, we need to know when we're ready to signal to ensure it races with.
+                let killswitch_send_signal =
+                    inst.lock_testpoints.kill_switch_after_guest_alarm.wait_at();
+
+                let guest = thread::Builder::new()
+                    .name("guest".to_owned())
+                    .spawn(move || {
+                        match inst.run("main", &[0u32.into(), 0u32.into()]) {
+                            Err(Error::RuntimeFault(details)) => {
+                                assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        // Check that we can reset the instance and run a normal function.
+                        inst.reset().expect("instance resets");
+                        run_onetwothree(&mut inst);
+                    })
+                    .expect("can spawn guest thread");
+
+                let termination_thread = unfortunate_time_to_terminate.wait_and_then(|| {
+                    let thread = thread::Builder::new()
+                        .name("killswitch".to_owned())
+                        .spawn(move || {
+                            assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
+                        })
+                        .expect("can spawn killswitch thread");
+                    killswitch_send_signal.wait();
+                    thread
+                });
+
+                // Get ready to signal...
+                // and be sure that we haven't exited the signal handler until afterward
+                exiting_signal_handler.wait();
+
+                guest.join().expect("guest exits without panic");
+                termination_thread
+                    .join()
+                    .expect("termination completes without panic");
+            })
+        }
+
+        // Variant of the above where for scheduler reasons `terminable` and
+        // `execution_domain.lock()` happen on different sides of an instance descheduling.
+        //
+        // This corresponds to a race during the documentation's State B -> State E "guest faults
+        // or is terminated" transition.
+        //
+        // Specifically, we want:
+        // * signal handler fires, handling a guest fault
+        // * timeout fires, acquiring terminable
+        // * signal handler completes, locking in deschedule to serialize pending KillSwitch
+        // * KillSwitch is rescheduled, then fires
+        //
+        // And for all of this to complete without error!
+        #[test]
+        fn terminate_during_guest_fault_racing_deschedule() {
+            test_c_with_instrumented_guest_entry("timeout", "fault.c", |mut inst| {
+                let kill_switch = inst.kill_switch();
+
+                // *before* termination is critical, since afterward the `KillSwitch` we test with will
+                // just take no action.
+                let unfortunate_time_to_terminate = inst
+                    .lock_testpoints
+                    .signal_handler_before_disabling_termination
+                    .wait_at();
+                // we need to let the instance deschedule before our KillSwitch takes
+                // `execution_domain`.
+                let killswitch_acquire_termination = inst
+                    .lock_testpoints
+                    .kill_switch_after_acquiring_termination
+                    .wait_at();
+                // and the entire test revolves around KillSwitch taking effect after
+                // `CURRENT_INSTANCE` is cleared!
+                let current_instance_cleared = inst
+                    .lock_testpoints
+                    .instance_after_clearing_current_instance
+                    .wait_at();
+
+                let guest = thread::Builder::new()
+                    .name("guest".to_owned())
+                    .spawn(move || {
+                        match inst.run("main", &[0u32.into(), 0u32.into()]) {
+                            Err(Error::RuntimeFault(details)) => {
+                                assert_eq!(details.trapcode, Some(TrapCode::HeapOutOfBounds));
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        // Check that we can reset the instance and run a normal function.
+                        inst.reset().expect("instance resets");
+                        run_onetwothree(&mut inst);
+                    })
+                    .expect("can spawn guest thread");
+
+                let (termination_thread, killswitch_before_domain) = unfortunate_time_to_terminate
+                    .wait_and_then(|| {
+                        let ks_thread = thread::Builder::new()
+                            .name("killswitch".to_owned())
+                            .spawn(move || {
+                                assert_eq!(kill_switch.terminate(), Err(KillError::NotTerminable));
+                            })
+                            .expect("can spawn killswitch thread");
+
+                        // Pause the KillSwitch thread right before it acquires `execution_domain`
+                        let killswitch_before_domain = killswitch_acquire_termination.pause();
+
+                        (ks_thread, killswitch_before_domain)
+                    });
+
+                // `execution_domain` is not held, so instance descheduling will complete promptly.
+                current_instance_cleared.wait();
+
+                // Resume `KillSwitch`, which will acquire `execution_domain` and terminate.
+                killswitch_before_domain.resume();
+
+                guest.join().expect("guest exits without panic");
+                termination_thread
+                    .join()
+                    .expect("termination completes without panic");
+            })
+        }
+
         // This doesn't doesn't correspond to any state change in the documentation because it should have
         // no effect. The guest is in State E before, and should remain in State E after.
         #[test]
@@ -744,12 +890,12 @@ macro_rules! killswitch_tests {
 
                 ks1.join().expect("killswitch_1 did not panic");
 
-                // At this point the first `KillSwitch` has completed terminating the instance. Now try
-                // again and make sure there's no boom.
-                assert_eq!(second_kill_switch.terminate(), Err(KillError::Invalid));
-
                 // Allow the instance to reset and run a new function after termination.
-                guest_exit_testpoint.wait();
+                guest_exit_testpoint.wait_and_then(|| {
+                    // At this point the first `KillSwitch` has completed terminating the instance. Now try
+                    // again and make sure there's no boom.
+                    assert_eq!(second_kill_switch.terminate(), Err(KillError::Invalid));
+                });
 
                 // And after the instance successfully runs a test function, it exits without error.
                 guest.join().expect("guest stops running");

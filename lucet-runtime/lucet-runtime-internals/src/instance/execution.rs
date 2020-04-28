@@ -149,6 +149,13 @@ pub struct KillState {
     /// `tid_change_notifier` allows functions that may cause a change in `thread_id` to wait,
     /// without spinning, for the signal to be processed.
     tid_change_notifier: Condvar,
+    /// `ignore_alarm` indicates if a SIGALRM directed at this KillState's instance must be
+    /// ignored. This is necessary for a specific race where a termination occurs right around when
+    /// a Lucet guest, or hostcall the guest made, handles some other signal: if the termination
+    /// occurs during handling of a signal that arose from guest code, a SIGALRM will either be
+    /// pending, masked by Lucet's sigaction's signal mask, OR a SIGLARM will be imminent after
+    /// handling the signal.
+    ignore_alarm: AtomicBool,
     #[cfg(feature = "concurrent_testpoints")]
     /// When testing race permutations, `KillState` keeps a reference to the `LockTestpoints` its
     /// associated instance holds.
@@ -312,6 +319,7 @@ impl Default for KillState {
             tid_change_notifier: Condvar::new(),
             execution_domain: Mutex::new(Domain::Pending),
             thread_id: Mutex::new(None),
+            ignore_alarm: AtomicBool::new(false),
         }
     }
 }
@@ -330,6 +338,7 @@ impl KillState {
             tid_change_notifier: Condvar::new(),
             execution_domain: Mutex::new(Domain::Pending),
             thread_id: Mutex::new(None),
+            ignore_alarm: AtomicBool::new(false),
             lock_testpoints,
         }
     }
@@ -342,12 +351,20 @@ impl KillState {
         self.terminable.store(true, Ordering::SeqCst);
     }
 
-    pub fn disable_termination(&self) {
-        self.terminable.store(false, Ordering::SeqCst);
+    pub fn disable_termination(&self) -> bool {
+        self.terminable.swap(false, Ordering::SeqCst)
     }
 
     pub fn terminable_ptr(&self) -> *const AtomicBool {
         &self.terminable as *const AtomicBool
+    }
+
+    pub fn silence_alarm(&self) -> bool {
+        self.ignore_alarm.swap(true, Ordering::SeqCst)
+    }
+
+    pub fn alarm_active(&self) -> bool {
+        !self.ignore_alarm.load(Ordering::SeqCst)
     }
 
     /// Set the execution domain to signify that we are currently executing a hostcall.
@@ -450,6 +467,27 @@ impl KillState {
     pub fn deschedule(&self) {
         *self.thread_id.lock().unwrap() = None;
         self.tid_change_notifier.notify_all();
+
+        // If a guest is being descheduled, this lock is load-bearing in two ways:
+        // * If a KillSwitch is in flight and already holds `execution_domain`, we must wait for
+        // it to complete. This prevents a SIGALRM from being sent at some point later in host
+        // execution.
+        // * If a KillSwitch has aqcuired `terminable`, but not `execution_domain`, we may win the
+        // race for this lock. We don't know when the KillSwitch will try to check
+        // `execution_domain`. Holding the lock, we can update it to `Terminated` - this reflects
+        // that the instance has exited, but also signals that the KillSwitch should take no
+        // effect.
+        //
+        // This must occur *after* notifing `tid_change_notifier` so that we indicate to a
+        // `KillSwitch` that the instance was actually descheduled, if it was terminating a guest.
+        //
+        // If any other state is being descheduled, either the instance faulted in another domain,
+        // or a hostcall called `yield`, and we must preserve the `Hostcall` domain, so don't
+        // change it.
+        let mut execution_domain = self.execution_domain.lock().unwrap();
+        if let Domain::Guest = *execution_domain {
+            *execution_domain = Domain::Terminated;
+        }
     }
 }
 
@@ -593,6 +631,10 @@ impl KillSwitch {
                     unsafe {
                         pthread_kill(thread_id, SIGALRM);
                     }
+
+                    #[cfg(feature = "concurrent_testpoints")]
+                    state.lock_testpoints.kill_switch_after_guest_alarm.check();
+
                     // wait for the SIGALRM handler to deschedule the instance
                     //
                     // this should never actually loop, which would indicate the instance
