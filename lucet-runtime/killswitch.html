@@ -1,0 +1,554 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>KillSwitch - Lucet</title>
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
+        <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div id="sidebar-scrollbox" class="sidebar-scrollbox">
+                <ol class="chapter"><li class="expanded "><a href="../Overview.html"><strong aria-hidden="true">1.</strong> Overview</a></li><li class="expanded "><a href="../Using-lucet.html"><strong aria-hidden="true">2.</strong> Using Lucet</a></li><li><ol class="section"><li class="expanded "><a href="../Compiling.html"><strong aria-hidden="true">2.1.</strong> Compiling Lucet</a></li><li><ol class="section"><li class="expanded "><a href="../Compiling-on-Linux.html"><strong aria-hidden="true">2.1.1.</strong> Compiling on Linux</a></li><li class="expanded "><a href="../Compiling-on-macOS.html"><strong aria-hidden="true">2.1.2.</strong> Compiling on macOS</a></li></ol></li><li class="expanded "><a href="../Your-first-Lucet-application.html"><strong aria-hidden="true">2.2.</strong> Lucet &quot;Hello World&quot;</a></li><li class="expanded "><a href="../lucet-runtime-example.html"><strong aria-hidden="true">2.3.</strong> Using the Lucet runtime API from Rust</a></li><li class="expanded "><a href="../Integrity-and-authentication.html"><strong aria-hidden="true">2.4.</strong> Module integrity and authentication</a></li></ol></li><li class="expanded "><a href="../Lucet-components.html"><strong aria-hidden="true">3.</strong> Lucet components</a></li><li><ol class="section"><li class="expanded "><a href="../lucetc.html"><strong aria-hidden="true">3.1.</strong> lucetc</a></li><li class="expanded "><a href="../lucet-runtime.html"><strong aria-hidden="true">3.2.</strong> lucet-runtime</a></li><li><ol class="section"><li class="expanded "><a href="../lucet-runtime/killswitch.html" class="active"><strong aria-hidden="true">3.2.1.</strong> KillSwitch</a></li></ol></li><li class="expanded "><a href="../lucet-wasi.html"><strong aria-hidden="true">3.3.</strong> lucet-wasi</a></li><li class="expanded "><a href="../lucet-objdump.html"><strong aria-hidden="true">3.4.</strong> lucet-objdump</a></li><li class="expanded "><a href="../lucet-spectest.html"><strong aria-hidden="true">3.5.</strong> lucet-spectest</a></li><li class="expanded "><a href="../lucet-wasi-sdk.html"><strong aria-hidden="true">3.6.</strong> lucet-wasi-sdk</a></li><li class="expanded "><a href="../lucet-module.html"><strong aria-hidden="true">3.7.</strong> lucet-module</a></li><li class="expanded "><a href="../Tests-and-benchmarks.html"><strong aria-hidden="true">3.8.</strong> Tests and benchmarks</a></li><li><ol class="section"><li class="expanded "><a href="../sightglass.html"><strong aria-hidden="true">3.8.1.</strong> sightglass</a></li></ol></li></ol></li><li class="expanded "><a href="../versioning_releasing.html"><strong aria-hidden="true">4.</strong> Versioning and releasing to crates.io</a></li><li class="expanded "><a href="../Security.html"><strong aria-hidden="true">5.</strong> Security</a></li><li class="expanded "><a href="../CHANGELOG.html"><strong aria-hidden="true">6.</strong> Changelog</a></li><li class="expanded "><a href="../License.html"><strong aria-hidden="true">7.</strong> License</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar" class="menu-bar">
+                    <div id="menu-bar-sticky-container">
+                        <div class="left-buttons">
+                            <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                                <i class="fa fa-bars"></i>
+                            </button>
+                            <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                                <i class="fa fa-paint-brush"></i>
+                            </button>
+                            <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                                <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                            </ul>
+                            
+                            <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                                <i class="fa fa-search"></i>
+                            </button>
+                            
+                        </div>
+
+                        <h1 class="menu-title">Lucet</h1>
+
+                        <div class="right-buttons">
+                            <a href="../print.html" title="Print this book" aria-label="Print this book">
+                                <i id="print-button" class="fa fa-print"></i>
+                            </a>
+                            
+                            <a href="https://github.com/bytecodealliance/lucet" title="Git repository" aria-label="Git repository">
+                                <i id="git-repository-button" class="fa fa-github"></i>
+                            </a>
+                            
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1><a class="header" href="#killswitch" id="killswitch"><code>KillSwitch</code></a></h1>
+<p><code>KillSwitch</code> is a mechanism by which users of <code>lucet-runtime</code> can
+asynchronously request, very sternly, that an <code>lucet_runtime::Instance</code> be
+disabled from running.</p>
+<p>If the instance is currently running, it will be stopped as soon as possible.
+If the instance has not yet started running, it will immediately exit with
+an error when the <code>lucet</code> embedder attempts to run it.</p>
+<p><code>KillSwitch</code> easily interoperates with Lucet's instance suspend/resume
+machinery: suspending an instance is, from the instance's point of view, just a
+(possibly very long) hostcall. Termination of a suspended instance behaves like
+termination in any other hostcall: witnessed when the instance is resumed and
+the &quot;hostcall&quot; exits.</p>
+<p>In some circumstances, a <code>KillSwitch</code> may successfully fire to no actual effect
+at any point in the program - one such example is termination in a hostcall that
+eventually faults; since termination cannot preempt hostcalls, the termination may
+never be witnessed if the fault causes the host to never resume the Lucet
+instance.</p>
+<p>In this chapter we will describe a typical usage of <code>KillSwitch</code> as a mechanism
+to enforce execution time limits. Then, we will discuss the implementation
+complexities that <code>KillSwitch</code> must address to be correct.</p>
+<p><code>KillSwitch</code> are valid for termination only on the instance call after they are
+created, or until an instance is reset. When a call into a guest returns, the
+shared state by which <code>KillSwitch</code> signal is replaced, and an attempt to
+<code>terminate</code> will fail with an <code>Err</code>.</p>
+<h2><a class="header" href="#example-killswitch-used-as-a-timeout-mechanism" id="example-killswitch-used-as-a-timeout-mechanism">Example: <code>KillSwitch</code> used as a timeout mechanism</a></h2>
+<p>This example is taken from <code>lucet_runtime_tests::timeout::timeout_in_guest</code>:</p>
+<pre><pre class="playpen"><code class="language-rust">
+<span class="boring">#![allow(unused_variables)]
+</span><span class="boring">fn main() {
+</span>let module = mock_timeout_module();
+let region = TestRegion::create(1, &amp;Limits::default()).expect(&quot;region can be created&quot;);
+let mut inst = region
+    .new_instance(module)
+    .expect(&quot;instance can be created&quot;);
+let kill_switch = inst.kill_switch();
+
+// Spawn a thread to terminate the instance after waiting for 100ms.
+let t = thread::Builder::new()
+    .name(&quot;killswitch&quot;.to_owned())
+    .spawn(move || {
+        thread::sleep(Duration::from_millis(100));
+        assert_eq!(kill_switch.terminate(), Ok(KillSuccess::Signalled));
+    })
+    .expect(&quot;can spawn a thread&quot;);
+
+// Begin running the instance, which will be terminated remotely by the KillSwitch.
+match inst.run(&quot;infinite_loop&quot;, &amp;[]) {
+    Err(Error::RuntimeTerminated(TerminationDetails::Remote)) =&gt; {
+        // the result of a guest that was remotely terminated (a KillSwitch at work)
+    }
+    res =&gt; panic!(&quot;unexpected result: {:?}&quot;, res),
+}
+
+// wait for the KillSwitch-firing thread to complete
+t.join().unwrap();
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#implementation" id="implementation">Implementation</a></h2>
+<p>As this section discusses implementation details of <code>lucet_runtime</code>, it will
+refer to structures and enums that are unexported. For most components of
+Lucet's <code>KillSwitch</code> functionality, defintions live in
+<code>lucet-runtime-internals/src/instance/execution.rs</code>.</p>
+<p><code>KillState</code> and <code>Domain</code>, around which most of the implementation is centered,
+are both defined here and are internal to Lucet. As a result, fully qualified
+paths such as <code>instance::execution::Domain</code> may be used below and not have
+corresponding entries visible in rustdoc - these items exist in the crate
+source though!</p>
+<p>As much as is possible, <code>KillSwitch</code> tries to be self-contained; no members are
+public, and it tries to avoid leaking details of its state-keeping into public
+interfaces. Currently, <code>lucet-runtime</code> is heavily dependent on POSIX
+thread-directed signals to implement guest termination. For non-POSIX platforms
+alternate implementations may be plausible, but need careful consideration of
+the race conditions that can arise from other platform-specific functionality.</p>
+<p><code>KillSwitch</code> fundamentally relies on two pieces of state for safe operation,
+which are encapsulated in a <code>KillState</code> held by the <code>Instance</code> it terminates:</p>
+<ul>
+<li><code>execution_domain</code>, a <code>Domain</code> that describes the kind of execution that is
+currently happening in the <code>Instance</code>.
+<ul>
+<li>This is kept in a <code>Mutex</code> since in many cases it will need to be accessed
+either by a <code>KillSwitch</code> or <code>KillState</code>, both of which must block other
+users while they are considering the domain.</li>
+</ul>
+</li>
+<li><code>terminable</code>, an <code>AtomicBool</code> that indicates if the <code>Instance</code> may stop
+executing.
+<ul>
+<li><code>terminable</code> is in some ways a subset of the information expressed by
+<code>Domain</code>. It is true if and only if the instance is not obligated to a
+specific exit mechanism yet, which could be determined by examing the
+active <code>Domain</code> at points we check <code>terminable</code> instead. Even though this
+is duplicative, it is necessary for a correct implementation when POSIX
+signal handlers are involved, because it is extremely inadvisable to take
+locks in a signal handler. While a <code>Mutex</code> can be dangerous, we can share
+an <code>AtomicBool</code> in signal-safety-constrained code with impunity! See the
+section <code>Timeout while handling a guest fault</code> for more details on working
+under this constraint.</li>
+</ul>
+</li>
+</ul>
+<p>The astute observer may notice that <code>Lucet</code> contains both an instance <code>Domain</code>
+and an instance <code>State</code>. These discuss different aspects of the instance's
+lifecycle: <code>Domain</code> describes what the instance is doing right now, where
+<code>State</code> describes the state of the instance as visible outside <code>lucet_runtime</code>.
+This is fundamentally the reason why <code>State</code> does not and cannot describe a
+&quot;making a hostcall&quot; variant - this is not something <code>lucet_runtime</code> wants to
+expose, and at the moment we don't intend to make any commitments about being
+able to query instance-internal state like this.</p>
+<p>Additionally, this is why <code>Domain::Terminated</code> only expresses that an instance
+has <em>stopped</em> running, not if it successfully or unsuccessfully exited. From
+<code>Domain</code>'s perspective, the instance has stopped running, and that's all there
+is to it. The <code>Instance</code>'s <code>State</code> will describe how the instance stopped, and
+if that's by a return or a fault.</p>
+<h3><a class="header" href="#termination-mechanisms" id="termination-mechanisms">Termination Mechanisms</a></h3>
+<p>At a high level,<code>KillSwitch</code> picks one of several mechanisms to terminate an
+instance. The mechanism selected depends on the instance's current <code>Domain</code>:</p>
+<p><code>Domain::Guest</code> is likely to be the most common termination form.
+<code>lucet_runtime</code> will send a thread-directed <code>SIGARLM</code> to the thread running the
+Lucet instance that currently is in guest code.</p>
+<p><code>Domain::Hostcall</code> results in the mechanism with least guarantees:
+<code>lucet_runtime</code> can't know if it's safe to signal in arbitrary host-provided
+code[1]. Instead, we set the execution domain to <code>Domain::Terminated</code> and wait
+for the host code to complete, at which point <code>lucet_runtime</code> will exit the
+guest.</p>
+<p><code>Domain::Pending</code> is the easiest domain to stop execution in: we simply update
+the execution domain to <code>Cancelled</code>. In <code>enter_guest_region</code>, we see that the
+instance is no longer eligible to run and exit before handing control to the
+guest.</p>
+<p>Other variants of <code>Domain</code> imply an instance state where there is no possible
+termination mechanism. <code>Domain::Terminated</code> indicates that the instance has
+already been terminated, and <code>Domain::Cancelled</code> indicates that the instance
+has already been preemptively stopped.</p>
+<h4><a class="header" href="#guest-signalling" id="guest-signalling">Guest Signalling</a></h4>
+<p>There are two other pieces of information attached to <code>KillState</code> that support
+the specific case where we need to send a <code>SIGALRM</code>: the thread ID we need to
+signal, and a <a href="https://doc.rust-lang.org/1.40.0/std/sync/struct.Condvar.html"><code>Condvar</code></a> we can wait on to know when the instance has
+been stopped.</p>
+<p>The thread ID is necessary because we don't record <em>where</em> the instance is
+running anywhere else. We keep it here because, so far, <code>KillState</code> is the only
+place we actually need to care. <code>Condvar</code> allows <code>lucet_runtime</code> to avoid a
+spin loop while waiting for signal handling machinery to actually terminate an
+<code>Instance</code> in <code>Domain::Guest</code>.</p>
+<h3><a class="header" href="#lifecycle" id="lifecycle">Lifecycle</a></h3>
+<p>Having described both <code>KillState</code> and the termination mechanisms it helps
+select, we can discuss the actual lifecycle of the <code>KillState</code> for a call into
+an <code>Instance</code> and see how these pieces begin to fit together.</p>
+<p>Because <code>KillState</code> only describes one call into an instance, an <code>Instance</code> may
+have many <code>KillState</code> over its lifetime. Even so, at one <em>specific</em> time there
+is only one <code>KillState</code>, which describes the current, or imminent, call into
+the instance.</p>
+<p>Execution of a Lucet <code>Instance</code> begins with a default <code>KillState</code>: in the
+<code>Pending</code> domain, <code>terminable</code> set to <code>true</code>, with no <code>thread_id</code> as it is not
+currently running.  When a call is made to <code>Instance::run</code>, the <code>Instance</code>'s
+bootstrap context is set up and <code>KillState::schedule</code> is called to set up
+last-minute state before the instance begins running.</p>
+<p><code>lucet_runtime</code> shortly thereafter will switch to the <code>Instance</code> and begin
+executing its bootstrapping code. In <code>enter_guest_region</code> the guest will lock
+and update the execution domain to <code>Guest</code>, or see the instance is
+<code>Domain::Cancelled</code> and exit. If the instance could run, we proceed into the
+AOT-compiled Wasm.</p>
+<p>At some point, the instance will likely make a hostcall to embedder-provided or
+<code>lucet_runtime</code>-provided code; correctly-implemented hostcalls are wrapped in
+<code>begin_hostcall</code> and <code>end_hostcall</code> to take care of runtime bookkeeping,
+including updating <code>execution_domain</code> to <code>Domain::Hostcall</code> (<code>begin_hostcall</code>)
+and afterwards checking that the instance can return to guest code, setting
+<code>execution_domain</code> back to <code>Domain::Guest</code> (<code>end_hostcall</code>).</p>
+<p>At some point the instance will hopefully exit, where in
+<code>lucet_context_backstop</code> we check that the instance may stop exiting
+(<code>KillState::terminable</code>). If it can exit, then do so. Finally, back in
+<code>lucet_runtime</code>, we can <code>KillState::deschedule</code> to tear down the last of the
+run-specific state - the <code>thread_id</code>.</p>
+<h2><a class="header" href="#implementation-complexities-when-you-have-a-scheduler-full-of-demons" id="implementation-complexities-when-you-have-a-scheduler-full-of-demons">Implementation Complexities (When You Have A Scheduler Full Of Demons)</a></h2>
+<p>Many devils live in the details. The rest of this chapter will discuss the
+numerous edge cases and implementation concerns that Lucet's asynchronous
+signal implementation must consider, and arguments for its correctness in the
+face of these.</p>
+<p>First, a flow chart of the various states and their transitions:
+<img src="states.png" alt="state flow chart" /></p>
+<p>This graph describes the various states that reflect values of
+<code>execution_domain</code> and <code>terminable</code> for those states, with edges describing
+transitions between domains including termination in non-race scenarios. The
+rest of this section discusses the correctness of termination at boundaries
+where these state transitions occur.</p>
+<p>For reference later, the possible state transitions are:</p>
+<ul>
+<li><code>A -&gt; B</code> (instance runs guest code)</li>
+<li><code>A -&gt; D</code> (KillSwitch fires before instance runs)</li>
+<li><code>B -&gt; C</code> (guest makes a hostcall)</li>
+<li><code>B -&gt; E</code> (normal guest exit)</li>
+<li><code>B -&gt; E</code> (from a guest fault/termination)</li>
+<li><code>C -&gt; B</code> (hostcall returns to guest)</li>
+<li><code>C -&gt; E</code> (hostcall terminates instance)</li>
+<li><code>C -&gt; E</code> (hostcall observes termination)
+<ul>
+<li>not an internal state but we will also discuss termination during a hostcall fault</li>
+</ul>
+</li>
+<li><code>D -&gt; E</code> (cancelled guest is run)</li>
+</ul>
+<p>These will be covered in rough order of complexity, starting with the simplest
+cases and ending with the race which has shown itself to have the most corners.
+Races involving <code>Domain::Guest</code> tend to be trickiest, and consequently are
+further down.</p>
+<h3><a class="header" href="#a---d---termination-before-instance-runs" id="a---d---termination-before-instance-runs"><code>A -&gt; D</code> - Termination before instance runs</a></h3>
+<p>This is a timeout while another <code>KillSwitch</code> has already fired, timing out a
+guest before exeuction. Because another <code>KillSwitch</code> must have fired for there
+to be a race, one of the two will acquire <code>terminable</code> and actually update
+<code>execution_domain</code>, while the other simply exits.</p>
+<h3><a class="header" href="#d---e---termination-when-cancelled-guest-is-run" id="d---e---termination-when-cancelled-guest-is-run"><code>D -&gt; E</code> - Termination when cancelled guest is run</a></h3>
+<p>Terminating a previously cancelled guest will have no effect - termination must
+have occurred already, so the <code>KillSwitch</code> that fired will not acquire
+<code>terminable</code>, and will return without ceremony.</p>
+<h3><a class="header" href="#c---b---termination-when-hostcall-returns-to-guest" id="c---b---termination-when-hostcall-returns-to-guest"><code>C -&gt; B</code> - Termination when hostcall returns to guest</a></h3>
+<p>The case of a <code>KillSwitch</code> firing while exiting from a hostcall is very similar
+to termination while entering a hostcall.</p>
+<p>The <code>KillSwitch</code> might observe a guest in <code>Domain::Guest</code>, prohibit a state
+change, and signal the guest. Alternatively, the <code>KillSwitch</code> can observe the
+guest in <code>Domain::Hostcall</code> and update the guest to <code>Domain::Terminated</code>. In
+the latter case, the guest will be free to run when the <code>KillSwitch</code> returns,
+at which point it will have the same behavior as termination in any
+hostcall.</p>
+<h3><a class="header" href="#c---e---termination-during-hostcall-terminating-instance" id="c---e---termination-during-hostcall-terminating-instance"><code>C -&gt; E</code> - Termination during hostcall terminating instance</a></h3>
+<p>The <code>KillSwitch</code> that fires acquires <code>terminable</code> and then attempts to acquire
+a lock on <code>execution_domain</code>. The <code>KillSwitch</code> will see <code>Domain::Hostcall</code>, and
+will update to <code>Domain::Terminated</code>. The shared <code>KillState</code> will be not used by
+<code>lucet_runtime</code> again in the future, because after returning to the host it
+will be replaced by a new <code>KillState</code>.</p>
+<h3><a class="header" href="#c---e---termination-repeatedly-during-hostcall" id="c---e---termination-repeatedly-during-hostcall"><code>C -&gt; E</code> - Termination repeatedly during hostcall</a></h3>
+<p>Termination while a hostcall is already observing an earlier termination will
+have no effect. The <code>KillSwitch</code> that fired last will not acquire
+<code>terminable</code>, and will return without ceremony.</p>
+<h3><a class="header" href="#b---c---termination-when-guest-makes-a-hostcall" id="b---c---termination-when-guest-makes-a-hostcall"><code>B -&gt; C</code> - Termination when guest makes a hostcall</a></h3>
+<p>If a <code>KillSwitch</code> fires during a transition from guest (B) to hostcall (C) code,
+there are two circumstances also contingent on whether the instance has
+switched to <code>Domain::Hostcall</code>.</p>
+<h4><a class="header" href="#before-switching-to-domainhostcall" id="before-switching-to-domainhostcall">Before switching to <code>Domain::Hostcall</code></a></h4>
+<p>The <code>KillSwitch</code> that fires locks <code>execution_domain</code> and sees the execution
+domain is <code>Domain::Guest</code>. It then uses typical guest termination macinery and
+signals the guest. An important correctness subtlety here is that <code>KillSwitch</code>
+holds the <code>execution_domain</code> lock until the guest is terminated, so the guest
+cannot simultaneously proceed into hostcall code and receieve a stray
+<code>SIGALRM</code>.</p>
+<h4><a class="header" href="#after-switching-to-domainhostcall" id="after-switching-to-domainhostcall">After switching to <code>Domain::Hostcall</code></a></h4>
+<p>The <code>KillSwitch</code> that fires acquires <code>terminable</code> and then attempts to acquire
+a lock on <code>execution_domain</code>. Because the instance is switching to or has
+switched to <code>Domain::Hostcall</code>, the <code>KillSwitch</code> will select the termination
+style for hostcalls. It will update the execution domain to
+<code>Domain::Terminated</code> and the instance will return when the hostcall exits and
+the <code>Terminated</code> domain is observed.</p>
+<h3><a class="header" href="#a---b---termination-while-entering-guest-code" id="a---b---termination-while-entering-guest-code"><code>A -&gt; B</code> - Termination while entering guest code</a></h3>
+<p>If a <code>KillSwitch</code> fires between instance initialization (A) and the start of
+guest execution (B), there are two circumstances to consider: does the
+termination occur before or after the Lucet instance has switched to
+<code>Domain::Guest</code>?</p>
+<h4><a class="header" href="#before-switching-to-domainguest" id="before-switching-to-domainguest">Before switching to <code>Domain::Guest</code></a></h4>
+<p>The <code>KillSwitch</code> that fires acquires <code>terminable</code> and then locks
+<code>execution_domain</code> to determine the appropriate termination  mechanism.  This is
+before the instance has locked it in <code>enter_guest_region</code>, so it will acquire
+the lock, with a state of <code>Domain::Pending</code>. Seeing a pending instance, the
+<code>KillSwitch</code> will update it to <code>Domain::Cancelled</code> and release the lock, at
+which point the instance will acquire the lock, observe the instance is
+<code>Cancelled</code>, and return to the host without executing any guest code.</p>
+<h4><a class="header" href="#after-switching-to-domainguest" id="after-switching-to-domainguest">After switching to <code>Domain::Guest</code></a></h4>
+<p>The <code>KillSwitch</code> that fires acquires <code>terminable</code> and then attempts to acquire
+a lock on <code>execution_domain</code> to determine the appropriate termination mechanism.
+Because the instance has already locked <code>execution_domain</code> to update it to
+<code>Domain::Guest</code>, this blocks until the instance releases the lock (and guest
+code is running).  At this point, the instance is running guest code and it is
+safe for the <code>KillSwitch</code> to operate as if it were terminating any other guest
+code - with the same machinery as an instance in state <code>B</code> (a <code>SIGALRM</code>).</p>
+<h3><a class="header" href="#b---e---termination-during-normal-guest-exit" id="b---e---termination-during-normal-guest-exit"><code>B -&gt; E</code> - Termination during normal guest exit</a></h3>
+<p>The <code>KillSwitch</code> that fires attempts to acquire <code>terminable</code>, but is in a race
+with the teardown in <code>lucet_context_backstop</code>. Both functions attempt to swap
+<code>false</code> into <code>terminable</code>, but only one will see <code>true</code> out of it. This acts as
+an indicator for which function may continue, where the other may have to take
+special care as to not leave the instance in a state that would be dangerous to
+signal.</p>
+<h4><a class="header" href="#guest-acquires-terminable" id="guest-acquires-terminable">Guest acquires <code>terminable</code></a></h4>
+<p>The guest exits in the next handful of instructions. The <code>KillSwitch</code> that
+failed to acquire the <code>true</code> in <code>terminable</code> exits with an indication that it
+could not terminate the guest. In this circunstance, we are certain that there
+is a non-conditional and short path out of the guest comprising a return from
+<code>exit_guest_region</code> and a context swap back to the host code. Timeouts
+&quot;failing&quot; due to this are only failing because the guest is about to exit, and
+a signal would have no interesting additional benefit.</p>
+<h4><a class="header" href="#killswitch-acquires-terminable" id="killswitch-acquires-terminable"><code>KillSwitch</code> acquires <code>terminable</code></a></h4>
+<p>In a more unfortunate circumstance, the <code>KillSwitch</code> is what observed the
+<code>true</code> out of <code>terminable</code>. In this case, the guest observed <code>false</code> and must
+not proceed, so that whenever an imminent <code>SIGALRM</code> from the corresponding
+<code>KillSwitch</code> arrives, it will be in a guaranteed-to-be-safe spin loop, or on
+its way there with only signal-safe state.</p>
+<p>The <code>KillSwitch</code> itself will signal the guest as any other <code>Domain::Guest</code>
+interruption.</p>
+<h3><a class="header" href="#b---e---termination-during-guest-fault-or-terminated-twice" id="b---e---termination-during-guest-fault-or-terminated-twice"><code>B -&gt; E</code> - Termination during guest fault, or terminated twice</a></h3>
+<p>In this sub-section we assume that the Lucet signal handler is being used, and
+will discuss the properties <code>KillSwitch</code> requires from any signal handler for
+correctness.</p>
+<p>The <code>KillSwitch</code> that fires attempts to acquire <code>terminable</code>. Because a guest
+fault or termination has occurred, the guest is actually in
+<code>lucet_runtime_internals::instance::signals::handle_signal</code>. If termination
+occurs while the guest is already responding to a previous <code>KillSwitch</code>'s
+termination, the second <code>KillSwitch</code> will see <code>terminable</code> of <code>false</code> and
+quickly exit.  Otherwise, <code>terminable</code> is <code>true</code> and we have to handle...</p>
+<h4><a class="header" href="#terminated-while-handling-a-guest-fault" id="terminated-while-handling-a-guest-fault">Terminated while handling a guest fault</a></h4>
+<p>In the case that a <code>KillSwitch</code> fires during a guest fault, the <code>KillSwitch</code> may
+acquire <code>terminable</code>. POSIX signal handlers are highly constrained, see <code>man 7 signal-safety</code> for details. The functional constraint imposed on signal
+handlers used with Lucet is that they may not lock on <code>KillState</code>'s
+<code>execution_domain</code>.</p>
+<p>As a consequence, a <code>KillSwitch</code> may fire during the handling of a guest fault.
+<code>sigaction</code> must mask <code>SIGALRM</code> so that a signal fired before the handler exits
+is discarded. If the signal behavior is to continue without effect, leave
+termination in place and continue to the guest. Otherwise the signal handler
+has determined it must return to the host, and it disables termination on the
+instance to avoid sending an erroneous SIGALRM immediately after swapping to
+the host context.</p>
+<h3><a class="header" href="#terminated-in-hostcall-fault" id="terminated-in-hostcall-fault">Terminated in hostcall fault</a></h3>
+<p>As promised, a note about what happens when a timeout occurs directly when a
+hostcall faults! The instance's <code>execution_domain</code> must be <code>Domain::Hostcall</code>,
+as it's a hostcall that faulted. The <code>KillSwitch</code> may or may not fire before
+the signal handler disables termination. Even if it does fire, it will lock the
+shared <code>execution_domain</code> and see <code>Domain::Hostcall</code>, where the domain will be
+updated to <code>Domain::Terminated</code>.  Since the hostcall will not resume,
+<code>end_hostcall</code> will never see that the instance should stop, and no further
+effect will be had; regardless of <code>KillSwitch</code> effect, the instance will exit
+through the signal handler with a <code>Faulted</code> state. Additionally, because
+faulted instances cannot be resumed, <code>end_hostcall</code> will never witness the
+timeout.</p>
+<p>[1]: For example, the code we would <em>like</em> to interrupt may hold locks, which we
+can't necessarily guarantee drop. In a non-locking example, the host code could
+be resizing a <code>Vec</code> shared outside that function, where interrupting the resize
+could yield various forms of broken behavior.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="../lucet-runtime.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="../lucet-wasi.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a href="../lucet-runtime.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a href="../lucet-wasi.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+        
+        
+        <script type="text/javascript">
+            window.playpen_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+
+    </body>
+</html>
