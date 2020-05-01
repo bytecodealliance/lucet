@@ -1,4 +1,4 @@
-use crate::alloc::{host_page_size, instance_heap_offset, AddrLocation, Alloc, Limits, Slot};
+use crate::alloc::{host_page_size, instance_heap_offset, AddrLocation, Alloc, AllocStrategy, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle, InstanceInternal};
@@ -211,16 +211,19 @@ impl RegionInternal for UffdRegion {
         module: Arc<dyn Module>,
         embed_ctx: CtxMap,
         heap_memory_size_limit: usize,
+        mut alloc_strategy: AllocStrategy,
     ) -> Result<InstanceHandle, Error> {
         let limits = self.get_limits();
         module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
 
-        let slot = self
-            .freelist
-            .lock()
-            .unwrap()
-            .pop()
-            .ok_or(Error::RegionFull(self.instance_capacity))?;
+        // Use the supplied alloc_strategy to get the next available slot
+        // for this new instance.
+        let slot;
+        {
+            let mut free_slot_vector = self.freelist.lock().unwrap();
+            let slot_index = alloc_strategy.next(free_slot_vector.len(), self.capacity())?;
+            slot = free_slot_vector.swap_remove(slot_index);
+        }
 
         assert_eq!(
             slot.heap as usize % host_page_size(),
@@ -234,7 +237,7 @@ impl RegionInternal for UffdRegion {
             // zero the sigstack
             (slot.sigstack, limits.signal_stack_size),
         ]
-        .into_iter()
+        .iter()
         {
             // globals_size = 0 is valid, but the ioctl fails if you pass it 0
             if *len > 0 {
