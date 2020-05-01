@@ -184,8 +184,6 @@ macro_rules! guest_fault_tests {
         use nix::unistd::{fork, ForkResult};
         use std::ptr;
         use std::sync::{Arc, Mutex};
-        use $TestRegion as TestRegion;
-        use $crate::guest_fault::{mock_traps_module, with_unchanged_signal_handlers};
         use $crate::helpers::{
             test_ex, test_nonex, with_unchanged_signal_handlers, FunctionPointer,
             MockExportBuilder, MockModuleBuilder,
@@ -205,19 +203,6 @@ macro_rules! guest_fault_tests {
         #[cfg(not(target_os = "linux"))]
         const INVALID_PERMISSION_SIGNAL: Signal = Signal::SIGBUS;
 
-        static HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
-
-        #[no_mangle]
-        unsafe extern "C" fn guest_recoverable_get_ptr() -> *const libc::c_char {
-            RECOVERABLE_PTR
-        }
-
-        #[lucet_hostcall]
-        #[no_mangle]
-        pub fn hostcall_test(_vmctx: &mut Vmctx) {
-            lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
-        }
-
         $(
             mod $region_id {
                 use lazy_static::lazy_static;
@@ -235,10 +220,10 @@ macro_rules! guest_fault_tests {
                 use std::ptr;
                 use std::sync::{Arc, Mutex};
                 use $TestRegion as TestRegion;
-                use $crate::guest_fault::{mock_traps_module, with_unchanged_signal_handlers};
                 use $crate::helpers::{
-                    test_ex, test_nonex, FunctionPointer, MockExportBuilder, MockModuleBuilder,
+                    test_ex, test_nonex, with_unchanged_signal_handlers, FunctionPointer, MockExportBuilder, MockModuleBuilder,
                 };
+                use super::mock_traps_module;
 
 
                 unsafe fn recoverable_ptr_setup() {
