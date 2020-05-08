@@ -7,7 +7,7 @@ pub use crate::instance::execution::{KillError, KillState, KillSuccess, KillSwit
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 pub use crate::instance::state::State;
 
-use crate::alloc::{Alloc, HOST_PAGE_SIZE_EXPECTED};
+use crate::alloc::Alloc;
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
@@ -15,6 +15,7 @@ use crate::error::Error;
 use crate::lock_testpoints::LockTestpoints;
 use crate::module::{self, FunctionHandle, Global, GlobalValue, Module, TrapCode};
 use crate::region::RegionInternal;
+use crate::sysdeps::HOST_PAGE_SIZE_EXPECTED;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, pthread_self, siginfo_t, uintptr_t};

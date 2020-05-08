@@ -3,10 +3,11 @@ macro_rules! sparse_page_data_tests {
     ( $TestRegion:path ) => {
         use std::sync::Arc;
         use $TestRegion as TestRegion;
-        use $crate::alloc::{host_page_size, Limits};
+        use $crate::alloc::Limits;
         use $crate::instance::InstanceInternal;
         use $crate::module::{MockModuleBuilder, Module};
         use $crate::region::Region;
+        use $crate::sysdeps::host_page_size;
 
         const FIRST_MESSAGE: &'static [u8] = b"hello from mock_sparse_module!";
         const SECOND_MESSAGE: &'static [u8] = b"hello again from mock_sparse_module!";
