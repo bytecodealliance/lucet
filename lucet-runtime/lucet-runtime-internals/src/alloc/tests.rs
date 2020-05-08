@@ -6,7 +6,7 @@ macro_rules! alloc_tests {
         use rand::{thread_rng, Rng, SeedableRng};
         use std::sync::{Arc, Mutex};
         use $TestRegion as TestRegion;
-        use $crate::alloc::{host_page_size, AllocStrategy, Limits, MINSIGSTKSZ};
+        use $crate::alloc::{AllocStrategy, Limits, MINSIGSTKSZ};
         use $crate::context::{Context, ContextHandle};
         use $crate::error::Error;
         use $crate::instance::InstanceInternal;
@@ -14,6 +14,7 @@ macro_rules! alloc_tests {
             FunctionPointer, GlobalValue, HeapSpec, MockExportBuilder, MockModuleBuilder, Module,
         };
         use $crate::region::Region;
+        use $crate::sysdeps::host_page_size;
         use $crate::val::Val;
         use $crate::vmctx::lucet_vmctx;
 
