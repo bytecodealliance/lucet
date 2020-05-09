@@ -3,7 +3,7 @@ macro_rules! start_tests {
     ( $( $region_id:ident => $TestRegion:path ),* ) => {
         $(
             mod $region_id {
-                use lucet_runtime::{DlModule, Error, Limits, Region};
+                use lucet_runtime::{DlModule, Error, Limits, Region, RegionCreate};
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
                 use $crate::build::test_module_wasm;
@@ -20,7 +20,7 @@ macro_rules! start_tests {
                         let module = test_module_wasm("start", "global_init.wat")
                             .expect("module compiled and loaded");
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -44,7 +44,7 @@ macro_rules! start_tests {
                         let module = test_module_wasm("start", "start_and_call.wat")
                             .expect("module compiled and loaded");
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -68,7 +68,7 @@ macro_rules! start_tests {
                         let module = test_module_wasm("start", "start_and_call.wat")
                             .expect("module compiled and loaded");
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -86,7 +86,7 @@ macro_rules! start_tests {
                         let module = test_module_wasm("start", "start_and_call.wat")
                             .expect("module compiled and loaded");
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -105,7 +105,7 @@ macro_rules! start_tests {
                         let module = test_module_wasm("start", "start_and_call.wat")
                             .expect("module compiled and loaded");
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -140,7 +140,7 @@ macro_rules! start_tests {
                         let module =
                             test_module_wasm("start", "no_start.wat").expect("module compiled and loaded");
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -165,7 +165,7 @@ macro_rules! start_tests {
                             let module = test_module_wasm("start", "start_and_call.wat")
                                 .expect("module compiled and loaded");
                             let region =
-                                TestRegion::create(1, &Limits::default()).expect("region can be created");
+                                <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                             let mut inst = region
                                 .new_instance(module)
                                 .expect("instance can be created");
@@ -225,7 +225,7 @@ macro_rules! start_tests {
                             ..Limits::default()
                         };
                         let region =
-                            TestRegion::create(1, &limits_no_sigstack).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &limits_no_sigstack).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");

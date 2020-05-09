@@ -8,7 +8,7 @@ macro_rules! globals_tests {
                 use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
                 use lucet_module::{lucet_signature, FunctionPointer, GlobalValue};
                 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-                use lucet_runtime::{Error, Limits, Module, Region};
+                use lucet_runtime::{Error, Limits, Module, Region, RegionCreate};
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
 
@@ -16,7 +16,7 @@ macro_rules! globals_tests {
                 fn defined_globals() {
                     let module =
                         test_module_wasm("globals", "definition.wat").expect("module compiled and loaded");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -55,7 +55,7 @@ macro_rules! globals_tests {
                 #[test]
                 fn reject_import() {
                     let module = mock_import_module();
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     match region.new_instance(module) {
                         Ok(_) => panic!("instance creation should not succeed"),
                         Err(Error::Unsupported(_)) => (),
@@ -117,7 +117,7 @@ macro_rules! globals_tests {
                 #[test]
                 fn globals_initialized() {
                     let module = mock_globals_module();
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -128,7 +128,7 @@ macro_rules! globals_tests {
                 #[test]
                 fn get_global0() {
                     let module = mock_globals_module();
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -143,7 +143,7 @@ macro_rules! globals_tests {
                 #[test]
                 fn get_both_globals() {
                     let module = mock_globals_module();
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -164,7 +164,7 @@ macro_rules! globals_tests {
                 #[test]
                 fn mutate_global0() {
                     let module = mock_globals_module();
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");

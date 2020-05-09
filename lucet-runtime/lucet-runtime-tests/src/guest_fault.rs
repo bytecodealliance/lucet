@@ -210,7 +210,7 @@ macro_rules! guest_fault_tests {
                 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
                 use lucet_runtime::{
                     lucet_hostcall, lucet_hostcall_terminate, lucet_internal_ensure_linked, DlModule,
-                    Error, FaultDetails, Instance, Limits, Region, SignalBehavior, TerminationDetails,
+                    Error, FaultDetails, Instance, Limits, Region, RegionCreate, SignalBehavior, TerminationDetails,
                     TrapCode,
                 };
                 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
@@ -269,7 +269,7 @@ macro_rules! guest_fault_tests {
                     test_nonex(|| {
                         let module = mock_traps_module();
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -295,7 +295,7 @@ macro_rules! guest_fault_tests {
                         with_unchanged_signal_handlers(|| {
                             let module = mock_traps_module();
                             let region =
-                                TestRegion::create(1, &Limits::default()).expect("region can be created");
+                                <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                             let mut inst = region
                                 .new_instance(module)
                                 .expect("instance can be created");
@@ -328,7 +328,7 @@ macro_rules! guest_fault_tests {
                         with_unchanged_signal_handlers(|| {
                             let module = mock_traps_module();
                             let region =
-                                TestRegion::create(1, &Limits::default()).expect("region can be created");
+                                <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                             let mut inst = region
                                 .new_instance(module)
                                 .expect("instance can be created");
@@ -401,7 +401,7 @@ macro_rules! guest_fault_tests {
                             ..Limits::default()
                         };
                         let region =
-                            TestRegion::create(1, &limits_no_sigstack).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &limits_no_sigstack).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -435,7 +435,7 @@ macro_rules! guest_fault_tests {
                     test_nonex(|| {
                         let module = mock_traps_module();
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -461,7 +461,7 @@ macro_rules! guest_fault_tests {
                     test_nonex(|| {
                         let module = mock_traps_module();
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -482,7 +482,7 @@ macro_rules! guest_fault_tests {
                     test_nonex(|| {
                         let module = mock_traps_module();
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -531,7 +531,7 @@ macro_rules! guest_fault_tests {
                         let lock = super::RECOVERABLE_PTR_LOCK.lock().unwrap();
                         let module = mock_traps_module();
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -574,7 +574,7 @@ macro_rules! guest_fault_tests {
                         match fork().expect("can fork") {
                             ForkResult::Child => {
                                 let module = mock_traps_module();
-                                let region = TestRegion::create(1, &Limits::default())
+                                let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
                                     .expect("region can be created");
                                 let mut inst = region
                                     .new_instance(module)
@@ -634,7 +634,7 @@ macro_rules! guest_fault_tests {
                             let recoverable_ptr_lock = super::RECOVERABLE_PTR_LOCK.lock().unwrap();
                             let module = mock_traps_module();
                             let region =
-                                TestRegion::create(1, &Limits::default()).expect("region can be created");
+                                <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                             let mut inst = region
                                 .new_instance(module)
                                 .expect("instance can be created");
@@ -726,7 +726,7 @@ macro_rules! guest_fault_tests {
                                         FunctionPointer::from_usize(sleepy_guest as usize),
                                     ))
                                     .build();
-                                let region = TestRegion::create(1, &Limits::default())
+                                let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
                                     .expect("region can be created");
                                 let mut inst = region
                                     .new_instance(module)
@@ -778,7 +778,7 @@ macro_rules! guest_fault_tests {
                                 // gets re-raised.
                                 std::thread::spawn(|| {
                                     let module = mock_traps_module();
-                                    let region = TestRegion::create(1, &Limits::default())
+                                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
                                         .expect("region can be created");
                                     let mut inst = region
                                         .new_instance(module)
@@ -814,7 +814,7 @@ macro_rules! guest_fault_tests {
                     test_ex(|| {
                         let module = mock_traps_module();
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -850,7 +850,7 @@ macro_rules! guest_fault_tests {
                         match fork().expect("can fork") {
                             ForkResult::Child => {
                                 let region =
-                                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                                    <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                                 let mut inst = region
                                     .new_instance(module)
                                     .expect("instance can be created");
@@ -885,7 +885,7 @@ macro_rules! guest_fault_tests {
                     test_ex(|| {
                         let module = mock_traps_module();
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -927,7 +927,7 @@ macro_rules! guest_fault_tests {
 
                         let module = mock_traps_module();
                         let region =
-                            TestRegion::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");

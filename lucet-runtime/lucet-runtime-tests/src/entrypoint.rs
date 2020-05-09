@@ -194,7 +194,7 @@ macro_rules! entrypoint_tests {
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall, DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE,
+            lucet_hostcall, DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE
         };
 
         #[lucet_hostcall]
@@ -231,7 +231,7 @@ macro_rules! entrypoint_tests {
                 use libc::c_void;
                 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
                 use lucet_runtime::{
-                    lucet_hostcall, DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE,
+                    lucet_hostcall, DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE, RegionCreate
                 };
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
@@ -249,7 +249,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn calc_add_2(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -273,7 +273,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn calc_add_10(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -317,7 +317,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn calc_mul_2(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -336,7 +336,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn calc_add_then_mul(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -367,7 +367,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn calc_invalid_entrypoint(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -388,7 +388,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn calc_add_f32_2(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -410,7 +410,7 @@ macro_rules! entrypoint_tests {
                     calc_add_f64_2(wat_calculator_module());
                 }
                 fn calc_add_f64_2(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -432,7 +432,7 @@ macro_rules! entrypoint_tests {
                     calc_add_f32_10(wat_calculator_module());
                 }
                 fn calc_add_f32_10(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -471,7 +471,7 @@ macro_rules! entrypoint_tests {
                     calc_add_f64_10(wat_calculator_module());
                 }
                 fn calc_add_f64_10(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -507,7 +507,7 @@ macro_rules! entrypoint_tests {
                 }
                 // TODO: it would be pretty annoying to write the mixed_20 calc test in wasm, so we havent.
                 fn calc_add_mixed_20(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -577,7 +577,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn typecheck_entrypoint_wrong_args(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -601,7 +601,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn typecheck_entrypoint_too_few_args(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -626,7 +626,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn typecheck_entrypoint_too_many_args(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -651,7 +651,7 @@ macro_rules! entrypoint_tests {
                 }
 
                 fn imported_entrypoint(module: Arc<dyn Module>) {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -676,7 +676,7 @@ macro_rules! entrypoint_tests {
 
                     let module =
                         test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
                         .new_instance(module)
@@ -728,7 +728,7 @@ macro_rules! entrypoint_tests {
 
                     let module =
                         test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
                         .new_instance(module)
@@ -804,7 +804,7 @@ macro_rules! entrypoint_tests {
 
                     let module =
                         test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
                         .new_instance(module)
@@ -881,7 +881,7 @@ macro_rules! entrypoint_tests {
                 fn entrypoint_ctype() {
                     use byteorder::{LittleEndian, ReadBytesExt};
                     let module = test_module_c("entrypoint", "ctype.c").expect("module builds and loads");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
                         .new_instance(module)
@@ -920,7 +920,7 @@ macro_rules! entrypoint_tests {
                 fn entrypoint_callback() {
                     let module =
                         test_module_c("entrypoint", "callback.c").expect("module builds and loads");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
                         .new_instance(module)
