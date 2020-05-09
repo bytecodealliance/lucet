@@ -258,14 +258,14 @@ macro_rules! guest_fault_tests {
             static ref RECOVERABLE_PTR_LOCK: Mutex<()> = Mutex::new(());
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         const INVALID_PERMISSION_FAULT: libc::c_int = SIGSEGV;
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         const INVALID_PERMISSION_FAULT: libc::c_int = SIGBUS;
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         const INVALID_PERMISSION_SIGNAL: Signal = Signal::SIGSEGV;
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         const INVALID_PERMISSION_SIGNAL: Signal = Signal::SIGBUS;
 
         $(
