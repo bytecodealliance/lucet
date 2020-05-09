@@ -81,14 +81,14 @@ macro_rules! stack_tests {
         $(
             mod $region_id {
                 use lucet_runtime::{
-                    DlModule, Error, InstanceHandle, Limits, Region, TrapCode, UntypedRetVal, Val,
+                    DlModule, Error, InstanceHandle, Limits, Region, RegionCreate, TrapCode, UntypedRetVal, Val,
                 };
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
                 use $crate::stack::stack_testcase;
 
                 fn run(module: Arc<DlModule>, recursion_depth: i32) -> Result<UntypedRetVal, Error> {
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
