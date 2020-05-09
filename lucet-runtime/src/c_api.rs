@@ -1,5 +1,5 @@
 #[cfg(all(target_os = "linux", feature = "uffd"))]
-use crate::UffdRegion;
+use crate::{DefaultUffdStrategy, UffdRegion};
 use crate::{DlModule, Instance, Limits, MmapRegion, Module, Region};
 use libc::{c_char, c_int, c_void};
 use lucet_module::TrapCode;
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn lucet_uffd_region_create(
                 .as_ref()
                 .map(|l| l.into())
                 .unwrap_or(Limits::default());
-            match UffdRegion::create(instance_capacity as usize, &limits) {
+            match UffdRegion::create(instance_capacity as usize, &limits, DefaultUffdStrategy {}) {
                 Ok(region) => {
                     let region_thin = Arc::into_raw(Arc::new(region as Arc<dyn Region>));
                     region_out.write(region_thin as _);
