@@ -17,7 +17,7 @@ macro_rules! strcmp_tests {
             mod $region_id {
                 use libc::{c_char, c_int, c_void, strcmp};
                 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-                use lucet_runtime::{Error, Limits, Region, Val, WASM_PAGE_SIZE};
+                use lucet_runtime::{Error, Limits, Region, RegionCreate, Val, WASM_PAGE_SIZE};
                 use std::ffi::CString;
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
@@ -35,7 +35,7 @@ macro_rules! strcmp_tests {
                     assert!(s1.len() + s2.len() < WASM_PAGE_SIZE as usize);
 
                     let module = test_module_c("strcmp", "guest.c").expect("compile module");
-                    let region = TestRegion::create(10, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(10, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -85,7 +85,7 @@ macro_rules! strcmp_tests {
                 #[test]
                 fn strcmp_fault_test() {
                     let module = test_module_c("strcmp", "guest.c").expect("compile module");
-                    let region = TestRegion::create(10, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(10, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");

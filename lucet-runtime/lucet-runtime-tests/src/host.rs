@@ -148,7 +148,7 @@ macro_rules! host_tests {
                 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
                 use lucet_runtime::{
                     lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, Limits, Region,
-                    TerminationDetails, TrapCode,
+                    RegionCreate, TerminationDetails, TrapCode,
                 };
                 use std::sync::{Arc, Mutex};
                 use $crate::build::test_module_c;
@@ -173,7 +173,7 @@ macro_rules! host_tests {
                 #[test]
                 fn instantiate_trivial() {
                     let module = test_module_c("host", "trivial.c").expect("build and load module");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -182,7 +182,7 @@ macro_rules! host_tests {
                 #[test]
                 fn run_trivial() {
                     let module = test_module_c("host", "trivial.c").expect("build and load module");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -193,7 +193,7 @@ macro_rules! host_tests {
                 #[test]
                 fn run_hello() {
                     let module = test_module_c("host", "hello.c").expect("build and load module");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
                         .new_instance_builder(module)
@@ -210,7 +210,7 @@ macro_rules! host_tests {
                 #[test]
                 fn run_hostcall_error() {
                     let module = test_module_c("host", "hostcall_error.c").expect("build and load module");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -234,7 +234,7 @@ macro_rules! host_tests {
                 fn run_hostcall_error_unwind() {
                     let module =
                         test_module_c("host", "hostcall_error_unwind.c").expect("build and load module");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
                         .new_instance_builder(module)
@@ -262,7 +262,7 @@ macro_rules! host_tests {
                 #[test]
                 fn run_fpe() {
                     let module = test_module_c("host", "fpe.c").expect("build and load module");
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -294,7 +294,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -326,7 +326,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -358,7 +358,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -387,7 +387,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -420,7 +420,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -451,7 +451,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -486,7 +486,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -534,7 +534,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -573,7 +573,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -604,7 +604,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
@@ -638,7 +638,7 @@ macro_rules! host_tests {
                         ))
                         .build();
 
-                    let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
                         .new_instance(module)
                         .expect("instance can be created");
