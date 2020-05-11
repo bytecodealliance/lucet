@@ -30,7 +30,7 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
 # Install our supported version of Rust, rustfmt, and the wasm32-wasi cross-compilation target
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.43.0 -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.43.1 -y
 ENV PATH=/root/.cargo/bin:$PATH
 RUN rustup component add rustfmt
 RUN rustup target add wasm32-wasi
