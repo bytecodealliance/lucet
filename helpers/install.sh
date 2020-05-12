@@ -39,7 +39,7 @@ else
 fi
 
 BINS="lucet-objdump lucet-validate lucet-wasi lucetc sightglass spec-test wasmonkey"
-LIBS="liblucet_runtime.${DYLIB_SUFFIX}"
+LIBS="liblucet_runtime.${DYLIB_SUFFIX} liblucet_wasi.${DYLIB_SUFFIX}"
 DOCS="sightglass/README.md"
 BUNDLE_DOCS="README.md"
 
