@@ -172,7 +172,7 @@ macro_rules! guest_fault_common_defs {
 macro_rules! guest_fault_tests {
     ( $TestRegion:path ) => {
         use lazy_static::lazy_static;
-        use libc::{c_void, pthread_kill, pthread_self, siginfo_t, SIGALRM, SIGBUS, SIGSEGV};
+        use libc::{c_void, siginfo_t, SIGALRM, SIGBUS, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
             lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, FaultDetails, Instance,
