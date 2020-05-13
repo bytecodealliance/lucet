@@ -6,9 +6,11 @@
 
   Creating or resetting an instance no longer implicitly runs the start function. Embedders must ensure that `run_start()` is called before calling any other exported functions. `Instance::run()` will now return `Err(Error::InstanceNeedsStart)` if the start function is present but hasn't been run since the instance was created or reset.
 
+[start-function]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
+
 - Corrected a race condition where a `KillSwitch` fired while lucet-runtime is handling a guest fault could result in a SIGALRM or panic in the Lucet embedder.
 
-[start-function]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
+- Converted the `&mut Vmctx` argument to hostcalls into `&Vmctx`. Additionally, all `Vmctx` methods now take `&self`, where some methods such as `yield` previously took `&mut self`. These methods still require that no other outstanding borrows (such as the heap view) are held across them, but that property is checked dynamically rather than at compile time.
 
 ### 0.6.1 (2020-02-18)
 

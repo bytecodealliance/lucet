@@ -37,11 +37,11 @@ pub fn run_onetwothree(inst: &mut Instance) {
 /// * Guest fault
 /// * Hostcall fault
 pub fn mock_killswitch_module() -> Arc<dyn Module> {
-    extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
+    extern "C" fn onetwothree(_vmctx: *const lucet_vmctx) -> std::os::raw::c_int {
         123
     }
 
-    extern "C" fn run_guest(_vmctx: *mut lucet_vmctx) {
+    extern "C" fn run_guest(_vmctx: *const lucet_vmctx) {
         unsafe {
             // ENTERING_GUEST is only populated if the test requires this syncpoint be checked.
             if let Some(entering_guest) = ENTERING_GUEST.as_ref() {
@@ -50,7 +50,7 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
         }
     }
 
-    extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
+    extern "C" fn infinite_loop(_vmctx: *const lucet_vmctx) {
         unsafe {
             // ENTERING_GUEST is only populated if the test requires this syncpoint be checked.
             if let Some(entering_guest) = ENTERING_GUEST.as_ref() {
@@ -60,9 +60,9 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
         loop {}
     }
 
-    extern "C" fn fatal(vmctx: *mut lucet_vmctx) {
+    extern "C" fn fatal(vmctx: *const lucet_vmctx) {
         extern "C" {
-            fn lucet_vmctx_get_heap(vmctx: *mut lucet_vmctx) -> *mut u8;
+            fn lucet_vmctx_get_heap(vmctx: *const lucet_vmctx) -> *mut u8;
         }
 
         unsafe {
@@ -77,9 +77,9 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
         }
     }
 
-    extern "C" fn hit_sigstack_guard_page(vmctx: *mut lucet_vmctx) {
+    extern "C" fn hit_sigstack_guard_page(vmctx: *const lucet_vmctx) {
         extern "C" {
-            fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut u8;
+            fn lucet_vmctx_get_globals(vmctx: *const lucet_vmctx) -> *mut u8;
         }
 
         unsafe {
@@ -90,18 +90,18 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
         }
     }
 
-    extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () {}
+    extern "C" fn do_nothing(_vmctx: *const lucet_vmctx) -> () {}
 
-    extern "C" fn run_hostcall(vmctx: *mut lucet_vmctx) -> bool {
+    extern "C" fn run_hostcall(vmctx: *const lucet_vmctx) -> bool {
         extern "C" {
-            fn real_hostcall(vmctx: *mut lucet_vmctx) -> bool;
+            fn real_hostcall(vmctx: *const lucet_vmctx) -> bool;
         }
         unsafe { real_hostcall(vmctx) }
     }
 
-    extern "C" fn run_yielding_hostcall(vmctx: *mut lucet_vmctx) -> () {
+    extern "C" fn run_yielding_hostcall(vmctx: *const lucet_vmctx) -> () {
         extern "C" {
-            fn yielding_hostcall(vmctx: *mut lucet_vmctx) -> ();
+            fn yielding_hostcall(vmctx: *const lucet_vmctx) -> ();
         }
         unsafe { yielding_hostcall(vmctx) }
     }
@@ -147,7 +147,7 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
 /// hostcall.
 #[lucet_hostcall]
 #[no_mangle]
-pub fn real_hostcall(_vmctx: &mut Vmctx) -> bool {
+pub fn real_hostcall(_vmctx: &Vmctx) -> bool {
     true
 }
 
@@ -155,7 +155,7 @@ pub fn real_hostcall(_vmctx: &mut Vmctx) -> bool {
 /// yielded instance.
 #[lucet_hostcall]
 #[no_mangle]
-pub fn yielding_hostcall(vmctx: &mut Vmctx) {
+pub fn yielding_hostcall(vmctx: &Vmctx) {
     vmctx.yield_();
 }
 

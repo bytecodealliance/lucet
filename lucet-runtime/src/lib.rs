@@ -74,8 +74,8 @@
 //! accessing a key/value store, etc.
 //!
 //! Some simple hostcalls can be implemented by using the
-//! [`#[lucet_hostcall]`](attr.lucet_hostcall.html] attribute on a function that takes `&mut Vmctx`
-//! as its first argument. Hostcalls that require access to some embedder-specific state, such as
+//! [`#[lucet_hostcall]`](attr.lucet_hostcall.html) attribute on a function that takes `&Vmctx` as
+//! its first argument. Hostcalls that require access to some embedder-specific state, such as
 //! Terrarium's key-value store, can access a custom embedder context through `vmctx`. For example,
 //! to make a `u32` available to hostcalls:
 //!
@@ -87,7 +87,7 @@
 //!
 //! #[lucet_hostcall]
 //! #[no_mangle]
-//! pub fn foo(vmctx: &mut Vmctx) {
+//! pub fn foo(vmctx: &Vmctx) {
 //!     let mut hostcall_context = vmctx.get_embed_ctx_mut::<MyContext>();
 //!     hostcall_context.x = 42;
 //! }
@@ -205,8 +205,8 @@
 //!
 //! #[lucet_hostcall]
 //! #[no_mangle]
-//! pub fn hostcall_factorials(vmctx: &mut Vmctx, n: u64) -> u64 {
-//!     fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
+//! pub fn hostcall_factorials(vmctx: &Vmctx, n: u64) -> u64 {
+//!     fn fact(vmctx: &Vmctx, n: u64) -> u64 {
 //!         let result = if n <= 1 {
 //!             1
 //!         } else {
@@ -404,8 +404,8 @@ pub use lucet_runtime_internals::{lucet_hostcall, lucet_hostcall_terminate, WASM
 pub mod vmctx {
     //! Functions for manipulating instances from hostcalls.
     //!
-    //! The Lucet compiler inserts an extra `*mut lucet_vmctx` argument to all functions defined and
-    //! called by WebAssembly code. Through this pointer, code running in the guest context can
+    //! The Lucet compiler inserts an extra `*const lucet_vmctx` argument to all functions defined
+    //! and called by WebAssembly code. Through this pointer, code running in the guest context can
     //! access and manipulate the instance and its structures. These functions are intended for use
     //! in hostcall implementations, and must only be used from within a running guest.
     //!

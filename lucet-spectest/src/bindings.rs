@@ -5,19 +5,19 @@ use serde_json::json;
 
 #[lucet_hostcall]
 #[no_mangle]
-pub fn print(_vmctx: &mut Vmctx) {
+pub fn print(_vmctx: &Vmctx) {
     println!("hello, world!");
 }
 
 #[lucet_hostcall]
 #[no_mangle]
-pub fn print_i32(_vmctx: &mut Vmctx, x: i32) {
+pub fn print_i32(_vmctx: &Vmctx, x: i32) {
     println!("{}", x);
 }
 
 #[lucet_hostcall]
 #[no_mangle]
-pub fn print_f32(_vmctx: &mut Vmctx, x: i32) {
+pub fn print_f32(_vmctx: &Vmctx, x: i32) {
     println!("{}", x);
 }
 

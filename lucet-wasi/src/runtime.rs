@@ -10,7 +10,7 @@ lucet_wasi_generate::bindings!({
     ctx: LucetWasiCtx,
     // Describe how to construct the context type. The expression inside the first set
     // of braces will be used each time LucetWasiCtx needs to be constructed.
-    // `vmctx: &mut Vmctx` is a free variable at the construction site.
+    // `vmctx: &Vmctx` is a free variable at the construction site.
     constructor: { LucetWasiCtx { vmctx } }
 });
 

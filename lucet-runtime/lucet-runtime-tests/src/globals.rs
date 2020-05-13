@@ -62,20 +62,20 @@ macro_rules! globals_tests {
 
         fn mock_globals_module() -> Arc<dyn Module> {
             extern "C" {
-                fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut GlobalValue;
+                fn lucet_vmctx_get_globals(vmctx: *const lucet_vmctx) -> *mut GlobalValue;
             }
 
-            unsafe extern "C" fn get_global0(vmctx: *mut lucet_vmctx) -> i64 {
+            unsafe extern "C" fn get_global0(vmctx: *const lucet_vmctx) -> i64 {
                 let globals = std::slice::from_raw_parts(lucet_vmctx_get_globals(vmctx), 2);
                 globals[0].i_64
             }
 
-            unsafe extern "C" fn set_global0(vmctx: *mut lucet_vmctx, val: i64) {
+            unsafe extern "C" fn set_global0(vmctx: *const lucet_vmctx, val: i64) {
                 let globals = std::slice::from_raw_parts_mut(lucet_vmctx_get_globals(vmctx), 2);
                 globals[0].i_64 = val;
             }
 
-            unsafe extern "C" fn get_global1(vmctx: *mut lucet_vmctx) -> i64 {
+            unsafe extern "C" fn get_global1(vmctx: *const lucet_vmctx) -> i64 {
                 let globals = std::slice::from_raw_parts(lucet_vmctx_get_globals(vmctx), 2);
                 globals[1].i_64
             }
