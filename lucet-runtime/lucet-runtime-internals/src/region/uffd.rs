@@ -519,7 +519,7 @@ pub trait UffdStrategy: Send + Sync + 'static {
     ) -> Result<(), Error>;
 }
 
-pub struct DefaultUffdStrategy {}
+pub struct DefaultUffdStrategy;
 
 impl UffdStrategy for DefaultUffdStrategy {
     fn stack_fault(&self, uffd: &Uffd, fault_page: *mut c_void) -> Result<(), Error> {
