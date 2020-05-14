@@ -208,9 +208,10 @@ impl ContextHandle {
         stack: &mut [u64],
         fptr: usize,
         args: &[Val],
+        heap: *mut core::ffi::c_void,
     ) -> Result<ContextHandle, Error> {
         let mut child = ContextHandle::new();
-        Context::init(stack, &mut child, fptr, args)?;
+        Context::init(stack, &mut child, fptr, args, heap)?;
         Ok(child)
     }
 }
@@ -303,6 +304,7 @@ impl Context {
     ///     &mut child,
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
+    ///     std::ptr::null_mut(),
     /// );
     /// assert!(res.is_ok());
     /// ```
@@ -326,6 +328,7 @@ impl Context {
     ///     &mut child,
     ///     entrypoint as usize,
     ///     &[Val::U64(120), Val::F32(3.14)],
+    ///     std::ptr::null_mut(),
     /// );
     /// assert!(res.is_ok());
     /// ```
@@ -367,6 +370,7 @@ impl Context {
         child: &mut Context,
         fptr: usize,
         args: &[Val],
+        heap: *mut core::ffi::c_void,
     ) -> Result<(), Error> {
         Context::init_with_callback(
             stack,
@@ -375,6 +379,7 @@ impl Context {
             ptr::null_mut(),
             fptr,
             args,
+            heap,
         )
     }
 
@@ -393,6 +398,7 @@ impl Context {
         callback_data: *mut Instance,
         fptr: usize,
         args: &[Val],
+        heap: *mut core::ffi::c_void,
     ) -> Result<(), Error> {
         if !stack_is_aligned(stack) {
             return Err(Error::UnalignedStack);
@@ -475,6 +481,10 @@ impl Context {
         // even at the entrypoint of the guest.
         child.gpr.rbp = child as *const Context as u64;
 
+        // Heap pinning: r15 is not used to pass any parameters on Windows/POSIX abis, we simply set this to be the value of the heap always.
+        // This value will be used only when the lucet module loaded is compiled requiring use of the pinned heap register.
+        child.gpr.r15 = heap as u64;
+
         Ok(())
     }
 
@@ -547,6 +557,7 @@ impl Context {
     ///     &mut child,
     ///     entrypoint as usize,
     ///     &[],
+    ///     std::ptr::null_mut(),
     /// ).unwrap();
     ///
     /// unsafe { Context::swap(&mut parent, &mut child); }

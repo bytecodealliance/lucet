@@ -120,6 +120,7 @@ pub struct Options {
     pub pk_path: Option<PathBuf>,
     pub sk_path: Option<PathBuf>,
     pub count_instructions: bool,
+    pub pinned_heap: bool,
     pub error_style: ErrorStyle,
     pub target: Triple,
 }
@@ -211,6 +212,7 @@ impl Options {
         let sk_path = m.value_of("sk_path").map(PathBuf::from);
         let pk_path = m.value_of("pk_path").map(PathBuf::from);
         let count_instructions = m.is_present("count_instructions");
+        let pinned_heap = m.is_present("pinned_heap");
 
         let error_style = match m.value_of("error_style") {
             None => ErrorStyle::default(),
@@ -239,6 +241,7 @@ impl Options {
             sk_path,
             pk_path,
             count_instructions,
+            pinned_heap,
             error_style,
             target,
         })
@@ -451,6 +454,12 @@ SSE3 but not AVX:
                     .long("--count-instructions")
                     .takes_value(false)
                     .help("Instrument the produced binary to count the number of wasm operations the translated program executes")
+            )
+            .arg(
+                Arg::with_name("pinned_heap")
+                    .long("--pinned-heap-reg")
+                    .takes_value(false)
+                    .help("This feature is not stable - it may be removed in the future! Pin a register to use as this module's heap base. Typically improves performance.")
             )
             .arg(
                 Arg::with_name("error_style")

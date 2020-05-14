@@ -14,6 +14,7 @@ use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
     binemit, ir,
+    isa::RegUnit,
     isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
@@ -63,6 +64,7 @@ pub struct CompilerBuilder {
     heap_settings: HeapSettings,
     count_instructions: bool,
     canonicalize_nans: bool,
+    pinned_heap: bool,
     validator: Option<Validator>,
 }
 
@@ -75,6 +77,7 @@ impl CompilerBuilder {
             heap_settings: HeapSettings::default(),
             count_instructions: false,
             canonicalize_nans: false,
+            pinned_heap: false,
             validator: None,
         }
     }
@@ -145,6 +148,15 @@ impl CompilerBuilder {
         self
     }
 
+    pub fn pinned_heap(&mut self, pinned_heap: bool) {
+        self.pinned_heap = pinned_heap;
+    }
+
+    pub fn with_pinned_heap(mut self, pinned_heap: bool) -> Self {
+        self.pinned_heap(pinned_heap);
+        self
+    }
+
     pub fn validator(&mut self, validator: Option<Validator>) {
         self.validator = validator;
     }
@@ -169,6 +181,7 @@ impl CompilerBuilder {
             self.count_instructions,
             &self.validator,
             self.canonicalize_nans,
+            self.pinned_heap,
         )
     }
 }
@@ -182,6 +195,8 @@ pub struct Compiler<'a> {
     count_instructions: bool,
     module_translation_state: ModuleTranslationState,
     canonicalize_nans: bool,
+    pinned_heap: bool,
+    pinned_heap_register: RegUnit,
 }
 
 impl<'a> Compiler<'a> {
@@ -195,8 +210,15 @@ impl<'a> Compiler<'a> {
         count_instructions: bool,
         validator: &Option<Validator>,
         canonicalize_nans: bool,
+        pinned_heap: bool,
     ) -> Result<Self, Error> {
-        let isa = Self::target_isa(target.clone(), opt_level, &cpu_features, canonicalize_nans)?;
+        let isa = Self::target_isa(
+            target.clone(),
+            opt_level,
+            &cpu_features,
+            canonicalize_nans,
+            pinned_heap,
+        )?;
 
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
@@ -228,6 +250,8 @@ impl<'a> Compiler<'a> {
             _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
+        let pinned_heap_register = isa.register_info().parse_regunit("r15").unwrap();
+
         let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls);
         builder.function_alignment(16);
         let mut clif_module: ClifModule<ObjectBackend> = ClifModule::new(builder);
@@ -250,6 +274,8 @@ impl<'a> Compiler<'a> {
             module_translation_state,
             target,
             canonicalize_nans,
+            pinned_heap,
+            pinned_heap_register,
         })
     }
 
@@ -260,6 +286,8 @@ impl<'a> Compiler<'a> {
     pub fn module_features(&self) -> ModuleFeatures {
         let mut mf: ModuleFeatures = (&self.cpu_features).into();
         mf.instruction_count = self.count_instructions;
+        mf.pinned_heap = self.pinned_heap;
+        mf.pinned_heap_register = self.pinned_heap_register;
         mf
     }
 
@@ -475,6 +503,7 @@ impl<'a> Compiler<'a> {
                 self.opt_level,
                 &self.cpu_features,
                 self.canonicalize_nans,
+                self.pinned_heap,
             )?,
         ))
     }
@@ -484,6 +513,7 @@ impl<'a> Compiler<'a> {
         opt_level: OptLevel,
         cpu_features: &CpuFeatures,
         canonicalize_nans: bool,
+        pinned_heap: bool,
     ) -> Result<Box<dyn TargetIsa>, Error> {
         let mut flags_builder = settings::builder();
         let isa_builder = cpu_features.isa_builder(target)?;
@@ -492,6 +522,10 @@ impl<'a> Compiler<'a> {
         flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
         if canonicalize_nans {
             flags_builder.enable("enable_nan_canonicalization").unwrap();
+        }
+        if pinned_heap {
+            flags_builder.enable("enable_pinned_reg").unwrap();
+            flags_builder.enable("use_pinned_reg_as_heap_base").unwrap();
         }
         Ok(isa_builder.finish(settings::Flags::new(flags_builder)))
     }
