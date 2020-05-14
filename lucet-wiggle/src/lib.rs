@@ -11,25 +11,23 @@ pub mod generate {
 
 pub mod runtime {
     use lucet_runtime::vmctx::Vmctx;
-    use std::cell::RefMut;
     use wiggle::GuestMemory;
 
     pub struct LucetMemory<'a> {
-        mem: RefMut<'a, [u8]>,
+        vmctx: &'a Vmctx,
     }
 
     impl<'a> LucetMemory<'a> {
-        pub fn new(vmctx: &Vmctx) -> LucetMemory {
-            LucetMemory {
-                mem: vmctx.heap_mut(),
-            }
+        pub fn new(vmctx: &'a Vmctx) -> LucetMemory {
+            LucetMemory { vmctx }
         }
     }
 
     unsafe impl<'a> GuestMemory for LucetMemory<'a> {
         fn base(&self) -> (*mut u8, u32) {
-            let len = self.mem.len() as u32;
-            let ptr = self.mem.as_ptr();
+            let mem = self.vmctx.heap_mut();
+            let len = mem.len() as u32;
+            let ptr = mem.as_ptr();
             (ptr as *mut u8, len)
         }
     }
