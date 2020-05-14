@@ -51,10 +51,8 @@ ENV WASI_SDK=/opt/wasi-sdk
 # optional install of wasm-opt and wasm-reduce for fuzzing and benchmarking
 ENV BINARYEN_DIR=/opt/binaryen
 ENV BINARYEN_VERSION=86
-RUN curl -sS -L "https://github.com/WebAssembly/binaryen/archive/version_${BINARYEN_VERSION}.tar.gz" | tar xzf - && \
-    mkdir -p binaryen-build && ( cd binaryen-build && cmake "../binaryen-version_${BINARYEN_VERSION}" && \
-    make -j wasm-opt wasm-reduce ) && \
+RUN curl -sS -L "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz" | tar xzf - && \
     install -d -v "${BINARYEN_DIR}/bin" && \
-    for tool in wasm-opt wasm-reduce; do install -v "binaryen-build/bin/${tool}" "${BINARYEN_DIR}/bin/"; done && \
-    rm -fr binaryen-build binaryen-version_${BINARYEN_VERSION}
-ENV PATH=$BINARYEN_DIR:$PATH
+    for tool in wasm-opt wasm-reduce; do install -v "binaryen-version_${BINARYEN_VERSION}/${tool}" "${BINARYEN_DIR}/bin/"; done && \
+    rm -fr binaryen-version_${BINARYEN_VERSION}
+ENV PATH=$BINARYEN_DIR/bin:$PATH

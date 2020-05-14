@@ -1,0 +1,20 @@
+version: 2.1
+jobs:
+  test:
+    machine:
+      image: ubuntu-1604:202004-01
+    steps:
+      - checkout
+      - run: |
+          set -x
+          git submodule sync
+          git submodule update --init --recursive
+          docker build -t lucet .
+          docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "make -C /lucet test-ci"
+          git diff --exit-code
+
+workflows:
+  version: 2.1
+  build_and_test:
+    jobs:
+      - test
