@@ -1,0 +1,13 @@
+version: 2.1
+jobs:
+  test:
+    machine:
+      image: ubuntu-1604:202004-01
+    steps:
+      - checkout
+
+workflows:
+  version: 2.1
+  build_and_test:
+    jobs:
+      - test
