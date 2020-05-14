@@ -1,20 +1,111 @@
 version: 2.1
+
 jobs:
-  test:
+  run_in_container:
+    parameters:
+      command:
+        type: string
     machine:
-      image: ubuntu-1604:202004-01
+      image: "ubuntu-1604:202004-01"
     steps:
-      - checkout
-      - run: |
-          set -x
-          git submodule sync
-          git submodule update --init --recursive
-          docker build -t lucet .
-          docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "make -C /lucet test-ci"
-          git diff --exit-code
+      - checkout_recursively
+      - run_in_container_step:
+          command: << parameters.command >>
+      - ensure_sources_unchanged
+
+  rustfmt:
+    docker:
+      - image: "circleci/rust:1.43.1"
+    steps:
+      - checkout_recursively
+      - run:
+          name: Run rustfmt
+          command: |
+            set -x
+            make indent-check
+
+  cargo_audit:
+    docker:
+      - image: "circleci/rust:1.43.1"
+    steps:
+      - checkout_recursively
+      - run:
+          name: Build and Run cargo-audit
+          command: |
+            set -x
+            cargo install --debug cargo-audit
+            cargo audit
+
+  docs:
+    docker:
+      - image: "circleci/rust:1.43.1"
+    steps:
+      - checkout_recursively
+      - run:
+          name: Build Documentation
+          command: |
+            set -x
+            cargo install --debug mdbook
+            mdbook build docs
 
 workflows:
-  version: 2.1
-  build_and_test:
+  build:
     jobs:
-      - test
+      - run_in_container:
+          name: Test
+          command: make -C /lucet test-ci
+      - run_in_container:
+          name: Smoke Test Benchmarks
+          command: make -C /lucet test-benchmarks
+      - run_in_container:
+          name: Smoke Test Fuzz
+          command: make -C /lucet test-fuzz
+      - run_in_container:
+          name: Test Release
+          command: make -C /lucet test-release
+      - run_in_container:
+          name: Test Release Executables
+          command: make -C /lucet test-release-executables
+      - run_in_container:
+          name: Package
+          command: make -C /lucet test-release-executables
+      - rustfmt:
+          name: Rustfmt
+      - cargo_audit:
+          name: Cargo Audit
+      - docs:
+          name: Docs
+
+commands:
+  checkout_recursively:
+    description: "Check out the git repository, and recursively initialize its submodules"
+    steps:
+      - checkout
+      - run:
+          name: "Sync and Recursively Update Submodules"
+          command: |
+            set -x
+            git submodule sync
+            git submodule update --init --recursive
+
+  run_in_container_step:
+    description: "Build the Lucet development/CI Docker image, and then run a command in it"
+    parameters:
+      command:
+        type: string
+    steps:
+      - run:
+          name: "Build and Run Command in Docker: << parameters.command >>"
+          command: |
+            set -x
+            docker build -t lucet .
+            docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "<< parameters.command >>"
+
+  ensure_sources_unchanged:
+    description: "Make sure that previous steps did not change the source files from git"
+    steps:
+      - run:
+          name: "Ensure Sources Are Unchanged"
+          command: |
+            set -x
+            git diff --exit-code
