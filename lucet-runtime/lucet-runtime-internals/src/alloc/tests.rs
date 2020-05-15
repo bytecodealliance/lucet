@@ -1134,4 +1134,4 @@ macro_rules! alloc_tests {
 }
 
 #[cfg(test)]
-alloc_tests!(crate::region::mmap::MmapRegion);
+alloc_tests!(crate::sysdeps::MmapRegion);

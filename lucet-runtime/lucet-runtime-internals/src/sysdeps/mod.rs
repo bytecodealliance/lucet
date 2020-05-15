@@ -7,6 +7,9 @@ mod linux;
 #[cfg(unix)]
 mod unix;
 
+#[cfg(unix)]
+mod mmap;
+
 #[cfg(target_os = "macos")]
 pub use macos::*;
 
@@ -15,3 +18,6 @@ pub use linux::*;
 
 #[cfg(unix)]
 pub use unix::*;
+
+#[cfg(unix)]
+pub use mmap::*;

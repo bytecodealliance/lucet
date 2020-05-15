@@ -67,5 +67,5 @@ macro_rules! sparse_page_data_tests {
 
 #[cfg(test)]
 mod tests {
-    sparse_page_data_tests!(crate::region::mmap::MmapRegion);
+    sparse_page_data_tests!(crate::sysdeps::MmapRegion);
 }

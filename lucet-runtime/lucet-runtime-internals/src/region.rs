@@ -1,5 +1,3 @@
-pub mod mmap;
-
 use crate::alloc::{Alloc, AllocStrategy, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
