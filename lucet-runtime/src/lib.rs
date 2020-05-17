@@ -418,7 +418,9 @@ pub use lucet_runtime_internals::lucet_hostcalls;
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
 #[cfg(all(target_os = "linux", feature = "uffd"))]
-pub use lucet_runtime_internals::region::uffd::{DefaultUffdStrategy, UffdRegion, UffdStrategy};
+pub use lucet_runtime_internals::region::uffd::{
+    HostPageSizedUffdStrategy, UffdRegion, UffdStrategy, WasmPageSizedUffdStrategy,
+};
 pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
 pub use lucet_runtime_internals::{lucet_hostcall, lucet_hostcall_terminate, WASM_PAGE_SIZE};

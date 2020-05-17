@@ -5,6 +5,7 @@ use crate::instance::{new_instance_handle, Instance, InstanceHandle, InstanceInt
 use crate::module::Module;
 use crate::region::{Region, RegionCreate, RegionInternal};
 use crate::sysdeps::host_page_size;
+use crate::WASM_PAGE_SIZE;
 use crate::{lucet_bail, lucet_ensure, lucet_format_err};
 use libc::c_void;
 use nix::poll;
@@ -137,7 +138,8 @@ fn uffd_handler(
                     lucet_bail!("instance magic incorrect");
                 }
 
-                let loc = inst.alloc().addr_location(fault_addr as *const c_void);
+                let alloc = inst.alloc();
+                let loc = alloc.addr_location(fault_addr as *const c_void);
                 match loc {
                     AddrLocation::InaccessibleHeap | AddrLocation::StackGuard => {
                         // eprintln!("fault in heap guard!");
@@ -159,16 +161,12 @@ fn uffd_handler(
                     AddrLocation::Stack => {
                         uffd_strategy.stack_fault(&uffd, fault_page as *mut c_void)?
                     }
-                    AddrLocation::Heap => {
-                        let pages_into_heap =
-                            (fault_page - inst.alloc().slot().heap as usize) / host_page_size();
-                        uffd_strategy.heap_fault(
-                            &uffd,
-                            inst.module(),
-                            fault_page as *mut c_void,
-                            pages_into_heap,
-                        )?
-                    }
+                    AddrLocation::Heap => uffd_strategy.heap_fault(
+                        &uffd,
+                        inst.module(),
+                        alloc,
+                        fault_page as *mut c_void,
+                    )?,
                 }
             }
             Ok(Some(ev)) => panic!("unexpected uffd event: {:?}", ev),
@@ -326,7 +324,7 @@ impl RegionCreate for UffdRegion {
     const TYPE_NAME: &'static str = "UffdRegion";
 
     fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error> {
-        UffdRegion::create(instance_capacity, limits, DefaultUffdStrategy {})
+        UffdRegion::create(instance_capacity, limits, WasmPageSizedUffdStrategy {})
     }
 }
 
@@ -514,14 +512,14 @@ pub trait UffdStrategy: Send + Sync + 'static {
         &self,
         uffd: &Uffd,
         module: &dyn Module,
+        alloc: &Alloc,
         fault_page: *mut c_void,
-        pages_into_heap: usize,
     ) -> Result<(), Error>;
 }
 
-pub struct DefaultUffdStrategy;
+pub struct HostPageSizedUffdStrategy;
 
-impl UffdStrategy for DefaultUffdStrategy {
+impl UffdStrategy for HostPageSizedUffdStrategy {
     fn stack_fault(&self, uffd: &Uffd, fault_page: *mut c_void) -> Result<(), Error> {
         unsafe {
             uffd.zeropage(fault_page as *mut c_void, host_page_size(), true)
@@ -534,9 +532,11 @@ impl UffdStrategy for DefaultUffdStrategy {
         &self,
         uffd: &Uffd,
         module: &dyn Module,
+        alloc: &Alloc,
         fault_page: *mut c_void,
-        pages_into_heap: usize,
     ) -> Result<(), Error> {
+        let pages_into_heap = (fault_page as usize - alloc.slot().heap as usize) / host_page_size();
+
         // page fault occurred in the heap; copy or zero
         if let Some(page) = module.get_sparse_page_data(pages_into_heap) {
             // we are in the sparse data area, with a non-empty page; copy it in
@@ -551,12 +551,76 @@ impl UffdStrategy for DefaultUffdStrategy {
             }
         } else {
             // else if outside the sparse data area, or with an empty page
-            // eprintln!("zeroing a page at {:p}", fault_page as *mut c_void);
             unsafe {
                 uffd.zeropage(fault_page, host_page_size(), true)
                     .map_err(|e| Error::InternalError(e.into()))?;
             }
         }
+        Ok(())
+    }
+}
+
+pub struct WasmPageSizedUffdStrategy;
+
+impl UffdStrategy for WasmPageSizedUffdStrategy {
+    fn stack_fault(&self, uffd: &Uffd, fault_page: *mut c_void) -> Result<(), Error> {
+        unsafe {
+            uffd.zeropage(fault_page as *mut c_void, host_page_size(), true)
+                .map_err(|e| Error::InternalError(e.into()))?;
+        }
+        Ok(())
+    }
+
+    fn heap_fault(
+        &self,
+        uffd: &Uffd,
+        module: &dyn Module,
+        alloc: &Alloc,
+        fault_page: *mut c_void,
+    ) -> Result<(), Error> {
+        let slot = alloc.slot.as_ref().unwrap();
+        // Find the address of the fault relative to the heap base
+        let rel_fault_addr = fault_page as usize - slot.heap as usize;
+        // Find the base of the wasm page, relative to the heap start
+        let rel_wasm_page_base_addr = rel_fault_addr - (rel_fault_addr % WASM_PAGE_SIZE as usize);
+        // Find the absolute address of the base of the wasm page
+        let wasm_page_base_addr = slot.heap as usize + rel_wasm_page_base_addr;
+        // Find the number of host pages into the heap the wasm page base begins at
+        let base_pages_into_heap = rel_wasm_page_base_addr / host_page_size();
+
+        assert!(WASM_PAGE_SIZE as usize > host_page_size());
+        assert_eq!(WASM_PAGE_SIZE as usize % host_page_size(), 0);
+
+        let host_pages_per_wasm_page = WASM_PAGE_SIZE as usize / host_page_size();
+
+        for page_num in 0..host_pages_per_wasm_page {
+            let pages_into_heap = base_pages_into_heap + page_num;
+            let host_page_addr = wasm_page_base_addr + (page_num * host_page_size());
+
+            // page fault occurred in the heap; copy or zero
+            if let Some(page) = module.get_sparse_page_data(pages_into_heap) {
+                // we are in the sparse data area, with a non-empty page; copy it in
+                unsafe {
+                    uffd.copy(
+                        page.as_ptr() as *const c_void,
+                        host_page_addr as *mut c_void,
+                        host_page_size(),
+                        false,
+                    )
+                    .map_err(|e| Error::InternalError(e.into()))?;
+                }
+            } else {
+                // else if outside the sparse data area, or with an empty page
+                unsafe {
+                    uffd.zeropage(host_page_addr as *mut c_void, host_page_size(), false)
+                        .map_err(|e| Error::InternalError(e.into()))?;
+                }
+            }
+        }
+
+        uffd.wake(fault_page as *mut c_void, host_page_size())
+            .map_err(|e| Error::InternalError(e.into()))?;
+
         Ok(())
     }
 }
