@@ -45,9 +45,13 @@ pub enum Error {
     #[error("Runtime terminated")]
     RuntimeTerminated(TerminationDetails),
 
-    /// IO errors arising during dynamic loading with [`DlModule`](struct.DlModule.html).
+    /// Errors arising during dynamic loading with [`DlModule`](struct.DlModule.html).
     #[error("Dynamic loading error: {0}")]
-    DlError(#[from] std::io::Error),
+    DlError(
+        #[from]
+        #[source]
+        crate::module::DlError,
+    ),
 
     #[error("Instance not returned")]
     InstanceNotReturned,

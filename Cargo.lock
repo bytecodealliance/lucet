@@ -802,6 +802,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "libloading"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cadb8e769f070c45df05c78c7520eb4cd17061d4ab262e43cfc68b4d00ac71c"
+dependencies = [
+ "winapi 0.3.8",
+]
+
+[[package]]
 name = "log"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -909,7 +918,7 @@ dependencies = [
  "cc",
  "lazy_static",
  "libc",
- "libloading",
+ "libloading 0.6.2",
  "lucet-module",
  "lucet-runtime-macros",
  "memoffset",
@@ -1848,7 +1857,7 @@ dependencies = [
  "goblin",
  "hwloc",
  "libc",
- "libloading",
+ "libloading 0.5.2",
  "precision",
  "printtable",
  "serde",

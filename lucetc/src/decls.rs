@@ -419,10 +419,6 @@ impl<'a> ModuleDecls<'a> {
         })
     }
 
-    pub fn get_start_func(&self) -> Option<UniqueFuncIndex> {
-        self.info.start_func.clone()
-    }
-
     pub fn get_runtime(&self, runtime_func: RuntimeFunc) -> Result<RuntimeDecl<'_>, Error> {
         let func_id = *self.runtime_names.get(&runtime_func).unwrap();
         let name = self.function_names.get(func_id).unwrap();
@@ -507,6 +503,7 @@ impl<'a> ModuleDecls<'a> {
         };
 
         let mut functions: Vec<FunctionMetadata<'_>> = Vec::new();
+        let mut start_func = None;
         for fn_index in self.function_names.keys() {
             let decl = self.get_func(fn_index).unwrap();
 
@@ -516,6 +513,10 @@ impl<'a> ModuleDecls<'a> {
                 .function_names
                 .get(fn_index)
                 .expect("fn_index is key into function_names");
+
+            if Some(fn_index) == self.info.start_func {
+                start_func = Some(LucetFunctionIndex::from_u32(functions.len() as u32));
+            }
 
             functions.push(FunctionMetadata {
                 signature: decl.signature_index,
@@ -538,6 +539,7 @@ impl<'a> ModuleDecls<'a> {
             self.exports.clone(),
             signatures,
             features,
+            start_func,
         ))
     }
 }

@@ -45,6 +45,7 @@ pub struct ModuleData<'a> {
     #[derivative(Debug = "ignore")]
     module_signature: [u8; SignatureBones::BYTES],
     features: ModuleFeatures,
+    start_function: Option<FunctionIndex>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -89,6 +90,7 @@ impl<'a> ModuleData<'a> {
         export_functions: Vec<ExportFunction<'a>>,
         signatures: Vec<Signature>,
         features: ModuleFeatures,
+        start_function: Option<FunctionIndex>,
     ) -> Self {
         Self {
             linear_memory,
@@ -99,6 +101,7 @@ impl<'a> ModuleData<'a> {
             signatures,
             module_signature: [0u8; SignatureBones::BYTES],
             features,
+            start_function,
         }
     }
 
@@ -148,6 +151,10 @@ impl<'a> ModuleData<'a> {
             .iter()
             .find(|export| export.names.contains(&name))
             .map(|export| export.fn_idx)
+    }
+
+    pub fn get_start_func_id(&self) -> Option<FunctionIndex> {
+        self.start_function
     }
 
     pub fn signatures(&self) -> &[Signature] {
@@ -211,6 +218,7 @@ pub struct OwnedModuleData {
     exports: Vec<OwnedExportFunction>,
     signatures: Vec<Signature>,
     features: ModuleFeatures,
+    start_function: Option<FunctionIndex>,
 }
 
 impl OwnedModuleData {
@@ -222,6 +230,7 @@ impl OwnedModuleData {
         exports: Vec<OwnedExportFunction>,
         signatures: Vec<Signature>,
         features: ModuleFeatures,
+        start_function: Option<FunctionIndex>,
     ) -> Self {
         Self {
             linear_memory,
@@ -231,6 +240,7 @@ impl OwnedModuleData {
             exports,
             signatures,
             features,
+            start_function,
         }
     }
 
@@ -252,6 +262,7 @@ impl OwnedModuleData {
             self.exports.iter().map(|exp| exp.to_ref()).collect(),
             self.signatures.clone(),
             self.features.clone(),
+            self.start_function,
         )
     }
 
@@ -264,6 +275,7 @@ impl OwnedModuleData {
             vec![],
             vec![],
             ModuleFeatures::none(),
+            None,
         )
     }
 

@@ -6,6 +6,10 @@
 
   Creating or resetting an instance no longer implicitly runs the start function. Embedders must ensure that `run_start()` is called before calling any other exported functions. `Instance::run()` will now return `Err(Error::InstanceNeedsStart)` if the start function is present but hasn't been run since the instance was created or reset.
 
+- Encoded the [Wasm start function][start-function] in Lucet module metadata, rather than as a specially-named symbol in the shared object. This reduces contention from `dlsym` operations when multiple threads run Lucet instances concurrently.
+
+- Upgraded the `libloading` dependency, allowing for more specific error messages from dynamic loading operations.
+
 - Corrected a race condition where a `KillSwitch` fired while lucet-runtime is handling a guest fault could result in a SIGALRM or panic in the Lucet embedder.
 
 [start-function]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
