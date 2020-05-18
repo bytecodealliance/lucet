@@ -1116,7 +1116,7 @@ dependencies = [
  "log",
  "lucet-module",
  "lucet-validate",
- "lucet-wiggle",
+ "lucet-wiggle-generate",
  "memoffset",
  "minisign",
  "object",

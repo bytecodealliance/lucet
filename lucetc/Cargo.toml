@@ -26,7 +26,7 @@ cranelift-wasm = { path = "../wasmtime/cranelift/wasm", version = "0.62.0" }
 target-lexicon = "0.10"
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 lucet-validate = { path = "../lucet-validate", version = "=0.7.0-dev" }
-lucet-wiggle = { path = "../lucet-wiggle", version = "=0.7.0-dev" }
+lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.7.0-dev" }
 wasmparser = "0.51.2"
 clap="2.32"
 log = "0.4"
