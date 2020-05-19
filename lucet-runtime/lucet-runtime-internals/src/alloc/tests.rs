@@ -13,7 +13,7 @@ macro_rules! alloc_tests {
         use $crate::module::{
             FunctionPointer, GlobalValue, HeapSpec, MockExportBuilder, MockModuleBuilder, Module,
         };
-        use $crate::region::Region;
+        use $crate::region::{Region, RegionCreate};
         use $crate::sysdeps::host_page_size;
         use $crate::val::Val;
         use $crate::vmctx::lucet_vmctx;
@@ -59,7 +59,7 @@ macro_rules! alloc_tests {
         /// and stack of the correct size and read/writability.
         #[test]
         fn allocate_runtime_works() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let mut inst = region
                 .new_instance(
                     MockModuleBuilder::new()
@@ -100,7 +100,7 @@ macro_rules! alloc_tests {
         }
 
         fn expand_heap_once_template(heap_spec: HeapSpec) {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(heap_spec.clone())
                 .build();
@@ -129,7 +129,7 @@ macro_rules! alloc_tests {
         /// This test shows the heap works properly after two expands.
         #[test]
         fn expand_heap_twice() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
@@ -169,7 +169,7 @@ macro_rules! alloc_tests {
         /// multiple slots in order to exercise more edge cases with adjacent managed memory.
         #[test]
         fn expand_past_spec_max() {
-            let region = TestRegion::create(10, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(10, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
@@ -200,7 +200,7 @@ macro_rules! alloc_tests {
         /// the heap fail, but the existing heap can still be used.
         #[test]
         fn expand_past_spec_max_with_custom_limit() {
-            let region = TestRegion::create(10, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(10, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
@@ -248,7 +248,7 @@ macro_rules! alloc_tests {
         /// order to exercise more edge cases with adjacent managed memory.
         #[test]
         fn expand_past_heap_limit() {
-            let region = TestRegion::create(10, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(10, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(EXPAND_PAST_LIMIT_SPEC)
                 .build();
@@ -296,7 +296,7 @@ macro_rules! alloc_tests {
             };
             assert_eq!(INSTANCE_LIMIT % host_page_size(), 0);
 
-            let region = TestRegion::create(10, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(10, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new().with_heap_spec(SPEC).build();
             let mut inst = region
                 .new_instance_builder(module.clone())
@@ -344,7 +344,7 @@ macro_rules! alloc_tests {
         /// exercise more edge cases with adjacent managed memory.
         #[test]
         fn reject_initial_oversize_heap() {
-            let region = TestRegion::create(10, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(10, &LIMITS).expect("region created");
             let res = region.new_instance(
                 MockModuleBuilder::new()
                     .with_heap_spec(INITIAL_OVERSIZE_HEAP)
@@ -363,7 +363,7 @@ macro_rules! alloc_tests {
                 globals_size: LIMITS_GLOBALS_SIZE,
                 ..Limits::default()
             };
-            let res = TestRegion::create(10, &LIMITS);
+            let res = <TestRegion as RegionCreate>::create(10, &LIMITS);
             assert!(res.is_err(), "region creation fails");
         }
 
@@ -378,7 +378,7 @@ macro_rules! alloc_tests {
         /// allowed.
         #[test]
         fn accept_small_guard_heap() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let _inst = region
                 .new_instance(
                     MockModuleBuilder::new()
@@ -399,7 +399,7 @@ macro_rules! alloc_tests {
         /// allowed.
         #[test]
         fn reject_large_guard_heap() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let res = region.new_instance(
                 MockModuleBuilder::new()
                     .with_heap_spec(LARGE_GUARD_HEAP)
@@ -476,7 +476,7 @@ macro_rules! alloc_tests {
             }
 
             // with a region size of 1, the slot must be reused
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
 
             peek_n_poke(&region);
             peek_n_poke(&region);
@@ -485,7 +485,7 @@ macro_rules! alloc_tests {
         /// This test shows that the reset method clears the heap and resets its protections.
         #[test]
         fn alloc_reset() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
@@ -531,7 +531,7 @@ macro_rules! alloc_tests {
         /// initial size after growing the heap.
         #[test]
         fn alloc_grow_reset() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
@@ -595,7 +595,7 @@ macro_rules! alloc_tests {
         /// This test shows the alloc works even with a zero guard size.
         #[test]
         fn guardless_heap_create() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let mut inst = region
                 .new_instance(
                     MockModuleBuilder::new()
@@ -689,7 +689,8 @@ macro_rules! alloc_tests {
                 heap[4095] = 45;
             }
 
-            let region = TestRegion::create(1, &CONTEXT_TEST_LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &CONTEXT_TEST_LIMITS)
+                .expect("region created");
             let mut inst = region
                 .new_instance(
                     MockModuleBuilder::new()
@@ -738,7 +739,8 @@ macro_rules! alloc_tests {
                 heap[0] = onthestack.as_ptr() as u64;
             }
 
-            let region = TestRegion::create(1, &CONTEXT_TEST_LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &CONTEXT_TEST_LIMITS)
+                .expect("region created");
             let mut inst = region
                 .new_instance(
                     MockModuleBuilder::new()
@@ -773,7 +775,8 @@ macro_rules! alloc_tests {
 
         #[test]
         fn drop_region_first() {
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+                .expect("region can be created");
             let inst = region
                 .new_instance(MockModuleBuilder::new().build())
                 .expect("new_instance succeeds");
@@ -786,7 +789,7 @@ macro_rules! alloc_tests {
             let module = MockModuleBuilder::new()
                 .with_heap_spec(LARGE_GUARD_HEAP)
                 .build();
-            let region = TestRegion::create(2, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(2, &LIMITS).expect("region created");
             assert_eq!(region.capacity(), 2);
             assert_eq!(region.free_slots(), 2);
             assert_eq!(region.used_slots(), 0);
@@ -802,7 +805,7 @@ macro_rules! alloc_tests {
             let module = MockModuleBuilder::new()
                 .with_heap_spec(ONE_PAGE_HEAP)
                 .build();
-            let region = TestRegion::create(2, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(2, &LIMITS).expect("region created");
             assert_eq!(region.capacity(), 2);
             assert_eq!(region.free_slots(), 2);
             assert_eq!(region.used_slots(), 0);
@@ -833,7 +836,7 @@ macro_rules! alloc_tests {
             let module = MockModuleBuilder::new()
                 .with_heap_spec(ONE_PAGE_HEAP)
                 .build();
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             assert_eq!(region.capacity(), 1);
             assert_eq!(region.free_slots(), 1);
             assert_eq!(region.used_slots(), 0);
@@ -875,7 +878,8 @@ macro_rules! alloc_tests {
                     .with_heap_spec(ONE_PAGE_HEAP)
                     .build();
                 let total_slots = 10;
-                let region = TestRegion::create(total_slots, &LIMITS).expect("region created");
+                let region = <TestRegion as RegionCreate>::create(total_slots, &LIMITS)
+                    .expect("region created");
                 assert_eq!(region.capacity(), total_slots);
                 assert_eq!(region.free_slots(), 10);
                 assert_eq!(region.used_slots(), 0);
@@ -939,7 +943,8 @@ macro_rules! alloc_tests {
                     .with_heap_spec(ONE_PAGE_HEAP)
                     .build();
                 let total_slots = 10;
-                let region = TestRegion::create(total_slots, &LIMITS).expect("region created");
+                let region = <TestRegion as RegionCreate>::create(total_slots, &LIMITS)
+                    .expect("region created");
                 assert_eq!(region.capacity(), total_slots);
                 assert_eq!(region.free_slots(), 10);
                 assert_eq!(region.used_slots(), 0);
@@ -1016,7 +1021,7 @@ macro_rules! alloc_tests {
                     * host_page_size(),
                 ..Limits::default()
             };
-            let region = TestRegion::create(1, &limits).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &limits).expect("region created");
             let mut inst = region
                 .new_instance(do_nothing_module())
                 .expect("new_instance succeeds");
@@ -1036,7 +1041,8 @@ macro_rules! alloc_tests {
 
             // now make sure that we can run an instance with reasonable limits on this same thread,
             // to make sure the `CURRENT_INSTANCE` thread-local isn't left in a bad state
-            let region = TestRegion::create(1, &Limits::default()).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+                .expect("region created");
             let mut inst = region
                 .new_instance(do_nothing_module())
                 .expect("new_instance succeeds");
@@ -1056,7 +1062,7 @@ macro_rules! alloc_tests {
                 signal_stack_size: 8192,
                 ..Limits::default()
             };
-            let region = TestRegion::create(1, &limits).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &limits).expect("region created");
             let mut inst = region
                 .new_instance(do_nothing_module())
                 .expect("new_instance succeeds");
@@ -1071,7 +1077,8 @@ macro_rules! alloc_tests {
 
             // now make sure that we can run an instance with reasonable limits on this same thread,
             // to make sure the `CURRENT_INSTANCE` thread-local isn't left in a bad state
-            let region = TestRegion::create(1, &Limits::default()).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+                .expect("region created");
             let mut inst = region
                 .new_instance(do_nothing_module())
                 .expect("new_instance succeeds");
@@ -1086,7 +1093,7 @@ macro_rules! alloc_tests {
                     .unwrap(),
                 ..Limits::default()
             };
-            let res = TestRegion::create(1, &limits);
+            let res = <TestRegion as RegionCreate>::create(1, &limits);
             match res {
                 Err(Error::InvalidArgument(
                     "signal stack size must be a multiple of host page size",
@@ -1102,7 +1109,7 @@ macro_rules! alloc_tests {
         /// instance's custom limit must not exceed the Region's.
         #[test]
         fn reject_heap_memory_size_exceeds_region_limits() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let module = MockModuleBuilder::new()
                 .with_heap_spec(THREE_PAGE_MAX_HEAP)
                 .build();
@@ -1127,7 +1134,7 @@ macro_rules! alloc_tests {
         /// default size.
         #[test]
         fn custom_size_does_not_break_default() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
 
             // Build an instance that is has custom limits that are big
             // enough to accommodate the HeapSpec.
@@ -1167,7 +1174,7 @@ macro_rules! alloc_tests {
         /// initial heap memory size, but the instance's limit is too small.
         #[test]
         fn reject_heap_memory_size_exeeds_instance_limits() {
-            let region = TestRegion::create(1, &LIMITS).expect("region created");
+            let region = <TestRegion as RegionCreate>::create(1, &LIMITS).expect("region created");
             let res = region
                 .new_instance_builder(
                     MockModuleBuilder::new()
