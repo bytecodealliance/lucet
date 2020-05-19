@@ -597,6 +597,11 @@ impl UffdStrategy for WasmPageSizedUffdStrategy {
             let pages_into_heap = base_pages_into_heap + page_num;
             let host_page_addr = wasm_page_base_addr + (page_num * host_page_size());
 
+            if alloc.addr_location(host_page_addr as *const c_void) != AddrLocation::Heap {
+                tracing::error!("Heap ended earlier than expected.");
+                break;
+            }
+
             // page fault occurred in the heap; copy or zero
             if let Some(page) = module.get_sparse_page_data(pages_into_heap) {
                 // we are in the sparse data area, with a non-empty page; copy it in
