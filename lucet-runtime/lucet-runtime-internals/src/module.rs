@@ -2,7 +2,7 @@ mod dl;
 mod mock;
 mod sparse_page_data;
 
-pub use crate::module::dl::DlModule;
+pub use crate::module::dl::{DlError, DlModule};
 pub use crate::module::mock::{MockExportBuilder, MockModuleBuilder};
 pub use lucet_module::{
     FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, Global, GlobalSpec, GlobalValue,
