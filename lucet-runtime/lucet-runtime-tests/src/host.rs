@@ -636,10 +636,5 @@ macro_rules! host_tests {
             .unwrap();
             assert_eq!(u64::from(res), 42u64);
         }
-
-        #[test]
-        fn ensure_linked() {
-            lucet_runtime::lucet_internal_ensure_linked();
-        }
     };
 }

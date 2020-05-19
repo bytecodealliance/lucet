@@ -1,5 +1,6 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
+use proc_macro2::{Ident, TokenStream as TokenStream2};
 use quote::quote;
 use syn::spanned::Spanned;
 
@@ -96,6 +97,8 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! { lucet_runtime::TerminationDetails }
     };
 
+    let link_abi = register_link_abi(&hostcall_ident);
+
     let raw_hostcall = quote! {
         #(#attrs)*
         #vis
@@ -121,6 +124,33 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             })
         }
+        #link_abi
     };
     raw_hostcall.into()
+}
+
+#[proc_macro_attribute]
+pub fn lucet_link_abi(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let func = syn::parse_macro_input!(item as syn::ItemFn);
+    let register = register_link_abi(&func.sig.ident);
+    TokenStream::from(quote! {
+        #func
+        #register
+    })
+}
+
+fn register_link_abi(id: &Ident) -> TokenStream2 {
+    let pkg_name = std::env::var("CARGO_PKG_NAME").unwrap();
+    let rt = match pkg_name.as_str() {
+        "lucet-runtime" | "lucet-runtime-internals" | "lucet-runtime-tests" => {
+            quote!(lucet_runtime_internals)
+        }
+        _ => quote!(lucet_runtime),
+    };
+    quote! {
+        #rt::link_abi::submit! {
+            #![crate = #rt]
+            #rt::link_abi::LinkAbi::new(stringify!(#id), #id as *const extern "C" fn())
+        }
+    }
 }

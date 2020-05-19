@@ -487,6 +487,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctor"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf6b25ee9ac1995c54d7adb2eff8cfffb7260bc774fb63c601ec65467f43cd9d"
+dependencies = [
+ "quote 1.0.3",
+ "syn 1.0.18",
+]
+
+[[package]]
 name = "cvt"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -646,6 +656,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ghost"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a36606a68532b5640dc86bb1f33c64b45c4682aad4c50f3937b317ea387f3d6"
+dependencies = [
+ "proc-macro2 1.0.10",
+ "quote 1.0.3",
+ "syn 1.0.18",
+]
+
+[[package]]
 name = "gimli"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -737,6 +758,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "076f042c5b7b98f31d205f1249267e12a6518c1481e9dae9764af19b707d2292"
 dependencies = [
  "autocfg 1.0.0",
+]
+
+[[package]]
+name = "inventory"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82d3f4b90287725c97b17478c60dda0c6324e7c84ee1ed72fb9179d0fdf13956"
+dependencies = [
+ "ctor",
+ "ghost",
+ "inventory-impl",
+]
+
+[[package]]
+name = "inventory-impl"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9092a4fefc9d503e9287ef137f03180a6e7d1b04c419563171ee14947c5e80ec"
+dependencies = [
+ "proc-macro2 1.0.10",
+ "quote 1.0.3",
+ "syn 1.0.18",
 ]
 
 [[package]]
@@ -916,6 +959,7 @@ dependencies = [
  "bitflags 1.2.1",
  "byteorder",
  "cc",
+ "inventory",
  "lazy_static",
  "libc",
  "libloading 0.6.2",
@@ -935,6 +979,7 @@ dependencies = [
 name = "lucet-runtime-macros"
 version = "0.7.0-dev"
 dependencies = [
+ "proc-macro2 1.0.10",
  "quote 1.0.3",
  "syn 1.0.18",
 ]

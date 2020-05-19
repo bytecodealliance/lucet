@@ -160,11 +160,6 @@ macro_rules! guest_fault_common_defs {
                     .build()
             }
         }
-
-        #[test]
-        fn ensure_linked() {
-            lucet_runtime::lucet_internal_ensure_linked();
-        }
     };
 }
 

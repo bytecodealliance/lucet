@@ -59,9 +59,6 @@ the differences in alignment for `long long`s. See #445 for updates:
 "
     );
 
-    lucet_runtime::lucet_internal_ensure_linked();
-    lucet_wasi::export_wasi_funcs();
-
     match Config::from_args() {
         Config::Fuzz { num_tests } => run_many(num_tests),
         Config::Creduce { seed } => run_creduce_driver(seed),

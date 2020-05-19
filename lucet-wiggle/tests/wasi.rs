@@ -382,12 +382,6 @@ impl<'a> crate::wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a
 /// Test the above generated code by running Wasm code that calls into it.
 #[test]
 fn main() {
-    // The `init` function ensures that all of the host call functions are
-    // linked into the executable.
-    crate::hostcalls::init();
-    // Same for lucet-runtime:
-    lucet_runtime::lucet_internal_ensure_linked();
-
     // Temporary directory for outputs.
     let workdir = TempDir::new().expect("create working directory");
 

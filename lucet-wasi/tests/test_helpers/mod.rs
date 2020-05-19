@@ -136,14 +136,3 @@ pub fn run_with_null_stdin<P: AsRef<Path>>(
 
     Ok(exitcode)
 }
-
-/// Call this if you're having trouble with `__wasi_*` symbols not being exported.
-///
-/// This is pretty hackish; we will hopefully be able to avoid this altogether once [this
-/// issue](https://github.com/rust-lang/rust/issues/58037) is addressed.
-#[no_mangle]
-#[doc(hidden)]
-pub extern "C" fn lucet_wasi_tests_internal_ensure_linked() {
-    lucet_runtime::lucet_internal_ensure_linked();
-    lucet_wasi::export_wasi_funcs();
-}

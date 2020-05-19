@@ -8,11 +8,6 @@ macro_rules! memory_tests {
         use $crate::build::test_module_wasm;
 
         #[test]
-        fn ensure_linked() {
-            lucet_runtime::lucet_internal_ensure_linked();
-        }
-
-        #[test]
         fn current_memory_hostcall() {
             let module = test_module_wasm("memory", "current_memory.wat")
                 .expect("compile and load current_memory.wasm");

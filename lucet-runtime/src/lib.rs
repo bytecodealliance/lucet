@@ -399,6 +399,7 @@ pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
 pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
+pub use lucet_runtime_internals::{inventory, link_abi};
 pub use lucet_runtime_internals::{lucet_hostcall, lucet_hostcall_terminate, WASM_PAGE_SIZE};
 
 pub mod vmctx {
@@ -428,5 +429,5 @@ pub mod vmctx {
 #[no_mangle]
 #[doc(hidden)]
 pub extern "C" fn lucet_internal_ensure_linked() {
-    self::c_api::ensure_linked();
+    //assert_ne!(*lucet_runtime_internals::link_abi::ENSURE_LINKED, 0);
 }

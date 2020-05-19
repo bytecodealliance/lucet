@@ -8,6 +8,8 @@
 pub mod error;
 #[macro_use]
 pub mod hostcall_macros;
+// Required to re-export the inventory underneath the top level in order for lucet_runtime_macros that use its machinery to be able to find it:
+pub use inventory;
 pub use lucet_runtime_macros::lucet_hostcall;
 
 #[macro_use]
@@ -19,6 +21,7 @@ pub mod c_api;
 pub mod context;
 pub mod embed_ctx;
 pub mod instance;
+pub mod link_abi;
 #[cfg(feature = "concurrent_testpoints")]
 pub mod lock_testpoints;
 pub mod module;

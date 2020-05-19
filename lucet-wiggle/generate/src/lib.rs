@@ -90,12 +90,15 @@ pub fn generate(
             /// each hostcall is reachable and not garbage-collected by the
             /// compile-time linker (ld).
             pub fn init() {
+                println!("initialized hostcalls...");
+                /*
                 let funcs: &[*const extern "C" fn()] = &[
                     #(#init),*
                 ];
                 for func in funcs {
                     assert_ne!(*func, std::ptr::null(), "hostcall address is not null");
                 }
+                */
             }
         }
     }

@@ -1,18 +1,22 @@
 mod test_helpers;
 
-use crate::test_helpers::{
-    lucet_wasi_tests_internal_ensure_linked, run, run_with_null_stdin, run_with_stdout,
-    LUCET_WASI_ROOT,
-};
+use crate::test_helpers::{run, run_with_null_stdin, run_with_stdout, LUCET_WASI_ROOT};
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
 use std::fs::File;
 use std::path::Path;
 use tempfile::TempDir;
 
 #[test]
-fn double_import() {
-    lucet_wasi_tests_internal_ensure_linked();
+fn ensure_linked() {
+    lucet_wasi::export_wasi_funcs();
+    println!(
+        "ensure linked: {:?}",
+        *lucet_runtime::link_abi::ENSURE_LINKED
+    );
+}
 
+#[test]
+fn double_import() {
     let mut ctx = WasiCtxBuilder::new();
 
     let (exitcode, stdout) = run_with_stdout("duplicate_import.wat", &mut ctx).unwrap();

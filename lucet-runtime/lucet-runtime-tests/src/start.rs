@@ -8,11 +8,6 @@ macro_rules! start_tests {
         use $crate::helpers::{test_ex, test_nonex, with_unchanged_signal_handlers};
 
         #[test]
-        fn ensure_linked() {
-            lucet_runtime::lucet_internal_ensure_linked();
-        }
-
-        #[test]
         fn global_init() {
             test_nonex(|| {
                 let module = test_module_wasm("start", "global_init.wat")
