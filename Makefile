@@ -38,9 +38,9 @@ test-release:
 
 .PHONY: test-release-executables
 test-release-executables:
-	cargo build --release
-	helpers/lucet-toolchain-tests/signature.sh
-	helpers/lucet-toolchain-tests/objdump.sh
+	cargo build --release -p lucetc -p lucet-wasi -p lucet-objdump
+	helpers/lucet-toolchain-tests/signature.sh release
+	helpers/lucet-toolchain-tests/objdump.sh release
 
 .PHONY: test-ci
 test-ci: test-packages test-objdump test-bitrot test-signature test-objdump

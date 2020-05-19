@@ -1,21 +1,22 @@
 #! /bin/sh
 
+set -e
+set -x
+
 LUCET_DIR="."
 TMPDIR="$(mktemp -d)"
 
-if [ -x "${LUCET_DIR}/target/release/lucetc" ]; then
-    LUCETC="${LUCET_DIR}/target/release/lucetc"
-elif [ -x "${LUCET_DIR}/target/debug/lucetc" ]; then
-    LUCETC="${LUCET_DIR}/target/debug/lucetc"
+PROFILE="${1:-debug}"
+
+if [ -x "${LUCET_DIR}/target/${PROFILE}/lucetc" ]; then
+    LUCETC="${LUCET_DIR}/target/${PROFILE}/lucetc"
 else
     echo "lucetc not found" >&2
     exit 1
 fi
 
-if [ -x "${LUCET_DIR}/target/release/lucet-objdump" ]; then
-    LUCET_OBJDUMP="${LUCET_DIR}/target/release/lucet-objdump"
-elif [ -x "${LUCET_DIR}/target/debug/lucet-objdump" ]; then
-    LUCET_OBJDUMP="${LUCET_DIR}/target/debug/lucet-objdump"
+if [ -x "${LUCET_DIR}/target/${PROFILE}/lucet-objdump" ]; then
+    LUCET_OBJDUMP="${LUCET_DIR}/target/${PROFILE}/lucet-objdump"
 else
     echo "lucet-objdump not found" >&2
     exit 1

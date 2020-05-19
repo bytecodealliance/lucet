@@ -1,13 +1,221 @@
+# https://circleci.com/docs/2.0/configuration-reference/
+
 version: 2.1
-jobs:
-  test:
+
+executors:
+  linux:
     machine:
-      image: ubuntu-1604:202004-01
+      image: "ubuntu-1604:202004-01"
+      # This is an expensive option! Do not use this machine type to run a large number of `jobs` in
+      # parallel, otherwise we'll get dinged for each one. It is usually not much slower to add a
+      # new step to the existing job commands.
+      docker_layer_caching: true
+    resource_class: xlarge
+  macos:
+    macos:
+      # Latest non-beta as of this writing.
+      xcode: "11.4.1"
+    resource_class: large
+
+jobs:
+  ##################################
+  # Linux `make test-full` targets #
+  ##################################
+  full_ci_branch:
+    executor: linux
     steps:
-      - checkout
+      - full_ci:
+          cache_target: true
+
+  full_ci_master:
+    executor: linux
+    steps:
+      - full_ci:
+          cache_target: false
+
+  ################################
+  # macOS `make test-ci` targets #
+  ################################
+  mac_ci_branch:
+    executor: macos
+    steps:
+      - mac_ci:
+          cache_target: true
+
+  mac_ci_master:
+    executor: macos
+    steps:
+      - mac_ci:
+          cache_target: false
 
 workflows:
-  version: 2.1
-  build_and_test:
+  build:
     jobs:
-      - test
+      ##################################
+      # Linux `make test-full` targets #
+      ##################################
+      - full_ci_branch:
+          filters:
+            branches:
+              ignore: master
+      - full_ci_master:
+          filters:
+            branches:
+              only: master
+      ################################
+      # macOS `make test-ci` targets #
+      ################################
+      - mac_ci_branch:
+          filters:
+            branches:
+              ignore: master
+      - mac_ci_master:
+          filters:
+            branches:
+              only: master
+
+commands:
+  full_ci:
+    description: "Run the full CI for Lucet"
+    parameters:
+      cache_target:
+        type: boolean
+        description: "If `true`, the target/ directory will be cached between builds"
+    steps:
+      - checkout_recursively
+      - when:
+          condition: << parameters.cache_target >>
+          steps:
+            - restore_cache:
+                keys:
+                  # These keys match by prefix, and the topmost matching pattern wins. Arranging the
+                  # patterns like this means that we prefer to restore cache from:
+                  #
+                  # 1. A Linux cache built on a matching branch name with a matching `Cargo.lock` checksum
+                  # 2. A Linux cache built on a matching branch name with any `Cargo.lock` checksum
+                  # 3. Any Linux cache
+                  #
+                  # The hope is that even if some of the dependencies change between branches and
+                  # revisions, that enough of the slow-changing dependencies will remain static that
+                  # Cargo won't have to rebuild them.
+                  - target_dir-linux-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                  - target_dir-linux-{{ .Branch }}-
+                  - target_dir-linux-
+      - build_container
+      - make_in_container:
+          target: test-full
+      - make_in_container:
+          target: test-release test-release-executables
+      - ensure_sources_unchanged
+      - when:
+          condition: << parameters.cache_target >>
+          steps:
+            - save_cache:
+                key: target_dir-linux-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                paths:
+                  - "target"
+
+  mac_ci:
+    description: "Run a subset of CI for Lucet on Mac"
+    parameters:
+      cache_target:
+        type: boolean
+        description: "If `true`, the target/ directory will be cached between builds"
+    steps:
+      - checkout_recursively
+      - when:
+          condition: << parameters.cache_target >>
+          steps:
+            - restore_cache:
+                keys:
+                  # These keys match by prefix, and the topmost matching pattern wins. Arranging the
+                  # patterns like this means that we prefer to restore cache from:
+                  #
+                  # 1. A macOS cache built on a matching branch name with a matching `Cargo.lock` checksum
+                  # 2. A macOS cache built on a matching branch name with any `Cargo.lock` checksum
+                  # 3. Any macOS cache
+                  #
+                  # The hope is that even if some of the dependencies change between branches and
+                  # revisions, that enough of the slow-changing dependencies will remain static that
+                  # Cargo won't have to rebuild them.
+                  - target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                  - target_dir-macos-{{ .Branch }}-
+                  - target_dir-macos-
+      - run:
+          name: "Install Homebrew dependencies"
+          command: |
+            set -x
+            export HOMEBREW_NO_AUTO_UPDATE=1
+            export HOMEBREW_NO_INSTALL_CLEANUP=1
+            brew install cmake
+      - run:
+          name: "Install Rust"
+          command: |
+            set -x
+            curl https://sh.rustup.rs | sh -s -- --default-toolchain 1.43.1 -y
+            source $HOME/.cargo/env
+            rustup component add rustfmt
+            rustup target add wasm32-wasi
+      - run:
+          name: "Install wasi-sdk"
+          command: |
+            set -x
+            curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk-10.0-macos.tar.gz
+            tar xf wasi-sdk-10.0-macos.tar.gz
+            sudo mkdir -p /opt/wasi-sdk
+            sudo mv wasi-sdk-10.0/* /opt/wasi-sdk/
+      - run:
+          name: "Make target: test-ci"
+          command: |
+            set -x
+            source $HOME/.cargo/env
+            make test-ci
+      - ensure_sources_unchanged
+      - when:
+          condition: << parameters.cache_target >>
+          steps:
+            - save_cache:
+                key: target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                paths:
+                  - "target"
+
+  checkout_recursively:
+    description: "Check out the git repository, and recursively initialize its submodules"
+    steps:
+      - checkout
+      - run:
+          name: "Sync and recursively update submodules"
+          command: |
+            set -x
+            git submodule sync
+            git submodule update --init --recursive
+
+  build_container:
+    description: "Build the Lucet development/CI Docker image"
+    steps:
+      - run:
+          name: "Build Docker image"
+          command: |
+            set -x
+            docker build -t lucet .
+
+  make_in_container:
+    description: "Run a make target in the Lucet development/CI Docker image"
+    parameters:
+      target:
+        type: string
+    steps:
+      - run:
+          name: "Run Make target in Docker: << parameters.target >>"
+          command: |
+            set -x
+            docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "make -C /lucet << parameters.target >>"
+
+  ensure_sources_unchanged:
+    description: "Make sure that previous steps did not change the source files from git"
+    steps:
+      - run:
+          name: "Ensure sources are unchanged"
+          command: |
+            set -x
+            git diff --exit-code
