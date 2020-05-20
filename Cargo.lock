@@ -312,14 +312,14 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.62.0"
+version = "0.63.0"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.62.0"
+version = "0.63.0"
 dependencies = [
  "byteorder",
  "cranelift-bforest",
@@ -336,7 +336,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.62.0"
+version = "0.63.0"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
@@ -344,15 +344,15 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.62.0"
+version = "0.63.0"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.62.0"
+version = "0.63.0"
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.62.0"
+version = "0.63.0"
 dependencies = [
  "cranelift-codegen",
  "log",
@@ -362,7 +362,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-module"
-version = "0.62.0"
+version = "0.63.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -373,7 +373,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-native"
-version = "0.62.0"
+version = "0.63.0"
 dependencies = [
  "cranelift-codegen",
  "raw-cpuid 7.0.3",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-object"
-version = "0.62.0"
+version = "0.63.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-module",
@@ -392,7 +392,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.62.0"
+version = "0.63.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -1711,12 +1711,13 @@ checksum = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
 
 [[package]]
 name = "regalloc"
-version = "0.0.17"
+version = "0.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89ce0cd835fa6e91bbf5d010beee19d0c2e97e4ad5e13c399a31122cfc83bdd6"
+checksum = "b27b256b41986ac5141b37b8bbba85d314fbf546c182eb255af6720e07e4f804"
 dependencies = [
  "log",
  "rustc-hash",
+ "smallvec",
 ]
 
 [[package]]
@@ -2291,7 +2292,7 @@ checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
 
 [[package]]
 name = "wasi-common"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -2390,7 +2391,7 @@ dependencies = [
 
 [[package]]
 name = "wig"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "heck",
  "proc-macro2 1.0.13",
@@ -2400,7 +2401,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "thiserror",
  "wiggle-macro",
@@ -2409,7 +2410,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle-generate"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "anyhow",
  "heck",
@@ -2421,7 +2422,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle-macro"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "quote 1.0.6",
  "syn 1.0.22",
@@ -2431,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle-test"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "proptest",
  "wiggle",
@@ -2482,7 +2483,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "winx"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "bitflags 1.2.1",
  "cvt",
@@ -2507,7 +2508,7 @@ checksum = "da90eac47bf1d7871b75004b9b631d107df15f37669383b23f0b5297bc7516b6"
 
 [[package]]
 name = "yanix"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "bitflags 1.2.1",
  "cfg-if",
