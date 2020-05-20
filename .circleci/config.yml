@@ -15,7 +15,7 @@ executors:
     macos:
       # Latest non-beta as of this writing.
       xcode: "11.4.1"
-    resource_class: large
+    resource_class: medium
 
 jobs:
   ##################################
@@ -122,6 +122,12 @@ commands:
         type: boolean
         description: "If `true`, the target/ directory will be cached between builds"
     steps:
+      - run:
+          # https://support.circleci.com/hc/en-us/articles/360037142773-Freeing-up-Disk-Space-on-macOS
+          name: "Delete unneeded iOS simulator files to allow more disk space headroom"
+          command: |
+            set -x
+            sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes
       - checkout_recursively
       - when:
           condition: << parameters.cache_target >>
