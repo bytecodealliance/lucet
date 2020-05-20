@@ -81,7 +81,7 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     let mut bindings = Bindings::empty();
     if opts.wiggle_bindings {
         if let Some(ref v) = validator {
-            bindings.extend(&lucet_wiggle::bindings(v.doc()))?;
+            bindings.extend(&lucet_wiggle_generate::bindings(v.doc()))?;
         }
     }
     for file in opts.binding_files.iter() {

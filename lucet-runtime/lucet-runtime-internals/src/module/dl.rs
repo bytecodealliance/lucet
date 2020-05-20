@@ -3,8 +3,8 @@ use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, T
 use libc::c_void;
 use libloading::Library;
 use lucet_module::{
-    FunctionHandle, FunctionIndex, FunctionPointer, FunctionSpec, ModuleData, ModuleFeatures,
-    ModuleSignature, PublicKey, SerializedModule, Signature, VersionInfo, LUCET_MODULE_SYM,
+    FunctionHandle, FunctionIndex, FunctionSpec, ModuleData, ModuleFeatures, ModuleSignature,
+    PublicKey, SerializedModule, Signature, VersionInfo, LUCET_MODULE_SYM,
 };
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -12,8 +12,25 @@ use std::path::Path;
 use std::slice;
 use std::slice::from_raw_parts;
 use std::sync::Arc;
+use thiserror::Error;
 
 use raw_cpuid::CpuId;
+
+#[derive(Debug, Error)]
+pub enum DlError {
+    #[error("Loading: {0}")]
+    Loading(
+        #[from]
+        #[source]
+        libloading::Error,
+    ),
+    #[error("IO: {0}")]
+    Io(
+        #[from]
+        #[source]
+        std::io::Error,
+    ),
+}
 
 fn check_feature_support(module_features: &ModuleFeatures) -> Result<(), Error> {
     let cpuid = CpuId::new();
@@ -78,7 +95,11 @@ fn check_feature_support(module_features: &ModuleFeatures) -> Result<(), Error> 
 
 /// A Lucet module backed by a dynamically-loaded shared object.
 pub struct DlModule {
-    lib: Library,
+    /// A handle to the loaded object.
+    ///
+    /// This is never used after initialization, but we can't let the library close until we're done
+    /// with this module.
+    _lib: Library,
 
     /// Base address of the dynamically-loaded module
     fbase: *const c_void,
@@ -111,8 +132,8 @@ impl DlModule {
         // functions will be provided by the current executable.  We trust our wasm->dylib compiler
         // to make sure these function calls are the way the dylib can touch memory outside of its
         // stack and heap.
-        let abs_so_path = so_path.as_ref().canonicalize().map_err(Error::DlError)?;
-        let lib = Library::new(abs_so_path.as_os_str()).map_err(Error::DlError)?;
+        let abs_so_path = so_path.as_ref().canonicalize().map_err(DlError::Io)?;
+        let lib = Library::new(abs_so_path.as_os_str()).map_err(DlError::Loading)?;
 
         let serialized_module_ptr = unsafe {
             lib.get::<*const SerializedModule>(LUCET_MODULE_SYM.as_bytes())
@@ -192,7 +213,7 @@ impl DlModule {
         };
 
         Ok(Arc::new(DlModule {
-            lib,
+            _lib: lib,
             fbase,
             module: lucet_module::Module {
                 version: module_version,
@@ -271,22 +292,14 @@ impl ModuleInternal for DlModule {
     }
 
     fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error> {
-        // `guest_start` is a pointer to the function the module designates as the start function,
-        // since we can't have multiple symbols pointing to the same function and guest code might
-        // call it in the normal course of execution
-        if let Ok(start_func) = unsafe { self.lib.get::<*const extern "C" fn()>(b"guest_start") } {
-            if start_func.is_null() {
-                lucet_incorrect_module!("`guest_start` is defined but null");
+        Ok(self.module.module_data.get_start_func_id().map(|id| {
+            let ptr = self.function_manifest()[id.as_u32() as usize].ptr();
+            FunctionHandle {
+                ptr,
+                id,
+                is_start_func: true,
             }
-            let mut func = self
-                .function_handle_from_ptr(FunctionPointer::from_usize(
-                    unsafe { **start_func } as usize
-                ));
-            func.is_start_func = true;
-            Ok(Some(func))
-        } else {
-            Ok(None)
-        }
+        }))
     }
 
     fn function_manifest(&self) -> &[FunctionSpec] {

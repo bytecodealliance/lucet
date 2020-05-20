@@ -329,7 +329,6 @@ impl<'a> Compiler<'a> {
         let module_data_len = module_data_bytes.len();
 
         let module_data_id = write_module_data(&mut self.clif_module, module_data_bytes)?;
-        write_startfunc_data(&mut self.clif_module, &self.decls)?;
         let (table_id, table_len) = write_table_data(&mut self.clif_module, &self.decls)?;
 
         // The function manifest must be written out in the order that
@@ -514,32 +513,6 @@ fn write_module_data<B: ClifBackend>(
         .map_err(Error::ClifModuleError)?;
 
     Ok(module_data_decl)
-}
-
-fn write_startfunc_data<B: ClifBackend>(
-    clif_module: &mut ClifModule<B>,
-    decls: &ModuleDecls<'_>,
-) -> Result<(), Error> {
-    use cranelift_module::{DataContext, Linkage};
-
-    if let Some(func_ix) = decls.get_start_func() {
-        let name = clif_module
-            .declare_data("guest_start", Linkage::Export, false, false, None)
-            .map_err(Error::MetadataSerializer)?;
-        let mut ctx = DataContext::new();
-        ctx.define(vec![0u8; 8].into_boxed_slice());
-
-        let start_func = decls
-            .get_func(func_ix)
-            .expect("start func is valid func id");
-        let fid = start_func.name.as_funcid().expect("start func is a func");
-        let fref = clif_module.declare_func_in_data(fid, &mut ctx);
-        ctx.write_function_addr(0, fref);
-        clif_module
-            .define_data(name, &ctx)
-            .map_err(Error::MetadataSerializer)?;
-    }
-    Ok(())
 }
 
 /// Collect traps from cranelift_module codegen:

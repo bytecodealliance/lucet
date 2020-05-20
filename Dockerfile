@@ -36,7 +36,7 @@ RUN rustup component add rustfmt
 RUN rustup target add wasm32-wasi
 
 # Optional additional Rust programs
-RUN cargo install --debug rsign2 cargo-deb
+RUN cargo install --debug rsign2 cargo-audit mdbook
 
 RUN curl -sSLO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk_10.0_amd64.deb \
 	&& dpkg -i wasi-sdk_10.0_amd64.deb && rm -f wasi-sdk_10.0_amd64.deb
@@ -46,10 +46,8 @@ ENV WASI_SDK=/opt/wasi-sdk
 # optional install of wasm-opt and wasm-reduce for fuzzing and benchmarking
 ENV BINARYEN_DIR=/opt/binaryen
 ENV BINARYEN_VERSION=86
-RUN curl -sS -L "https://github.com/WebAssembly/binaryen/archive/version_${BINARYEN_VERSION}.tar.gz" | tar xzf - && \
-    mkdir -p binaryen-build && ( cd binaryen-build && cmake "../binaryen-version_${BINARYEN_VERSION}" && \
-    make wasm-opt wasm-reduce ) && \
+RUN curl -sS -L "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz" | tar xzf - && \
     install -d -v "${BINARYEN_DIR}/bin" && \
-    for tool in wasm-opt wasm-reduce; do install -v "binaryen-build/bin/${tool}" "${BINARYEN_DIR}/bin/"; done && \
-    rm -fr binaryen-build binaryen-version_${BINARYEN_VERSION}
-ENV PATH=$BINARYEN_DIR:$PATH
+    for tool in wasm-opt wasm-reduce; do install -v "binaryen-version_${BINARYEN_VERSION}/${tool}" "${BINARYEN_DIR}/bin/"; done && \
+    rm -fr binaryen-version_${BINARYEN_VERSION}
+ENV PATH=$BINARYEN_DIR/bin:$PATH

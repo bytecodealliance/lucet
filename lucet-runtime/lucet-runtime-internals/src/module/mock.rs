@@ -20,7 +20,12 @@ pub struct MockModuleBuilder {
     table_elements: BTreeMap<usize, TableElement>,
     export_funcs: HashMap<&'static str, FunctionPointer>,
     func_table: HashMap<(u32, u32), FunctionPointer>,
-    start_func: Option<FunctionPointer>,
+    /// The Wasm start function.
+    ///
+    /// Here, we hang onto the `FunctionIndex` for the `OwnedModuleData`, but use the
+    /// `FunctionHandle` in the `Module` trait implementation because it's easier than wrangling the
+    /// lookup later.
+    start_func: Option<(FunctionIndex, FunctionHandle)>,
     function_manifest: Vec<FunctionSpec>,
     function_info: Vec<OwnedFunctionMetadata>,
     imports: Vec<OwnedImportFunction>,
@@ -175,8 +180,16 @@ impl MockModuleBuilder {
         self
     }
 
-    pub fn with_start_func(mut self, func: FunctionPointer) -> Self {
-        self.start_func = Some(func);
+    pub fn with_start_func(mut self, ptr: FunctionPointer) -> Self {
+        let id = FunctionIndex::from_u32(self.function_manifest.len() as u32);
+        self.function_manifest
+            .push(FunctionSpec::new(ptr.as_usize() as u64, 0u32, 0u64, 0u64));
+        let handle = FunctionHandle {
+            ptr,
+            id,
+            is_start_func: true,
+        };
+        self.start_func = Some((id, handle));
         self
     }
 
@@ -222,6 +235,7 @@ impl MockModuleBuilder {
             self.exports,
             self.signatures,
             ModuleFeatures::none(),
+            self.start_func.map(|x| x.0),
         );
         let serialized_module_data = owned_module_data
             .to_ref()
@@ -236,7 +250,7 @@ impl MockModuleBuilder {
             table_elements,
             export_funcs: self.export_funcs,
             func_table: self.func_table,
-            start_func: self.start_func,
+            start_func: self.start_func.map(|x| x.1),
             function_manifest: self.function_manifest,
         };
         Arc::new(mock)
@@ -250,7 +264,7 @@ pub struct MockModule {
     pub table_elements: Vec<TableElement>,
     pub export_funcs: HashMap<&'static str, FunctionPointer>,
     pub func_table: HashMap<(u32, u32), FunctionPointer>,
-    pub start_func: Option<FunctionPointer>,
+    pub start_func: Option<FunctionHandle>,
     pub function_manifest: Vec<FunctionSpec>,
 }
 
@@ -308,12 +322,7 @@ impl ModuleInternal for MockModule {
     }
 
     fn get_start_func(&self) -> Result<Option<FunctionHandle>, Error> {
-        let func = self.start_func.map(|start| {
-            let mut func = self.function_handle_from_ptr(start);
-            func.is_start_func = true;
-            func
-        });
-        Ok(func)
+        Ok(self.start_func)
     }
 
     fn function_manifest(&self) -> &[FunctionSpec] {
