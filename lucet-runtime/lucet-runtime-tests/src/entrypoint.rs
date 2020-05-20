@@ -10,12 +10,12 @@ pub fn wat_calculator_module() -> Arc<dyn Module> {
 }
 
 pub fn mock_calculator_module() -> Arc<dyn Module> {
-    extern "C" fn add_2(_vmctx: *mut lucet_vmctx, arg0: u64, arg1: u64) -> u64 {
+    extern "C" fn add_2(_vmctx: *const lucet_vmctx, arg0: u64, arg1: u64) -> u64 {
         arg0 + arg1
     }
 
     extern "C" fn add_4_hostcall(
-        _vmctx: *mut lucet_vmctx,
+        _vmctx: *const lucet_vmctx,
         arg0: u64,
         arg1: u64,
         arg2: u64,
@@ -25,7 +25,7 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
     }
 
     extern "C" fn add_10(
-        _vmctx: *mut lucet_vmctx,
+        _vmctx: *const lucet_vmctx,
         arg0: u64,
         arg1: u64,
         arg2: u64,
@@ -40,20 +40,20 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
         arg0 + arg1 + arg2 + arg3 + arg4 + arg5 + arg6 + arg7 + arg8 + arg9
     }
 
-    extern "C" fn mul_2(_vmctx: *mut lucet_vmctx, arg0: u64, arg1: u64) -> u64 {
+    extern "C" fn mul_2(_vmctx: *const lucet_vmctx, arg0: u64, arg1: u64) -> u64 {
         arg0 * arg1
     }
 
-    extern "C" fn add_f32_2(_vmctx: *mut lucet_vmctx, arg0: f32, arg1: f32) -> f32 {
+    extern "C" fn add_f32_2(_vmctx: *const lucet_vmctx, arg0: f32, arg1: f32) -> f32 {
         arg0 + arg1
     }
 
-    extern "C" fn add_f64_2(_vmctx: *mut lucet_vmctx, arg0: f64, arg1: f64) -> f64 {
+    extern "C" fn add_f64_2(_vmctx: *const lucet_vmctx, arg0: f64, arg1: f64) -> f64 {
         arg0 + arg1
     }
 
     extern "C" fn add_f32_10(
-        _vmctx: *mut lucet_vmctx,
+        _vmctx: *const lucet_vmctx,
         arg0: f32,
         arg1: f32,
         arg2: f32,
@@ -69,7 +69,7 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
     }
 
     extern "C" fn add_f64_10(
-        _vmctx: *mut lucet_vmctx,
+        _vmctx: *const lucet_vmctx,
         arg0: f64,
         arg1: f64,
         arg2: f64,
@@ -85,7 +85,7 @@ pub fn mock_calculator_module() -> Arc<dyn Module> {
     }
 
     extern "C" fn add_mixed_20(
-        _vmctx: *mut lucet_vmctx,
+        _vmctx: *const lucet_vmctx,
         arg0: f64,
         arg1: u8,
         arg2: f32,
@@ -199,15 +199,15 @@ macro_rules! entrypoint_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn black_box(_vmctx: &mut Vmctx, _val: *mut c_void) {}
+        pub fn black_box(_vmctx: &Vmctx, _val: *mut c_void) {}
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub unsafe extern "C" fn callback_hostcall(vmctx: &mut Vmctx, cb_idx: u32, x: u64) -> u64 {
+        pub unsafe extern "C" fn callback_hostcall(vmctx: &Vmctx, cb_idx: u32, x: u64) -> u64 {
             let func = vmctx
                 .get_func_from_idx(0, cb_idx)
                 .expect("can get function by index");
-            let func = std::mem::transmute::<usize, extern "C" fn(*mut lucet_vmctx, u64) -> u64>(
+            let func = std::mem::transmute::<usize, extern "C" fn(*const lucet_vmctx, u64) -> u64>(
                 func.ptr.as_usize(),
             );
             (func)(vmctx.as_raw(), x) + 1
@@ -216,7 +216,7 @@ macro_rules! entrypoint_tests {
         #[lucet_hostcall]
         #[no_mangle]
         pub unsafe extern "C" fn add_4_hostcall(
-            vmctx: &mut Vmctx,
+            vmctx: &Vmctx,
             x: u64,
             y: u64,
             z: u64,
@@ -224,7 +224,6 @@ macro_rules! entrypoint_tests {
         ) -> u64 {
             x + y + z + w
         }
-
 
         $(
             mod $region_id {
@@ -235,7 +234,7 @@ macro_rules! entrypoint_tests {
                 };
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
-
+                use $crate::build::test_module_c;
                 use $crate::entrypoint::{mock_calculator_module, wat_calculator_module};
 
                 #[test]
@@ -666,7 +665,6 @@ macro_rules! entrypoint_tests {
                     assert_eq!(u64::from(retval), 1800);
                 }
 
-                use $crate::build::test_module_c;
                 const TEST_REGION_INIT_VAL: libc::c_int = 123;
                 const TEST_REGION_SIZE: libc::size_t = 4;
 

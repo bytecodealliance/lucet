@@ -28,7 +28,7 @@ macro_rules! lucet_hostcalls {
         $(
             $(#[$attr:meta])*
             pub unsafe extern "C" fn $name:ident(
-                &mut $vmctx:ident
+                &$vmctx:ident
                 $(, $arg:ident : $arg_ty:ty )*,
             ) -> $ret_ty:ty {
                 $($body:tt)*
@@ -41,7 +41,7 @@ macro_rules! lucet_hostcalls {
             #[$crate::lucet_hostcall]
             $(#[$attr])*
             pub unsafe extern "C" fn $name(
-                $vmctx: &mut lucet_runtime::vmctx::Vmctx,
+                $vmctx: &lucet_runtime::vmctx::Vmctx,
                 $( $arg: $arg_ty ),*
             ) -> $ret_ty {
                 $($body)*

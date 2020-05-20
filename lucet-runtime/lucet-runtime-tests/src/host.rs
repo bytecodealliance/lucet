@@ -8,10 +8,11 @@ macro_rules! host_tests {
             lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, Limits, Region,
             TerminationDetails, TrapCode,
         };
-        use std::sync::{Arc, Mutex};
         use std::cell::RefCell;
+        use std::ops::Deref;
+        use std::sync::{Arc, Mutex};
         use $crate::build::test_module_c;
-        use $crate::helpers::{FunctionPointer, MockExportBuilder, MockModuleBuilder};
+        use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder};
 
         #[test]
         fn load_module() {
@@ -28,13 +29,13 @@ macro_rules! host_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_test_func_hostcall_error(_vmctx: &mut Vmctx) {
+        pub fn hostcall_test_func_hostcall_error(_vmctx: &Vmctx) {
             lucet_hostcall_terminate!(ERROR_MESSAGE);
         }
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_test_func_hello(vmctx: &mut Vmctx, hello_ptr: u32, hello_len: u32) {
+        pub fn hostcall_test_func_hello(vmctx: &Vmctx, hello_ptr: u32, hello_len: u32) {
             let heap = vmctx.heap();
             let hello = heap.as_ptr() as usize + hello_ptr as usize;
             if !vmctx.check_heap(hello as *const c_void, hello_len as usize) {
@@ -50,7 +51,7 @@ macro_rules! host_tests {
         #[lucet_hostcall]
         #[allow(unreachable_code)]
         #[no_mangle]
-        pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &mut Vmctx) {
+        pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &Vmctx) {
             let lock = vmctx.get_embed_ctx::<Arc<Mutex<()>>>();
             let _mutex_guard = lock.lock().unwrap();
             lucet_hostcall_terminate!(ERROR_MESSAGE);
@@ -59,7 +60,7 @@ macro_rules! host_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_bad_borrow(vmctx: &mut Vmctx) -> bool {
+        pub fn hostcall_bad_borrow(vmctx: &Vmctx) -> bool {
             let heap = vmctx.heap();
             let mut other_heap = vmctx.heap_mut();
             heap[0] == other_heap[0]
@@ -67,7 +68,7 @@ macro_rules! host_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_missing_embed_ctx(vmctx: &mut Vmctx) -> bool {
+        pub fn hostcall_missing_embed_ctx(vmctx: &Vmctx) -> bool {
             struct S {
                 x: bool,
             }
@@ -77,7 +78,7 @@ macro_rules! host_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_multiple_vmctx(vmctx: &mut Vmctx) -> bool {
+        pub fn hostcall_multiple_vmctx(vmctx: &Vmctx) -> bool {
             let mut vmctx1 = unsafe { Vmctx::from_raw(vmctx.as_raw()) };
             vmctx1.heap_mut()[0] = 0xAF;
             drop(vmctx1);
@@ -91,26 +92,26 @@ macro_rules! host_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_yields(vmctx: &mut Vmctx) {
+        pub fn hostcall_yields(vmctx: &Vmctx) {
             vmctx.yield_();
         }
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_yield_expects_5(vmctx: &mut Vmctx) -> u64 {
+        pub fn hostcall_yield_expects_5(vmctx: &Vmctx) -> u64 {
             vmctx.yield_expecting_val()
         }
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_yields_5(vmctx: &mut Vmctx) {
+        pub fn hostcall_yields_5(vmctx: &Vmctx) {
             vmctx.yield_val(5u64);
         }
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_yield_facts(vmctx: &mut Vmctx, n: u64) -> u64 {
-            fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
+        pub fn hostcall_yield_facts(vmctx: &Vmctx, n: u64) -> u64 {
+            fn fact(vmctx: &Vmctx, n: u64) -> u64 {
                 let result = if n <= 1 { 1 } else { n * fact(vmctx, n - 1) };
                 vmctx.yield_val(result);
                 result
@@ -125,8 +126,8 @@ macro_rules! host_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_coop_facts(vmctx: &mut Vmctx, n: u64) -> u64 {
-            fn fact(vmctx: &mut Vmctx, n: u64) -> u64 {
+        pub fn hostcall_coop_facts(vmctx: &Vmctx, n: u64) -> u64 {
+            fn fact(vmctx: &Vmctx, n: u64) -> u64 {
                 let result = if n <= 1 {
                     1
                 } else {
@@ -139,6 +140,49 @@ macro_rules! host_tests {
             fact(vmctx, n)
         }
 
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_yield_with_borrowed_heap(vmctx: &Vmctx) {
+            let heap = vmctx.heap();
+            vmctx.yield_val(5u64);
+            // shouldn't get here
+            assert_eq!(heap[0], 0);
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_yield_with_borrowed_globals(vmctx: &Vmctx) {
+            let globals = vmctx.globals();
+            vmctx.yield_val(5u64);
+            // shouldn't get here
+            assert_eq!(unsafe { globals[0].i_64 }, 0);
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_yield_with_borrowed_ctx(vmctx: &Vmctx) {
+            let ctx = vmctx.get_embed_ctx::<u32>();
+            vmctx.yield_val(5u64);
+            // shouldn't get here
+            assert_eq!(ctx.deref(), &0);
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_grow_with_borrowed_ctx(vmctx: &Vmctx) {
+            let ctx = vmctx.get_embed_ctx::<u32>();
+            vmctx.grow_memory(1).expect("grow_memory succeeds");
+            assert_eq!(ctx.deref(), &0);
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_grow_with_borrowed_heap(vmctx: &Vmctx) {
+            let heap = vmctx.heap();
+            vmctx.grow_memory(1).expect("grow_memory succeeds");
+            // shouldn't get here
+            assert_eq!(heap[0], 0);
+        }
 
         $(
             mod $region_id {
@@ -152,7 +196,7 @@ macro_rules! host_tests {
                 };
                 use std::sync::{Arc, Mutex};
                 use $crate::build::test_module_c;
-                use $crate::helpers::{FunctionPointer, MockExportBuilder, MockModuleBuilder};
+                use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder};
                 use $TestRegion as TestRegion;
 
                 lazy_static! {
@@ -280,10 +324,10 @@ macro_rules! host_tests {
                 #[test]
                 fn run_hostcall_bad_borrow() {
                     extern "C" {
-                        fn hostcall_bad_borrow(vmctx: *mut lucet_vmctx) -> bool;
+                        fn hostcall_bad_borrow(vmctx: *const lucet_vmctx) -> bool;
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
                         hostcall_bad_borrow(vmctx);
                     }
 
@@ -312,10 +356,10 @@ macro_rules! host_tests {
                 #[test]
                 fn run_hostcall_missing_embed_ctx() {
                     extern "C" {
-                        fn hostcall_missing_embed_ctx(vmctx: *mut lucet_vmctx) -> bool;
+                        fn hostcall_missing_embed_ctx(vmctx: *const lucet_vmctx) -> bool;
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
                         hostcall_missing_embed_ctx(vmctx);
                     }
 
@@ -344,10 +388,10 @@ macro_rules! host_tests {
                 #[test]
                 fn run_hostcall_multiple_vmctx() {
                     extern "C" {
-                        fn hostcall_multiple_vmctx(vmctx: *mut lucet_vmctx) -> bool;
+                        fn hostcall_multiple_vmctx(vmctx: *const lucet_vmctx) -> bool;
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
                         hostcall_multiple_vmctx(vmctx);
                     }
 
@@ -373,10 +417,10 @@ macro_rules! host_tests {
                 #[test]
                 fn run_hostcall_yields_5() {
                     extern "C" {
-                        fn hostcall_yields_5(vmctx: *mut lucet_vmctx);
+                        fn hostcall_yields_5(vmctx: *const lucet_vmctx);
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
                         hostcall_yields_5(vmctx);
                     }
 
@@ -406,10 +450,10 @@ macro_rules! host_tests {
                 #[test]
                 fn run_hostcall_yield_expects_5() {
                     extern "C" {
-                        fn hostcall_yield_expects_5(vmctx: *mut lucet_vmctx) -> u64;
+                        fn hostcall_yield_expects_5(vmctx: *const lucet_vmctx) -> u64;
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
                         hostcall_yield_expects_5(vmctx)
                     }
 
@@ -437,10 +481,10 @@ macro_rules! host_tests {
                 #[test]
                 fn yield_factorials() {
                     extern "C" {
-                        fn hostcall_yield_facts(vmctx: *mut lucet_vmctx, n: u64) -> u64;
+                        fn hostcall_yield_facts(vmctx: *const lucet_vmctx, n: u64) -> u64;
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
                         hostcall_yield_facts(vmctx, 5)
                     }
 
@@ -472,10 +516,10 @@ macro_rules! host_tests {
                 #[test]
                 fn coop_factorials() {
                     extern "C" {
-                        fn hostcall_coop_facts(vmctx: *mut lucet_vmctx, n: u64) -> u64;
+                        fn hostcall_coop_facts(vmctx: *const lucet_vmctx, n: u64) -> u64;
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
                         hostcall_coop_facts(vmctx, 5)
                     }
 
@@ -520,10 +564,10 @@ macro_rules! host_tests {
                 #[test]
                 fn resume_unexpected() {
                     extern "C" {
-                        fn hostcall_yields_5(vmctx: *mut lucet_vmctx);
+                        fn hostcall_yields_5(vmctx: *const lucet_vmctx);
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
                         hostcall_yields_5(vmctx);
                     }
 
@@ -559,10 +603,10 @@ macro_rules! host_tests {
                 #[test]
                 fn missing_resume_val() {
                     extern "C" {
-                        fn hostcall_yield_expects_5(vmctx: *mut lucet_vmctx) -> u64;
+                        fn hostcall_yield_expects_5(vmctx: *const lucet_vmctx) -> u64;
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
                         hostcall_yield_expects_5(vmctx)
                     }
 
@@ -590,10 +634,10 @@ macro_rules! host_tests {
                 #[test]
                 fn resume_wrong_type() {
                     extern "C" {
-                        fn hostcall_yield_expects_5(vmctx: *mut lucet_vmctx) -> u64;
+                        fn hostcall_yield_expects_5(vmctx: *const lucet_vmctx) -> u64;
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
                         hostcall_yield_expects_5(vmctx)
                     }
 
@@ -623,10 +667,10 @@ macro_rules! host_tests {
                 #[test]
                 fn switch_threads_resume() {
                     extern "C" {
-                        fn hostcall_yields_5(vmctx: *mut lucet_vmctx);
+                        fn hostcall_yields_5(vmctx: *const lucet_vmctx);
                     }
 
-                    unsafe extern "C" fn f(vmctx: *mut lucet_vmctx) -> u64 {
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
                         hostcall_yields_5(vmctx);
                         42
                     }
@@ -667,10 +711,181 @@ macro_rules! host_tests {
                 }
 
                 #[test]
-                fn ensure_linked() {
-                    lucet_runtime::lucet_internal_ensure_linked();
+                fn yield_with_borrowed_heap_terminates() {
+                    extern "C" {
+                        fn hostcall_yield_with_borrowed_heap(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_yield_with_borrowed_heap(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::BorrowError("heap"));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
+                }
+
+                #[test]
+                fn yield_with_borrowed_globals_terminates() {
+                    extern "C" {
+                        fn hostcall_yield_with_borrowed_globals(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_yield_with_borrowed_globals(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::BorrowError("globals"));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
+                }
+
+                #[test]
+                fn yield_with_borrowed_ctx_terminates() {
+                    extern "C" {
+                        fn hostcall_yield_with_borrowed_ctx(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_yield_with_borrowed_ctx(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    inst.insert_embed_ctx(0u32);
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::BorrowError("embed_ctx"));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
+                }
+
+                #[test]
+                fn grow_with_borrowed_ctx() {
+                    extern "C" {
+                        fn hostcall_grow_with_borrowed_ctx(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_grow_with_borrowed_ctx(vmctx);
+                    }
+
+                    const HEAP_SPEC: HeapSpec = HeapSpec {
+                        reserved_size: 4 * 1024 * 1024,
+                        guard_size: 4 * 1024 * 1024,
+                        initial_size: 64 * 1024,
+                        max_size: Some(2 * 64 * 1024),
+                    };
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .with_heap_spec(HEAP_SPEC)
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    inst.insert_embed_ctx(0u32);
+
+                    inst.run("f", &[]).expect("instance runs");
+                }
+
+                #[test]
+                fn grow_with_borrowed_heap_terminates() {
+                    extern "C" {
+                        fn hostcall_grow_with_borrowed_heap(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_grow_with_borrowed_heap(vmctx);
+                    }
+
+                    const HEAP_SPEC: HeapSpec = HeapSpec {
+                        reserved_size: 4 * 1024 * 1024,
+                        guard_size: 4 * 1024 * 1024,
+                        initial_size: 64 * 1024,
+                        max_size: Some(2 * 64 * 1024),
+                    };
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .with_heap_spec(HEAP_SPEC)
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::BorrowError("heap"));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
                 }
             }
         )*
+
+        #[test]
+        fn ensure_linked() {
+            lucet_runtime::lucet_internal_ensure_linked();
+        }
     };
 }

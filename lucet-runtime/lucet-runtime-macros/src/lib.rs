@@ -17,7 +17,7 @@ use syn::spanned::Spanned;
 /// ```ignore
 /// #[lucet_hostcall]
 /// #[no_mangle]
-/// pub fn yield_5(vmctx: &mut Vmctx) {
+/// pub fn yield_5(vmctx: &Vmctx) {
 ///     vmctx.yield_val(5);
 /// }
 /// ```
@@ -69,7 +69,7 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // replace the first argument to the raw hostcall with the vmctx pointer
     if let Some(arg0) = raw_sig.inputs.iter_mut().next() {
-        let lucet_vmctx: syn::FnArg = syn::parse_quote!(vmctx_raw: *mut #vmctx_mod::lucet_vmctx);
+        let lucet_vmctx: syn::FnArg = syn::parse_quote!(vmctx_raw: *const #vmctx_mod::lucet_vmctx);
         *arg0 = lucet_vmctx;
     }
 
@@ -103,10 +103,10 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #[inline(always)]
             #hostcall
 
-            let mut vmctx = #vmctx_mod::Vmctx::from_raw(vmctx_raw);
-            #vmctx_mod::VmctxInternal::instance_mut(&mut vmctx).uninterruptable(|| {
+            let vmctx = #vmctx_mod::Vmctx::from_raw(vmctx_raw);
+            #vmctx_mod::VmctxInternal::instance_mut(&vmctx).uninterruptable(|| {
                 let res = std::panic::catch_unwind(move || {
-                    #hostcall_ident(&mut #vmctx_mod::Vmctx::from_raw(vmctx_raw), #(#impl_args),*)
+                    #hostcall_ident(&#vmctx_mod::Vmctx::from_raw(vmctx_raw), #(#impl_args),*)
                 });
                 match res {
                     Ok(res) => res,

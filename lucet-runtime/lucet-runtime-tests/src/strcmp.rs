@@ -6,7 +6,7 @@ macro_rules! strcmp_tests {
         use lucet_runtime::lucet_hostcall;
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_host_fault(_vmctx: &mut Vmctx) {
+        pub fn hostcall_host_fault(_vmctx: &Vmctx) {
             let oob = (-1isize) as *mut c_char;
             unsafe {
                 *oob = 'x' as c_char;

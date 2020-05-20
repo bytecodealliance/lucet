@@ -61,7 +61,7 @@ pub fn generate(
             quote! {
                 #[lucet_hostcall]
                 #[no_mangle]
-                pub fn #name(vmctx: &mut lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #rets {
+                pub fn #name(vmctx: &lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #rets {
                     let memory = lucet_wiggle::runtime::LucetMemory::new(vmctx);
                     let mut ctx: #ctx_type = #ctx_constructor;
                     super::#mod_name::#method_name(&ctx, &memory, #(#call_args),*)
