@@ -17,4 +17,4 @@ runs:
       # The test target of the Makefile is our standard CI.
     - 'export HOME=/root; make ${{ inputs.target }}'
   env:
-    CRATES_NOT_TESTED: lucet-runtime lucet-spectest lucet-benchmarks lucet-runtime-example
+    - 'CRATES_NOT_TESTED="lucet-runtime lucet-spectest lucet-benchmarks lucet-runtime-example lucet-runtime-internal"'
