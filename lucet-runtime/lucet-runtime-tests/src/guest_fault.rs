@@ -13,7 +13,7 @@ macro_rules! guest_fault_common_defs {
 
             #[lucet_hostcall]
             #[no_mangle]
-            pub fn hostcall_test(_vmctx: &mut Vmctx) {
+            pub fn hostcall_test(_vmctx: &Vmctx) {
                 lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
             }
 
@@ -25,14 +25,14 @@ macro_rules! guest_fault_common_defs {
             }
 
             pub fn mock_traps_module() -> Arc<dyn Module> {
-                extern "C" fn onetwothree(_vmctx: *mut lucet_vmctx) -> std::os::raw::c_int {
+                extern "C" fn onetwothree(_vmctx: *const lucet_vmctx) -> std::os::raw::c_int {
                     123
                 }
 
-                extern "C" fn hostcall_main(vmctx: *mut lucet_vmctx) {
+                extern "C" fn hostcall_main(vmctx: *const lucet_vmctx) {
                     extern "C" {
                         // actually is defined in this file
-                        fn hostcall_test(vmctx: *mut lucet_vmctx);
+                        fn hostcall_test(vmctx: *const lucet_vmctx);
                     }
                     unsafe {
                         hostcall_test(vmctx);
@@ -40,13 +40,13 @@ macro_rules! guest_fault_common_defs {
                     }
                 }
 
-                extern "C" fn infinite_loop(_vmctx: *mut lucet_vmctx) {
+                extern "C" fn infinite_loop(_vmctx: *const lucet_vmctx) {
                     loop {}
                 }
 
-                extern "C" fn fatal(vmctx: *mut lucet_vmctx) {
+                extern "C" fn fatal(vmctx: *const lucet_vmctx) {
                     extern "C" {
-                        fn lucet_vmctx_get_heap(vmctx: *mut lucet_vmctx) -> *mut u8;
+                        fn lucet_vmctx_get_heap(vmctx: *const lucet_vmctx) -> *mut u8;
                     }
 
                     unsafe {
@@ -61,9 +61,9 @@ macro_rules! guest_fault_common_defs {
                     }
                 }
 
-                extern "C" fn hit_sigstack_guard_page(vmctx: *mut lucet_vmctx) {
+                extern "C" fn hit_sigstack_guard_page(vmctx: *const lucet_vmctx) {
                     extern "C" {
-                        fn lucet_vmctx_get_globals(vmctx: *mut lucet_vmctx) -> *mut u8;
+                        fn lucet_vmctx_get_globals(vmctx: *const lucet_vmctx) -> *mut u8;
                     }
 
                     unsafe {
@@ -74,7 +74,7 @@ macro_rules! guest_fault_common_defs {
                     }
                 }
 
-                extern "C" fn recoverable_fatal(_vmctx: *mut lucet_vmctx) {
+                extern "C" fn recoverable_fatal(_vmctx: *const lucet_vmctx) {
                     use std::os::raw::c_char;
                     extern "C" {
                         fn guest_recoverable_get_ptr() -> *mut c_char;
@@ -87,8 +87,8 @@ macro_rules! guest_fault_common_defs {
 
                 // defined in `guest_fault/traps.S`
                 extern "C" {
-                    fn guest_func_illegal_instr(vmctx: *mut lucet_vmctx);
-                    fn guest_func_oob(vmctx: *mut lucet_vmctx);
+                    fn guest_func_illegal_instr(vmctx: *const lucet_vmctx);
+                    fn guest_func_oob(vmctx: *const lucet_vmctx);
                 }
 
                 // Note: manually creating a trap manifest structure like this is almost certain to fragile at
@@ -697,7 +697,7 @@ macro_rules! guest_fault_tests {
                     }
 
                     #[lucet_hostcall]
-                    pub fn sleepy_guest(_vmctx: &mut Vmctx) {
+                    pub fn sleepy_guest(_vmctx: &Vmctx) {
                         std::thread::sleep(std::time::Duration::from_millis(20));
                     }
 

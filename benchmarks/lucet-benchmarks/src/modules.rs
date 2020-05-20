@@ -21,7 +21,7 @@ pub fn compile_hello<P: AsRef<Path>>(so_file: P, opt_level: OptLevel) {
 }
 
 pub fn null_mock() -> Arc<dyn Module> {
-    extern "C" fn f(_vmctx: *mut lucet_vmctx) {}
+    extern "C" fn f(_vmctx: *const lucet_vmctx) {}
 
     MockModuleBuilder::new()
         .with_export_func(MockExportBuilder::new(
@@ -32,7 +32,7 @@ pub fn null_mock() -> Arc<dyn Module> {
 }
 
 pub fn large_dense_heap_mock(heap_kb: usize) -> Arc<dyn Module> {
-    extern "C" fn f(_vmctx: *mut lucet_vmctx) {}
+    extern "C" fn f(_vmctx: *const lucet_vmctx) {}
 
     let heap_len = heap_kb * 1024;
 
@@ -59,7 +59,7 @@ pub fn large_dense_heap_mock(heap_kb: usize) -> Arc<dyn Module> {
 }
 
 pub fn large_sparse_heap_mock(heap_kb: usize, stride: usize) -> Arc<dyn Module> {
-    extern "C" fn f(_vmctx: *mut lucet_vmctx) {}
+    extern "C" fn f(_vmctx: *const lucet_vmctx) {}
 
     let heap_len = heap_kb * 1024;
 
@@ -90,7 +90,7 @@ pub fn large_sparse_heap_mock(heap_kb: usize, stride: usize) -> Arc<dyn Module> 
 }
 
 pub fn fib_mock() -> Arc<dyn Module> {
-    extern "C" fn f(_vmctx: *mut lucet_vmctx) {
+    extern "C" fn f(_vmctx: *const lucet_vmctx) {
         fn fib(n: u32) -> u32 {
             if n == 0 {
                 0
@@ -113,7 +113,7 @@ pub fn fib_mock() -> Arc<dyn Module> {
 
 pub fn many_args_mock() -> Arc<dyn Module> {
     extern "C" fn f(
-        _vmctx: *mut lucet_vmctx,
+        _vmctx: *const lucet_vmctx,
         _: u8,
         _: u16,
         _: u32,
@@ -211,7 +211,7 @@ pub fn hostcalls_mock() -> Arc<dyn Module> {
     #[inline(never)]
     #[no_mangle]
     pub unsafe extern "C" fn hostcall_wrapped(
-        vmctx: &mut Vmctx,
+        vmctx: &Vmctx,
         x1: u64,
         x2: u64,
         x3: u64,
@@ -238,7 +238,7 @@ pub fn hostcalls_mock() -> Arc<dyn Module> {
     #[inline(never)]
     #[no_mangle]
     pub unsafe extern "C" fn hostcall_raw(
-        vmctx: *mut lucet_vmctx,
+        vmctx: *const lucet_vmctx,
         x1: u64,
         x2: u64,
         x3: u64,
@@ -263,13 +263,13 @@ pub fn hostcalls_mock() -> Arc<dyn Module> {
         assert_eq!(vmctx.heap()[0], 136);
     }
 
-    unsafe extern "C" fn wrapped(vmctx: *mut lucet_vmctx) {
+    unsafe extern "C" fn wrapped(vmctx: *const lucet_vmctx) {
         for _ in 0..1000 {
             hostcall_wrapped(vmctx, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
         }
     }
 
-    unsafe extern "C" fn raw(vmctx: *mut lucet_vmctx) {
+    unsafe extern "C" fn raw(vmctx: *const lucet_vmctx) {
         for _ in 0..1000 {
             hostcall_raw(vmctx, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
         }

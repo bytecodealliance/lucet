@@ -63,4 +63,15 @@ impl CtxMap {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Returns `true` if there are any outstanding borrows to any of the values stored in the map.
+    pub fn is_any_value_borrowed(&self) -> bool {
+        for cell in self.map.values() {
+            // borrow_mut will only fail if there is another borrow (mutable or not) outstanding
+            if cell.try_borrow_mut().is_err() {
+                return true;
+            }
+        }
+        false
+    }
 }

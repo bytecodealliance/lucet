@@ -999,7 +999,7 @@ macro_rules! alloc_tests {
         }
 
         fn do_nothing_module() -> Arc<dyn Module> {
-            extern "C" fn do_nothing(_vmctx: *mut lucet_vmctx) -> () {}
+            extern "C" fn do_nothing(_vmctx: *const lucet_vmctx) -> () {}
 
             MockModuleBuilder::new()
                 .with_export_func(MockExportBuilder::new(

@@ -35,7 +35,8 @@ This example is taken from `lucet_runtime_tests::timeout::timeout_in_guest`:
 
 ```rust
 let module = mock_timeout_module();
-let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+    .expect("region can be created");
 let mut inst = region
     .new_instance(module)
     .expect("instance can be created");
