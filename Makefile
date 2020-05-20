@@ -1,6 +1,6 @@
 export GUEST_MODULE_PREFIX:=$(abspath .)
 
-CRATES_NOT_TESTED = lucet-spectest lucet-benchmarks lucet-runtime-example
+CRATES_NOT_TESTED ?= lucet-spectest lucet-benchmarks lucet-runtime-example
 
 .PHONY: build-dev
 build-dev:

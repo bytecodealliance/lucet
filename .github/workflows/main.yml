@@ -55,6 +55,8 @@ jobs:
 
   test_release:
     name: Test Release
+    env:
+      CRATES_NOT_TESTED: lucet-runtime lucet-spectest lucet-benchmarks lucet-runtime-example
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1

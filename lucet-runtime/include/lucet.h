@@ -66,6 +66,10 @@ enum lucet_error lucet_mmap_region_create(uint64_t                         insta
                                           const struct lucet_alloc_limits *limits,
                                           struct lucet_region **           region_out);
 
+enum lucet_error lucet_uffd_region_create(uint64_t                         instance_capacity,
+                                          const struct lucet_alloc_limits *limits,
+                                          struct lucet_region **           region_out);
+
 enum lucet_error lucet_region_new_instance(const struct lucet_region *   region,
                                            const struct lucet_dl_module *module,
                                            struct lucet_instance **      inst_out);

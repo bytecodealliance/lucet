@@ -164,7 +164,7 @@ macro_rules! killswitch_tests {
     ( $TestRegion:path ) => {
         use lucet_runtime::{
             lucet_hostcall, Error, Instance, InstanceHandle, KillError, KillSuccess, Limits,
-            Region, RunResult, TerminationDetails, TrapCode,
+            Region, RegionCreate, RunResult, TerminationDetails, TrapCode,
         };
         use lucet_runtime_internals::lock_testpoints::{SyncWaiter, Syncpoint};
         use lucet_runtime_tests::build::test_module_c;
@@ -185,8 +185,8 @@ macro_rules! killswitch_tests {
                     ENTERING_GUEST = Some(Syncpoint::new());
                 }
                 let module = test_module_c(dir, cfile).expect("build and load module");
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+                    .expect("region can be created");
 
                 let inst = region
                     .new_instance(module)
@@ -209,8 +209,8 @@ macro_rules! killswitch_tests {
                     ENTERING_GUEST = Some(Syncpoint::new());
                 }
                 let module = mock_killswitch_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+                    .expect("region can be created");
 
                 let inst = region
                     .new_instance(module)
@@ -230,8 +230,8 @@ macro_rules! killswitch_tests {
         {
             test_nonex(|| {
                 let module = mock_killswitch_module();
-                let region =
-                    TestRegion::create(1, &Limits::default()).expect("region can be created");
+                let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+                    .expect("region can be created");
 
                 let inst = region
                     .new_instance(module)

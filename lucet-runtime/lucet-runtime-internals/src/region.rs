@@ -1,5 +1,8 @@
 pub mod mmap;
 
+#[cfg(all(target_os = "linux", feature = "uffd"))]
+pub mod uffd;
+
 use crate::alloc::{Alloc, AllocStrategy, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;

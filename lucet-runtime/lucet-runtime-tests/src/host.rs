@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! host_tests {
-    ( $TestRegion:path ) => {
+    ( $( $region_id:ident => $TestRegion:path ),* ) => {
         use lazy_static::lazy_static;
         use libc::c_void;
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
@@ -8,9 +8,9 @@ macro_rules! host_tests {
             lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, Limits, Region,
             TerminationDetails, TrapCode,
         };
+        use std::cell::RefCell;
         use std::ops::Deref;
         use std::sync::{Arc, Mutex};
-        use $TestRegion as TestRegion;
         use $crate::build::test_module_c;
         use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder};
 
@@ -26,10 +26,6 @@ macro_rules! host_tests {
         }
 
         const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
-
-        lazy_static! {
-            static ref HOSTCALL_MUTEX: Mutex<()> = Mutex::new(());
-        }
 
         #[lucet_hostcall]
         #[no_mangle]
@@ -55,12 +51,11 @@ macro_rules! host_tests {
         #[lucet_hostcall]
         #[allow(unreachable_code)]
         #[no_mangle]
-        pub fn hostcall_test_func_hostcall_error_unwind(_vmctx: &Vmctx) {
-            let _lock = HOSTCALL_MUTEX.lock().unwrap();
-            unsafe {
-                lucet_hostcall_terminate!(ERROR_MESSAGE);
-            }
-            drop(_lock);
+        pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &Vmctx) {
+            let lock = vmctx.get_embed_ctx::<Arc<Mutex<()>>>();
+            let _mutex_guard = lock.lock().unwrap();
+            lucet_hostcall_terminate!(ERROR_MESSAGE);
+            drop(_mutex_guard);
         }
 
         #[lucet_hostcall]
@@ -145,499 +140,6 @@ macro_rules! host_tests {
             fact(vmctx, n)
         }
 
-        #[test]
-        fn instantiate_trivial() {
-            let module = test_module_c("host", "trivial.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-        }
-
-        #[test]
-        fn run_trivial() {
-            let module = test_module_c("host", "trivial.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-            inst.run("main", &[0u32.into(), 0i32.into()])
-                .expect("instance runs");
-        }
-
-        #[test]
-        fn run_hello() {
-            let module = test_module_c("host", "hello.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-
-            let mut inst = region
-                .new_instance_builder(module)
-                .with_embed_ctx(false)
-                .build()
-                .expect("instance can be created");
-
-            inst.run("main", &[0u32.into(), 0i32.into()])
-                .expect("instance runs");
-
-            assert!(*inst.get_embed_ctx::<bool>().unwrap().unwrap());
-        }
-
-        #[test]
-        fn run_hostcall_error() {
-            let module = test_module_c("host", "hostcall_error.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("main", &[0u32.into(), 0i32.into()]) {
-                Err(Error::RuntimeTerminated(term)) => {
-                    assert_eq!(
-                        *term
-                            .provided_details()
-                            .expect("user provided termination reason")
-                            .downcast_ref::<&'static str>()
-                            .expect("error was static str"),
-                        ERROR_MESSAGE
-                    );
-                }
-                res => panic!("unexpected result: {:?}", res),
-            }
-        }
-
-        #[test]
-        fn run_hostcall_error_unwind() {
-            let module =
-                test_module_c("host", "hostcall_error_unwind.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("main", &[0u32.into(), 0u32.into()]) {
-                Err(Error::RuntimeTerminated(term)) => {
-                    assert_eq!(
-                        *term
-                            .provided_details()
-                            .expect("user provided termination reason")
-                            .downcast_ref::<&'static str>()
-                            .expect("error was static str"),
-                        ERROR_MESSAGE
-                    );
-                }
-                res => panic!("unexpected result: {:?}", res),
-            }
-
-            assert!(HOSTCALL_MUTEX.is_poisoned());
-        }
-
-        #[test]
-        fn run_fpe() {
-            let module = test_module_c("host", "fpe.c").expect("build and load module");
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("trigger_div_error", &[0u32.into()]) {
-                Err(Error::RuntimeFault(details)) => {
-                    assert_eq!(details.trapcode, Some(TrapCode::IntegerDivByZero));
-                }
-                res => {
-                    panic!("unexpected result: {:?}", res);
-                }
-            }
-        }
-
-        #[test]
-        fn run_hostcall_bad_borrow() {
-            extern "C" {
-                fn hostcall_bad_borrow(vmctx: *const lucet_vmctx) -> bool;
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_bad_borrow(vmctx);
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("f", &[]) {
-                Err(Error::RuntimeTerminated(details)) => {
-                    assert_eq!(details, TerminationDetails::BorrowError("heap_mut"));
-                }
-                res => {
-                    panic!("unexpected result: {:?}", res);
-                }
-            }
-        }
-
-        #[test]
-        fn run_hostcall_missing_embed_ctx() {
-            extern "C" {
-                fn hostcall_missing_embed_ctx(vmctx: *const lucet_vmctx) -> bool;
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_missing_embed_ctx(vmctx);
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("f", &[]) {
-                Err(Error::RuntimeTerminated(details)) => {
-                    assert_eq!(details, TerminationDetails::CtxNotFound);
-                }
-                res => {
-                    panic!("unexpected result: {:?}", res);
-                }
-            }
-        }
-
-        #[test]
-        fn run_hostcall_multiple_vmctx() {
-            extern "C" {
-                fn hostcall_multiple_vmctx(vmctx: *const lucet_vmctx) -> bool;
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_multiple_vmctx(vmctx);
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            let retval = inst
-                .run("f", &[])
-                .expect("instance runs")
-                .expect_returned("instance returned");
-            assert_eq!(bool::from(retval), true);
-        }
-
-        #[test]
-        fn run_hostcall_yields_5() {
-            extern "C" {
-                fn hostcall_yields_5(vmctx: *const lucet_vmctx);
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_yields_5(vmctx);
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            assert_eq!(
-                *inst
-                    .run("f", &[])
-                    .unwrap()
-                    .unwrap_yielded()
-                    .downcast::<u64>()
-                    .unwrap(),
-                5u64
-            );
-        }
-
-        #[test]
-        fn run_hostcall_yield_expects_5() {
-            extern "C" {
-                fn hostcall_yield_expects_5(vmctx: *const lucet_vmctx) -> u64;
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
-                hostcall_yield_expects_5(vmctx)
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            assert!(inst.run("f", &[]).unwrap().unwrap_yielded().is_none());
-
-            let retval = inst
-                .resume_with_val(5u64)
-                .expect("instance resumes")
-                .unwrap_returned();
-            assert_eq!(u64::from(retval), 5u64);
-        }
-
-        #[test]
-        fn yield_factorials() {
-            extern "C" {
-                fn hostcall_yield_facts(vmctx: *const lucet_vmctx, n: u64) -> u64;
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
-                hostcall_yield_facts(vmctx, 5)
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            let mut facts = vec![];
-
-            let mut res = inst.run("f", &[]).unwrap();
-
-            while res.is_yielded() {
-                facts.push(*res.unwrap_yielded().downcast::<u64>().unwrap());
-                res = inst.resume().unwrap();
-            }
-
-            assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
-            assert_eq!(u64::from(res.unwrap_returned()), 120u64);
-        }
-
-        #[test]
-        fn coop_factorials() {
-            extern "C" {
-                fn hostcall_coop_facts(vmctx: *const lucet_vmctx, n: u64) -> u64;
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
-                hostcall_coop_facts(vmctx, 5)
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            let mut facts = vec![];
-
-            let mut res = inst.run("f", &[]).unwrap();
-
-            while let Ok(val) = res.yielded_ref() {
-                if let Some(k) = val.downcast_ref::<CoopFactsK>() {
-                    match k {
-                        CoopFactsK::Mult(n, n_rec) => {
-                            // guest wants us to multiply for it
-                            res = inst.resume_with_val(n * n_rec).unwrap();
-                        }
-                        CoopFactsK::Result(n) => {
-                            // guest is returning an answer
-                            facts.push(*n);
-                            res = inst.resume().unwrap();
-                        }
-                    }
-                } else {
-                    panic!("didn't yield with expected type");
-                }
-            }
-
-            assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
-            assert_eq!(u64::from(res.unwrap_returned()), 120u64);
-        }
-
-        #[test]
-        fn resume_unexpected() {
-            extern "C" {
-                fn hostcall_yields_5(vmctx: *const lucet_vmctx);
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_yields_5(vmctx);
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            assert_eq!(
-                *inst
-                    .run("f", &[])
-                    .unwrap()
-                    .unwrap_yielded()
-                    .downcast::<u64>()
-                    .unwrap(),
-                5u64
-            );
-
-            match inst.resume_with_val(5u64) {
-                Err(Error::InvalidArgument(_)) => (),
-                Err(e) => panic!("unexpected error: {}", e),
-                Ok(_) => panic!("unexpected success"),
-            }
-        }
-
-        #[test]
-        fn missing_resume_val() {
-            extern "C" {
-                fn hostcall_yield_expects_5(vmctx: *const lucet_vmctx) -> u64;
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
-                hostcall_yield_expects_5(vmctx)
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            assert!(inst.run("f", &[]).unwrap().unwrap_yielded().is_none());
-
-            match inst.resume() {
-                Err(Error::InvalidArgument(_)) => (),
-                Err(e) => panic!("unexpected error: {}", e),
-                Ok(_) => panic!("unexpected success"),
-            }
-        }
-
-        #[test]
-        fn resume_wrong_type() {
-            extern "C" {
-                fn hostcall_yield_expects_5(vmctx: *const lucet_vmctx) -> u64;
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
-                hostcall_yield_expects_5(vmctx)
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            assert!(inst.run("f", &[]).unwrap().unwrap_yielded().is_none());
-
-            match inst.resume_with_val(true) {
-                Err(Error::InvalidArgument(_)) => (),
-                Err(e) => panic!("unexpected error: {}", e),
-                Ok(_) => panic!("unexpected success"),
-            }
-        }
-
-        /// This test shows that we can send an `InstanceHandle` to another thread while a guest is
-        /// yielded, and it resumes successfully.
-        #[test]
-        fn switch_threads_resume() {
-            extern "C" {
-                fn hostcall_yields_5(vmctx: *const lucet_vmctx);
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
-                hostcall_yields_5(vmctx);
-                42
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            // make sure we yield with 5 on the original thread
-            assert_eq!(
-                *inst
-                    .run("f", &[])
-                    .unwrap()
-                    .unwrap_yielded()
-                    .downcast::<u64>()
-                    .unwrap(),
-                5u64
-            );
-
-            let res = std::thread::spawn(move || {
-                // but then move the instance to another thread and resume it from there
-                inst.resume()
-                    .expect("instance resumes")
-                    .returned()
-                    .expect("returns 42")
-            })
-            .join()
-            .unwrap();
-            assert_eq!(u64::from(res), 42u64);
-        }
-
         #[lucet_hostcall]
         #[no_mangle]
         pub fn hostcall_yield_with_borrowed_heap(vmctx: &Vmctx) {
@@ -645,38 +147,6 @@ macro_rules! host_tests {
             vmctx.yield_val(5u64);
             // shouldn't get here
             assert_eq!(heap[0], 0);
-        }
-
-        #[test]
-        fn yield_with_borrowed_heap_terminates() {
-            extern "C" {
-                fn hostcall_yield_with_borrowed_heap(vmctx: *const lucet_vmctx);
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_yield_with_borrowed_heap(vmctx);
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("f", &[]) {
-                Err(Error::RuntimeTerminated(details)) => {
-                    assert_eq!(details, TerminationDetails::BorrowError("heap"));
-                }
-                res => {
-                    panic!("unexpected result: {:?}", res);
-                }
-            }
         }
 
         #[lucet_hostcall]
@@ -688,38 +158,6 @@ macro_rules! host_tests {
             assert_eq!(unsafe { globals[0].i_64 }, 0);
         }
 
-        #[test]
-        fn yield_with_borrowed_globals_terminates() {
-            extern "C" {
-                fn hostcall_yield_with_borrowed_globals(vmctx: *const lucet_vmctx);
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_yield_with_borrowed_globals(vmctx);
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("f", &[]) {
-                Err(Error::RuntimeTerminated(details)) => {
-                    assert_eq!(details, TerminationDetails::BorrowError("globals"));
-                }
-                res => {
-                    panic!("unexpected result: {:?}", res);
-                }
-            }
-        }
-
         #[lucet_hostcall]
         #[no_mangle]
         pub fn hostcall_yield_with_borrowed_ctx(vmctx: &Vmctx) {
@@ -729,80 +167,12 @@ macro_rules! host_tests {
             assert_eq!(ctx.deref(), &0);
         }
 
-        #[test]
-        fn yield_with_borrowed_ctx_terminates() {
-            extern "C" {
-                fn hostcall_yield_with_borrowed_ctx(vmctx: *const lucet_vmctx);
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_yield_with_borrowed_ctx(vmctx);
-            }
-
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            inst.insert_embed_ctx(0u32);
-
-            match inst.run("f", &[]) {
-                Err(Error::RuntimeTerminated(details)) => {
-                    assert_eq!(details, TerminationDetails::BorrowError("embed_ctx"));
-                }
-                res => {
-                    panic!("unexpected result: {:?}", res);
-                }
-            }
-        }
-
         #[lucet_hostcall]
         #[no_mangle]
         pub fn hostcall_grow_with_borrowed_ctx(vmctx: &Vmctx) {
             let ctx = vmctx.get_embed_ctx::<u32>();
             vmctx.grow_memory(1).expect("grow_memory succeeds");
             assert_eq!(ctx.deref(), &0);
-        }
-
-        #[test]
-        fn grow_with_borrowed_ctx() {
-            extern "C" {
-                fn hostcall_grow_with_borrowed_ctx(vmctx: *const lucet_vmctx);
-            }
-
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_grow_with_borrowed_ctx(vmctx);
-            }
-
-            const HEAP_SPEC: HeapSpec = HeapSpec {
-                reserved_size: 4 * 1024 * 1024,
-                guard_size: 4 * 1024 * 1024,
-                initial_size: 64 * 1024,
-                max_size: Some(2 * 64 * 1024),
-            };
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .with_heap_spec(HEAP_SPEC)
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            inst.insert_embed_ctx(0u32);
-
-            inst.run("f", &[]).expect("instance runs");
         }
 
         #[lucet_hostcall]
@@ -814,44 +184,704 @@ macro_rules! host_tests {
             assert_eq!(heap[0], 0);
         }
 
-        #[test]
-        fn grow_with_borrowed_heap_terminates() {
-            extern "C" {
-                fn hostcall_grow_with_borrowed_heap(vmctx: *const lucet_vmctx);
-            }
+        $(
+            mod $region_id {
 
-            unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
-                hostcall_grow_with_borrowed_heap(vmctx);
-            }
+                use lazy_static::lazy_static;
+                use libc::c_void;
+                use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
+                use lucet_runtime::{
+                    lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, Limits, Region,
+                    RegionCreate, TerminationDetails, TrapCode,
+                };
+                use std::sync::{Arc, Mutex};
+                use $crate::build::test_module_c;
+                use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder};
+                use $TestRegion as TestRegion;
 
-            const HEAP_SPEC: HeapSpec = HeapSpec {
-                reserved_size: 4 * 1024 * 1024,
-                guard_size: 4 * 1024 * 1024,
-                initial_size: 64 * 1024,
-                max_size: Some(2 * 64 * 1024),
-            };
-            let module = MockModuleBuilder::new()
-                .with_export_func(MockExportBuilder::new(
-                    "f",
-                    FunctionPointer::from_usize(f as usize),
-                ))
-                .with_heap_spec(HEAP_SPEC)
-                .build();
-
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
-            let mut inst = region
-                .new_instance(module)
-                .expect("instance can be created");
-
-            match inst.run("f", &[]) {
-                Err(Error::RuntimeTerminated(details)) => {
-                    assert_eq!(details, TerminationDetails::BorrowError("heap"));
+                lazy_static! {
+                    static ref HOSTCALL_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
                 }
-                res => {
-                    panic!("unexpected result: {:?}", res);
+
+                #[test]
+                fn load_module() {
+                    let _module = test_module_c("host", "trivial.c").expect("build and load module");
+                }
+
+                #[test]
+                fn load_nonexistent_module() {
+                    let module = DlModule::load("/non/existient/file");
+                    assert!(module.is_err());
+                }
+
+                #[test]
+                fn instantiate_trivial() {
+                    let module = test_module_c("host", "trivial.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+                }
+
+                #[test]
+                fn run_trivial() {
+                    let module = test_module_c("host", "trivial.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+                    inst.run("main", &[0u32.into(), 0i32.into()])
+                        .expect("instance runs");
+                }
+
+                #[test]
+                fn run_hello() {
+                    let module = test_module_c("host", "hello.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+
+                    let mut inst = region
+                        .new_instance_builder(module)
+                        .with_embed_ctx(false)
+                        .build()
+                        .expect("instance can be created");
+
+                    inst.run("main", &[0u32.into(), 0i32.into()])
+                        .expect("instance runs");
+
+                    assert!(*inst.get_embed_ctx::<bool>().unwrap().unwrap());
+                }
+
+                #[test]
+                fn run_hostcall_error() {
+                    let module = test_module_c("host", "hostcall_error.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("main", &[0u32.into(), 0i32.into()]) {
+                        Err(Error::RuntimeTerminated(term)) => {
+                            assert_eq!(
+                                *term
+                                    .provided_details()
+                                    .expect("user provided termination reason")
+                                    .downcast_ref::<&'static str>()
+                                    .expect("error was static str"),
+                                super::ERROR_MESSAGE
+                            );
+                        }
+                        res => panic!("unexpected result: {:?}", res),
+                    }
+                }
+
+                #[test]
+                fn run_hostcall_error_unwind() {
+                    let module =
+                        test_module_c("host", "hostcall_error_unwind.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+
+                    let mut inst = region
+                        .new_instance_builder(module)
+                        .with_embed_ctx(HOSTCALL_MUTEX.clone())
+                        .build()
+                        .expect("instance can be created");
+
+                    match inst.run("main", &[0u32.into(), 0u32.into()]) {
+                        Err(Error::RuntimeTerminated(term)) => {
+                            assert_eq!(
+                                *term
+                                    .provided_details()
+                                    .expect("user provided termination reason")
+                                    .downcast_ref::<&'static str>()
+                                    .expect("error was static str"),
+                                super::ERROR_MESSAGE
+                            );
+                        }
+                        res => panic!("unexpected result: {:?}", res),
+                    }
+
+                    assert!(HOSTCALL_MUTEX.is_poisoned());
+                }
+
+                #[test]
+                fn run_fpe() {
+                    let module = test_module_c("host", "fpe.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("trigger_div_error", &[0u32.into()]) {
+                        Err(Error::RuntimeFault(details)) => {
+                            assert_eq!(details.trapcode, Some(TrapCode::IntegerDivByZero));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
+                }
+
+                #[test]
+                fn run_hostcall_bad_borrow() {
+                    extern "C" {
+                        fn hostcall_bad_borrow(vmctx: *const lucet_vmctx) -> bool;
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_bad_borrow(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::BorrowError("heap_mut"));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
+                }
+
+                #[test]
+                fn run_hostcall_missing_embed_ctx() {
+                    extern "C" {
+                        fn hostcall_missing_embed_ctx(vmctx: *const lucet_vmctx) -> bool;
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_missing_embed_ctx(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::CtxNotFound);
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
+                }
+
+                #[test]
+                fn run_hostcall_multiple_vmctx() {
+                    extern "C" {
+                        fn hostcall_multiple_vmctx(vmctx: *const lucet_vmctx) -> bool;
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_multiple_vmctx(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    let retval = inst
+                        .run("f", &[])
+                        .expect("instance runs")
+                        .expect_returned("instance returned");
+                    assert_eq!(bool::from(retval), true);
+                }
+
+                #[test]
+                fn run_hostcall_yields_5() {
+                    extern "C" {
+                        fn hostcall_yields_5(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_yields_5(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    assert_eq!(
+                        *inst
+                            .run("f", &[])
+                            .unwrap()
+                            .unwrap_yielded()
+                            .downcast::<u64>()
+                            .unwrap(),
+                        5u64
+                    );
+                }
+
+                #[test]
+                fn run_hostcall_yield_expects_5() {
+                    extern "C" {
+                        fn hostcall_yield_expects_5(vmctx: *const lucet_vmctx) -> u64;
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
+                        hostcall_yield_expects_5(vmctx)
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    assert!(inst.run("f", &[]).unwrap().unwrap_yielded().is_none());
+
+                    let retval = inst
+                        .resume_with_val(5u64)
+                        .expect("instance resumes")
+                        .unwrap_returned();
+                    assert_eq!(u64::from(retval), 5u64);
+                }
+
+                #[test]
+                fn yield_factorials() {
+                    extern "C" {
+                        fn hostcall_yield_facts(vmctx: *const lucet_vmctx, n: u64) -> u64;
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
+                        hostcall_yield_facts(vmctx, 5)
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    let mut facts = vec![];
+
+                    let mut res = inst.run("f", &[]).unwrap();
+
+                    while res.is_yielded() {
+                        facts.push(*res.unwrap_yielded().downcast::<u64>().unwrap());
+                        res = inst.resume().unwrap();
+                    }
+
+                    assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
+                    assert_eq!(u64::from(res.unwrap_returned()), 120u64);
+                }
+
+                #[test]
+                fn coop_factorials() {
+                    extern "C" {
+                        fn hostcall_coop_facts(vmctx: *const lucet_vmctx, n: u64) -> u64;
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
+                        hostcall_coop_facts(vmctx, 5)
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    let mut facts = vec![];
+
+                    let mut res = inst.run("f", &[]).unwrap();
+
+                    while let Ok(val) = res.yielded_ref() {
+                        if let Some(k) = val.downcast_ref::<super::CoopFactsK>() {
+                            match k {
+                                super::CoopFactsK::Mult(n, n_rec) => {
+                                    // guest wants us to multiply for it
+                                    res = inst.resume_with_val(n * n_rec).unwrap();
+                                }
+                                super::CoopFactsK::Result(n) => {
+                                    // guest is returning an answer
+                                    facts.push(*n);
+                                    res = inst.resume().unwrap();
+                                }
+                            }
+                        } else {
+                            panic!("didn't yield with expected type");
+                        }
+                    }
+
+                    assert_eq!(facts.as_slice(), &[1, 2, 6, 24, 120]);
+                    assert_eq!(u64::from(res.unwrap_returned()), 120u64);
+                }
+
+                #[test]
+                fn resume_unexpected() {
+                    extern "C" {
+                        fn hostcall_yields_5(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_yields_5(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    assert_eq!(
+                        *inst
+                            .run("f", &[])
+                            .unwrap()
+                            .unwrap_yielded()
+                            .downcast::<u64>()
+                            .unwrap(),
+                        5u64
+                    );
+
+                    match inst.resume_with_val(5u64) {
+                        Err(Error::InvalidArgument(_)) => (),
+                        Err(e) => panic!("unexpected error: {}", e),
+                        Ok(_) => panic!("unexpected success"),
+                    }
+                }
+
+                #[test]
+                fn missing_resume_val() {
+                    extern "C" {
+                        fn hostcall_yield_expects_5(vmctx: *const lucet_vmctx) -> u64;
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
+                        hostcall_yield_expects_5(vmctx)
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    assert!(inst.run("f", &[]).unwrap().unwrap_yielded().is_none());
+
+                    match inst.resume() {
+                        Err(Error::InvalidArgument(_)) => (),
+                        Err(e) => panic!("unexpected error: {}", e),
+                        Ok(_) => panic!("unexpected success"),
+                    }
+                }
+
+                #[test]
+                fn resume_wrong_type() {
+                    extern "C" {
+                        fn hostcall_yield_expects_5(vmctx: *const lucet_vmctx) -> u64;
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
+                        hostcall_yield_expects_5(vmctx)
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    assert!(inst.run("f", &[]).unwrap().unwrap_yielded().is_none());
+
+                    match inst.resume_with_val(true) {
+                        Err(Error::InvalidArgument(_)) => (),
+                        Err(e) => panic!("unexpected error: {}", e),
+                        Ok(_) => panic!("unexpected success"),
+                    }
+                }
+
+                /// This test shows that we can send an `InstanceHandle` to another thread while a guest is
+                /// yielded, and it resumes successfully.
+                #[test]
+                fn switch_threads_resume() {
+                    extern "C" {
+                        fn hostcall_yields_5(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) -> u64 {
+                        hostcall_yields_5(vmctx);
+                        42
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    // make sure we yield with 5 on the original thread
+                    assert_eq!(
+                        *inst
+                            .run("f", &[])
+                            .unwrap()
+                            .unwrap_yielded()
+                            .downcast::<u64>()
+                            .unwrap(),
+                        5u64
+                    );
+
+                    let res = std::thread::spawn(move || {
+                        // but then move the instance to another thread and resume it from there
+                        inst.resume()
+                            .expect("instance resumes")
+                            .returned()
+                            .expect("returns 42")
+                    })
+                        .join()
+                        .unwrap();
+                    assert_eq!(u64::from(res), 42u64);
+                }
+
+                #[test]
+                fn yield_with_borrowed_heap_terminates() {
+                    extern "C" {
+                        fn hostcall_yield_with_borrowed_heap(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_yield_with_borrowed_heap(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::BorrowError("heap"));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
+                }
+
+                #[test]
+                fn yield_with_borrowed_globals_terminates() {
+                    extern "C" {
+                        fn hostcall_yield_with_borrowed_globals(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_yield_with_borrowed_globals(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::BorrowError("globals"));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
+                }
+
+                #[test]
+                fn yield_with_borrowed_ctx_terminates() {
+                    extern "C" {
+                        fn hostcall_yield_with_borrowed_ctx(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_yield_with_borrowed_ctx(vmctx);
+                    }
+
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    inst.insert_embed_ctx(0u32);
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::BorrowError("embed_ctx"));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
+                }
+
+                #[test]
+                fn grow_with_borrowed_ctx() {
+                    extern "C" {
+                        fn hostcall_grow_with_borrowed_ctx(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_grow_with_borrowed_ctx(vmctx);
+                    }
+
+                    const HEAP_SPEC: HeapSpec = HeapSpec {
+                        reserved_size: 4 * 1024 * 1024,
+                        guard_size: 4 * 1024 * 1024,
+                        initial_size: 64 * 1024,
+                        max_size: Some(2 * 64 * 1024),
+                    };
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .with_heap_spec(HEAP_SPEC)
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    inst.insert_embed_ctx(0u32);
+
+                    inst.run("f", &[]).expect("instance runs");
+                }
+
+                #[test]
+                fn grow_with_borrowed_heap_terminates() {
+                    extern "C" {
+                        fn hostcall_grow_with_borrowed_heap(vmctx: *const lucet_vmctx);
+                    }
+
+                    unsafe extern "C" fn f(vmctx: *const lucet_vmctx) {
+                        hostcall_grow_with_borrowed_heap(vmctx);
+                    }
+
+                    const HEAP_SPEC: HeapSpec = HeapSpec {
+                        reserved_size: 4 * 1024 * 1024,
+                        guard_size: 4 * 1024 * 1024,
+                        initial_size: 64 * 1024,
+                        max_size: Some(2 * 64 * 1024),
+                    };
+                    let module = MockModuleBuilder::new()
+                        .with_export_func(MockExportBuilder::new(
+                            "f",
+                            FunctionPointer::from_usize(f as usize),
+                        ))
+                        .with_heap_spec(HEAP_SPEC)
+                        .build();
+
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("f", &[]) {
+                        Err(Error::RuntimeTerminated(details)) => {
+                            assert_eq!(details, TerminationDetails::BorrowError("heap"));
+                        }
+                        res => {
+                            panic!("unexpected result: {:?}", res);
+                        }
+                    }
                 }
             }
-        }
+        )*
 
         #[test]
         fn ensure_linked() {

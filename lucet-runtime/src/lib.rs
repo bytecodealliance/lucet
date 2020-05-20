@@ -23,7 +23,10 @@
 //! [`InstanceHandle`](struct.InstanceHandle.html) smart pointer.
 //!
 //! - [`Region`](trait.Region.html): the memory from which instances are created. This crate
-//! includes [`MmapRegion`](struct.MmapRegion.html), an implementation backed by `mmap`.
+//! includes [`MmapRegion`](struct.MmapRegion.html), an implementation backed by `mmap`, and
+//! optionally [`UffdRegion`](struct.UffdRegion.html), which is backed by the
+//! [`userfaultfd`](http://man7.org/linux/man-pages/man2/userfaultfd.2.html) feature available on
+//! newer Linux kernels ([see below](index.html#userfaultfd-backed-region)).
 //!
 //! - [`Limits`](struct.Limits.html): upper bounds for the resources a Lucet instance may
 //! consume. These may be larger or smaller than the limits described in the WebAssembly module
@@ -374,6 +377,23 @@
 //! this number could change between Lucet releases or even Rust compiler versions.
 //!
 //! [default-sigstack-size]: constant.DEFAULT_SIGNAL_STACK_SIZE.html
+//!
+//! ## `userfaultfd`-Backed Region
+//!
+//! [`UffdRegion`](struct.UffdRegion.html) is a [`Region`](trait.Region.html) backed by the
+//! [`userfaultfd`](http://man7.org/linux/man-pages/man2/userfaultfd.2.html) feature available in
+//! newer Linux kernels. It allows Lucet instances to lazily copy in the initial heap contents of an
+//! `Instance`, reducing startup time. Instance stack pages can also be lazily initialized, reducing
+//! the memory footprint of instances that only use a small portion of their available stack space.
+//!
+//! `UffdRegion` is enabled by default on Linux platforms, but can be disabled by disabling default
+//! features for this crate and `lucet-runtime-internals`:
+//!
+//! ```toml
+//! [dependencies]
+//! lucet-runtime = { version = "0.6.1", default-features = false }
+//! lucet-runtime-internals = { version = "0.6.1", default-features = false }
+//! ```
 
 #![deny(bare_trait_objects)]
 
@@ -397,6 +417,10 @@ pub use lucet_runtime_internals::instance::{
 pub use lucet_runtime_internals::lucet_hostcalls;
 pub use lucet_runtime_internals::module::{DlModule, Module};
 pub use lucet_runtime_internals::region::mmap::MmapRegion;
+#[cfg(all(target_os = "linux", feature = "uffd"))]
+pub use lucet_runtime_internals::region::uffd::{
+    HostPageSizedUffdStrategy, UffdRegion, UffdStrategy, WasmPageSizedUffdStrategy,
+};
 pub use lucet_runtime_internals::region::{InstanceBuilder, Region, RegionCreate};
 pub use lucet_runtime_internals::val::{UntypedRetVal, Val};
 pub use lucet_runtime_internals::{lucet_hostcall, lucet_hostcall_terminate, WASM_PAGE_SIZE};

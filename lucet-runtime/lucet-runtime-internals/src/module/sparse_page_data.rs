@@ -6,7 +6,7 @@ macro_rules! sparse_page_data_tests {
         use $crate::alloc::Limits;
         use $crate::instance::InstanceInternal;
         use $crate::module::{MockModuleBuilder, Module};
-        use $crate::region::Region;
+        use $crate::region::{Region, RegionCreate};
         use $crate::sysdeps::host_page_size;
 
         const FIRST_MESSAGE: &'static [u8] = b"hello from mock_sparse_module!";
@@ -47,7 +47,8 @@ macro_rules! sparse_page_data_tests {
         #[test]
         fn instantiate_valid_sparse_data() {
             let module = mock_sparse_module();
-            let region = TestRegion::create(1, &Limits::default()).expect("region can be created");
+            let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+                .expect("region can be created");
             let inst = region
                 .new_instance(module)
                 .expect("instance can be created");

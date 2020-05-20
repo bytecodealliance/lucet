@@ -72,7 +72,7 @@ pub enum Error {
     ///
     /// As the API matures, these will likely become rarer, replaced by new variants of this enum,
     /// or by panics for truly unrecoverable situations.
-    #[error("Internal error")]
+    #[error("Internal error: {0}")]
     InternalError(#[source] anyhow::Error),
 
     /// An unsupported feature was used.
