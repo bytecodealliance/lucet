@@ -69,7 +69,8 @@ jobs:
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code
-
+      env:
+	CRATES_NOT_TESTED: lucet-runtime lucet-spectest lucet-benchmarks lucet-runtime-example                                              
   test_release_executables:
     name: Test Release Executables
     runs-on: ubuntu-latest
