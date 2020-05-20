@@ -393,7 +393,7 @@ dependencies = [
  "cranelift-frontend",
  "log",
  "thiserror",
- "wasmparser",
+ "wasmparser 0.52.2",
 ]
 
 [[package]]
@@ -1028,7 +1028,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "wabt",
- "wasmparser",
+ "wasmparser 0.52.2",
  "witx",
 ]
 
@@ -1174,7 +1174,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "wabt",
- "wasmparser",
+ "wasmparser 0.52.2",
 ]
 
 [[package]]
@@ -1313,7 +1313,7 @@ dependencies = [
  "flate2",
  "indexmap",
  "target-lexicon",
- "wasmparser",
+ "wasmparser 0.51.4",
 ]
 
 [[package]]
@@ -1704,9 +1704,9 @@ checksum = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
 
 [[package]]
 name = "regalloc"
-version = "0.0.21"
+version = "0.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b27b256b41986ac5141b37b8bbba85d314fbf546c182eb255af6720e07e4f804"
+checksum = "b36727ea09f6e363ddebb29b2d2620052267cc1fc6e0da7da63317938eb4104c"
 dependencies = [
  "log",
  "rustc-hash",
@@ -2362,6 +2362,12 @@ name = "wasmparser"
 version = "0.51.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aeb1956b19469d1c5e63e459d29e7b5aa0f558d9f16fcef09736f8a265e6c10a"
+
+[[package]]
+name = "wasmparser"
+version = "0.52.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "733954023c0b39602439e60a65126fd31b003196d3a1e8e4531b055165a79b31"
 
 [[package]]
 name = "wast"
