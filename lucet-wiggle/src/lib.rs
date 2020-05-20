@@ -1,7 +1,7 @@
 pub use lucet_wiggle_generate::bindings;
 pub use lucet_wiggle_macro::from_witx;
 pub use wiggle::{
-    witx, GuestBorrows, GuestError, GuestErrorType, GuestMemory, GuestPtr, GuestType,
+    witx, BorrowChecker, GuestError, GuestErrorType, GuestMemory, GuestPtr, GuestType,
     GuestTypeTransparent, Pointee,
 };
 
