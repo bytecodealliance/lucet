@@ -1,6 +1,6 @@
 mod c_child;
 mod rust_child;
-use crate::context::{Context, ContextHandle, Error};
+use crate::context::{Context, ContextHandle, Error, InstanceExitData};
 use memoffset::offset_of;
 use std::slice;
 
@@ -8,8 +8,24 @@ use std::slice;
 fn context_offsets_correct() {
     assert_eq!(offset_of!(Context, gpr), 0);
     assert_eq!(offset_of!(Context, fpr), 10 * 8);
-    assert_eq!(offset_of!(Context, retvals_gp), 10 * 8 + 8 * 16);
-    assert_eq!(offset_of!(Context, retval_fp), 10 * 8 + 8 * 16 + 8 * 2);
+    assert_eq!(offset_of!(Context, exit_data), 10 * 8 + 8 * 16);
+
+    let exit_data_offset = offset_of!(Context, exit_data);
+}
+
+#[test]
+fn exit_data_offsets_correct() {
+    assert_eq!(offset_of!(InstanceExitData, retvals_gp), 0);
+    assert_eq!(offset_of!(InstanceExitData, retval_fp), 8 * 2);
+    assert_eq!(offset_of!(InstanceExitData, parent_ctx), 8 * 2 + 16);
+    assert_eq!(
+        offset_of!(InstanceExitData, backstop_callback),
+        8 * 2 + 16 + 8
+    );
+    assert_eq!(
+        offset_of!(InstanceExitData, callback_data),
+        8 * 2 + 16 + 8 + 8
+    );
 }
 
 #[test]

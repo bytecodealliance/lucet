@@ -116,12 +116,7 @@ impl FpRegs {
 pub struct Context {
     pub(crate) gpr: GpRegs,
     fpr: FpRegs,
-    retvals_gp: [u64; 2],
-    retval_fp: __m128,
-    parent_ctx: *mut Context,
-    // TODO ACF 2019-10-23: make Instance into a generic parameter?
-    backstop_callback: *const unsafe extern "C" fn(*mut Instance),
-    callback_data: *mut Instance,
+    exit_data: InstanceExitData,
 }
 
 impl Context {
@@ -130,18 +125,58 @@ impl Context {
         Context {
             gpr: GpRegs::new(),
             fpr: FpRegs::new(),
-            retvals_gp: [0; 2],
-            retval_fp: unsafe { _mm_setzero_ps() },
-            parent_ctx: ptr::null_mut(),
-            backstop_callback: Context::default_backstop_callback as *const _,
-            callback_data: ptr::null_mut(),
+            exit_data: InstanceExitData::default(),
         }
     }
 
     /// Get a raw pointer to the instance's callback data.
     pub(crate) fn callback_data_ptr(&self) -> *mut Instance {
-        self.callback_data
+        self.exit_data.callback_data
     }
+}
+
+// DEV KTM 2020-05-18: `InstanceExitData` structure.
+#[repr(C)]
+pub struct InstanceExitData {
+    pub retvals_gp: [u64; 2],
+    pub retval_fp: __m128,
+    /// A pointer to the parent [`Context`](context/struct.Context.html).
+    ///
+    /// This is the context we will swap back to after the [`Instance`](struct.Instance.html) has
+    /// finished running.
+    pub parent_ctx: *mut Context,
+    // TODO ACF 2019-10-23: make Instance into a generic parameter?
+    /// A callback which is invoked before switching back to the parent
+    /// [`Context`](context/struct.Context.html).
+    ///
+    /// If no callback function is needed, `default_backstop_callback` can be used.
+    pub backstop_callback: *const unsafe extern "C" fn(*mut Instance),
+    /// The argument to the backstop callback.
+    ///
+    /// If no backstop callback is needed, `ptr::null_mut` can be given.
+    pub callback_data: *mut Instance,
+    // DEV KTM 2020-05-19: Check links in documentation comments above.
+}
+
+impl Default for InstanceExitData {
+    fn default() -> Self {
+        Self {
+            retvals_gp: [0; 2],
+            retval_fp: unsafe { _mm_setzero_ps() },
+            parent_ctx: ptr::null_mut(),
+            backstop_callback: Self::default_backstop_callback as *const _,
+            callback_data: ptr::null_mut(),
+        }
+    }
+}
+
+impl InstanceExitData {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The default backstop callback does nothing, and is just a marker.
+    pub(crate) extern "C" fn default_backstop_callback(_: *mut Instance) {}
 }
 
 /// A wrapper around a `Context`, primarily meant for use in test code.
@@ -371,15 +406,12 @@ impl Context {
         Context::init_with_callback(
             stack,
             child,
-            Context::default_backstop_callback,
+            InstanceExitData::default_backstop_callback,
             ptr::null_mut(),
             fptr,
             args,
         )
     }
-
-    /// The default backstop callback does nothing, and is just a marker.
-    extern "C" fn default_backstop_callback(_: *mut Instance) {}
 
     /// Similar to `Context::init()`, but allows setting a callback function to be run when the
     /// guest entrypoint returns.
@@ -398,9 +430,9 @@ impl Context {
             return Err(Error::UnalignedStack);
         }
 
-        if backstop_callback != Context::default_backstop_callback {
-            child.backstop_callback = backstop_callback as *const _;
-            child.callback_data = callback_data;
+        if backstop_callback != InstanceExitData::default_backstop_callback {
+            child.exit_data.backstop_callback = backstop_callback as *const _;
+            child.exit_data.callback_data = callback_data;
         }
 
         let mut gp_args_ix = 0;
@@ -446,6 +478,10 @@ impl Context {
             "incorrect alignment for guest call frame"
         );
 
+        // DEV KTM 2020-05-19: Here's where we prepare the stack, pushing `lucet_context_backstop`,
+        // the named function, arguments, and `lucet_context_bootstrap`. Note that this is *also*
+        // where we set `rbp` to a pointer to the guest `Context`.
+
         // we execute the guest code via returns, so we make a "call stack" of routines like:
         // -> lucet_context_backstop()
         //    -> fptr()
@@ -474,6 +510,8 @@ impl Context {
         // reach the backstop. This allows us to prepare an argument for `lucet_context_backstop`
         // even at the entrypoint of the guest.
         child.gpr.rbp = child as *const Context as u64;
+
+        // DEV KTM 2020-05-20: Pass the child `Context` as the backstop argument.
 
         Ok(())
     }
@@ -553,7 +591,7 @@ impl Context {
     /// ```
     #[inline]
     pub unsafe fn swap(from: &mut Context, to: &mut Context) {
-        to.parent_ctx = from;
+        to.exit_data.parent_ctx = from;
         lucet_context_swap(from as *mut _, to as *mut _);
     }
 
@@ -621,9 +659,9 @@ impl Context {
 
     /// Clear (zero) return values.
     pub fn clear_retvals(&mut self) {
-        self.retvals_gp = [0; 2];
+        self.exit_data.retvals_gp = [0; 2];
         let zero = unsafe { _mm_setzero_ps() };
-        self.retval_fp = zero;
+        self.exit_data.retval_fp = zero;
     }
 
     /// Get the general-purpose return value at index `idx`.
@@ -631,7 +669,7 @@ impl Context {
     /// If this method is called before the context has returned from its original entrypoint, the
     /// result will be `0`.
     pub fn get_retval_gp(&self, idx: usize) -> u64 {
-        self.retvals_gp[idx]
+        self.exit_data.retvals_gp[idx]
     }
 
     /// Get the floating point return value.
@@ -639,7 +677,7 @@ impl Context {
     /// If this method is called before the context has returned from its original entrypoint, the
     /// result will be `0.0`.
     pub fn get_retval_fp(&self) -> __m128 {
-        self.retval_fp
+        self.exit_data.retval_fp
     }
 
     /// Get the return value as an `UntypedRetVal`.

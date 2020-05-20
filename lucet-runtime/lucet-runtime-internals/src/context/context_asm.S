@@ -29,6 +29,10 @@
 
 */
 
+// DEV KTM 2020-05-19: `lucet_context_bootstrap` definition
+//
+// This should eventually live in  `instance_asm.S`, and be renamed
+// `lucet_instance_bootstrap`.
 .text
 .globl lucet_context_bootstrap
 #ifdef __ELF__
@@ -54,6 +58,10 @@ _lucet_context_bootstrap:
 .size lucet_context_bootstrap,.-lucet_context_bootstrap
 #endif
 
+// DEV KTM 2020-05-19: `lucet_context_backstop` definition
+//
+// This should eventually live in  `instance_asm.S`, and be
+// renamed `lucet_instance_backstop`.
 .text
 .globl lucet_context_backstop
 #ifdef __ELF__
@@ -191,6 +199,10 @@ _lucet_context_set:
 .size lucet_context_set,.-lucet_context_set
 #endif
 
+// DEV KTM 2020-05-19: `lucet_context_activate` definition
+//
+//  This should eventually live in  `instance_asm.S`, and be renamed
+// `lucet_instance_activate`.
 .text
 .globl lucet_context_activate
 #ifdef __ELF__
