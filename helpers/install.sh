@@ -212,12 +212,6 @@ EOT
 install -p -v "$wrapper_file" "${LUCET_BIN_DIR}/lucetc-wasi"
 rm -f "$wrapper_file"
 
-(
-    cd "$LUCET_SRC_PREFIX" || exit 1
-    find assemblyscript -type d -exec install -d -v "${LUCET_SHARE_DIR}/{}" \;
-    find assemblyscript -type f -exec install -p -v -m 0644 "{}" "${LUCET_SHARE_DIR}/{}" \;
-)
-
 for file in wasm-opt wasm-reduce; do
     ln -sfv "${BINARYEN_BIN_DIR}/${file}" "${LUCET_BIN_DIR}/${file}"
 done
