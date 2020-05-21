@@ -404,7 +404,7 @@ extern crate self as lucet_runtime;
 pub mod c_api;
 
 pub use lucet_module::{PublicKey, TrapCode};
-pub use lucet_runtime_internals::alloc::{Limits, DEFAULT_SIGNAL_STACK_SIZE};
+pub use lucet_runtime_internals::alloc::{AllocStrategy, Limits, DEFAULT_SIGNAL_STACK_SIZE};
 pub use lucet_runtime_internals::error::Error;
 pub use lucet_runtime_internals::instance::signals::{
     install_lucet_signal_handler, remove_lucet_signal_handler,
