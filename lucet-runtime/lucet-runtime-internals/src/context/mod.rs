@@ -371,6 +371,7 @@ impl Context {
     /// stack:
     /// ```text
     /// 0x1000: +-------------------------+
+    /// 0xfixme | exit_data               | // fixme, describe what's happening here.
     /// 0x0ff8: | NULL                    | // Null added if necessary for alignment.
     /// 0x0ff0: | spilled_arg_1           | // Guest arguments follow.
     /// 0x0fe8: | spilled_arg_2           |
@@ -465,6 +466,9 @@ impl Context {
         // set up an initial call stack for guests to bootstrap into and execute
         let mut stack_builder = CallStackBuilder::new(stack);
 
+        stack_builder.push(child as *const Context as u64);
+        stack_builder.push(0);
+
         // we actually don't want to put an explicit pointer to these arguments anywhere. we'll
         // line up the rest of the stack such that these are in argument position when we jump to
         // `fptr`.
@@ -509,7 +513,8 @@ impl Context {
         // Base pointer: `rbp` will be saved through all guest code, and preserved for when we
         // reach the backstop. This allows us to prepare an argument for `lucet_context_backstop`
         // even at the entrypoint of the guest.
-        child.gpr.rbp = child as *const Context as u64;
+        // child.gpr.rbp = child as *const Context as u64;
+        child.gpr.rbp = stack[stack.len() - 1];
 
         // DEV KTM 2020-05-20: Pass the child `Context` as the backstop argument.
 
