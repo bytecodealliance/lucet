@@ -10,21 +10,15 @@ In order to compile applications to WebAssembly, builtins need to be installed
 as well:
 
 ```sh
-curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
-sudo tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
+curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/libclang_rt.builtins-wasm32-wasi-10.0.tar.gz | \
+  sudo tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
 ```
 
-Fetch, compile and install the WASI libc:
+Install the WASI sysroot:
 
 ```sh
-git clone --recursive https://github.com/CraneStation/wasi-libc
-
-cd wasi-libc
-
-sudo env PATH=/usr/local/opt/llvm/bin:$PATH \
-  make INSTALL_DIR=/opt/wasi-sysroot install
-
-cd - && sudo rm -fr wasi-libc
+RUN curl -sS -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sysroot-10.0.tar.gz | \
+  tar x -zf - -C /opt
 ```
 
 Enter the Lucet git repository clone, and fetch/update the submodules:
