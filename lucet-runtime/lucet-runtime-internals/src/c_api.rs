@@ -391,7 +391,6 @@ pub mod lucet_result {
     pub enum lucet_trapcode {
         StackOverflow,
         HeapOutOfBounds,
-        OutOfBounds,
         IndirectCallToNull,
         BadSignature,
         IntegerOverflow,
@@ -415,7 +414,6 @@ pub mod lucet_result {
                 match ty {
                     TrapCode::StackOverflow => lucet_trapcode::StackOverflow,
                     TrapCode::HeapOutOfBounds => lucet_trapcode::HeapOutOfBounds,
-                    TrapCode::OutOfBounds => lucet_trapcode::OutOfBounds,
                     TrapCode::IndirectCallToNull => lucet_trapcode::IndirectCallToNull,
                     TrapCode::BadSignature => lucet_trapcode::BadSignature,
                     TrapCode::IntegerOverflow => lucet_trapcode::IntegerOverflow,

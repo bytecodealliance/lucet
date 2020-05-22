@@ -55,7 +55,6 @@ enum lucet_terminated_reason {
 enum lucet_trapcode {
     lucet_trapcode_stack_overflow,
     lucet_trapcode_heap_out_of_bounds,
-    lucet_trapcode_out_of_bounds,
     lucet_trapcode_indirect_call_to_null,
     lucet_trapcode_bad_signature,
     lucet_trapcode_integer_overflow,
