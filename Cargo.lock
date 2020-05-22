@@ -904,8 +904,6 @@ dependencies = [
  "derivative",
  "memoffset",
  "minisign",
- "num-derive",
- "num-traits",
  "object 0.18.0",
  "serde",
  "serde-big-array",

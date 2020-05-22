@@ -1,9 +1,7 @@
-use num_derive::FromPrimitive;
-
 /// The type of a WebAssembly
 /// [trap](http://webassembly.github.io/spec/core/intro/overview.html#trap).
 #[repr(u32)]
-#[derive(Copy, Clone, Debug, FromPrimitive, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TrapCode {
     StackOverflow,
     HeapOutOfBounds,
