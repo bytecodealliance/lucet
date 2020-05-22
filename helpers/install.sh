@@ -71,7 +71,7 @@ fi
 
 # Find a WASI sysroot
 for wasi_sysroot in $WASI_SYSROOT ${WASI_SDK_PREFIX}/share/wasi-sysroot /opt/wasi-sysroot; do
-    if [ -e "${wasi_sysroot}/include/wasi/core.h" ]; then
+    if [ -e "${wasi_sysroot}/include/wasi/api.h" ]; then
         WASI_SYSROOT="$wasi_sysroot"
     fi
 done
@@ -85,11 +85,11 @@ echo "* WASI sysroot: [$WASI_SYSROOT]"
 # Find:
 # - A clang/llvm installation able to compile to WebAssmbly/WASI
 # - The base path to this installation
-# - The optional suffix added to clang (e.g. clang-8)
-# - The optional suffix added to LLVM tools (e.g. ar-8) that differs from the clang one on some Linux distributions
+# - The optional suffix added to clang (e.g. clang-10)
+# - The optional suffix added to LLVM tools (e.g. ar-10) that differs from the clang one on some Linux distributions
 
 TMP_OBJ=$(mktemp)
-for llvm_bin_path_candidate in "$LLVM_BIN" "${WASI_SDK_PREFIX}/bin" /usr/local/opt/llvm/bin $(echo "$PATH" | sed s/:/\ /g); do
+for llvm_bin_path_candidate in "$LLVM_BIN" "${WASI_SDK_PREFIX}/bin" /usr/local/opt/llvm/bin $(echo "$PATH" | sed s/:/\ /g) /usr/lib/llvm-*; do
     [ -d "$llvm_bin_path_candidate" ] || continue
     clang_candidate=$(find "$llvm_bin_path_candidate" -maxdepth 1 \( -type f -o -type l \) \( -name "clang" -o -name "clang-[0-9]*" \) -print |
         sort | while read -r clang_candidate; do
@@ -225,7 +225,7 @@ done
 if test -t 0; then
     echo
     echo "Lucet has been installed in [${LUCET_PREFIX}]"
-    if [ "$(basename $SHELL)" = "fish" ]; then
+    if [ -n "$SHELL" ] && [ "$(basename $SHELL)" = "fish" ]; then
         echo "Add ${LUCET_BIN_DIR} to your shell's search paths."
     else
         echo "Type 'source ${LUCET_BIN_DIR}/setenv.sh' to add the Lucet paths to your environment."
