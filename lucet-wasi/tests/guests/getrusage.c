@@ -1,17 +1,14 @@
 #include <assert.h>
+#include <sched.h>
 #include <sys/resource.h>
 
-// Temporary fix until
-// https://github.com/CraneStation/wasi-sysroot/pull/24/
-// is available in wasi-sdk package
-extern int getrusage(int who, struct rusage *usage);
-
-int main()
+int main(void)
 {
     struct rusage ru1;
     getrusage(RUSAGE_SELF, &ru1);
 
     for (int i = 0; i < 1000; i++) {
+        sched_yield();
     }
 
     struct rusage ru2;
