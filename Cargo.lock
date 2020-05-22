@@ -76,12 +76,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "base64"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53d1ccbaf7d9ec9537465a97bf19edc1a4e158ecb49fc16178202238c569cc42"
-
-[[package]]
 name = "bencher"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1206,11 +1200,10 @@ dependencies = [
 
 [[package]]
 name = "minisign"
-version = "0.5.15"
+version = "0.5.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4ba4f3bfa2d67def1b18805caeb719f5c30438f87f1c03fb618497707715e1a"
+checksum = "d1e61ea4bb16e165abb0091d7960e385ab856021895af5efdcecd3b666ab6a7c"
 dependencies = [
- "base64",
  "getrandom",
  "rpassword",
  "scrypt",
