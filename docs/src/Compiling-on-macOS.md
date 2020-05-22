@@ -1,31 +1,30 @@
 # Compiling on macOS
 
+## Prerequisites
+
 Install `llvm`, `rust` and `cmake` using [Homebrew](https://brew.sh):
 
 ```sh
 brew install llvm rust cmake
 ```
 
-In order to compile applications to WebAssembly, builtins need to be installed
-as well:
+In order to compile applications written in C to WebAssembly, `clang` builtins need to be installed:
 
 ```sh
-curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
-sudo tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
+curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/libclang_rt.builtins-wasm32-wasi-10.0.tar.gz | \
+  tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
 ```
 
-Fetch, compile and install the WASI libc:
+As well as the WASI sysroot:
 
 ```sh
-git clone --recursive https://github.com/CraneStation/wasi-libc
+sudo mkdir -p /opt
 
-cd wasi-libc
-
-sudo env PATH=/usr/local/opt/llvm/bin:$PATH \
-  make INSTALL_DIR=/opt/wasi-sysroot install
-
-cd - && sudo rm -fr wasi-libc
+curl -sS -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sysroot-10.0.tar.gz | \
+  sudo tar x -zf - -C /opt
 ```
+
+## Compiling and installing Lucet
 
 Enter the Lucet git repository clone, and fetch/update the submodules:
 
@@ -35,19 +34,39 @@ cd lucet
 git submodule update --init
 ```
 
-Set relevant environment variables:
+Define the location of the WASI sysroot installation:
 
 ```sh
 export WASI_SYSROOT=/opt/wasi-sysroot
-export CLANG_ROOT="$(echo /usr/local/opt/llvm/lib/clang/10*)"
-export CLANG=/usr/local/opt/llvm/bin/clang
 ```
 
-Finally, compile and install toolchain:
+Finally, compile and install the toolchain:
 
 ```sh
 env LUCET_PREFIX=/opt/lucet make install
 ```
 
 Change `LUCET_PREFIX` to the directory you would like to install Lucet into. `/opt/lucet` is the default directory.
-The Lucet executable files can be found in the `target/release/` directory.
+
+## Setting up the environment
+
+In order to add `/opt/lucet` to the command search path, as well register the library path for the Lucet runtime, the following command can be run interactively or added to the shell startup files:
+
+```sh
+source /opt/lucet/bin/setenv.sh
+```
+
+## Running the test suite
+
+If you want to run the test suite, and in addition to `WASI_SYSROOT`, the following environment variables must be set:
+
+```sh
+export CLANG_ROOT="$(echo /usr/local/opt/llvm/lib/clang/10*)"
+export CLANG=/usr/local/opt/llvm/bin/clang
+```
+
+And the test suite can then be run with the following command:
+
+ ```sh
+ make test
+```
