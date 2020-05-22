@@ -64,10 +64,7 @@ pub fn generate(
                 pub fn #name(vmctx: &lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #rets {
                     let memory = lucet_wiggle::runtime::LucetMemory::new(vmctx);
                     let mut ctx: #ctx_type = #ctx_constructor;
-                    // Safety requires exactly one BorrowChecker for a given WebAssembly memory.
-                    // Because we do not make recursive calls into WebAssembly, this is safe.
-                    let bc = unsafe { lucet_wiggle::BorrowChecker::new() };
-                    super::#mod_name::#method_name(&ctx, &memory, &bc, #(#call_args),*)
+                    super::#mod_name::#method_name(&ctx, &memory, #(#call_args),*)
                 }
             }
         });

@@ -11,15 +11,22 @@ pub mod generate {
 
 pub mod runtime {
     use lucet_runtime::vmctx::Vmctx;
-    use wiggle::GuestMemory;
+    use wiggle::{BorrowChecker, GuestMemory};
 
     pub struct LucetMemory<'a> {
         vmctx: &'a Vmctx,
+        bc: BorrowChecker,
     }
 
     impl<'a> LucetMemory<'a> {
         pub fn new(vmctx: &'a Vmctx) -> LucetMemory {
-            LucetMemory { vmctx }
+            LucetMemory {
+                vmctx,
+                // Safety: we only construct a LucetMemory at the entry point of hostcalls, and
+                // hostcalls are not re-entered, therefore there is exactly one BorrowChecker per
+                // memory.
+                bc: unsafe { BorrowChecker::new() },
+            }
         }
     }
 
@@ -29,6 +36,9 @@ pub mod runtime {
             let len = mem.len() as u32;
             let ptr = mem.as_ptr();
             (ptr as *mut u8, len)
+        }
+        fn borrow_checker(&self) -> &BorrowChecker {
+            &self.bc
         }
     }
 }
