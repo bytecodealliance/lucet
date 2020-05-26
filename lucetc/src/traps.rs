@@ -15,7 +15,6 @@ pub(crate) fn translate_trapcode(code: ir::TrapCode) -> lucet_module::TrapCode {
     match code {
         ir::TrapCode::StackOverflow => lucet_module::TrapCode::StackOverflow,
         ir::TrapCode::HeapOutOfBounds => lucet_module::TrapCode::HeapOutOfBounds,
-        ir::TrapCode::OutOfBounds => lucet_module::TrapCode::OutOfBounds,
         ir::TrapCode::IndirectCallToNull => lucet_module::TrapCode::IndirectCallToNull,
         ir::TrapCode::BadSignature => lucet_module::TrapCode::BadSignature,
         ir::TrapCode::IntegerOverflow => lucet_module::TrapCode::IntegerOverflow,
