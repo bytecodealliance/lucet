@@ -5,6 +5,7 @@ use crate::sysdeps::host_page_size;
 use libc::c_void;
 use lucet_module::GlobalValue;
 use rand::{thread_rng, Rng, RngCore};
+use std::fmt;
 use std::sync::{Arc, Mutex, Weak};
 
 pub fn instance_heap_offset() -> usize {
@@ -79,7 +80,17 @@ pub enum AllocStrategy {
     /// supplied random number generator.
     ///
     /// This strategy is used to create reproducible behavior for testing.
-    CustomRandom(Arc<Mutex<dyn RngCore>>),
+    CustomRandom(Arc<Mutex<dyn RngCore + Send>>),
+}
+
+impl fmt::Debug for AllocStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            AllocStrategy::Linear => write!(f, "AllocStrategy::Linear"),
+            AllocStrategy::Random => write!(f, "AllocStrategy::Random"),
+            AllocStrategy::CustomRandom(_) => write!(f, "AllocStrategy::CustomRandom(...)"),
+        }
+    }
 }
 
 impl AllocStrategy {
