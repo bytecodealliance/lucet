@@ -71,6 +71,7 @@ impl Slot {
 }
 
 /// The strategy by which a `Region` selects an allocation to back an `Instance`.
+#[derive(Clone)]
 pub enum AllocStrategy {
     /// Allocate from the next slot available.
     Linear,
