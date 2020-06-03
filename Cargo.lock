@@ -972,7 +972,7 @@ dependencies = [
  "rand 0.7.3",
  "raw-cpuid 6.1.0",
  "thiserror",
- "tracing",
+ "tracing 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "userfaultfd",
 ]
 
@@ -2126,12 +2126,33 @@ dependencies = [
 [[package]]
 name = "tracing"
 version = "0.1.14"
+source = "git+https://github.com/tokio-rs/tracing#180e494c7a13c0a18c09f3c7b465e8734c51f5e2"
+dependencies = [
+ "cfg-if",
+ "log",
+ "tracing-attributes 0.1.8 (git+https://github.com/tokio-rs/tracing)",
+ "tracing-core 0.1.10 (git+https://github.com/tokio-rs/tracing)",
+]
+
+[[package]]
+name = "tracing"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7c6b59d116d218cb2d990eb06b77b64043e0268ef7323aae63d8b30ae462923"
 dependencies = [
  "cfg-if",
- "tracing-attributes",
- "tracing-core",
+ "tracing-attributes 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tracing-core 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.8"
+source = "git+https://github.com/tokio-rs/tracing#180e494c7a13c0a18c09f3c7b465e8734c51f5e2"
+dependencies = [
+ "proc-macro2 1.0.13",
+ "quote 1.0.6",
+ "syn 1.0.22",
 ]
 
 [[package]]
@@ -2143,6 +2164,14 @@ dependencies = [
  "proc-macro2 1.0.13",
  "quote 1.0.6",
  "syn 1.0.22",
+]
+
+[[package]]
+name = "tracing-core"
+version = "0.1.10"
+source = "git+https://github.com/tokio-rs/tracing#180e494c7a13c0a18c09f3c7b465e8734c51f5e2"
+dependencies = [
+ "lazy_static",
 ]
 
 [[package]]
@@ -2407,6 +2436,7 @@ name = "wiggle"
 version = "0.16.0"
 dependencies = [
  "thiserror",
+ "tracing 0.1.14 (git+https://github.com/tokio-rs/tracing)",
  "wiggle-macro",
  "witx",
 ]

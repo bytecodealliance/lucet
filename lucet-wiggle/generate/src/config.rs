@@ -3,9 +3,17 @@ use syn::{
     braced,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    Error, Ident, Result, Token,
+    Error, Result, Token,
 };
 use wiggle_generate::config as w;
+
+mod kw {
+    syn::custom_keyword!(witx);
+    syn::custom_keyword!(witx_literal);
+    syn::custom_keyword!(ctx);
+    syn::custom_keyword!(errors);
+    syn::custom_keyword!(constructor);
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -21,19 +29,35 @@ pub enum ConfigField {
 
 impl Parse for ConfigField {
     fn parse(input: ParseStream) -> Result<Self> {
-        let id: Ident = input.parse()?;
-        let _colon: Token![:] = input.parse()?;
-        match id.to_string().as_ref() {
-            "constructor" => {
-                let contents;
-                let _lbrace = braced!(contents in input);
-                Ok(ConfigField::Constructor(contents.parse()?))
-            }
-            _ => Ok(ConfigField::Wiggle(w::ConfigField::parse_pair(
-                id.to_string().as_ref(),
-                input,
-                id.span(),
-            )?)),
+        let lookahead = input.lookahead1();
+        if lookahead.peek(kw::constructor) {
+            input.parse::<kw::constructor>()?;
+            input.parse::<Token![:]>()?;
+            let contents;
+            let _lbrace = braced!(contents in input);
+            Ok(ConfigField::Constructor(contents.parse()?))
+        } else if lookahead.peek(kw::witx) {
+            input.parse::<kw::witx>()?;
+            input.parse::<Token![:]>()?;
+            Ok(ConfigField::Wiggle(w::ConfigField::Witx(
+                w::WitxConf::Paths(input.parse()?),
+            )))
+        } else if lookahead.peek(kw::witx_literal) {
+            input.parse::<kw::witx_literal>()?;
+            input.parse::<Token![:]>()?;
+            Ok(ConfigField::Wiggle(w::ConfigField::Witx(
+                w::WitxConf::Literal(input.parse()?),
+            )))
+        } else if lookahead.peek(kw::ctx) {
+            input.parse::<kw::ctx>()?;
+            input.parse::<Token![:]>()?;
+            Ok(ConfigField::Wiggle(w::ConfigField::Ctx(input.parse()?)))
+        } else if lookahead.peek(kw::errors) {
+            input.parse::<kw::errors>()?;
+            input.parse::<Token![:]>()?;
+            Ok(ConfigField::Wiggle(w::ConfigField::Error(input.parse()?)))
+        } else {
+            Err(lookahead.error())
         }
     }
 }
