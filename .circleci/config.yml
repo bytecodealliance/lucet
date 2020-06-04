@@ -181,7 +181,7 @@ commands:
           condition: << parameters.cache_target >>
           steps:
             - save_cache:
-                key: target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                key: target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}-{{ .Environment.CACHE_VERSION }}
                 paths:
                   - "target"
 
