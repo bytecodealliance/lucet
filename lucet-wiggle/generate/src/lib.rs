@@ -33,6 +33,8 @@ pub fn generate(
     ctx_type: &Ident,
     ctx_constructor: &TokenStream,
     wiggle_mod_path: &TokenStream,
+    pre_hook: &TokenStream,
+    post_hook: &TokenStream,
 ) -> TokenStream {
     let names = wiggle_generate::Names::new(ctx_type, quote!(lucet_wiggle));
     let fs = doc.modules().map(|m| {
@@ -62,9 +64,12 @@ pub fn generate(
                 #[lucet_hostcall]
                 #[no_mangle]
                 pub fn #name(vmctx: &lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #rets {
+                    { #pre_hook }
                     let memory = lucet_wiggle::runtime::LucetMemory::new(vmctx);
                     let mut ctx: #ctx_type = #ctx_constructor;
-                    super::#mod_name::#method_name(&ctx, &memory, #(#call_args),*)
+                    let r = super::#mod_name::#method_name(&ctx, &memory, #(#call_args),*);
+                    { #post_hook }
+                    r
                 }
             }
         });

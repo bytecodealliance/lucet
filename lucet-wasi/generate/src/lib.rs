@@ -40,6 +40,8 @@ pub fn bindings(args: TokenStream) -> TokenStream {
         &config.ctx_name,
         &config.constructor,
         &quote!(wasi_common::wasi),
+        &quote!(), // pre_hook,
+        &quote!(), // post_hook,
     ));
 
     TokenStream::from(ts)
