@@ -556,7 +556,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn translate_table_grow(
         &mut self,
         _pos: FuncCursor,
-        _table_index: u32,
+        _table_index: TableIndex,
         _delta: ir::Value,
         _init_value: ir::Value,
     ) -> WasmResult<ir::Value> {
@@ -568,7 +568,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn translate_table_get(
         &mut self,
         _pos: FuncCursor,
-        _table_index: u32,
+        _table_index: TableIndex,
         _index: ir::Value,
     ) -> WasmResult<ir::Value> {
         Err(WasmError::Unsupported(
@@ -579,7 +579,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn translate_table_set(
         &mut self,
         _pos: FuncCursor,
-        _table_index: u32,
+        _table_index: TableIndex,
         _value: ir::Value,
         _index: ir::Value,
     ) -> WasmResult<()> {
@@ -608,7 +608,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn translate_table_fill(
         &mut self,
         _pos: FuncCursor,
-        _table_index: u32,
+        _table_index: TableIndex,
         _dst: ir::Value,
         _val: ir::Value,
         _len: ir::Value,
