@@ -43,8 +43,9 @@ RUN rustup target add wasm32-wasi
 # Optional additional Rust programs
 RUN cargo install --debug rsign2 cargo-audit mdbook
 
-RUN curl -sSLO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk_10.0_amd64.deb \
-	&& dpkg -i wasi-sdk_10.0_amd64.deb && rm -f wasi-sdk_10.0_amd64.deb
+RUN curl -sSLO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/wasi-sdk_11.0_amd64_ubuntu20.04.deb \
+    && dpkg -i wasi-sdk_11.0_amd64_ubuntu20.04.deb \
+    && rm -f wasi-sdk_11.0_amd64_ubuntu20.04.deb
 
 ENV WASI_SDK=/opt/wasi-sdk
 
