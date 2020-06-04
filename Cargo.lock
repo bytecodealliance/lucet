@@ -306,14 +306,14 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "byteorder",
  "cranelift-bforest",
@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
@@ -338,15 +338,15 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.63.0"
+version = "0.64.0"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.63.0"
+version = "0.64.0"
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "cranelift-codegen",
  "log",
@@ -356,7 +356,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-module"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -367,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-native"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "cranelift-codegen",
  "raw-cpuid 7.0.3",
@@ -376,7 +376,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-object"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-module",
@@ -386,14 +386,14 @@ dependencies = [
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
  "cranelift-frontend",
  "log",
  "thiserror",
- "wasmparser 0.55.0",
+ "wasmparser 0.57.0",
 ]
 
 [[package]]
@@ -1172,7 +1172,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "wabt",
- "wasmparser 0.55.0",
+ "wasmparser 0.57.0",
 ]
 
 [[package]]
@@ -1702,9 +1702,9 @@ checksum = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
 
 [[package]]
 name = "regalloc"
-version = "0.0.24"
+version = "0.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5842bece8a4b1690ffa6d9d959081c1d5d851ee4337a36c0a121fafe8c16add2"
+checksum = "cca5b48c9db66c5ba084e4660b4c0cfe8b551a96074bc04b7c11de86ad0bf1f9"
 dependencies = [
  "log",
  "rustc-hash",
@@ -2125,11 +2125,12 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.14"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7c6b59d116d218cb2d990eb06b77b64043e0268ef7323aae63d8b30ae462923"
+checksum = "a41f40ed0e162c911ac6fcb53ecdc8134c46905fdbbae8c50add462a538b495f"
 dependencies = [
  "cfg-if",
+ "log",
  "tracing-attributes",
  "tracing-core",
 ]
@@ -2283,7 +2284,7 @@ checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
 
 [[package]]
 name = "wasi-common"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -2369,9 +2370,9 @@ checksum = "733954023c0b39602439e60a65126fd31b003196d3a1e8e4531b055165a79b31"
 
 [[package]]
 name = "wasmparser"
-version = "0.55.0"
+version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af931e2e1960c53f4a28b063fec4cacd036f35acbec8ff3a4739125b17382a87"
+checksum = "32fddd575d477c6e9702484139cf9f23dcd554b06d185ed0f56c857dd3a47aa6"
 
 [[package]]
 name = "wast"
@@ -2394,7 +2395,7 @@ dependencies = [
 
 [[package]]
 name = "wig"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "heck",
  "proc-macro2 1.0.13",
@@ -2404,16 +2405,17 @@ dependencies = [
 
 [[package]]
 name = "wiggle"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "thiserror",
+ "tracing",
  "wiggle-macro",
  "witx",
 ]
 
 [[package]]
 name = "wiggle-generate"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "heck",
@@ -2425,7 +2427,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle-macro"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "quote 1.0.6",
  "syn 1.0.22",
@@ -2435,7 +2437,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle-test"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "proptest",
  "wiggle",
@@ -2486,7 +2488,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "winx"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "bitflags 1.2.1",
  "cvt",
@@ -2511,7 +2513,7 @@ checksum = "da90eac47bf1d7871b75004b9b631d107df15f37669383b23f0b5297bc7516b6"
 
 [[package]]
 name = "yanix"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "bitflags 1.2.1",
  "cfg-if",

@@ -22,6 +22,7 @@ use lucet_module::{
     ModuleData, Signature as LucetSignature, UniqueSignatureIndex,
 };
 use std::collections::HashMap;
+use wasmparser::FuncType;
 
 #[derive(Debug)]
 pub struct FunctionDecl<'a> {
@@ -201,9 +202,10 @@ impl<'a> ModuleDecls<'a> {
         clif_module: &mut ClifModule<B>,
         decl_sym: String,
         decl_linkage: Linkage,
+        wasm_func_type: &FuncType,
         signature: ir::Signature,
     ) -> Result<UniqueFuncIndex, Error> {
-        let (new_funcidx, _) = self.info.declare_func_with_sig(signature)?;
+        let (new_funcidx, _) = self.info.declare_func_with_sig(wasm_func_type, signature)?;
 
         self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)?;
 
@@ -272,12 +274,13 @@ impl<'a> ModuleDecls<'a> {
         clif_module: &mut ClifModule<B>,
         runtime: Runtime,
     ) -> Result<(), Error> {
-        for (func, (symbol, signature)) in runtime.functions.iter() {
+        for (func, functype) in runtime.functions.iter() {
             let func_id = decls.declare_new_function(
                 clif_module,
-                symbol.clone(),
+                functype.name.clone(),
                 Linkage::Import,
-                signature.clone(),
+                &functype.wasm_func_type,
+                functype.signature.clone(),
             )?;
 
             decls.runtime_names.insert(*func, func_id);
@@ -408,7 +411,7 @@ impl<'a> ModuleDecls<'a> {
         let name = self.function_names.get(func_index).unwrap();
         let exportable_sigix = self.info.functions.get(func_index).unwrap();
         let signature_index = self.get_signature_uid(exportable_sigix.entity).unwrap();
-        let signature = self.info.signatures.get(signature_index).unwrap();
+        let (signature, _wasm_func_type) = self.info.signatures.get(signature_index).unwrap();
         let import_name = self.info.imported_funcs.get(func_index);
         Some(FunctionDecl {
             signature,
@@ -459,10 +462,14 @@ impl<'a> ModuleDecls<'a> {
 
     pub fn get_signature(&self, signature_index: SignatureIndex) -> Result<&ir::Signature, Error> {
         self.get_signature_uid(signature_index).and_then(|uid| {
-            self.info.signatures.get(uid).ok_or_else(|| {
-                let message = format!("signature out of bounds: {:?}", uid);
-                Error::Signature(message)
-            })
+            self.info
+                .signatures
+                .get(uid)
+                .map(|(sig, _wasm_func_type)| sig)
+                .ok_or_else(|| {
+                    let message = format!("signature out of bounds: {:?}", uid);
+                    Error::Signature(message)
+                })
         })
     }
 
@@ -528,7 +535,9 @@ impl<'a> ModuleDecls<'a> {
             .info
             .signatures
             .values()
-            .map(|sig| to_lucet_signature(sig).map_err(Error::SignatureConversion))
+            .map(|(_sig, wasm_func_type)| {
+                to_lucet_signature(wasm_func_type).map_err(Error::SignatureConversion)
+            })
             .collect::<Result<Vec<LucetSignature>, Error>>()?;
 
         Ok(ModuleData::new(

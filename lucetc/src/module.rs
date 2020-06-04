@@ -11,6 +11,7 @@ use cranelift_wasm::{
 };
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
+use wasmparser::FuncType;
 
 /// UniqueFuncIndex names a function after merging duplicate function declarations to a single
 /// identifier, whereas FuncIndex is maintained by Cranelift and may have multiple indices referring
@@ -58,7 +59,7 @@ pub struct ModuleInfo<'a> {
     /// declared.
     pub signature_mapping: PrimaryMap<SignatureIndex, UniqueSignatureIndex>,
     /// Provided by `declare_signature`
-    pub signatures: PrimaryMap<UniqueSignatureIndex, ir::Signature>,
+    pub signatures: PrimaryMap<UniqueSignatureIndex, (ir::Signature, FuncType)>,
     /// Provided by `declare_func_import`
     pub imported_funcs: PrimaryMap<UniqueFuncIndex, (&'a str, &'a str)>,
     /// Provided by `declare_global_import`
@@ -127,15 +128,17 @@ impl<'a> ModuleInfo<'a> {
         // All signatures map to some unique signature index
         let unique_sig_idx = self.signature_mapping.get(sig_idx).unwrap();
         // Unique signature indices are valid (or we're in some deeply bad state)
-        self.signatures.get(*unique_sig_idx).unwrap()
+        let (sig, _wasm_func_type) = self.signatures.get(*unique_sig_idx).unwrap();
+        sig
     }
 
     pub fn declare_func_with_sig(
         &mut self,
+        wasm_func_type: &FuncType,
         sig: ir::Signature,
     ) -> Result<(UniqueFuncIndex, SignatureIndex), Error> {
         let new_sigidx = SignatureIndex::from_u32(self.signature_mapping.len() as u32);
-        self.declare_signature(sig)?;
+        self.declare_signature(wasm_func_type, sig)?;
         let new_funcidx = UniqueFuncIndex::from_u32(self.functions.len() as u32);
         self.declare_func_type(new_sigidx)?;
         Ok((new_funcidx, new_sigidx))
@@ -149,7 +152,11 @@ impl<'a> TargetEnvironment for ModuleInfo<'a> {
 }
 
 impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
-    fn declare_signature(&mut self, mut sig: ir::Signature) -> WasmResult<()> {
+    fn declare_signature(
+        &mut self,
+        wasm_func_type: &FuncType,
+        mut sig: ir::Signature,
+    ) -> WasmResult<()> {
         sig.params.insert(
             0,
             ir::AbiParam::special(NATIVE_POINTER, ir::ArgumentPurpose::VMContext),
@@ -158,11 +165,11 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         let match_key = self
             .signatures
             .iter()
-            .find(|(_, v)| *v == &sig)
+            .find(|(_, (ssig, _))| ssig == &sig)
             .map(|(key, _)| key)
             .unwrap_or_else(|| {
                 let lucet_sig_ix = UniqueSignatureIndex::from_u32(self.signatures.len() as u32);
-                self.signatures.push(sig);
+                self.signatures.push((sig, wasm_func_type.clone()));
                 lucet_sig_ix
             });
 

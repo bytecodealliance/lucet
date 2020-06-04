@@ -3,37 +3,79 @@ use syn::{
     braced,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    Error, Ident, Result, Token,
+    Error, Result, Token,
 };
 use wiggle_generate::config as w;
+
+mod kw {
+    syn::custom_keyword!(witx);
+    syn::custom_keyword!(witx_literal);
+    syn::custom_keyword!(ctx);
+    syn::custom_keyword!(errors);
+    syn::custom_keyword!(constructor);
+    syn::custom_keyword!(pre_hook);
+    syn::custom_keyword!(post_hook);
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub wiggle: w::Config,
     pub constructor: TokenStream,
+    pub pre_hook: Option<TokenStream>,
+    pub post_hook: Option<TokenStream>,
 }
 
 #[derive(Debug, Clone)]
 pub enum ConfigField {
     Wiggle(w::ConfigField),
     Constructor(TokenStream),
+    PreHook(TokenStream),
+    PostHook(TokenStream),
 }
 
 impl Parse for ConfigField {
     fn parse(input: ParseStream) -> Result<Self> {
-        let id: Ident = input.parse()?;
-        let _colon: Token![:] = input.parse()?;
-        match id.to_string().as_ref() {
-            "constructor" => {
-                let contents;
-                let _lbrace = braced!(contents in input);
-                Ok(ConfigField::Constructor(contents.parse()?))
-            }
-            _ => Ok(ConfigField::Wiggle(w::ConfigField::parse_pair(
-                id.to_string().as_ref(),
-                input,
-                id.span(),
-            )?)),
+        let lookahead = input.lookahead1();
+        if lookahead.peek(kw::constructor) {
+            input.parse::<kw::constructor>()?;
+            input.parse::<Token![:]>()?;
+            let contents;
+            let _lbrace = braced!(contents in input);
+            Ok(ConfigField::Constructor(contents.parse()?))
+        } else if lookahead.peek(kw::pre_hook) {
+            input.parse::<kw::pre_hook>()?;
+            input.parse::<Token![:]>()?;
+            let contents;
+            let _lbrace = braced!(contents in input);
+            Ok(ConfigField::PreHook(contents.parse()?))
+        } else if lookahead.peek(kw::post_hook) {
+            input.parse::<kw::post_hook>()?;
+            input.parse::<Token![:]>()?;
+            let contents;
+            let _lbrace = braced!(contents in input);
+            Ok(ConfigField::PostHook(contents.parse()?))
+        } else if lookahead.peek(kw::witx) {
+            input.parse::<kw::witx>()?;
+            input.parse::<Token![:]>()?;
+            Ok(ConfigField::Wiggle(w::ConfigField::Witx(
+                w::WitxConf::Paths(input.parse()?),
+            )))
+        } else if lookahead.peek(kw::witx_literal) {
+            input.parse::<kw::witx_literal>()?;
+            input.parse::<Token![:]>()?;
+            Ok(ConfigField::Wiggle(w::ConfigField::Witx(
+                w::WitxConf::Literal(input.parse()?),
+            )))
+        } else if lookahead.peek(kw::ctx) {
+            input.parse::<kw::ctx>()?;
+            input.parse::<Token![:]>()?;
+            Ok(ConfigField::Wiggle(w::ConfigField::Ctx(input.parse()?)))
+        } else if lookahead.peek(kw::errors) {
+            input.parse::<kw::errors>()?;
+            input.parse::<Token![:]>()?;
+            Ok(ConfigField::Wiggle(w::ConfigField::Error(input.parse()?)))
+        } else {
+            Err(lookahead.error())
         }
     }
 }
@@ -48,10 +90,18 @@ impl Config {
             err_loc,
         )?;
         let mut constructor = None;
+        let mut pre_hook = None;
+        let mut post_hook = None;
         for f in fields {
             match f {
                 ConfigField::Constructor(c) => {
                     constructor = Some(c);
+                }
+                ConfigField::PreHook(c) => {
+                    pre_hook = Some(c);
+                }
+                ConfigField::PostHook(c) => {
+                    post_hook = Some(c);
                 }
                 ConfigField::Wiggle { .. } => {} // Ignore
             }
@@ -61,6 +111,8 @@ impl Config {
             constructor: constructor
                 .take()
                 .ok_or_else(|| Error::new(err_loc, "`constructor` field required"))?,
+            pre_hook,
+            post_hook,
         })
     }
 }

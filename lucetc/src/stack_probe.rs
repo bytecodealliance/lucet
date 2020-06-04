@@ -16,6 +16,7 @@ use cranelift_codegen::{
     isa::CallConv,
 };
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule, TrapSite};
+use wasmparser::FuncType;
 
 /// Stack probe symbol name
 pub const STACK_PROBE_SYM: &str = "lucet_probestack";
@@ -61,6 +62,10 @@ pub fn declare<'a, B: ClifBackend>(
             clif_module,
             STACK_PROBE_SYM.to_string(),
             Linkage::Local,
+            &FuncType {
+                params: vec![].into_boxed_slice(),
+                returns: vec![wasmparser::Type::I32].into_boxed_slice(),
+            },
             Signature {
                 params: vec![],
                 returns: vec![AbiParam::new(types::I32)],
