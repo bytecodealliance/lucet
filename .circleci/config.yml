@@ -144,9 +144,9 @@ commands:
                   # The hope is that even if some of the dependencies change between branches and
                   # revisions, that enough of the slow-changing dependencies will remain static that
                   # Cargo won't have to rebuild them.
-                  - target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}
-                  - target_dir-macos-{{ .Branch }}-
-                  - target_dir-macos-
+                  - target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}-{{ .Environment.CACHE_VERSION }}
+                  - target_dir-macos-{{ .Branch }}-{{ .Environment.CACHE_VERSION }}
+                  - target_dir-macos-{{ .Environment.CACHE_VERSION }}
       - run:
           name: "Install Homebrew dependencies"
           command: |
@@ -166,10 +166,10 @@ commands:
           name: "Install wasi-sdk"
           command: |
             set -x
-            curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk-10.0-macos.tar.gz
-            tar xf wasi-sdk-10.0-macos.tar.gz
+            curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/wasi-sdk-11.0-macos.tar.gz
+            tar xf wasi-sdk-11.0-macos.tar.gz
             sudo mkdir -p /opt/wasi-sdk
-            sudo mv wasi-sdk-10.0/* /opt/wasi-sdk/
+            sudo mv wasi-sdk-11.0/* /opt/wasi-sdk/
       - run:
           name: "Make target: test-ci"
           command: |
@@ -181,7 +181,7 @@ commands:
           condition: << parameters.cache_target >>
           steps:
             - save_cache:
-                key: target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                key: target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}-{{ .Environment.CACHE_VERSION }}
                 paths:
                   - "target"
 

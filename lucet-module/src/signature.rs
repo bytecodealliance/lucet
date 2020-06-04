@@ -6,7 +6,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use memoffset::offset_of;
 pub use minisign::{PublicKey, SecretKey};
 use minisign::{SignatureBones, SignatureBox};
-use object::{read::ObjectSection, NativeFile as ObjectFile, Object, SymbolKind};
+use object::{NativeFile as ObjectFile, Object, SymbolKind};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -146,6 +146,8 @@ impl RawModuleAndData {
         symbol_name: &str,
         _mangle: bool,
     ) -> Result<Option<SymbolData>, io::Error> {
+        use object::read::ObjectSection;
+
         let obj = ObjectFile::parse(obj_bin)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
         let symbol_map = obj.symbol_map();
