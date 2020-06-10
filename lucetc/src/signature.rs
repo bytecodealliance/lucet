@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 pub const RAW_KEY_PREFIX: &str = "raw:";
 
-fn raw_key_path<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
+fn raw_key_path(path: impl AsRef<Path>) -> Option<PathBuf> {
     let path = path.as_ref();
     if let Some(path) = path.to_str() {
         if path.starts_with(RAW_KEY_PREFIX) {
@@ -17,7 +17,7 @@ fn raw_key_path<P: AsRef<Path>>(path: P) -> Option<PathBuf> {
     None
 }
 
-pub fn sk_from_file<P: AsRef<Path>>(sk_path: P) -> Result<SecretKey, Error> {
+pub fn sk_from_file(sk_path: impl AsRef<Path>) -> Result<SecretKey, Error> {
     match raw_key_path(sk_path.as_ref()) {
         None => SecretKey::from_file(sk_path, None).map_err(|e| {
             let message = format!("Unable to read the secret key: {}", e);
@@ -34,7 +34,7 @@ pub fn sk_from_file<P: AsRef<Path>>(sk_path: P) -> Result<SecretKey, Error> {
     }
 }
 
-fn signature_path<P: AsRef<Path>>(path: P) -> Result<PathBuf, Error> {
+fn signature_path(path: impl AsRef<Path>) -> Result<PathBuf, Error> {
     let path = path.as_ref().to_str().ok_or_else(|| {
         let message = format!("Invalid signature path {:?}", path.as_ref());
         Error::Input(message)
@@ -42,7 +42,7 @@ fn signature_path<P: AsRef<Path>>(path: P) -> Result<PathBuf, Error> {
     Ok(PathBuf::from(format!("{}.minisig", path)))
 }
 
-pub fn signature_box_for_module_path<P: AsRef<Path>>(path: P) -> Result<SignatureBox, Error> {
+pub fn signature_box_for_module_path(path: impl AsRef<Path>) -> Result<SignatureBox, Error> {
     let signature_path = signature_path(path)?;
     SignatureBox::from_file(&signature_path).map_err(|e| {
         let message = format!("Unable to load the signature file: {}", e);
@@ -50,7 +50,7 @@ pub fn signature_box_for_module_path<P: AsRef<Path>>(path: P) -> Result<Signatur
     })
 }
 
-pub fn keygen<P: AsRef<Path>, Q: AsRef<Path>>(pk_path: P, sk_path: Q) -> Result<KeyPair, Error> {
+pub fn keygen(pk_path: impl AsRef<Path>, sk_path: impl AsRef<Path>) -> Result<KeyPair, Error> {
     match raw_key_path(&sk_path) {
         None => {
             let pk_writer = File::create(pk_path)?;
@@ -89,6 +89,6 @@ pub fn verify_source_code(
 }
 
 // Sign the compiled code
-pub fn sign_module<P: AsRef<Path>>(path: P, sk: &SecretKey) -> Result<(), Error> {
+pub fn sign_module(path: impl AsRef<Path>, sk: &SecretKey) -> Result<(), Error> {
     ModuleSignature::sign(path, sk).map_err(|e| e.into())
 }

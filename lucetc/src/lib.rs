@@ -261,7 +261,7 @@ impl<T: AsLucetc> LucetcOpts for T {
 }
 
 impl Lucetc {
-    pub fn new<P: AsRef<Path>>(input: P) -> Self {
+    pub fn new(input: impl AsRef<Path>) -> Self {
         let input = input.as_ref();
         Self {
             input: LucetcInput::Path(input.to_owned()),
@@ -274,7 +274,7 @@ impl Lucetc {
         }
     }
 
-    pub fn try_from_bytes<B: AsRef<[u8]>>(bytes: B) -> Result<Self, Error> {
+    pub fn try_from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, Error> {
         let input = read_bytes(bytes.as_ref().to_vec())?;
         Ok(Self {
             input: LucetcInput::Bytes(input),
@@ -302,7 +302,7 @@ impl Lucetc {
         Ok((module_binary, bindings))
     }
 
-    pub fn object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+    pub fn object_file(&self, output: impl AsRef<Path>) -> Result<(), Error> {
         let (module_contents, bindings) = self.build()?;
         let compiler = self.builder.create(&module_contents, &bindings)?;
         let obj = compiler.object_file()?;
@@ -311,7 +311,7 @@ impl Lucetc {
         Ok(())
     }
 
-    pub fn clif_ir<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+    pub fn clif_ir(&self, output: impl AsRef<Path>) -> Result<(), Error> {
         let (module_contents, bindings) = self.build()?;
 
         let compiler = self.builder.create(&module_contents, &bindings)?;
@@ -321,7 +321,7 @@ impl Lucetc {
         Ok(())
     }
 
-    pub fn shared_object_file<P: AsRef<Path>>(&self, output: P) -> Result<(), Error> {
+    pub fn shared_object_file(&self, output: impl AsRef<Path>) -> Result<(), Error> {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
@@ -338,11 +338,11 @@ impl Lucetc {
 
 const LD_DEFAULT: &str = "ld";
 
-fn link_so<P, Q>(objpath: P, target: &Triple, sopath: Q) -> Result<(), Error>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
+fn link_so(
+    objpath: impl AsRef<Path>,
+    target: &Triple,
+    sopath: impl AsRef<Path>,
+) -> Result<(), Error> {
     // Let `LD` be something like "clang --target=... ..." for convenience.
     let env_ld = env::var("LD").unwrap_or(LD_DEFAULT.into());
     let mut ld_iter = env_ld.split_whitespace();
@@ -373,10 +373,7 @@ where
     Ok(())
 }
 
-fn output_arg_for<P>(cmd_ld: &mut Command, target: &Triple, sopath: P)
-where
-    P: AsRef<Path>,
-{
+fn output_arg_for(cmd_ld: &mut Command, target: &Triple, sopath: impl AsRef<Path>) {
     use target_lexicon::{Environment, OperatingSystem};
 
     if target.operating_system != OperatingSystem::Windows || target.environment == Environment::Gnu
