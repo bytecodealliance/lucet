@@ -1157,6 +1157,7 @@ dependencies = [
  "cranelift-object",
  "cranelift-wasm",
  "env_logger",
+ "gimli 0.20.0",
  "human-size",
  "log",
  "lucet-module",

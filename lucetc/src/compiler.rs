@@ -14,16 +14,18 @@ use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
     binemit, ir,
+    isa::unwind::UnwindInfo,
     isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
 };
 use cranelift_module::{
     Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, FuncOrDataId,
-    Linkage as ClifLinkage, Module as ClifModule,
+    Linkage as ClifLinkage, Module as ClifModule, ModuleError as ClifModuleError,
 };
 use cranelift_object::{ObjectBackend, ObjectBuilder};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
+use gimli::write::{Address, EhFrame, Writer};
 use lucet_module::bindings::Bindings;
 use lucet_module::{
     ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
@@ -271,9 +273,23 @@ impl<'a> Compiler<'a> {
         let mut func_translator = FuncTranslator::new();
         let mut function_manifest_ctx = ClifDataContext::new();
         let mut function_manifest_bytes = Cursor::new(Vec::new());
+        //        let mut eh_frame_table_bytes: Cursor<Vec<u8>> = Cursor::new(Vec::new());
         let mut function_map: HashMap<FuncId, (u32, DataId, usize)> = HashMap::new();
 
-        for (ref func, (code, code_offset)) in self.decls.function_bodies() {
+        let mut frame_table = gimli::write::FrameTable::default();
+
+        let isa = Self::target_isa(
+            self.target.clone(),
+            self.opt_level,
+            &self.cpu_features,
+            self.canonicalize_nans,
+        )?;
+        let cie_id = frame_table.add_cie(match isa.create_systemv_cie() {
+            Some(cie) => cie,
+            None => panic!("uh oh"),
+        });
+
+        for (idx, (ref func, (code, code_offset))) in self.decls.function_bodies().enumerate() {
             let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
@@ -302,6 +318,36 @@ impl<'a> Compiler<'a> {
                 })?;
 
             let size = compiled.size;
+
+            println!(
+                "signature for {} is {:?}",
+                func.name.symbol(),
+                func.signature.call_conv
+            );
+            println!("isa: {}, ptr bits: {}", isa.name(), isa.pointer_bits());
+            let unwind_info =
+                clif_context
+                    .create_unwind_info(isa.as_ref())
+                    .map_err(|compilation_error| Error::FunctionDefinition {
+                        symbol: func.name.symbol().to_string(),
+                        source: ClifModuleError::Compilation(compilation_error),
+                    })?;
+            if let Some(unwind_info) = unwind_info {
+                if let UnwindInfo::SystemV(info) = unwind_info {
+                    frame_table.add_fde(
+                        cie_id,
+                        info.to_fde(Address::Symbol {
+                            symbol: idx, // func.name.symbol().to_string(),
+                            addend: 0,
+                        }),
+                    );
+                } else {
+                    panic!("non-sysv unwind info in lucet module");
+                }
+            } else {
+                println!("no info for {}", func.name.symbol());
+                // .expect("function yields .eh_frame information");
+            }
 
             let trap_data_id = traps.write(&mut self.clif_module, func.name.symbol())?;
 
@@ -378,6 +424,73 @@ impl<'a> Compiler<'a> {
         )?;
         self.clif_module
             .define_data(manifest_data_id, &function_manifest_ctx)?;
+
+        let mut eh_frame_ctx = ClifDataContext::new();
+        struct EhFrameSink<'a> {
+            pub data: Vec<u8>,
+            pub data_context: &'a mut ClifDataContext,
+            pub decls: &'a ModuleDecls<'a>,
+        }
+
+        impl<'a> Writer for EhFrameSink<'a> {
+            type Endian = gimli::LittleEndian;
+
+            fn endian(&self) -> Self::Endian {
+                gimli::LittleEndian
+            }
+            fn len(&self) -> usize {
+                self.data.len()
+            }
+            fn write(&mut self, bytes: &[u8]) -> gimli::write::Result<()> {
+                self.data.extend_from_slice(bytes);
+                Ok(())
+            }
+            fn write_at(&mut self, offset: usize, bytes: &[u8]) -> gimli::write::Result<()> {
+                if offset + bytes.len() > self.data.len() {
+                    return Err(gimli::write::Error::LengthOutOfBounds);
+                }
+                self.data[offset..][..bytes.len()].copy_from_slice(bytes);
+                Ok(())
+            }
+
+            fn write_address(&mut self, address: Address, size: u8) -> gimli::write::Result<()> {
+                match address {
+                    Address::Constant(val) => self.write_udata(val, size),
+                    Address::Symbol { symbol, addend } => {
+                        assert_eq!(addend, 0);
+
+                        use crate::module::UniqueFuncIndex;
+                        let name = self
+                            .decls
+                            .get_func(UniqueFuncIndex::from_u32(symbol as u32))
+                            .expect("valid index")
+                            .name
+                            .as_externalname();
+                        let funcref = self.data_context.import_function(name);
+                        let offset = self.data.len();
+                        self.data_context
+                            .write_function_addr(offset as u32, funcref);
+
+                        self.write_udata(0, size)
+                    }
+                }
+            }
+        }
+        let mut eh_frame = EhFrame(EhFrameSink {
+            data: Vec::new(),
+            data_context: &mut eh_frame_ctx,
+            decls: &self.decls,
+        });
+        frame_table
+            .write_eh_frame(&mut eh_frame)
+            .expect("this works too");
+        let eh_frame_bytes = eh_frame.0.data.into_boxed_slice();
+        eh_frame_ctx.define(eh_frame_bytes);
+        let eh_frame_data_id =
+            self.clif_module
+                .declare_data(".eh_frame", ClifLinkage::Export, false, false, None)?;
+        self.clif_module
+            .define_data(eh_frame_data_id, &eh_frame_ctx)?;
 
         // Write out the structure tying everything together.
         let mut native_data =
