@@ -27,7 +27,7 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
     } else {
         wat2wasm(bytes).map_err(|err| {
             let mut result = format!("wat2wasm error: {}", err);
-            match unsafe { std::mem::transmute::<wabt::Error, wabt::ErrorKind>(err) } {
+            match err.kind() {
                 ErrorKind::Parse(msg) |
                 // this shouldn't be reachable - we're going the other way
                 ErrorKind::Deserialize(msg) |
