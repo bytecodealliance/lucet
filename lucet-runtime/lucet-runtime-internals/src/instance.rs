@@ -374,6 +374,14 @@ impl RunResult {
         self.yielded_ref().is_ok()
     }
 
+    /// Returns `true` if the instance has yielded a value of the given type.
+    pub fn has_yielded<A: Any>(&self) -> bool {
+        match self {
+            RunResult::Yielded(yv) => yv.is::<A>(),
+            _ => false,
+        }
+    }
+
     /// Unwraps a run result into a yielded value.
     ///
     /// # Panics
@@ -1343,9 +1351,14 @@ impl YieldedVal {
         YieldedVal { val: Box::new(val) }
     }
 
+    /// Returns `true` if the guest yielded the parameterized type.
+    pub fn is<A: Any>(&self) -> bool {
+        self.val.is::<A>()
+    }
+
     /// Returns `true` if the guest yielded without a value.
     pub fn is_none(&self) -> bool {
-        self.val.is::<EmptyYieldVal>()
+        self.is::<EmptyYieldVal>()
     }
 
     /// Returns `true` if the guest yielded with a value.

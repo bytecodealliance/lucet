@@ -18,6 +18,7 @@ pub mod alloc;
 pub mod c_api;
 pub mod context;
 pub mod embed_ctx;
+pub mod future;
 pub mod instance;
 #[cfg(feature = "concurrent_testpoints")]
 pub mod lock_testpoints;
