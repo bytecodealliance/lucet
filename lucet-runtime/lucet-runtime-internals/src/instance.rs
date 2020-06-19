@@ -1277,7 +1277,7 @@ impl Instance {
                     Ok(_) => lucet_bail!("resume with forced unwind returned normally"),
                 }
             }
-            State::Faulted { context, .. } => {
+            State::Faulted { context, details, .. } => {
                 #[unwind(allowed)]
                 extern "C" fn initiate_unwind() {
                     panic!(TerminationDetails::ForcedUnwind);
@@ -1287,7 +1287,7 @@ impl Instance {
                 context.as_ptr().save_to_context(&mut self.ctx);
 
                 // get the instruction pointer when the fault was raised
-                let guest_addr = context.as_ptr().get_ip();
+                let guest_addr = details.rip_addr;
 
                 // if we should unwind by returning into the guest to cause a fault, do so with the redzone
                 // available in case the guest was at or close to overflowing.
