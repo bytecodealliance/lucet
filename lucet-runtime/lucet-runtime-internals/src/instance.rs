@@ -1277,7 +1277,9 @@ impl Instance {
                     Ok(_) => lucet_bail!("resume with forced unwind returned normally"),
                 }
             }
-            State::Faulted { context, details, .. } => {
+            State::Faulted {
+                context, details, ..
+            } => {
                 #[unwind(allowed)]
                 extern "C" fn initiate_unwind() {
                     panic!(TerminationDetails::ForcedUnwind);
