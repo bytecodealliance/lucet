@@ -5,8 +5,7 @@ mod tests;
 
 use crate::instance::Instance;
 use crate::val::{val_to_reg, val_to_stack, RegVal, UntypedRetVal, Val};
-use nix;
-use nix::sys::signal;
+
 use std::arch::x86_64::{__m128, _mm_setzero_ps};
 use std::ptr::NonNull;
 use std::{mem, ptr};
@@ -123,7 +122,6 @@ pub struct Context {
     // TODO ACF 2019-10-23: make Instance into a generic parameter?
     backstop_callback: *const unsafe extern "C" fn(*mut Instance),
     callback_data: *mut Instance,
-    sigset: signal::SigSet,
 }
 
 impl Context {
@@ -137,7 +135,6 @@ impl Context {
             parent_ctx: ptr::null_mut(),
             backstop_callback: Context::default_backstop_callback as *const _,
             callback_data: ptr::null_mut(),
-            sigset: signal::SigSet::empty(),
         }
     }
 
