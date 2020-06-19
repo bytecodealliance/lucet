@@ -14,18 +14,16 @@ use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
     binemit, ir,
-    isa::unwind::UnwindInfo,
     isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
 };
 use cranelift_module::{
     Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, FuncOrDataId,
-    Linkage as ClifLinkage, Module as ClifModule, ModuleError as ClifModuleError,
+    Linkage as ClifLinkage, Module as ClifModule,
 };
 use cranelift_object::{ObjectBackend, ObjectBuilder};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
-use gimli::write::{Address, EhFrame, Writer};
 use lucet_module::bindings::Bindings;
 use lucet_module::{
     ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
@@ -273,23 +271,9 @@ impl<'a> Compiler<'a> {
         let mut func_translator = FuncTranslator::new();
         let mut function_manifest_ctx = ClifDataContext::new();
         let mut function_manifest_bytes = Cursor::new(Vec::new());
-        //        let mut eh_frame_table_bytes: Cursor<Vec<u8>> = Cursor::new(Vec::new());
         let mut function_map: HashMap<FuncId, (u32, DataId, usize)> = HashMap::new();
 
-        let mut frame_table = gimli::write::FrameTable::default();
-
-        let isa = Self::target_isa(
-            self.target.clone(),
-            self.opt_level,
-            &self.cpu_features,
-            self.canonicalize_nans,
-        )?;
-        let cie_id = frame_table.add_cie(match isa.create_systemv_cie() {
-            Some(cie) => cie,
-            None => panic!("uh oh"),
-        });
-
-        for (idx, (ref func, (code, code_offset))) in self.decls.function_bodies().enumerate() {
+        for (ref func, (code, code_offset)) in self.decls.function_bodies() {
             let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
