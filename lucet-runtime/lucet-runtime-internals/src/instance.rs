@@ -264,6 +264,9 @@ pub struct Instance {
     /// The value passed back to the guest when resuming a yielded instance.
     pub(crate) resumed_val: Option<Box<dyn Any + 'static>>,
 
+    /// Whether or not the instance is running in an async context
+    pub running_async: bool,
+
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
     /// It is also used to compute the size of the structure up to that point, i.e. without padding.
