@@ -1,4 +1,6 @@
+use crate::context::Context;
 use libc::{c_int, c_short, c_void, sigset_t, size_t};
+use std::arch::x86_64::{__m128, _mm_loadu_ps};
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct sigaltstack {
@@ -147,6 +149,41 @@ impl UContextPtr {
     pub fn set_rdi(self, new_rdi: u64) {
         let mcontext: &mut mcontext64 = unsafe { &mut (*self.0).uc_mcontext.as_mut().unwrap() };
         mcontext.ss.rdi = new_rdi;
+    }
+
+    pub fn save_to_context(&self, ctx: &mut Context) {
+        let mcontext: &mut mcontext64 = unsafe { (*self.0).uc_mcontext.as_mut().unwrap() };
+        ctx.gpr.rbx = mcontext.ss.rbx;
+        ctx.gpr.rsp = mcontext.ss.rsp;
+        ctx.gpr.rbp = mcontext.ss.rbp;
+        ctx.gpr.rdi = mcontext.ss.rdi;
+        ctx.gpr.r12 = mcontext.ss.r12;
+        ctx.gpr.r13 = mcontext.ss.r13;
+        ctx.gpr.r14 = mcontext.ss.r14;
+        ctx.gpr.r15 = mcontext.ss.r15;
+
+        let fpregs = &mcontext.fs;
+        let xmms = [
+            fpregs.fpu_xmm0,
+            fpregs.fpu_xmm1,
+            fpregs.fpu_xmm2,
+            fpregs.fpu_xmm3,
+            fpregs.fpu_xmm4,
+            fpregs.fpu_xmm5,
+            fpregs.fpu_xmm6,
+            fpregs.fpu_xmm7,
+        ]
+            .iter()
+            .map(|reg| unsafe { _mm_loadu_ps(reg.0.as_ptr() as *const u32 as *const _) })
+            .collect::<Vec<__m128>>();
+        ctx.fpr.xmm0 = xmms[0];
+        ctx.fpr.xmm1 = xmms[1];
+        ctx.fpr.xmm2 = xmms[2];
+        ctx.fpr.xmm3 = xmms[3];
+        ctx.fpr.xmm4 = xmms[4];
+        ctx.fpr.xmm5 = xmms[5];
+        ctx.fpr.xmm6 = xmms[6];
+        ctx.fpr.xmm7 = xmms[7];
     }
 }
 
