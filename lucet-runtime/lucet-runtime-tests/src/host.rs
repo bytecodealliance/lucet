@@ -28,14 +28,15 @@ macro_rules! host_tests {
         const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
 
         lazy_static! {
-            static ref HOSTCALL_MUTEX: Mutex<()> = Mutex::new(());
             static ref NESTED_OUTER: Mutex<()> = Mutex::new(());
             static ref NESTED_INNER: Mutex<()> = Mutex::new(());
             static ref NESTED_REGS_OUTER: Mutex<()> = Mutex::new(());
             static ref NESTED_REGS_INNER: Mutex<()> = Mutex::new(());
-            static ref BAD_ACCESS_UNWIND: Mutex<()> = Mutex::new(());
-            static ref STACK_OVERFLOW_UNWIND: Mutex<()> = Mutex::new(());
         }
+
+        static mut HOSTCALL_MUTEX: Option<Mutex<()>> = None;
+        static mut BAD_ACCESS_UNWIND: Option<Mutex<()>> = None;
+        static mut STACK_OVERFLOW_UNWIND: Option<Mutex<()>> = None;
 
         #[allow(unreachable_code)]
         #[inline]
@@ -84,7 +85,7 @@ macro_rules! host_tests {
         #[allow(unreachable_code)]
         #[no_mangle]
         pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &Vmctx) {
-            let lock = HOSTCALL_MUTEX.lock().unwrap();
+            let lock = unsafe { HOSTCALL_MUTEX.as_ref().unwrap() }.lock().unwrap();
             unsafe {
                 lucet_hostcall_terminate!(ERROR_MESSAGE);
             }
@@ -209,7 +210,7 @@ macro_rules! host_tests {
             vmctx: &Vmctx,
             cb_idx: u32,
         ) -> () {
-            let lock = STACK_OVERFLOW_UNWIND.lock().unwrap();
+            let lock = unsafe { STACK_OVERFLOW_UNWIND.as_ref().unwrap() }.lock().unwrap();
 
             let func = vmctx
                 .get_func_from_idx(0, cb_idx)
@@ -231,7 +232,7 @@ macro_rules! host_tests {
             vmctx: &Vmctx,
             cb_idx: u32,
         ) -> () {
-            let lock = BAD_ACCESS_UNWIND.lock().unwrap();
+            let lock = unsafe { BAD_ACCESS_UNWIND.as_ref().unwrap() }.lock().unwrap();
 
             let func = vmctx
                 .get_func_from_idx(0, cb_idx)
@@ -384,7 +385,7 @@ macro_rules! host_tests {
                 };
                 use std::sync::{Arc, Mutex};
                 use $crate::build::test_module_c;
-                use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder};
+                use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder, test_ex};
                 use $TestRegion as TestRegion;
 
                 #[test]
@@ -460,29 +461,42 @@ macro_rules! host_tests {
 
                 #[test]
                 fn run_hostcall_error_unwind() {
-                    let module =
-                        test_module_c("host", "hostcall_error_unwind.c").expect("build and load module");
-                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
-
-                    let mut inst = region
-                        .new_instance(module)
-                        .expect("instance can be created");
-
-                    match inst.run("main", &[0u32.into(), 0u32.into()]) {
-                        Err(Error::RuntimeTerminated(term)) => {
-                            assert_eq!(
-                                *term
-                                    .provided_details()
-                                    .expect("user provided termination reason")
-                                    .downcast_ref::<&'static str>()
-                                    .expect("error was static str"),
-                                super::ERROR_MESSAGE
-                            );
+                    test_ex(|| {
+                        // Since `hostcall_test_func_hostcall_error_unwind` is reused in two
+                        // different modules, meaning two different tests, we need to reset the
+                        // mutex it will (hopefully) poison before running this test.
+                        //
+                        // The contention for this global mutex is why this test must be `test_ex`.
+                        unsafe {
+                            super::HOSTCALL_MUTEX = Some(Mutex::new(()));
                         }
-                        res => panic!("unexpected result: {:?}", res),
-                    }
 
-                    assert!(super::HOSTCALL_MUTEX.is_poisoned());
+                        let module =
+                            test_module_c("host", "hostcall_error_unwind.c").expect("build and load module");
+                        let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        match inst.run("main", &[0u32.into(), 0u32.into()]) {
+                            Err(Error::RuntimeTerminated(term)) => {
+                                assert_eq!(
+                                    *term
+                                        .provided_details()
+                                        .expect("user provided termination reason")
+                                        .downcast_ref::<&'static str>()
+                                        .expect("error was static str"),
+                                    super::ERROR_MESSAGE
+                                );
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        unsafe {
+                            assert!(super::HOSTCALL_MUTEX.as_ref().unwrap().is_poisoned());
+                        }
+                    })
                 }
 
                 /// Check that if two segments of hostcall stack are present when terminating, that they
@@ -580,28 +594,40 @@ macro_rules! host_tests {
                 /// Ensures that hostcall stack frames get unwound when a fault occurs in guest code.
                 #[test]
                 fn bad_access_unwind() {
-                    let module = test_module_c("host", "fault_unwind.c").expect("build and load module");
-                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
-                    let mut inst = region
-                        .new_instance(module)
-                        .expect("instance can be created");
-                    inst.run("bad_access", &[]).unwrap_err();
-                    inst.reset().unwrap();
-                    assert!(super::BAD_ACCESS_UNWIND.is_poisoned());
+                    test_ex(|| {
+                        unsafe {
+                            super::BAD_ACCESS_UNWIND = Some(Mutex::new(()));
+                        }
+                        let module = test_module_c("host", "fault_unwind.c").expect("build and load module");
+                        let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+                        inst.run("bad_access", &[]).unwrap_err();
+                        inst.reset().unwrap();
+                        unsafe {
+                            assert!(unsafe { super::BAD_ACCESS_UNWIND.as_ref().unwrap() }.is_poisoned());
+                        }
+                    })
                 }
 
                 /// Ensures that hostcall stack frames get unwound even when a stack overflow occurs in
                 /// guest code.
                 #[test]
                 fn stack_overflow_unwind() {
-                    let module = test_module_c("host", "fault_unwind.c").expect("build and load module");
-                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
-                    let mut inst = region
-                        .new_instance(module)
-                        .expect("instance can be created");
-                    inst.run("stack_overflow", &[]).unwrap_err();
-                    inst.reset().unwrap();
-                    assert!(super::STACK_OVERFLOW_UNWIND.is_poisoned());
+                    test_ex(|| {
+                        unsafe {
+                            super::STACK_OVERFLOW_UNWIND = Some(Mutex::new(()));
+                        }
+                        let module = test_module_c("host", "fault_unwind.c").expect("build and load module");
+                        let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+                        inst.run("stack_overflow", &[]).unwrap_err();
+                        inst.reset().unwrap();
+                        assert!(unsafe { super::STACK_OVERFLOW_UNWIND.as_ref().unwrap() }.is_poisoned());
+                    })
                 }
 
                 #[test]

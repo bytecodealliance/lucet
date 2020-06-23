@@ -320,7 +320,6 @@ impl RegionInternal for UffdRegion {
     }
 
     fn enable_stack_redzone(&self, _slot: &Slot) {
-        // no-op
     }
 
     fn disable_stack_redzone(&self, _slot: &Slot) {
@@ -510,7 +509,7 @@ impl UffdRegion {
             sigstack: sigstack as *mut c_void,
             limits: region.limits.clone(),
             region: Arc::downgrade(region) as Weak<dyn RegionInternal>,
-            redzone_stack_enabled: true,
+            redzone_stack_enabled: false,
         })
     }
 }
