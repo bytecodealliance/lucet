@@ -13,8 +13,8 @@ proc-macro = true
 
 [dependencies]
 lucet-wiggle = { path = "../../lucet-wiggle", version = "0.7.0-dev" }
-wasi-common = { path = "../../wasmtime/crates/wasi-common",  version = "0.17.0", features = ["wiggle_metadata"] }
-wiggle-generate = { path = "../../wasmtime/crates/wiggle/generate",  version = "0.17.0" }
+wasi-common = { path = "../../wasmtime/crates/wasi-common",  version = "0.18.0", features = ["wiggle_metadata"] }
+wiggle-generate = { path = "../../wasmtime/crates/wiggle/generate",  version = "0.18.0" }
 syn = { version = "1.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
