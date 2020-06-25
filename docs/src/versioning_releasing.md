@@ -58,7 +58,7 @@ changelog, and is expected to be refined as we get more experience with it.
 1. Create a new release branch based on the commit you want to eventually release. For example:
 
    ```shell
-   $ git checkout -b 0.5.2-release origin/master
+   $ git checkout -b 0.5.2-release origin/main
    ```
 
 1. Replace the development version with the final version in the crates' `Cargo.toml` files. For

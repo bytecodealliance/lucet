@@ -862,8 +862,8 @@ macro_rules! alloc_tests {
         /// random nature of the allocation strategy.
         #[test]
         fn slot_counts_work_with_custom_random_alloc() {
-            let mut master_rng = thread_rng();
-            let seed: u64 = master_rng.gen();
+            let mut primary_rng = thread_rng();
+            let seed: u64 = primary_rng.gen();
             eprintln!(
                 "Seeding slot_counts_work_with_custom_random_alloc() with {}",
                 seed
@@ -930,8 +930,8 @@ macro_rules! alloc_tests {
         /// exercise the random nature of the allocation strategy.
         #[test]
         fn slot_counts_work_with_mixed_alloc() {
-            let mut master_rng = thread_rng();
-            let seed: u64 = master_rng.gen();
+            let mut primary_rng = thread_rng();
+            let seed: u64 = primary_rng.gen();
             eprintln!("Seeding slot_counts_work_with_mixed_alloc() with {}", seed);
 
             let rng: StdRng = SeedableRng::seed_from_u64(seed);

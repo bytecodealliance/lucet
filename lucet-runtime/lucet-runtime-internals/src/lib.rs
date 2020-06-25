@@ -1,6 +1,6 @@
 //! `lucet-runtime` is a library for loading, running, and monitoring ahead-of-time compiled
 //! WebAssembly modules in lightweight sandboxes. It is intended to work with modules compiled by
-//! [`lucetc`](https://github.com/fastly/lucet/tree/master/lucetc).
+//! [`lucetc`](https://github.com/bytecodealliance/lucet/tree/main/lucetc).
 
 #![deny(bare_trait_objects)]
 
