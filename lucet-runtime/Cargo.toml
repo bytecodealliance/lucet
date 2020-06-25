@@ -27,6 +27,7 @@ nix = "0.17"
 rayon = "1.0"
 tempfile = "3.0"
 anyhow = "1"
+futures = "0.3"
 
 [build-dependencies]
 # only used for tests

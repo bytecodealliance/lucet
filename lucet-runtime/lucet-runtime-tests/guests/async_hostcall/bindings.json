@@ -1,0 +1,5 @@
+{
+    "env": {
+        "hostcall_containing_yield": "hostcall_containing_yield"
+    }
+}

@@ -1018,6 +1018,7 @@ dependencies = [
  "byteorder",
  "cc",
  "cfg-if",
+ "futures",
  "lazy_static",
  "libc",
  "lucet-module",
