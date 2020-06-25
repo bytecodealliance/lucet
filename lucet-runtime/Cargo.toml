@@ -18,16 +18,16 @@ num-traits = "0.2"
 num-derive = "0.3.0"
 
 [dev-dependencies]
+anyhow = "1"
 byteorder = "1.2"
+futures-executor = "0.3.5"
 lazy_static = "1.4"
-lucetc = { path = "../lucetc", version = "=0.7.0-dev" }
 lucet-runtime-tests = { path = "lucet-runtime-tests", version = "=0.7.0-dev" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.7.0-dev" }
+lucetc = { path = "../lucetc", version = "=0.7.0-dev" }
 nix = "0.17"
 rayon = "1.0"
 tempfile = "3.0"
-anyhow = "1"
-futures = "0.3"
 
 [build-dependencies]
 # only used for tests

@@ -2,9 +2,13 @@ use crate::error::Error;
 use crate::instance::{Instance, RunResult, State, TerminationDetails};
 use crate::val::Val;
 use crate::vmctx::{Vmctx, VmctxInternal};
-use futures::future::{FutureExt, LocalBoxFuture};
 use std::any::Any;
 use std::future::Future;
+use std::pin::Pin;
+
+/// This is the same type defined by the `futures` library, but we don't need the rest of the
+/// library for this purpose.
+type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
 impl Vmctx {
     /// Run an `async` computation. A `Vmctx` is passed to ordinary
@@ -28,7 +32,7 @@ impl Vmctx {
         }
         // Wrap the Output of `f` as a boxed ResumeVal. Then, box the entire
         // async computation.
-        let f = async move { ResumeVal(Box::new(f.await)) }.boxed_local();
+        let f = Box::pin(async move { ResumeVal(Box::new(f.await)) });
         // Change the lifetime of the async computation from `'a` to `'static.
         // We need to lie about this lifetime so that `YieldedFuture` may impl
         // `Any` and be passed through the yield. `Instance::run_async`
