@@ -315,6 +315,10 @@ pub mod lucet_result {
                                 reason: lucet_terminated_reason::Remote,
                                 provided: std::ptr::null_mut(),
                             },
+                            TerminationDetails::AwaitNeedsAsync => lucet_terminated {
+                                reason: lucet_terminated_reason::AwaitNeedsAsync,
+                                provided: std::ptr::null_mut(),
+                            },
                         },
                     },
                 },
@@ -369,6 +373,7 @@ pub mod lucet_result {
         BorrowError,
         Provided,
         Remote,
+        AwaitNeedsAsync,
     }
 
     #[repr(C)]

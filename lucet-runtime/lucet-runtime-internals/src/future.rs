@@ -1,7 +1,5 @@
 use crate::error::Error;
-use crate::instance::Instance;
-use crate::instance::RunResult;
-use crate::lucet_hostcall_terminate;
+use crate::instance::{Instance, RunResult, TerminationDetails, State};
 use crate::val::Val;
 use crate::vmctx::{Vmctx, VmctxInternal};
 use futures::future::{FutureExt, LocalBoxFuture};
@@ -21,8 +19,13 @@ impl Vmctx {
         R: Any + 'static,
     {
         // Die if we aren't in Instance::run_async
-        if !self.instance().running_async {
-            lucet_hostcall_terminate!("Vmctx::run_await must be used inside Instance::run_async");
+        match self.instance().state {
+            State::Running{ async_context } => {
+                if !async_context {
+                    panic!(TerminationDetails::AwaitNeedsAsync)
+                }
+            }
+            _ => unreachable!("Access to vmctx implies instance is Running"),
         }
         // Wrap the Output of `f` as a boxed ResumeVal. Then, box the entire
         // async computation.
@@ -64,12 +67,6 @@ impl Instance {
             ));
         }
 
-        // This flag tells `Vmctx::run_await` that the instance is able to
-        // run its YieldedFuture, otherwise, run_await will terminate the
-        // instance. We must unset this flag before returning from this
-        // function.
-        self.running_async = true;
-
         // Store the ResumeVal here when we get it.
         let mut resume_val: Option<ResumeVal> = None;
         let ret = loop {
@@ -78,14 +75,16 @@ impl Instance {
                 // A previous iteration of the loop stored the ResumeVal in
                 // `resume_val`, send it back to the guest ctx and continue
                 // running:
-                self.resume_with_val(
+                self._resume_with_val(
                     resume_val
                         .take()
                         .expect("is_yielded implies resume_value is some"),
+                    true,
                 )
             } else {
                 // This is the first iteration, call the entrypoint:
-                self.run(entrypoint, args)
+                let func = self.module.get_export_func(entrypoint)?;
+                self.run_func(func, args, true)
             };
             match run {
                 Ok(run_result) => {
@@ -120,8 +119,6 @@ impl Instance {
             }
         };
 
-        // Unset the flag.
-        self.running_async = false;
         // Return the result of the run.
         return ret;
     }
