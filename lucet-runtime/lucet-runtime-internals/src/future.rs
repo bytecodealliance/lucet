@@ -1,11 +1,10 @@
 use crate::error::Error;
-use crate::instance::{Instance, RunResult, TerminationDetails, State};
+use crate::instance::{Instance, RunResult, State, TerminationDetails};
 use crate::val::Val;
 use crate::vmctx::{Vmctx, VmctxInternal};
 use futures::future::{FutureExt, LocalBoxFuture};
 use std::any::Any;
 use std::future::Future;
-
 
 impl Vmctx {
     /// Run an `async` computation. A `Vmctx` is passed to ordinary
@@ -20,7 +19,7 @@ impl Vmctx {
     {
         // Die if we aren't in Instance::run_async
         match self.instance().state {
-            State::Running{ async_context } => {
+            State::Running { async_context } => {
                 if !async_context {
                     panic!(TerminationDetails::AwaitNeedsAsync)
                 }
