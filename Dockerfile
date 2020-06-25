@@ -25,10 +25,12 @@ RUN apt-get update \
 	gcc-multilib \
 	clang-6.0 \
 	llvm-6.0 \
+	lld-9 \
 	&& rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
 RUN update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-6.0 100
+RUN update-alternatives --install /usr/bin/ld ld /usr/bin/lld-9 50
 
 # Setting a consistent LD_LIBRARY_PATH across the entire environment prevents unnecessary Cargo
 # rebuilds.
