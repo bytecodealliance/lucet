@@ -21,7 +21,7 @@ pub enum State {
     ///
     /// Transitions to `Ready` when the guest function returns normally, or to `Faulted`,
     /// `Terminating`, or `Yielding` if the instance faults, terminates, or yields.
-    Running,
+    Running { async_context: bool },
 
     /// The instance has faulted, potentially fatally.
     ///
@@ -85,7 +85,12 @@ impl std::fmt::Display for State {
         match self {
             State::NotStarted => write!(f, "not started"),
             State::Ready => write!(f, "ready"),
-            State::Running => write!(f, "running"),
+            State::Running {
+                async_context: false,
+            } => write!(f, "running"),
+            State::Running {
+                async_context: true,
+            } => write!(f, "running (in async context)"),
             State::Faulted {
                 details, siginfo, ..
             } => {
@@ -138,8 +143,16 @@ impl State {
     }
 
     pub fn is_running(&self) -> bool {
-        if let State::Running = self {
+        if let State::Running { .. } = self {
             true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_running_async(&self) -> bool {
+        if let State::Running { async_context } = self {
+            *async_context
         } else {
             false
         }
