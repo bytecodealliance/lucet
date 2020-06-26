@@ -27,7 +27,7 @@ jobs:
       - full_ci:
           cache_target: true
 
-  full_ci_master:
+  full_ci_main:
     executor: linux
     steps:
       - full_ci:
@@ -42,7 +42,7 @@ jobs:
       - mac_ci:
           cache_target: true
 
-  mac_ci_master:
+  mac_ci_main:
     executor: macos
     steps:
       - mac_ci:
@@ -57,22 +57,22 @@ workflows:
       - full_ci_branch:
           filters:
             branches:
-              ignore: master
-      - full_ci_master:
+              ignore: main
+      - full_ci_main:
           filters:
             branches:
-              only: master
+              only: main
       ################################
       # macOS `make test-ci` targets #
       ################################
       - mac_ci_branch:
           filters:
             branches:
-              ignore: master
-      - mac_ci_master:
+              ignore: main
+      - mac_ci_main:
           filters:
             branches:
-              only: master
+              only: main
 
 commands:
   full_ci:

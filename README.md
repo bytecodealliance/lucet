@@ -21,4 +21,4 @@ Lucet uses, and is developed in collaboration with, the Bytecode Alliance's
 [![asciicast](https://asciinema.org/a/249302.svg)](https://asciinema.org/a/249302)
 
 Lucet's documentation is available at <https://bytecodealliance.github.io/lucet>
-([sources](https://github.com/bytecodealliance/lucet/tree/master/docs)).
+([sources](https://github.com/bytecodealliance/lucet/tree/main/docs)).

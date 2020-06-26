@@ -1,6 +1,6 @@
 //! `KillSwitch` has documentation about the correctness of its various edge cases as part of
 //! Lucet's wider documentation, see this section of the book for more:
-//! https://github.com/bytecodealliance/lucet/blob/master/docs/src/lucet-runtime/killswitch.md#implementation-complexities-when-you-have-a-scheduler-full-of-demons
+//! https://github.com/bytecodealliance/lucet/blob/main/docs/src/lucet-runtime/killswitch.md#implementation-complexities-when-you-have-a-scheduler-full-of-demons
 //!
 //! This module contains actual test cases exercising these conditions where possible. Phrasing
 //! from the above-mentioned section are re-used below in describing test cases. New tests should

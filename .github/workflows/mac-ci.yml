@@ -6,7 +6,7 @@ jobs:
     name: Test (MacOS)
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v2
       with:
         submodules: 'recursive'
 

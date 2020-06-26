@@ -75,7 +75,7 @@ Usually, this should match the `--reserved-size` value given to `lucetc`.
 ## Supported syscalls
 
 We support the entire [WASI
-API](https://github.com/bytecodealliance/wasmtime/blob/master/docs/WASI-api.md), with the exception of
+API](https://github.com/bytecodealliance/wasmtime/blob/main/docs/WASI-api.md), with the exception of
 socket-related syscalls. These will be added when network access is standardized.
 
 ## Thread safety
