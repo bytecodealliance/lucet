@@ -5,12 +5,19 @@
         <meta charset="UTF-8">
         <title>Compiling on macOS - Lucet</title>
         
+        
+
+
+        <!-- Custom HTML head -->
+        
+
 
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
+        <link rel="icon" href="favicon.svg">
         <link rel="shortcut icon" href="favicon.png">
         <link rel="stylesheet" href="css/variables.css">
         <link rel="stylesheet" href="css/general.css">
@@ -19,8 +26,9 @@
 
         <!-- Fonts -->
         <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
-        <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
+        
+        <link rel="stylesheet" href="fonts/fonts.css">
+        
 
         <!-- Highlight.js Stylesheets -->
         <link rel="stylesheet" href="highlight.css">
@@ -36,7 +44,7 @@
         <!-- Provide site root to javascript -->
         <script type="text/javascript">
             var path_to_root = "";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "light";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
         </script>
 
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
@@ -80,8 +88,8 @@
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="Overview.html"><strong aria-hidden="true">1.</strong> Overview</a></li><li class="expanded "><a href="Using-lucet.html"><strong aria-hidden="true">2.</strong> Using Lucet</a></li><li><ol class="section"><li class="expanded "><a href="Compiling.html"><strong aria-hidden="true">2.1.</strong> Compiling Lucet</a></li><li><ol class="section"><li class="expanded "><a href="Compiling-on-Linux.html"><strong aria-hidden="true">2.1.1.</strong> Compiling on Linux</a></li><li class="expanded "><a href="Compiling-on-macOS.html" class="active"><strong aria-hidden="true">2.1.2.</strong> Compiling on macOS</a></li></ol></li><li class="expanded "><a href="Your-first-Lucet-application.html"><strong aria-hidden="true">2.2.</strong> Lucet &quot;Hello World&quot;</a></li><li class="expanded "><a href="lucet-runtime-example.html"><strong aria-hidden="true">2.3.</strong> Using the Lucet runtime API from Rust</a></li><li class="expanded "><a href="Integrity-and-authentication.html"><strong aria-hidden="true">2.4.</strong> Module integrity and authentication</a></li></ol></li><li class="expanded "><a href="Lucet-components.html"><strong aria-hidden="true">3.</strong> Lucet components</a></li><li><ol class="section"><li class="expanded "><a href="lucetc.html"><strong aria-hidden="true">3.1.</strong> lucetc</a></li><li class="expanded "><a href="lucet-runtime.html"><strong aria-hidden="true">3.2.</strong> lucet-runtime</a></li><li><ol class="section"><li class="expanded "><a href="lucet-runtime/killswitch.html"><strong aria-hidden="true">3.2.1.</strong> KillSwitch</a></li></ol></li><li class="expanded "><a href="lucet-wasi.html"><strong aria-hidden="true">3.3.</strong> lucet-wasi</a></li><li class="expanded "><a href="lucet-objdump.html"><strong aria-hidden="true">3.4.</strong> lucet-objdump</a></li><li class="expanded "><a href="lucet-spectest.html"><strong aria-hidden="true">3.5.</strong> lucet-spectest</a></li><li class="expanded "><a href="lucet-wasi-sdk.html"><strong aria-hidden="true">3.6.</strong> lucet-wasi-sdk</a></li><li class="expanded "><a href="lucet-module.html"><strong aria-hidden="true">3.7.</strong> lucet-module</a></li><li class="expanded "><a href="Tests-and-benchmarks.html"><strong aria-hidden="true">3.8.</strong> Tests and benchmarks</a></li><li><ol class="section"><li class="expanded "><a href="sightglass.html"><strong aria-hidden="true">3.8.1.</strong> sightglass</a></li></ol></li></ol></li><li class="expanded "><a href="versioning_releasing.html"><strong aria-hidden="true">4.</strong> Versioning and releasing to crates.io</a></li><li class="expanded "><a href="Security.html"><strong aria-hidden="true">5.</strong> Security</a></li><li class="expanded "><a href="CHANGELOG.html"><strong aria-hidden="true">6.</strong> Changelog</a></li><li class="expanded "><a href="License.html"><strong aria-hidden="true">7.</strong> License</a></li></ol>
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="Overview.html"><strong aria-hidden="true">1.</strong> Overview</a></li><li class="chapter-item expanded "><a href="Using-lucet.html"><strong aria-hidden="true">2.</strong> Using Lucet</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="Compiling.html"><strong aria-hidden="true">2.1.</strong> Compiling Lucet</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="Compiling-on-Linux.html"><strong aria-hidden="true">2.1.1.</strong> Compiling on Linux</a></li><li class="chapter-item expanded "><a href="Compiling-on-macOS.html" class="active"><strong aria-hidden="true">2.1.2.</strong> Compiling on macOS</a></li></ol></li><li class="chapter-item expanded "><a href="Your-first-Lucet-application.html"><strong aria-hidden="true">2.2.</strong> Lucet &quot;Hello World&quot;</a></li><li class="chapter-item expanded "><a href="lucet-runtime-example.html"><strong aria-hidden="true">2.3.</strong> Using the Lucet runtime API from Rust</a></li><li class="chapter-item expanded "><a href="Integrity-and-authentication.html"><strong aria-hidden="true">2.4.</strong> Module integrity and authentication</a></li></ol></li><li class="chapter-item expanded "><a href="Lucet-components.html"><strong aria-hidden="true">3.</strong> Lucet components</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="lucetc.html"><strong aria-hidden="true">3.1.</strong> lucetc</a></li><li class="chapter-item expanded "><a href="lucet-runtime.html"><strong aria-hidden="true">3.2.</strong> lucet-runtime</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="lucet-runtime/killswitch.html"><strong aria-hidden="true">3.2.1.</strong> KillSwitch</a></li></ol></li><li class="chapter-item expanded "><a href="lucet-wasi.html"><strong aria-hidden="true">3.3.</strong> lucet-wasi</a></li><li class="chapter-item expanded "><a href="lucet-objdump.html"><strong aria-hidden="true">3.4.</strong> lucet-objdump</a></li><li class="chapter-item expanded "><a href="lucet-spectest.html"><strong aria-hidden="true">3.5.</strong> lucet-spectest</a></li><li class="chapter-item expanded "><a href="lucet-wasi-sdk.html"><strong aria-hidden="true">3.6.</strong> lucet-wasi-sdk</a></li><li class="chapter-item expanded "><a href="lucet-module.html"><strong aria-hidden="true">3.7.</strong> lucet-module</a></li><li class="chapter-item expanded "><a href="Tests-and-benchmarks.html"><strong aria-hidden="true">3.8.</strong> Tests and benchmarks</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="sightglass.html"><strong aria-hidden="true">3.8.1.</strong> sightglass</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="versioning_releasing.html"><strong aria-hidden="true">4.</strong> Versioning and releasing to crates.io</a></li><li class="chapter-item expanded "><a href="Security.html"><strong aria-hidden="true">5.</strong> Security</a></li><li class="chapter-item expanded "><a href="CHANGELOG.html"><strong aria-hidden="true">6.</strong> Changelog</a></li><li class="chapter-item expanded "><a href="License.html"><strong aria-hidden="true">7.</strong> License</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -90,41 +98,40 @@
 
             <div class="page">
                 
-                <div id="menu-bar" class="menu-bar">
-                    <div id="menu-bar-sticky-container">
-                        <div class="left-buttons">
-                            <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
-                                <i class="fa fa-bars"></i>
-                            </button>
-                            <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
-                                <i class="fa fa-paint-brush"></i>
-                            </button>
-                            <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
-                                <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
-                                <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
-                                <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
-                                <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
-                                <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
-                            </ul>
-                            
-                            <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
-                                <i class="fa fa-search"></i>
-                            </button>
-                            
-                        </div>
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
 
-                        <h1 class="menu-title">Lucet</h1>
+                    <h1 class="menu-title">Lucet</h1>
 
-                        <div class="right-buttons">
-                            <a href="print.html" title="Print this book" aria-label="Print this book">
-                                <i id="print-button" class="fa fa-print"></i>
-                            </a>
-                            
-                            <a href="https://github.com/bytecodealliance/lucet" title="Git repository" aria-label="Git repository">
-                                <i id="git-repository-button" class="fa fa-github"></i>
-                            </a>
-                            
-                        </div>
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                        <a href="https://github.com/bytecodealliance/lucet" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        
                     </div>
                 </div>
 
@@ -153,39 +160,45 @@
                 <div id="content" class="content">
                     <main>
                         <h1><a class="header" href="#compiling-on-macos" id="compiling-on-macos">Compiling on macOS</a></h1>
+<h2><a class="header" href="#prerequisites" id="prerequisites">Prerequisites</a></h2>
 <p>Install <code>llvm</code>, <code>rust</code> and <code>cmake</code> using <a href="https://brew.sh">Homebrew</a>:</p>
 <pre><code class="language-sh">brew install llvm rust cmake
 </code></pre>
-<p>In order to compile applications to WebAssembly, builtins need to be installed
-as well:</p>
-<pre><code class="language-sh">curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
-sudo tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
+<p>In order to compile applications written in C to WebAssembly, <code>clang</code> builtins need to be installed:</p>
+<pre><code class="language-sh">curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/libclang_rt.builtins-wasm32-wasi-10.0.tar.gz | \
+  tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
 </code></pre>
-<p>Fetch, compile and install the WASI libc:</p>
-<pre><code class="language-sh">git clone --recursive https://github.com/CraneStation/wasi-libc
+<p>As well as the WASI sysroot:</p>
+<pre><code class="language-sh">sudo mkdir -p /opt
 
-cd wasi-libc
-
-sudo env PATH=/usr/local/opt/llvm/bin:$PATH \
-  make INSTALL_DIR=/opt/wasi-sysroot install
-
-cd - &amp;&amp; sudo rm -fr wasi-libc
+curl -sS -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sysroot-10.0.tar.gz | \
+  sudo tar x -zf - -C /opt
 </code></pre>
+<h2><a class="header" href="#compiling-and-installing-lucet" id="compiling-and-installing-lucet">Compiling and installing Lucet</a></h2>
 <p>Enter the Lucet git repository clone, and fetch/update the submodules:</p>
 <pre><code class="language-sh">cd lucet
 
 git submodule update --init
 </code></pre>
-<p>Set relevant environment variables:</p>
+<p>Define the location of the WASI sysroot installation:</p>
 <pre><code class="language-sh">export WASI_SYSROOT=/opt/wasi-sysroot
-export CLANG_ROOT=&quot;$(echo /usr/local/opt/llvm/lib/clang/10*)&quot;
-export CLANG=/usr/local/opt/llvm/bin/clang
 </code></pre>
-<p>Finally, compile and install toolchain:</p>
+<p>Finally, compile and install the toolchain:</p>
 <pre><code class="language-sh">env LUCET_PREFIX=/opt/lucet make install
 </code></pre>
-<p>Change <code>LUCET_PREFIX</code> to the directory you would like to install Lucet into. <code>/opt/lucet</code> is the default directory.
-The Lucet executable files can be found in the <code>target/release/</code> directory.</p>
+<p>Change <code>LUCET_PREFIX</code> to the directory you would like to install Lucet into. <code>/opt/lucet</code> is the default directory.</p>
+<h2><a class="header" href="#setting-up-the-environment" id="setting-up-the-environment">Setting up the environment</a></h2>
+<p>In order to add <code>/opt/lucet</code> to the command search path, as well register the library path for the Lucet runtime, the following command can be run interactively or added to the shell startup files:</p>
+<pre><code class="language-sh">source /opt/lucet/bin/setenv.sh
+</code></pre>
+<h2><a class="header" href="#running-the-test-suite" id="running-the-test-suite">Running the test suite</a></h2>
+<p>If you want to run the test suite, and in addition to <code>WASI_SYSROOT</code>, the following environment variables must be set:</p>
+<pre><code class="language-sh">export CLANG_ROOT=&quot;$(echo /usr/local/opt/llvm/lib/clang/10*)&quot;
+export CLANG=/usr/local/opt/llvm/bin/clang
+</code></pre>
+<p>And the test suite can then be run with the following command:</p>
+<pre><code class="language-sh">make test
+</code></pre>
 
                     </main>
 
@@ -210,13 +223,13 @@ The Lucet executable files can be found in the <code>target/release/</code> dire
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a href="Compiling-on-Linux.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="Compiling-on-Linux.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
                 
-                    <a href="Your-first-Lucet-application.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="Your-first-Lucet-application.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 
@@ -229,10 +242,10 @@ The Lucet executable files can be found in the <code>target/release/</code> dire
         
 
         
-        
+
         
         <script type="text/javascript">
-            window.playpen_copyable = true;
+            window.playground_copyable = true;
         </script>
         
 

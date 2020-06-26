@@ -7,12 +7,19 @@
         
         <meta name="robots" content="noindex" />
         
+        
+
+
+        <!-- Custom HTML head -->
+        
+
 
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
+        <link rel="icon" href="favicon.svg">
         <link rel="shortcut icon" href="favicon.png">
         <link rel="stylesheet" href="css/variables.css">
         <link rel="stylesheet" href="css/general.css">
@@ -21,8 +28,9 @@
 
         <!-- Fonts -->
         <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
-        <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
+        
+        <link rel="stylesheet" href="fonts/fonts.css">
+        
 
         <!-- Highlight.js Stylesheets -->
         <link rel="stylesheet" href="highlight.css">
@@ -38,7 +46,7 @@
         <!-- Provide site root to javascript -->
         <script type="text/javascript">
             var path_to_root = "";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "light";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
         </script>
 
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
@@ -82,8 +90,8 @@
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <div id="sidebar-scrollbox" class="sidebar-scrollbox">
-                <ol class="chapter"><li class="expanded "><a href="Overview.html"><strong aria-hidden="true">1.</strong> Overview</a></li><li class="expanded "><a href="Using-lucet.html"><strong aria-hidden="true">2.</strong> Using Lucet</a></li><li><ol class="section"><li class="expanded "><a href="Compiling.html"><strong aria-hidden="true">2.1.</strong> Compiling Lucet</a></li><li><ol class="section"><li class="expanded "><a href="Compiling-on-Linux.html"><strong aria-hidden="true">2.1.1.</strong> Compiling on Linux</a></li><li class="expanded "><a href="Compiling-on-macOS.html"><strong aria-hidden="true">2.1.2.</strong> Compiling on macOS</a></li></ol></li><li class="expanded "><a href="Your-first-Lucet-application.html"><strong aria-hidden="true">2.2.</strong> Lucet &quot;Hello World&quot;</a></li><li class="expanded "><a href="lucet-runtime-example.html"><strong aria-hidden="true">2.3.</strong> Using the Lucet runtime API from Rust</a></li><li class="expanded "><a href="Integrity-and-authentication.html"><strong aria-hidden="true">2.4.</strong> Module integrity and authentication</a></li></ol></li><li class="expanded "><a href="Lucet-components.html"><strong aria-hidden="true">3.</strong> Lucet components</a></li><li><ol class="section"><li class="expanded "><a href="lucetc.html"><strong aria-hidden="true">3.1.</strong> lucetc</a></li><li class="expanded "><a href="lucet-runtime.html"><strong aria-hidden="true">3.2.</strong> lucet-runtime</a></li><li><ol class="section"><li class="expanded "><a href="lucet-runtime/killswitch.html"><strong aria-hidden="true">3.2.1.</strong> KillSwitch</a></li></ol></li><li class="expanded "><a href="lucet-wasi.html"><strong aria-hidden="true">3.3.</strong> lucet-wasi</a></li><li class="expanded "><a href="lucet-objdump.html"><strong aria-hidden="true">3.4.</strong> lucet-objdump</a></li><li class="expanded "><a href="lucet-spectest.html"><strong aria-hidden="true">3.5.</strong> lucet-spectest</a></li><li class="expanded "><a href="lucet-wasi-sdk.html"><strong aria-hidden="true">3.6.</strong> lucet-wasi-sdk</a></li><li class="expanded "><a href="lucet-module.html"><strong aria-hidden="true">3.7.</strong> lucet-module</a></li><li class="expanded "><a href="Tests-and-benchmarks.html"><strong aria-hidden="true">3.8.</strong> Tests and benchmarks</a></li><li><ol class="section"><li class="expanded "><a href="sightglass.html"><strong aria-hidden="true">3.8.1.</strong> sightglass</a></li></ol></li></ol></li><li class="expanded "><a href="versioning_releasing.html"><strong aria-hidden="true">4.</strong> Versioning and releasing to crates.io</a></li><li class="expanded "><a href="Security.html"><strong aria-hidden="true">5.</strong> Security</a></li><li class="expanded "><a href="CHANGELOG.html"><strong aria-hidden="true">6.</strong> Changelog</a></li><li class="expanded "><a href="License.html"><strong aria-hidden="true">7.</strong> License</a></li></ol>
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="Overview.html"><strong aria-hidden="true">1.</strong> Overview</a></li><li class="chapter-item expanded "><a href="Using-lucet.html"><strong aria-hidden="true">2.</strong> Using Lucet</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="Compiling.html"><strong aria-hidden="true">2.1.</strong> Compiling Lucet</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="Compiling-on-Linux.html"><strong aria-hidden="true">2.1.1.</strong> Compiling on Linux</a></li><li class="chapter-item expanded "><a href="Compiling-on-macOS.html"><strong aria-hidden="true">2.1.2.</strong> Compiling on macOS</a></li></ol></li><li class="chapter-item expanded "><a href="Your-first-Lucet-application.html"><strong aria-hidden="true">2.2.</strong> Lucet &quot;Hello World&quot;</a></li><li class="chapter-item expanded "><a href="lucet-runtime-example.html"><strong aria-hidden="true">2.3.</strong> Using the Lucet runtime API from Rust</a></li><li class="chapter-item expanded "><a href="Integrity-and-authentication.html"><strong aria-hidden="true">2.4.</strong> Module integrity and authentication</a></li></ol></li><li class="chapter-item expanded "><a href="Lucet-components.html"><strong aria-hidden="true">3.</strong> Lucet components</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="lucetc.html"><strong aria-hidden="true">3.1.</strong> lucetc</a></li><li class="chapter-item expanded "><a href="lucet-runtime.html"><strong aria-hidden="true">3.2.</strong> lucet-runtime</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="lucet-runtime/killswitch.html"><strong aria-hidden="true">3.2.1.</strong> KillSwitch</a></li></ol></li><li class="chapter-item expanded "><a href="lucet-wasi.html"><strong aria-hidden="true">3.3.</strong> lucet-wasi</a></li><li class="chapter-item expanded "><a href="lucet-objdump.html"><strong aria-hidden="true">3.4.</strong> lucet-objdump</a></li><li class="chapter-item expanded "><a href="lucet-spectest.html"><strong aria-hidden="true">3.5.</strong> lucet-spectest</a></li><li class="chapter-item expanded "><a href="lucet-wasi-sdk.html"><strong aria-hidden="true">3.6.</strong> lucet-wasi-sdk</a></li><li class="chapter-item expanded "><a href="lucet-module.html"><strong aria-hidden="true">3.7.</strong> lucet-module</a></li><li class="chapter-item expanded "><a href="Tests-and-benchmarks.html"><strong aria-hidden="true">3.8.</strong> Tests and benchmarks</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="sightglass.html"><strong aria-hidden="true">3.8.1.</strong> sightglass</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="versioning_releasing.html"><strong aria-hidden="true">4.</strong> Versioning and releasing to crates.io</a></li><li class="chapter-item expanded "><a href="Security.html"><strong aria-hidden="true">5.</strong> Security</a></li><li class="chapter-item expanded "><a href="CHANGELOG.html"><strong aria-hidden="true">6.</strong> Changelog</a></li><li class="chapter-item expanded "><a href="License.html"><strong aria-hidden="true">7.</strong> License</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -92,41 +100,40 @@
 
             <div class="page">
                 
-                <div id="menu-bar" class="menu-bar">
-                    <div id="menu-bar-sticky-container">
-                        <div class="left-buttons">
-                            <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
-                                <i class="fa fa-bars"></i>
-                            </button>
-                            <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
-                                <i class="fa fa-paint-brush"></i>
-                            </button>
-                            <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
-                                <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
-                                <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
-                                <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
-                                <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
-                                <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
-                            </ul>
-                            
-                            <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
-                                <i class="fa fa-search"></i>
-                            </button>
-                            
-                        </div>
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
 
-                        <h1 class="menu-title">Lucet</h1>
+                    <h1 class="menu-title">Lucet</h1>
 
-                        <div class="right-buttons">
-                            <a href="print.html" title="Print this book" aria-label="Print this book">
-                                <i id="print-button" class="fa fa-print"></i>
-                            </a>
-                            
-                            <a href="https://github.com/bytecodealliance/lucet" title="Git repository" aria-label="Git repository">
-                                <i id="git-repository-button" class="fa fa-github"></i>
-                            </a>
-                            
-                        </div>
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                        <a href="https://github.com/bytecodealliance/lucet" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        
                     </div>
                 </div>
 
@@ -164,7 +171,7 @@ to safely execute untrusted WebAssembly programs inside your application.</stron
 <a href="https://wasm.fastlylabs.com">Terrarium</a> platform.</p>
 <p><a href="https://asciinema.org/a/249302"><img src="https://asciinema.org/a/249302.svg" alt="asciicast" /></a></p>
 <p>Lucet's documentation is available at <a href="https://bytecodealliance.github.io/lucet">https://bytecodealliance.github.io/lucet</a>
-(<a href="https://github.com/bytecodealliance/lucet/tree/master/docs">sources</a>).</p>
+(<a href="https://github.com/bytecodealliance/lucet/tree/main/docs">sources</a>).</p>
 <h2><a class="header" href="#getting-started" id="getting-started">Getting started</a></h2>
 <p>To learn how to set up the toolchain, and then compile and run your first WebAssembly application
 using Lucet, see <a href="./Getting-started.html">Getting started</a>.</p>
@@ -196,77 +203,21 @@ API</a> to embed a Lucet program in your Rust application.</p>
 <a href="./Compiling-on-macOS.html">macOS</a> (experimental).</p>
 <p>If you are using another platform, or if the provided instructions are not working, it may be
 helpful to try adapting the setup code in the <code>Dockerfile</code> that defines the Lucet continuous
-integration environment. While the image is defined in terms of Ubuntu, many of the packages are
-available through other package managers and operating systems.</p>
-<pre><code class="language-Dockerfile">FROM ubuntu:bionic
-
-# This env variable makes sure installing the tzdata package doesn't hang in prompt
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-	&amp;&amp; apt-get install -y --no-install-recommends \
-	build-essential \
-	curl \
-	git \
-	libbsd-dev \
-	doxygen \
-	python-sphinx \
-	cmake \
-	ninja-build \
-	ca-certificates \
-	software-properties-common \
-	libssl-dev \
-	pkg-config \
-	csmith \
-	libcsmith-dev \
-	creduce \
-	gcc-multilib \
-	clang-6.0 \
-	&amp;&amp; rm -rf /var/lib/apt/lists/*
-
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-6.0 100
-
-# Setting a consistent LD_LIBRARY_PATH across the entire environment prevents unnecessary Cargo
-# rebuilds.
-ENV LD_LIBRARY_PATH=/usr/local/lib
-
-# Install our supported version of Rust, rustfmt, and the wasm32-wasi cross-compilation target
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.43.0 -y
-ENV PATH=/root/.cargo/bin:$PATH
-RUN rustup component add rustfmt
-RUN rustup target add wasm32-wasi
-
-# Optional additional Rust programs
-RUN cargo install --debug rsign2 cargo-deb
-
-RUN curl -sSLO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk_10.0_amd64.deb \
-	&amp;&amp; dpkg -i wasi-sdk_10.0_amd64.deb &amp;&amp; rm -f wasi-sdk_10.0_amd64.deb
-
-ENV WASI_SDK=/opt/wasi-sdk
-
-# optional install of wasm-opt and wasm-reduce for fuzzing and benchmarking
-ENV BINARYEN_DIR=/opt/binaryen
-ENV BINARYEN_VERSION=86
-RUN curl -sS -L &quot;https://github.com/WebAssembly/binaryen/archive/version_${BINARYEN_VERSION}.tar.gz&quot; | tar xzf - &amp;&amp; \
-    mkdir -p binaryen-build &amp;&amp; ( cd binaryen-build &amp;&amp; cmake &quot;../binaryen-version_${BINARYEN_VERSION}&quot; &amp;&amp; \
-    make wasm-opt wasm-reduce ) &amp;&amp; \
-    install -d -v &quot;${BINARYEN_DIR}/bin&quot; &amp;&amp; \
-    for tool in wasm-opt wasm-reduce; do install -v &quot;binaryen-build/bin/${tool}&quot; &quot;${BINARYEN_DIR}/bin/&quot;; done &amp;&amp; \
-    rm -fr binaryen-build binaryen-version_${BINARYEN_VERSION}
-ENV PATH=$BINARYEN_DIR:$PATH
-</code></pre>
+integration environment. While the image is defined in terms of Ubuntu 18.04, many of the
+packages are available through other package managers and operating systems.</p>
 <h1><a class="header" href="#compiling-on-linux" id="compiling-on-linux">Compiling on Linux</a></h1>
 <p>We successfully compiled Lucet on Arch Linux, Fedora, Gentoo and Ubuntu. Only x86_64 CPUs are
 supported at this time.</p>
-<h2><a class="header" href="#installation-on-ubuntu-with-a-sidecar-installation-of-llvmclang" id="installation-on-ubuntu-with-a-sidecar-installation-of-llvmclang">Installation on Ubuntu, with a sidecar installation of LLVM/clang</a></h2>
+<h2><a class="header" href="#option-1-installation-on-ubuntu-with-a-sidecar-installation-of-llvmclang" id="option-1-installation-on-ubuntu-with-a-sidecar-installation-of-llvmclang">Option 1: installation on Ubuntu, with a sidecar installation of LLVM/clang</a></h2>
 <p>The following instructions only work on Ubuntu. They install a recent version of LLVM and <code>clang</code>
 (in <code>/opt/wasi-sdk</code>), so that WebAssembly code can be compiled on Ubuntu versions older than 19.04.</p>
-<p>First, the <code>curl</code> and <code>cmake</code> package must be installed:</p>
-<pre><code class="language-sh">apt install curl ca-certificates
+<p>First, the <code>curl</code> and <code>cmake</code> packages must be installed:</p>
+<pre><code class="language-sh">apt install curl ca-certificates cmake
 </code></pre>
 <p>You will need to install <code>wasi-sdk</code> as well. Note that you may need to run <code>dpkg</code> with elevated
 privileges to install the package.</p>
-<pre><code class="language-sh">curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk_8.0_amd64.deb \
-    &amp;&amp; dpkg -i wasi-sdk_8.0_amd64.deb &amp;&amp; rm -f wasi-sdk_8.0_amd64.deb
+<pre><code class="language-sh">curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk_10.0_amd64.deb \
+    &amp;&amp; dpkg -i wasi-sdk_10.0_amd64.deb &amp;&amp; rm -f wasi-sdk_10.0_amd64.deb
 </code></pre>
 <p>Install the latest stable version of the Rust compiler:</p>
 <pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -283,10 +234,10 @@ git submodule update --init --recursive
 <p>In order to use <code>clang</code> to compile WebAssembly code, you need to adjust your <code>PATH</code> to use tools
 from <code>/opt/wasi-sdk/bin</code> instead of the system compiler. Or use set of commands prefixed by
 <code>wasm-wasi-</code>, such as <code>wasm32-wasi-clang</code> instead of <code>clang</code>.</p>
-<h2><a class="header" href="#installation-on-any-recent-linux-system-using-the-base-compiler" id="installation-on-any-recent-linux-system-using-the-base-compiler">Installation on any recent Linux system, using the base compiler</a></h2>
+<h2><a class="header" href="#option-2-installation-on-a-recent-linux-system-using-the-base-compiler" id="option-2-installation-on-a-recent-linux-system-using-the-base-compiler">Option 2: installation on a recent Linux system, using the base compiler</a></h2>
 <p>Support for WebAssembly was introduced in LLVM 8, released in March 2019.</p>
 <p>As a result, Lucet can be compiled with an existing LLVM installation, provided that it is up to
-date. Most distributions now include LLVM 8 or LLVM 9, so that an additional installation is not
+date. Most distributions now include LLVM &gt;= 8, so that an additional installation is not
 required to compile to WebAssembly .</p>
 <p>On distributions such as Ubuntu (19.04 or newer) and Debian (bullseye or newer), the following
 command installs the prerequisites:</p>
@@ -296,8 +247,8 @@ command installs the prerequisites:</p>
 <pre><code class="language-sh">pacman -S curl clang lld cmake
 </code></pre>
 <p>Next, install the WebAssembly compiler builtins:</p>
-<pre><code class="language-sh">curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
-sudo tar x -zf - -C /usr/lib/llvm-*/lib/clang/*
+<pre><code class="language-sh">curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/libclang_rt.builtins-wasm32-wasi-10.0.tar.gz | \
+  sudo tar x -zf - -C /usr/lib/llvm-*/lib/clang/*
 </code></pre>
 <p>Install the latest stable version of the Rust compiler:</p>
 <pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -305,8 +256,8 @@ source $HOME/.cargo/env
 </code></pre>
 <p>Install the WASI sysroot:</p>
 <pre><code class="language-sh">mkdir -p /opt
-curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/wasi-sdk-8.0-linux.tar.gz | \
-sudo tar x -zv -C /opt -f - wasi-sdk-8.0/share &amp;&amp; \
+curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk-10.0-linux.tar.gz | \
+sudo tar x -zv -C /opt -f - wasi-sdk-10.0/share &amp;&amp; \
   sudo ln -s /opt/wasi-sdk-*/share/wasi-sysroot /opt/wasi-sysroot
 </code></pre>
 <p>Enter your clone of the Lucet repository, and then fetch/update the submodules:</p>
@@ -327,39 +278,45 @@ git submodule update --init --recursive
 <p>The standard system compiler can be used to compile to WebAssembly, simply by adding
 <code>--host=wasm32-wasi</code> to the compilation flags.</p>
 <h1><a class="header" href="#compiling-on-macos" id="compiling-on-macos">Compiling on macOS</a></h1>
+<h2><a class="header" href="#prerequisites" id="prerequisites">Prerequisites</a></h2>
 <p>Install <code>llvm</code>, <code>rust</code> and <code>cmake</code> using <a href="https://brew.sh">Homebrew</a>:</p>
 <pre><code class="language-sh">brew install llvm rust cmake
 </code></pre>
-<p>In order to compile applications to WebAssembly, builtins need to be installed
-as well:</p>
-<pre><code class="language-sh">curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-8/libclang_rt.builtins-wasm32-wasi-8.0.tar.gz | \
-sudo tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
+<p>In order to compile applications written in C to WebAssembly, <code>clang</code> builtins need to be installed:</p>
+<pre><code class="language-sh">curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/libclang_rt.builtins-wasm32-wasi-10.0.tar.gz | \
+  tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
 </code></pre>
-<p>Fetch, compile and install the WASI libc:</p>
-<pre><code class="language-sh">git clone --recursive https://github.com/CraneStation/wasi-libc
+<p>As well as the WASI sysroot:</p>
+<pre><code class="language-sh">sudo mkdir -p /opt
 
-cd wasi-libc
-
-sudo env PATH=/usr/local/opt/llvm/bin:$PATH \
-  make INSTALL_DIR=/opt/wasi-sysroot install
-
-cd - &amp;&amp; sudo rm -fr wasi-libc
+curl -sS -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sysroot-10.0.tar.gz | \
+  sudo tar x -zf - -C /opt
 </code></pre>
+<h2><a class="header" href="#compiling-and-installing-lucet" id="compiling-and-installing-lucet">Compiling and installing Lucet</a></h2>
 <p>Enter the Lucet git repository clone, and fetch/update the submodules:</p>
 <pre><code class="language-sh">cd lucet
 
 git submodule update --init
 </code></pre>
-<p>Set relevant environment variables:</p>
+<p>Define the location of the WASI sysroot installation:</p>
 <pre><code class="language-sh">export WASI_SYSROOT=/opt/wasi-sysroot
-export CLANG_ROOT=&quot;$(echo /usr/local/opt/llvm/lib/clang/10*)&quot;
-export CLANG=/usr/local/opt/llvm/bin/clang
 </code></pre>
-<p>Finally, compile and install toolchain:</p>
+<p>Finally, compile and install the toolchain:</p>
 <pre><code class="language-sh">env LUCET_PREFIX=/opt/lucet make install
 </code></pre>
-<p>Change <code>LUCET_PREFIX</code> to the directory you would like to install Lucet into. <code>/opt/lucet</code> is the default directory.
-The Lucet executable files can be found in the <code>target/release/</code> directory.</p>
+<p>Change <code>LUCET_PREFIX</code> to the directory you would like to install Lucet into. <code>/opt/lucet</code> is the default directory.</p>
+<h2><a class="header" href="#setting-up-the-environment" id="setting-up-the-environment">Setting up the environment</a></h2>
+<p>In order to add <code>/opt/lucet</code> to the command search path, as well register the library path for the Lucet runtime, the following command can be run interactively or added to the shell startup files:</p>
+<pre><code class="language-sh">source /opt/lucet/bin/setenv.sh
+</code></pre>
+<h2><a class="header" href="#running-the-test-suite" id="running-the-test-suite">Running the test suite</a></h2>
+<p>If you want to run the test suite, and in addition to <code>WASI_SYSROOT</code>, the following environment variables must be set:</p>
+<pre><code class="language-sh">export CLANG_ROOT=&quot;$(echo /usr/local/opt/llvm/lib/clang/10*)&quot;
+export CLANG=/usr/local/opt/llvm/bin/clang
+</code></pre>
+<p>And the test suite can then be run with the following command:</p>
+<pre><code class="language-sh">make test
+</code></pre>
 <h1><a class="header" href="#your-first-lucet-application" id="your-first-lucet-application">Your first Lucet application</a></h1>
 <p>Ensure the Lucet command-line tools are <a href="./Compiling.html">installed on your machine</a></p>
 <p>Create a new work directory in the <code>lucet</code> directory:</p>
@@ -413,7 +370,7 @@ lucet-wasi = { path = &quot;../../lucet-wasi&quot; }
 # lucet-wasi = &quot;0.5.1&quot;
 </code></pre>
 <h2><a class="header" href="#srcmainrs" id="srcmainrs"><code>src/main.rs</code>:</a></h2>
-<pre><pre class="playpen"><code class="language-rust">use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
+<pre><pre class="playground"><code class="language-rust">use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
 
 fn main() {
@@ -668,11 +625,12 @@ shared state by which <code>KillSwitch</code> signal is replaced, and an attempt
 <code>terminate</code> will fail with an <code>Err</code>.</p>
 <h2><a class="header" href="#example-killswitch-used-as-a-timeout-mechanism" id="example-killswitch-used-as-a-timeout-mechanism">Example: <code>KillSwitch</code> used as a timeout mechanism</a></h2>
 <p>This example is taken from <code>lucet_runtime_tests::timeout::timeout_in_guest</code>:</p>
-<pre><pre class="playpen"><code class="language-rust">
-<span class="boring">#![allow(unused_variables)]
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let module = mock_timeout_module();
-let region = TestRegion::create(1, &amp;Limits::default()).expect(&quot;region can be created&quot;);
+let region = &lt;TestRegion as RegionCreate&gt;::create(1, &amp;Limits::default())
+    .expect(&quot;region can be created&quot;);
 let mut inst = region
     .new_instance(module)
     .expect(&quot;instance can be created&quot;);
@@ -952,11 +910,59 @@ handlers used with Lucet is that they may not lock on <code>KillState</code>'s
 <code>execution_domain</code>.</p>
 <p>As a consequence, a <code>KillSwitch</code> may fire during the handling of a guest fault.
 <code>sigaction</code> must mask <code>SIGALRM</code> so that a signal fired before the handler exits
-is discarded. If the signal behavior is to continue without effect, leave
-termination in place and continue to the guest. Otherwise the signal handler
-has determined it must return to the host, and it disables termination on the
-instance to avoid sending an erroneous SIGALRM immediately after swapping to
-the host context.</p>
+does not preempt the handler. If the signal behavior is to continue without
+effect, leave termination in place and continue to the guest. A pending SIGALRM
+will be raised at this point and the instance will exit. Otherwise, the signal
+handler has determined it must return to the host, and must be sensitive to a
+possible in-flight <code>KillSwitch</code>...</p>
+<h4><a class="header" href="#instance-stopping-guest-fault-with-concurrent-killswitch" id="instance-stopping-guest-fault-with-concurrent-killswitch">Instance-stopping guest fault with concurrent <code>KillSwitch</code></a></h4>
+<p>In this case we must consider three constraints:</p>
+<ul>
+<li>A <code>KillSwitch</code> may fire and deliver a <code>SIGALRM</code> at any point</li>
+<li>A <code>SIGALRM</code> may already have been fired, pending on the handler returning</li>
+<li>The signal handler must return to host code</li>
+</ul>
+<p>First, we handle the risk of a <code>KillSwitch</code> firing: disable termination. If we
+acquire <code>terminable</code>, we know this is to the exclusion of any <code>KillSwitch</code>, and
+are safe to return. Otherwise, some <code>KillSwitch</code> has terminated, or is in the
+process of terminating, this guest's execution. This means a <code>SIGALRM</code> may be
+pending or imminent!</p>
+<p>A slightly simpler model is to consider that a <code>SIGALRM</code> may arrive in the
+future. This way, for correctness we only have to make sure we handle the
+signal we can be sent! We know that we must return to the host, and the guest
+fault that occurred is certainly more interesting than the guest termination,
+so we would like to preserve that information. There is no information or
+effect we want from the signal, so silence the alarm on <code>KillState</code>. This way,
+if we recieve the possible <code>SIGARLM</code>, we know to ignore it.</p>
+<p>An important question to ask is &quot;How do we know the possible <code>SIGARLM</code> must be
+ignored? Could it not be for another instance later on that thread?&quot; The answer
+is, in short, &quot;We ensure it cannot!&quot;</p>
+<p>The <code>SIGARLM</code> is thread-directed, so to be an alarm for some other reason,
+another instance would have to run and be terminated. To prevent this, we must
+prevent another instance from running. Additionally, if a <code>SIGALRM</code> is <em>in
+flight</em>, we need to stop and wait anyway. Since <code>KillSwitch</code> maintains a lock
+on <code>execution_domain</code> as long as it's attempting to terminate a guest, we can
+achieve both of these goals by taking, and immediately dropping, a lock on
+<code>execution_domain</code> before descheduling an instance.</p>
+<p>Even taking this lock is interesting:</p>
+<ol start="0">
+<li>This lock could be taken while racing a <code>KillSwitch</code>, after it has observed it may fire but before advancing to take this lock.</li>
+<li>This lock could be taken while racing a <code>KillSwitch</code>, after it has taken this lock.</li>
+<li>This lock could be taken without racing a <code>KillSwitch</code>.</li>
+</ol>
+<p>In the first case, we've won a race on <code>execution_domain</code>, but there might be a
+<code>KillSwitch</code> we're blocking with this. Disarm the <code>KillSwitch</code> by updating the
+domain to <code>Terminated</code>, which reflects the fact that this instance has exited.</p>
+<p>In the second case, descheduling until the <code>KillSwitch</code> has completed
+termination. The domain will be <code>Terminated</code>, and updating to <code>Terminated</code> has
+no effect. We simply use this lock to prevent continuting into the host until
+an in-flight <code>KillSwitch</code> completes.</p>
+<p>In the third case, we're not racing a <code>KillSwitch</code>, and any method of exiting
+the guest will have disabled termination. No <code>KillSwitch</code> will observe a
+changed <code>execution_domain</code>, so it's not incorrect to update it to <code>Terminated</code>.</p>
+<p>Taken together, this ensures that descheduling an instance serializes in-flight
+<code>KillSwitch</code> or prevents one from taking effect in a possibly-incorrect way, so
+we know this race is handled correctly.</p>
 <h3><a class="header" href="#terminated-in-hostcall-fault" id="terminated-in-hostcall-fault">Terminated in hostcall fault</a></h3>
 <p>As promised, a note about what happens when a timeout occurs directly when a
 hostcall faults! The instance's <code>execution_domain</code> must be <code>Domain::Hostcall</code>,
@@ -1024,7 +1030,7 @@ from any of its subdirectories can be accessed as well.</p>
 <p><code>--heap-address-space</code> controls the maximum allowed heap size.</p>
 <p>Usually, this should match the <code>--reserved-size</code> value given to <code>lucetc</code>.</p>
 <h2><a class="header" href="#supported-syscalls" id="supported-syscalls">Supported syscalls</a></h2>
-<p>We support the entire <a href="https://github.com/bytecodealliance/wasmtime/blob/master/docs/WASI-api.md">WASI
+<p>We support the entire <a href="https://github.com/bytecodealliance/wasmtime/blob/main/docs/WASI-api.md">WASI
 API</a>, with the exception of
 socket-related syscalls. These will be added when network access is standardized.</p>
 <h2><a class="header" href="#thread-safety" id="thread-safety">Thread safety</a></h2>
@@ -1235,7 +1241,7 @@ changelog, and is expected to be refined as we get more experience with it.</p>
 </li>
 <li>
 <p>Create a new release branch based on the commit you want to eventually release. For example:</p>
-<pre><code class="language-shell">$ git checkout -b 0.5.2-release origin/master
+<pre><code class="language-shell">$ git checkout -b 0.5.2-release origin/main
 </code></pre>
 </li>
 <li>
@@ -1360,7 +1366,7 @@ deleted, and will be the basis for any future hotfix releases that may be requir
 <p>The scenarios are modeled as simplified data flow diagrams below. <a href="https://draw.io">draw.io</a> diagram source files are available <a href="assets/lucet_dfds.xml">here</a>.</p>
 <h3><a class="header" href="#compileload-scenario" id="compileload-scenario">Compile/load scenario</a></h3>
 <p><img src="assets/security_dfd_cl.png" alt="" /></p>
-<p>In the compile/load scenario, a user provides untrusted WebAssembly code to the <a href="https://github.com/bytecodealliance/lucet/tree/master/lucetc"><code>lucetc</code></a> compiler. The <code>lucetc</code> compiler consumes this code along with trusted bindings and produces a shared object file. A trusted application (e.g. server) that embeds <code>lucet-runtime</code> then loads the guest program.</p>
+<p>In the compile/load scenario, a user provides untrusted WebAssembly code to the <a href="https://github.com/bytecodealliance/lucet/tree/main/lucetc"><code>lucetc</code></a> compiler. The <code>lucetc</code> compiler consumes this code along with trusted bindings and produces a shared object file. A trusted application (e.g. server) that embeds <code>lucet-runtime</code> then loads the guest program.</p>
 <h3><a class="header" href="#program-execution-scenario" id="program-execution-scenario">Program execution scenario</a></h3>
 <p><img src="assets/security_dfd_pe.png" alt="" /></p>
 <p>In the program execution scenario, an untrusted third party end-user sends data to a trusted server that has loaded a guest program (via the compile/load scenario above). The trusted server handles this data and passes it to an instance of the untrusted guest program for processing. The guest program may call into trusted server APIs to perform privileged processing, such as further communication with the end-user, untrusted network endpoints, etc. before execution terminates.</p>
@@ -1373,7 +1379,7 @@ deleted, and will be the basis for any future hotfix releases that may be requir
 <p>Attack vectors stemming from asymmetric consumption of resources inherent in compilation processes, for example consumption of CPU or memory for large or complex inputs, should be addressed by user/administrator via environmental controls or similar. For example, a <code>lucetc</code> deployment could limit input size earlier in the processing flow, include cgroup runtime controls, etc.</p>
 <p>Note that an evolving compiler toolchain like <code>lucetc</code> presents a rich attack surface that will likely require ongoing patching of vulnerabilities. It is highly recommended that additional protections common classes of attacks be deployed by administrators for defense-in-depth. For example, the <a href="https://wasm.fastlylabs.com/">terrarium project</a> runs <code>lucetc</code> compilation jobs in minimal, single-use, security-hardened containers in an isolated environment subject to runtime security monitoring.</p>
 <h3><a class="header" href="#guest-to-host-attacks" id="guest-to-host-attacks">Guest-to-host attacks</a></h3>
-<p>An attacker can supply malicious guest code to a Lucet embedding. Bugs in <code>lucetc</code>, <code>lucet-runtime</code>, or any other project components that allow code generated by an attacker to elevate privileges against the embedding host, crash the host, leak host data, or otherwise compromise the host’s security are considered security vulnerabilities. Correspondingly, bugs in Lucet that compromise of security policies of system components (e.g. <a href="https://github.com/bytecodealliance/wasmtime/blob/master/docs/WASI-overview.md">WASI capabilities policies</a>) are considered security vulnerabilities.</p>
+<p>An attacker can supply malicious guest code to a Lucet embedding. Bugs in <code>lucetc</code>, <code>lucet-runtime</code>, or any other project components that allow code generated by an attacker to elevate privileges against the embedding host, crash the host, leak host data, or otherwise compromise the host’s security are considered security vulnerabilities. Correspondingly, bugs in Lucet that compromise of security policies of system components (e.g. <a href="https://github.com/bytecodealliance/wasmtime/blob/main/docs/WASI-overview.md">WASI capabilities policies</a>) are considered security vulnerabilities.</p>
 <p>Lucet leverages WebAssembly semantics, control flow, and operational memory isolation models to prevent broad classes of attacks against the host embedding (see the <a href="https://webassembly.org/docs/security/">WebAssembly docs</a> for details). Specifically, Lucet provides WebAssembly-based mechanisms for isolating most faults to a specific instance of guest program; in these cases mitigations can be applied (e.g. alerting, guest banning, etc.) and execution of the host process can continue unabated. Lucet is compatible with the <a href="https://wasi.dev">WebAssembly System Interface (WASI)</a> API for system interfaces, which supplies a capabilities-based security model for system resource access. Lucet is designed to provide a baseline for integration with additional host sandboxing technologies, such as seccomp-bpf.</p>
 <p>Host function call bindings supplied by the Lucet user/administrator are analogous to WebAssembly imported functions. Lucet project components aim to generate code that provides ABI-level consistency checking of function call arguments (work in progress), but vulnerabilities explicitly defined in host-side functionality supplied by Lucet administrators (e.g. memory corruption in an embedding server’s C code) is considered out-of-scope for the Lucet project.</p>
 <h4><a class="header" href="#caveats" id="caveats">Caveats</a></h4>
@@ -1398,6 +1404,18 @@ deleted, and will be the basis for any future hotfix releases that may be requir
 <li>
 <p>Added <code>Instance::run_start()</code> to the public API, which runs the <a href="https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start">Wasm start function</a> if it is present in that instance's Wasm module. It does nothing if there is no start function.</p>
 <p>Creating or resetting an instance no longer implicitly runs the start function. Embedders must ensure that <code>run_start()</code> is called before calling any other exported functions. <code>Instance::run()</code> will now return <code>Err(Error::InstanceNeedsStart)</code> if the start function is present but hasn't been run since the instance was created or reset.</p>
+</li>
+<li>
+<p>Encoded the <a href="https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start">Wasm start function</a> in Lucet module metadata, rather than as a specially-named symbol in the shared object. This reduces contention from <code>dlsym</code> operations when multiple threads run Lucet instances concurrently.</p>
+</li>
+<li>
+<p>Upgraded the <code>libloading</code> dependency, allowing for more specific error messages from dynamic loading operations.</p>
+</li>
+<li>
+<p>Corrected a race condition where a <code>KillSwitch</code> fired while lucet-runtime is handling a guest fault could result in a SIGALRM or panic in the Lucet embedder.</p>
+</li>
+<li>
+<p>Converted the <code>&amp;mut Vmctx</code> argument to hostcalls into <code>&amp;Vmctx</code>. Additionally, all <code>Vmctx</code> methods now take <code>&amp;self</code>, where some methods such as <code>yield</code> previously took <code>&amp;mut self</code>. These methods still require that no other outstanding borrows (such as the heap view) are held across them, but that property is checked dynamically rather than at compile time.</p>
 </li>
 </ul>
 <h3><a class="header" href="#061-2020-02-18" id="061-2020-02-18">0.6.1 (2020-02-18)</a></h3>
@@ -1726,10 +1744,10 @@ Software.
         
 
         
-        
+
         
         <script type="text/javascript">
-            window.playpen_copyable = true;
+            window.playground_copyable = true;
         </script>
         
 
