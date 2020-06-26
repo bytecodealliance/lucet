@@ -21,7 +21,11 @@ pub enum State {
     ///
     /// Transitions to `Ready` when the guest function returns normally, or to `Faulted`,
     /// `Terminating`, or `Yielding` if the instance faults, terminates, or yields.
-    Running { async_context: bool },
+    Running {
+        /// Indicates whether the instance is running in an async context (`Instance::run_async`)
+        /// or not. Needed by `Vmctx::block_on`.
+        async_context: bool,
+    },
 
     /// The instance has faulted, potentially fatally.
     ///
