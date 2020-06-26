@@ -13,7 +13,7 @@ macro_rules! async_hostcall_tests {
 
         $(
             mod $region_id {
-                use lucet_runtime::{DlModule, Error, Limits, Region, RegionCreate, TerminationDetails, RunResult};
+                use lucet_runtime::{DlModule, Error, Limits, Region, RegionCreate, TerminationDetails};
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
                 use $crate::build::test_module_c;
@@ -87,7 +87,7 @@ macro_rules! async_hostcall_tests {
                                 |f| block_in_place(f),
                             ));
                     match correct_run_res_2 {
-                        Ok(RunResult::Returned { .. }) => {} // expected
+                        Ok(_) => {} // expected
                         _ => panic!(
                             "second run_async main should return successfully, got {:?}",
                             correct_run_res_2
