@@ -84,6 +84,12 @@ impl Instance {
     /// that use `Vmctx::block_on` and provides the trampoline that `.await`s those futures on
     /// behalf of the guest.
     ///
+    /// # `Vmctx` Restrictions
+    ///
+    /// This method permits the use of `Vmctx::block_on`, but disallows all other uses of `Vmctx::
+    /// yield_val_expecting_val` and family (`Vmctx::yield_`, `Vmctx::yield_expecting_val`,
+    /// `Vmctx::yield_val`).
+    ///
     /// # Blocking thread
     ///
     /// The `wrap_blocking` argument is a function that is called with a closure that runs the Wasm
