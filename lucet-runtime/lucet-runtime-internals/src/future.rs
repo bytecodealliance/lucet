@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::instance::{Instance, RunResult, State, TerminationDetails};
+use crate::instance::{InstanceHandle, RunResult, State, TerminationDetails};
 use crate::val::{UntypedRetVal, Val};
 use crate::vmctx::{Vmctx, VmctxInternal};
 use std::any::Any;
@@ -8,16 +8,18 @@ use std::pin::Pin;
 
 /// This is the same type defined by the `futures` library, but we don't need the rest of the
 /// library for this purpose.
-type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// A unique type that wraps a boxed future with a boxed return value.
 ///
 /// Type and lifetime guarantees are maintained by `Vmctx::block_on` and `Instance::run_async`. The
 /// user never sees this type.
-struct YieldedFuture(LocalBoxFuture<'static, ResumeVal>);
+struct YieldedFuture(BoxFuture<'static, ResumeVal>);
 
 /// A unique type for a boxed return value. The user never sees this type.
-struct ResumeVal(Box<dyn Any + Send + 'static>);
+pub struct ResumeVal(Box<dyn Any + Send + 'static>);
+
+unsafe impl Send for ResumeVal {}
 
 impl Vmctx {
     /// Block on the result of an `async` computation from an instance run by `Instance::run_async`.
@@ -45,7 +47,7 @@ impl Vmctx {
     ///
     /// Note that this method may only be used if `Instance::run_async` was used to run the VM,
     /// otherwise it will terminate the instance with `TerminationDetails::AwaitNeedsAsync`.
-    pub fn block_on<'a, R>(&'a self, f: impl Future<Output = R> + 'a) -> R
+    pub fn block_on<'a, R>(&'a self, f: impl Future<Output = R> + Send + 'a) -> R
     where
         R: Any + Send + 'static,
     {
@@ -68,9 +70,7 @@ impl Vmctx {
         // This is safe because the stack frame that `'a` is tied to gets
         // frozen in place as part of `self.yield_val_expecting_val`.
         let f = unsafe {
-            std::mem::transmute::<LocalBoxFuture<'a, ResumeVal>, LocalBoxFuture<'static, ResumeVal>>(
-                f,
-            )
+            std::mem::transmute::<BoxFuture<'a, ResumeVal>, BoxFuture<'static, ResumeVal>>(f)
         };
         // Wrap the computation in `YieldedFuture` so that
         // `Instance::run_async` can catch and run it.  We will get the
@@ -82,7 +82,12 @@ impl Vmctx {
     }
 }
 
-impl Instance {
+pub enum Bounce<'a> {
+    Done(UntypedRetVal),
+    More(BoxFuture<'a, ResumeVal>),
+}
+
+impl InstanceHandle {
     /// Run a WebAssembly function with arguments in the guest context at the given entrypoint.
     ///
     /// This method is similar to `Instance::run()`, but allows the Wasm program to invoke hostcalls
@@ -132,7 +137,7 @@ impl Instance {
         wrap_blocking: F,
     ) -> Result<UntypedRetVal, Error>
     where
-        F: Fn(&mut (dyn FnMut() -> Result<RunResult, Error>)) -> Result<RunResult, Error>,
+        F: for<'b> Fn(&mut (dyn FnMut() -> Result<Bounce<'b>, Error>)) -> Result<Bounce<'b>, Error>,
     {
         if self.is_yielded() {
             return Err(Error::Unsupported(
@@ -144,8 +149,8 @@ impl Instance {
         let mut resume_val: Option<ResumeVal> = None;
         loop {
             // Run the WebAssembly program
-            let run_result = wrap_blocking(&mut || {
-                if self.is_yielded() {
+            let bounce = wrap_blocking(&mut || {
+                let run_result = if self.is_yielded() {
                     // A previous iteration of the loop stored the ResumeVal in
                     // `resume_val`, send it back to the guest ctx and continue
                     // running:
@@ -159,34 +164,38 @@ impl Instance {
                     // This is the first iteration, call the entrypoint:
                     let func = self.module.get_export_func(entrypoint)?;
                     self.run_func(func, args, true)
+                };
+                match run_result? {
+                    RunResult::Returned(rval) => {
+                        // Finished running, return UntypedReturnValue
+                        return Ok(Bounce::Done(rval));
+                    }
+                    RunResult::Yielded(yval) => {
+                        // Check if the yield came from Vmctx::block_on:
+                        if yval.is::<YieldedFuture>() {
+                            let YieldedFuture(future) = *yval.downcast::<YieldedFuture>().unwrap();
+                            // Rehydrate the lifetime from `'static` to `'a`, which
+                            // is morally the same lifetime as was passed into
+                            // `Vmctx::block_on`.
+                            Ok(Bounce::More(future as BoxFuture<'a, ResumeVal>))
+                        } else {
+                            // Any other yielded value is not supported - die with an error.
+                            Err(Error::Unsupported(
+                                "cannot yield anything besides a future in Instance::run_async"
+                                    .to_owned(),
+                            ))
+                        }
+                    }
                 }
             })?;
-            match run_result {
-                RunResult::Returned(rval) => {
-                    // Finished running, return UntypedReturnValue
-                    return Ok(rval);
-                }
-                RunResult::Yielded(yval) => {
-                    // Check if the yield came from Vmctx::block_on:
-                    if yval.is::<YieldedFuture>() {
-                        let YieldedFuture(future) = *yval.downcast::<YieldedFuture>().unwrap();
-                        // Rehydrate the lifetime from `'static` to `'a`, which
-                        // is morally the same lifetime as was passed into
-                        // `Vmctx::block_on`.
-                        let future = future as LocalBoxFuture<'a, ResumeVal>;
-                        // await on the computation. Store its result in
-                        // `resume_val`.
-                        resume_val = Some(future.await);
-                        // Now we want to `Instance::resume_with_val` and start
-                        // this cycle over.
-                        continue;
-                    } else {
-                        // Any other yielded value is not supported - die with an error.
-                        return Err(Error::Unsupported(
-                            "cannot yield anything besides a future in Instance::run_async"
-                                .to_owned(),
-                        ));
-                    }
+            match bounce {
+                Bounce::Done(rval) => return Ok(rval),
+                Bounce::More(fut) => {
+                    // await on the computation. Store its result in
+                    // `resume_val`.
+                    resume_val = Some(fut.await);
+                    // Now we want to `Instance::resume_with_val` and start
+                    // this cycle over.
                 }
             }
         }
