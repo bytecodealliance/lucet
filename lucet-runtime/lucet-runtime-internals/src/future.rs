@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::instance::{Instance, RunResult, State, TerminationDetails};
-use crate::val::Val;
+use crate::val::{UntypedRetVal, Val};
 use crate::vmctx::{Vmctx, VmctxInternal};
 use std::any::Any;
 use std::future::Future;
@@ -17,7 +17,7 @@ type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 struct YieldedFuture(LocalBoxFuture<'static, ResumeVal>);
 
 /// A unique type for a boxed return value. The user never sees this type.
-struct ResumeVal(Box<dyn Any + 'static>);
+struct ResumeVal(Box<dyn Any + Send + 'static>);
 
 impl Vmctx {
     /// Block on the result of an `async` computation from an instance run by `Instance::run_async`.
@@ -44,7 +44,7 @@ impl Vmctx {
     /// otherwise it will terminate the instance with `TerminationDetails::AwaitNeedsAsync`.
     pub fn block_on<'a, R>(&'a self, f: impl Future<Output = R> + 'a) -> R
     where
-        R: Any + 'static,
+        R: Any + Send + 'static,
     {
         // Die if we aren't in Instance::run_async
         match self.instance().state {
@@ -119,7 +119,7 @@ impl Instance {
         entrypoint: &'a str,
         args: &'a [Val],
         wrap_blocking: F,
-    ) -> Result<RunResult, Error>
+    ) -> Result<UntypedRetVal, Error>
     where
         F: Fn(&mut (dyn FnMut() -> Result<RunResult, Error>)) -> Result<RunResult, Error>,
     {
@@ -131,9 +131,9 @@ impl Instance {
 
         // Store the ResumeVal here when we get it.
         let mut resume_val: Option<ResumeVal> = None;
-        let ret = loop {
+        loop {
             // Run the WebAssembly program
-            let run = wrap_blocking(&mut || {
+            let run_result = wrap_blocking(&mut || {
                 if self.is_yielded() {
                     // A previous iteration of the loop stored the ResumeVal in
                     // `resume_val`, send it back to the guest ctx and continue
@@ -149,16 +149,16 @@ impl Instance {
                     let func = self.module.get_export_func(entrypoint)?;
                     self.run_func(func, args, true)
                 }
-            });
-            match run {
-                Ok(run_result) => {
+            })?;
+            match run_result {
+                RunResult::Returned(rval) => {
+                    // Finished running, return UntypedReturnValue
+                    return Ok(rval);
+                }
+                RunResult::Yielded(yval) => {
                     // Check if the yield came from Vmctx::block_on:
-                    if run_result.has_yielded::<YieldedFuture>() {
-                        let YieldedFuture(future) = *run_result
-                            .yielded()
-                            .unwrap()
-                            .downcast::<YieldedFuture>()
-                            .unwrap();
+                    if yval.is::<YieldedFuture>() {
+                        let YieldedFuture(future) = *yval.downcast::<YieldedFuture>().unwrap();
                         // Rehydrate the lifetime from `'static` to `'a`, which
                         // is morally the same lifetime as was passed into
                         // `Vmctx::block_on`.
@@ -170,20 +170,14 @@ impl Instance {
                         // this cycle over.
                         continue;
                     } else {
-                        // Any other result of the run is returned to this
-                        // function's caller.
-                        break Ok(run_result);
+                        // Any other yielded value is not supported - die with an error.
+                        return Err(Error::Unsupported(
+                            "cannot yield anything besides a future in Instance::run_async"
+                                .to_owned(),
+                        ));
                     }
                 }
-                _ => {
-                    // Any other result of the run is returned to this
-                    // function's caller.
-                    break run;
-                }
             }
-        };
-
-        // Return the result of the run.
-        return ret;
+        }
     }
 }
