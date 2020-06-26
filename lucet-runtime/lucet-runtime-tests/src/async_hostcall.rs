@@ -6,7 +6,7 @@ macro_rules! async_hostcall_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub fn hostcall_containing_yield(vmctx: &Vmctx, value: u32) {
+        pub fn hostcall_containing_block_on(vmctx: &Vmctx, value: u32) {
             let asynced_value = vmctx.block_on(async move { value });
             assert_eq!(asynced_value, value);
         }
@@ -17,7 +17,6 @@ macro_rules! async_hostcall_tests {
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
                 use $crate::build::test_module_c;
-                use $crate::helpers::{test_ex, test_nonex, with_unchanged_signal_handlers};
 
                 #[test]
                 fn ensure_linked() {
@@ -27,7 +26,7 @@ macro_rules! async_hostcall_tests {
                 #[test]
                 fn load_module() {
                     let _module =
-                        test_module_c("async_hostcall", "hostcall_yield.c").expect("build and load module");
+                        test_module_c("async_hostcall", "hostcall_block_on.c").expect("build and load module");
                 }
 
                 #[test]
@@ -43,59 +42,57 @@ macro_rules! async_hostcall_tests {
                         f()
                     }
 
-                    test_nonex(|| {
-                        let module = test_module_c("async_hostcall", "hostcall_yield.c")
-                            .expect("module compiled and loaded");
-                        let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
-                            .expect("region can be created");
-                        let mut inst = region
-                            .new_instance(module)
-                            .expect("instance can be created");
+                    let module = test_module_c("async_hostcall", "hostcall_block_on.c")
+                        .expect("module compiled and loaded");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+                        .expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
 
-                        inst.run_start().expect("start section runs");
+                    inst.run_start().expect("start section runs");
 
-                        let correct_run_res =
-                            futures_executor::block_on(
-                                inst.run_async(
-                                    "main",
-                                    &[0u32.into(), 0i32.into()],
-                                    |f| block_in_place(f),
-                                ));
-                        match correct_run_res {
-                            Ok(RunResult::Returned { .. }) => {} // expected
-                            _ => panic!(
-                                "run_async main should return successfully, got {:?}",
-                                correct_run_res
-                            ),
+                    let correct_run_res =
+                        futures_executor::block_on(
+                            inst.run_async(
+                                "main",
+                                &[0u32.into(), 0i32.into()],
+                                |f| block_in_place(f),
+                            ));
+                    match correct_run_res {
+                        Ok(_) => {} // expected - UntypedRetVal is (), so no reason to inspect value
+                        _ => panic!(
+                            "run_async main should return successfully, got {:?}",
+                            correct_run_res
+                        ),
+                    }
+
+                    let incorrect_run_res = inst.run("main", &[0u32.into(), 0i32.into()]);
+                    match incorrect_run_res {
+                        Err(Error::RuntimeTerminated(term)) => {
+                            assert_eq!(term, TerminationDetails::AwaitNeedsAsync);
                         }
+                        _ => panic!(
+                            "inst.run should fail because its not an async context, got {:?}",
+                            incorrect_run_res
+                        ),
+                    }
+                    inst.reset().expect("can reset instance");
 
-                        let incorrect_run_res = inst.run("main", &[0u32.into(), 0i32.into()]);
-                        match incorrect_run_res {
-                            Err(Error::RuntimeTerminated(term)) => {
-                                assert_eq!(term, TerminationDetails::AwaitNeedsAsync);
-                            }
-                            _ => panic!(
-                                "inst.run should fail because its not an async context, got {:?}",
-                                incorrect_run_res
-                            ),
-                        }
-                        inst.reset().expect("can reset instance");
-
-                        let correct_run_res_2 =
-                            futures_executor::block_on(
-                                inst.run_async(
-                                    "main",
-                                    &[0u32.into(), 0i32.into()],
-                                    |f| block_in_place(f),
-                                ));
-                        match correct_run_res_2 {
-                            Ok(RunResult::Returned { .. }) => {} // expected
-                            _ => panic!(
-                                "second run_async main should return successfully, got {:?}",
-                                correct_run_res_2
-                            ),
-                        }
-                    });
+                    let correct_run_res_2 =
+                        futures_executor::block_on(
+                            inst.run_async(
+                                "main",
+                                &[0u32.into(), 0i32.into()],
+                                |f| block_in_place(f),
+                            ));
+                    match correct_run_res_2 {
+                        Ok(RunResult::Returned { .. }) => {} // expected
+                        _ => panic!(
+                            "second run_async main should return successfully, got {:?}",
+                            correct_run_res_2
+                        ),
+                    }
                 }
 
             }
