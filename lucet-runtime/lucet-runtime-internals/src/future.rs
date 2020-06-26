@@ -99,7 +99,8 @@ impl Instance {
     /// another closure so that the types are compatible. For example:
     ///
     /// ```no_run
-    /// # let instance: InstanceHandle = unimplemented!();
+    /// # async fn f() {
+    /// # let instance: lucet_runtime_internals::instance::InstanceHandle = unimplemented!();
     /// fn block_in_place<F, R>(f: F) -> R
     /// where
     ///     F: FnOnce() -> R,
@@ -108,7 +109,8 @@ impl Instance {
     ///     # f()
     /// }
     ///
-    /// instance.run_async("entrypoint", &[], |f| block_in_place(f)).unwrap();
+    /// instance.run_async("entrypoint", &[], |f| block_in_place(f)).await.unwrap();
+    /// # }
     /// ```
     ///
     /// [tokio]: https://docs.rs/tokio/0.2.21/tokio/task/fn.block_in_place.html
