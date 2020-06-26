@@ -7,7 +7,7 @@ macro_rules! async_hostcall_tests {
         #[lucet_hostcall]
         #[no_mangle]
         pub fn hostcall_containing_yield(vmctx: &Vmctx, value: u32) {
-            let asynced_value = vmctx.run_await(async move { value });
+            let asynced_value = vmctx.block_on(async move { value });
             assert_eq!(asynced_value, value);
         }
 
@@ -32,6 +32,17 @@ macro_rules! async_hostcall_tests {
 
                 #[test]
                 fn hostcall_yield() {
+                    /// Dummy function with the same type signature as
+                    /// [`tokio::task::block_in_place`][tokio].
+                    ///
+                    /// [tokio]: https://docs.rs/tokio/0.2.21/tokio/task/fn.block_in_place.html
+                    fn block_in_place<F, R>(f: F) -> R
+                    where
+                        F: FnOnce() -> R,
+                    {
+                        f()
+                    }
+
                     test_nonex(|| {
                         let module = test_module_c("async_hostcall", "hostcall_yield.c")
                             .expect("module compiled and loaded");
@@ -44,7 +55,12 @@ macro_rules! async_hostcall_tests {
                         inst.run_start().expect("start section runs");
 
                         let correct_run_res =
-                            futures_executor::block_on(inst.run_async("main", &[0u32.into(), 0i32.into()]));
+                            futures_executor::block_on(
+                                inst.run_async(
+                                    "main",
+                                    &[0u32.into(), 0i32.into()],
+                                    |f| block_in_place(f),
+                                ));
                         match correct_run_res {
                             Ok(RunResult::Returned { .. }) => {} // expected
                             _ => panic!(
@@ -66,7 +82,12 @@ macro_rules! async_hostcall_tests {
                         inst.reset().expect("can reset instance");
 
                         let correct_run_res_2 =
-                            futures_executor::block_on(inst.run_async("main", &[0u32.into(), 0i32.into()]));
+                            futures_executor::block_on(
+                                inst.run_async(
+                                    "main",
+                                    &[0u32.into(), 0i32.into()],
+                                    |f| block_in_place(f),
+                                ));
                         match correct_run_res_2 {
                             Ok(RunResult::Returned { .. }) => {} // expected
                             _ => panic!(
