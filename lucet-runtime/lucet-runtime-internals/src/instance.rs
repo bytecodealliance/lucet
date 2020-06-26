@@ -523,10 +523,10 @@ impl Instance {
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
-        self._resume_with_val(val, false)
+        self.resume_with_val_impl(val, false)
     }
 
-    pub(crate) fn _resume_with_val<A: Any + 'static>(
+    pub(crate) fn resume_with_val_impl<A: Any + 'static>(
         &mut self,
         val: A,
         async_context: bool,
@@ -1324,7 +1324,7 @@ pub enum TerminationDetails {
     /// [Rust](https://github.com/rust-lang/rfcs/pull/2945) and
     /// [Lucet](https://github.com/bytecodealliance/lucet/pull/254).
     OtherPanic(Box<dyn Any + Send + 'static>),
-    /// The instance was terminated by `Vmctx::run_await` being called from an instance
+    /// The instance was terminated by `Vmctx::block_on` being called from an instance
     /// that isnt running in an async context
     AwaitNeedsAsync,
 }

@@ -10,14 +10,39 @@ use std::pin::Pin;
 /// library for this purpose.
 type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
+/// A unique type that wraps a boxed future with a boxed return value.
+///
+/// Type and lifetime guarantees are maintained by `Vmctx::block_on` and `Instance::run_async`. The
+/// user never sees this type.
+struct YieldedFuture(LocalBoxFuture<'static, ResumeVal>);
+
+/// A unique type for a boxed return value. The user never sees this type.
+struct ResumeVal(Box<dyn Any + 'static>);
+
 impl Vmctx {
-    /// Run an `async` computation. A `Vmctx` is passed to ordinary
-    /// (synchronous) functions called from WebAssembly. We cannot execute
-    /// `async` code in that context, so this method trampolines an `async`
-    /// computation back to `Instance::run_async`, which can `.await` on it.
-    /// Note that this method may only be used if `Instance::run_async` was
-    /// used to run the VM, otherwise it will terminate the instance.
-    pub fn run_await<'a, R>(&'a self, f: impl Future<Output = R> + 'a) -> R
+    /// Block on the result of an `async` computation from an instance run by `Instance::run_async`.
+    ///
+    /// Lucet hostcalls are synchronous `extern "C" fn` functions called from WebAssembly. In that
+    /// context, we cannot use `.await` directly because the hostcall is not `async`. While we could
+    /// block on an executor using `futures::executor::block_on` or
+    /// `tokio::runtime::Runtime::block_on`, that has two drawbacks:
+    ///
+    /// - If the Lucet instance was originally invoked from an async context, trying to block on the
+    ///   same runtime will fail if the executor cannot be nested (all executors we know of have this
+    ///   restriction).
+    ///
+    /// - The current OS thread would be blocked on the result of the computation, rather than being
+    ///   able to run other async tasks while awaiting. This means an application will need more
+    ///   threads than otherwise would be necessary.
+    ///
+    /// This `block_on` operator instead yields yields a future back to a loop that runs in
+    /// `Instance::run_async`, which `.await`s on it and then resumes the instance with the
+    /// result. The future runs on the same runtime that invoked `run_async`, avoiding problems of
+    /// nesting, and allowing the current OS thread to continue performing other async work.
+    ///
+    /// Note that this method may only be used if `Instance::run_async` was used to run the VM,
+    /// otherwise it will terminate the instance with `TerminationDetails::AwaitNeedsAsync`.
+    pub fn block_on<'a, R>(&'a self, f: impl Future<Output = R> + 'a) -> R
     where
         R: Any + 'static,
     {
@@ -53,17 +78,49 @@ impl Vmctx {
 }
 
 impl Instance {
-    /// Run a WebAssembly function with arguments in the guest context at the
-    /// given entrypoint. Enable `Vmctx::run_await` to trampoline async
-    /// computations back to this context so that we may `.await` on them.
+    /// Run a WebAssembly function with arguments in the guest context at the given entrypoint.
     ///
-    /// Aside from asynchrony, this function behaves identically to
-    /// `Instance::run`.
-    pub async fn run_async<'a>(
+    /// This method is similar to `Instance::run()`, but allows the Wasm program to invoke hostcalls
+    /// that use `Vmctx::block_on` and provides the trampoline that `.await`s those futures on
+    /// behalf of the guest.
+    ///
+    /// # Blocking thread
+    ///
+    /// The `wrap_blocking` argument is a function that is called with a closure that runs the Wasm
+    /// program. Since Wasm may execute for an arbitrarily long time without `await`ing, we need to
+    /// make sure that it runs on a thread that is allowed to block.
+    ///
+    /// This argument is designed with [`tokio::task::block_in_place`][tokio] in mind. The odd type
+    /// is a concession to the fact that we don't have rank 2 types in Rust, and so must fall back
+    /// to trait objects in order to be able to take an argument that is itself a function that
+    /// takes a closure.
+    ///
+    /// In order to provide an appropriate function, you may have to wrap the library function in
+    /// another closure so that the types are compatible. For example:
+    ///
+    /// ```no_run
+    /// # let instance: InstanceHandle = unimplemented!();
+    /// fn block_in_place<F, R>(f: F) -> R
+    /// where
+    ///     F: FnOnce() -> R,
+    /// {
+    ///     // ...
+    ///     # f()
+    /// }
+    ///
+    /// instance.run_async("entrypoint", &[], |f| block_in_place(f)).unwrap();
+    /// ```
+    ///
+    /// [tokio]: https://docs.rs/tokio/0.2.21/tokio/task/fn.block_in_place.html
+    pub async fn run_async<'a, F>(
         &'a mut self,
-        entrypoint: &str,
-        args: &[Val],
-    ) -> Result<RunResult, Error> {
+        entrypoint: &'a str,
+        args: &'a [Val],
+        wrap_blocking: F,
+    ) -> Result<RunResult, Error>
+    where
+        F: Fn(&mut (dyn FnMut() -> Result<RunResult, Error>)) -> Result<RunResult, Error>,
+    {
         if self.is_yielded() {
             return Err(Error::Unsupported(
                 "cannot run_async a yielded instance".to_owned(),
@@ -74,24 +131,26 @@ impl Instance {
         let mut resume_val: Option<ResumeVal> = None;
         let ret = loop {
             // Run the WebAssembly program
-            let run = if self.is_yielded() {
-                // A previous iteration of the loop stored the ResumeVal in
-                // `resume_val`, send it back to the guest ctx and continue
-                // running:
-                self._resume_with_val(
-                    resume_val
-                        .take()
-                        .expect("is_yielded implies resume_value is some"),
-                    true,
-                )
-            } else {
-                // This is the first iteration, call the entrypoint:
-                let func = self.module.get_export_func(entrypoint)?;
-                self.run_func(func, args, true)
-            };
+            let run = wrap_blocking(&mut || {
+                if self.is_yielded() {
+                    // A previous iteration of the loop stored the ResumeVal in
+                    // `resume_val`, send it back to the guest ctx and continue
+                    // running:
+                    self.resume_with_val_impl(
+                        resume_val
+                            .take()
+                            .expect("is_yielded implies resume_value is some"),
+                        true,
+                    )
+                } else {
+                    // This is the first iteration, call the entrypoint:
+                    let func = self.module.get_export_func(entrypoint)?;
+                    self.run_func(func, args, true)
+                }
+            });
             match run {
                 Ok(run_result) => {
-                    // Check if the yield came from Vmctx::run_await:
+                    // Check if the yield came from Vmctx::block_on:
                     if run_result.has_yielded::<YieldedFuture>() {
                         let YieldedFuture(future) = *run_result
                             .yielded()
@@ -100,7 +159,7 @@ impl Instance {
                             .unwrap();
                         // Rehydrate the lifetime from `'static` to `'a`, which
                         // is morally the same lifetime as was passed into
-                        // `Vmctx::run_await`.
+                        // `Vmctx::block_on`.
                         let future = future as LocalBoxFuture<'a, ResumeVal>;
                         // await on the computation. Store its result in
                         // `resume_val`.
@@ -126,10 +185,3 @@ impl Instance {
         return ret;
     }
 }
-
-/// A unique type that wraps a boxed future with a boxed return value.
-/// Type and lifetime guarantees are maintained by `Vmctx::run_await` and
-/// `Instance::run_async`. The user never sees this type.
-struct YieldedFuture(LocalBoxFuture<'static, ResumeVal>);
-/// A unique type for a boxed return value. The user never sees this type.
-struct ResumeVal(Box<dyn Any + 'static>);
