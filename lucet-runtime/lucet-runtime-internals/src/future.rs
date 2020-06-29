@@ -35,10 +35,13 @@ impl Vmctx {
     ///   able to run other async tasks while awaiting. This means an application will need more
     ///   threads than otherwise would be necessary.
     ///
-    /// This `block_on` operator instead yields yields a future back to a loop that runs in
-    /// `Instance::run_async`, which `.await`s on it and then resumes the instance with the
-    /// result. The future runs on the same runtime that invoked `run_async`, avoiding problems of
-    /// nesting, and allowing the current OS thread to continue performing other async work.
+    /// Instead, this block_on operator is designed to work only when called within an invocation
+    /// of [`Instance::run_async`]. The `run_async` method executes instance code within a
+    /// trampoline, itself running within an async context, making it possible to temporarily pause
+    /// guest execution, jump back to the trampoline, and await there. The future given to block_on
+    /// is in passed back to that trampoline, and runs on the same runtime that invoked
+    /// `run_async`, avoiding problems of nesting, and allowing the current OS thread to continue
+    /// performing other async work.
     ///
     /// Note that this method may only be used if `Instance::run_async` was used to run the VM,
     /// otherwise it will terminate the instance with `TerminationDetails::AwaitNeedsAsync`.
@@ -62,6 +65,8 @@ impl Vmctx {
         // We need to lie about this lifetime so that `YieldedFuture` may impl
         // `Any` and be passed through the yield. `Instance::run_async`
         // rehydrates this lifetime to be at most as long as the Vmctx's `'a`.
+        // This is safe because the stack frame that `'a` is tied to gets
+        // frozen in place as part of `self.yield_val_expecting_val`.
         let f = unsafe {
             std::mem::transmute::<LocalBoxFuture<'a, ResumeVal>, LocalBoxFuture<'static, ResumeVal>>(
                 f,
