@@ -18,8 +18,8 @@ You will need to install `wasi-sdk` as well. Note that you may need to run `dpkg
 privileges to install the package.
 
 ```sh
-curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk_10.0_amd64.deb \
-    && dpkg -i wasi-sdk_10.0_amd64.deb && rm -f wasi-sdk_10.0_amd64.deb
+curl -sS -L -O https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/wasi-sdk_11.0_amd64.deb \
+    && dpkg -i wasi-sdk_11.0_amd64.deb && rm -f wasi-sdk_11.0_amd64.deb
 ```
 
 Install the latest stable version of the Rust compiler:
@@ -71,7 +71,7 @@ pacman -S curl clang lld cmake
 Next, install the WebAssembly compiler builtins:
 
 ```sh
-curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/libclang_rt.builtins-wasm32-wasi-10.0.tar.gz | \
+curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/libclang_rt.builtins-wasm32-wasi-11.0.tar.gz | \
   sudo tar x -zf - -C /usr/lib/llvm-*/lib/clang/*
 ```
 
@@ -86,8 +86,8 @@ Install the WASI sysroot:
 
 ```sh
 mkdir -p /opt
-curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sdk-10.0-linux.tar.gz | \
-sudo tar x -zv -C /opt -f - wasi-sdk-10.0/share && \
+curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/wasi-sdk-11.0-linux.tar.gz | \
+sudo tar x -zv -C /opt -f - wasi-sdk-11.0/share && \
   sudo ln -s /opt/wasi-sdk-*/share/wasi-sysroot /opt/wasi-sysroot
 ```
 

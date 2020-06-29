@@ -11,7 +11,7 @@ brew install llvm rust cmake
 In order to compile applications written in C to WebAssembly, `clang` builtins need to be installed:
 
 ```sh
-curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/libclang_rt.builtins-wasm32-wasi-10.0.tar.gz | \
+curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/libclang_rt.builtins-wasm32-wasi-11.0.tar.gz | \
   tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
 ```
 
@@ -20,7 +20,7 @@ As well as the WASI sysroot:
 ```sh
 sudo mkdir -p /opt
 
-curl -sS -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-10/wasi-sysroot-10.0.tar.gz | \
+curl -sS -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/wasi-sysroot-11.0.tar.gz | \
   sudo tar x -zf - -C /opt
 ```
 
@@ -31,7 +31,7 @@ Enter the Lucet git repository clone, and fetch/update the submodules:
 ```sh
 cd lucet
 
-git submodule update --init
+git submodule update --init --recursive
 ```
 
 Define the location of the WASI sysroot installation:
