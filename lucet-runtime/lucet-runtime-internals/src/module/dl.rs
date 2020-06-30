@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
+use backtrace::{Backtrace, BacktraceFrame};
 use libc::c_void;
 use libloading::Library;
 use lucet_module::{
@@ -330,6 +331,50 @@ impl ModuleInternal for DlModule {
 
     fn get_signature(&self, fn_id: FunctionIndex) -> &Signature {
         self.module.module_data.get_signature(fn_id)
+    }
+
+    fn resolve_and_trim(&self, full_bt: &Backtrace) -> Backtrace {
+        let mut bt = full_bt.clone();
+        bt.resolve();
+        let trimmed_frames = bt
+            .frames()
+            .iter()
+            .filter(|fr| match self.addr_details(fr.ip()) {
+                // if we can look up addr details, and it's in module code, keep the frame
+                Ok(Some(details)) => details.in_module_code,
+                _ => false,
+            })
+            // // skip everything until the entry to the signal handler
+            // .skip_while(|fr| {
+            //     fr.symbols()
+            //         .iter()
+            //         .find(|sym| {
+            //             sym.name().map_or(false, |sn| {
+            //                 let name = format!("{}", sn);
+            //                 name.starts_with(
+            //                     "lucet_runtime_internals::instance::signals::handle_signal",
+            //                 ) && !name.contains("closure")
+            //             })
+            //         })
+            //         .is_none()
+            // })
+            // // drop the handle_signal frame
+            // .skip(1)
+            // // take all frames between handle_signal and Context::swap
+            // .take_while(|fr| {
+            //     fr.symbols()
+            //         .iter()
+            //         .find(|sym| {
+            //             sym.name().map_or(false, |sn| {
+            //                 format!("{}", sn)
+            //                     .starts_with("lucet_runtime_internals::context::Context::swap")
+            //             })
+            //         })
+            //         .is_none()
+            // })
+            .cloned()
+            .collect::<Vec<BacktraceFrame>>();
+        trimmed_frames.into()
     }
 }
 

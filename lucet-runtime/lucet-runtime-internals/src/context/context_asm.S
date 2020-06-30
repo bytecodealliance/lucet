@@ -55,13 +55,122 @@ _lucet_context_bootstrap:
 #endif
 
 .text
+.globl unwind_stub
+.align 16
+.cfi_startproc
+  // load bearing nop so we can just put `unwind_stub` in places and have the unwinding mechanism understand we mean we are _in_ this function
+  nop
+unwind_stub:
+_unwind_stub:
+  ret
+.cfi_endproc
+#ifdef __ELF__
+.size unwind_stub,.-unwind_stub
+#endif
+
+.text
+.globl libunwind_backstop_shim
+.align 16
+// unsure if `simple` is necessary here. GAS docs suggest this may omit some initial CFI instructions, and i want this to be as barren as possible for now.
+.cfi_startproc simple
+    // .cfi_personality 0,win
+
+    // TODO: generate these CFI instructions, perhaps using gimli
+
+    // The idea with the call frame information here is to make any unwinder (libgcc, gdb,
+    // libunwind, etc) think that the previous frame is the call to `Context::swap()` that initially swapped
+    // us from host context into guest context. This means indicating that the values of
+    // callee-saved registers may be found within the saved host context, and that the canonical
+    // frame address is in the host stack.
+
+    // The values we want to use are behind two dereferences (address of the parent context, parent
+    // context), so the normal `.cfi_*` assembler directives are not sufficient to specify their
+    // location. Instead, we have to use `.cfi_escape` so that we can write DWARF expressions that
+    // locate the values or their addresses. See the DWARF spec for more info.
+
+    // Start by providing the canonical frame address. Even though unwinding runtimes _should_ be
+    // able to figure this out based on the saved rsp value, things go wrong if this is missing.
+
+    .cfi_escape 0x0f, /* DW_CFA_def_cfa_expression */ \
+                9, /* uleb128 length of expression bytes */ \
+                0x76, 0xf0, 0x01, /* DW_OP_breg5 (put rbp + 240 on the stack; should be a pointer to the parent context's address) */ \
+                0x06, /* DW_OP_deref should then leave the parent context pointer on the stack */ \
+                0x23, 0x08, /* DW_OP_plus_uconst (add 8 to the base of context to point to saved rsp) */ \
+                0x06, /* deref */ \
+                0x23, 0x08 /* add 8 to pop the return address from the call to lucet_context_swap */
+
+    // Now provide the saved rsp value. Note that unlike the other callee-saved register
+    // expressions, this is a `val-expression` so that we can increment the final value to account for
+    // the extra `lucet_context_swap` call frame we want to skip over
+
+    .cfi_escape 0x16, 0x07, /* DW_CFA_val_expression(7=rsp) */ \
+                9, /* uleb128 length of expression bytes */ \
+                0x76, 0xf0, 0x01, /* DW_OP_breg5 (put rbp + 240 on the stack; should be a pointer to the parent context's address) */ \
+                0x06, /* DW_OP_deref should then leave the parent context pointer on the stack */ \
+                0x23, 0x08, /* DW_OP_plus_uconst (add 8 to the base of context to point to saved rsp) */ \
+                0x06, /* deref */ \
+                0x23, 0x08 /* add 8 to pop the return address from the call to lucet_context_swap */
+
+    // The remaining expressions are all very similar; they just return the address that points to
+    // the corresponding field on the `Context` struct
+
+    .cfi_escape 0x10, 0x03, /* DW_CFA_expression(3=rbx) */ \
+                4, /* uleb128 length of expression bytes */ \
+                0x76, 0xf0, 0x01, /* DW_OP_breg5 (put rbp + 240 on the stack; should be a pointer to the parent context's address) */ \
+                0x06 /* DW_OP_deref should then leave the parent context pointer on the stack */ \
+                /* rbx is at offset 0 */
+
+    .cfi_escape 0x10, 0x06, /* DW_CFA_expression(6=rbp) */ \
+                6, /* uleb128 length of expression bytes */ \
+                0x76, 0xf0, 0x01, /* DW_OP_breg5 (put rbp + 240 on the stack; should be a pointer to the parent context's address) */ \
+                0x06, /* DW_OP_deref should then leave the parent context pointer on the stack */ \
+                0x23, 0x10 /* DW_OP_plus_uconst (add 16 to the base of context to point to saved rbp) */
+
+    .cfi_escape 0x10, 0x05, /* DW_CFA_expression(5=rdi) */ \
+                6, /* uleb128 length of expression bytes */ \
+                0x76, 0xf0, 0x01, /* DW_OP_breg5 (put rbp + 240 on the stack; should be a pointer to the parent context's address) */ \
+                0x06, /* DW_OP_deref should then leave the parent context pointer on the stack */ \
+                0x23, 0x18 /* DW_OP_plus_uconst (add 24 to the base of context to point to saved rdi) */
+
+    .cfi_escape 0x10, 0x0c, /* DW_CFA_expression(12=r12) */ \
+                6, /* uleb128 length of expression bytes */ \
+                0x76, 0xf0, 0x01, /* DW_OP_breg5 (put rbp + 240 on the stack; should be a pointer to the parent context's address) */ \
+                0x06, /* DW_OP_deref should then leave the parent context pointer on the stack */ \
+                0x23, 0x20 /* DW_OP_plus_uconst (add 32 to the base of context to point to saved r12) */
+
+    .cfi_escape 0x10, 0x0d, /* DW_CFA_expression(13=r13) */ \
+                6, /* uleb128 length of expression bytes */ \
+                0x76, 0xf0, 0x01, /* DW_OP_breg5 (put rbp + 240 on the stack; should be a pointer to the parent context's address) */ \
+                0x06, /* DW_OP_deref should then leave the parent context pointer on the stack */ \
+                0x23, 0x28 /* DW_OP_plus_uconst (add 40 to the base of context to point to saved r13) */
+
+    .cfi_escape 0x10, 0x0e, /* DW_CFA_expression(14=r14) */ \
+                6, /* uleb128 length of expression bytes */ \
+                0x76, 0xf0, 0x01, /* DW_OP_breg5 (put rbp + 240 on the stack; should be a pointer to the parent context's address) */ \
+                0x06, /* DW_OP_deref should then leave the parent context pointer on the stack */ \
+                0x23, 0x30 /* DW_OP_plus_uconst (add 48 to the base of context to point to saved r14) */
+
+    .cfi_escape 0x10, 0x0f, /* DW_CFA_expression(15=r15) */ \
+                6, /* uleb128 length of expression bytes */ \
+                0x76, 0xf0, 0x01, /* DW_OP_breg5 (put rbp + 240 on the stack; should be a pointer to the parent context's address) */ \
+                0x06, /* DW_OP_deref should then leave the parent context pointer on the stack */ \
+                0x23, 0x38 /* DW_OP_plus_uconst (add 56 to the base of context to point to saved r15) */
+
+    .cfi_offset 16, -8 /* return address value is stored at is CFA -8 */
+
+    // this nop is load-bearing. We set up the backstop with a cfi_personality function so that stack unwinding through
+    // guest code ends at a handler which can recover and switch back to the host.
+    // However: libunwind doesn't treat the start of `lucet_context_backstop` as `lucet_context_backstop` but as the end
+    // of `lucet_context_bootstrap`. so to get the unwinder to reach information about this function, start the unwind
+    // region slightly before the real address we use, and place an address after the start, unambiguously referring to
+    // the backstop function, on the stack for guests (and libunwind!) to eventually reach.
+    nop
 .globl lucet_context_backstop
 #ifdef __ELF__
 .type lucet_context_backstop,@function
 #else
 .globl _lucet_context_backstop
 #endif
-.align 16
 lucet_context_backstop:
 _lucet_context_backstop:
     // Note that `rbp` here really has no relation to any stack!
@@ -94,6 +203,7 @@ no_backstop_callback:
 #else
     jmp lucet_context_swap
 #endif
+.cfi_endproc
 #ifdef __ELF__
 .size lucet_context_backstop,.-lucet_context_backstop
 #endif

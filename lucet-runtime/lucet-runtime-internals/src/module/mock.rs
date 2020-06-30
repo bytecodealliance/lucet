@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::module::{AddrDetails, GlobalSpec, HeapSpec, Module, ModuleInternal, TableElement};
+use backtrace::Backtrace;
 use libc::c_void;
 use lucet_module::owned::{
     OwnedExportFunction, OwnedFunctionMetadata, OwnedGlobalSpec, OwnedImportFunction,
@@ -333,6 +334,14 @@ impl ModuleInternal for MockModule {
         // we can call `dladdr` on Rust code, but unless we inspect the stack I don't think there's
         // a way to determine whether or not we're in "module" code; punt for now
         Ok(None)
+    }
+
+    fn resolve_and_trim(&self, full_bt: &Backtrace) -> Backtrace {
+        // for a mock module, just resolve since we can't differentiate between hostcall code and
+        // mock module functions
+        let mut bt = full_bt.clone();
+        bt.resolve();
+        bt
     }
 
     fn get_signature(&self, fn_id: FunctionIndex) -> &Signature {

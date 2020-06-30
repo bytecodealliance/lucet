@@ -1,6 +1,7 @@
 use crate::instance::siginfo_ext::SiginfoExt;
 use crate::instance::{FaultDetails, TerminationDetails, YieldedVal};
 use crate::sysdeps::UContext;
+use backtrace::Backtrace;
 use libc::{SIGBUS, SIGSEGV};
 use std::any::Any;
 use std::ffi::{CStr, CString};
@@ -32,6 +33,7 @@ pub enum State {
         details: FaultDetails,
         siginfo: libc::siginfo_t,
         context: UContext,
+        full_backtrace: Backtrace,
     },
 
     /// The instance is in the process of terminating.

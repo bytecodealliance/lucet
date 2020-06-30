@@ -1,3 +1,5 @@
+#![feature(unwind_attributes)]
+
 use lucet_runtime_tests::strcmp_tests;
 
 cfg_if::cfg_if! {

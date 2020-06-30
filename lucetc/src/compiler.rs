@@ -11,7 +11,10 @@ use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
 use crate::traps::{translate_trapcode, trap_sym_for_func};
+use crate::unwind::EhFrameSink;
 use byteorder::{LittleEndian, WriteBytesExt};
+use cranelift_codegen::isa::unwind::UnwindInfo;
+use cranelift_codegen::CodegenError;
 use cranelift_codegen::{
     binemit, ir,
     isa::TargetIsa,
@@ -20,10 +23,12 @@ use cranelift_codegen::{
 };
 use cranelift_module::{
     Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, FuncOrDataId,
-    Linkage as ClifLinkage, Module as ClifModule,
+    Linkage as ClifLinkage, Module as ClifModule, ModuleError,
 };
 use cranelift_object::{ObjectBackend, ObjectBuilder};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
+use gimli::write::EhFrame;
+use gimli::write::{Address, FrameTable};
 use lucet_module::bindings::Bindings;
 use lucet_module::{
     ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
@@ -228,7 +233,7 @@ impl<'a> Compiler<'a> {
             _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
-        let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls);
+        let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls)?;
         builder.function_alignment(16);
         let mut clif_module: ClifModule<ObjectBackend> = ClifModule::new(builder);
 
@@ -268,7 +273,20 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn object_file(mut self) -> Result<ObjectFile, Error> {
+        let isa = Self::target_isa(
+            self.target.clone(),
+            self.opt_level,
+            &self.cpu_features,
+            self.canonicalize_nans,
+        )?;
+        let target_binary_format = isa.triple().binary_format;
+        let mut frame_table = FrameTable::default();
         let mut func_translator = FuncTranslator::new();
+        let cie_id = frame_table.add_cie(
+            isa.as_ref()
+                .create_systemv_cie()
+                .expect("creating a SystemV CIE does not fail"),
+        );
         let mut function_manifest_ctx = ClifDataContext::new();
         let mut function_manifest_bytes = Cursor::new(Vec::new());
         let mut function_map: HashMap<FuncId, (u32, DataId, usize)> = HashMap::new();
@@ -278,6 +296,7 @@ impl<'a> Compiler<'a> {
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();
+            clif_context.func.collect_debug_info();
 
             func_translator
                 .translate(
@@ -300,6 +319,48 @@ impl<'a> Compiler<'a> {
                     symbol: func.name.symbol().to_string(),
                     source,
                 })?;
+
+            let unwind_info = clif_context
+                .create_unwind_info(isa.as_ref())
+                .map_err(|err| Error::ClifModuleError(ModuleError::Compilation(err)))?;
+            if let Some(unwind_info) = unwind_info {
+                match target_binary_format {
+                    target_lexicon::BinaryFormat::Elf | target_lexicon::BinaryFormat::Macho => {
+                        if let UnwindInfo::SystemV(info) = unwind_info {
+                            frame_table.add_fde(
+                                cie_id,
+                                info.to_fde(Address::Symbol {
+                                    symbol: func_id.as_u32() as usize,
+                                    addend: 0,
+                                }),
+                            );
+                        } else {
+                            return Err(Error::ClifModuleError(ModuleError::Compilation(
+                                CodegenError::Unsupported(
+                                    "Non-SystemV unwind information in ELF/MachO output."
+                                        .to_string(),
+                                ),
+                            )));
+                        }
+                    }
+                    objfmt => {
+                        return Err(Error::ClifModuleError(ModuleError::Compilation(
+                            CodegenError::Unsupported(format!(
+                                "lucetc does not yet support consolidating \
+                                {:?} unwind information.",
+                                objfmt
+                            )),
+                        )));
+                    }
+                }
+            } else {
+                return Err(Error::ClifModuleError(ModuleError::Compilation(
+                    CodegenError::Unsupported(format!(
+                        "lucetc does not yet support consolidated unwind \
+                    information where some functions have no unwind information."
+                    )),
+                )));
+            }
 
             let size = compiled.size;
 
@@ -436,6 +497,43 @@ impl<'a> Compiler<'a> {
         native_data_ctx.define(native_data.into_inner().into());
         self.clif_module
             .define_data(native_data_id, &native_data_ctx)?;
+
+        let mut eh_frame_ctx = cranelift_module::DataContext::new();
+
+        let mut eh_frame = EhFrame(EhFrameSink {
+            data: Vec::new(),
+            data_context: &mut eh_frame_ctx,
+        });
+        frame_table
+            .write_eh_frame(&mut eh_frame)
+            .map_err(|e| cranelift_module::ModuleError::Backend(anyhow::anyhow!(e)))?;
+        let eh_frame_bytes = eh_frame.0.data;
+
+        let eh_section_name = match target_binary_format {
+            target_lexicon::BinaryFormat::Elf => ".eh_frame",
+            target_lexicon::BinaryFormat::Macho => "__eh_frame",
+            objfmt => {
+                return Err(Error::ClifModuleError(ModuleError::Compilation(
+                    CodegenError::Unsupported(format!(
+                        "lucetc does not yet support consolidating \
+                        {:?} unwind information.",
+                        objfmt
+                    )),
+                )));
+            }
+        };
+
+        eh_frame_ctx.set_segment_section("", eh_section_name);
+        eh_frame_ctx.define(eh_frame_bytes.into_boxed_slice());
+
+        let dataid = self.clif_module.declare_data(
+            eh_section_name,
+            ClifLinkage::Local,
+            false,
+            false,
+            None,
+        )?;
+        self.clif_module.define_data(dataid, &eh_frame_ctx)?;
 
         let obj = ObjectFile::new(self.clif_module.finish())?;
 

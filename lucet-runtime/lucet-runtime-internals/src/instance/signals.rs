@@ -5,6 +5,7 @@ use crate::instance::{
     HOST_CTX,
 };
 use crate::sysdeps::UContextPtr;
+use backtrace::Backtrace;
 use lazy_static::lazy_static;
 use libc::{c_int, c_void, siginfo_t, SIGBUS, SIGSEGV};
 use lucet_module::TrapCode;
@@ -121,9 +122,9 @@ fn decrement_lucet_signal_state() {
 }
 
 impl Instance {
-    pub(crate) fn with_signals_on<F, R>(&mut self, f: F) -> Result<R, Error>
+    pub(crate) fn with_signals_on<F>(&mut self, f: F) -> Result<(), Error>
     where
-        F: FnOnce(&mut Instance) -> Result<R, Error>,
+        F: FnOnce(&mut Instance) -> Result<(), Error>,
     {
         let previous_sigstack = if self.ensure_sigstack_installed {
             validate_sigstack_size(self.alloc.slot().limits.signal_stack_size)?;
@@ -173,8 +174,21 @@ impl Instance {
             );
         }
 
-        // run the body
-        let res = f(self);
+        let res = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            // run the body
+            f(self)
+        })) {
+            Ok(res) => res,
+            Err(e) => match e.downcast::<TerminationDetails>() {
+                Ok(details) => {
+                    self.state = State::Terminating { details: *details };
+                    Ok(())
+                }
+                Err(e) => {
+                    std::panic::resume_unwind(e);
+                }
+            },
+        };
 
         if self.ensure_signal_handler_installed {
             decrement_lucet_signal_state();
@@ -315,9 +329,11 @@ extern "C" fn handle_signal(signum: c_int, siginfo_ptr: *mut siginfo_t, ucontext
                             // Details set to `None` here: have to wait until `verify_trap_safety` to
                             // fill in these details, because access may not be signal safe.
                             rip_addr_details: None,
+                            backtrace: None,
                         },
                         siginfo,
                         context: ctx.into(),
+                        full_backtrace: Backtrace::new_unresolved(),
                     };
                 };
 

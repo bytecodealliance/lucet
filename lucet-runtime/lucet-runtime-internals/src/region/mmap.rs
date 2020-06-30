@@ -276,6 +276,28 @@ impl RegionInternal for MmapRegion {
     fn as_dyn_internal(&self) -> &dyn RegionInternal {
         self
     }
+
+    fn enable_stack_redzone(&self, slot: &Slot) {
+        unsafe {
+            mprotect(
+                slot.stack_redzone_start(),
+                host_page_size(),
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+            )
+            .expect("can set permissions on stack redzone page")
+        }
+    }
+
+    fn disable_stack_redzone(&self, slot: &Slot) {
+        unsafe {
+            mprotect(
+                slot.stack_redzone_start(),
+                host_page_size(),
+                ProtFlags::PROT_NONE,
+            )
+            .expect("can set permissions on stack redzone page")
+        }
+    }
 }
 
 impl Drop for MmapRegion {
@@ -412,6 +434,7 @@ impl MmapRegion {
             sigstack: sigstack as *mut c_void,
             limits: region.limits.clone(),
             region: Arc::downgrade(region) as Weak<dyn RegionInternal>,
+            redzone_stack_enabled: false,
         })
     }
 

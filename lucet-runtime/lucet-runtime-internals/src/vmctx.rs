@@ -295,6 +295,7 @@ impl Vmctx {
     /// [ongoing](https://github.com/bytecodealliance/lucet/pull/254).
     ///
     /// ```no_run
+    /// # #![feature(unwind_attributes)]
     /// use lucet_runtime_macros::lucet_hostcall;
     /// use lucet_runtime_internals::lucet_hostcall_terminate;
     /// use lucet_runtime_internals::vmctx::{lucet_vmctx, Vmctx};
@@ -397,6 +398,9 @@ impl Vmctx {
         };
 
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
+        if let Some(td) = inst.pending_termination.take() {
+            panic!(td);
+        }
     }
 
     /// Take and return the value passed to

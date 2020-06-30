@@ -318,6 +318,28 @@ impl RegionInternal for UffdRegion {
     fn as_dyn_internal(&self) -> &dyn RegionInternal {
         self
     }
+
+    fn enable_stack_redzone(&self, slot: &Slot) {
+        // The stack grows downward, `slot.stack` is the lowest address of the stack, meaning the
+        // guard page is before `slot.stack`.
+        let stack_guard_start = slot.stack as usize - host_page_size();
+        unsafe {
+            self.uffd
+                .zeropage(stack_guard_start as *mut _, host_page_size(), true)
+                .expect("uffd.zeropage succeeds");
+        }
+    }
+
+    fn disable_stack_redzone(&self, slot: &Slot) {
+        let stack_guard_start = slot.stack as usize - host_page_size();
+        unsafe {
+            madvise(
+                stack_guard_start as *mut _,
+                host_page_size(),
+                MmapAdvise::MADV_DONTNEED,
+            ).expect("disabling stack redzone succeeds");
+        }
+    }
 }
 
 impl RegionCreate for UffdRegion {
@@ -502,6 +524,7 @@ impl UffdRegion {
             sigstack: sigstack as *mut c_void,
             limits: region.limits.clone(),
             region: Arc::downgrade(region) as Weak<dyn RegionInternal>,
+            redzone_stack_enabled: false,
         })
     }
 }

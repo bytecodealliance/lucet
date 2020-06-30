@@ -21,6 +21,10 @@
 ///     // body
 /// }
 /// ```
+///
+/// **Note:** This macro currently uses the unstable `#![feature(unwind_attributes)]`, which must be
+/// enabled in any crate where the macro is used. In the long term, we hope to move back to stable
+/// once [unwinding across FFI](https://github.com/rust-lang/rfcs/pull/2753) is defined.
 #[macro_export]
 #[deprecated(since = "0.5.0", note = "Use the #[lucet_hostcall] attribute instead")]
 macro_rules! lucet_hostcalls {
@@ -40,11 +44,39 @@ macro_rules! lucet_hostcalls {
             #[allow(unused_unsafe)]
             #[$crate::lucet_hostcall]
             $(#[$attr])*
+            #[unwind(allowed)]
             pub unsafe extern "C" fn $name(
                 $vmctx: &lucet_runtime::vmctx::Vmctx,
                 $( $arg: $arg_ty ),*
             ) -> $ret_ty {
-                $($body)*
+                #[inline(always)]
+                unsafe fn hostcall_impl(
+                    $vmctx: &mut $crate::vmctx::Vmctx,
+                    $( $arg : $arg_ty ),*
+                ) -> $ret_ty {
+                    $($body)*
+                }
+                // let res = std::panic::catch_unwind(move || {
+                    #[allow(unused_imports)]
+                    use lucet_runtime_internals::vmctx::VmctxInternal;
+                    let res = $crate::vmctx::Vmctx::from_raw(vmctx_raw).instance_mut().in_hostcall(|| {
+                        hostcall_impl(&mut $crate::vmctx::Vmctx::from_raw(vmctx_raw), $( $arg ),*)
+                    });
+                    res
+                // });
+                // match res {
+                //     Ok(res) => res,
+                //     Err(e) => {
+                //         if let Some(details) = e.downcast_ref::<$crate::instance::TerminationDetails>() {
+                //             let mut vmctx = $crate::vmctx::Vmctx::from_raw(vmctx_raw);
+                //             vmctx.terminate_no_unwind(details.clone());
+                //         } else {
+                //             std::panic::resume_unwind(e);
+                //         }
+                //     }
+                // }
+                //
+                // res
             }
         )*
     }

@@ -1,3 +1,5 @@
+#![feature(unwind_attributes)]
+
 mod compile;
 mod context;
 mod modules;

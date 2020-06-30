@@ -27,6 +27,39 @@ macro_rules! host_tests {
 
         const ERROR_MESSAGE: &'static str = "hostcall_test_func_hostcall_error";
 
+        lazy_static! {
+            static ref NESTED_OUTER: Mutex<()> = Mutex::new(());
+            static ref NESTED_INNER: Mutex<()> = Mutex::new(());
+            static ref NESTED_REGS_OUTER: Mutex<()> = Mutex::new(());
+            static ref NESTED_REGS_INNER: Mutex<()> = Mutex::new(());
+        }
+
+        static mut HOSTCALL_MUTEX: Option<Mutex<()>> = None;
+        static mut BAD_ACCESS_UNWIND: Option<Mutex<()>> = None;
+        static mut STACK_OVERFLOW_UNWIND: Option<Mutex<()>> = None;
+
+        #[allow(unreachable_code)]
+        #[inline]
+        unsafe fn unwind_inner(vmctx: &Vmctx, mutex: &Mutex<()>) {
+            let lock = mutex.lock().unwrap();
+            lucet_hostcall_terminate!(ERROR_MESSAGE);
+            drop(lock);
+        }
+
+        #[inline]
+        unsafe fn unwind_outer(vmctx: &Vmctx, mutex: &Mutex<()>, cb_idx: u32) -> u64 {
+            let lock = mutex.lock().unwrap();
+            let func = vmctx
+                .get_func_from_idx(0, cb_idx)
+                .expect("can get function by index");
+            let func = std::mem::transmute::<usize, extern "C" fn(*const lucet_vmctx) -> u64>(
+                func.ptr.as_usize(),
+            );
+            let res = (func)(vmctx.as_raw());
+            drop(lock);
+            res
+        }
+
         #[lucet_hostcall]
         #[no_mangle]
         pub fn hostcall_test_func_hostcall_error(_vmctx: &Vmctx) {
@@ -52,10 +85,167 @@ macro_rules! host_tests {
         #[allow(unreachable_code)]
         #[no_mangle]
         pub fn hostcall_test_func_hostcall_error_unwind(vmctx: &Vmctx) {
-            let lock = vmctx.get_embed_ctx::<Arc<Mutex<()>>>();
-            let _mutex_guard = lock.lock().unwrap();
-            lucet_hostcall_terminate!(ERROR_MESSAGE);
-            drop(_mutex_guard);
+            let lock = unsafe { HOSTCALL_MUTEX.as_ref().unwrap() }.lock().unwrap();
+            unsafe {
+                lucet_hostcall_terminate!(ERROR_MESSAGE);
+            }
+            drop(lock);
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn nested_error_unwind_outer(
+            vmctx: &Vmctx,
+            cb_idx: u32,
+        ) -> u64 {
+            unsafe {
+                unwind_outer(vmctx, &*NESTED_OUTER, cb_idx)
+            }
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn nested_error_unwind_inner(
+            vmctx: &Vmctx,
+        ) -> () {
+            unsafe {
+                unwind_inner(vmctx, &*NESTED_INNER)
+            }
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn nested_error_unwind_regs_outer(
+            vmctx: &Vmctx,
+            cb_idx: u32,
+        ) -> u64 {
+            unsafe {
+                unwind_outer(vmctx, &*NESTED_REGS_OUTER, cb_idx)
+            }
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn nested_error_unwind_regs_inner(
+            vmctx: &Vmctx,
+        ) -> () {
+            unsafe {
+                unwind_inner(vmctx, &*NESTED_REGS_INNER)
+            }
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_panic(
+            _vmctx: &Vmctx,
+        ) -> () {
+            panic!("hostcall_panic");
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_restore_callee_saved(
+            vmctx: &Vmctx,
+            cb_idx: u32,
+        ) -> u64 {
+            let mut a: u64;
+            let mut b: u64 = 0xAAAAAAAA00000001;
+            let mut c: u64 = 0xAAAAAAAA00000002;
+            let mut d: u64 = 0xAAAAAAAA00000003;
+            let mut e: u64 = 0xAAAAAAAA00000004;
+            let mut f: u64 = 0xAAAAAAAA00000005;
+            let mut g: u64 = 0xAAAAAAAA00000006;
+            let mut h: u64 = 0xAAAAAAAA00000007;
+            let mut i: u64 = 0xAAAAAAAA00000008;
+            let mut j: u64 = 0xAAAAAAAA00000009;
+            let mut k: u64 = 0xAAAAAAAA0000000A;
+            let mut l: u64 = 0xAAAAAAAA0000000B;
+
+            a = b.wrapping_add(c ^ 0);
+            b = c.wrapping_add(d ^ 1);
+            c = d.wrapping_add(e ^ 2);
+            d = e.wrapping_add(f ^ 3);
+            e = f.wrapping_add(g ^ 4);
+            f = g.wrapping_add(h ^ 5);
+            g = h.wrapping_add(i ^ 6);
+            h = i.wrapping_add(j ^ 7);
+            i = j.wrapping_add(k ^ 8);
+            j = k.wrapping_add(l ^ 9);
+            k = l.wrapping_add(a ^ 10);
+            l = a.wrapping_add(b ^ 11);
+
+            let func = vmctx
+                .get_func_from_idx(0, cb_idx)
+                .expect("can get function by index");
+            let func = unsafe {
+                std::mem::transmute::<usize, extern "C" fn(*const lucet_vmctx) -> u64>(
+                    func.ptr.as_usize(),
+                )
+            };
+            let vmctx_raw = vmctx.as_raw();
+            let res = std::panic::catch_unwind(|| {
+                (func)(vmctx_raw);
+            });
+            assert!(res.is_err());
+
+            a = b.wrapping_mul(c & 0);
+            b = c.wrapping_mul(d & 1);
+            c = d.wrapping_mul(e & 2);
+            d = e.wrapping_mul(f & 3);
+            e = f.wrapping_mul(g & 4);
+            f = g.wrapping_mul(h & 5);
+            g = h.wrapping_mul(i & 6);
+            h = i.wrapping_mul(j & 7);
+            i = j.wrapping_mul(k & 8);
+            j = k.wrapping_mul(l & 9);
+            k = l.wrapping_mul(a & 10);
+            l = a.wrapping_mul(b & 11);
+
+            a ^ b ^ c ^ d ^ e ^ f ^ g ^ h ^ i ^ j ^ k ^ l
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_stack_overflow_unwind(
+            vmctx: &Vmctx,
+            cb_idx: u32,
+        ) -> () {
+            let lock = unsafe { STACK_OVERFLOW_UNWIND.as_ref().unwrap() }.lock().unwrap();
+
+            let func = vmctx
+                .get_func_from_idx(0, cb_idx)
+                .expect("can get function by index");
+            let func = unsafe {
+                std::mem::transmute::<usize, extern "C" fn(*const lucet_vmctx)>(
+                    func.ptr.as_usize(),
+                )
+            };
+            let vmctx_raw = vmctx.as_raw();
+            func(vmctx_raw);
+
+            drop(lock);
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_bad_access_unwind(
+            vmctx: &Vmctx,
+            cb_idx: u32,
+        ) -> () {
+            let lock = unsafe { BAD_ACCESS_UNWIND.as_ref().unwrap() }.lock().unwrap();
+
+            let func = vmctx
+                .get_func_from_idx(0, cb_idx)
+                .expect("can get function by index");
+            let func = unsafe {
+                std::mem::transmute::<usize, extern "C" fn(*const lucet_vmctx)>(
+                    func.ptr.as_usize(),
+                )
+            };
+            let vmctx_raw = vmctx.as_raw();
+            func(vmctx_raw);
+
+            drop(lock);
         }
 
         #[lucet_hostcall]
@@ -186,7 +376,6 @@ macro_rules! host_tests {
 
         $(
             mod $region_id {
-
                 use lazy_static::lazy_static;
                 use libc::c_void;
                 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
@@ -196,12 +385,8 @@ macro_rules! host_tests {
                 };
                 use std::sync::{Arc, Mutex};
                 use $crate::build::test_module_c;
-                use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder};
+                use $crate::helpers::{FunctionPointer, HeapSpec, MockExportBuilder, MockModuleBuilder, test_ex};
                 use $TestRegion as TestRegion;
-
-                lazy_static! {
-                    static ref HOSTCALL_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-                }
 
                 #[test]
                 fn load_module() {
@@ -276,17 +461,62 @@ macro_rules! host_tests {
 
                 #[test]
                 fn run_hostcall_error_unwind() {
-                    let module =
-                        test_module_c("host", "hostcall_error_unwind.c").expect("build and load module");
-                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    test_ex(|| {
+                        // Since `hostcall_test_func_hostcall_error_unwind` is reused in two
+                        // different modules, meaning two different tests, we need to reset the
+                        // mutex it will (hopefully) poison before running this test.
+                        //
+                        // The contention for this global mutex is why this test must be `test_ex`.
+                        unsafe {
+                            super::HOSTCALL_MUTEX = Some(Mutex::new(()));
+                        }
 
+                        let module =
+                            test_module_c("host", "hostcall_error_unwind.c").expect("build and load module");
+                        let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        match inst.run("main", &[0u32.into(), 0u32.into()]) {
+                            Err(Error::RuntimeTerminated(term)) => {
+                                assert_eq!(
+                                    *term
+                                        .provided_details()
+                                        .expect("user provided termination reason")
+                                        .downcast_ref::<&'static str>()
+                                        .expect("error was static str"),
+                                    super::ERROR_MESSAGE
+                                );
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        unsafe {
+                            assert!(super::HOSTCALL_MUTEX.as_ref().unwrap().is_poisoned());
+                        }
+                    })
+                }
+
+                /// Check that if two segments of hostcall stack are present when terminating, that they
+                /// both get properly unwound.
+                ///
+                /// Currently ignored as we don't allow nested hostcalls - the nested hostcall runs afoul
+                /// of timeouts' domain-checking logic, which assumes beginning a hostscall will only
+                /// happen from a guest context, but when initiated from a nested hostcall is actually a
+                /// hostcall context
+                #[test]
+                #[ignore]
+                fn nested_error_unwind() {
+                    let module =
+                        test_module_c("host", "nested_error_unwind.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                     let mut inst = region
-                        .new_instance_builder(module)
-                        .with_embed_ctx(HOSTCALL_MUTEX.clone())
-                        .build()
+                        .new_instance(module)
                         .expect("instance can be created");
 
-                    match inst.run("main", &[0u32.into(), 0u32.into()]) {
+                    match inst.run("entrypoint", &[]) {
                         Err(Error::RuntimeTerminated(term)) => {
                             assert_eq!(
                                 *term
@@ -300,7 +530,104 @@ macro_rules! host_tests {
                         res => panic!("unexpected result: {:?}", res),
                     }
 
-                    assert!(HOSTCALL_MUTEX.is_poisoned());
+                    assert!(super::NESTED_OUTER.is_poisoned());
+                    assert!(super::NESTED_INNER.is_poisoned());
+                }
+
+                /// Like `nested_error_unwind`, but the guest code callback in between the two segments of
+                /// hostcall stack uses enough locals to require saving callee registers.
+                ///
+                /// Currently ignored as we don't allow nested hostcalls - the nested hostcall runs afoul
+                /// of timeouts' domain-checking logic, which assumes beginning a hostscall will only
+                /// happen from a guest context, but when initiated from a nested hostcall is actually a
+                /// hostcall context
+                #[test]
+                #[ignore]
+                fn nested_error_unwind_regs() {
+                    let module =
+                        test_module_c("host", "nested_error_unwind.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    match inst.run("entrypoint_regs", &[]) {
+                        Err(Error::RuntimeTerminated(term)) => {
+                            assert_eq!(
+                                *term
+                                    .provided_details()
+                                    .expect("user provided termination reason")
+                                    .downcast_ref::<&'static str>()
+                                    .expect("error was static str"),
+                                super::ERROR_MESSAGE
+                            );
+                        }
+                        res => panic!("unexpected result: {:?}", res),
+                    }
+
+                    assert!(super::NESTED_REGS_OUTER.is_poisoned());
+                    assert!(super::NESTED_REGS_INNER.is_poisoned());
+                }
+
+                /// Ensures that callee-saved registers are properly restored following a `catch_unwind`
+                /// that catches a panic.
+                ///
+                /// Currently ignored as we don't allow nested hostcalls - the nested hostcall runs afoul
+                /// of timeouts' domain-checking logic, which assumes beginning a hostscall will only
+                /// happen from a guest context, but when initiated from a nested hostcall is actually a
+                /// hostcall context
+                #[ignore]
+                #[test]
+                fn restore_callee_saved() {
+                    let module =
+                        test_module_c("host", "nested_error_unwind.c").expect("build and load module");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+                    assert_eq!(
+                        u64::from(inst.run("entrypoint_restore", &[]).unwrap().unwrap_returned()),
+                        6148914668330025056
+                    );
+                }
+
+                /// Ensures that hostcall stack frames get unwound when a fault occurs in guest code.
+                #[test]
+                fn bad_access_unwind() {
+                    test_ex(|| {
+                        unsafe {
+                            super::BAD_ACCESS_UNWIND = Some(Mutex::new(()));
+                        }
+                        let module = test_module_c("host", "fault_unwind.c").expect("build and load module");
+                        let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+                        inst.run("bad_access", &[]).unwrap_err();
+                        inst.reset().unwrap();
+                        unsafe {
+                            assert!(unsafe { super::BAD_ACCESS_UNWIND.as_ref().unwrap() }.is_poisoned());
+                        }
+                    })
+                }
+
+                /// Ensures that hostcall stack frames get unwound even when a stack overflow occurs in
+                /// guest code.
+                #[test]
+                fn stack_overflow_unwind() {
+                    test_ex(|| {
+                        unsafe {
+                            super::STACK_OVERFLOW_UNWIND = Some(Mutex::new(()));
+                        }
+                        let module = test_module_c("host", "fault_unwind.c").expect("build and load module");
+                        let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+                        inst.run("stack_overflow", &[]).unwrap_err();
+                        inst.reset().unwrap();
+                        assert!(unsafe { super::STACK_OVERFLOW_UNWIND.as_ref().unwrap() }.is_poisoned());
+                    })
                 }
 
                 #[test]
