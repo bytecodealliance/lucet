@@ -104,6 +104,8 @@ pub trait LucetcOpts {
     fn with_count_instructions(self, enable_count: bool) -> Self;
     fn canonicalize_nans(&mut self, enable_canonicalize_nans: bool);
     fn with_canonicalize_nans(self, enable_canonicalize_nans: bool) -> Self;
+    fn pinned_heap(&mut self, enable_pinned_heap: bool);
+    fn with_pinned_heap(self, enable_pinned_heap: bool) -> Self;
 }
 
 impl<T: AsLucetc> LucetcOpts for T {
@@ -258,6 +260,15 @@ impl<T: AsLucetc> LucetcOpts for T {
         self.canonicalize_nans(enable_nans_canonicalization);
         self
     }
+
+    fn pinned_heap(&mut self, enable_pinned_heap: bool) {
+        self.as_lucetc().builder.pinned_heap(enable_pinned_heap);
+    }
+
+    fn with_pinned_heap(mut self, enable_pinned_heap: bool) -> Self {
+        self.pinned_heap(enable_pinned_heap);
+        self
+    }
 }
 
 impl Lucetc {
@@ -315,7 +326,6 @@ impl Lucetc {
         let (module_contents, bindings) = self.build()?;
 
         let compiler = self.builder.create(&module_contents, &bindings)?;
-
         compiler.cranelift_funcs()?.write(&output)?;
 
         Ok(())

@@ -58,6 +58,7 @@ mod module_data {
             false,
             &None,
             false,
+            false,
         )
         .expect("compiling exported_import");
         let mdata = c.module_data().unwrap();
@@ -288,7 +289,6 @@ mod module_data {
         let h = HeapSettings::default();
         let builder = Compiler::builder().with_heap_settings(h.clone());
         let c = builder.create(&m, &b).expect("compiling heap_spec_import");
-
         assert_eq!(
             c.module_data().unwrap().heap_spec(),
             Some(&HeapSpec {
@@ -313,7 +313,6 @@ mod module_data {
         let c = builder
             .create(&m, &b)
             .expect("compiling heap_spec_definition");
-
         assert_eq!(
             c.module_data().unwrap().heap_spec(),
             Some(&HeapSpec {
@@ -572,6 +571,7 @@ mod validate {
             h,
             false,
             &Some(v),
+            false,
             false,
         )
         .expect("compile");

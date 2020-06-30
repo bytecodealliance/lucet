@@ -55,6 +55,7 @@ macro_rules! init_and_swap {
                 &mut *$stack,
                 $fn as usize,
                 &[$( $args ),*],
+                std::ptr::null_mut(),
             ).unwrap()));
 
             child_regs = child;
