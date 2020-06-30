@@ -114,18 +114,11 @@ fn getentropy() {
 
 #[test]
 fn stdin() {
-    use std::io::Write;
-    use std::os::unix::io::FromRawFd;
-
-    let (pipe_out, pipe_in) = nix::unistd::pipe().expect("can create pipe");
-
-    let mut stdin_file = unsafe { File::from_raw_fd(pipe_in) };
-    write!(stdin_file, "hello from stdin!").expect("pipe write succeeds");
-    drop(stdin_file);
+    let stdin = wasi_common::virtfs::pipe::ReadPipe::from("hello from stdin!");
 
     let mut ctx = WasiCtxBuilder::new();
     ctx.args(["stdin"].iter());
-    ctx.stdin(unsafe { File::from_raw_fd(pipe_out) });
+    ctx.stdin(stdin);
 
     let (exitcode, stdout) = run_with_stdout("stdin.c", &mut ctx).unwrap();
 

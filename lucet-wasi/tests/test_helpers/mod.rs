@@ -1,11 +1,8 @@
-use anyhow::{bail, Error};
+use anyhow::{anyhow, bail, Error};
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::{self, types::Exitcode, WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
-use std::fs::File;
-use std::io::Read;
-use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -106,17 +103,19 @@ pub fn run_with_stdout<P: AsRef<Path>>(
     path: P,
     ctx: &mut WasiCtxBuilder,
 ) -> Result<(Exitcode, String), Error> {
-    let (pipe_out, pipe_in) = nix::unistd::pipe()?;
+    let stdout = wasi_common::virtfs::pipe::WritePipe::new_in_memory();
+    ctx.stdout(stdout.clone());
 
-    ctx.stdout(unsafe { File::from_raw_fd(pipe_in) });
     let ctx = ctx.build()?;
 
     let exitcode = run(path, ctx)?;
 
-    let mut stdout_file = unsafe { File::from_raw_fd(pipe_out) };
-    let mut stdout = String::new();
-    stdout_file.read_to_string(&mut stdout)?;
-    nix::unistd::close(stdout_file.into_raw_fd())?;
+    let stdout = String::from_utf8(
+        stdout
+            .try_into_inner()
+            .map_err(|_| anyhow!("no other pipe references can exist"))?
+            .into_inner(),
+    )?;
 
     Ok((exitcode, stdout))
 }
@@ -125,14 +124,12 @@ pub fn run_with_null_stdin<P: AsRef<Path>>(
     path: P,
     ctx: &mut WasiCtxBuilder,
 ) -> Result<Exitcode, Error> {
-    let (pipe_out, pipe_in) = nix::unistd::pipe()?;
+    let stdin = wasi_common::virtfs::pipe::ReadPipe::from("");
+    ctx.stdin(stdin);
 
-    ctx.stdin(unsafe { File::from_raw_fd(pipe_out) });
     let ctx = ctx.build()?;
 
     let exitcode = run(path, ctx)?;
-
-    nix::unistd::close(pipe_in)?;
 
     Ok(exitcode)
 }
