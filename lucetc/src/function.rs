@@ -557,6 +557,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         &mut self,
         _pos: FuncCursor,
         _table_index: TableIndex,
+        _table: ir::Table,
         _delta: ir::Value,
         _init_value: ir::Value,
     ) -> WasmResult<ir::Value> {
@@ -567,8 +568,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn translate_table_get(
         &mut self,
-        _pos: FuncCursor,
+        _func: &mut FunctionBuilder,
         _table_index: TableIndex,
+        _table: ir::Table,
         _index: ir::Value,
     ) -> WasmResult<ir::Value> {
         Err(WasmError::Unsupported(
@@ -578,8 +580,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
 
     fn translate_table_set(
         &mut self,
-        _pos: FuncCursor,
+        _func: &mut FunctionBuilder,
         _table_index: TableIndex,
+        _table: ir::Table,
         _value: ir::Value,
         _index: ir::Value,
     ) -> WasmResult<()> {
@@ -640,7 +643,11 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         ))
     }
 
-    fn translate_ref_func(&mut self, _pos: FuncCursor, _func_index: u32) -> WasmResult<ir::Value> {
+    fn translate_ref_func(
+        &mut self,
+        _pos: FuncCursor,
+        _func_index: FuncIndex,
+    ) -> WasmResult<ir::Value> {
         Err(WasmError::Unsupported(
             "reference type operations not supported yet".into(),
         ))
