@@ -9,9 +9,8 @@ use lucetc::{Lucetc, LucetcOpts};
 use rand::prelude::random;
 use rayon::prelude::*;
 use regex::Regex;
-use std::fs::File;
 use std::io::{Read, Write};
-use std::os::unix::prelude::{FromRawFd, IntoRawFd, OpenOptionsExt};
+use std::os::unix::prelude::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -380,19 +379,20 @@ fn run_with_stdout<P: AsRef<Path>>(
     let mut ctx = WasiCtxBuilder::new();
     ctx.args(&["gen"]);
 
-    let (pipe_out, pipe_in) = nix::unistd::pipe()?;
+    let stdout = wasi_common::virtfs::pipe::WritePipe::new_in_memory();
+    ctx.stdout(stdout.clone());
 
-    ctx.stdout(unsafe { File::from_raw_fd(pipe_in) });
     let ctx = ctx.build()?;
 
     let exitcode = run(tmpdir, path, ctx)?;
 
-    let mut stdout_file = unsafe { File::from_raw_fd(pipe_out) };
-    let mut stdout = vec![];
-    stdout_file.read_to_end(&mut stdout)?;
-    nix::unistd::close(stdout_file.into_raw_fd())?;
-
-    Ok((exitcode, stdout))
+    Ok((
+        exitcode,
+        stdout
+            .try_into_inner()
+            .expect("no other pipe references can exist")
+            .into_inner(),
+    ))
 }
 
 fn run<P: AsRef<Path>>(tmpdir: &TempDir, path: P, ctx: WasiCtx) -> Result<Exitcode, Error> {

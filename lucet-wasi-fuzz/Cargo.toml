@@ -27,3 +27,4 @@ rayon = "1.0"
 structopt = "0.3.3"
 tempfile = "3.0"
 wait-timeout = "0.2"
+wasi-common = { path = "../wasmtime/crates/wasi-common" }
