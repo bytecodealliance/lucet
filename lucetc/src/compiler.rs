@@ -14,7 +14,6 @@ use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
     binemit, ir,
-    isa::RegUnit,
     isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
@@ -27,12 +26,13 @@ use cranelift_object::{ObjectBackend, ObjectBuilder};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use lucet_module::bindings::Bindings;
 use lucet_module::{
-    ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
+    HeapPinStyle, ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM,
+    MODULE_DATA_SYM,
 };
 use lucet_validate::Validator;
 use std::collections::HashMap;
 use std::io::Cursor;
-use target_lexicon::Triple;
+use target_lexicon::{Architecture, Triple};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OptLevel {
@@ -196,7 +196,6 @@ pub struct Compiler<'a> {
     module_translation_state: ModuleTranslationState,
     canonicalize_nans: bool,
     pinned_heap: bool,
-    pinned_heap_register: RegUnit,
 }
 
 impl<'a> Compiler<'a> {
@@ -250,8 +249,6 @@ impl<'a> Compiler<'a> {
             _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
-        let pinned_heap_register = isa.register_info().parse_regunit("r15").unwrap();
-
         let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls);
         builder.function_alignment(16);
         let mut clif_module: ClifModule<ObjectBackend> = ClifModule::new(builder);
@@ -275,7 +272,6 @@ impl<'a> Compiler<'a> {
             target,
             canonicalize_nans,
             pinned_heap,
-            pinned_heap_register,
         })
     }
 
@@ -286,8 +282,21 @@ impl<'a> Compiler<'a> {
     pub fn module_features(&self) -> ModuleFeatures {
         let mut mf: ModuleFeatures = (&self.cpu_features).into();
         mf.instruction_count = self.count_instructions;
-        mf.pinned_heap = self.pinned_heap;
-        mf.pinned_heap_register = self.pinned_heap_register;
+        if self.pinned_heap {
+            if self.target.architecture == Architecture::X86_64 {
+                // on x86_64 systems, heap pinning in Cranelift is implemented by pinning r15.
+                mf.pinned_heap = Some(HeapPinStyle::PinR15);
+            } else {
+                // Lucet does not support other architectures, and Cranelift might not support
+                // value pinning on other architectures. So:
+                panic!(
+                    "Lucet does not support heap pinning for architecture {}",
+                    self.target.architecture
+                );
+            }
+        } else {
+            mf.pinned_heap = None;
+        }
         mf
     }
 

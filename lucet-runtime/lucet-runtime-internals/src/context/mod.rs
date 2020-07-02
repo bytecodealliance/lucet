@@ -483,6 +483,8 @@ impl Context {
 
         // Heap pinning: r15 is not used to pass any parameters on Windows/POSIX abis, we simply set this to be the value of the heap always.
         // This value will be used only when the lucet module loaded is compiled requiring use of the pinned heap register.
+        // TODO: if we might conditionally use another register, or support non-x86_64 targets,
+        // this will need to be conditional as well.
         child.gpr.r15 = heap as u64;
 
         Ok(())

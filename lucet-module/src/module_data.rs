@@ -47,6 +47,17 @@ pub struct ModuleData<'a> {
     features: ModuleFeatures,
 }
 
+/// Different kinds of heap pinning that Lucet modules might want to see. This enum describes an
+/// architecture-dependent detail of modules - currently only `x86_64`, but at some point it could
+/// list `i386` or `aarch64` heap pinning styles as well.
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum HeapPinStyle {
+    /// Heap base is stored in `r15`. This appears to be flexible enough to work on any `x86_64` OS
+    /// without issue.
+    PinR15 = 1,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ModuleFeatures {
     pub sse3: bool,
@@ -59,8 +70,7 @@ pub struct ModuleFeatures {
     pub lzcnt: bool,
     pub popcnt: bool,
     pub instruction_count: bool,
-    pub pinned_heap: bool,
-    pub pinned_heap_register: u16,
+    pub pinned_heap: Option<HeapPinStyle>,
     _hidden: (),
 }
 
@@ -77,8 +87,7 @@ impl ModuleFeatures {
             lzcnt: false,
             popcnt: false,
             instruction_count: false,
-            pinned_heap: false,
-            pinned_heap_register: 0,
+            pinned_heap: None,
             _hidden: (),
         }
     }
