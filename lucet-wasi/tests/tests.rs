@@ -1,7 +1,7 @@
 mod test_helpers;
 
 use crate::test_helpers::{
-    lucet_wasi_tests_internal_ensure_linked, run, run_with_null_stdin, run_with_stdout,
+    lucet_wasi_tests_internal_ensure_linked, run, run_with_null_stdin, run_with_stdout, Pipe,
     LUCET_WASI_ROOT,
 };
 use lucet_wasi::{WasiCtx, WasiCtxBuilder};
@@ -125,7 +125,7 @@ fn stdin() {
 
     let mut ctx = WasiCtxBuilder::new();
     ctx.args(["stdin"].iter());
-    ctx.stdin(unsafe { File::from_raw_fd(pipe_out) });
+    ctx.stdin(Pipe(unsafe { File::from_raw_fd(pipe_out) }));
 
     let (exitcode, stdout) = run_with_stdout("stdin.c", &mut ctx).unwrap();
 

@@ -1,16 +1,46 @@
 use anyhow::{bail, Error};
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
+use lucet_wasi::handles::{Filetype, Handle, HandleRights, Result as WasiResult};
 use lucet_wasi::{self, types::Exitcode, WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
+use std::any::Any;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read, Write};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
 
 pub const LUCET_WASI_ROOT: &str = env!("CARGO_MANIFEST_DIR");
+
+pub struct Pipe(pub File);
+
+impl Handle for Pipe {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn try_clone(&self) -> io::Result<Box<dyn Handle>> {
+        Ok(Box::new(Pipe(self.0.try_clone()?)))
+    }
+
+    fn get_file_type(&self) -> Filetype {
+        Filetype::Unknown
+    }
+
+    fn set_rights(&self, _: HandleRights) {}
+
+    fn write_vectored(&self, iovs: &[io::IoSlice]) -> WasiResult<usize> {
+        let nwritten = (&self.0).write_vectored(iovs)?;
+        Ok(nwritten)
+    }
+
+    fn read_vectored(&self, iovs: &mut [io::IoSliceMut]) -> WasiResult<usize> {
+        let nread = (&self.0).read_vectored(iovs)?;
+        Ok(nread)
+    }
+}
 
 pub fn test_module_wasi<P: AsRef<Path>>(cfile: P) -> Result<Arc<dyn Module>, Error> {
     let c_path = guest_file(&cfile);
@@ -108,7 +138,7 @@ pub fn run_with_stdout<P: AsRef<Path>>(
 ) -> Result<(Exitcode, String), Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    ctx.stdout(unsafe { File::from_raw_fd(pipe_in) });
+    ctx.stdout(Pipe(unsafe { File::from_raw_fd(pipe_in) }));
     let ctx = ctx.build()?;
 
     let exitcode = run(path, ctx)?;
@@ -127,7 +157,7 @@ pub fn run_with_null_stdin<P: AsRef<Path>>(
 ) -> Result<Exitcode, Error> {
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    ctx.stdin(unsafe { File::from_raw_fd(pipe_out) });
+    ctx.stdin(Pipe(unsafe { File::from_raw_fd(pipe_out) }));
     let ctx = ctx.build()?;
 
     let exitcode = run(path, ctx)?;

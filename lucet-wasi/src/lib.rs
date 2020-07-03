@@ -7,6 +7,10 @@ pub use runtime::*;
 // Wasi-common re-exports:
 pub use wasi_common::{WasiCtx, WasiCtxBuilder, WasiCtxBuilderError};
 
+pub mod handles {
+    pub use wasi_common::{wasi::types::Filetype, wasi::Result, Handle, HandleRights};
+}
+
 /// Wasi executables export the following symbol for the entry point:
 pub const START_SYMBOL: &str = "_start";
 

@@ -3,13 +3,16 @@
 use anyhow::{bail, format_err, Error};
 use libc::c_ulong;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
+use lucet_wasi::handles::{Filetype, Handle, HandleRights, Result as WasiResult};
 use lucet_wasi::{types::Exitcode, WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
 use rand::prelude::random;
 use rayon::prelude::*;
 use regex::Regex;
+use std::any::Any;
 use std::fs::File;
+use std::io;
 use std::io::{Read, Write};
 use std::os::unix::prelude::{FromRawFd, IntoRawFd, OpenOptionsExt};
 use std::path::{Path, PathBuf};
@@ -44,6 +47,34 @@ enum Config {
     /// Run a test case with the given Csmith seed
     #[structopt(name = "test-seed")]
     TestSeed { seed: Seed },
+}
+
+struct Pipe(File);
+
+impl Handle for Pipe {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn try_clone(&self) -> io::Result<Box<dyn Handle>> {
+        Ok(Box::new(Pipe(self.0.try_clone()?)))
+    }
+
+    fn get_file_type(&self) -> Filetype {
+        Filetype::Unknown
+    }
+
+    fn set_rights(&self, _: HandleRights) {}
+
+    fn write_vectored(&self, iovs: &[io::IoSlice]) -> WasiResult<usize> {
+        let nwritten = (&self.0).write_vectored(iovs)?;
+        Ok(nwritten)
+    }
+
+    fn read_vectored(&self, iovs: &mut [io::IoSliceMut]) -> WasiResult<usize> {
+        let nread = (&self.0).read_vectored(iovs)?;
+        Ok(nread)
+    }
 }
 
 fn main() {
@@ -382,7 +413,8 @@ fn run_with_stdout<P: AsRef<Path>>(
 
     let (pipe_out, pipe_in) = nix::unistd::pipe()?;
 
-    ctx.stdout(unsafe { File::from_raw_fd(pipe_in) });
+    let pipe_in = Pipe(unsafe { File::from_raw_fd(pipe_in) });
+    ctx.stdout(pipe_in);
     let ctx = ctx.build()?;
 
     let exitcode = run(tmpdir, path, ctx)?;
