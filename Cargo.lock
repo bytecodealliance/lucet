@@ -898,7 +898,7 @@ dependencies = [
  "derivative",
  "memoffset",
  "minisign",
- "object 0.18.0",
+ "object 0.20.0",
  "serde",
  "serde-big-array",
  "serde_json",
@@ -912,7 +912,7 @@ dependencies = [
  "byteorder",
  "colored",
  "lucet-module",
- "object 0.18.0",
+ "object 0.20.0",
 ]
 
 [[package]]
@@ -1299,17 +1299,6 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5666bbb90bc4d1e5bdcb26c0afda1822d25928341e9384ab187a9b37ab69e36"
-dependencies = [
- "flate2",
- "target-lexicon",
- "wasmparser 0.51.4",
-]
-
-[[package]]
-name = "object"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9cbca9424c482ee628fa549d9c812e2cd22f1180b9222c9200fdfa6eb31aecb2"
@@ -1321,7 +1310,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ab52be62400ca80aa00285d25253d7f7c437b7375c4de678f5405d3afe82ca5"
 dependencies = [
  "crc32fast",
+ "flate2",
  "indexmap",
+ "wasmparser 0.57.0",
 ]
 
 [[package]]
@@ -2362,15 +2353,15 @@ checksum = "a91c2916119c17a8e316507afaaa2dd94b47646048014bbdf6bef098c1bb58ad"
 
 [[package]]
 name = "wasmparser"
-version = "0.51.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aeb1956b19469d1c5e63e459d29e7b5aa0f558d9f16fcef09736f8a265e6c10a"
-
-[[package]]
-name = "wasmparser"
 version = "0.52.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "733954023c0b39602439e60a65126fd31b003196d3a1e8e4531b055165a79b31"
+
+[[package]]
+name = "wasmparser"
+version = "0.57.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32fddd575d477c6e9702484139cf9f23dcd554b06d185ed0f56c857dd3a47aa6"
 
 [[package]]
 name = "wasmparser"
