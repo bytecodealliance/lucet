@@ -294,8 +294,8 @@ fn get_trampoline_func(
             println!("declaring trampoline {}", trampoline_name);
 
             // decls.declare_function(clif_module, trampoline_name, Linkage::Local)
-            let funcid = clif_module
-                .declare_function(&trampoline_name, Linkage::Local, signature)?;
+            let funcid =
+                clif_module.declare_function(&trampoline_name, Linkage::Local, signature)?;
             v.insert((funcid, hostcall_index)).0
         }
     };
@@ -483,9 +483,8 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
                 unique_index,
                 &func_decl,
                 &func.dfg.signatures[signature],
-            ).map_err(|err| {
-                WasmError::User(format!("{}", err))
-            })?
+            )
+            .map_err(|err| WasmError::User(format!("{}", err)))?
         };
         Ok(func.import_function(ir::ExtFuncData {
             name,

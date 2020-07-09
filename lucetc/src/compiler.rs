@@ -322,110 +322,15 @@ impl<'a> Compiler<'a> {
         }
 
         // Now that we've defined all functions, we know what trampolines must also be created.
-        //
-        // Hostcall trampolines have the general shape of:
-        //
-        // ```
-        // fn trampoline_$hostcall(&vmctx, $hostcall_args) -> $hostcall_result {
-        //     if context.rsp < vmctx.instance_implicits.stack_limit {
-        //         // insufficient stack space to make the call
-        //         terminate_with_stack_overflow();
-        //     }
-        //
-        //     $hostcall(vmctx, $hostcall_args..)
-        // }
-        // ```
-        //
-        // but are specified here as Cranelift IR for lack of source to generate them from.
         for (hostcall_name, (trampoline_id, hostcall_func_index)) in &self.trampolines {
-            let mut trampoline_context = ClifContext::new();
-            trampoline_context.func.name = ir::ExternalName::from(*trampoline_id);
-            // the trampoline's signature is the same as the hostcall it calls' signature
-            let hostcall_sig = self.decls.info.signature_for_function(*hostcall_func_index);
-            trampoline_context.func.signature = hostcall_sig.clone();
-
-            // We're going to load the stack limit later, create the global value to load while we
-            // can.
-            let vmctx = trampoline_context
-                .func
-                .create_global_value(ir::GlobalValueData::VMContext);
-            let stack_limit_gv =
-                trampoline_context
-                    .func
-                    .create_global_value(ir::GlobalValueData::Load {
-                        base: vmctx,
-                        offset: (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
-                            + (offset_of!(InstanceRuntimeData, stack_limit) as i32))
-                            .into(),
-                        global_type: ir::types::I64,
-                        readonly: false,
-                    });
-
-            let mut builder_ctx = FunctionBuilderContext::new();
-            let mut builder = FunctionBuilder::new(&mut trampoline_context.func, &mut builder_ctx);
-
-            let entry = builder.create_block();
-            let hostcall_block = builder.create_block();
-            builder.append_block_params_for_function_params(entry);
-            // The hostcall block will end up having all the same arguments as the trampoline,
-            // which itself matches the signature of the hostcall to be called.
-            builder.append_block_params_for_function_params(hostcall_block);
-            let trampoline_args = builder.block_params(entry).to_vec();
-
-            let hostcall_decl = self
-                .decls
-                .get_func(*hostcall_func_index)
-                .expect("hostcall has been declared");
-            let hostcall_sig_ref = builder.import_signature(hostcall_decl.signature.clone());
-            let hostcall_ref = builder.import_function(ir::ExtFuncData {
-                name: hostcall_decl.name.into(),
-                signature: hostcall_sig_ref,
-                colocated: false,
-            });
-
-            // Reserve a block for handling a stack check fail.
-            let stack_check_fail = builder.create_block();
-
-            // And start building the trampoline from entry.
-            builder.switch_to_block(entry);
-
-            let stack_limit = builder.ins().global_value(ir::types::I64, stack_limit_gv);
-            let sp_cmp = builder.ins().ifcmp_sp(stack_limit);
-
-            builder.ins().brif(
-                ir::condcodes::IntCC::UnsignedGreaterThanOrEqual,
-                sp_cmp,
-                stack_check_fail,
-                &[],
-            );
-            builder.ins().fallthrough(hostcall_block, &trampoline_args);
-
-            builder.switch_to_block(hostcall_block);
-            let hostcall_args = builder.block_params(hostcall_block).to_vec();
-            let call_inst = builder.ins().call(hostcall_ref, &hostcall_args);
-            let results = builder.inst_results(call_inst).to_vec();
-            builder.ins().return_(&results);
-
-            builder.switch_to_block(stack_check_fail);
-            builder.ins().trap(ir::TrapCode::StackOverflow);
-
-            let mut traps = TrapSites::new();
-
-            let trampoline_name = format!("trampoline_{}", hostcall_name);
-
-            let compiled = self
-                .clif_module
-                .define_function(*trampoline_id, &mut trampoline_context, &mut traps)
-                .map_err(|source| Error::FunctionDefinition {
-                    symbol: trampoline_name.clone(),
-                    source,
-                })?;
-
-            let size = compiled.size;
-
-            let trap_data_id = traps.write(&mut self.clif_module, &trampoline_name)?;
-
-            function_map.insert(*trampoline_id, (size, trap_data_id, traps.len()));
+            synthesize_trampoline(
+                &mut self.decls,
+                &mut self.clif_module,
+                &mut function_map,
+                hostcall_name,
+                *trampoline_id,
+                *hostcall_func_index,
+            )?;
         }
 
         // Write out the stack probe and associated data.
@@ -619,6 +524,117 @@ impl<'a> Compiler<'a> {
         }
         Ok(isa_builder.finish(settings::Flags::new(flags_builder)))
     }
+}
+
+// Hostcall trampolines have the general shape of:
+//
+// ```
+// fn trampoline_$hostcall(&vmctx, $hostcall_args) -> $hostcall_result {
+//     if context.rsp < vmctx.instance_implicits.stack_limit {
+//         // insufficient stack space to make the call
+//         terminate_with_stack_overflow();
+//     }
+//
+//     $hostcall(vmctx, $hostcall_args..)
+// }
+// ```
+//
+// but are specified here as Cranelift IR for lack of source to generate them from.
+fn synthesize_trampoline(
+    decls: &mut ModuleDecls,
+    clif_module: &mut ClifModule<ObjectBackend>,
+    function_map: &mut HashMap<FuncId, (u32, DataId, usize)>,
+    hostcall_name: &str,
+    trampoline_id: FuncId,
+    hostcall_func_index: UniqueFuncIndex,
+) -> Result<(), Error> {
+    let mut trampoline_context = ClifContext::new();
+    trampoline_context.func.name = ir::ExternalName::from(trampoline_id);
+    // the trampoline's signature is the same as the hostcall it calls' signature
+    let hostcall_sig = decls.info.signature_for_function(hostcall_func_index);
+    trampoline_context.func.signature = hostcall_sig.clone();
+
+    // We're going to load the stack limit later, create the global value to load while we
+    // can.
+    let vmctx = trampoline_context
+        .func
+        .create_global_value(ir::GlobalValueData::VMContext);
+    let stack_limit_gv = trampoline_context
+        .func
+        .create_global_value(ir::GlobalValueData::Load {
+            base: vmctx,
+            offset: (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
+                + (offset_of!(InstanceRuntimeData, stack_limit) as i32))
+                .into(),
+            global_type: ir::types::I64,
+            readonly: false,
+        });
+
+    let mut builder_ctx = FunctionBuilderContext::new();
+    let mut builder = FunctionBuilder::new(&mut trampoline_context.func, &mut builder_ctx);
+
+    let entry = builder.create_block();
+    let hostcall_block = builder.create_block();
+    builder.append_block_params_for_function_params(entry);
+    // The hostcall block will end up having all the same arguments as the trampoline,
+    // which itself matches the signature of the hostcall to be called.
+    builder.append_block_params_for_function_params(hostcall_block);
+    let trampoline_args = builder.block_params(entry).to_vec();
+
+    let hostcall_decl = decls
+        .get_func(hostcall_func_index)
+        .expect("hostcall has been declared");
+    let hostcall_sig_ref = builder.import_signature(hostcall_decl.signature.clone());
+    let hostcall_ref = builder.import_function(ir::ExtFuncData {
+        name: hostcall_decl.name.into(),
+        signature: hostcall_sig_ref,
+        colocated: false,
+    });
+
+    // Reserve a block for handling a stack check fail.
+    let stack_check_fail = builder.create_block();
+
+    // And start building the trampoline from entry.
+    builder.switch_to_block(entry);
+
+    let stack_limit = builder.ins().global_value(ir::types::I64, stack_limit_gv);
+    let sp_cmp = builder.ins().ifcmp_sp(stack_limit);
+
+    builder.ins().brif(
+        ir::condcodes::IntCC::UnsignedGreaterThanOrEqual,
+        sp_cmp,
+        stack_check_fail,
+        &[],
+    );
+    builder.ins().fallthrough(hostcall_block, &trampoline_args);
+
+    builder.switch_to_block(hostcall_block);
+    let hostcall_args = builder.block_params(hostcall_block).to_vec();
+    let call_inst = builder.ins().call(hostcall_ref, &hostcall_args);
+    let results = builder.inst_results(call_inst).to_vec();
+    builder.ins().return_(&results);
+
+    builder.switch_to_block(stack_check_fail);
+    builder.ins().trap(ir::TrapCode::StackOverflow);
+
+    let mut traps = TrapSites::new();
+
+    let trampoline_name = format!("trampoline_{}", hostcall_name);
+
+    let compiled = clif_module
+        .define_function(trampoline_id, &mut trampoline_context, &mut traps)
+        .map_err(|source| Error::FunctionDefinition {
+            symbol: trampoline_name.clone(),
+            source,
+        })?;
+
+    let size = compiled.size;
+
+    let trap_data_id = traps.write(clif_module, &trampoline_name)?;
+
+    function_map.insert(trampoline_id, (size, trap_data_id, traps.len()));
+
+    Ok(())
 }
 
 fn write_module_data<B: ClifBackend>(

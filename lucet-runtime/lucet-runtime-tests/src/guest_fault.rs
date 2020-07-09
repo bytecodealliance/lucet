@@ -6,8 +6,8 @@ macro_rules! guest_fault_common_defs {
             use lucet_module::{FunctionPointer, TrapCode, TrapSite};
             use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
             use lucet_runtime::{lucet_hostcall, lucet_hostcall_terminate, Module};
-            use $crate::build::test_module_wasm;
             use std::sync::Arc;
+            use $crate::build::test_module_wasm;
             use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
 
             pub const HOSTCALL_TEST_ERROR: &'static str = "hostcall_test threw an error!";
@@ -174,7 +174,6 @@ macro_rules! guest_fault_common_defs {
 
         #[test]
         fn ensure_linked() {
-            std::mem::forget(std::rc::Rc::new(Box::new(crate::common::onetwothree)));
             lucet_runtime::lucet_internal_ensure_linked();
         }
     };
