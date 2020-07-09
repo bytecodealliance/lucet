@@ -906,8 +906,8 @@ impl Instance {
         };
         inst.set_globals_ptr(globals_ptr);
         inst.set_instruction_count(0);
-        // 32KiB is arbitrarily chosen as a limit that does not fail tests.
-        const HOSTCALL_STACK_LIMIT: usize = 32 * 1024;
+        // 16KiB is arbitrarily chosen as a limit that does not fail tests.
+        const HOSTCALL_STACK_LIMIT: usize = 16 * 1024;
         inst.set_hostcall_stack_reservation(HOSTCALL_STACK_LIMIT);
 
         assert_eq!(mem::size_of::<Instance>(), HOST_PAGE_SIZE_EXPECTED);
