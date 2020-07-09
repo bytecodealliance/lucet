@@ -8,7 +8,7 @@ use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_frontend::FunctionBuilder;
-use cranelift_module::{FuncId, Linkage, Module as ClifModule};
+use cranelift_module::{FuncId, Linkage, Module as ClifModule, ModuleError as ClifModuleError};
 use cranelift_object::ObjectBackend;
 use cranelift_wasm::{
     FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex, GlobalVariable, MemoryIndex,
@@ -284,7 +284,7 @@ fn get_trampoline_func(
     hostcall_index: UniqueFuncIndex,
     func_decl: &FunctionDecl,
     signature: &ir::Signature,
-) -> Result<ir::ExternalName, WasmError> {
+) -> Result<ir::ExternalName, ClifModuleError> {
     // decls.declare_new_function(clif_module, name, linkage, 0
     use std::collections::hash_map::Entry;
     let funcid = match trampolines.entry(func_decl.name.symbol().to_string()) {
@@ -295,8 +295,7 @@ fn get_trampoline_func(
 
             // decls.declare_function(clif_module, trampoline_name, Linkage::Local)
             let funcid = clif_module
-                .declare_function(&trampoline_name, Linkage::Local, signature)
-                .expect("TODO: translate the moduleerror to a wasmerror");
+                .declare_function(&trampoline_name, Linkage::Local, signature)?;
             v.insert((funcid, hostcall_index)).0
         }
     };
@@ -484,7 +483,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
                 unique_index,
                 &func_decl,
                 &func.dfg.signatures[signature],
-            )?
+            ).map_err(|err| {
+                WasmError::User(format!("{}", err))
+            })?
         };
         Ok(func.import_function(ir::ExtFuncData {
             name,

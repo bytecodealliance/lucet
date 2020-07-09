@@ -1,11 +1,12 @@
 #[macro_export]
 macro_rules! guest_fault_common_defs {
     () => {
-        use common::{mock_traps_module, HOSTCALL_TEST_ERROR, RECOVERABLE_PTR};
+        use common::{mock_traps_module, wat_traps_module, HOSTCALL_TEST_ERROR, RECOVERABLE_PTR};
         pub mod common {
             use lucet_module::{FunctionPointer, TrapCode, TrapSite};
             use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
             use lucet_runtime::{lucet_hostcall, lucet_hostcall_terminate, Module};
+            use $crate::build::test_module_wasm;
             use std::sync::Arc;
             use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
 
@@ -17,11 +18,21 @@ macro_rules! guest_fault_common_defs {
                 lucet_hostcall_terminate!(HOSTCALL_TEST_ERROR);
             }
 
+            #[lucet_hostcall]
+            #[no_mangle]
+            pub fn onetwothree(_vmctx: &Vmctx) -> i64 {
+                123
+            }
+
             pub static mut RECOVERABLE_PTR: *mut libc::c_char = std::ptr::null_mut();
 
             #[no_mangle]
             pub unsafe extern "C" fn guest_recoverable_get_ptr() -> *const libc::c_char {
                 RECOVERABLE_PTR
+            }
+
+            pub fn wat_traps_module() -> Arc<dyn Module> {
+                test_module_wasm("guest_fault", "guest.wat").expect("build and load module")
             }
 
             pub fn mock_traps_module() -> Arc<dyn Module> {
@@ -163,6 +174,7 @@ macro_rules! guest_fault_common_defs {
 
         #[test]
         fn ensure_linked() {
+            std::mem::forget(std::rc::Rc::new(Box::new(crate::common::onetwothree)));
             lucet_runtime::lucet_internal_ensure_linked();
         }
     };
@@ -223,6 +235,7 @@ macro_rules! guest_fault_tests {
                 use $crate::helpers::{
                     test_ex, test_nonex, with_unchanged_signal_handlers, FunctionPointer, MockExportBuilder, MockModuleBuilder,
                 };
+                use super::wat_traps_module;
                 use super::mock_traps_module;
 
 
@@ -480,7 +493,11 @@ macro_rules! guest_fault_tests {
                 #[test]
                 fn hostcall_insufficient_stack() {
                     test_nonex(|| {
-                        let module = mock_traps_module();
+                        // NOTE: we must use `wat_traps_module` here because we want to test an
+                        // artifact that only exists through `lucetc`: hostcall trampolines. The
+                        // mock module will not have trampolines as lucetc generates, and this test
+                        // will not see the expected failure if a mock module is used.
+                        let module = wat_traps_module();
                         let region =
                             <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
                         let mut inst = region
@@ -494,18 +511,10 @@ macro_rules! guest_fault_tests {
 
                         // Run the hostcall `onetwothree` because other than the hostcall stack
                         // limit check, the hostcall in question should complete successfully.
-                        match inst.run("onetwothree", &[]) {
-                            Err(Error::RuntimeTerminated(term)) => {
-                                assert_eq!(
-                                    term
-                                        .provided_details()
-                                        .expect("hostcall has details")
-                                        .downcast_ref::<FaultDetails>()
-                                        .expect("hostcall details are a fault")
-                                        .trapcode,
-                                    Some(TrapCode::StackOverflow),
-                                );
-                            }
+                        match inst.run("make_onetwothree_hostcall", &[]) {
+                            Err(Error::RuntimeFault(details)) => {
+                                assert_eq!(details.trapcode, Some(TrapCode::StackOverflow));
+                            },
                             res => panic!("unexpected result: {:?}", res),
                         }
 

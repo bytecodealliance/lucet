@@ -864,17 +864,6 @@ impl Instance {
             panic!("TODO: error this");
         }
 
-        eprintln!("slot stack base:                 {:016p}", slot.stack);
-        eprintln!(
-            "slot stack size:                 {:#016x}",
-            slot.limits.stack_size
-        );
-        eprintln!("hostcall reservation:            {:#016x}", reservation);
-        eprintln!(
-            "slot hostcall reservation limit: {:#016x}",
-            slot.stack as usize + reservation
-        );
-
         // The `.stack` field is a pointer to the lowest address of the stack - the start of its
         // allocation. Because the stack grows downward, this is the end of the stack space. So the
         // limit we'll need to check for hostcalls is some reserved space upwards from here, to
