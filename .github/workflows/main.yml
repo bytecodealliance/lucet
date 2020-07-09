@@ -108,9 +108,7 @@ jobs:
       with:
         submodules: 'recursive'
     - name: Install Rust (rustup)
-      run: |
-        rustup update
-        rustup component add rustfmt
+      run: rustup update
     - run: cargo install cargo-audit
     - run: cargo audit
 
