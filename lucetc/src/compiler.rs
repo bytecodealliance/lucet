@@ -5,7 +5,7 @@ use crate::decls::ModuleDecls;
 use crate::error::Error;
 use crate::function::FuncInfo;
 use crate::heap::HeapSettings;
-use crate::module::ModuleInfo;
+use crate::module::{ModuleInfo, UniqueFuncIndex};
 use crate::output::{CraneliftFuncs, ObjectFile, FUNCTION_MANIFEST_SYM};
 use crate::runtime::Runtime;
 use crate::stack_probe;
@@ -13,11 +13,13 @@ use crate::table::write_table_data;
 use crate::traps::{translate_trapcode, trap_sym_for_func};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
-    binemit, ir,
+    binemit,
+    ir::{self, InstBuilder},
     isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
 };
+use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{
     Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, FuncOrDataId,
     Linkage as ClifLinkage, Module as ClifModule,
@@ -26,9 +28,11 @@ use cranelift_object::{ObjectBackend, ObjectBuilder};
 use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
 use lucet_module::bindings::Bindings;
 use lucet_module::{
-    ModuleData, ModuleFeatures, SerializedModule, VersionInfo, LUCET_MODULE_SYM, MODULE_DATA_SYM,
+    InstanceRuntimeData, ModuleData, ModuleFeatures, SerializedModule, VersionInfo,
+    LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };
 use lucet_validate::Validator;
+use memoffset::offset_of;
 use std::collections::HashMap;
 use std::io::Cursor;
 use target_lexicon::Triple;
@@ -176,6 +180,9 @@ impl CompilerBuilder {
 pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
     clif_module: ClifModule<ObjectBackend>,
+    // the `FuncId` references the declared trampoline function Cranelift knows, but the
+    // `UniqueFuncIndex` references the hostcall being trampoline'd to.
+    trampolines: HashMap<String, (FuncId, UniqueFuncIndex)>,
     target: Triple,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
@@ -244,6 +251,7 @@ impl<'a> Compiler<'a> {
         Ok(Self {
             decls,
             clif_module,
+            trampolines: HashMap::new(),
             opt_level,
             cpu_features,
             count_instructions,
@@ -274,7 +282,12 @@ impl<'a> Compiler<'a> {
         let mut function_map: HashMap<FuncId, (u32, DataId, usize)> = HashMap::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
-            let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
+            let mut func_info = FuncInfo::new(
+                &self.decls,
+                &mut self.trampolines,
+                &mut self.clif_module,
+                self.count_instructions,
+            );
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();
@@ -306,6 +319,113 @@ impl<'a> Compiler<'a> {
             let trap_data_id = traps.write(&mut self.clif_module, func.name.symbol())?;
 
             function_map.insert(func_id, (size, trap_data_id, traps.len()));
+        }
+
+        // Now that we've defined all functions, we know what trampolines must also be created.
+        //
+        // Hostcall trampolines have the general shape of:
+        //
+        // ```
+        // fn trampoline_$hostcall(&vmctx, $hostcall_args) -> $hostcall_result {
+        //     if context.rsp < vmctx.instance_implicits.stack_limit {
+        //         // insufficient stack space to make the call
+        //         terminate_with_stack_overflow();
+        //     }
+        //
+        //     $hostcall(vmctx, $hostcall_args..)
+        // }
+        // ```
+        //
+        // but are specified here as Cranelift IR for lack of source to generate them from.
+        for (hostcall_name, (trampoline_id, hostcall_func_index)) in &self.trampolines {
+            let mut trampoline_context = ClifContext::new();
+            trampoline_context.func.name = ir::ExternalName::from(*trampoline_id);
+            // the trampoline's signature is the same as the hostcall it calls' signature
+            let hostcall_sig = self.decls.info.signature_for_function(*hostcall_func_index);
+            trampoline_context.func.signature = hostcall_sig.clone();
+
+            // We're going to load the stack limit later, create the global value to load while we
+            // can.
+            let vmctx = trampoline_context
+                .func
+                .create_global_value(ir::GlobalValueData::VMContext);
+            let stack_limit_gv =
+                trampoline_context
+                    .func
+                    .create_global_value(ir::GlobalValueData::Load {
+                        base: vmctx,
+                        offset: (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
+                            + (offset_of!(InstanceRuntimeData, stack_limit) as i32))
+                            .into(),
+                        global_type: ir::types::I64,
+                        readonly: false,
+                    });
+
+            let mut builder_ctx = FunctionBuilderContext::new();
+            let mut builder = FunctionBuilder::new(&mut trampoline_context.func, &mut builder_ctx);
+
+            let entry = builder.create_block();
+            let hostcall_block = builder.create_block();
+            builder.append_block_params_for_function_params(entry);
+            // The hostcall block will end up having all the same arguments as the trampoline,
+            // which itself matches the signature of the hostcall to be called.
+            builder.append_block_params_for_function_params(hostcall_block);
+            let trampoline_args = builder.block_params(entry).to_vec();
+
+            let hostcall_decl = self
+                .decls
+                .get_func(*hostcall_func_index)
+                .expect("hostcall has been declared");
+            let hostcall_sig_ref = builder.import_signature(hostcall_decl.signature.clone());
+            let hostcall_ref = builder.import_function(ir::ExtFuncData {
+                name: hostcall_decl.name.into(),
+                signature: hostcall_sig_ref,
+                colocated: false,
+            });
+
+            // Reserve a block for handling a stack check fail.
+            let stack_check_fail = builder.create_block();
+
+            // And start building the trampoline from entry.
+            builder.switch_to_block(entry);
+
+            let stack_limit = builder.ins().global_value(ir::types::I64, stack_limit_gv);
+            let sp_cmp = builder.ins().ifcmp_sp(stack_limit);
+
+            builder.ins().brif(
+                ir::condcodes::IntCC::UnsignedGreaterThanOrEqual,
+                sp_cmp,
+                stack_check_fail,
+                &[],
+            );
+            builder.ins().fallthrough(hostcall_block, &trampoline_args);
+
+            builder.switch_to_block(hostcall_block);
+            let hostcall_args = builder.block_params(hostcall_block).to_vec();
+            let call_inst = builder.ins().call(hostcall_ref, &hostcall_args);
+            let results = builder.inst_results(call_inst).to_vec();
+            builder.ins().return_(&results);
+
+            builder.switch_to_block(stack_check_fail);
+            builder.ins().trap(ir::TrapCode::StackOverflow);
+
+            let mut traps = TrapSites::new();
+
+            let trampoline_name = format!("trampoline_{}", hostcall_name);
+
+            let compiled = self
+                .clif_module
+                .define_function(*trampoline_id, &mut trampoline_context, &mut traps)
+                .map_err(|source| Error::FunctionDefinition {
+                    symbol: trampoline_name.clone(),
+                    source,
+                })?;
+
+            let size = compiled.size;
+
+            let trap_data_id = traps.write(&mut self.clif_module, &trampoline_name)?;
+
+            function_map.insert(*trampoline_id, (size, trap_data_id, traps.len()));
         }
 
         // Write out the stack probe and associated data.
@@ -442,12 +562,17 @@ impl<'a> Compiler<'a> {
         Ok(obj)
     }
 
-    pub fn cranelift_funcs(self) -> Result<CraneliftFuncs, Error> {
+    pub fn cranelift_funcs(mut self) -> Result<CraneliftFuncs, Error> {
         let mut funcs = HashMap::new();
         let mut func_translator = FuncTranslator::new();
 
         for (ref func, (code, code_offset)) in self.decls.function_bodies() {
-            let mut func_info = FuncInfo::new(&self.decls, self.count_instructions);
+            let mut func_info = FuncInfo::new(
+                &self.decls,
+                &mut self.trampolines,
+                &mut self.clif_module,
+                self.count_instructions,
+            );
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();

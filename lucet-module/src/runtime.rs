@@ -5,4 +5,5 @@
 pub struct InstanceRuntimeData {
     pub globals_ptr: *mut i64,
     pub instruction_count: u64,
+    pub stack_limit: u64,
 }

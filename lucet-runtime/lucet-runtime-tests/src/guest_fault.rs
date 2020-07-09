@@ -478,6 +478,45 @@ macro_rules! guest_fault_tests {
                 }
 
                 #[test]
+                fn hostcall_insufficient_stack() {
+                    test_nonex(|| {
+                        let module = mock_traps_module();
+                        let region =
+                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        // Require that the entire stack be free when making a hostcall. Since at
+                        // least some of the stack will always be used for the backstop, this has
+                        // the effect of failing the check for any hostcall.
+                        inst.set_hostcall_stack_reservation(Limits::default().stack_size);
+
+                        // Run the hostcall `onetwothree` because other than the hostcall stack
+                        // limit check, the hostcall in question should complete successfully.
+                        match inst.run("onetwothree", &[]) {
+                            Err(Error::RuntimeTerminated(term)) => {
+                                assert_eq!(
+                                    term
+                                        .provided_details()
+                                        .expect("hostcall has details")
+                                        .downcast_ref::<FaultDetails>()
+                                        .expect("hostcall details are a fault")
+                                        .trapcode,
+                                    Some(TrapCode::StackOverflow),
+                                );
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        // after a fault, can reset and run a normal function
+                        inst.reset().expect("instance resets");
+
+                        run_onetwothree(&mut inst);
+                    });
+                }
+
+                #[test]
                 fn hostcall_error() {
                     test_nonex(|| {
                         let module = mock_traps_module();
