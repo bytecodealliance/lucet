@@ -228,7 +228,7 @@ impl<'a> Compiler<'a> {
             _ => (cranelift_module::default_libcall_names())(libcall),
         });
 
-        let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls);
+        let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls)?;
         builder.function_alignment(16);
         let mut clif_module: ClifModule<ObjectBackend> = ClifModule::new(builder);
 

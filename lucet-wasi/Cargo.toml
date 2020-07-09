@@ -22,7 +22,7 @@ lucet-wiggle = { path = "../lucet-wiggle", version = "=0.7.0-dev" }
 libc = "0.2.65"
 nix = "0.17"
 rand = "0.6"
-wasi-common = { path = "../wasmtime/crates/wasi-common", version = "0.17.0", features = ["wiggle_metadata"] }
+wasi-common = { path = "../wasmtime/crates/wasi-common", version = "0.18.0", features = ["wiggle_metadata"] }
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }

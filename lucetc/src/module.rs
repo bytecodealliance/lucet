@@ -378,6 +378,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
                 if self.tables.is_empty() && table_index == TableIndex::new(0) {
                     let table = Table {
                         ty: TableElementType::Func,
+                        wasm_ty: wasmparser::Type::Func,
                         minimum: 0,
                         maximum: None,
                     };
