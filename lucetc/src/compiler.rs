@@ -567,7 +567,7 @@ fn synthesize_trampoline(
                 + (offset_of!(InstanceRuntimeData, stack_limit) as i32))
                 .into(),
             global_type: ir::types::I64,
-            readonly: false,
+            readonly: true,
         });
 
     let mut builder_ctx = FunctionBuilderContext::new();

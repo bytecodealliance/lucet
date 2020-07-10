@@ -285,7 +285,6 @@ fn get_trampoline_func(
     func_decl: &FunctionDecl,
     signature: &ir::Signature,
 ) -> Result<ir::ExternalName, ClifModuleError> {
-    // decls.declare_new_function(clif_module, name, linkage, 0
     use std::collections::hash_map::Entry;
     let funcid = match trampolines.entry(func_decl.name.symbol().to_string()) {
         Entry::Occupied(o) => o.get().0,
@@ -293,7 +292,6 @@ fn get_trampoline_func(
             let trampoline_name = format!("trampoline_{}", func_decl.name.symbol());
             println!("declaring trampoline {}", trampoline_name);
 
-            // decls.declare_function(clif_module, trampoline_name, Linkage::Local)
             let funcid =
                 clif_module.declare_function(&trampoline_name, Linkage::Local, signature)?;
             v.insert((funcid, hostcall_index)).0
