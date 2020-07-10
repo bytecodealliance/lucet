@@ -177,7 +177,6 @@ fn main() {
         .with_heap_memory_size(heap_memory_size)
         .with_heap_address_space_size(heap_address_space_size)
         .with_stack_size(stack_size)
-        .expect("stack size is larger than hostcall reservation")
         .with_globals_size(0); // calculated from module
 
     let guest_args = matches

@@ -431,9 +431,9 @@ pub struct Limits {
     /// Size of total virtual memory. (default 8G)
     pub heap_address_space_size: usize,
     /// Size of the guest stack. (default 128K)
-    stack_size: usize,
+    pub stack_size: usize,
     /// Amount of the guest stack that must be available for hostcalls. (default 32K)
-    hostcall_reservation: usize,
+    pub hostcall_reservation: usize,
     /// Size of the globals region in bytes; each global uses 8 bytes. (default 4K)
     pub globals_size: usize,
     /// Size of the signal stack in bytes. (default SIGSTKSZ for release builds, at least 12K for
@@ -446,8 +446,6 @@ pub struct Limits {
     /// specifically enabling debug assertions in your release builds, the default signal stack may
     /// be larger.
     pub signal_stack_size: usize,
-    /// Hidden item to forbid explicit construction of `Limits` without validation along the way.
-    _hidden: (),
 }
 
 // this constant isn't exported by `libc` on Mac
@@ -491,56 +489,39 @@ impl Limits {
             hostcall_reservation: 32 * 1024,
             globals_size: 4096,
             signal_stack_size: DEFAULT_SIGNAL_STACK_SIZE,
-            _hidden: (),
         }
     }
-    pub fn stack_size(&self) -> usize {
-        self.stack_size
-    }
-    pub fn hostcall_reservation(&self) -> usize {
-        self.hostcall_reservation
-    }
-    pub fn with_heap_memory_size(mut self, heap_memory_size: usize) -> Self {
+
+    pub const fn with_heap_memory_size(mut self, heap_memory_size: usize) -> Self {
         self.heap_memory_size = heap_memory_size;
         self
     }
-    pub fn with_heap_address_space_size(mut self, heap_address_space_size: usize) -> Self {
+
+    pub const fn with_heap_address_space_size(mut self, heap_address_space_size: usize) -> Self {
         self.heap_address_space_size = heap_address_space_size;
         self
     }
-    pub fn with_stack_size(mut self, stack_size: usize) -> Result<Self, Error> {
-        if stack_size <= self.hostcall_reservation {
-            return Err(Error::InvalidArgument(
-                "stack size must be greater than hostcall reserved space",
-            ));
-        }
 
+    pub const fn with_stack_size(mut self, stack_size: usize) -> Self {
         self.stack_size = stack_size;
-        Ok(self)
+        self
     }
-    pub fn with_hostcall_reservation(mut self, hostcall_reservation: usize) -> Result<Self, Error> {
-        // We allow `hostcall_reservation == self.stack_size`, a circumstance that guarantees
-        // any hostcalls will fail with a StackOverflow.
-        if hostcall_reservation > self.stack_size {
-            return Err(Error::InvalidArgument(
-                "hostcall reserved space must be less than stack size",
-            ));
-        }
 
+    pub const fn with_hostcall_reservation(mut self, hostcall_reservation: usize) -> Self {
         self.hostcall_reservation = hostcall_reservation;
-        Ok(self)
+        self
     }
-    pub fn with_globals_size(mut self, globals_size: usize) -> Self {
+
+    pub const fn with_globals_size(mut self, globals_size: usize) -> Self {
         self.globals_size = globals_size;
         self
     }
-    pub fn with_signal_stack_size(mut self, signal_stack_size: usize) -> Self {
+
+    pub const fn with_signal_stack_size(mut self, signal_stack_size: usize) -> Self {
         self.signal_stack_size = signal_stack_size;
         self
     }
-}
 
-impl Limits {
     pub fn total_memory_size(&self) -> usize {
         // Memory is laid out as follows:
         // * the instance (up to instance_heap_offset)
@@ -593,6 +574,13 @@ impl Limits {
         }
         if self.stack_size <= 0 {
             return Err(Error::InvalidArgument("stack size must be greater than 0"));
+        }
+        // We allow `hostcall_reservation == self.stack_size`, a circumstance that guarantees
+        // any hostcalls will fail with a StackOverflow.
+        if self.hostcall_reservation > self.stack_size {
+            return Err(Error::InvalidArgument(
+                "hostcall reserved space must not be greater than stack size",
+            ));
         }
         if self.signal_stack_size < MINSIGSTKSZ {
             tracing::info!(

@@ -103,7 +103,7 @@ impl RegionInternal for MmapRegion {
 
         for (ptr, len) in [
             // make the stack read/writable
-            (slot.stack, limits.stack_size()),
+            (slot.stack, limits.stack_size),
             // make the globals read/writable
             (slot.globals, limits.globals_size),
             // make the sigstack read/writable
@@ -159,7 +159,7 @@ impl RegionInternal for MmapRegion {
         for (ptr, len) in [
             // We don't ever shrink the heap, so we only need to zero up until the accessible size
             (slot.heap, alloc.heap_accessible_size),
-            (slot.stack, slot.limits.stack_size()),
+            (slot.stack, slot.limits.stack_size),
             (slot.globals, slot.limits.globals_size),
             (slot.sigstack, slot.limits.signal_stack_size),
         ]
@@ -395,7 +395,7 @@ impl MmapRegion {
         let heap = mem as usize + instance_heap_offset();
         let stack_guard = heap + region.limits.heap_address_space_size;
         let stack = stack_guard + host_page_size();
-        let globals = stack + region.limits.stack_size();
+        let globals = stack + region.limits.stack_size;
         let sigstack = globals + region.limits.globals_size + host_page_size();
 
         // ensure we've accounted for all space

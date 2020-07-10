@@ -169,8 +169,8 @@ impl From<&Limits> for lucet_alloc_limits {
         lucet_alloc_limits {
             heap_memory_size: limits.heap_memory_size as u64,
             heap_address_space_size: limits.heap_address_space_size as u64,
-            stack_size: limits.stack_size() as u64,
-            hostcall_reservation: limits.hostcall_reservation() as u64,
+            stack_size: limits.stack_size as u64,
+            hostcall_reservation: limits.hostcall_reservation as u64,
             globals_size: limits.globals_size as u64,
             signal_stack_size: limits.signal_stack_size as u64,
         }
@@ -189,9 +189,7 @@ impl From<&lucet_alloc_limits> for Limits {
             .with_heap_memory_size(limits.heap_memory_size as usize)
             .with_heap_address_space_size(limits.heap_address_space_size as usize)
             .with_stack_size(limits.stack_size as usize)
-            .expect("lucet_alloc_limts has a valid stack size")
             .with_hostcall_reservation(limits.hostcall_reservation as usize)
-            .expect("lucet_alloc_limits has a valid hostcall reservation size")
             .with_globals_size(limits.globals_size as usize)
             .with_signal_stack_size(limits.signal_stack_size as usize)
     }

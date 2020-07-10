@@ -500,8 +500,7 @@ macro_rules! guest_fault_tests {
                         // least some of the stack will always be used for the backstop, this has
                         // the effect of failing the check for any hostcall.
                         let impossible_hostcall_limits = Limits::default()
-                            .with_hostcall_reservation(Limits::default().stack_size())
-                            .expect("can set custom hostcall stack reservation");
+                            .with_hostcall_reservation(Limits::default().stack_size);
                         let region =
                             <TestRegion as RegionCreate>::create(
                                 1,

@@ -860,7 +860,7 @@ impl Instance {
             .as_ref()
             .expect("reachable instance has a slot");
 
-        let reservation = slot.limits.hostcall_reservation();
+        let reservation = slot.limits.hostcall_reservation;
 
         // The `.stack` field is a pointer to the lowest address of the stack - the start of its
         // allocation. Because the stack grows downward, this is the end of the stack space. So the
