@@ -188,8 +188,10 @@ impl From<&lucet_alloc_limits> for Limits {
         Limits::default()
             .with_heap_memory_size(limits.heap_memory_size as usize)
             .with_heap_address_space_size(limits.heap_address_space_size as usize)
-            .with_stack_size(limits.stack_size as usize).expect("lucet_alloc_limts has a valid stack size")
-            .with_hostcall_reservation(limits.hostcall_reservation as usize).expect("lucet_alloc_limits has a valid hostcall reservation size")
+            .with_stack_size(limits.stack_size as usize)
+            .expect("lucet_alloc_limts has a valid stack size")
+            .with_hostcall_reservation(limits.hostcall_reservation as usize)
+            .expect("lucet_alloc_limits has a valid hostcall reservation size")
             .with_globals_size(limits.globals_size as usize)
             .with_signal_stack_size(limits.signal_stack_size as usize)
     }

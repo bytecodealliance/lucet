@@ -510,7 +510,9 @@ impl Limits {
     }
     pub fn with_stack_size(mut self, stack_size: usize) -> Result<Self, Error> {
         if stack_size <= self.hostcall_reservation {
-            return Err(Error::InvalidArgument("stack size must be greater than hostcall reserved space"));
+            return Err(Error::InvalidArgument(
+                "stack size must be greater than hostcall reserved space",
+            ));
         }
 
         self.stack_size = stack_size;
@@ -520,7 +522,9 @@ impl Limits {
         // We allow `hostcall_reservation == self.stack_size`, a circumstance that guarantees
         // any hostcalls will fail with a StackOverflow.
         if hostcall_reservation > self.stack_size {
-            return Err(Error::InvalidArgument("hostcall reserved space must be less than stack size"));
+            return Err(Error::InvalidArgument(
+                "hostcall reserved space must be less than stack size",
+            ));
         }
 
         self.hostcall_reservation = hostcall_reservation;
