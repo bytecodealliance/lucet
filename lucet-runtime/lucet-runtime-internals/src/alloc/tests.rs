@@ -666,6 +666,7 @@ macro_rules! alloc_tests {
             heap_memory_size: 4096,
             heap_address_space_size: 2 * 4096,
             stack_size: 4096,
+            hostcall_reservation: 4096,
             globals_size: 4096,
             ..Limits::default()
         };
