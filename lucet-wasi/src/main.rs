@@ -97,7 +97,7 @@ fn main() {
                 .long("stack-size")
                 .takes_value(true)
                 .default_value("8 MiB")
-                .help("Maximum stack size (must be a multiple of 4 KiB)"),
+                .help("Maximum stack size (must be a multiple of 4 KiB). Stack size must be larger than 32 KiB, which is the default stack size reserved for hostcalls. If the application will make hostcalls (relies on WASI, for example), the stack size must be larger than 32 KiB"),
         )
         .arg(
             Arg::with_name("timeout").long("timeout").takes_value(true).help("Number of milliseconds the instance will be allowed to run")
