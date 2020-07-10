@@ -173,13 +173,11 @@ fn main() {
         .value_of("timeout")
         .map(|t| Duration::from_millis(t.parse::<u64>().unwrap()));
 
-    let limits = Limits {
-        heap_memory_size,
-        heap_address_space_size,
-        stack_size,
-        globals_size: 0, // calculated from module
-        ..Limits::default()
-    };
+    let limits = Limits::default()
+        .with_heap_memory_size(heap_memory_size)
+        .with_heap_address_space_size(heap_address_space_size)
+        .with_stack_size(stack_size).expect("stack size is larger than hostcall reservation")
+        .with_globals_size(0); // calculated from module
 
     let guest_args = matches
         .values_of("guest_args")
@@ -222,12 +220,11 @@ fn run(config: Config<'_>) {
         let min_globals_size = module.initial_globals_size();
         let globals_size = ((min_globals_size + 4096 - 1) / 4096) * 4096;
 
+        let configured_limits: Limits = config.limits;
+
         let region = MmapRegion::create(
             1,
-            &Limits {
-                globals_size,
-                ..config.limits
-            },
+            &configured_limits.with_globals_size(globals_size),
         )
         .expect("region can be created");
 

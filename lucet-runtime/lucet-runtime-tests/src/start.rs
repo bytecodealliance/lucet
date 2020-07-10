@@ -220,10 +220,8 @@ macro_rules! start_tests {
 
                         let module = test_module_wasm("start", "start_and_call.wat")
                             .expect("module compiled and loaded");
-                        let limits_no_sigstack = Limits {
-                            signal_stack_size: 0,
-                            ..Limits::default()
-                        };
+                        let limits_no_sigstack = Limits::default()
+                            .with_signal_stack_size(0);
                         let region =
                             <TestRegion as RegionCreate>::create(1, &limits_no_sigstack).expect("region can be created");
                         let mut inst = region

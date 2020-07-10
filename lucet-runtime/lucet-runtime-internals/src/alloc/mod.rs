@@ -431,7 +431,9 @@ pub struct Limits {
     /// Size of total virtual memory. (default 8G)
     pub heap_address_space_size: usize,
     /// Size of the guest stack. (default 128K)
-    pub stack_size: usize,
+    stack_size: usize,
+    /// Amount of the guest stack that must be available for hostcalls. (default 32K)
+    hostcall_reservation: usize,
     /// Size of the globals region in bytes; each global uses 8 bytes. (default 4K)
     pub globals_size: usize,
     /// Size of the signal stack in bytes. (default SIGSTKSZ for release builds, at least 12K for
@@ -444,6 +446,8 @@ pub struct Limits {
     /// specifically enabling debug assertions in your release builds, the default signal stack may
     /// be larger.
     pub signal_stack_size: usize,
+    /// Hidden item to forbid explicit construction of `Limits` without validation along the way.
+    _hidden: (),
 }
 
 // this constant isn't exported by `libc` on Mac
@@ -484,9 +488,51 @@ impl Limits {
             heap_memory_size: 16 * 64 * 1024,
             heap_address_space_size: 0x0002_0000_0000,
             stack_size: 128 * 1024,
+            hostcall_reservation: 32 * 1024,
             globals_size: 4096,
             signal_stack_size: DEFAULT_SIGNAL_STACK_SIZE,
+            _hidden: (),
         }
+    }
+    pub fn stack_size(&self) -> usize {
+        self.stack_size
+    }
+    pub fn hostcall_reservation(&self) -> usize {
+        self.hostcall_reservation
+    }
+    pub fn with_heap_memory_size(mut self, heap_memory_size: usize) -> Self {
+        self.heap_memory_size = heap_memory_size;
+        self
+    }
+    pub fn with_heap_address_space_size(mut self, heap_address_space_size: usize) -> Self {
+        self.heap_address_space_size = heap_address_space_size;
+        self
+    }
+    pub fn with_stack_size(mut self, stack_size: usize) -> Result<Self, Error> {
+        if stack_size <= self.hostcall_reservation {
+            return Err(Error::InvalidArgument("stack size must be greater than hostcall reserved space"));
+        }
+
+        self.stack_size = stack_size;
+        Ok(self)
+    }
+    pub fn with_hostcall_reservation(mut self, hostcall_reservation: usize) -> Result<Self, Error> {
+        // We allow `hostcall_reservation == self.stack_size`, a circumstance that guarantees
+        // any hostcalls will fail with a StackOverflow.
+        if hostcall_reservation > self.stack_size {
+            return Err(Error::InvalidArgument("hostcall reserved space must be less than stack size"));
+        }
+
+        self.hostcall_reservation = hostcall_reservation;
+        Ok(self)
+    }
+    pub fn with_globals_size(mut self, globals_size: usize) -> Self {
+        self.globals_size = globals_size;
+        self
+    }
+    pub fn with_signal_stack_size(mut self, signal_stack_size: usize) -> Self {
+        self.signal_stack_size = signal_stack_size;
+        self
     }
 }
 

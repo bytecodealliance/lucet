@@ -482,7 +482,7 @@ impl UffdRegion {
         // lay out the other sections in memory
         let heap = start as usize + instance_heap_offset();
         let stack = heap + region.limits.heap_address_space_size + host_page_size();
-        let globals = stack + region.limits.stack_size;
+        let globals = stack + region.limits.stack_size();
         let sigstack = globals + region.limits.globals_size + host_page_size();
 
         // turn on the `Instance` page

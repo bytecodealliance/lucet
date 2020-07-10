@@ -408,10 +408,8 @@ macro_rules! guest_fault_tests {
                         };
 
                         let module = mock_traps_module();
-                        let limits_no_sigstack = Limits {
-                            signal_stack_size: 0,
-                            ..Limits::default()
-                        };
+                        let limits_no_sigstack = Limits::default()
+                            .with_signal_stack_size(0);
                         let region =
                             <TestRegion as RegionCreate>::create(1, &limits_no_sigstack).expect("region can be created");
                         let mut inst = region
@@ -497,16 +495,21 @@ macro_rules! guest_fault_tests {
                         // mock module will not have trampolines as lucetc generates, and this test
                         // will not see the expected failure if a mock module is used.
                         let module = wat_traps_module();
-                        let region =
-                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
-                        let mut inst = region
-                            .new_instance(module)
-                            .expect("instance can be created");
 
                         // Require that the entire stack be free when making a hostcall. Since at
                         // least some of the stack will always be used for the backstop, this has
                         // the effect of failing the check for any hostcall.
-                        inst.set_hostcall_stack_reservation(Limits::default().stack_size);
+                        let impossible_hostcall_limits = Limits::default()
+                            .with_hostcall_reservation(Limits::default().stack_size())
+                            .expect("can set custom hostcall stack reservation");
+                        let region =
+                            <TestRegion as RegionCreate>::create(
+                                1,
+                                &impossible_hostcall_limits
+                            ).expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
 
                         // Run the hostcall `onetwothree` because other than the hostcall stack
                         // limit check, the hostcall in question should complete successfully.
