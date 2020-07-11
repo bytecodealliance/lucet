@@ -1,12 +1,16 @@
 #[macro_export]
 macro_rules! guest_fault_common_defs {
     () => {
-        use common::{mock_traps_module, wat_traps_module, HOSTCALL_TEST_ERROR, RECOVERABLE_PTR};
+        use common::{
+            mock_traps_module, stack_testcase, wat_traps_module, HOSTCALL_TEST_ERROR,
+            RECOVERABLE_PTR,
+        };
         pub mod common {
             use lucet_module::{FunctionPointer, TrapCode, TrapSite};
             use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
-            use lucet_runtime::{lucet_hostcall, lucet_hostcall_terminate, Module};
+            use lucet_runtime::{lucet_hostcall, lucet_hostcall_terminate, DlModule, Module};
             use std::sync::Arc;
+            use tempfile::TempDir;
             use $crate::build::test_module_wasm;
             use $crate::helpers::{MockExportBuilder, MockModuleBuilder};
 
@@ -170,6 +174,33 @@ macro_rules! guest_fault_common_defs {
                     ))
                     .build()
             }
+
+            pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, anyhow::Error> {
+                use lucetc::{Bindings, Lucetc, LucetcOpts};
+                let native_build = Lucetc::try_from_bytes($crate::stack::generate_test_wat(
+                    num_locals,
+                    &["onetwothree"],
+                    Some("      (i32.add (i32.wrap_i64 (call $onetwothree)))\n"),
+                ))?
+                .with_bindings(Bindings::from_str(
+                    r#"
+                            {
+                                "env": {
+                                    "onetwothree": "onetwothree"
+                                }
+                            }"#,
+                )?);
+
+                let workdir = TempDir::new().expect("create working directory");
+
+                let so_file = workdir.path().join("out.so");
+
+                native_build.shared_object_file(so_file.clone())?;
+
+                let dlmodule = DlModule::load(so_file)?;
+
+                Ok(dlmodule)
+            }
         }
 
         #[test]
@@ -186,7 +217,7 @@ macro_rules! guest_fault_tests {
         use libc::{c_void, siginfo_t, SIGALRM, SIGBUS, SIGSEGV};
         use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
         use lucet_runtime::{
-            lucet_hostcall, lucet_hostcall_terminate, DlModule, Error, FaultDetails, Instance,
+            lucet_hostcall, lucet_hostcall_terminate, DlModule, FaultDetails, Instance,
             Limits, Region, SignalBehavior, TerminationDetails, TrapCode,
         };
         use nix::sys::mman::{mmap, MapFlags, ProtFlags};
@@ -222,7 +253,7 @@ macro_rules! guest_fault_tests {
                 use lucet_runtime::{
                     lucet_hostcall, lucet_hostcall_terminate, lucet_internal_ensure_linked, DlModule,
                     Error, FaultDetails, Instance, Limits, Region, RegionCreate, SignalBehavior, TerminationDetails,
-                    TrapCode,
+                    TrapCode, UntypedRetVal,
                 };
                 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
                 use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -234,9 +265,9 @@ macro_rules! guest_fault_tests {
                 use $crate::helpers::{
                     test_ex, test_nonex, with_unchanged_signal_handlers, FunctionPointer, MockExportBuilder, MockModuleBuilder,
                 };
-                use super::wat_traps_module;
                 use super::mock_traps_module;
-
+                use super::stack_testcase;
+                use super::wat_traps_module;
 
                 unsafe fn recoverable_ptr_setup() {
                     assert!(super::RECOVERABLE_PTR.is_null());
@@ -524,6 +555,66 @@ macro_rules! guest_fault_tests {
 
                         run_onetwothree(&mut inst);
                     });
+                }
+
+                fn run(limits: &Limits, module: Arc<DlModule>, recursion_depth: i32) -> Result<UntypedRetVal, Error> {
+                    let region = <TestRegion as RegionCreate>::create(1, limits).expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    inst.run("localpalooza", &[recursion_depth.into()])
+                        .and_then(|rr| rr.returned())
+                }
+
+                fn expect_ok(limits: &Limits, module: Arc<DlModule>, recursion_depth: i32) {
+                    assert!(run(limits, module, recursion_depth).is_ok());
+                }
+
+                fn expect_stack_overflow(limits: &Limits, module: Arc<DlModule>, recursion_depth: i32, probestack: bool) {
+                    match run(limits, module, recursion_depth) {
+                        Err(Error::RuntimeFault(details)) => {
+                            // We should get a nonfatal trap due to the stack overflow.
+                            assert_eq!(details.fatal, false);
+                            assert_eq!(details.trapcode, Some(TrapCode::StackOverflow));
+                            if probestack {
+                                // Make sure we overflowed in the stack probe as expected
+                                //
+                                // TODO: this no longer differentiates between different stack overflow
+                                // sites after moving the stack probe into lucetc; figure out a way to
+                                // provide that information or just wait till we can do the stack probe as a
+                                // global symbol again
+                                let addr_details =
+                                    details.rip_addr_details.expect("can look up addr details");
+                                assert!(addr_details.in_module_code);
+                            }
+                        }
+                        res => panic!("unexpected result: {:?}", res),
+                    }
+                }
+
+                #[test]
+                // Exhausting most stack space with the default hostcall reservation will fail,
+                // we've used far more than the limit in the guest.
+                fn expect_hostcall_reservation_stack_overflow_locals64_441() {
+                    expect_stack_overflow(
+                        &Limits::default(),
+                        stack_testcase(64 - 4).expect("generate stack_testcase 64"),
+                        461,
+                        true,
+                    );
+                }
+
+                #[test]
+                // Exhausting most stack space with hostcall reservation set very low should work;
+                // the hostcall `onetwothree` uses little stack space.
+                fn expect_no_stack_overflow_locals64_441() {
+                    expect_ok(
+                        &Limits::default()
+                            .with_hostcall_reservation(128),
+                        stack_testcase(64 - 4).expect("generate stack_testcase 64"),
+                        461,
+                    );
                 }
 
                 #[test]
