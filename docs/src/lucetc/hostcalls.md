@@ -118,7 +118,7 @@ be observed in places we expect, with patterns we can expect. But this is by no
 means a guarantee, and stack accesses might not be through the stack pointer
 directly (perhaps the address is loaded into an alternate register, and a fault
 occurs without referencing the stack pointer at all). Second, if a hostcall
-fault were to be recoverd by Lucet, the runtime may have to unwind a guest that
+fault were to be recovered by Lucet, the runtime may have to unwind a guest that
 already has exhausted its stack space. This would require temporarily making
 the stack guard writable to support instigating a guest unwind, and probably
 motivate a second "real" guard page for safety against unforseen circumstances
