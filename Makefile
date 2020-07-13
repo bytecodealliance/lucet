@@ -47,8 +47,8 @@ test-ci: test-packages test-objdump test-bitrot test-signature test-objdump
 
 .PHONY: test-bitrot
 test-bitrot:
-	# check but do *not* build or run these packages to mitigate bitrot
-	cargo check -p lucet-spectest -p lucet-runtime-example
+	# build but do *not* run these packages to mitigate bitrot
+	cargo build -p lucet-spectest -p lucet-runtime-example
 
 .PHONY: test-signature
 test-signature:
