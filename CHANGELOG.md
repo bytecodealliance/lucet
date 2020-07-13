@@ -14,6 +14,8 @@
 
 - Converted the `&mut Vmctx` argument to hostcalls into `&Vmctx`. Additionally, all `Vmctx` methods now take `&self`, where some methods such as `yield` previously took `&mut self`. These methods still require that no other outstanding borrows (such as the heap view) are held across them, but that property is checked dynamically rather than at compile time.
 
+- Added the field `hostcall_reservation` to `Limits` to specify an amount of stack space Lucet will ensure is available when making a hostcall. `hostcall_reservation` defaults to 32KiB. If there is less than the configured amount of stack space when making a hostcall, the instance will fault in the same way as any other guest-code stack overflow.
+
 [start-function]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
 
 ### 0.6.1 (2020-02-18)
