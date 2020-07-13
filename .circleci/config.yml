@@ -95,12 +95,15 @@ commands:
                   # 2. A Linux cache built on a matching branch name with any `Cargo.lock` checksum
                   # 3. Any Linux cache
                   #
+                  # We only restore caches from matching `rust-toolchain` versions, so that we don't
+                  # accumulate multiple versions of build artifacts over time.
+                  #
                   # The hope is that even if some of the dependencies change between branches and
                   # revisions, that enough of the slow-changing dependencies will remain static that
                   # Cargo won't have to rebuild them.
-                  - target_dir-linux-{{ .Branch }}-{{ checksum "Cargo.lock" }}
-                  - target_dir-linux-{{ .Branch }}-
-                  - target_dir-linux-
+                  - target_dir-{{ .Environment.CACHE_VERSION }}-linux-{{ checksum "rust-toolchain" }}-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                  - target_dir-{{ .Environment.CACHE_VERSION }}-linux-{{ checksum "rust-toolchain" }}-{{ .Branch }}-
+                  - target_dir-{{ .Environment.CACHE_VERSION }}-linux-{{ checksum "rust-toolchain" }}-
       - build_container
       - make_in_container:
           target: test-full
@@ -111,7 +114,7 @@ commands:
           condition: << parameters.cache_target >>
           steps:
             - save_cache:
-                key: target_dir-linux-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                key: target_dir-{{ .Environment.CACHE_VERSION }}-linux-{{ checksum "rust-toolchain" }}-{{ .Branch }}-{{ checksum "Cargo.lock" }}
                 paths:
                   - "target"
 
@@ -141,12 +144,15 @@ commands:
                   # 2. A macOS cache built on a matching branch name with any `Cargo.lock` checksum
                   # 3. Any macOS cache
                   #
+                  # We only restore caches from matching `rust-toolchain` versions, so that we don't
+                  # accumulate multiple versions of build artifacts over time.
+                  #
                   # The hope is that even if some of the dependencies change between branches and
                   # revisions, that enough of the slow-changing dependencies will remain static that
                   # Cargo won't have to rebuild them.
-                  - target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}-{{ .Environment.CACHE_VERSION }}
-                  - target_dir-macos-{{ .Branch }}-{{ .Environment.CACHE_VERSION }}
-                  - target_dir-macos-{{ .Environment.CACHE_VERSION }}
+                  - target_dir-{{ .Environment.CACHE_VERSION }}-macos-{{ checksum "rust-toolchain" }}-{{ .Branch }}-{{ checksum "Cargo.lock" }}
+                  - target_dir-{{ .Environment.CACHE_VERSION }}-macos-{{ checksum "rust-toolchain" }}-{{ .Branch }}-
+                  - target_dir-{{ .Environment.CACHE_VERSION }}-macos-{{ checksum "rust-toolchain" }}-
       - run:
           name: "Install Homebrew dependencies"
           command: |
@@ -181,7 +187,7 @@ commands:
           condition: << parameters.cache_target >>
           steps:
             - save_cache:
-                key: target_dir-macos-{{ .Branch }}-{{ checksum "Cargo.lock" }}-{{ .Environment.CACHE_VERSION }}
+                key: target_dir-{{ .Environment.CACHE_VERSION }}-macos-{{ checksum "rust-toolchain" }}-{{ .Branch }}-{{ checksum "Cargo.lock" }}
                 paths:
                   - "target"
 
