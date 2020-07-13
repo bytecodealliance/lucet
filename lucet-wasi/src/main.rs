@@ -97,7 +97,7 @@ fn main() {
                 .long("stack-size")
                 .takes_value(true)
                 .default_value("8 MiB")
-                .help("Maximum stack size (must be a multiple of 4 KiB)"),
+                .help("Maximum stack size (must be a multiple of 4 KiB). Stack size must be larger than 32 KiB, which is the default stack size reserved for hostcalls. If the application will make hostcalls (relies on WASI, for example), the stack size must be larger than 32 KiB"),
         )
         .arg(
             Arg::with_name("timeout").long("timeout").takes_value(true).help("Number of milliseconds the instance will be allowed to run")
@@ -173,13 +173,11 @@ fn main() {
         .value_of("timeout")
         .map(|t| Duration::from_millis(t.parse::<u64>().unwrap()));
 
-    let limits = Limits {
-        heap_memory_size,
-        heap_address_space_size,
-        stack_size,
-        globals_size: 0, // calculated from module
-        ..Limits::default()
-    };
+    let limits = Limits::default()
+        .with_heap_memory_size(heap_memory_size)
+        .with_heap_address_space_size(heap_address_space_size)
+        .with_stack_size(stack_size)
+        .with_globals_size(0); // calculated from module
 
     let guest_args = matches
         .values_of("guest_args")
@@ -222,14 +220,10 @@ fn run(config: Config<'_>) {
         let min_globals_size = module.initial_globals_size();
         let globals_size = ((min_globals_size + 4096 - 1) / 4096) * 4096;
 
-        let region = MmapRegion::create(
-            1,
-            &Limits {
-                globals_size,
-                ..config.limits
-            },
-        )
-        .expect("region can be created");
+        let configured_limits: Limits = config.limits;
+
+        let region = MmapRegion::create(1, &configured_limits.with_globals_size(globals_size))
+            .expect("region can be created");
 
         // put the path to the module on the front for argv[0]
         let args = std::iter::once(config.lucet_module)

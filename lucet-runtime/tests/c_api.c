@@ -10,6 +10,7 @@ bool lucet_runtime_test_mmap_expand_heap(struct lucet_dl_module *mod)
         .heap_memory_size        = 4 * 1024 * 1024,
         .heap_address_space_size = 8 * 1024 * 1024,
         .stack_size              = 64 * 1024,
+        .hostcall_reservation    = 32 * 1024,
         .globals_size            = 4096,
         .signal_stack_size       = 32 * 1024,
     };

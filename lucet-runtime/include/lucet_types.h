@@ -121,6 +121,10 @@ struct lucet_alloc_limits {
      */
     uint64_t stack_size;
     /**
+     * Amount of the guest stack that must be available for hostcalls. (default 32K)
+     */
+    uint64_t hostcall_reservation;
+    /**
      * Size of the globals region in bytes; each global uses 8 bytes. (default 4K)
      */
     uint64_t globals_size;

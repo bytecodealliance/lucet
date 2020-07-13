@@ -80,10 +80,7 @@ fn instantiate_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
         region.new_instance(module).unwrap()
     }
 
-    let limits = Limits {
-        heap_memory_size: 1024 * 1024 * 1024,
-        ..Limits::default()
-    };
+    let limits = Limits::default().with_heap_memory_size(1024 * 1024 * 1024);
 
     let region = R::create(1, &limits).unwrap();
 
@@ -103,10 +100,7 @@ fn instantiate_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
         region.new_instance(module).unwrap()
     }
 
-    let limits = Limits {
-        heap_memory_size: 1024 * 1024 * 1024,
-        ..Limits::default()
-    };
+    let limits = Limits::default().with_heap_memory_size(1024 * 1024 * 1024);
 
     let region = R::create(1, &limits).unwrap();
 
@@ -153,10 +147,7 @@ fn hello_drop_instance<R: RegionCreate + 'static>(c: &mut Criterion) {
 fn drop_instance_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(_inst: InstanceHandle) {}
 
-    let limits = Limits {
-        heap_memory_size: 1024 * 1024 * 1024,
-        ..Limits::default()
-    };
+    let limits = Limits::default().with_heap_memory_size(1024 * 1024 * 1024);
 
     let region = R::create(1, &limits).unwrap();
 
@@ -178,10 +169,7 @@ fn drop_instance_with_dense_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
 fn drop_instance_with_sparse_heap<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(_inst: InstanceHandle) {}
 
-    let limits = Limits {
-        heap_memory_size: 1024 * 1024 * 1024,
-        ..Limits::default()
-    };
+    let limits = Limits::default().with_heap_memory_size(1024 * 1024 * 1024);
 
     let region = R::create(1, &limits).unwrap();
 

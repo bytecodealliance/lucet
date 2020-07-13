@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, Error> {
-    let native_build = Lucetc::try_from_bytes(generate_test_wat(num_locals))?;
+    let native_build = Lucetc::try_from_bytes(generate_test_wat(num_locals, &[], None))?;
 
     let workdir = TempDir::new().expect("create working directory");
 
@@ -18,12 +18,30 @@ pub fn stack_testcase(num_locals: usize) -> Result<Arc<DlModule>, Error> {
     Ok(dlmodule)
 }
 
-fn generate_test_wat(num_locals: usize) -> String {
+// Generate a stack-heavy test wat. This is somewhat modular to support both use in `stack` tests,
+// and some slightly more complex tests in `guest_fault`.
+//
+// `hostcalls` must be a (possibly-empty) list of functions of type `() -> i64`, exported by the
+// provided name.
+// `recursive_body` must be a wasm body taking `i32` and returning an `i32`. Empty string is
+// permissible, but `None` is allowed for caller-clarity.
+pub fn generate_test_wat(
+    num_locals: usize,
+    hostcalls: &[&str],
+    recursive_body: Option<&str>,
+) -> String {
     assert!(num_locals > 2);
 
-    let mut module =
-        "(module (func $localpalooza (export \"localpalooza\") (param i32) (result i32)\n"
-            .to_owned();
+    let mut module = "(module\n".to_string();
+    for hostcall in hostcalls {
+        // add an imported hostcall like
+        // `(func $foo (import "env" "foo") (result i64))`
+        module.push_str(&format!(
+            "  (func ${} (import \"env\" \"{}\") (result i64))\n",
+            hostcall, hostcall
+        ));
+    }
+    module.push_str("  (func $localpalooza (export \"localpalooza\") (param i32) (result i32)\n");
 
     // Declare locals:
     module.push_str("(local ");
@@ -62,6 +80,9 @@ fn generate_test_wat(num_locals: usize) -> String {
         num_locals - 1,
         num_locals - 2
     ));
+    if let Some(body) = recursive_body {
+        module.push_str(body);
+    }
     module.push_str("      (call $localpalooza (i32.sub (get_local 0) (i32.const 1))))))\n");
     module.push_str(&format!(
         "  (else (set_local {} (i32.add (get_local {}) (get_local {})))))\n",

@@ -142,6 +142,8 @@ pub struct lucet_alloc_limits {
     pub heap_address_space_size: u64,
     /// Size of the guest stack. (default 128K)
     pub stack_size: u64,
+    /// Amount of the guest stack that must be available for hostcalls. (default 32K)
+    pub hostcall_reservation: u64,
     /// Size of the globals region in bytes; each global uses 8 bytes. (default 4K)
     pub globals_size: u64,
     /// Size of the signal stack in bytes. (default SIGSTKSZ for release builds, at least 12K for
@@ -168,6 +170,7 @@ impl From<&Limits> for lucet_alloc_limits {
             heap_memory_size: limits.heap_memory_size as u64,
             heap_address_space_size: limits.heap_address_space_size as u64,
             stack_size: limits.stack_size as u64,
+            hostcall_reservation: limits.hostcall_reservation as u64,
             globals_size: limits.globals_size as u64,
             signal_stack_size: limits.signal_stack_size as u64,
         }
@@ -182,13 +185,13 @@ impl From<lucet_alloc_limits> for Limits {
 
 impl From<&lucet_alloc_limits> for Limits {
     fn from(limits: &lucet_alloc_limits) -> Limits {
-        Limits {
-            heap_memory_size: limits.heap_memory_size as usize,
-            heap_address_space_size: limits.heap_address_space_size as usize,
-            stack_size: limits.stack_size as usize,
-            globals_size: limits.globals_size as usize,
-            signal_stack_size: limits.signal_stack_size as usize,
-        }
+        Limits::default()
+            .with_heap_memory_size(limits.heap_memory_size as usize)
+            .with_heap_address_space_size(limits.heap_address_space_size as usize)
+            .with_stack_size(limits.stack_size as usize)
+            .with_hostcall_reservation(limits.hostcall_reservation as usize)
+            .with_globals_size(limits.globals_size as usize)
+            .with_signal_stack_size(limits.signal_stack_size as usize)
     }
 }
 

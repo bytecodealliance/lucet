@@ -1,5 +1,6 @@
 use super::runtime::RuntimeFunc;
-use crate::decls::ModuleDecls;
+use crate::decls::{FunctionDecl, ModuleDecls};
+use crate::module::UniqueFuncIndex;
 use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
 use crate::table::TABLE_REF_SIZE;
 use cranelift_codegen::cursor::FuncCursor;
@@ -7,6 +8,8 @@ use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_frontend::FunctionBuilder;
+use cranelift_module::{FuncId, Linkage, Module as ClifModule, ModuleError as ClifModuleError};
+use cranelift_object::ObjectBackend;
 use cranelift_wasm::{
     FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex, GlobalVariable, MemoryIndex,
     SignatureIndex, TableIndex, TargetEnvironment, WasmError, WasmResult,
@@ -18,6 +21,8 @@ use wasmparser::Operator;
 
 pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
+    trampolines: &'a mut HashMap<String, (FuncId, UniqueFuncIndex)>,
+    clif_module: &'a mut ClifModule<ObjectBackend>,
     count_instructions: bool,
     scope_costs: Vec<u32>,
     vmctx_value: Option<ir::GlobalValue>,
@@ -26,9 +31,16 @@ pub struct FuncInfo<'a> {
 }
 
 impl<'a> FuncInfo<'a> {
-    pub fn new(module_decls: &'a ModuleDecls<'a>, count_instructions: bool) -> Self {
+    pub fn new(
+        module_decls: &'a ModuleDecls<'a>,
+        trampolines: &'a mut HashMap<String, (FuncId, UniqueFuncIndex)>,
+        clif_module: &'a mut ClifModule<ObjectBackend>,
+        count_instructions: bool,
+    ) -> Self {
         Self {
             module_decls,
+            trampolines,
+            clif_module,
             count_instructions,
             scope_costs: vec![0],
             vmctx_value: None,
@@ -265,6 +277,30 @@ impl<'a> FuncInfo<'a> {
     }
 }
 
+/// Get the local trampoline function to do safety checks before calling an imported hostcall.
+fn get_trampoline_func(
+    trampolines: &mut HashMap<String, (FuncId, UniqueFuncIndex)>,
+    clif_module: &mut ClifModule<ObjectBackend>,
+    hostcall_index: UniqueFuncIndex,
+    func_decl: &FunctionDecl,
+    signature: &ir::Signature,
+) -> Result<ir::ExternalName, ClifModuleError> {
+    use std::collections::hash_map::Entry;
+    let funcid = match trampolines.entry(func_decl.name.symbol().to_string()) {
+        Entry::Occupied(o) => o.get().0,
+        Entry::Vacant(v) => {
+            let trampoline_name = format!("trampoline_{}", func_decl.name.symbol());
+            println!("declaring trampoline {}", trampoline_name);
+
+            let funcid =
+                clif_module.declare_function(&trampoline_name, Linkage::Local, signature)?;
+            v.insert((funcid, hostcall_index)).0
+        }
+    };
+
+    Ok(ir::ExternalName::from(funcid))
+}
+
 impl<'a> TargetEnvironment for FuncInfo<'a> {
     fn target_config(&self) -> TargetFrontendConfig {
         self.module_decls.target_config()
@@ -431,9 +467,25 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             .expect("function indices are valid");
         let func_decl = self.module_decls.get_func(unique_index).unwrap();
         let signature = func.import_signature(func_decl.signature.clone());
+
+        // if we're setting up a function ref for a call to an imported function, we'll need a
+        // trampoline to check the stack first. in that case, return the trampoline function
+        // instead.
         let colocated = !func_decl.imported();
+        let name = if colocated {
+            func_decl.name.into()
+        } else {
+            get_trampoline_func(
+                &mut self.trampolines,
+                &mut self.clif_module,
+                unique_index,
+                &func_decl,
+                &func.dfg.signatures[signature],
+            )
+            .map_err(|err| WasmError::User(format!("{}", err)))?
+        };
         Ok(func.import_function(ir::ExtFuncData {
-            name: func_decl.name.into(),
+            name,
             signature,
             colocated,
         }))

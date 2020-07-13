@@ -851,6 +851,23 @@ impl Instance {
     pub fn set_instruction_count(&mut self, instruction_count: u64) {
         self.get_instance_implicits_mut().instruction_count = instruction_count;
     }
+
+    #[inline]
+    pub fn set_hostcall_stack_reservation(&mut self) {
+        let slot = self
+            .alloc
+            .slot
+            .as_ref()
+            .expect("reachable instance has a slot");
+
+        let reservation = slot.limits.hostcall_reservation;
+
+        // The `.stack` field is a pointer to the lowest address of the stack - the start of its
+        // allocation. Because the stack grows downward, this is the end of the stack space. So the
+        // limit we'll need to check for hostcalls is some reserved space upwards from here, to
+        // meet some guest stack pointer early.
+        self.get_instance_implicits_mut().stack_limit = slot.stack as u64 + reservation as u64;
+    }
 }
 
 // Private API
@@ -887,6 +904,8 @@ impl Instance {
         };
         inst.set_globals_ptr(globals_ptr);
         inst.set_instruction_count(0);
+        // Ensure the hostcall limit tracked in this instance's guest-shared data is up-to-date.
+        inst.set_hostcall_stack_reservation();
 
         assert_eq!(mem::size_of::<Instance>(), HOST_PAGE_SIZE_EXPECTED);
         let unpadded_size = offset_of!(Instance, _padding);
