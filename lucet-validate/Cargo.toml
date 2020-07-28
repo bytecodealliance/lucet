@@ -27,4 +27,5 @@ wasmparser = "0.52.0"
 lucet-wasi = { path = "../lucet-wasi", version = "=0.7.0-dev" }
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.7.0-dev" }
 tempfile = "3.0"
-wabt = "0.9.2"
+wabt = "0.9.1"
+

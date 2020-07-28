@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::signature::{self, PublicKey};
 use std::path::Path;
-use wabt::{wat2wasm, ErrorKind};
+use wabt::wat2wasm;
 
 pub fn read_module(
     path: impl AsRef<Path>,
@@ -35,20 +35,8 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
         Ok(bytes)
     } else {
         wat2wasm(bytes).map_err(|err| {
-            let mut result = format!("wat2wasm error: {}", err);
-            match err.kind() {
-                ErrorKind::Parse(msg) |
-                // this shouldn't be reachable - we're going the other way
-                ErrorKind::Deserialize(msg) |
-                // not sure how this error comes up
-                ErrorKind::ResolveNames(msg) |
-                ErrorKind::Validate(msg) => {
-                    result.push_str(":\n");
-                    result.push_str(&msg);
-                },
-                _ => { }
-            };
-            Error::Input(result)
+            let result = format!("wat2wasm {}", err);
+            crate::error::Error::Input(result)
         })
     }
 }
