@@ -33,18 +33,3 @@ tempfile = "3.0"
 [lib]
 name = "lucet_wasi"
 crate-type = ["rlib", "staticlib", "cdylib"]
-
-[package.metadata.deb]
-name = "fst-lucet-wasi"
-maintainer = "Adam C. Foltzer <acfoltzer@fastly.com>"
-depends = "$auto"
-priority = "optional"
-assets = [
-    ["target/release/liblucet_wasi.a", "/opt/fst-lucet-wasi/lib/", "644"],
-    ["target/release/liblucet_wasi.rlib", "/opt/fst-lucet-wasi/lib/", "644"],
-    ["target/release/liblucet_wasi.so", "/opt/fst-lucet-wasi/lib/", "755"],
-    ["include/*.h", "/opt/fst-lucet-wasi/include/", "644"],
-    ["LICENSE", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
-    ["LICENSE.wasmtime", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
-    ["LICENSE.cloudabi-utils", "/opt/fst-lucet-wasi/share/doc/lucet-wasi/", "644"],
-]

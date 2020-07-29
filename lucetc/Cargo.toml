@@ -43,22 +43,3 @@ serde = "1.0"
 serde_json = "1.0"
 thiserror = "1.0.4"
 raw-cpuid = "6.0.0"
-
-[package.metadata.deb]
-name = "fst-lucetc"
-maintainer = "Lucet team <lucet@fastly.com>"
-depends = "$auto"
-priority = "optional"
-assets = [
-    ["target/release/lucetc", "/opt/fst-lucetc/bin/lucetc", "755"],
-    ["target/release/liblucetc.rlib", "/opt/fst-lucetc/lib/", "644"],
-    ["LICENSE", "/opt/fst-lucetc/share/doc/lucetc/", "644"],
-    ["../wasi/phases/old/snapshot_0/witx/typenames.witx",
-     "/opt/fst-lucetc/share/wasi/snapshot_0/typenames.witx", "644"],
-    ["../wasi/phases/old/snapshot_0/witx/wasi_unstable.witx",
-     "/opt/fst-lucetc/share/wasi/snapshot_0/wasi_unstable.witx", "644"],
-    ["../wasi/phases/snapshot/witx/typenames.witx",
-     "/opt/fst-lucetc/share/wasi/snapshot_1/typenames.witx", "644"],
-    ["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx",
-     "/opt/fst-lucetc/share/wasi/snapshot_1/wasi_snapshot_preview1.witx", "644"],
-]
