@@ -1284,6 +1284,25 @@ pub enum TerminationDetails {
     Provided(Box<dyn Any + 'static>),
     /// The instance was terminated by its `KillSwitch`.
     Remote,
+    /// A panic occurred during a hostcall other than the specialized panic used to implement
+    /// Lucet runtime features.
+    ///
+    /// Panics are raised by the Lucet runtime in order to unwind the hostcall before jumping back
+    /// to the host context for any of the reasons described by the variants of this type. The panic
+    /// payload in that case is a already a `TerminationDetails` value.
+    ///
+    /// This variant is created when any type other than `TerminationDetails` is the payload of a
+    /// panic arising during a hostcall, meaning it was not intentionally raised by the Lucet
+    /// runtime.
+    ///
+    /// The panic payload contained in this variant should be rethrown using
+    /// [`resume_unwind`](https://doc.rust-lang.org/std/panic/fn.resume_unwind.html) once returned
+    /// to the host context.
+    ///
+    /// Note that this variant will be removed once cross-FFI unwinding support lands in
+    /// [Rust](https://github.com/rust-lang/rfcs/pull/2945) and
+    /// [Lucet](https://github.com/bytecodealliance/lucet/pull/254).
+    OtherPanic(Box<dyn Any + Send + 'static>),
 }
 
 impl TerminationDetails {
@@ -1334,6 +1353,7 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::YieldTypeMismatch => write!(f, "YieldTypeMismatch"),
             TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
             TerminationDetails::Remote => write!(f, "Remote"),
+            TerminationDetails::OtherPanic(_) => write!(f, "OtherPanic(Any)"),
         }
     }
 }

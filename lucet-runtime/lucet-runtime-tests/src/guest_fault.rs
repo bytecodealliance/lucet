@@ -28,6 +28,14 @@ macro_rules! guest_fault_common_defs {
                 123
             }
 
+            pub struct OtherPanicPayload;
+
+            #[lucet_hostcall]
+            #[no_mangle]
+            pub fn raise_other_panic(_vmctx: &Vmctx) {
+                panic!(OtherPanicPayload);
+            }
+
             pub static mut RECOVERABLE_PTR: *mut libc::c_char = std::ptr::null_mut();
 
             #[no_mangle]
@@ -51,6 +59,17 @@ macro_rules! guest_fault_common_defs {
                     }
                     unsafe {
                         hostcall_test(vmctx);
+                        std::hint::unreachable_unchecked();
+                    }
+                }
+
+                extern "C" fn raise_other_panic_main(vmctx: *const lucet_vmctx) {
+                    extern "C" {
+                        // actually is defined in this file
+                        fn raise_other_panic(vmctx: *const lucet_vmctx);
+                    }
+                    unsafe {
+                        raise_other_panic(vmctx);
                         std::hint::unreachable_unchecked();
                     }
                 }
@@ -155,6 +174,10 @@ macro_rules! guest_fault_common_defs {
                     .with_export_func(MockExportBuilder::new(
                         "hostcall_main",
                         FunctionPointer::from_usize(hostcall_main as usize),
+                    ))
+                    .with_export_func(MockExportBuilder::new(
+                        "raise_other_panic_main",
+                        FunctionPointer::from_usize(raise_other_panic_main as usize),
                     ))
                     .with_export_func(MockExportBuilder::new(
                         "infinite_loop",
@@ -622,7 +645,8 @@ macro_rules! guest_fault_tests {
                     test_nonex(|| {
                         let module = mock_traps_module();
                         let region =
-                            <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
+                            <TestRegion as RegionCreate>::create(1, &Limits::default())
+                            .expect("region can be created");
                         let mut inst = region
                             .new_instance(module)
                             .expect("instance can be created");
@@ -642,6 +666,32 @@ macro_rules! guest_fault_tests {
                         }
 
                         // after a fault, can reset and run a normal function
+                        inst.reset().expect("instance resets");
+
+                        run_onetwothree(&mut inst);
+                    });
+                }
+
+                #[test]
+                fn raise_other_panic() {
+                    test_nonex(|| {
+                        let module = mock_traps_module();
+                        let region =
+                            <TestRegion as RegionCreate>::create(1, &Limits::default())
+                            .expect("region can be created");
+                        let mut inst = region
+                            .new_instance(module)
+                            .expect("instance can be created");
+
+                        match inst.run("raise_other_panic_main", &[]) {
+                            Err(Error::RuntimeTerminated(TerminationDetails::OtherPanic(payload))) => {
+                                assert!(payload.is::<crate::common::OtherPanicPayload>());
+                            }
+                            res => panic!("unexpected result: {:?}", res),
+                        }
+
+                        // after a fault, can reset and run a normal function; in practice we would
+                        // want to reraise the panic most of the time, but this should still work
                         inst.reset().expect("instance resets");
 
                         run_onetwothree(&mut inst);

@@ -111,12 +111,11 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 match res {
                     Ok(res) => res,
                     Err(e) => {
-                        match e.downcast::<#termination_details>() {
-                            Ok(details) => {
-                                #vmctx_mod::Vmctx::from_raw(vmctx_raw).terminate_no_unwind(*details)
-                            },
-                            Err(e) => std::panic::resume_unwind(e),
-                        }
+                        let details = match e.downcast::<#termination_details>() {
+                            Ok(details) => *details,
+                            Err(e) => #termination_details::OtherPanic(e),
+                        };
+                        #vmctx_mod::Vmctx::from_raw(vmctx_raw).terminate_no_unwind(details)
                     }
                 }
             })
