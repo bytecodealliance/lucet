@@ -20,6 +20,8 @@ pub enum Error {
     IOError(#[from] std::io::Error),
     #[error("Converting to Wasm signature: {0}")]
     SignatureConversion(#[from] SignatureError),
+    #[error("Input does not have Wasm preamble")]
+    MissingWasmPreamble,
     #[error("Wasm validation: {0}")]
     WasmValidation(#[from] wasmparser::BinaryReaderError),
     #[error("Wat input: {0}")]

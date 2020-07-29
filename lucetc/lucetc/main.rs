@@ -143,6 +143,8 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.count_instructions(true);
     }
 
+    c.translate_wat(opts.translate_wat);
+
     match opts.codegen {
         CodegenOutput::Obj => c.object_file(&opts.output)?,
         CodegenOutput::SharedObj => c.shared_object_file(&opts.output)?,

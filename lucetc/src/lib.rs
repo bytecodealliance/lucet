@@ -46,6 +46,7 @@ pub struct Lucetc {
     pk: Option<PublicKey>,
     sign: bool,
     verify: bool,
+    translate_wat: bool,
 }
 
 pub trait AsLucetc {
@@ -104,6 +105,8 @@ pub trait LucetcOpts {
     fn with_count_instructions(self, enable_count: bool) -> Self;
     fn canonicalize_nans(&mut self, enable_canonicalize_nans: bool);
     fn with_canonicalize_nans(self, enable_canonicalize_nans: bool) -> Self;
+    fn translate_wat(&mut self, enable_translate_wat: bool);
+    fn with_translate_wat(self, enable_translate_wat: bool) -> Self;
 }
 
 impl<T: AsLucetc> LucetcOpts for T {
@@ -258,6 +261,14 @@ impl<T: AsLucetc> LucetcOpts for T {
         self.canonicalize_nans(enable_nans_canonicalization);
         self
     }
+    fn translate_wat(&mut self, enable_translate_wat: bool) {
+        self.as_lucetc().translate_wat = enable_translate_wat;
+    }
+
+    fn with_translate_wat(mut self, enable_translate_wat: bool) -> Self {
+        self.translate_wat(enable_translate_wat);
+        self
+    }
 }
 
 impl Lucetc {
@@ -271,6 +282,7 @@ impl Lucetc {
             sk: None,
             sign: false,
             verify: false,
+            translate_wat: true,
         }
     }
 
@@ -284,13 +296,16 @@ impl Lucetc {
             sk: None,
             sign: false,
             verify: false,
+            translate_wat: false,
         })
     }
 
     fn build(&self) -> Result<(Vec<u8>, Bindings), Error> {
         let module_binary = match &self.input {
             LucetcInput::Bytes(bytes) => bytes.clone(),
-            LucetcInput::Path(path) => read_module(&path, &self.pk, self.verify)?,
+            LucetcInput::Path(path) => {
+                read_module(&path, &self.pk, self.verify, self.translate_wat)?
+            }
         };
 
         // Collect set of Bindings into a single Bindings:
