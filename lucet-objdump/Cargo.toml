@@ -14,13 +14,3 @@ object = "0.18"
 byteorder="1.2.1"
 colored="1.8.0"
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
-
-[package.metadata.deb]
-name = "fst-lucet-objdump"
-maintainer = "Lucet team <lucet@fastly.com>"
-depends = "$auto"
-priority = "optional"
-assets = [
-    ["target/release/lucet-objdump", "/opt/fst-lucet-objdump/bin/lucet-objdump", "755"],
-    ["LICENSE", "/opt/fst-lucet-objdump/share/doc/lucet-objdump/", "644"],
-]

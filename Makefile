@@ -21,10 +21,10 @@ install-dev: build-dev
 	@helpers/install.sh --unoptimized
 
 .PHONY: test
-test: indent-check test-packages
+test: indent-check test-crates
 
-.PHONY: test-packages
-test-packages:
+.PHONY: test-crates
+test-crates:
 	cargo test --no-fail-fast --all $(CRATES_NOT_TESTED:%=--exclude %)
 
 .PHONY: test-full
@@ -43,12 +43,13 @@ test-release-executables:
 	helpers/lucet-toolchain-tests/objdump.sh release
 
 .PHONY: test-ci
-test-ci: test-packages test-objdump test-bitrot test-signature test-objdump
+test-ci: test-crates test-objdump test-bitrot test-signature test-objdump
 
 .PHONY: test-bitrot
 test-bitrot:
-	# build but do *not* run these packages to mitigate bitrot
-	cargo build -p lucet-spectest -p lucet-runtime-example
+	# build but do *not* run these crates. The tests for these crates are
+	# known to fail, but we want to make sure they still build.
+	cargo check -p lucet-spectest -p lucet-runtime-example
 
 .PHONY: test-signature
 test-signature:
