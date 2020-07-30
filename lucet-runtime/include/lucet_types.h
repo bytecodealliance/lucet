@@ -50,6 +50,7 @@ enum lucet_terminated_reason {
     lucet_terminated_reason_borrow_error,
     lucet_terminated_reason_provided,
     lucet_terminated_reason_remote,
+    lucet_terminated_reason_other_panic,
 };
 
 enum lucet_trapcode {

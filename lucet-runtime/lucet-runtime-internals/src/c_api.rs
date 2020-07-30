@@ -309,14 +309,20 @@ pub mod lucet_result {
                             },
                             TerminationDetails::Provided(p) => lucet_terminated {
                                 reason: lucet_terminated_reason::Provided,
-                                provided: p
+                                provided: *p
                                     .downcast_ref()
-                                    .map(|CTerminationDetails { details }| *details)
-                                    .unwrap_or(ptr::null_mut()),
+                                    .map(|CTerminationDetails { details }| details)
+                                    .unwrap_or(&ptr::null_mut()),
                             },
                             TerminationDetails::Remote => lucet_terminated {
                                 reason: lucet_terminated_reason::Remote,
                                 provided: std::ptr::null_mut(),
+                            },
+                            TerminationDetails::OtherPanic(p) => lucet_terminated {
+                                reason: lucet_terminated_reason::OtherPanic,
+                                // double box the panic payload so that the pointer passed to FFI
+                                // land is thin
+                                provided: Box::into_raw(Box::new(p)) as *mut _,
                             },
                         },
                     },
@@ -372,6 +378,7 @@ pub mod lucet_result {
         BorrowError,
         Provided,
         Remote,
+        OtherPanic,
     }
 
     #[repr(C)]
