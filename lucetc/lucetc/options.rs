@@ -122,6 +122,7 @@ pub struct Options {
     pub count_instructions: bool,
     pub error_style: ErrorStyle,
     pub target: Triple,
+    pub translate_wat: bool,
 }
 
 impl Options {
@@ -211,6 +212,7 @@ impl Options {
         let sk_path = m.value_of("sk_path").map(PathBuf::from);
         let pk_path = m.value_of("pk_path").map(PathBuf::from);
         let count_instructions = m.is_present("count_instructions");
+        let translate_wat = !m.is_present("no_translate_wat");
 
         let error_style = match m.value_of("error_style") {
             None => ErrorStyle::default(),
@@ -241,6 +243,7 @@ impl Options {
             count_instructions,
             error_style,
             target,
+            translate_wat,
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -458,6 +461,12 @@ SSE3 but not AVX:
                     .takes_value(true)
                     .possible_values(&["human", "json"])
                     .help("Style of error reporting (default: human)"),
+            )
+            .arg(
+                Arg::with_name("no_translate_wat")
+                    .long("--no-translate-wat")
+                    .takes_value(false)
+                    .help("Disable translating wat input files to wasm")
             )
             .get_matches();
 

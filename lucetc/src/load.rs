@@ -7,6 +7,7 @@ pub fn read_module(
     path: impl AsRef<Path>,
     pk: &Option<PublicKey>,
     verify: bool,
+    translate_wat: bool,
 ) -> Result<Vec<u8>, Error> {
     let contents = std::fs::read(&path)?;
     if verify {
@@ -18,7 +19,15 @@ pub fn read_module(
                 .ok_or(Error::Signature("public key is missing".to_string()))?,
         )?;
     }
-    read_bytes(contents)
+    if translate_wat {
+        read_bytes(contents)
+    } else {
+        if wasm_preamble(&contents) {
+            Ok(contents)
+        } else {
+            Err(Error::MissingWasmPreamble)
+        }
+    }
 }
 
 pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
@@ -39,7 +48,7 @@ pub fn read_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
                 },
                 _ => { }
             };
-            crate::error::Error::Input(result)
+            Error::Input(result)
         })
     }
 }
