@@ -290,7 +290,6 @@ fn get_trampoline_func(
         Entry::Occupied(o) => o.get().0,
         Entry::Vacant(v) => {
             let trampoline_name = format!("trampoline_{}", func_decl.name.symbol());
-            println!("declaring trampoline {}", trampoline_name);
 
             let funcid =
                 clif_module.declare_function(&trampoline_name, Linkage::Local, signature)?;
