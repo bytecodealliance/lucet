@@ -46,7 +46,7 @@ impl Vmctx {
     /// performing other async work.
     ///
     /// Note that this method may only be used if `Instance::run_async` was used to run the VM,
-    /// otherwise it will terminate the instance with `TerminationDetails::AwaitNeedsAsync`.
+    /// otherwise it will terminate the instance with `TerminationDetails::BlockOnNeedsAsync`.
     pub fn block_on<'a, R>(&'a self, f: impl Future<Output = R> + Send + 'a) -> R
     where
         R: Any + Send + 'static,
@@ -55,7 +55,7 @@ impl Vmctx {
         match self.instance().state {
             State::Running { async_context } => {
                 if !async_context {
-                    panic!(TerminationDetails::AwaitNeedsAsync)
+                    panic!(TerminationDetails::BlockOnNeedsAsync)
                 }
             }
             _ => unreachable!("Access to vmctx implies instance is Running"),

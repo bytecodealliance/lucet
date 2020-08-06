@@ -1326,7 +1326,7 @@ pub enum TerminationDetails {
     OtherPanic(Box<dyn Any + Send + 'static>),
     /// The instance was terminated by `Vmctx::block_on` being called from an instance
     /// that isnt running in an async context
-    AwaitNeedsAsync,
+    BlockOnNeedsAsync,
 }
 
 impl TerminationDetails {
@@ -1361,7 +1361,7 @@ impl PartialEq for TerminationDetails {
             (Signal, Signal) => true,
             (BorrowError(msg1), BorrowError(msg2)) => msg1 == msg2,
             (CtxNotFound, CtxNotFound) => true,
-            (AwaitNeedsAsync, AwaitNeedsAsync) => true,
+            (BlockOnNeedsAsync, BlockOnNeedsAsync) => true,
             // can't compare `Any`
             _ => false,
         }
@@ -1379,7 +1379,7 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
             TerminationDetails::Remote => write!(f, "Remote"),
             TerminationDetails::OtherPanic(_) => write!(f, "OtherPanic(Any)"),
-            TerminationDetails::AwaitNeedsAsync => write!(f, "AwaitNeedsAsync"),
+            TerminationDetails::BlockOnNeedsAsync => write!(f, "BlockOnNeedsAsync"),
         }
     }
 }
