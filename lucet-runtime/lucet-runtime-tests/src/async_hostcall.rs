@@ -70,7 +70,7 @@ macro_rules! async_hostcall_tests {
                     let incorrect_run_res = inst.run("main", &[0u32.into(), 0i32.into()]);
                     match incorrect_run_res {
                         Err(Error::RuntimeTerminated(term)) => {
-                            assert_eq!(term, TerminationDetails::AwaitNeedsAsync);
+                            assert_eq!(term, TerminationDetails::BlockOnNeedsAsync);
                         }
                         _ => panic!(
                             "inst.run should fail because its not an async context, got {:?}",
