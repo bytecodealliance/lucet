@@ -83,11 +83,13 @@ impl Vmctx {
     }
 }
 
-/// This enum is used internally to `InstanceHandle::run_async`. It is only
-/// `pub` in order for the type signature of a "block_in_place" function to be
-/// writable, which is a concession because Rust does not have rank 2 types.
-/// The user should never inspect or construct the contents of this enum.
-pub enum Bounce<'a> {
+/// This struct needs to be exposed publicly in order for the signature of a
+/// "block_in_place" function to be writable, a concession we must make because
+/// Rust does not have rank 2 types. To prevent the user from inspecting or
+/// constructing the inside of this type, it is completely opaque.
+pub struct Bounce<'a>(BounceInner<'a>);
+
+enum BounceInner<'a> {
     Done(UntypedRetVal),
     More(BoxFuture<'a, ResumeVal>),
 }
@@ -173,7 +175,7 @@ impl InstanceHandle {
                 match run_result? {
                     RunResult::Returned(rval) => {
                         // Finished running, return UntypedReturnValue
-                        return Ok(Bounce::Done(rval));
+                        return Ok(Bounce(BounceInner::Done(rval)));
                     }
                     RunResult::Yielded(yval) => {
                         // Check if the yield came from Vmctx::block_on:
@@ -182,7 +184,7 @@ impl InstanceHandle {
                             // Rehydrate the lifetime from `'static` to `'a`, which
                             // is morally the same lifetime as was passed into
                             // `Vmctx::block_on`.
-                            Ok(Bounce::More(future as BoxFuture<'a, ResumeVal>))
+                            Ok(Bounce(BounceInner::More(future as BoxFuture<'a, ResumeVal>)))
                         } else {
                             // Any other yielded value is not supported - die with an error.
                             Err(Error::Unsupported(
@@ -194,8 +196,8 @@ impl InstanceHandle {
                 }
             })?;
             match bounce {
-                Bounce::Done(rval) => return Ok(rval),
-                Bounce::More(fut) => {
+                Bounce(BounceInner::Done(rval)) => return Ok(rval),
+                Bounce(BounceInner::More(fut)) => {
                     // await on the computation. Store its result in
                     // `resume_val`.
                     resume_val = Some(fut.await);
