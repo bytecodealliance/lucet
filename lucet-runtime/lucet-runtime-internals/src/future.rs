@@ -82,6 +82,10 @@ impl Vmctx {
     }
 }
 
+/// This enum is used internally to `InstanceHandle::run_async`. It is only
+/// `pub` in order for the type signature of a "block_in_place" function to be
+/// writable, which is a concession because Rust does not have rank 2 types.
+/// The user should never inspect or construct the contents of this enum.
 pub enum Bounce<'a> {
     Done(UntypedRetVal),
     More(BoxFuture<'a, ResumeVal>),
