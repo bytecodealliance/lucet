@@ -109,7 +109,7 @@ impl VmctxInternal for Vmctx {
     }
 
     fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> Option<R> {
-        self.yield_impl::<A, R>(val);
+        self.yield_impl::<A, R>(val, true);
         self.try_take_resumed_val()
     }
 }
@@ -383,12 +383,24 @@ impl Vmctx {
     /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
     /// host with a value of type `R`.
     pub fn yield_val_expecting_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> R {
-        self.yield_impl::<A, R>(val);
+        self.yield_impl::<A, R>(val, true);
         self.take_resumed_val()
     }
 
-    fn yield_impl<A: Any + 'static, R: Any + 'static>(&self, val: A) {
-        self.ensure_no_borrows();
+    /// Implementation of the `yield` operator. This function is only
+    /// pub(crate) so that it may be used from `crate::future`.
+    /// The `borrow_check` parameter determines whether the runtime borrow
+    /// check of Vmctx resources is performed. This should be `true` in every
+    /// case except for use from `Vmctx::block_on`, whose safety is guaranteed
+    /// by the construction of `InstanceHandle::run_async`.
+    pub(crate) fn yield_impl<A: Any + 'static, R: Any + 'static>(
+        &self,
+        val: A,
+        borrow_check: bool,
+    ) {
+        if borrow_check {
+            self.ensure_no_borrows();
+        }
         let inst = unsafe { self.instance_mut() };
         let expecting: Box<PhantomData<R>> = Box::new(PhantomData);
         inst.state = State::Yielding {
@@ -402,7 +414,9 @@ impl Vmctx {
     /// Take and return the value passed to
     /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val), terminating
     /// the instance if there is no value present, or the dynamic type check of the value fails.
-    fn take_resumed_val<R: Any + 'static>(&self) -> R {
+    /// This method is only `pub(crate)` so that it may be used from
+    /// `crate::future`.
+    pub(crate) fn take_resumed_val<R: Any + 'static>(&self) -> R {
         self.try_take_resumed_val()
             .unwrap_or_else(|| panic!(TerminationDetails::YieldTypeMismatch))
     }

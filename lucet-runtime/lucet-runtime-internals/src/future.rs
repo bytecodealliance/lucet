@@ -75,7 +75,8 @@ impl Vmctx {
         // Wrap the computation in `YieldedFuture` so that
         // `Instance::run_async` can catch and run it.  We will get the
         // `ResumeVal` we applied to `f` above.
-        let ResumeVal(v) = self.yield_val_expecting_val(YieldedFuture(f));
+        self.yield_impl::<YieldedFuture, ResumeVal>(YieldedFuture(f), false);
+        let ResumeVal(v) = self.take_resumed_val();
         // We may now downcast and unbox the returned Box<dyn Any> into an `R`
         // again.
         *v.downcast().expect("run_async broke invariant")
