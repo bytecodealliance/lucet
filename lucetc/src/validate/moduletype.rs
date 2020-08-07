@@ -1,8 +1,9 @@
-use crate::{AtomType, Error, FuncSignature, ImportFunc};
+use crate::validate::{AtomType, Error, FuncSignature, ImportFunc};
 use cranelift_entity::{entity_impl, PrimaryMap};
 use std::collections::HashMap;
 use wasmparser::{
     ExternalKind, FuncType, ImportSectionEntryType, ModuleReader, SectionContent, Type as WType,
+    TypeDef,
 };
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
@@ -61,11 +62,7 @@ impl ModuleType {
                 SectionContent::Type(types) => {
                     for entry in types {
                         match entry? {
-                            FuncType {
-                                form: WType::Func,
-                                params,
-                                returns,
-                            } => {
+                            TypeDef::Func(FuncType { params, returns }) => {
                                 let ret = match returns.len() {
                                     0 => None,
                                     1 => Some(wasmparser_to_atomtype(&returns[0])?),
@@ -95,25 +92,40 @@ impl ModuleType {
                                     ty: TypeIndex::from_u32(ftype),
                                     import: Some((
                                         import.module.to_owned(),
-                                        import.field.to_owned(),
+                                        import
+                                            .field
+                                            .expect("func import has field name")
+                                            .to_owned(),
                                     )),
                                 });
                             }
                             ImportSectionEntryType::Memory(_) => {
                                 return Err(Error::Unsupported(format!(
-                                    "memory import {}:{}",
+                                    "memory import {}:{:?}",
                                     import.module, import.field
                                 )));
                             }
                             ImportSectionEntryType::Table(_) => {
                                 return Err(Error::Unsupported(format!(
-                                    "table import {}:{}",
+                                    "table import {}:{:?}",
                                     import.module, import.field
                                 )));
                             }
                             ImportSectionEntryType::Global(_) => {
                                 return Err(Error::Unsupported(format!(
-                                    "global import {}:{}",
+                                    "global import {}:{:?}",
+                                    import.module, import.field
+                                )));
+                            }
+                            ImportSectionEntryType::Module(_) => {
+                                return Err(Error::Unsupported(format!(
+                                    "module import {}:{:?}",
+                                    import.module, import.field
+                                )));
+                            }
+                            ImportSectionEntryType::Instance(_) => {
+                                return Err(Error::Unsupported(format!(
+                                    "instance import {}:{:?}",
                                     import.module, import.field
                                 )));
                             }

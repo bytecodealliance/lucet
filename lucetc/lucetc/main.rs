@@ -7,10 +7,9 @@ use crate::options::{CodegenOutput, ErrorStyle, Options};
 use anyhow::{format_err, Error};
 use log::info;
 use lucet_module::bindings::Bindings;
-use lucet_validate::Validator;
 use lucetc::{
     signature::{self, PublicKey},
-    Lucetc, LucetcOpts,
+    Lucetc, LucetcOpts, Validator,
 };
 use serde::Serialize;
 

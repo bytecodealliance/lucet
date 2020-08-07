@@ -2,9 +2,8 @@
 mod lucetc_tests {
     use anyhow::Error;
     use lucet_module::bindings::Bindings;
-    use lucet_validate::Validator;
     use lucet_wasi_sdk::*;
-    use lucetc::Compiler;
+    use lucetc::{Compiler, Validator};
     use std::collections::HashMap;
     use std::fs::File;
     use std::io::Read;

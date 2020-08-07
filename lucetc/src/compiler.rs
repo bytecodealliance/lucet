@@ -11,6 +11,7 @@ use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
 use crate::traps::{translate_trapcode, trap_sym_for_func};
+use crate::validate::Validator;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
     binemit,
@@ -31,7 +32,6 @@ use lucet_module::{
     InstanceRuntimeData, ModuleData, ModuleFeatures, SerializedModule, VersionInfo,
     LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };
-use lucet_validate::Validator;
 use memoffset::offset_of;
 use std::collections::HashMap;
 use std::io::Cursor;

@@ -17,6 +17,6 @@ thiserror = "1.0.4"
 
 [dev-dependencies]
 anyhow = "1"
-lucet-validate = { path = "../lucet-validate", version  = "=0.7.0-dev" }
+lucetc = { path = "../lucetc", version  = "=0.7.0-dev" }
 lucet-wasi = { path = "../lucet-wasi", version  = "=0.7.0-dev" }
 target-lexicon = "0.10"

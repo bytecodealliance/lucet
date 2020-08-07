@@ -475,8 +475,7 @@ mod compile {
 
 mod validate {
     use super::load_wat_module;
-    use lucet_validate::Validator;
-    use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel};
+    use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel, Validator};
     use target_lexicon::Triple;
 
     #[test]

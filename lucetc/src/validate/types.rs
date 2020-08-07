@@ -1,4 +1,4 @@
-use crate::AtomType;
+use crate::validate::AtomType;
 use witx::CoreFuncType;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
