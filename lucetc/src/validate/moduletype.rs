@@ -1,9 +1,8 @@
-use crate::validate::{AtomType, Error, FuncSignature, ImportFunc};
+use crate::validate::Error;
 use cranelift_entity::{entity_impl, PrimaryMap};
 use std::collections::HashMap;
 use wasmparser::{
-    ExternalKind, FuncType, ImportSectionEntryType, ModuleReader, SectionContent, Type as WType,
-    TypeDef,
+    ExternalKind, FuncType, ImportSectionEntryType, ModuleReader, SectionContent, TypeDef,
 };
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
@@ -20,9 +19,16 @@ struct Func {
     pub import: Option<(String, String)>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ImportFunc {
+    pub module: String,
+    pub field: String,
+    pub ty: FuncType,
+}
+
 #[derive(Clone)]
 pub struct ModuleType {
-    types: PrimaryMap<TypeIndex, FuncSignature>,
+    types: PrimaryMap<TypeIndex, FuncType>,
     funcs: PrimaryMap<FuncIndex, Func>,
     exports: HashMap<String, FuncIndex>,
 }
@@ -41,7 +47,7 @@ impl ModuleType {
             .collect()
     }
 
-    pub fn export(&self, name: &str) -> Option<&FuncSignature> {
+    pub fn export(&self, name: &str) -> Option<&FuncType> {
         self.exports.get(name).map(|funcix| {
             let func = self.funcs.get(*funcix).expect("valid funcix");
             self.types.get(func.ty).expect("valid typeix")
@@ -62,22 +68,8 @@ impl ModuleType {
                 SectionContent::Type(types) => {
                     for entry in types {
                         match entry? {
-                            TypeDef::Func(FuncType { params, returns }) => {
-                                let ret = match returns.len() {
-                                    0 => None,
-                                    1 => Some(wasmparser_to_atomtype(&returns[0])?),
-                                    _ => {
-                                        return Err(Error::Unsupported(format!(
-                                            "more than 1 return value: {:?}",
-                                            returns,
-                                        )))
-                                    }
-                                };
-                                let args = params
-                                    .iter()
-                                    .map(|a| wasmparser_to_atomtype(a))
-                                    .collect::<Result<Vec<_>, _>>()?;
-                                module.types.push(FuncSignature { args, ret });
+                            TypeDef::Func(functype) => {
+                                module.types.push(functype);
                             }
                             _ => return Err(Error::Unsupported("type section entry".to_string())),
                         }
@@ -157,15 +149,5 @@ impl ModuleType {
         }
 
         Ok(module)
-    }
-}
-
-fn wasmparser_to_atomtype(a: &WType) -> Result<AtomType, Error> {
-    match a {
-        WType::I32 => Ok(AtomType::I32),
-        WType::I64 => Ok(AtomType::I64),
-        WType::F32 => Ok(AtomType::F32),
-        WType::F64 => Ok(AtomType::F64),
-        _ => Err(Error::Unsupported(format!("wasmparser type {:?}", a))),
     }
 }

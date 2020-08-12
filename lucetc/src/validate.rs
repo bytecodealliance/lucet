@@ -1,5 +1,4 @@
 mod moduletype;
-mod types;
 
 use std::path::Path;
 use std::rc::Rc;
@@ -7,8 +6,8 @@ use thiserror::Error;
 
 use witx::{self, Id, Module};
 
-pub use self::moduletype::ModuleType;
-pub use self::types::{FuncSignature, ImportFunc};
+pub use self::moduletype::{ImportFunc, ModuleType};
+pub use wasmparser::FuncType;
 pub use witx::{AtomType, Document, WitxError};
 
 #[derive(Debug, Error)]
@@ -27,14 +26,14 @@ pub enum Error {
     ImportTypeError {
         module: String,
         field: String,
-        expected: FuncSignature,
-        got: FuncSignature,
+        expected: FuncType,
+        got: FuncType,
     },
     #[error("Export type error: for {field}, expected {expected:?}, got {got:?}")]
     ExportTypeError {
         field: String,
-        expected: FuncSignature,
-        got: FuncSignature,
+        expected: FuncType,
+        got: FuncType,
     },
 }
 
@@ -93,7 +92,7 @@ impl Validator {
                     module: import.module.clone(),
                     field: import.field.clone(),
                 })?;
-            let spec_type = FuncSignature::from(func.core_type());
+            let spec_type = witx_to_functype(&func.core_type());
             if spec_type != import.ty {
                 return Err(Error::ImportTypeError {
                     module: import.module,
@@ -123,9 +122,9 @@ impl Validator {
 
     fn check_wasi_start_func(&self, moduletype: &ModuleType) -> Result<(), Error> {
         let start_name = "_start";
-        let expected = FuncSignature {
-            args: vec![],
-            ret: None,
+        let expected = FuncType {
+            params: vec![].into_boxed_slice(),
+            returns: vec![].into_boxed_slice(),
         };
         if let Some(startfunc) = moduletype.export(start_name) {
             if startfunc != &expected {
@@ -143,4 +142,27 @@ impl Validator {
             })
         }
     }
+}
+
+fn witx_to_functype(coretype: &witx::CoreFuncType) -> FuncType {
+    fn atom_to_type(atom: &witx::AtomType) -> wasmparser::Type {
+        match atom {
+            witx::AtomType::I32 => wasmparser::Type::I32,
+            witx::AtomType::I64 => wasmparser::Type::I64,
+            witx::AtomType::F32 => wasmparser::Type::F32,
+            witx::AtomType::F64 => wasmparser::Type::F64,
+        }
+    }
+    let params = coretype
+        .args
+        .iter()
+        .map(|a| atom_to_type(&a.repr()))
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+    let returns = if let Some(ref r) = coretype.ret {
+        vec![atom_to_type(&r.repr())].into_boxed_slice()
+    } else {
+        vec![].into_boxed_slice()
+    };
+    FuncType { params, returns }
 }
