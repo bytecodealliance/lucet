@@ -1,10 +1,9 @@
 pub mod moduletype;
 
+use std::collections::HashMap;
 use std::path::Path;
-use std::rc::Rc;
 use thiserror::Error;
-
-use witx::{self, Id, Module};
+use witx::Id;
 
 use self::moduletype::ModuleType;
 
@@ -13,8 +12,6 @@ pub use witx::{AtomType, Document, WitxError};
 
 #[derive(Debug, Error, Clone)]
 pub enum Error {
-    #[error("Module not found: {0}")]
-    ModuleNotFound(String),
     #[error("Import not found: {module}::{field}")]
     ImportNotFound { module: String, field: String },
     #[error("Export not found: {field}")]
@@ -32,8 +29,11 @@ pub enum Error {
         expected: FuncType,
         got: FuncType,
     },
+    #[error("Missing required export function: {field} with type {type_:?}")]
+    MissingRequiredExport { field: String, type_: FuncType },
 }
 
+#[derive(Debug, Clone)]
 pub enum WasiMode {
     Command,
     Reactor,
@@ -93,16 +93,46 @@ impl ValidatorBuilder {
             params: vec![].into_boxed_slice(),
             returns: vec![].into_boxed_slice(),
         };
-        let (required_exports, optional_exports) = match self.wasi_mode {
-            None => (vec![], vec![]),
-            Some(WasiMode::Command) => (vec![("_start", no_params_no_returns)], vec![]),
-            Some(WasiMode::Reactor) => (vec![], vec![("_initialize", no_params_no_returns)]),
+        let exports = match self.wasi_mode {
+            None => vec![],
+            Some(WasiMode::Command) => vec![(
+                "_start".to_string(),
+                ExportRequired::Required,
+                no_params_no_returns,
+            )],
+            Some(WasiMode::Reactor) => vec![(
+                "_initialize".to_string(),
+                ExportRequired::Optional,
+                no_params_no_returns,
+            )],
         };
-        Validator {
-            witx: self.witx,
-            required_exports,
-            optional_exports,
-            errors: vec![],
+        Validator::new(self.witx, exports.into_iter())
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ExportRequired {
+    Required,
+    Optional,
+}
+
+#[derive(Debug, Clone)]
+struct ExportSpec {
+    name: String,
+    required: ExportRequired,
+    type_: FuncType,
+    result: Option<Result<(), Error>>,
+}
+
+impl ExportSpec {
+    fn result(self) -> Option<Error> {
+        match (self.result, self.required) {
+            (Some(Err(e)), _) => Some(e),
+            (None, ExportRequired::Required) => Some(Error::MissingRequiredExport {
+                field: self.name,
+                type_: self.type_,
+            }),
+            _ => None,
         }
     }
 }
@@ -110,9 +140,8 @@ impl ValidatorBuilder {
 #[derive(Debug, Clone)]
 pub struct Validator {
     witx: Vec<Document>,
-    required_exports: Vec<(&'static str, FuncType)>,
-    optional_exports: Vec<(&'static str, FuncType)>,
-    errors: Vec<Error>,
+    exports: HashMap<String, ExportSpec>,
+    import_errors: Vec<Error>,
 }
 
 impl Validator {
@@ -120,69 +149,101 @@ impl Validator {
         ValidatorBuilder::new()
     }
 
+    fn new(
+        witx: Vec<Document>,
+        exports: impl Iterator<Item = (String, ExportRequired, FuncType)>,
+    ) -> Self {
+        let exports = exports
+            .map(|(name, required, type_)| {
+                (
+                    name.clone(),
+                    ExportSpec {
+                        name,
+                        required,
+                        type_,
+                        result: None,
+                    },
+                )
+            })
+            .collect();
+        Self {
+            witx,
+            exports,
+            import_errors: vec![],
+        }
+    }
+
+    /// Used to calculate bindings
     pub fn docs(&self) -> &[Document] {
         &self.witx
     }
 
-    pub fn available_import(
-        &self,
-        module: &str,
-        field: &str,
-        type_: &FuncType,
-    ) -> Result<(), Error> {
-        let func = self
-            .witx_module(module)?
-            .func(&Id::new(field))
-            .ok_or_else(|| Error::ImportNotFound {
+    pub fn available_import(&mut self, module: &str, field: &str, type_: &FuncType) {
+        let inner = || {
+            let not_found = Error::ImportNotFound {
                 module: module.to_owned(),
                 field: field.to_owned(),
-            })?;
-        let spec_type = witx_to_functype(&func.core_type());
-        if &spec_type != type_ {
-            return Err(Error::ImportTypeError {
-                module: module.to_owned(),
-                field: field.to_owned(),
-                got: type_.clone(),
-                expected: spec_type,
-            });
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn required_exports(&self) -> &[(&'static str, FuncType)] {
-        &self.required_exports
-    }
-
-    pub fn validate_module_type(&self, moduletype: &ModuleType) -> Result<(), Error> {
-        for import in moduletype.imports() {
-            self.available_import(&import.module, &import.field, &import.ty)?;
-        }
-
-        for (name, expected) in self.required_exports.iter() {
-            if let Some(e) = moduletype.export(name) {
-                if e != expected {
-                    return Err(Error::ExportTypeError {
-                        field: name.to_string(),
-                        expected: expected.clone(),
-                        got: e.clone(),
-                    });
-                }
-            } else {
-                return Err(Error::ExportNotFound {
-                    field: name.to_string(),
+            };
+            let func = self
+                .witx
+                .iter()
+                .find_map(|doc| doc.module(&Id::new(module)))
+                .ok_or(not_found.clone())?
+                .func(&Id::new(field))
+                .ok_or(not_found)?;
+            let spec_type = witx_to_functype(&func.core_type());
+            if &spec_type != type_ {
+                return Err(Error::ImportTypeError {
+                    module: module.to_owned(),
+                    field: field.to_owned(),
+                    got: type_.clone(),
+                    expected: spec_type,
                 });
+            } else {
+                Ok(())
+            }
+        };
+        match inner() {
+            Ok(()) => {}
+            Err(e) => self.import_errors.push(e),
+        }
+    }
+
+    pub fn register_export(&mut self, name: &str, type_: &FuncType) {
+        if let Some(mut e) = self.exports.get_mut(name) {
+            if &e.type_ != type_ {
+                e.result = Some(Err(Error::ExportTypeError {
+                    field: name.to_owned(),
+                    expected: e.type_.clone(),
+                    got: type_.clone(),
+                }))
+            } else {
+                e.result = Some(Ok(()))
+            }
+        }
+    }
+
+    pub fn validate_module_type(mut self, moduletype: &ModuleType) -> Result<(), Vec<Error>> {
+        for import in moduletype.imports() {
+            self.available_import(&import.module, &import.field, &import.ty);
+        }
+
+        for (name, functype) in moduletype.exports() {
+            self.register_export(name, functype);
+        }
+
+        let mut errs = self.import_errors;
+        for (_n, ex) in self.exports.into_iter() {
+            if let Some(err) = ex.result() {
+                errs.push(err);
             }
         }
 
-        Ok(())
-    }
-
-    fn witx_module(&self, module: &str) -> Result<Rc<Module>, Error> {
-        self.witx
-            .iter()
-            .find_map(|doc| doc.module(&Id::new(module)))
-            .ok_or_else(|| Error::ModuleNotFound(module.to_string()))
+        if errs.is_empty() {
+            Ok(())
+        } else {
+            Err(errs)
+        }
     }
 }
 

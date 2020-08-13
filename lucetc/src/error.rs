@@ -16,8 +16,8 @@ pub enum Error {
     ClifWasmError(#[from] ClifWasmError),
     #[error("Lucet Module: {0}")]
     LucetModule(#[from] LucetModuleError),
-    #[error("Lucet validation: {0}")]
-    LucetValidation(#[from] ValidationError),
+    #[error("Lucet validation errors: {0:?}")]
+    LucetValidation(Vec<ValidationError>),
     #[error("Lucet moduletype: {0}")]
     LucetModuleType(#[from] ModuleTypeError),
     #[error("I/O: {0}")]

@@ -68,6 +68,13 @@ impl ModuleType {
         })
     }
 
+    pub fn exports<'a>(&'a self) -> impl Iterator<Item = (&'a String, &'a FuncType)> + 'a {
+        self.exports.iter().map(move |(name, funcix)| {
+            let func = self.funcs.get(*funcix).expect("valid funcix");
+            let ty = self.types.get(func.ty).expect("valid typeix");
+            (name, ty)
+        })
+    }
     pub fn parse_wasm(module_contents: &[u8]) -> Result<Self, ModuleTypeError> {
         let mut module = ModuleType {
             types: PrimaryMap::new(),
