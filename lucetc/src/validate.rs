@@ -125,12 +125,12 @@ struct ExportSpec {
 }
 
 impl ExportSpec {
-    fn result(self) -> Option<Error> {
-        match (self.result, self.required) {
-            (Some(Err(e)), _) => Some(e),
+    fn result(&self) -> Option<Error> {
+        match (&self.result, &self.required) {
+            (Some(Err(e)), _) => Some(e.clone()),
             (None, ExportRequired::Required) => Some(Error::MissingRequiredExport {
-                field: self.name,
-                type_: self.type_,
+                field: self.name.clone(),
+                type_: self.type_.clone(),
             }),
             _ => None,
         }
@@ -178,7 +178,7 @@ impl Validator {
         &self.witx
     }
 
-    pub fn available_import(&mut self, module: &str, field: &str, type_: &FuncType) {
+    pub fn register_import(&mut self, module: &str, field: &str, type_: &FuncType) {
         let inner = || {
             let not_found = Error::ImportNotFound {
                 module: module.to_owned(),
@@ -223,19 +223,11 @@ impl Validator {
         }
     }
 
-    pub fn validate_module_type(mut self, moduletype: &ModuleType) -> Result<(), Vec<Error>> {
-        for import in moduletype.imports() {
-            self.available_import(&import.module, &import.field, &import.ty);
-        }
-
-        for (name, functype) in moduletype.exports() {
-            self.register_export(name, functype);
-        }
-
-        let mut errs = self.import_errors;
-        for (_n, ex) in self.exports.into_iter() {
+    pub fn report(&self) -> Result<(), Vec<Error>> {
+        let mut errs = self.import_errors.clone();
+        for (_n, ex) in self.exports.iter() {
             if let Some(err) = ex.result() {
-                errs.push(err);
+                errs.push(err.clone());
             }
         }
 
@@ -244,6 +236,18 @@ impl Validator {
         } else {
             Err(errs)
         }
+    }
+
+    pub fn validate_module_type(mut self, moduletype: &ModuleType) -> Result<(), Vec<Error>> {
+        for import in moduletype.imports() {
+            self.register_import(&import.module, &import.field, &import.ty);
+        }
+
+        for (name, functype) in moduletype.exports() {
+            self.register_export(name, functype);
+        }
+
+        self.report()
     }
 }
 

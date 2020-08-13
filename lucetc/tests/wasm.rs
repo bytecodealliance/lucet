@@ -56,7 +56,7 @@ mod module_data {
             &b,
             h,
             false,
-            &None,
+            None,
             false,
         )
         .expect("compiling exported_import");
@@ -575,7 +575,7 @@ mod validate {
             &b,
             h,
             false,
-            &Some(v),
+            Some(v),
             false,
         )
         .expect("compile");

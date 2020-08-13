@@ -1,6 +1,7 @@
 //! Implements ModuleEnvironment for cranelift-wasm. Code derived from cranelift-wasm/environ/dummy.rs
 use crate::error::Error;
 use crate::pointer::NATIVE_POINTER;
+use crate::validate::Validator;
 use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap, SecondaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -53,6 +54,8 @@ pub struct DataInitializer<'a> {
 }
 
 pub struct ModuleInfo<'a> {
+    /// Witx validator
+    pub validator: Option<Validator>,
     /// Target description used for codegen
     pub target_config: TargetFrontendConfig,
     /// This mapping lets us merge duplicate types (permitted by the wasm spec) as they're
@@ -95,8 +98,9 @@ pub struct ModuleInfo<'a> {
 }
 
 impl<'a> ModuleInfo<'a> {
-    pub fn new(target_config: TargetFrontendConfig) -> Self {
+    pub fn new(target_config: TargetFrontendConfig, validator: Option<Validator>) -> Self {
         Self {
+            validator,
             target_config,
             signature_mapping: PrimaryMap::new(),
             signatures: PrimaryMap::new(),
@@ -117,19 +121,24 @@ impl<'a> ModuleInfo<'a> {
         }
     }
 
-    pub fn signature_for_function(&self, func_index: UniqueFuncIndex) -> &ir::Signature {
+    pub fn signature_for_function(
+        &self,
+        func_index: UniqueFuncIndex,
+    ) -> &(ir::Signature, FuncType) {
         // UniqueFuncIndex are valid (or the caller has very bad data)
         let sigidx = self.functions.get(func_index).unwrap().entity;
 
         self.signature_by_id(sigidx)
     }
 
-    pub fn signature_by_id(&self, sig_idx: SignatureIndex) -> &ir::Signature {
+    pub fn signature_by_id(
+        &self,
+        sig_idx: SignatureIndex,
+    ) -> &(ir::Signature, wasmparser::FuncType) {
         // All signatures map to some unique signature index
         let unique_sig_idx = self.signature_mapping.get(sig_idx).unwrap();
         // Unique signature indices are valid (or we're in some deeply bad state)
-        let (sig, _wasm_func_type) = self.signatures.get(*unique_sig_idx).unwrap();
-        sig
+        self.signatures.get(*unique_sig_idx).unwrap()
     }
 
     pub fn declare_func_with_sig(
@@ -142,6 +151,14 @@ impl<'a> ModuleInfo<'a> {
         let new_funcidx = UniqueFuncIndex::from_u32(self.functions.len() as u32);
         self.declare_func_type(new_sigidx)?;
         Ok((new_funcidx, new_sigidx))
+    }
+
+    pub fn validation_errors(&self) -> Result<(), Error> {
+        if let Some(ref v) = self.validator {
+            v.report().map_err(Error::LucetValidation)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -201,6 +218,11 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             });
 
         self.function_mapping.push(unique_fn_index);
+
+        let (_sig, func_type) = self.signature_by_id(sig_index).clone();
+        if let Some(ref mut v) = self.validator {
+            v.register_import(module, field, &func_type);
+        }
         Ok(())
     }
 
@@ -289,6 +311,11 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
             .get_mut(unique_func_index)
             .expect("export of declared function")
             .push_export(name);
+
+        let (_sig, func_type) = self.signature_for_function(unique_func_index).clone();
+        if let Some(ref mut v) = self.validator {
+            v.register_export(name, &func_type)
+        }
         Ok(())
     }
 
