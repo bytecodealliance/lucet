@@ -475,7 +475,7 @@ mod compile {
 
 mod validate {
     use super::load_wat_module;
-    use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel, Validator};
+    use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel, Validator, WasiMode};
     use target_lexicon::Triple;
 
     #[test]
@@ -484,9 +484,10 @@ mod validate {
         let b = super::test_bindings();
 
         // Empty witx: arith module has no imports
-        let v = Validator::parse("")
+        let v = Validator::builder()
+            .parse_witx("")
             .expect("empty witx validates")
-            .with_wasi_exe(false);
+            .build();
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
@@ -501,9 +502,10 @@ mod validate {
             (module $env
               (@interface func (export \"inc\")
                 (result $r s32)))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
@@ -521,9 +523,10 @@ mod validate {
                 (param $a1 u32)
                 (param $a2 u32)
                 (result $r s32)))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
@@ -539,9 +542,10 @@ mod validate {
             (module $env
               (@interface func (export \"imported_main\"))
               (@interface func (export \"inc\")))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
@@ -558,9 +562,10 @@ mod validate {
             (module $env
               (@interface func (export \"imported_main\"))
               (@interface func (export \"inc\")))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let c = Compiler::new(
             &m,
@@ -588,9 +593,10 @@ mod validate {
               (@interface func (export \"imp_1\") (result $r u32))
               (@interface func (export \"imp_2\") (result $r u32))
               (@interface func (export \"imp_3\") (result $r u32)))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
@@ -603,9 +609,11 @@ mod validate {
         let b = super::test_bindings();
 
         let witx = "";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(true);
+            .wasi_mode(Some(WasiMode::Command))
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");

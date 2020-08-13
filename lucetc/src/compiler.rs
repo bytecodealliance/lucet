@@ -211,7 +211,7 @@ impl<'a> Compiler<'a> {
         wasmparser::validate(wasm_binary, None).map_err(Error::WasmValidation)?;
 
         if let Some(v) = validator {
-            let moduletype = crate::validate::ModuleType::parse_wasm(wasm_binary)?;
+            let moduletype = crate::validate::moduletype::ModuleType::parse_wasm(wasm_binary)?;
             v.validate_module_type(&moduletype)
                 .map_err(Error::LucetValidation)?;
         }

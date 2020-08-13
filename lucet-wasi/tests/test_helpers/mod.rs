@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Error};
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::{self, types::Exitcode, WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
-use lucetc::{Lucetc, LucetcOpts, Validator};
+use lucetc::{Lucetc, LucetcOpts, Validator, WasiMode};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -64,7 +64,12 @@ pub fn wasi_load<P: AsRef<Path>>(
 ) -> Result<Arc<dyn Module>, Error> {
     let native_build = Lucetc::new(wasm_file)
         .with_bindings(lucet_wasi::bindings())
-        .with_validator(Validator::new(lucet_wasi::witx_document(), true));
+        .with_validator(
+            Validator::builder()
+                .witx(lucet_wasi::witx_document())
+                .wasi_mode(Some(WasiMode::Command))
+                .build(),
+        );
 
     let so_file = workdir.path().join("out.so");
 

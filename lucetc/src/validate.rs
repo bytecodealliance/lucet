@@ -6,11 +6,12 @@ use thiserror::Error;
 
 use witx::{self, Id, Module};
 
-pub use self::moduletype::{ImportFunc, ModuleType};
+use self::moduletype::ModuleType;
+
 pub use wasmparser::FuncType;
 pub use witx::{AtomType, Document, WitxError};
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum Error {
     #[error("Module not found: {0}")]
     ModuleNotFound(String),
@@ -33,48 +34,94 @@ pub enum Error {
     },
 }
 
+pub enum WasiMode {
+    Command,
+    Reactor,
+}
+
+pub struct ValidatorBuilder {
+    witx: Vec<Document>,
+    wasi_mode: Option<WasiMode>,
+}
+
+impl ValidatorBuilder {
+    pub fn new() -> Self {
+        Self {
+            witx: vec![],
+            wasi_mode: None,
+        }
+    }
+
+    pub fn with_witx(&mut self, doc: Document) {
+        self.witx.push(doc);
+    }
+    pub fn witx(mut self, doc: Document) -> Self {
+        self.with_witx(doc);
+        self
+    }
+
+    pub fn with_parse_witx(&mut self, source: &str) -> Result<(), WitxError> {
+        let doc = witx::parse(source)?;
+        self.with_witx(doc);
+        Ok(())
+    }
+    pub fn parse_witx(mut self, source: &str) -> Result<Self, WitxError> {
+        self.with_parse_witx(source)?;
+        Ok(self)
+    }
+
+    pub fn with_load_witx(&mut self, source_paths: &[impl AsRef<Path>]) -> Result<(), WitxError> {
+        let doc = witx::load(source_paths)?;
+        self.with_witx(doc);
+        Ok(())
+    }
+    pub fn load_witx(mut self, source_paths: &[impl AsRef<Path>]) -> Result<Self, WitxError> {
+        self.with_load_witx(source_paths)?;
+        Ok(self)
+    }
+
+    pub fn with_wasi_mode(&mut self, mode: Option<WasiMode>) {
+        self.wasi_mode = mode;
+    }
+    pub fn wasi_mode(mut self, mode: Option<WasiMode>) -> Self {
+        self.with_wasi_mode(mode);
+        self
+    }
+
+    pub fn build(self) -> Validator {
+        let no_params_no_returns = FuncType {
+            params: vec![].into_boxed_slice(),
+            returns: vec![].into_boxed_slice(),
+        };
+        let (required_exports, optional_exports) = match self.wasi_mode {
+            None => (vec![], vec![]),
+            Some(WasiMode::Command) => (vec![("_start", no_params_no_returns)], vec![]),
+            Some(WasiMode::Reactor) => (vec![], vec![("_initialize", no_params_no_returns)]),
+        };
+        Validator {
+            witx: self.witx,
+            required_exports,
+            optional_exports,
+            errors: vec![],
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Validator {
-    witx: Document,
+    witx: Vec<Document>,
     required_exports: Vec<(&'static str, FuncType)>,
+    optional_exports: Vec<(&'static str, FuncType)>,
+    errors: Vec<Error>,
 }
 
 impl Validator {
-    pub fn new(witx: Document, wasi_exe: bool) -> Self {
-        Self {
-            witx,
-            required_exports: vec![],
-        }
-        .with_wasi_exe(wasi_exe)
+    pub fn builder() -> ValidatorBuilder {
+        ValidatorBuilder::new()
     }
 
-    pub fn parse(source: &str) -> Result<Self, WitxError> {
-        let witx = witx::parse(source)?;
-        Ok(Self::new(witx, false))
-    }
-
-    pub fn load<P: AsRef<Path>>(source_paths: &[P]) -> Result<Self, WitxError> {
-        let witx = witx::load(source_paths)?;
-        Ok(Self::new(witx, false))
-    }
-
-    pub fn wasi_exe(&mut self, check: bool) {
-        if check {
-            self.required_exports = vec![(
-                "_start",
-                FuncType {
-                    params: vec![].into_boxed_slice(),
-                    returns: vec![].into_boxed_slice(),
-                },
-            )];
-        } else {
-            self.required_exports = vec![];
-        }
-    }
-
-    pub fn with_wasi_exe(mut self, check: bool) -> Self {
-        self.wasi_exe(check);
-        self
+    pub fn docs(&self) -> &[Document] {
+        &self.witx
     }
 
     pub fn available_import(
@@ -108,12 +155,6 @@ impl Validator {
     }
 
     pub fn validate_module_type(&self, moduletype: &ModuleType) -> Result<(), Error> {
-        /*
-        wasmparser::validate(module_contents, None)?;
-
-        let moduletype = ModuleType::parse_wasm(module_contents)?;
-        */
-
         for import in moduletype.imports() {
             self.available_import(&import.module, &import.field, &import.ty)?;
         }
@@ -137,13 +178,10 @@ impl Validator {
         Ok(())
     }
 
-    pub fn doc(&self) -> &Document {
-        &self.witx
-    }
-
     fn witx_module(&self, module: &str) -> Result<Rc<Module>, Error> {
         self.witx
-            .module(&Id::new(module))
+            .iter()
+            .find_map(|doc| doc.module(&Id::new(module)))
             .ok_or_else(|| Error::ModuleNotFound(module.to_string()))
     }
 }
