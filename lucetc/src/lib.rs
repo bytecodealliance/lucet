@@ -32,7 +32,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use target_lexicon::Triple;
-pub use validate::{Validator, ValidatorBuilder, WasiMode};
+pub use validate::{Error as ValidationError, Validator, ValidatorBuilder, WasiMode};
 
 enum LucetcInput {
     Bytes(Vec<u8>),

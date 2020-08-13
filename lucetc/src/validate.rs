@@ -10,7 +10,7 @@ use self::moduletype::ModuleType;
 pub use wasmparser::FuncType;
 pub use witx::{AtomType, Document, WitxError};
 
-#[derive(Debug, Error, Clone)]
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum Error {
     #[error("Import not found: {module}::{field}")]
     ImportNotFound { module: String, field: String },
