@@ -46,37 +46,75 @@ impl From<wasmparser::BinaryReaderError> for Error {
 #[derive(Debug, Clone)]
 pub struct Validator {
     witx: Document,
-    wasi_exe: bool,
+    required_exports: Vec<(&'static str, FuncType)>,
 }
 
 impl Validator {
     pub fn new(witx: Document, wasi_exe: bool) -> Self {
-        Self { witx, wasi_exe }
+        Self {
+            witx,
+            required_exports: vec![],
+        }
+        .with_wasi_exe(wasi_exe)
     }
 
     pub fn parse(source: &str) -> Result<Self, WitxError> {
         let witx = witx::parse(source)?;
-        Ok(Self {
-            witx,
-            wasi_exe: false,
-        })
+        Ok(Self::new(witx, false))
     }
 
     pub fn load<P: AsRef<Path>>(source_paths: &[P]) -> Result<Self, WitxError> {
         let witx = witx::load(source_paths)?;
-        Ok(Self {
-            witx,
-            wasi_exe: false,
-        })
+        Ok(Self::new(witx, false))
     }
 
     pub fn wasi_exe(&mut self, check: bool) {
-        self.wasi_exe = check;
+        if check {
+            self.required_exports = vec![(
+                "_start",
+                FuncType {
+                    params: vec![].into_boxed_slice(),
+                    returns: vec![].into_boxed_slice(),
+                },
+            )];
+        } else {
+            self.required_exports = vec![];
+        }
     }
 
     pub fn with_wasi_exe(mut self, check: bool) -> Self {
         self.wasi_exe(check);
         self
+    }
+
+    pub fn available_import(
+        &self,
+        module: &str,
+        field: &str,
+        type_: &FuncType,
+    ) -> Result<(), Error> {
+        let func = self
+            .witx_module(module)?
+            .func(&Id::new(field))
+            .ok_or_else(|| Error::ImportNotFound {
+                module: module.to_owned(),
+                field: field.to_owned(),
+            })?;
+        let spec_type = witx_to_functype(&func.core_type());
+        if &spec_type != type_ {
+            return Err(Error::ImportTypeError {
+                module: module.to_owned(),
+                field: field.to_owned(),
+                got: type_.clone(),
+                expected: spec_type,
+            });
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn required_exports(&self) -> &[(&'static str, FuncType)] {
+        &self.required_exports
     }
 
     pub fn validate(&self, module_contents: &[u8]) -> Result<(), Error> {
@@ -85,26 +123,23 @@ impl Validator {
         let moduletype = ModuleType::parse_wasm(module_contents)?;
 
         for import in moduletype.imports() {
-            let func = self
-                .witx_module(&import.module)?
-                .func(&Id::new(&import.field))
-                .ok_or_else(|| Error::ImportNotFound {
-                    module: import.module.clone(),
-                    field: import.field.clone(),
-                })?;
-            let spec_type = witx_to_functype(&func.core_type());
-            if spec_type != import.ty {
-                return Err(Error::ImportTypeError {
-                    module: import.module,
-                    field: import.field,
-                    got: import.ty,
-                    expected: spec_type,
-                });
-            }
+            self.available_import(&import.module, &import.field, &import.ty)?;
         }
 
-        if self.wasi_exe {
-            self.check_wasi_start_func(&moduletype)?;
+        for (name, expected) in self.required_exports.iter() {
+            if let Some(e) = moduletype.export(name) {
+                if e != expected {
+                    return Err(Error::ExportTypeError {
+                        field: name.to_string(),
+                        expected: expected.clone(),
+                        got: e.clone(),
+                    });
+                }
+            } else {
+                return Err(Error::ExportNotFound {
+                    field: name.to_string(),
+                });
+            }
         }
 
         Ok(())
@@ -118,29 +153,6 @@ impl Validator {
         self.witx
             .module(&Id::new(module))
             .ok_or_else(|| Error::ModuleNotFound(module.to_string()))
-    }
-
-    fn check_wasi_start_func(&self, moduletype: &ModuleType) -> Result<(), Error> {
-        let start_name = "_start";
-        let expected = FuncType {
-            params: vec![].into_boxed_slice(),
-            returns: vec![].into_boxed_slice(),
-        };
-        if let Some(startfunc) = moduletype.export(start_name) {
-            if startfunc != &expected {
-                Err(Error::ExportTypeError {
-                    field: start_name.to_string(),
-                    expected,
-                    got: startfunc.clone(),
-                })
-            } else {
-                Ok(())
-            }
-        } else {
-            Err(Error::ExportNotFound {
-                field: start_name.to_string(),
-            })
-        }
     }
 }
 
