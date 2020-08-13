@@ -1,6 +1,6 @@
-use crate::validate::Error;
 use cranelift_entity::{entity_impl, PrimaryMap};
 use std::collections::HashMap;
+use thiserror::Error;
 use wasmparser::{
     ExternalKind, FuncType, ImportSectionEntryType, ModuleReader, SectionContent, TypeDef,
 };
@@ -24,6 +24,20 @@ pub struct ImportFunc {
     pub module: String,
     pub field: String,
     pub ty: FuncType,
+}
+
+#[derive(Debug, Error)]
+pub enum ModuleTypeError {
+    #[error("WebAssembly validation error at offset {1}: {0}")]
+    WasmValidation(String, usize),
+    #[error("Unsupported: {0}")]
+    Unsupported(String),
+}
+
+impl From<wasmparser::BinaryReaderError> for ModuleTypeError {
+    fn from(e: wasmparser::BinaryReaderError) -> ModuleTypeError {
+        ModuleTypeError::WasmValidation(e.message().to_owned(), e.offset())
+    }
 }
 
 #[derive(Clone)]
@@ -54,7 +68,7 @@ impl ModuleType {
         })
     }
 
-    pub fn parse_wasm(module_contents: &[u8]) -> Result<Self, Error> {
+    pub fn parse_wasm(module_contents: &[u8]) -> Result<Self, ModuleTypeError> {
         let mut module = ModuleType {
             types: PrimaryMap::new(),
             funcs: PrimaryMap::new(),
@@ -71,7 +85,11 @@ impl ModuleType {
                             TypeDef::Func(functype) => {
                                 module.types.push(functype);
                             }
-                            _ => return Err(Error::Unsupported("type section entry".to_string())),
+                            _ => {
+                                return Err(ModuleTypeError::Unsupported(
+                                    "type section entry".to_string(),
+                                ))
+                            }
                         }
                     }
                 }
@@ -92,31 +110,31 @@ impl ModuleType {
                                 });
                             }
                             ImportSectionEntryType::Memory(_) => {
-                                return Err(Error::Unsupported(format!(
+                                return Err(ModuleTypeError::Unsupported(format!(
                                     "memory import {}:{:?}",
                                     import.module, import.field
                                 )));
                             }
                             ImportSectionEntryType::Table(_) => {
-                                return Err(Error::Unsupported(format!(
+                                return Err(ModuleTypeError::Unsupported(format!(
                                     "table import {}:{:?}",
                                     import.module, import.field
                                 )));
                             }
                             ImportSectionEntryType::Global(_) => {
-                                return Err(Error::Unsupported(format!(
+                                return Err(ModuleTypeError::Unsupported(format!(
                                     "global import {}:{:?}",
                                     import.module, import.field
                                 )));
                             }
                             ImportSectionEntryType::Module(_) => {
-                                return Err(Error::Unsupported(format!(
+                                return Err(ModuleTypeError::Unsupported(format!(
                                     "module import {}:{:?}",
                                     import.module, import.field
                                 )));
                             }
                             ImportSectionEntryType::Instance(_) => {
-                                return Err(Error::Unsupported(format!(
+                                return Err(ModuleTypeError::Unsupported(format!(
                                     "instance import {}:{:?}",
                                     import.module, import.field
                                 )));

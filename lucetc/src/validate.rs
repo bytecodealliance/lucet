@@ -1,4 +1,4 @@
-mod moduletype;
+pub mod moduletype;
 
 use std::path::Path;
 use std::rc::Rc;
@@ -12,10 +12,6 @@ pub use witx::{AtomType, Document, WitxError};
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("WebAssembly validation error at offset {1}: {0}")]
-    WasmValidation(String, usize),
-    #[error("Unsupported: {0}")]
-    Unsupported(String),
     #[error("Module not found: {0}")]
     ModuleNotFound(String),
     #[error("Import not found: {module}::{field}")]
@@ -35,12 +31,6 @@ pub enum Error {
         expected: FuncType,
         got: FuncType,
     },
-}
-
-impl From<wasmparser::BinaryReaderError> for Error {
-    fn from(e: wasmparser::BinaryReaderError) -> Error {
-        Error::WasmValidation(e.message().to_owned(), e.offset())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -117,10 +107,12 @@ impl Validator {
         &self.required_exports
     }
 
-    pub fn validate(&self, module_contents: &[u8]) -> Result<(), Error> {
+    pub fn validate_module_type(&self, moduletype: &ModuleType) -> Result<(), Error> {
+        /*
         wasmparser::validate(module_contents, None)?;
 
         let moduletype = ModuleType::parse_wasm(module_contents)?;
+        */
 
         for import in moduletype.imports() {
             self.available_import(&import.module, &import.field, &import.ty)?;

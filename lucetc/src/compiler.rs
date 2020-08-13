@@ -208,13 +208,12 @@ impl<'a> Compiler<'a> {
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone());
 
+        wasmparser::validate(wasm_binary, None).map_err(Error::WasmValidation)?;
+
         if let Some(v) = validator {
-            v.validate(wasm_binary).map_err(Error::LucetValidation)?;
-        } else {
-            // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside
-            // cranelift-wasm does not validate. We need to run the validating parser on the binary
-            // first. The InvalidWebAssembly error below will never trigger.
-            wasmparser::validate(wasm_binary, None).map_err(Error::WasmValidation)?;
+            let moduletype = crate::validate::ModuleType::parse_wasm(wasm_binary)?;
+            v.validate_module_type(&moduletype)
+                .map_err(Error::LucetValidation)?;
         }
 
         let module_translation_state =
