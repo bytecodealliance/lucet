@@ -1,11 +1,7 @@
-pub mod moduletype;
-
 use std::collections::HashMap;
 use std::path::Path;
 use thiserror::Error;
 use witx::Id;
-
-use self::moduletype::ModuleType;
 
 pub use wasmparser::FuncType;
 pub use witx::{AtomType, Document, WitxError};
@@ -236,18 +232,6 @@ impl Validator {
         } else {
             Err(errs)
         }
-    }
-
-    pub fn validate_module_type(mut self, moduletype: &ModuleType) -> Result<(), Vec<Error>> {
-        for import in moduletype.imports() {
-            self.register_import(&import.module, &import.field, &import.ty);
-        }
-
-        for (name, functype) in moduletype.exports() {
-            self.register_export(name, functype);
-        }
-
-        self.report()
     }
 }
 
