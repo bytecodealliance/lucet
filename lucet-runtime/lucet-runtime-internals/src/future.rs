@@ -184,7 +184,9 @@ impl InstanceHandle {
                             // Rehydrate the lifetime from `'static` to `'a`, which
                             // is morally the same lifetime as was passed into
                             // `Vmctx::block_on`.
-                            Ok(Bounce(BounceInner::More(future as BoxFuture<'a, ResumeVal>)))
+                            Ok(Bounce(BounceInner::More(
+                                future as BoxFuture<'a, ResumeVal>,
+                            )))
                         } else {
                             // Any other yielded value is not supported - die with an error.
                             Err(Error::Unsupported(
