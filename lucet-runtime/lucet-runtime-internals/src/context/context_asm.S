@@ -221,6 +221,6 @@ _lucet_context_activate:
 #endif
 
 /* Mark that we don't need executable stack. */
-#if defined(__linux__) && defined(__ELF__)
+#if (defined(__linux__) || defined(__FreeBSD__)) && defined(__ELF__)
 .section .note.GNU-stack,"",%progbits
 #endif

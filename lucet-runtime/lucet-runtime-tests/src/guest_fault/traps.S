@@ -65,6 +65,6 @@ _guest_func_oob:
 #endif
 	.cfi_endproc
 
-#if defined(__linux__) && defined(__ELF__)
+#if (defined(__linux__) || defined(__FreeBSD__)) && defined(__ELF__)
 	.section	".note.GNU-stack","",@progbits
 #endif

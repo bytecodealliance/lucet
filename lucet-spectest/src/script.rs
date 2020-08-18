@@ -78,7 +78,7 @@ impl ScriptEnv {
             .write(&objfile_path)
             .map_err(ScriptError::CodegenError)?;
 
-        let mut cmd_ld = Command::new("ld");
+        let mut cmd_ld = Command::new(std::env::var("LD").unwrap_or("ld".to_string()));
         cmd_ld.arg(objfile_path.clone());
         cmd_ld.arg("-shared");
         cmd_ld.arg("-o");

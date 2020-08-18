@@ -465,19 +465,23 @@ pub const MINSIGSTKSZ: usize = libc::MINSIGSTKSZ;
 ///
 /// [sigstksz]: https://pubs.opengroup.org/onlinepubs/009695399/basedefs/signal.h.html
 pub const DEFAULT_SIGNAL_STACK_SIZE: usize = {
-    // on Linux, `SIGSTKSZ` is too small for the signal handler when compiled in debug mode
-    #[cfg(all(debug_assertions, not(target_os = "macos")))]
-    const SIZE: usize = 12 * 1024;
-
-    // on Mac, `SIGSTKSZ` is way larger than we need; it would be nice to combine these debug cases once
-    // `std::cmp::max` is a const fn
-    #[cfg(all(debug_assertions, target_os = "macos"))]
-    const SIZE: usize = libc::SIGSTKSZ;
-
-    #[cfg(not(debug_assertions))]
-    const SIZE: usize = libc::SIGSTKSZ;
-
-    SIZE
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "freebsd")] {
+            // on FreeBSD/amd64, `SIGSTKSZ` is not a multiple of the page size
+            // (34816 == MINSIGSTKSZ(2048) + 32768)
+            12 * 1024
+        } else if #[cfg(target_os = "macos")] {
+            // on Mac, `SIGSTKSZ` is way larger than we need;
+            // it would be nice to combine these debug cases once
+            // `std::cmp::max` is a const fn
+            libc::SIGSTKSZ
+        } else if #[cfg(debug_assertions)] {
+            // on Linux, `SIGSTKSZ` is too small for the signal handler when compiled in debug mode
+            12 * 1024
+        } else {
+            libc::SIGSTKSZ
+        }
+    }
 };
 
 impl Limits {
