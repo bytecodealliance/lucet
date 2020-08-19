@@ -47,11 +47,7 @@ pub enum Error {
 
     /// Errors arising during dynamic loading with [`DlModule`](struct.DlModule.html).
     #[error("Dynamic loading error: {0}")]
-    DlError(
-        #[from]
-        #[source]
-        crate::module::DlError,
-    ),
+    DlError(#[from] crate::module::DlError),
 
     #[error("Instance not returned")]
     InstanceNotReturned,

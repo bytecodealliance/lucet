@@ -258,14 +258,14 @@ macro_rules! guest_fault_tests {
             static ref RECOVERABLE_PTR_LOCK: Mutex<()> = Mutex::new(());
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         const INVALID_PERMISSION_FAULT: libc::c_int = SIGSEGV;
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         const INVALID_PERMISSION_FAULT: libc::c_int = SIGBUS;
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         const INVALID_PERMISSION_SIGNAL: Signal = Signal::SIGSEGV;
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         const INVALID_PERMISSION_SIGNAL: Signal = Signal::SIGBUS;
 
         $(
@@ -299,7 +299,7 @@ macro_rules! guest_fault_tests {
                         4096,
                         ProtFlags::PROT_NONE,
                         MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
-                        0,
+                        -1,
                         0,
                     )
                         .expect("mmap succeeds") as *mut libc::c_char;

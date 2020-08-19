@@ -19,17 +19,9 @@ use raw_cpuid::CpuId;
 #[derive(Debug, Error)]
 pub enum DlError {
     #[error("Loading: {0}")]
-    Loading(
-        #[from]
-        #[source]
-        libloading::Error,
-    ),
+    Loading(#[from] libloading::Error),
     #[error("IO: {0}")]
-    Io(
-        #[from]
-        #[source]
-        std::io::Error,
-    ),
+    Io(#[from] std::io::Error),
 }
 
 fn check_feature_support(module_features: &ModuleFeatures) -> Result<(), Error> {
