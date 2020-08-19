@@ -7,10 +7,9 @@ use crate::options::{CodegenOutput, ErrorStyle, Options};
 use anyhow::{format_err, Error};
 use log::info;
 use lucet_module::bindings::Bindings;
-use lucet_validate::Validator;
 use lucetc::{
     signature::{self, PublicKey},
-    Lucetc, LucetcOpts,
+    Lucetc, LucetcOpts, Validator, WasiMode,
 };
 use serde::Serialize;
 
@@ -73,7 +72,16 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     }?;
 
     let mut validator = if !opts.witx_specs.is_empty() {
-        Some(Validator::load(&opts.witx_specs)?.with_wasi_exe(opts.wasi_exe))
+        Some(
+            Validator::builder()
+                .load_witx(&opts.witx_specs)?
+                .wasi_mode(if opts.wasi_exe {
+                    Some(WasiMode::Command)
+                } else {
+                    None
+                })
+                .build(),
+        )
     } else {
         None
     };
@@ -81,7 +89,9 @@ pub fn run(opts: &Options) -> Result<(), Error> {
     let mut bindings = Bindings::empty();
     if opts.wiggle_bindings {
         if let Some(ref v) = validator {
-            bindings.extend(&lucet_wiggle_generate::bindings(v.doc()))?;
+            for d in v.docs().iter() {
+                bindings.extend(&lucet_wiggle_generate::bindings(d))?;
+            }
         }
     }
     for file in opts.binding_files.iter() {

@@ -11,6 +11,7 @@ use crate::runtime::Runtime;
 use crate::stack_probe;
 use crate::table::write_table_data;
 use crate::traps::{translate_trapcode, trap_sym_for_func};
+use crate::validate::Validator;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
     binemit,
@@ -31,7 +32,6 @@ use lucet_module::{
     InstanceRuntimeData, ModuleData, ModuleFeatures, SerializedModule, VersionInfo,
     LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };
-use lucet_validate::Validator;
 use memoffset::offset_of;
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -171,7 +171,7 @@ impl CompilerBuilder {
             bindings,
             self.heap_settings.clone(),
             self.count_instructions,
-            &self.validator,
+            self.validator.clone(),
             self.canonicalize_nans,
         )
     }
@@ -200,22 +200,15 @@ impl<'a> Compiler<'a> {
         bindings: &'a Bindings,
         heap_settings: HeapSettings,
         count_instructions: bool,
-        validator: &Option<Validator>,
+        validator: Option<Validator>,
         canonicalize_nans: bool,
     ) -> Result<Self, Error> {
         let isa = Self::target_isa(target.clone(), opt_level, &cpu_features, canonicalize_nans)?;
 
         let frontend_config = isa.frontend_config();
-        let mut module_info = ModuleInfo::new(frontend_config.clone());
+        let mut module_info = ModuleInfo::new(frontend_config.clone(), validator);
 
-        if let Some(v) = validator {
-            v.validate(wasm_binary).map_err(Error::LucetValidation)?;
-        } else {
-            // As of cranelift-wasm 0.43 which uses wasmparser 0.39.1, the parser used inside
-            // cranelift-wasm does not validate. We need to run the validating parser on the binary
-            // first. The InvalidWebAssembly error below will never trigger.
-            wasmparser::validate(wasm_binary, None).map_err(Error::WasmValidation)?;
-        }
+        wasmparser::validate(wasm_binary, None).map_err(Error::WasmValidation)?;
 
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
@@ -229,6 +222,8 @@ impl<'a> Compiler<'a> {
                 WasmError::Unsupported(s) => Error::Unsupported(s),
                 WasmError::ImplLimitExceeded { .. } => Error::ClifWasmError(e),
             })?;
+
+        module_info.validation_errors()?;
 
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
@@ -551,8 +546,12 @@ fn synthesize_trampoline(
     let mut trampoline_context = ClifContext::new();
     trampoline_context.func.name = ir::ExternalName::from(trampoline_id);
     // the trampoline's signature is the same as the hostcall it calls' signature
-    let hostcall_sig = decls.info.signature_for_function(hostcall_func_index);
-    trampoline_context.func.signature = hostcall_sig.clone();
+    let hostcall_sig = decls
+        .info
+        .signature_for_function(hostcall_func_index)
+        .0
+        .clone();
+    trampoline_context.func.signature = hostcall_sig;
 
     // We're going to load the stack limit later, create the global value to load while we
     // can.

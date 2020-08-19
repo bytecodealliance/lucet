@@ -27,7 +27,6 @@ wasi-common = { path = "../wasmtime/crates/wasi-common", version = "0.18.0", def
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 lucetc = { path = "../lucetc" }
-lucet-validate = { path = "../lucet-validate" }
 tempfile = "3.0"
 
 [lib]

@@ -1,5 +1,4 @@
-use lucet_module::Signature;
-use lucet_module::ValueType;
+use lucet_module::{Signature, ValueType};
 use std::fmt::{self, Display};
 use thiserror::Error;
 use wasmparser::FuncType;

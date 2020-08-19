@@ -17,6 +17,7 @@ mod stack_probe;
 mod table;
 mod traps;
 mod types;
+mod validate;
 
 use crate::load::read_bytes;
 pub use crate::{
@@ -26,12 +27,12 @@ pub use crate::{
     load::read_module,
 };
 pub use lucet_module::bindings::Bindings;
-pub use lucet_validate::Validator;
 use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use target_lexicon::Triple;
+pub use validate::{Error as ValidationError, Validator, ValidatorBuilder, WasiMode};
 
 enum LucetcInput {
     Bytes(Vec<u8>),

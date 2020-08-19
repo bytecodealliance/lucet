@@ -1011,21 +1011,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lucet-validate"
-version = "0.7.0-dev"
-dependencies = [
- "clap",
- "cranelift-entity",
- "lucet-wasi",
- "lucet-wasi-sdk",
- "tempfile",
- "thiserror",
- "wabt",
- "wasmparser 0.52.2",
- "witx",
-]
-
-[[package]]
 name = "lucet-wasi"
 version = "0.7.0-dev"
 dependencies = [
@@ -1037,7 +1022,6 @@ dependencies = [
  "lucet-module",
  "lucet-runtime",
  "lucet-runtime-internals",
- "lucet-validate",
  "lucet-wasi-generate",
  "lucet-wasi-sdk",
  "lucet-wiggle",
@@ -1090,7 +1074,6 @@ version = "0.7.0-dev"
 dependencies = [
  "anyhow",
  "lucet-module",
- "lucet-validate",
  "lucet-wasi",
  "lucetc",
  "target-lexicon",
@@ -1156,7 +1139,6 @@ dependencies = [
  "human-size",
  "log",
  "lucet-module",
- "lucet-validate",
  "lucet-wiggle-generate",
  "memoffset",
  "minisign",
@@ -1169,6 +1151,7 @@ dependencies = [
  "thiserror",
  "wabt",
  "wasmparser 0.58.0",
+ "witx",
 ]
 
 [[package]]
@@ -2350,12 +2333,6 @@ name = "wasm-bindgen-shared"
 version = "0.2.62"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a91c2916119c17a8e316507afaaa2dd94b47646048014bbdf6bef098c1bb58ad"
-
-[[package]]
-name = "wasmparser"
-version = "0.52.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "733954023c0b39602439e60a65126fd31b003196d3a1e8e4531b055165a79b31"
 
 [[package]]
 name = "wasmparser"

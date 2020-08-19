@@ -15,7 +15,6 @@ change to the following crates requires a semver major version bump:
 - `lucetc`
 - `lucet-objdump`
 - `lucet-runtime`
-- `lucet-validate`
 - `lucet-wasi`
 - `lucet-wasi-sdk`
 
@@ -94,18 +93,6 @@ to muddle through more manually.
    need to replace this version with the appropriate version according to the guidelines above,
    likely through a PR.
 
-1. Edit `lucet-validate/Cargo.toml` and make the following change (note the leading `#`):
-
-   ```diff
-    [dev-dependencies]
-   -lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.5.2" }
-   +#lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "=0.5.2" }
-    tempfile = "3.0"
-   ```
-
-   This breaks the only cycle that exists among the crates as of `0.5.1`; if other cycles develop,
-   you'll need to similarly break them by temporarily removing the dev dependency.
-
 1. Begin publishing the crates in a topological order by `cd`ing to the each crate and running
    `cargo publish --allow-dirty` (the tree should only be dirty due to the cycles broken
    above). While we would like to run `cargo publish --dry-run` beforehand to ensure all
@@ -117,7 +104,6 @@ to muddle through more manually.
    worked for the `0.5.1` release was:
 
    1. `lucet-module`
-   1. `lucet-validate`
    1. `lucetc`
    1. `lucet-wasi-sdk`
    1. `lucet-objdump`

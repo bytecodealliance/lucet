@@ -2,9 +2,8 @@
 mod lucetc_tests {
     use anyhow::Error;
     use lucet_module::bindings::Bindings;
-    use lucet_validate::Validator;
     use lucet_wasi_sdk::*;
-    use lucetc::Compiler;
+    use lucetc::{Compiler, Validator, WasiMode};
     use std::collections::HashMap;
     use std::fs::File;
     use std::io::Read;
@@ -42,7 +41,7 @@ mod lucetc_tests {
     fn empty() {
         let m = module_from_c(&["empty"], &[]).expect("build module for empty");
         let b = Bindings::empty();
-        let v = Validator::parse("").expect("empty validation environment");
+        let v = Validator::builder().build();
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile empty");
         let mdata = c.module_data().unwrap();
@@ -76,7 +75,7 @@ mod lucetc_tests {
     fn just_c() {
         let m = module_from_c(&["c"], &["c"]).expect("build module for c");
         let b = Bindings::empty();
-        let v = Validator::parse("").expect("empty validation environment");
+        let v = Validator::builder().build();
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile c");
         let mdata = c.module_data().unwrap();
@@ -94,10 +93,12 @@ mod lucetc_tests {
     fn just_d() {
         let m = module_from_c(&["d"], &["d"]).expect("build module for d");
         let b = d_only_test_bindings();
-        let v = Validator::parse(
-            "(module $env (@interface func (export \"c\") (param $a1 s32) (result $r1 s32)))",
-        )
-        .expect("empty validation environment");
+        let v = Validator::builder()
+            .parse_witx(
+                "(module $env (@interface func (export \"c\") (param $a1 s32) (result $r1 s32)))",
+            )
+            .expect("parse witx")
+            .build();
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile d");
         let mdata = c.module_data().unwrap();
@@ -114,7 +115,7 @@ mod lucetc_tests {
     fn c_and_d() {
         let m = module_from_c(&["c", "d"], &["c", "d"]).expect("build module for c & d");
         let b = Bindings::empty();
-        let v = Validator::parse("").expect("empty validation environment");
+        let v = Validator::builder().build();
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile c & d");
         let mdata = c.module_data().unwrap();
@@ -151,7 +152,10 @@ mod lucetc_tests {
         };
 
         let b = lucet_wasi::bindings();
-        let v = Validator::new(lucet_wasi::witx_document(), true);
+        let v = Validator::builder()
+            .witx(lucet_wasi::witx_document())
+            .wasi_mode(Some(WasiMode::Command))
+            .build();
         // Compiler will only unwrap if the Validator defined above accepts the module
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile empty");
