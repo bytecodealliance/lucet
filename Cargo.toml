@@ -10,7 +10,6 @@ members = [
   "lucet-runtime/lucet-runtime-macros",
   "lucet-runtime/lucet-runtime-tests",
   "lucet-spectest",
-  "lucet-validate",
   "lucet-wasi",
   "lucet-wasi/generate",
   "lucet-wasi-fuzz",

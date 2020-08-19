@@ -56,7 +56,7 @@ mod module_data {
             &b,
             h,
             false,
-            &None,
+            None,
             false,
         )
         .expect("compiling exported_import");
@@ -475,8 +475,7 @@ mod compile {
 
 mod validate {
     use super::load_wat_module;
-    use lucet_validate::Validator;
-    use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel};
+    use lucetc::{Compiler, CpuFeatures, HeapSettings, OptLevel, Validator, WasiMode};
     use target_lexicon::Triple;
 
     #[test]
@@ -485,9 +484,10 @@ mod validate {
         let b = super::test_bindings();
 
         // Empty witx: arith module has no imports
-        let v = Validator::parse("")
+        let v = Validator::builder()
+            .parse_witx("")
             .expect("empty witx validates")
-            .with_wasi_exe(false);
+            .build();
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
@@ -502,9 +502,10 @@ mod validate {
             (module $env
               (@interface func (export \"inc\")
                 (result $r s32)))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
@@ -522,9 +523,10 @@ mod validate {
                 (param $a1 u32)
                 (param $a2 u32)
                 (result $r s32)))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
@@ -540,9 +542,10 @@ mod validate {
             (module $env
               (@interface func (export \"imported_main\"))
               (@interface func (export \"inc\")))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
@@ -559,9 +562,10 @@ mod validate {
             (module $env
               (@interface func (export \"imported_main\"))
               (@interface func (export \"inc\")))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let c = Compiler::new(
             &m,
@@ -571,7 +575,7 @@ mod validate {
             &b,
             h,
             false,
-            &Some(v),
+            Some(v),
             false,
         )
         .expect("compile");
@@ -589,27 +593,129 @@ mod validate {
               (@interface func (export \"imp_1\") (result $r u32))
               (@interface func (export \"imp_2\") (result $r u32))
               (@interface func (export \"imp_3\") (result $r u32)))";
-        let v = Validator::parse(witx)
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(false);
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
     }
 
+    use lucetc::{Error, ValidationError};
+
     #[test]
-    fn validate_wasi_exe() {
-        let m = load_wat_module("wasi_exe");
+    fn report_multiple_import_errors() {
+        let m = load_wat_module("import_many");
         let b = super::test_bindings();
 
-        let witx = "";
-        let v = Validator::parse(witx)
+        let witx = "
+            (module $env
+              (@interface func (export \"imp_0\") (result $r u32))
+              (@interface func (export \"imp_1\") (result $r u32)))";
+        let v = Validator::builder()
+            .parse_witx(witx)
             .expect("witx validates")
-            .with_wasi_exe(true);
+            .build();
+
+        let builder = Compiler::builder().with_validator(Some(v));
+        let compiler = builder.create(&m, &b);
+        assert!(compiler.is_err(), "should throw missing import errors");
+        match compiler.err().unwrap() {
+            Error::LucetValidation(es) => assert_eq!(
+                es,
+                vec![
+                    ValidationError::ImportNotFound {
+                        module: "env".to_owned(),
+                        field: "imp_2".to_owned()
+                    },
+                    ValidationError::ImportNotFound {
+                        module: "env".to_owned(),
+                        field: "imp_3".to_owned()
+                    }
+                ]
+            ),
+            _ => panic!("should give us a LucetValidation error"),
+        }
+    }
+
+    use lucet_module::bindings::Bindings;
+    use std::collections::HashMap;
+    /// Intentionally incomplete - just enough to get wasi_command.wat to validate.
+    fn stub_wasi_bindings() -> Bindings {
+        let mod_ = [("args_get".into(), "wasi_args_get".into())]
+            .iter()
+            .cloned()
+            .collect::<HashMap<String, String>>();
+        let bs = [("wasi_snapshot_preview1".into(), mod_)]
+            .iter()
+            .cloned()
+            .collect::<HashMap<String, HashMap<String, String>>>();
+
+        Bindings::new(bs)
+    }
+
+    #[test]
+    fn validate_wasi_command() {
+        let m = load_wat_module("wasi_command");
+        let b = stub_wasi_bindings();
+
+        let witx = "
+(typename $errno (enum u8 $inval))
+(module $wasi_snapshot_preview1
+  (import \"memory\" (memory))
+  ;;; Read command-line argument data.
+  ;;; The size of the array should match that returned by `args_sizes_get`
+  (@interface func (export \"args_get\")
+    (param $argv (@witx pointer (@witx pointer u8)))
+    (param $argv_buf (@witx pointer u8))
+    (result $error $errno)
+  )
+)";
+        let v = Validator::builder()
+            .parse_witx(witx)
+            .expect("witx validates")
+            .wasi_mode(Some(WasiMode::Command))
+            .build();
 
         let builder = Compiler::builder().with_validator(Some(v));
         let c = builder.create(&m, &b).expect("compile");
         let _obj = c.object_file().expect("codegen");
+    }
+    #[test]
+    fn report_errors_wasi_command() {
+        let m = load_wat_module("wasi_command_missing_start");
+        let b = super::test_bindings();
+
+        let witx = "";
+        let v = Validator::builder()
+            .parse_witx(witx)
+            .expect("witx validates")
+            .wasi_mode(Some(WasiMode::Command))
+            .build();
+
+        let builder = Compiler::builder().with_validator(Some(v));
+        let compiler = builder.create(&m, &b);
+        assert!(compiler.is_err(), "should throw missing import errors");
+        match compiler.err().unwrap() {
+            Error::LucetValidation(es) => assert_eq!(
+                es,
+                vec![
+                    ValidationError::ImportNotFound {
+                        module: "wasi_snapshot_preview1".to_owned(),
+                        field: "args_get".to_owned()
+                    },
+                    ValidationError::MissingRequiredExport {
+                        field: "_start".to_owned(),
+                        type_: wasmparser::FuncType {
+                            params: vec![].into_boxed_slice(),
+                            returns: vec![].into_boxed_slice()
+                        }
+                    }
+                ]
+            ),
+            _ => panic!("should get LucetValidation error"),
+        }
     }
 }

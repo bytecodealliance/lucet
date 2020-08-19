@@ -1,4 +1,5 @@
 use crate::types::SignatureError;
+use crate::validate::Error as ValidationError;
 use cranelift_module::ModuleError as ClifModuleError;
 use cranelift_wasm::WasmError as ClifWasmError;
 use lucet_module::error::Error as LucetModuleError;
@@ -14,8 +15,8 @@ pub enum Error {
     ClifWasmError(#[from] ClifWasmError),
     #[error("Lucet Module: {0}")]
     LucetModule(#[from] LucetModuleError),
-    #[error("Lucet validation: {0}")]
-    LucetValidation(#[from] lucet_validate::Error),
+    #[error("Lucet validation errors: {0:?}")]
+    LucetValidation(Vec<ValidationError>),
     #[error("I/O: {0}")]
     IOError(#[from] std::io::Error),
     #[error("Converting to Wasm signature: {0}")]

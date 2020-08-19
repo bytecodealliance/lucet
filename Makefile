@@ -102,11 +102,6 @@ indent:
 indent-check:
 	helpers/indent.sh check
 
-.PHONY: package
-package:
-	cargo deb -p lucet-validate
-	cargo deb -p lucetc
-
 .PHONY: watch
 watch:
 	cargo watch --exec "test --all --exclude $(CRATES_NOT_TESTED)"

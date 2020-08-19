@@ -231,7 +231,7 @@ impl<'a> ModuleDecls<'a> {
         let funcid = clif_module.declare_function(
             &decl_sym,
             decl_linkage,
-            self.info.signature_for_function(func_ix),
+            &self.info.signature_for_function(func_ix).0,
         )?;
 
         if func_ix.as_u32() as usize >= self.function_names.len() {
@@ -426,7 +426,7 @@ impl<'a> ModuleDecls<'a> {
         let func_id = *self.runtime_names.get(&runtime_func).unwrap();
         let name = self.function_names.get(func_id).unwrap();
         Ok(RuntimeDecl {
-            signature: self.info.signature_for_function(func_id),
+            signature: &self.info.signature_for_function(func_id).0,
             name: name.clone(),
         })
     }
