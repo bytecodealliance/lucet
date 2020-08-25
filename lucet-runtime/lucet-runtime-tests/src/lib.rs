@@ -1,3 +1,4 @@
+pub mod async_hostcall;
 pub mod build;
 pub mod entrypoint;
 pub mod globals;

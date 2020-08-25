@@ -324,6 +324,10 @@ pub mod lucet_result {
                                 // land is thin
                                 provided: Box::into_raw(Box::new(p)) as *mut _,
                             },
+                            TerminationDetails::BlockOnNeedsAsync => lucet_terminated {
+                                reason: lucet_terminated_reason::BlockOnNeedsAsync,
+                                provided: std::ptr::null_mut(),
+                            },
                         },
                     },
                 },
@@ -379,6 +383,7 @@ pub mod lucet_result {
         Provided,
         Remote,
         OtherPanic,
+        BlockOnNeedsAsync,
     }
 
     #[repr(C)]

@@ -216,7 +216,7 @@ pub struct Instance {
     pub(crate) embed_ctx: CtxMap,
 
     /// The program (WebAssembly module) that is the entrypoint for the instance.
-    module: Arc<dyn Module>,
+    pub(crate) module: Arc<dyn Module>,
 
     /// The `Context` in which the guest program runs
     pub(crate) ctx: Context,
@@ -374,6 +374,14 @@ impl RunResult {
         self.yielded_ref().is_ok()
     }
 
+    /// Returns `true` if the instance has yielded a value of the given type.
+    pub fn has_yielded<A: Any>(&self) -> bool {
+        match self {
+            RunResult::Yielded(yv) => yv.is::<A>(),
+            _ => false,
+        }
+    }
+
     /// Unwraps a run result into a yielded value.
     ///
     /// # Panics
@@ -467,7 +475,7 @@ impl Instance {
     /// in the future.
     pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<RunResult, Error> {
         let func = self.module.get_export_func(entrypoint)?;
-        self.run_func(func, &args)
+        self.run_func(func, &args, false)
     }
 
     /// Run a function with arguments in the guest context from the [WebAssembly function
@@ -483,7 +491,7 @@ impl Instance {
         args: &[Val],
     ) -> Result<RunResult, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
-        self.run_func(func, &args)
+        self.run_func(func, &args, false)
     }
 
     /// Resume execution of an instance that has yielded without providing a value to the guest.
@@ -515,6 +523,14 @@ impl Instance {
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
+        self.resume_with_val_impl(val, false)
+    }
+
+    pub(crate) fn resume_with_val_impl<A: Any + 'static>(
+        &mut self,
+        val: A,
+        async_context: bool,
+    ) -> Result<RunResult, Error> {
         match &self.state {
             State::Yielded { expecting, .. } => {
                 // make sure the resumed value is of the right type
@@ -529,7 +545,7 @@ impl Instance {
 
         self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static>);
 
-        self.swap_and_return()
+        self.swap_and_return(async_context)
     }
 
     /// Run the module's [start function][start], if one exists.
@@ -567,7 +583,7 @@ impl Instance {
             if !self.is_not_started() {
                 return Err(Error::StartAlreadyRun);
             }
-            let res = self.run_func(start, &[])?;
+            let res = self.run_func(start, &[], false)?;
             if res.is_yielded() {
                 return Err(Error::StartYielded);
             }
@@ -951,7 +967,12 @@ impl Instance {
     }
 
     /// Run a function in guest context at the given entrypoint.
-    fn run_func(&mut self, func: FunctionHandle, args: &[Val]) -> Result<RunResult, Error> {
+    pub(crate) fn run_func(
+        &mut self,
+        func: FunctionHandle,
+        args: &[Val],
+        async_context: bool,
+    ) -> Result<RunResult, Error> {
         let needs_start = self.state.is_not_started() && !func.is_start_func;
         if needs_start {
             return Err(Error::InstanceNeedsStart);
@@ -1006,7 +1027,7 @@ impl Instance {
         )?;
 
         self.install_activator();
-        self.swap_and_return()
+        self.swap_and_return(async_context)
     }
 
     /// Prepare the guest so that it will update its execution domain upon entry.
@@ -1048,7 +1069,7 @@ impl Instance {
     /// This must only be called for an instance in a ready, non-fatally faulted, or yielded state,
     /// or in the not-started state on the start function. The public wrappers around this function
     /// should make sure the state is appropriate.
-    fn swap_and_return(&mut self) -> Result<RunResult, Error> {
+    fn swap_and_return(&mut self, async_context: bool) -> Result<RunResult, Error> {
         let is_start_func = self
             .entrypoint
             .expect("we always have an entrypoint by now")
@@ -1059,7 +1080,7 @@ impl Instance {
                 || (self.state.is_faulted() && !self.state.is_fatal())
                 || self.state.is_yielded()
         );
-        self.state = State::Running;
+        self.state = State::Running { async_context };
 
         let res = self.with_current_instance(|i| {
             i.with_signals_on(|i| {
@@ -1088,7 +1109,7 @@ impl Instance {
             // As of 2020-03-20, the only early return points in the code above happen before the
             // guest would be able to run, so this should always transition from running to
             // ready or not started if there's an error.
-            if let State::Running = self.state {
+            if let State::Running { .. } = self.state {
                 if is_start_func {
                     self.state = State::NotStarted;
                 } else {
@@ -1124,7 +1145,7 @@ impl Instance {
         }
 
         match st {
-            State::Running => {
+            State::Running { .. } => {
                 let retval = self.ctx.get_untyped_retval();
                 self.state = State::Ready;
                 Ok(RunResult::Returned(retval))
@@ -1303,6 +1324,9 @@ pub enum TerminationDetails {
     /// [Rust](https://github.com/rust-lang/rfcs/pull/2945) and
     /// [Lucet](https://github.com/bytecodealliance/lucet/pull/254).
     OtherPanic(Box<dyn Any + Send + 'static>),
+    /// The instance was terminated by `Vmctx::block_on` being called from an instance
+    /// that isnt running in an async context
+    BlockOnNeedsAsync,
 }
 
 impl TerminationDetails {
@@ -1337,6 +1361,7 @@ impl PartialEq for TerminationDetails {
             (Signal, Signal) => true,
             (BorrowError(msg1), BorrowError(msg2)) => msg1 == msg2,
             (CtxNotFound, CtxNotFound) => true,
+            (BlockOnNeedsAsync, BlockOnNeedsAsync) => true,
             // can't compare `Any`
             _ => false,
         }
@@ -1354,6 +1379,7 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
             TerminationDetails::Remote => write!(f, "Remote"),
             TerminationDetails::OtherPanic(_) => write!(f, "OtherPanic(Any)"),
+            TerminationDetails::BlockOnNeedsAsync => write!(f, "BlockOnNeedsAsync"),
         }
     }
 }
@@ -1382,9 +1408,14 @@ impl YieldedVal {
         YieldedVal { val: Box::new(val) }
     }
 
+    /// Returns `true` if the guest yielded the parameterized type.
+    pub fn is<A: Any>(&self) -> bool {
+        self.val.is::<A>()
+    }
+
     /// Returns `true` if the guest yielded without a value.
     pub fn is_none(&self) -> bool {
-        self.val.is::<EmptyYieldVal>()
+        self.is::<EmptyYieldVal>()
     }
 
     /// Returns `true` if the guest yielded with a value.

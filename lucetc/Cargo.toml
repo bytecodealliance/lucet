@@ -33,7 +33,7 @@ log = "0.4"
 env_logger = "0.6"
 object = { version = "0.20.0", default-features = false, features = ["write"] }
 byteorder = "1.2"
-wabt = "0.9.2"
+wabt = "0.9.1"
 tempfile = "3.0"
 bimap = "0.2"
 human-size = "0.4"
