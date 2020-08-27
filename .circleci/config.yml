@@ -164,7 +164,7 @@ commands:
           name: "Install Rust"
           command: |
             set -x
-            curl https://sh.rustup.rs | sh -s -- --default-toolchain 1.45.2 -y
+            curl https://sh.rustup.rs | sh -s -- --default-toolchain 1.46.0 -y
             source $HOME/.cargo/env
             rustup component add rustfmt
             rustup target add wasm32-wasi
