@@ -12,7 +12,7 @@ jobs:
 
     - name: Install Rust (macos)
       run: |
-        curl https://sh.rustup.rs | sh -s -- --default-toolchain 1.45.2 -y
+        curl https://sh.rustup.rs | sh -s -- --default-toolchain 1.46.0 -y
         rustup update
         echo "##[add-path]$HOME/.cargo/bin"
 
