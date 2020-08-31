@@ -3,7 +3,7 @@ use std::path::Path;
 use thiserror::Error;
 use witx::Id;
 
-pub use wasmparser::FuncType;
+pub use cranelift_wasm::{WasmFuncType, WasmType};
 pub use witx::{AtomType, Document, WitxError};
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -16,17 +16,17 @@ pub enum Error {
     ImportTypeError {
         module: String,
         field: String,
-        expected: FuncType,
-        got: FuncType,
+        expected: WasmFuncType,
+        got: WasmFuncType,
     },
     #[error("Export type error: for {field}, expected {expected:?}, got {got:?}")]
     ExportTypeError {
         field: String,
-        expected: FuncType,
-        got: FuncType,
+        expected: WasmFuncType,
+        got: WasmFuncType,
     },
     #[error("Missing required export function: {field} with type {type_:?}")]
-    MissingRequiredExport { field: String, type_: FuncType },
+    MissingRequiredExport { field: String, type_: WasmFuncType },
 }
 
 #[derive(Debug, Clone)]
@@ -85,7 +85,7 @@ impl ValidatorBuilder {
     }
 
     pub fn build(self) -> Validator {
-        let no_params_no_returns = FuncType {
+        let no_params_no_returns = WasmFuncType {
             params: vec![].into_boxed_slice(),
             returns: vec![].into_boxed_slice(),
         };
@@ -116,7 +116,7 @@ enum ExportRequired {
 struct ExportSpec {
     name: String,
     required: ExportRequired,
-    type_: FuncType,
+    type_: WasmFuncType,
     result: Option<Result<(), Error>>,
 }
 
@@ -147,7 +147,7 @@ impl Validator {
 
     fn new(
         witx: Vec<Document>,
-        exports: impl Iterator<Item = (String, ExportRequired, FuncType)>,
+        exports: impl Iterator<Item = (String, ExportRequired, WasmFuncType)>,
     ) -> Self {
         let exports = exports
             .map(|(name, required, type_)| {
@@ -174,7 +174,7 @@ impl Validator {
         &self.witx
     }
 
-    pub fn register_import(&mut self, module: &str, field: &str, type_: &FuncType) {
+    pub fn register_import(&mut self, module: &str, field: &str, type_: &WasmFuncType) {
         let inner = || {
             let not_found = Error::ImportNotFound {
                 module: module.to_owned(),
@@ -205,7 +205,7 @@ impl Validator {
         }
     }
 
-    pub fn register_export(&mut self, name: &str, type_: &FuncType) {
+    pub fn register_export(&mut self, name: &str, type_: &WasmFuncType) {
         if let Some(mut e) = self.exports.get_mut(name) {
             if &e.type_ != type_ {
                 e.result = Some(Err(Error::ExportTypeError {
@@ -235,13 +235,13 @@ impl Validator {
     }
 }
 
-fn witx_to_functype(coretype: &witx::CoreFuncType) -> FuncType {
-    fn atom_to_type(atom: &witx::AtomType) -> wasmparser::Type {
+fn witx_to_functype(coretype: &witx::CoreFuncType) -> WasmFuncType {
+    fn atom_to_type(atom: &witx::AtomType) -> WasmType {
         match atom {
-            witx::AtomType::I32 => wasmparser::Type::I32,
-            witx::AtomType::I64 => wasmparser::Type::I64,
-            witx::AtomType::F32 => wasmparser::Type::F32,
-            witx::AtomType::F64 => wasmparser::Type::F64,
+            witx::AtomType::I32 => WasmType::I32,
+            witx::AtomType::I64 => WasmType::I64,
+            witx::AtomType::F32 => WasmType::F32,
+            witx::AtomType::F64 => WasmType::F64,
         }
     }
     let params = coretype
@@ -255,5 +255,5 @@ fn witx_to_functype(coretype: &witx::CoreFuncType) -> FuncType {
     } else {
         vec![].into_boxed_slice()
     };
-    FuncType { params, returns }
+    WasmFuncType { params, returns }
 }

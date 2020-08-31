@@ -1,7 +1,7 @@
+use cranelift_wasm::{WasmFuncType, WasmType};
 use lucet_module::{Signature, ValueType};
 use std::fmt::{self, Display};
 use thiserror::Error;
-use wasmparser::FuncType;
 
 #[derive(Debug)]
 pub enum ValueError {
@@ -9,19 +9,19 @@ pub enum ValueError {
     InvalidVMContext,
 }
 
-fn to_lucet_valuetype(ty: &wasmparser::Type) -> Result<ValueType, ValueError> {
+fn to_lucet_valuetype(ty: &WasmType) -> Result<ValueType, ValueError> {
     match ty {
-        wasmparser::Type::I32 => Ok(ValueType::I32),
-        wasmparser::Type::I64 => Ok(ValueType::I64),
-        wasmparser::Type::F32 => Ok(ValueType::F32),
-        wasmparser::Type::F64 => Ok(ValueType::F64),
+        WasmType::I32 => Ok(ValueType::I32),
+        WasmType::I64 => Ok(ValueType::I64),
+        WasmType::F32 => Ok(ValueType::F32),
+        WasmType::F64 => Ok(ValueType::F64),
         _ => Err(ValueError::Unrepresentable),
     }
 }
 
 #[derive(Debug, Error)]
 pub enum SignatureError {
-    Type(wasmparser::Type, ValueError),
+    Type(WasmType, ValueError),
     Multivalue,
 }
 
@@ -31,7 +31,7 @@ impl Display for SignatureError {
     }
 }
 
-pub fn to_lucet_signature(func_type: &FuncType) -> Result<Signature, SignatureError> {
+pub fn to_lucet_signature(func_type: &WasmFuncType) -> Result<Signature, SignatureError> {
     let params = func_type
         .params
         .iter()

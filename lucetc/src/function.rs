@@ -736,4 +736,26 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         }
         Ok(())
     }
+
+    fn translate_atomic_wait(
+        &mut self,
+        _: FuncCursor,
+        _: MemoryIndex,
+        _: ir::Heap,
+        _: ir::Value,
+        _: ir::Value,
+        _: ir::Value,
+    ) -> WasmResult<ir::Value> {
+        unimplemented!("translate atomic wait");
+    }
+    fn translate_atomic_notify(
+        &mut self,
+        _: FuncCursor,
+        _: MemoryIndex,
+        _: ir::Heap,
+        _: ir::Value,
+        _: ir::Value,
+    ) -> WasmResult<ir::Value> {
+        unimplemented!("translate atomic verify");
+    }
 }

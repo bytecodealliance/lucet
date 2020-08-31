@@ -12,7 +12,7 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
 use cranelift_wasm::{
     Global, GlobalIndex, GlobalInit, MemoryIndex, SignatureIndex, Table, TableIndex,
-    TargetEnvironment,
+    TargetEnvironment, WasmFuncType,
 };
 use lucet_module::bindings::Bindings;
 use lucet_module::ModuleFeatures;
@@ -22,7 +22,6 @@ use lucet_module::{
     ModuleData, Signature as LucetSignature, UniqueSignatureIndex,
 };
 use std::collections::HashMap;
-use wasmparser::FuncType;
 
 #[derive(Debug)]
 pub struct FunctionDecl<'a> {
@@ -202,7 +201,7 @@ impl<'a> ModuleDecls<'a> {
         clif_module: &mut ClifModule<B>,
         decl_sym: String,
         decl_linkage: Linkage,
-        wasm_func_type: &FuncType,
+        wasm_func_type: WasmFuncType,
         signature: ir::Signature,
     ) -> Result<UniqueFuncIndex, Error> {
         let (new_funcidx, _) = self.info.declare_func_with_sig(wasm_func_type, signature)?;
@@ -279,7 +278,7 @@ impl<'a> ModuleDecls<'a> {
                 clif_module,
                 functype.name.clone(),
                 Linkage::Import,
-                &functype.wasm_func_type,
+                functype.wasm_func_type.clone(),
                 functype.signature.clone(),
             )?;
 

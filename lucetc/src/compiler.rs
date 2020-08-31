@@ -208,7 +208,7 @@ impl<'a> Compiler<'a> {
         let frontend_config = isa.frontend_config();
         let mut module_info = ModuleInfo::new(frontend_config.clone(), validator);
 
-        wasmparser::validate(wasm_binary, None).map_err(Error::WasmValidation)?;
+        wasmparser::validate(wasm_binary).map_err(Error::WasmValidation)?;
 
         let module_translation_state =
             translate_module(wasm_binary, &mut module_info).map_err(|e| match e {

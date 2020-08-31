@@ -13,6 +13,7 @@ pub enum TrapCode {
     Interrupt,
     TableOutOfBounds,
     Unreachable,
+    HeapMisaligned,
 }
 
 /// Trap information for an address in a compiled function

@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{types, AbiParam, Signature};
 use cranelift_codegen::isa::TargetFrontendConfig;
+use cranelift_wasm::{WasmFuncType, WasmType};
 use std::collections::HashMap;
-use wasmparser::FuncType;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
 pub enum RuntimeFunc {
@@ -12,7 +12,7 @@ pub enum RuntimeFunc {
 pub struct RuntimeFuncType {
     pub name: String,
     pub signature: Signature,
-    pub wasm_func_type: FuncType,
+    pub wasm_func_type: WasmFuncType,
 }
 
 pub struct Runtime {
@@ -31,9 +31,9 @@ impl Runtime {
                     returns: vec![AbiParam::new(types::I32)],
                     call_conv: target.default_call_conv,
                 },
-                wasm_func_type: FuncType {
+                wasm_func_type: WasmFuncType {
                     params: vec![].into_boxed_slice(),
-                    returns: vec![wasmparser::Type::I32].into_boxed_slice(),
+                    returns: vec![WasmType::I32].into_boxed_slice(),
                 },
             },
         );
@@ -48,9 +48,9 @@ impl Runtime {
                     returns: vec![AbiParam::new(types::I32)],
                     call_conv: target.default_call_conv,
                 },
-                wasm_func_type: FuncType {
-                    params: vec![wasmparser::Type::I32].into_boxed_slice(),
-                    returns: vec![wasmparser::Type::I32].into_boxed_slice(),
+                wasm_func_type: WasmFuncType {
+                    params: vec![WasmType::I32].into_boxed_slice(),
+                    returns: vec![WasmType::I32].into_boxed_slice(),
                 },
             },
         );

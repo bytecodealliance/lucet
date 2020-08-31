@@ -5,10 +5,7 @@ use syn::parse_macro_input;
 
 #[proc_macro]
 pub fn from_witx(args: TokenStream) -> TokenStream {
-    let mut config = parse_macro_input!(args as lucet_wiggle_generate::Config);
-    config.wiggle.witx.make_paths_relative_to(
-        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANFIEST_DIR env var"),
-    );
+    let config = parse_macro_input!(args as lucet_wiggle_generate::Config);
 
     let doc = config.wiggle.load_document();
 
