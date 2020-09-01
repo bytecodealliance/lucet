@@ -49,7 +49,7 @@ pub struct TestCtx {
 // `constructor`: Show how to construct a ctx struct.
 // `vmctx` is in scope at use sites.
 lucet_wiggle::from_witx!({
-    witx: ["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx"],
+    witx: ["$CARGO_MANIFEST_DIR/../wasmtime/crates/wasi-common/WASI/phases/snapshot/witx/wasi_snapshot_preview1.witx"],
     ctx: LucetWasiCtx,
     constructor: { LucetWasiCtx::build(vmctx) },
 });
