@@ -23,6 +23,7 @@ pub(crate) fn translate_trapcode(code: ir::TrapCode) -> lucet_module::TrapCode {
         ir::TrapCode::Interrupt => lucet_module::TrapCode::Interrupt,
         ir::TrapCode::TableOutOfBounds => lucet_module::TrapCode::TableOutOfBounds,
         ir::TrapCode::UnreachableCodeReached => lucet_module::TrapCode::Unreachable,
+        ir::TrapCode::HeapMisaligned => lucet_module::TrapCode::HeapMisaligned,
         ir::TrapCode::User(_) => panic!("we should never emit a user trapcode"),
     }
 }

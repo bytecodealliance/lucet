@@ -65,6 +65,7 @@ enum lucet_trapcode {
     lucet_trapcode_interrupt,
     lucet_trapcode_table_out_of_bounds,
     lucet_trapcode_user,
+    lucet_trapcode_heap_misaligned,
     lucet_trapcode_unknown,
 };
 

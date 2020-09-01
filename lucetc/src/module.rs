@@ -8,11 +8,10 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
     DataIndex, ElemIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment,
     ModuleTranslationState, SignatureIndex, Table, TableElementType, TableIndex, TargetEnvironment,
-    WasmResult,
+    WasmFuncType, WasmResult, WasmType,
 };
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
-use wasmparser::FuncType;
 
 /// UniqueFuncIndex names a function after merging duplicate function declarations to a single
 /// identifier, whereas FuncIndex is maintained by Cranelift and may have multiple indices referring
@@ -62,7 +61,7 @@ pub struct ModuleInfo<'a> {
     /// declared.
     pub signature_mapping: PrimaryMap<SignatureIndex, UniqueSignatureIndex>,
     /// Provided by `declare_signature`
-    pub signatures: PrimaryMap<UniqueSignatureIndex, (ir::Signature, FuncType)>,
+    pub signatures: PrimaryMap<UniqueSignatureIndex, (ir::Signature, WasmFuncType)>,
     /// Provided by `declare_func_import`
     pub imported_funcs: PrimaryMap<UniqueFuncIndex, (&'a str, &'a str)>,
     /// Provided by `declare_global_import`
@@ -124,17 +123,14 @@ impl<'a> ModuleInfo<'a> {
     pub fn signature_for_function(
         &self,
         func_index: UniqueFuncIndex,
-    ) -> &(ir::Signature, FuncType) {
+    ) -> &(ir::Signature, WasmFuncType) {
         // UniqueFuncIndex are valid (or the caller has very bad data)
         let sigidx = self.functions.get(func_index).unwrap().entity;
 
         self.signature_by_id(sigidx)
     }
 
-    pub fn signature_by_id(
-        &self,
-        sig_idx: SignatureIndex,
-    ) -> &(ir::Signature, wasmparser::FuncType) {
+    pub fn signature_by_id(&self, sig_idx: SignatureIndex) -> &(ir::Signature, WasmFuncType) {
         // All signatures map to some unique signature index
         let unique_sig_idx = self.signature_mapping.get(sig_idx).unwrap();
         // Unique signature indices are valid (or we're in some deeply bad state)
@@ -143,7 +139,7 @@ impl<'a> ModuleInfo<'a> {
 
     pub fn declare_func_with_sig(
         &mut self,
-        wasm_func_type: &FuncType,
+        wasm_func_type: WasmFuncType,
         sig: ir::Signature,
     ) -> Result<(UniqueFuncIndex, SignatureIndex), Error> {
         let new_sigidx = SignatureIndex::from_u32(self.signature_mapping.len() as u32);
@@ -171,7 +167,7 @@ impl<'a> TargetEnvironment for ModuleInfo<'a> {
 impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
     fn declare_signature(
         &mut self,
-        wasm_func_type: &FuncType,
+        wasm_func_type: WasmFuncType,
         mut sig: ir::Signature,
     ) -> WasmResult<()> {
         sig.params.insert(
@@ -405,7 +401,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
                 if self.tables.is_empty() && table_index == TableIndex::new(0) {
                     let table = Table {
                         ty: TableElementType::Func,
-                        wasm_ty: wasmparser::Type::Func,
+                        wasm_ty: WasmType::FuncRef,
                         minimum: 0,
                         maximum: None,
                     };
@@ -440,13 +436,12 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
         Ok(())
     }
 
-    fn declare_func_name(&mut self, func_index: FuncIndex, name: &'a str) -> WasmResult<()> {
+    fn declare_func_name(&mut self, func_index: FuncIndex, name: &'a str) {
         let unique_func_index = *self
             .function_mapping
             .get(func_index)
             .expect("function indices are valid");
         self.function_names[unique_func_index] = name;
-        Ok(())
     }
 
     fn declare_passive_element(

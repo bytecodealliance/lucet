@@ -708,7 +708,7 @@ mod validate {
                     },
                     ValidationError::MissingRequiredExport {
                         field: "_start".to_owned(),
-                        type_: wasmparser::FuncType {
+                        type_: cranelift_wasm::WasmFuncType {
                             params: vec![].into_boxed_slice(),
                             returns: vec![].into_boxed_slice()
                         }

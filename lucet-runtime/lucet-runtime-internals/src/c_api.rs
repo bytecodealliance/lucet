@@ -414,6 +414,7 @@ pub mod lucet_result {
         Interrupt,
         TableOutOfBounds,
         Unreachable,
+        HeapMisaligned,
         Unknown,
     }
 
@@ -437,6 +438,7 @@ pub mod lucet_result {
                     TrapCode::Interrupt => lucet_trapcode::Interrupt,
                     TrapCode::TableOutOfBounds => lucet_trapcode::TableOutOfBounds,
                     TrapCode::Unreachable => lucet_trapcode::Unreachable,
+                    TrapCode::HeapMisaligned => lucet_trapcode::HeapMisaligned,
                 }
             } else {
                 lucet_trapcode::Unknown
