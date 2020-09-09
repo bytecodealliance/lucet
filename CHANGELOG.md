@@ -16,6 +16,8 @@
 
 - Added the field `hostcall_reservation` to `Limits` to specify an amount of stack space Lucet will ensure is available when making a hostcall. `hostcall_reservation` defaults to 32KiB. If there is less than the configured amount of stack space when making a hostcall, the instance will fault in the same way as any other guest-code stack overflow.
 
+- Added `terminate_on_heap_oom` as an option for instances. This causes instances to terminate with an OOM-specific termination value rather than returning `-1` when a `memory.grow` instruction fails.
+
 [start-function]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
 
 ### 0.6.1 (2020-02-18)

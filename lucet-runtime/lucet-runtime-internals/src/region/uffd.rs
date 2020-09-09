@@ -1,5 +1,5 @@
-use crate::alloc::{instance_heap_offset, AddrLocation, Alloc, AllocStrategy, Limits, Slot};
-use crate::embed_ctx::CtxMap;
+use super::NewInstanceArgs;
+use crate::alloc::{instance_heap_offset, AddrLocation, Alloc, Limits, Slot};
 use crate::error::Error;
 use crate::instance::{new_instance_handle, Instance, InstanceHandle, InstanceInternal};
 use crate::module::Module;
@@ -193,10 +193,14 @@ impl Region for UffdRegion {
 impl RegionInternal for UffdRegion {
     fn new_instance_with(
         &self,
-        module: Arc<dyn Module>,
-        embed_ctx: CtxMap,
-        heap_memory_size_limit: usize,
-        mut alloc_strategy: AllocStrategy,
+        NewInstanceArgs {
+            module,
+            embed_ctx,
+            heap_memory_size_limit,
+            mut alloc_strategy,
+            terminate_on_heap_oom,
+            ..
+        }: NewInstanceArgs,
     ) -> Result<InstanceHandle, Error> {
         let limits = self.get_limits();
         module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
@@ -257,7 +261,8 @@ impl RegionInternal for UffdRegion {
             region,
         };
 
-        let inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
+        let mut inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
+        inst.set_terminate_on_heap_oom(terminate_on_heap_oom);
 
         Ok(inst)
     }

@@ -230,7 +230,7 @@ macro_rules! entrypoint_tests {
                 use libc::c_void;
                 use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
                 use lucet_runtime::{
-                    lucet_hostcall, DlModule, Error, Limits, Module, Region, Val, WASM_PAGE_SIZE, RegionCreate
+                    lucet_hostcall, DlModule, Error, FaultDetails, Limits, Module, Region, TerminationDetails, TrapCode, Val, WASM_PAGE_SIZE, RegionCreate
                 };
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
@@ -791,6 +791,86 @@ macro_rules! entrypoint_tests {
                             );
                         }
                     }
+                }
+
+
+                #[test]
+                fn allocator_terminate_on_heap_oom() {
+                    use byteorder::{LittleEndian, ReadBytesExt};
+
+                    let limits = Limits {
+                        heap_memory_size: 4 * 64 * 1024, // 4 Wasm pages
+                        ..Limits::default()
+                    };
+
+                    let module =
+                        test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
+                    let region = <TestRegion as RegionCreate>::create(1, &limits).expect("region can be created");
+
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    // First, we need to get an unused location in linear memory for the pointer that will be passed
+                    // as an argument to create_and_memset.
+                    let new_page = inst.grow_memory(1).expect("grow_memory succeeds");
+                    assert!(new_page > 0);
+                    // wasm memory index for the start of the new page
+                    let loc_outval = new_page * WASM_PAGE_SIZE;
+
+                    // run once with normal behavior; the malloc should fail, causing the subsequent
+                    // non-null assertion to fail
+                    let res = inst.run(
+                        "create_and_memset",
+                        &[
+                            // int init_as
+                            TEST_REGION_INIT_VAL.into(),
+                            // size_t size
+                            (5 * 64 * 1024).into(),
+                            // char** ptr_outval
+                            Val::GuestPtr(loc_outval),
+                        ],
+                    );
+                    match res {
+                        // the assertion failure has an unreachable instruction that traps
+                        Err(Error::RuntimeFault(FaultDetails { trapcode: Some(TrapCode::Unreachable), .. })) => (),
+                        res => panic!("unexpected result: {:?}", res),
+                    }
+
+                    // now reset and run the same entrypoint, but terminate on `memory.grow` failure
+                    inst.reset().expect("can reset instance");
+                    inst.set_terminate_on_heap_oom(true);
+                    let res = inst.run(
+                        "create_and_memset",
+                        &[
+                            // int init_as
+                            TEST_REGION_INIT_VAL.into(),
+                            // size_t size
+                            (5 * 64 * 1024).into(),
+                            // char** ptr_outval
+                            Val::GuestPtr(loc_outval),
+                        ],
+                    );
+                    match res {
+                        // still an error, but one specifically about out-of-memory
+                        Err(Error::RuntimeTerminated(TerminationDetails::HeapOutOfMemory)) => (),
+                        res => panic!("unexpected result: {:?}", res),
+                    }
+
+                    // finally reset and run the same entrypoint, but with a size that won't fail
+                    inst.reset().expect("can reset instance again");
+                    inst.set_terminate_on_heap_oom(false);
+                    inst.run(
+                        "create_and_memset",
+                        &[
+                            // int init_as
+                            TEST_REGION_INIT_VAL.into(),
+                            // size_t size
+                            TEST_REGION_SIZE.into(),
+                            // char** ptr_outval
+                            Val::GuestPtr(loc_outval),
+                        ],
+                    ).expect("instance runs");
                 }
 
                 const TEST_REGION2_INIT_VAL: libc::c_int = 99;
