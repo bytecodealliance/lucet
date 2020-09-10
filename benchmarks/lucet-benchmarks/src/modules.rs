@@ -210,7 +210,7 @@ pub fn hostcalls_mock() -> Arc<dyn Module> {
     #[lucet_hostcall]
     #[inline(never)]
     #[no_mangle]
-    pub unsafe extern "C" fn hostcall_wrapped(
+    pub unsafe fn hostcall_wrapped(
         vmctx: &Vmctx,
         x1: u64,
         x2: u64,

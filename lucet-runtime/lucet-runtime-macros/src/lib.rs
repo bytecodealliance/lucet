@@ -1,6 +1,6 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
 /// This attribute generates a Lucet hostcall from a standalone Rust function that takes a `&mut
@@ -39,6 +39,12 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let mut hostcall = syn::parse_macro_input!(item as syn::ItemFn);
+    if let Some(abi) = &hostcall.sig.abi {
+        let err = quote_spanned! {abi.span()=>
+            compile_error!("Functions annotated with `#[lucet_hostcall]` may not have an `extern` ABI");
+        };
+        return err.into();
+    }
     let hostcall_ident = hostcall.sig.ident.clone();
 
     // use the same attributes and visibility as the impl hostcall
