@@ -51,13 +51,7 @@ pub trait Region: RegionInternal {
 
 /// A `RegionInternal` is a collection of `Slot`s which are managed as a whole.
 pub trait RegionInternal: Send + Sync {
-    fn new_instance_with(
-        &self,
-        module: Arc<dyn Module>,
-        embed_ctx: CtxMap,
-        heap_memory_size_limit: usize,
-        alloc_strategy: AllocStrategy,
-    ) -> Result<InstanceHandle, Error>;
+    fn new_instance_with(&self, args: NewInstanceArgs) -> Result<InstanceHandle, Error>;
 
     /// Unmaps the heap, stack, and globals of an `Alloc`, while retaining the virtual address
     /// ranges in its `Slot`.
@@ -91,20 +85,32 @@ pub trait RegionCreate: Region {
 /// [`Region::new_instance_builder()`](trait.Region.html#method.new_instance_builder).
 pub struct InstanceBuilder<'a> {
     region: &'a dyn RegionInternal,
-    module: Arc<dyn Module>,
-    embed_ctx: CtxMap,
-    heap_memory_size_limit: usize,
-    alloc_strategy: AllocStrategy,
+    args: NewInstanceArgs,
+}
+
+/// Arguments that a region needs to create a new `Instance`.
+///
+/// This type is primarily created by `InstanceBuilder`, but its definition is public to support
+/// out-of-crate implementations of `RegionInternal`.
+pub struct NewInstanceArgs {
+    pub module: Arc<dyn Module>,
+    pub embed_ctx: CtxMap,
+    pub heap_memory_size_limit: usize,
+    pub alloc_strategy: AllocStrategy,
+    pub terminate_on_heap_oom: bool,
 }
 
 impl<'a> InstanceBuilder<'a> {
     fn new(region: &'a dyn RegionInternal, module: Arc<dyn Module>) -> Self {
         InstanceBuilder {
             region,
-            module,
-            embed_ctx: CtxMap::default(),
-            heap_memory_size_limit: region.get_limits().heap_memory_size,
-            alloc_strategy: AllocStrategy::Linear,
+            args: NewInstanceArgs {
+                module,
+                embed_ctx: CtxMap::default(),
+                heap_memory_size_limit: region.get_limits().heap_memory_size,
+                alloc_strategy: AllocStrategy::Linear,
+                terminate_on_heap_oom: false,
+            },
         }
     }
 
@@ -115,7 +121,7 @@ impl<'a> InstanceBuilder<'a> {
     /// alloc.  If a different strategy is desired, choose from those
     /// available in `AllocStrategy`.
     pub fn with_alloc_strategy(mut self, alloc_strategy: AllocStrategy) -> Self {
-        self.alloc_strategy = alloc_strategy;
+        self.args.alloc_strategy = alloc_strategy;
         self
     }
 
@@ -124,7 +130,7 @@ impl<'a> InstanceBuilder<'a> {
     /// This call is optional. Attempts to build a new instance fail if the
     /// limit supplied by with_heap_size_limit() exceeds that of the region.
     pub fn with_heap_size_limit(mut self, heap_memory_size_limit: usize) -> Self {
-        self.heap_memory_size_limit = heap_memory_size_limit;
+        self.args.heap_memory_size_limit = heap_memory_size_limit;
         self
     }
 
@@ -133,17 +139,26 @@ impl<'a> InstanceBuilder<'a> {
     /// Up to one context value of any particular type may exist in the instance. If a context value
     /// of the same type already exists, it is replaced by the new value.
     pub fn with_embed_ctx<T: Any>(mut self, ctx: T) -> Self {
-        self.embed_ctx.insert(ctx);
+        self.args.embed_ctx.insert(ctx);
+        self
+    }
+
+    /// Whether to terminate the guest with `TerminationDetails::HeapOutOfMemory` when `memory.grow`
+    /// fails, rather than returning `-1`; disabled by default.
+    ///
+    /// This behavior deviates from the WebAssembly spec, but is useful in practice for determining
+    /// when guest programs fail due to an exhausted heap.
+    ///
+    /// Most languages will compile to code that includes an `unreachable` instruction if allocation
+    /// fails, but this same instruction might also appear when other types of assertions fail,
+    /// `panic!()` is called, etc. Terminating allows the error to be more directly identifiable.
+    pub fn with_terminate_on_heap_oom(mut self, terminate_on_heap_oom: bool) -> Self {
+        self.args.terminate_on_heap_oom = terminate_on_heap_oom;
         self
     }
 
     /// Build the instance.
     pub fn build(self) -> Result<InstanceHandle, Error> {
-        self.region.new_instance_with(
-            self.module,
-            self.embed_ctx,
-            self.heap_memory_size_limit,
-            self.alloc_strategy,
-        )
+        self.region.new_instance_with(self.args)
     }
 }

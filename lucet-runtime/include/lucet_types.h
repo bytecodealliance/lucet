@@ -51,6 +51,7 @@ enum lucet_terminated_reason {
     lucet_terminated_reason_provided,
     lucet_terminated_reason_remote,
     lucet_terminated_reason_block_on_needs_async,
+    lucet_terminated_reason_heap_out_of_memory,
     lucet_terminated_reason_other_panic,
 };
 
