@@ -301,7 +301,7 @@ impl Vmctx {
     ///
     /// #[lucet_hostcall]
     /// #[no_mangle]
-    /// pub unsafe extern "C" fn hostcall_call_binop(
+    /// pub unsafe fn hostcall_call_binop(
     ///     vmctx: &Vmctx,
     ///     binop_table_idx: u32,
     ///     binop_func_idx: u32,
