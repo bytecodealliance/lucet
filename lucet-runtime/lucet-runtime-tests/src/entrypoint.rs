@@ -203,7 +203,7 @@ macro_rules! entrypoint_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub unsafe extern "C" fn callback_hostcall(vmctx: &Vmctx, cb_idx: u32, x: u64) -> u64 {
+        pub unsafe fn callback_hostcall(vmctx: &Vmctx, cb_idx: u32, x: u64) -> u64 {
             let func = vmctx
                 .get_func_from_idx(0, cb_idx)
                 .expect("can get function by index");
@@ -215,7 +215,7 @@ macro_rules! entrypoint_tests {
 
         #[lucet_hostcall]
         #[no_mangle]
-        pub unsafe extern "C" fn add_4_hostcall(
+        pub unsafe fn add_4_hostcall(
             vmctx: &Vmctx,
             x: u64,
             y: u64,
