@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use tracing_subscriber;
 
 struct Config<'a> {
     lucet_module: &'a str,
@@ -37,6 +38,10 @@ fn parse_humansized(desc: &str) -> Result<u64, Error> {
 }
 
 fn main() {
+    tracing_subscriber::FmtSubscriber::builder()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+
     // No-ops, but makes sure the linker doesn't throw away parts
     // of the runtime:
     lucet_runtime::lucet_internal_ensure_linked();
