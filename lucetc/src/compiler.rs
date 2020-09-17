@@ -26,7 +26,11 @@ use cranelift_module::{
     Linkage as ClifLinkage, Module as ClifModule,
 };
 use cranelift_object::{ObjectBackend, ObjectBuilder};
-use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
+use cranelift_wasm::{
+    translate_module,
+    wasmparser::{FuncValidator, ValidatorResources},
+    FuncTranslator, ModuleTranslationState, WasmError,
+};
 use lucet_module::bindings::Bindings;
 use lucet_module::{
     InstanceRuntimeData, ModuleData, ModuleFeatures, SerializedModule, VersionInfo,
@@ -276,7 +280,7 @@ impl<'a> Compiler<'a> {
         let mut function_manifest_bytes = Cursor::new(Vec::new());
         let mut function_map: HashMap<FuncId, (u32, DataId, usize)> = HashMap::new();
 
-        for (ref func, (code, code_offset)) in self.decls.function_bodies() {
+        for (ref func, (validator, func_body)) in self.decls.function_bodies() {
             let mut func_info = FuncInfo::new(
                 &self.decls,
                 &mut self.trampolines,
@@ -288,10 +292,9 @@ impl<'a> Compiler<'a> {
             clif_context.func.signature = func.signature.clone();
 
             func_translator
-                .translate(
-                    &self.module_translation_state,
-                    code,
-                    *code_offset,
+                .translate_body(
+                    &mut validator,
+                    func_body.clone(),
                     &mut clif_context.func,
                     &mut func_info,
                 )
@@ -466,7 +469,7 @@ impl<'a> Compiler<'a> {
         let mut funcs = HashMap::new();
         let mut func_translator = FuncTranslator::new();
 
-        for (ref func, (code, code_offset)) in self.decls.function_bodies() {
+        for (ref func, (validator, body)) in self.decls.function_bodies() {
             let mut func_info = FuncInfo::new(
                 &self.decls,
                 &mut self.trampolines,
@@ -478,10 +481,9 @@ impl<'a> Compiler<'a> {
             clif_context.func.signature = func.signature.clone();
 
             func_translator
-                .translate(
-                    &self.module_translation_state,
-                    code,
-                    *code_offset,
+                .translate_body(
+                    &mut validator,
+                    body.clone(),
                     &mut clif_context.func,
                     &mut func_info,
                 )

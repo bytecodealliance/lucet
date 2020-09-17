@@ -11,13 +11,13 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift_module::{FuncId, Linkage, Module as ClifModule, ModuleError as ClifModuleError};
 use cranelift_object::ObjectBackend;
 use cranelift_wasm::{
-    FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex, GlobalVariable, MemoryIndex,
-    SignatureIndex, TableIndex, TargetEnvironment, WasmError, WasmResult,
+    wasmparser::Operator, FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex,
+    GlobalVariable, MemoryIndex, SignatureIndex, TableIndex, TargetEnvironment, WasmError,
+    WasmResult,
 };
 use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
 use std::collections::HashMap;
-use wasmparser::Operator;
 
 pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
