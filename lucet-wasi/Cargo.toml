@@ -23,6 +23,7 @@ libc = "0.2.65"
 nix = "0.17"
 rand = "0.6"
 wasi-common = { path = "../wasmtime/crates/wasi-common", version = "0.20.0", default-features = false,  features = ["wiggle_metadata"] }
+tracing = "0.1.19"
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }

@@ -1125,6 +1125,7 @@ dependencies = [
  "nix",
  "rand 0.6.5",
  "tempfile",
+ "tracing",
  "wasi-common",
 ]
 
