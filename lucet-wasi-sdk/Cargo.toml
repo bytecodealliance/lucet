@@ -19,4 +19,4 @@ thiserror = "1.0.4"
 anyhow = "1"
 lucetc = { path = "../lucetc", version  = "=0.7.0-dev" }
 lucet-wasi = { path = "../lucet-wasi", version  = "=0.7.0-dev" }
-target-lexicon = "0.10"
+target-lexicon = "0.11"

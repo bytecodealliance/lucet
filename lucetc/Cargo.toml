@@ -23,7 +23,7 @@ cranelift-frontend = { path = "../wasmtime/cranelift/frontend", version = "0.67.
 cranelift-module = { path = "../wasmtime/cranelift/module", version = "0.67.0" }
 cranelift-object = { path = "../wasmtime/cranelift/object", version = "0.67.0" }
 cranelift-wasm = { path = "../wasmtime/cranelift/wasm", version = "0.67.0" }
-target-lexicon = "0.10"
+target-lexicon = "0.11"
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.7.0-dev" }
 witx = { path = "../wasmtime/crates/wasi-common/WASI/tools/witx", version = "0.8.5" }

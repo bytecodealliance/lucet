@@ -359,7 +359,7 @@ dependencies = [
  "log",
  "regalloc",
  "smallvec",
- "target-lexicon 0.11.0",
+ "target-lexicon",
  "thiserror",
 ]
 
@@ -386,7 +386,7 @@ dependencies = [
  "cranelift-codegen",
  "log",
  "smallvec",
- "target-lexicon 0.11.0",
+ "target-lexicon",
 ]
 
 [[package]]
@@ -406,7 +406,7 @@ version = "0.67.0"
 dependencies = [
  "cranelift-codegen",
  "raw-cpuid 7.0.3",
- "target-lexicon 0.11.0",
+ "target-lexicon",
 ]
 
 [[package]]
@@ -417,7 +417,7 @@ dependencies = [
  "cranelift-codegen",
  "cranelift-module",
  "object 0.21.1",
- "target-lexicon 0.11.0",
+ "target-lexicon",
 ]
 
 [[package]]
@@ -1100,7 +1100,7 @@ dependencies = [
  "lucetc",
  "serde",
  "serde_json",
- "target-lexicon 0.10.0",
+ "target-lexicon",
  "tempfile",
  "thiserror",
  "wabt",
@@ -1173,7 +1173,7 @@ dependencies = [
  "lucet-module",
  "lucet-wasi",
  "lucetc",
- "target-lexicon 0.10.0",
+ "target-lexicon",
  "tempfile",
  "thiserror",
 ]
@@ -1243,7 +1243,7 @@ dependencies = [
  "raw-cpuid 6.1.0",
  "serde",
  "serde_json",
- "target-lexicon 0.10.0",
+ "target-lexicon",
  "tempfile",
  "thiserror",
  "wabt",
@@ -2179,12 +2179,6 @@ dependencies = [
  "syn 1.0.22",
  "unicode-xid 0.2.0",
 ]
-
-[[package]]
-name = "target-lexicon"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab0e7238dcc7b40a7be719a25365910f6807bd864f4cce6b2e6b873658e2b19d"
 
 [[package]]
 name = "target-lexicon"
