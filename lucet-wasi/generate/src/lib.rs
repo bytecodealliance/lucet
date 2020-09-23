@@ -35,13 +35,14 @@ pub fn bindings(args: TokenStream) -> TokenStream {
         #(#modules)*
     };
 
+    let empty = quote!();
     ts.extend(lucet_wiggle::generate::generate(
         &doc,
         &config.ctx_name,
         &config.constructor,
         &quote!(wasi_common::wasi),
-        &quote!(), // pre_hook,
-        &quote!(), // post_hook,
+        config.pre_hook.as_ref().unwrap_or(&empty),
+        config.post_hook.as_ref().unwrap_or(&empty),
     ));
 
     TokenStream::from(ts)
