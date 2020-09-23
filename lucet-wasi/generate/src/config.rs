@@ -10,26 +10,51 @@ use syn::{
 pub struct Config {
     pub ctx_name: Ident,
     pub constructor: TokenStream,
+    pub pre_hook: Option<TokenStream>,
+    pub post_hook: Option<TokenStream>,
 }
 
 #[derive(Debug, Clone)]
 pub enum ConfigField {
     CtxName(Ident),
     Constructor(TokenStream),
+    PreHook(TokenStream),
+    PostHook(TokenStream),
+}
+mod kw {
+    syn::custom_keyword!(ctx);
+    syn::custom_keyword!(constructor);
+    syn::custom_keyword!(pre_hook);
+    syn::custom_keyword!(post_hook);
 }
 
 impl Parse for ConfigField {
     fn parse(input: ParseStream) -> Result<Self> {
-        let id: Ident = input.parse()?;
-        let _colon: Token![:] = input.parse()?;
-        match id.to_string().as_ref() {
-            "constructor" => {
-                let contents;
-                let _lbrace = braced!(contents in input);
-                Ok(ConfigField::Constructor(contents.parse()?))
-            }
-            "ctx" => Ok(ConfigField::CtxName(input.parse()?)),
-            _ => Err(Error::new(id.span(), "expected `constructor` or `ctx`")),
+        let lookahead = input.lookahead1();
+        if lookahead.peek(kw::constructor) {
+            input.parse::<kw::constructor>()?;
+            input.parse::<Token![:]>()?;
+            let contents;
+            let _lbrace = braced!(contents in input);
+            Ok(ConfigField::Constructor(contents.parse()?))
+        } else if lookahead.peek(kw::ctx) {
+            input.parse::<kw::ctx>()?;
+            input.parse::<Token![:]>()?;
+            Ok(ConfigField::CtxName(input.parse()?))
+        } else if lookahead.peek(kw::pre_hook) {
+            input.parse::<kw::pre_hook>()?;
+            input.parse::<Token![:]>()?;
+            let contents;
+            let _lbrace = braced!(contents in input);
+            Ok(ConfigField::PreHook(contents.parse()?))
+        } else if lookahead.peek(kw::post_hook) {
+            input.parse::<kw::post_hook>()?;
+            input.parse::<Token![:]>()?;
+            let contents;
+            let _lbrace = braced!(contents in input);
+            Ok(ConfigField::PostHook(contents.parse()?))
+        } else {
+            Err(lookahead.error())
         }
     }
 }
@@ -38,6 +63,8 @@ impl Config {
     pub fn build(fields: impl Iterator<Item = ConfigField> + Clone, err_loc: Span) -> Result<Self> {
         let mut ctx_name = None;
         let mut constructor = None;
+        let mut pre_hook = None;
+        let mut post_hook = None;
         for f in fields {
             match f {
                 ConfigField::Constructor(c) => {
@@ -45,6 +72,12 @@ impl Config {
                 }
                 ConfigField::CtxName(n) => {
                     ctx_name = Some(n);
+                }
+                ConfigField::PreHook(c) => {
+                    pre_hook = Some(c);
+                }
+                ConfigField::PostHook(c) => {
+                    post_hook = Some(c);
                 }
             }
         }
@@ -55,6 +88,8 @@ impl Config {
             constructor: constructor
                 .take()
                 .ok_or_else(|| Error::new(err_loc, "`constructor` field required"))?,
+            pre_hook,
+            post_hook,
         })
     }
 }
