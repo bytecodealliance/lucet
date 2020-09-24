@@ -1,7 +1,9 @@
 use lucet_runtime::{lucet_hostcall_terminate, vmctx::Vmctx};
 use lucet_wiggle::{GuestError, GuestPtr};
 use std::cell::Ref;
+use tracing::debug;
 use wasi_common::wasi::wasi_snapshot_preview1::WasiSnapshotPreview1;
+use wasi_common::Error;
 use wasi_common::WasiCtx;
 
 lucet_wasi_generate::bindings!({
@@ -11,7 +13,9 @@ lucet_wasi_generate::bindings!({
     // Describe how to construct the context type. The expression inside the first set
     // of braces will be used each time LucetWasiCtx needs to be constructed.
     // `vmctx: &Vmctx` is a free variable at the construction site.
-    constructor: { LucetWasiCtx { vmctx } }
+    constructor: { LucetWasiCtx { vmctx } },
+    // Need to use the exact same error mapping as wasi-common does:
+    errors: { errno => Error },
 });
 
 pub mod types {
@@ -33,9 +37,16 @@ impl<'a> LucetWasiCtx<'a> {
 }
 
 impl<'a> types::GuestErrorConversion for LucetWasiCtx<'a> {
-    fn into_errno(&self, _e: GuestError) -> types::Errno {
-        // TODO log error
-        types::Errno::Inval
+    fn into_errno(&self, e: GuestError) -> types::Errno {
+        debug!("Guest error: {:?}", e);
+        e.into()
+    }
+}
+
+impl<'a> types::UserErrorConversion for LucetWasiCtx<'a> {
+    fn errno_from_error(&self, e: Error) -> types::Errno {
+        debug!("Error: {:?}", e);
+        e.into()
     }
 }
 
@@ -44,11 +55,11 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         &self,
         argv: &GuestPtr<'b, GuestPtr<'b, u8>>,
         argv_buf: &GuestPtr<'b, u8>,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().args_get(argv, argv_buf)
     }
 
-    fn args_sizes_get(&self) -> Result<(types::Size, types::Size), types::Errno> {
+    fn args_sizes_get(&self) -> Result<(types::Size, types::Size), Error> {
         self.wasi().args_sizes_get()
     }
 
@@ -56,15 +67,15 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         &self,
         environ: &GuestPtr<'b, GuestPtr<'b, u8>>,
         environ_buf: &GuestPtr<'b, u8>,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().environ_get(environ, environ_buf)
     }
 
-    fn environ_sizes_get(&self) -> Result<(types::Size, types::Size), types::Errno> {
+    fn environ_sizes_get(&self) -> Result<(types::Size, types::Size), Error> {
         self.wasi().environ_sizes_get()
     }
 
-    fn clock_res_get(&self, id: types::Clockid) -> Result<types::Timestamp, types::Errno> {
+    fn clock_res_get(&self, id: types::Clockid) -> Result<types::Timestamp, Error> {
         self.wasi().clock_res_get(id)
     }
 
@@ -72,7 +83,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         &self,
         id: types::Clockid,
         precision: types::Timestamp,
-    ) -> Result<types::Timestamp, types::Errno> {
+    ) -> Result<types::Timestamp, Error> {
         self.wasi().clock_time_get(id, precision)
     }
 
@@ -82,7 +93,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         offset: types::Filesize,
         len: types::Filesize,
         advice: types::Advice,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().fd_advise(fd, offset, len, advice)
     }
 
@@ -91,27 +102,23 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         fd: types::Fd,
         offset: types::Filesize,
         len: types::Filesize,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().fd_allocate(fd, offset, len)
     }
 
-    fn fd_close(&self, fd: types::Fd) -> Result<(), types::Errno> {
+    fn fd_close(&self, fd: types::Fd) -> Result<(), Error> {
         self.wasi().fd_close(fd)
     }
 
-    fn fd_datasync(&self, fd: types::Fd) -> Result<(), types::Errno> {
+    fn fd_datasync(&self, fd: types::Fd) -> Result<(), Error> {
         self.wasi().fd_datasync(fd)
     }
 
-    fn fd_fdstat_get(&self, fd: types::Fd) -> Result<types::Fdstat, types::Errno> {
+    fn fd_fdstat_get(&self, fd: types::Fd) -> Result<types::Fdstat, Error> {
         self.wasi().fd_fdstat_get(fd)
     }
 
-    fn fd_fdstat_set_flags(
-        &self,
-        fd: types::Fd,
-        flags: types::Fdflags,
-    ) -> Result<(), types::Errno> {
+    fn fd_fdstat_set_flags(&self, fd: types::Fd, flags: types::Fdflags) -> Result<(), Error> {
         self.wasi().fd_fdstat_set_flags(fd, flags)
     }
 
@@ -120,20 +127,16 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         fd: types::Fd,
         fs_rights_base: types::Rights,
         fs_rights_inheriting: types::Rights,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi()
             .fd_fdstat_set_rights(fd, fs_rights_base, fs_rights_inheriting)
     }
 
-    fn fd_filestat_get(&self, fd: types::Fd) -> Result<types::Filestat, types::Errno> {
+    fn fd_filestat_get(&self, fd: types::Fd) -> Result<types::Filestat, Error> {
         self.wasi().fd_filestat_get(fd)
     }
 
-    fn fd_filestat_set_size(
-        &self,
-        fd: types::Fd,
-        size: types::Filesize,
-    ) -> Result<(), types::Errno> {
+    fn fd_filestat_set_size(&self, fd: types::Fd, size: types::Filesize) -> Result<(), Error> {
         self.wasi().fd_filestat_set_size(fd, size)
     }
 
@@ -143,7 +146,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         atim: types::Timestamp,
         mtim: types::Timestamp,
         fst_flags: types::Fstflags,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().fd_filestat_set_times(fd, atim, mtim, fst_flags)
     }
 
@@ -152,11 +155,11 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         fd: types::Fd,
         iovs: &types::IovecArray<'_>,
         offset: types::Filesize,
-    ) -> Result<types::Size, types::Errno> {
+    ) -> Result<types::Size, Error> {
         self.wasi().fd_pread(fd, iovs, offset)
     }
 
-    fn fd_prestat_get(&self, fd: types::Fd) -> Result<types::Prestat, types::Errno> {
+    fn fd_prestat_get(&self, fd: types::Fd) -> Result<types::Prestat, Error> {
         self.wasi().fd_prestat_get(fd)
     }
 
@@ -165,7 +168,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         fd: types::Fd,
         path: &GuestPtr<u8>,
         path_len: types::Size,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().fd_prestat_dir_name(fd, path, path_len)
     }
 
@@ -174,15 +177,11 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         fd: types::Fd,
         ciovs: &types::CiovecArray<'_>,
         offset: types::Filesize,
-    ) -> Result<types::Size, types::Errno> {
+    ) -> Result<types::Size, Error> {
         self.wasi().fd_pwrite(fd, ciovs, offset)
     }
 
-    fn fd_read(
-        &self,
-        fd: types::Fd,
-        iovs: &types::IovecArray<'_>,
-    ) -> Result<types::Size, types::Errno> {
+    fn fd_read(&self, fd: types::Fd, iovs: &types::IovecArray<'_>) -> Result<types::Size, Error> {
         self.wasi().fd_read(fd, iovs)
     }
 
@@ -192,11 +191,11 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         buf: &GuestPtr<u8>,
         buf_len: types::Size,
         cookie: types::Dircookie,
-    ) -> Result<types::Size, types::Errno> {
+    ) -> Result<types::Size, Error> {
         self.wasi().fd_readdir(fd, buf, buf_len, cookie)
     }
 
-    fn fd_renumber(&self, from: types::Fd, to: types::Fd) -> Result<(), types::Errno> {
+    fn fd_renumber(&self, from: types::Fd, to: types::Fd) -> Result<(), Error> {
         self.wasi().fd_renumber(from, to)
     }
 
@@ -205,15 +204,15 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         fd: types::Fd,
         offset: types::Filedelta,
         whence: types::Whence,
-    ) -> Result<types::Filesize, types::Errno> {
+    ) -> Result<types::Filesize, Error> {
         self.wasi().fd_seek(fd, offset, whence)
     }
 
-    fn fd_sync(&self, fd: types::Fd) -> Result<(), types::Errno> {
+    fn fd_sync(&self, fd: types::Fd) -> Result<(), Error> {
         self.wasi().fd_sync(fd)
     }
 
-    fn fd_tell(&self, fd: types::Fd) -> Result<types::Filesize, types::Errno> {
+    fn fd_tell(&self, fd: types::Fd) -> Result<types::Filesize, Error> {
         self.wasi().fd_tell(fd)
     }
 
@@ -221,7 +220,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         &self,
         fd: types::Fd,
         ciovs: &types::CiovecArray<'_>,
-    ) -> Result<types::Size, types::Errno> {
+    ) -> Result<types::Size, Error> {
         self.wasi().fd_write(fd, ciovs)
     }
 
@@ -229,7 +228,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         &self,
         dirfd: types::Fd,
         path: &GuestPtr<'_, str>,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().path_create_directory(dirfd, path)
     }
 
@@ -238,7 +237,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         dirfd: types::Fd,
         flags: types::Lookupflags,
         path: &GuestPtr<'_, str>,
-    ) -> Result<types::Filestat, types::Errno> {
+    ) -> Result<types::Filestat, Error> {
         self.wasi().path_filestat_get(dirfd, flags, path)
     }
 
@@ -250,7 +249,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         atim: types::Timestamp,
         mtim: types::Timestamp,
         fst_flags: types::Fstflags,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi()
             .path_filestat_set_times(dirfd, flags, path, atim, mtim, fst_flags)
     }
@@ -262,7 +261,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         old_path: &GuestPtr<'_, str>,
         new_fd: types::Fd,
         new_path: &GuestPtr<'_, str>,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi()
             .path_link(old_fd, old_flags, old_path, new_fd, new_path)
     }
@@ -276,7 +275,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         fs_rights_base: types::Rights,
         fs_rights_inheriting: types::Rights,
         fdflags: types::Fdflags,
-    ) -> Result<types::Fd, types::Errno> {
+    ) -> Result<types::Fd, Error> {
         self.wasi().path_open(
             dirfd,
             dirflags,
@@ -294,7 +293,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         path: &GuestPtr<'_, str>,
         buf: &GuestPtr<u8>,
         buf_len: types::Size,
-    ) -> Result<types::Size, types::Errno> {
+    ) -> Result<types::Size, Error> {
         self.wasi().path_readlink(dirfd, path, buf, buf_len)
     }
 
@@ -302,7 +301,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         &self,
         dirfd: types::Fd,
         path: &GuestPtr<'_, str>,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().path_remove_directory(dirfd, path)
     }
 
@@ -312,7 +311,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         old_path: &GuestPtr<'_, str>,
         new_fd: types::Fd,
         new_path: &GuestPtr<'_, str>,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().path_rename(old_fd, old_path, new_fd, new_path)
     }
 
@@ -321,15 +320,11 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         old_path: &GuestPtr<'_, str>,
         dirfd: types::Fd,
         new_path: &GuestPtr<'_, str>,
-    ) -> Result<(), types::Errno> {
+    ) -> Result<(), Error> {
         self.wasi().path_symlink(old_path, dirfd, new_path)
     }
 
-    fn path_unlink_file(
-        &self,
-        dirfd: types::Fd,
-        path: &GuestPtr<'_, str>,
-    ) -> Result<(), types::Errno> {
+    fn path_unlink_file(&self, dirfd: types::Fd, path: &GuestPtr<'_, str>) -> Result<(), Error> {
         self.wasi().path_unlink_file(dirfd, path)
     }
 
@@ -338,7 +333,7 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         in_: &GuestPtr<types::Subscription>,
         out: &GuestPtr<types::Event>,
         nsubscriptions: types::Size,
-    ) -> Result<types::Size, types::Errno> {
+    ) -> Result<types::Size, Error> {
         self.wasi().poll_oneoff(in_, out, nsubscriptions)
     }
 
@@ -346,15 +341,15 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         lucet_hostcall_terminate!(rval)
     }
 
-    fn proc_raise(&self, _sig: types::Signal) -> Result<(), types::Errno> {
-        Err(types::Errno::Inval)
+    fn proc_raise(&self, _sig: types::Signal) -> Result<(), Error> {
+        Err(Error::Inval)
     }
 
-    fn sched_yield(&self) -> Result<(), types::Errno> {
+    fn sched_yield(&self) -> Result<(), Error> {
         Ok(())
     }
 
-    fn random_get(&self, buf: &GuestPtr<u8>, buf_len: types::Size) -> Result<(), types::Errno> {
+    fn random_get(&self, buf: &GuestPtr<u8>, buf_len: types::Size) -> Result<(), Error> {
         self.wasi().random_get(buf, buf_len)
     }
 
@@ -363,8 +358,8 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         _fd: types::Fd,
         _ri_data: &types::IovecArray<'_>,
         _ri_flags: types::Riflags,
-    ) -> Result<(types::Size, types::Roflags), types::Errno> {
-        Err(types::Errno::Inval)
+    ) -> Result<(types::Size, types::Roflags), Error> {
+        Err(Error::Inval)
     }
 
     fn sock_send(
@@ -372,11 +367,11 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         _fd: types::Fd,
         _si_data: &types::CiovecArray<'_>,
         _si_flags: types::Siflags,
-    ) -> Result<types::Size, types::Errno> {
-        Err(types::Errno::Inval)
+    ) -> Result<types::Size, Error> {
+        Err(Error::Inval)
     }
 
-    fn sock_shutdown(&self, _fd: types::Fd, _how: types::Sdflags) -> Result<(), types::Errno> {
-        Err(types::Errno::Inval)
+    fn sock_shutdown(&self, _fd: types::Fd, _how: types::Sdflags) -> Result<(), Error> {
+        Err(Error::Inval)
     }
 }

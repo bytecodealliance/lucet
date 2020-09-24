@@ -12,7 +12,12 @@ pub fn bindings(args: TokenStream) -> TokenStream {
     let doc = wasi_common::wasi::metadata::document();
     let names = Names::new(&config.ctx_name, quote!(lucet_wiggle));
 
-    let error_transform = wiggle_generate::ErrorTransform::empty();
+    let error_transform = if let Some(error_conf) = config.error_conf {
+        wiggle_generate::ErrorTransform::new(&error_conf, &doc)
+            .expect("constructing error transform")
+    } else {
+        wiggle_generate::ErrorTransform::empty()
+    };
 
     let modules = doc.modules().map(|module| {
         let modname = names.module(&module.name);

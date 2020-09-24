@@ -361,14 +361,14 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.66.0"
+version = "0.67.0"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.66.0"
+version = "0.67.0"
 dependencies = [
  "byteorder",
  "cranelift-bforest",
@@ -385,7 +385,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.66.0"
+version = "0.67.0"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
@@ -393,15 +393,15 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.66.0"
+version = "0.67.0"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.66.0"
+version = "0.67.0"
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.66.0"
+version = "0.67.0"
 dependencies = [
  "cranelift-codegen",
  "log",
@@ -411,7 +411,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-module"
-version = "0.66.0"
+version = "0.67.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -422,7 +422,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-native"
-version = "0.66.0"
+version = "0.67.0"
 dependencies = [
  "cranelift-codegen",
  "raw-cpuid 7.0.3",
@@ -431,7 +431,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-object"
-version = "0.66.0"
+version = "0.67.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.66.0"
+version = "0.67.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -1145,6 +1145,7 @@ dependencies = [
  "nix",
  "rand 0.6.5",
  "tempfile",
+ "tracing",
  "tracing-subscriber",
  "wasi-common",
 ]
@@ -2221,9 +2222,9 @@ dependencies = [
 
 [[package]]
 name = "target-lexicon"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab0e7238dcc7b40a7be719a25365910f6807bd864f4cce6b2e6b873658e2b19d"
+checksum = "fe2635952a442a01fd4cb53d98858b5e4bb461b02c0d111f22f31772e3e7a8b2"
 
 [[package]]
 name = "tempfile"
@@ -2328,9 +2329,9 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.15"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a41f40ed0e162c911ac6fcb53ecdc8134c46905fdbbae8c50add462a538b495f"
+checksum = "6d79ca061b032d6ce30c660fded31189ca0b9922bf483cd70759f13a2d86786c"
 dependencies = [
  "cfg-if",
  "log",
@@ -2340,9 +2341,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.8"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99bbad0de3fd923c9c3232ead88510b783e5a4d16a6154adffa3d53308de984c"
+checksum = "80e0ccfc3378da0cce270c946b676a376943f5cd16aeba64568e7939806f4ada"
 dependencies = [
  "proc-macro2 1.0.13",
  "quote 1.0.6",
@@ -2351,9 +2352,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.10"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0aa83a9a47081cd522c09c81b31aec2c9273424976f922ad61c053b58350b715"
+checksum = "5bcf46c1f1f06aeea2d6b81f3c863d0930a596c86ad1920d4e5bad6dd1d7119a"
 dependencies = [
  "lazy_static",
 ]
@@ -2534,7 +2535,7 @@ checksum = "1a143597ca7c7793eff794def352d41792a93c481eb1042423ff7ff72ba2c31f"
 
 [[package]]
 name = "wasi-common"
-version = "0.19.1"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -2639,7 +2640,7 @@ dependencies = [
 
 [[package]]
 name = "wig"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "heck",
  "proc-macro2 1.0.13",
@@ -2649,7 +2650,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "thiserror",
  "tracing",
@@ -2659,7 +2660,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle-generate"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "heck",
@@ -2672,7 +2673,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle-macro"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "quote 1.0.6",
  "syn 1.0.22",
@@ -2733,7 +2734,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "winx"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "bitflags 1.2.1",
  "cvt",
@@ -2758,7 +2759,7 @@ checksum = "da90eac47bf1d7871b75004b9b631d107df15f37669383b23f0b5297bc7516b6"
 
 [[package]]
 name = "yanix"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "bitflags 1.2.1",
  "cfg-if",
