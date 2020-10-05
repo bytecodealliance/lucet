@@ -37,7 +37,7 @@ jobs:
         curl -sS -L "https://github.com/WebAssembly/binaryen/archive/version_${BINARYEN_VERSION}.tar.gz" | tar xzf -
         mkdir -p binaryen-build
         cd binaryen-build && cmake "../binaryen-version_${BINARYEN_VERSION}" && make wasm-opt wasm-reduce
-        echo "##[add-path]$PWD/binaryen-build/bin"
+        echo "$PWD/binaryen-build/bin" >> $GITHUB_PATH
       env:
         BINARYEN_VERSION: 86
 
