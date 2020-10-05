@@ -14,7 +14,7 @@ jobs:
       run: |
         curl https://sh.rustup.rs | sh -s -- --default-toolchain 1.46.0 -y
         rustup update
-        echo "##[add-path]$HOME/.cargo/bin"
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
     - name: Install wasi-sdk (macos)
       run: |
