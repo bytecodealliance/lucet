@@ -11,6 +11,7 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Linkage, Module as ClifModule};
 use cranelift_wasm::{
+    wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
     Global, GlobalIndex, GlobalInit, MemoryIndex, SignatureIndex, Table, TableIndex,
     TargetEnvironment, WasmFuncType,
 };
@@ -396,11 +397,18 @@ impl<'a> ModuleDecls<'a> {
         self.info.target_config()
     }
 
-    pub fn function_bodies(&self) -> impl Iterator<Item = (FunctionDecl<'_>, &(&'a [u8], usize))> {
+    pub fn function_bodies(
+        &mut self,
+    ) -> impl Iterator<
+        Item = (
+            FunctionDecl<'_>,
+            &mut (FuncValidator<ValidatorResources>, FunctionBody<'a>),
+        ),
+    > {
         Box::new(
             self.info
                 .function_bodies
-                .iter()
+                .iter_mut()
                 .map(move |(fidx, code)| (self.get_func(*fidx).unwrap(), code)),
         )
     }

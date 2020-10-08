@@ -6,9 +6,10 @@ use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap, SecondaryMap
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
+    wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
     DataIndex, ElemIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment,
-    ModuleTranslationState, SignatureIndex, Table, TableElementType, TableIndex, TargetEnvironment,
-    WasmFuncType, WasmResult, WasmType,
+    SignatureIndex, Table, TableElementType, TableIndex, TargetEnvironment, WasmFuncType,
+    WasmResult, WasmType,
 };
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
@@ -87,7 +88,8 @@ pub struct ModuleInfo<'a> {
     pub start_func: Option<UniqueFuncIndex>,
 
     /// Function bodies: local only
-    pub function_bodies: HashMap<UniqueFuncIndex, (&'a [u8], usize)>,
+    pub function_bodies:
+        HashMap<UniqueFuncIndex, (FuncValidator<ValidatorResources>, FunctionBody<'a>)>,
 
     /// Table elements: local only
     pub table_elems: HashMap<TableIndex, Vec<TableElems>>,
@@ -362,14 +364,13 @@ impl<'a> ModuleEnvironment<'a> for ModuleInfo<'a> {
 
     fn define_function_body(
         &mut self,
-        _module_translation_state: &ModuleTranslationState,
-        body_bytes: &'a [u8],
-        body_offset: usize,
+        func_validator: FuncValidator<ValidatorResources>,
+        body: FunctionBody<'a>,
     ) -> WasmResult<()> {
         let func_index =
             UniqueFuncIndex::new(self.imported_funcs.len() + self.function_bodies.len());
         self.function_bodies
-            .insert(func_index, (body_bytes, body_offset));
+            .insert(func_index, (func_validator, body));
         Ok(())
     }
 
