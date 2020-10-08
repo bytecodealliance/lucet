@@ -9,7 +9,7 @@ use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_frontend::FunctionBuilder;
 use cranelift_module::{FuncId, Linkage, Module as ClifModule, ModuleError as ClifModuleError};
-use cranelift_object::ObjectBackend;
+use cranelift_object::ObjectModule;
 use cranelift_wasm::{
     FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex, GlobalVariable, MemoryIndex,
     SignatureIndex, TableIndex, TargetEnvironment, WasmError, WasmResult,
@@ -22,7 +22,7 @@ use wasmparser::Operator;
 pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
     trampolines: &'a mut HashMap<String, (FuncId, UniqueFuncIndex)>,
-    clif_module: &'a mut ClifModule<ObjectBackend>,
+    clif_module: &'a mut ObjectModule,
     count_instructions: bool,
     scope_costs: Vec<u32>,
     vmctx_value: Option<ir::GlobalValue>,
@@ -34,7 +34,7 @@ impl<'a> FuncInfo<'a> {
     pub fn new(
         module_decls: &'a ModuleDecls<'a>,
         trampolines: &'a mut HashMap<String, (FuncId, UniqueFuncIndex)>,
-        clif_module: &'a mut ClifModule<ObjectBackend>,
+        clif_module: &'a mut ObjectModule,
         count_instructions: bool,
     ) -> Self {
         Self {
@@ -280,7 +280,7 @@ impl<'a> FuncInfo<'a> {
 /// Get the local trampoline function to do safety checks before calling an imported hostcall.
 fn get_trampoline_func(
     trampolines: &mut HashMap<String, (FuncId, UniqueFuncIndex)>,
-    clif_module: &mut ClifModule<ObjectBackend>,
+    clif_module: &mut ObjectModule,
     hostcall_index: UniqueFuncIndex,
     func_decl: &FunctionDecl,
     signature: &ir::Signature,

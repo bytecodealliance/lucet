@@ -15,7 +15,7 @@ use cranelift_codegen::{
     ir::{self, types, AbiParam, Signature},
     isa::CallConv,
 };
-use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule, TrapSite};
+use cranelift_module::{Linkage, Module as ClifModule, TrapSite};
 use cranelift_wasm::{WasmFuncType, WasmType};
 
 /// Stack probe symbol name
@@ -53,9 +53,9 @@ pub fn trap_sites() -> Vec<TrapSite> {
     ]
 }
 
-pub fn declare<'a, B: ClifBackend>(
+pub fn declare<'a>(
     decls: &mut ModuleDecls<'a>,
-    clif_module: &mut ClifModule<B>,
+    clif_module: &mut impl ClifModule,
 ) -> Result<UniqueFuncIndex, Error> {
     Ok(decls
         .declare_new_function(

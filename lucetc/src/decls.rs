@@ -9,7 +9,7 @@ use crate::types::to_lucet_signature;
 use cranelift_codegen::entity::{EntityRef, PrimaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
-use cranelift_module::{Backend as ClifBackend, Linkage, Module as ClifModule};
+use cranelift_module::{Linkage, Module as ClifModule};
 use cranelift_wasm::{
     Global, GlobalIndex, GlobalInit, MemoryIndex, SignatureIndex, Table, TableIndex,
     TargetEnvironment, WasmFuncType,
@@ -77,9 +77,9 @@ pub struct ModuleDecls<'a> {
 }
 
 impl<'a> ModuleDecls<'a> {
-    pub fn new<B: ClifBackend>(
+    pub fn new(
         info: ModuleInfo<'a>,
-        clif_module: &mut ClifModule<B>,
+        clif_module: &mut impl ClifModule,
         bindings: &'a Bindings,
         runtime: Runtime,
         heap_settings: HeapSettings,
@@ -108,9 +108,9 @@ impl<'a> ModuleDecls<'a> {
 
     // ********************* Constructor auxillary functions ***********************
 
-    fn declare_funcs<B: ClifBackend>(
+    fn declare_funcs(
         decls: &mut ModuleDecls<'a>,
-        clif_module: &mut ClifModule<B>,
+        clif_module: &mut impl ClifModule,
         bindings: &'a Bindings,
     ) -> Result<(), Error> {
         // Get the name for this function from the module names section, if it exists.
@@ -196,9 +196,9 @@ impl<'a> ModuleDecls<'a> {
     /// This is intended for cases where `lucetc` adds a new function that was not present in the
     /// original wasm - in these cases, Cranelift has not already declared the signature or
     /// function type, let alone name, linkage, etc. So we must do that ourselves!
-    pub fn declare_new_function<B: ClifBackend>(
+    pub fn declare_new_function(
         &mut self,
-        clif_module: &mut ClifModule<B>,
+        clif_module: &mut impl ClifModule,
         decl_sym: String,
         decl_linkage: Linkage,
         wasm_func_type: WasmFuncType,
@@ -213,9 +213,9 @@ impl<'a> ModuleDecls<'a> {
 
     /// The internal side of fixing up a new function declaration. This is also the work that must
     /// be done when building a ModuleDecls record of functions that were described by ModuleInfo.
-    fn declare_function<B: ClifBackend>(
+    fn declare_function(
         &mut self,
-        clif_module: &mut ClifModule<B>,
+        clif_module: &mut impl ClifModule,
         decl_sym: String,
         decl_linkage: Linkage,
         func_ix: UniqueFuncIndex,
@@ -247,30 +247,29 @@ impl<'a> ModuleDecls<'a> {
         Ok(UniqueFuncIndex::new(self.function_names.len() - 1))
     }
 
-    fn declare_tables<B: ClifBackend>(
+    fn declare_tables(
         info: &ModuleInfo<'a>,
-        clif_module: &mut ClifModule<B>,
+        clif_module: &mut impl ClifModule,
     ) -> Result<(Name, PrimaryMap<TableIndex, Name>), Error> {
         let mut table_names = PrimaryMap::new();
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id =
-                clif_module.declare_data(&def_symbol, Linkage::Local, false, false, None)?;
+                clif_module.declare_data(&def_symbol, Linkage::Local, false, false)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             table_names.push(def_name);
         }
 
-        let tables_list_id =
-            clif_module.declare_data(TABLE_SYM, Linkage::Local, false, false, None)?;
+        let tables_list_id = clif_module.declare_data(TABLE_SYM, Linkage::Local, false, false)?;
         let tables_list = Name::new_data(TABLE_SYM.to_string(), tables_list_id);
 
         Ok((tables_list, table_names))
     }
 
-    fn declare_runtime<B: ClifBackend>(
+    fn declare_runtime(
         decls: &mut ModuleDecls<'a>,
-        clif_module: &mut ClifModule<B>,
+        clif_module: &mut impl ClifModule,
         runtime: Runtime,
     ) -> Result<(), Error> {
         for (func, functype) in runtime.functions.iter() {
