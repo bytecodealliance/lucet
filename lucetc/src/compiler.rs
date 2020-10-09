@@ -5,7 +5,7 @@ use crate::decls::ModuleDecls;
 use crate::error::Error;
 use crate::function::FuncInfo;
 use crate::heap::HeapSettings;
-use crate::module::{ModuleInfo, UniqueFuncIndex};
+use crate::module::{ModuleValidation, UniqueFuncIndex};
 use crate::output::{CraneliftFuncs, ObjectFile, FUNCTION_MANIFEST_SYM};
 use crate::runtime::Runtime;
 use crate::stack_probe;
@@ -27,7 +27,7 @@ use cranelift_module::{
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use cranelift_wasm::{
     translate_module,
-    wasmparser::{FuncValidator, ValidatorResources},
+    wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
     FuncTranslator, ModuleTranslationState, WasmError,
 };
 use lucet_module::bindings::Bindings;
@@ -192,6 +192,8 @@ pub struct Compiler<'a> {
     count_instructions: bool,
     module_translation_state: ModuleTranslationState,
     canonicalize_nans: bool,
+    function_bodies:
+        HashMap<UniqueFuncIndex, (FuncValidator<ValidatorResources>, FunctionBody<'a>)>,
 }
 
 impl<'a> Compiler<'a> {
@@ -209,12 +211,12 @@ impl<'a> Compiler<'a> {
         let isa = Self::target_isa(target.clone(), opt_level, &cpu_features, canonicalize_nans)?;
 
         let frontend_config = isa.frontend_config();
-        let mut module_info = ModuleInfo::new(frontend_config.clone(), validator);
+        let mut module_validation = ModuleValidation::new(frontend_config.clone(), validator);
 
         wasmparser::validate(wasm_binary).map_err(Error::WasmValidation)?;
 
-        let module_translation_state =
-            translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
+        let module_translation_state = translate_module(wasm_binary, &mut module_validation)
+            .map_err(|e| match e {
                 WasmError::User(u) => Error::Input(u),
                 WasmError::InvalidWebAssembly { .. } => {
                     // Since wasmparser was already used to validate,
@@ -226,7 +228,7 @@ impl<'a> Compiler<'a> {
                 WasmError::ImplLimitExceeded { .. } => Error::ClifWasmError(e),
             })?;
 
-        module_info.validation_errors()?;
+        module_validation.validation_errors()?;
 
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
@@ -239,7 +241,7 @@ impl<'a> Compiler<'a> {
 
         let runtime = Runtime::lucet(frontend_config);
         let decls = ModuleDecls::new(
-            module_info,
+            module_validation.info,
             &mut clif_module,
             bindings,
             runtime,
@@ -256,6 +258,7 @@ impl<'a> Compiler<'a> {
             module_translation_state,
             target,
             canonicalize_nans,
+            function_bodies: module_validation.function_bodies,
         })
     }
 
@@ -279,7 +282,14 @@ impl<'a> Compiler<'a> {
         let mut function_manifest_bytes = Cursor::new(Vec::new());
         let mut function_map: HashMap<FuncId, (u32, DataId, usize)> = HashMap::new();
 
-        for (ref func, (validator, func_body)) in self.decls.function_bodies() {
+        let module_data_bytes = self.module_data()?.serialize()?;
+        let module_data_len = module_data_bytes.len();
+
+        for (unique_func_ix, (mut validator, func_body)) in self.function_bodies.into_iter() {
+            let func = self
+                .decls
+                .get_func(unique_func_ix)
+                .expect("decl exists for func body");
             let mut func_info = FuncInfo::new(
                 &self.decls,
                 &mut self.trampolines,
@@ -345,10 +355,6 @@ impl<'a> Compiler<'a> {
             stack_probe_traps.write(&mut self.clif_module, probe_func.name.symbol())?;
 
         function_map.insert(probe_func_id, (size, trap_data_id, stack_probe_traps.len()));
-
-        let module_data_bytes = self.module_data()?.serialize()?;
-
-        let module_data_len = module_data_bytes.len();
 
         let module_data_id = write_module_data(&mut self.clif_module, module_data_bytes)?;
         let (table_id, table_len) = write_table_data(&mut self.clif_module, &self.decls)?;
@@ -458,7 +464,11 @@ impl<'a> Compiler<'a> {
         let mut funcs = HashMap::new();
         let mut func_translator = FuncTranslator::new();
 
-        for (ref func, (validator, body)) in self.decls.function_bodies() {
+        for (unique_func_ix, (mut validator, body)) in self.function_bodies.into_iter() {
+            let func = self
+                .decls
+                .get_func(unique_func_ix)
+                .expect("decl exists for func body");
             let mut func_info = FuncInfo::new(
                 &self.decls,
                 &mut self.trampolines,

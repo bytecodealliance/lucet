@@ -397,22 +397,6 @@ impl<'a> ModuleDecls<'a> {
         self.info.target_config()
     }
 
-    pub fn function_bodies(
-        &mut self,
-    ) -> impl Iterator<
-        Item = (
-            FunctionDecl<'_>,
-            &mut (FuncValidator<ValidatorResources>, FunctionBody<'a>),
-        ),
-    > {
-        Box::new(
-            self.info
-                .function_bodies
-                .iter_mut()
-                .map(move |(fidx, code)| (self.get_func(*fidx).unwrap(), code)),
-        )
-    }
-
     pub fn get_func(&self, func_index: UniqueFuncIndex) -> Option<FunctionDecl<'_>> {
         let name = self.function_names.get(func_index).unwrap();
         let exportable_sigix = self.info.functions.get(func_index).unwrap();
