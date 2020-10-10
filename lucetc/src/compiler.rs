@@ -28,7 +28,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use cranelift_wasm::{
     translate_module,
     wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
-    FuncTranslator, ModuleTranslationState, WasmError,
+    FuncTranslator,
 };
 use lucet_module::bindings::Bindings;
 use lucet_module::{
@@ -190,7 +190,6 @@ pub struct Compiler<'a> {
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
     count_instructions: bool,
-    module_translation_state: ModuleTranslationState,
     canonicalize_nans: bool,
     function_bodies:
         HashMap<UniqueFuncIndex, (FuncValidator<ValidatorResources>, FunctionBody<'a>)>,
@@ -213,20 +212,7 @@ impl<'a> Compiler<'a> {
         let frontend_config = isa.frontend_config();
         let mut module_validation = ModuleValidation::new(frontend_config.clone(), validator);
 
-        wasmparser::validate(wasm_binary).map_err(Error::WasmValidation)?;
-
-        let module_translation_state = translate_module(wasm_binary, &mut module_validation)
-            .map_err(|e| match e {
-                WasmError::User(u) => Error::Input(u),
-                WasmError::InvalidWebAssembly { .. } => {
-                    // Since wasmparser was already used to validate,
-                    // reaching this case means there's a significant
-                    // bug in either wasmparser or cranelift-wasm.
-                    unreachable!();
-                }
-                WasmError::Unsupported(s) => Error::Unsupported(s),
-                WasmError::ImplLimitExceeded { .. } => Error::ClifWasmError(e),
-            })?;
+        let _module_translation_state = translate_module(wasm_binary, &mut module_validation)?;
 
         module_validation.validation_errors()?;
 
@@ -255,7 +241,6 @@ impl<'a> Compiler<'a> {
             opt_level,
             cpu_features,
             count_instructions,
-            module_translation_state,
             target,
             canonicalize_nans,
             function_bodies: module_validation.function_bodies,

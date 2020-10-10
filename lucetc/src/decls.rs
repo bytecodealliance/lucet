@@ -11,7 +11,6 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
     Global, GlobalIndex, GlobalInit, MemoryIndex, SignatureIndex, Table, TableIndex,
     TargetEnvironment, WasmFuncType,
 };
