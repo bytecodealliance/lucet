@@ -44,7 +44,7 @@ pub enum Error {
     FunctionTranslation {
         symbol: String,
         #[source]
-        source: ClifWasmError,
+        source: Box<Error>,
     },
     #[error("Inconsistent state when translating module: global {0} is declared as an import but has no entry in imported_globals")]
     GlobalDeclarationError(u32),

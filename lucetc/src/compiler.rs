@@ -294,7 +294,7 @@ impl<'a> Compiler<'a> {
                 )
                 .map_err(|source| Error::FunctionTranslation {
                     symbol: func.name.symbol().to_string(),
-                    source,
+                    source: Box::new(Error::from(source)),
                 })?;
             let func_id = func.name.as_funcid().unwrap();
             let mut traps = TrapSites::new();
@@ -473,7 +473,7 @@ impl<'a> Compiler<'a> {
                 )
                 .map_err(|source| Error::FunctionTranslation {
                     symbol: func.name.symbol().to_string(),
-                    source,
+                    source: Box::new(Error::from(source)),
                 })?;
 
             funcs.insert(func.name.clone(), clif_context.func);
