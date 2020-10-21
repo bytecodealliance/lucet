@@ -14,7 +14,6 @@ use crate::traps::{translate_trapcode, trap_sym_for_func};
 use crate::validate::Validator;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
-    binemit,
     ir::{self, InstBuilder},
     isa::TargetIsa,
     settings::{self, Configurable},
@@ -265,7 +264,7 @@ impl<'a> Compiler<'a> {
         let mut func_translator = FuncTranslator::new();
         let mut function_manifest_ctx = ClifDataContext::new();
         let mut function_manifest_bytes = Cursor::new(Vec::new());
-        let mut function_map: HashMap<FuncId, (u32, DataId, usize)> = HashMap::new();
+        let mut function_map: HashMap<FuncId, TrapMetadata> = HashMap::new();
 
         let module_data_bytes = self.module_data()?.serialize()?;
         let module_data_len = module_data_bytes.len();
@@ -306,11 +305,18 @@ impl<'a> Compiler<'a> {
                     source,
                 })?;
 
-            let size = compiled.size;
+            let func_size = compiled.size;
 
             let trap_data_id = traps.write(&mut self.clif_module, func.name.symbol())?;
 
-            function_map.insert(func_id, (size, trap_data_id, traps.len()));
+            function_map.insert(
+                func_id,
+                TrapMetadata {
+                    func_size,
+                    trap_data_id,
+                    trap_len: traps.len(),
+                },
+            );
         }
 
         // Now that we've defined all functions, we know what trampolines must also be created.
@@ -333,13 +339,20 @@ impl<'a> Compiler<'a> {
             .clif_module
             .define_function_bytes(probe_func_id, stack_probe::STACK_PROBE_BINARY)?;
 
-        let size = compiled.size;
+        let func_size = compiled.size;
         let stack_probe_traps: TrapSites = stack_probe::trap_sites().into();
 
         let trap_data_id =
             stack_probe_traps.write(&mut self.clif_module, probe_func.name.symbol())?;
 
-        function_map.insert(probe_func_id, (size, trap_data_id, stack_probe_traps.len()));
+        function_map.insert(
+            probe_func_id,
+            TrapMetadata {
+                func_size,
+                trap_data_id,
+                trap_len: stack_probe_traps.len(),
+            },
+        );
 
         let module_data_id = write_module_data(&mut self.clif_module, module_data_bytes)?;
         let (table_id, table_len) = write_table_data(&mut self.clif_module, &self.decls)?;
@@ -358,21 +371,12 @@ impl<'a> Compiler<'a> {
         let function_manifest_len = ids.len();
 
         for func_id in ids {
-            let (size, trap_data_id, traps_len) = match function_map.get(&func_id) {
-                Some((ref size, ref trap_data_id, ref traps_len)) => {
-                    (*size, Some(*trap_data_id), *traps_len)
-                }
-                None => (0 as u32, None, 0 as usize),
-            };
-
             write_function_spec(
                 &mut self.clif_module,
                 &mut function_manifest_ctx,
                 &mut function_manifest_bytes,
                 func_id,
-                size,
-                trap_data_id,
-                traps_len,
+                function_map.get(&func_id),
             )?;
         }
 
@@ -507,6 +511,12 @@ impl<'a> Compiler<'a> {
     }
 }
 
+struct TrapMetadata {
+    func_size: u32,
+    trap_data_id: DataId,
+    trap_len: usize,
+}
+
 // Hostcall trampolines have the general shape of:
 //
 // ```
@@ -524,7 +534,7 @@ impl<'a> Compiler<'a> {
 fn synthesize_trampoline(
     decls: &mut ModuleDecls,
     clif_module: &mut ObjectModule,
-    function_map: &mut HashMap<FuncId, (u32, DataId, usize)>,
+    function_map: &mut HashMap<FuncId, TrapMetadata>,
     hostcall_name: &str,
     trampoline_id: FuncId,
     hostcall_func_index: UniqueFuncIndex,
@@ -613,11 +623,18 @@ fn synthesize_trampoline(
             source,
         })?;
 
-    let size = compiled.size;
+    let func_size = compiled.size;
 
     let trap_data_id = traps.write(clif_module, &trampoline_name)?;
 
-    function_map.insert(trampoline_id, (size, trap_data_id, traps.len()));
+    function_map.insert(
+        trampoline_id,
+        TrapMetadata {
+            func_size,
+            trap_data_id,
+            trap_len: traps.len(),
+        },
+    );
 
     Ok(())
 }
@@ -715,10 +732,9 @@ fn write_function_spec(
     mut manifest_ctx: &mut ClifDataContext,
     manifest_bytes: &mut Cursor<Vec<u8>>,
     func_id: FuncId,
-    size: binemit::CodeOffset,
-    trap_data_id: Option<DataId>,
-    n_traps: usize,
+    metadata: Option<&TrapMetadata>,
 ) -> Result<(), Error> {
+    let size = metadata.as_ref().map(|m| m.func_size).unwrap_or(0);
     // This code has implicit knowledge of the layout of `FunctionSpec`!
     //
     // Write a (ptr, len) pair with relocation for the code.
@@ -728,15 +744,18 @@ fn write_function_spec(
     manifest_bytes.write_u64::<LittleEndian>(0 as u64)?;
     manifest_bytes.write_u64::<LittleEndian>(size as u64)?;
     // Write a (ptr, len) pair with relocation for the trap table.
-    if let Some(trap_data_id) = trap_data_id {
-        if n_traps > 0 {
-            let data_ref = module.declare_data_in_data(trap_data_id, &mut manifest_ctx);
+    if let Some(m) = metadata {
+        if m.trap_len > 0 {
+            let data_ref = module.declare_data_in_data(m.trap_data_id, &mut manifest_ctx);
             let offset = manifest_bytes.position() as u32;
             manifest_ctx.write_data_addr(offset, data_ref, 0);
         }
     }
+    // ptr data
     manifest_bytes.write_u64::<LittleEndian>(0 as u64)?;
-    manifest_bytes.write_u64::<LittleEndian>(n_traps as u64)?;
+    // len data
+    let trap_len = metadata.as_ref().map(|m| m.trap_len).unwrap_or(0);
+    manifest_bytes.write_u64::<LittleEndian>(trap_len as u64)?;
 
     Ok(())
 }
