@@ -35,6 +35,7 @@ use lucet_module::{
     LUCET_MODULE_SYM, MODULE_DATA_SYM,
 };
 use memoffset::offset_of;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -218,7 +219,7 @@ impl<'a> Compiler<'a> {
         let runtime = Runtime::lucet(frontend_config);
         let decls = ModuleDecls::new(
             module_validation.info,
-            codegen_context.clone(),
+            &codegen_context,
             bindings,
             runtime,
             heap_settings,
@@ -251,7 +252,6 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn object_file(self) -> Result<ObjectFile, Error> {
-        let mut func_translator = FuncTranslator::new();
         let mut function_manifest_ctx = ClifDataContext::new();
         let mut function_manifest_bytes = Cursor::new(Vec::new());
 
@@ -259,12 +259,12 @@ impl<'a> Compiler<'a> {
         let module_data_len = module_data_bytes.len();
 
         let mut decls = self.decls;
-        let codegen_context = self.codegen_context.clone();
+        let codegen_context = self.codegen_context;
         let count_instructions = self.count_instructions;
 
         let mut function_map = self
             .function_bodies
-            .into_iter()
+            .into_par_iter()
             .map(|(unique_func_ix, (mut validator, func_body))| {
                 let func = decls
                     .get_func(unique_func_ix)
@@ -274,7 +274,7 @@ impl<'a> Compiler<'a> {
                 clif_context.func.name = func.name.as_externalname();
                 clif_context.func.signature = func.signature.clone();
 
-                func_translator
+                FuncTranslator::new()
                     .translate_body(
                         &mut validator,
                         func_body.clone(),
@@ -523,6 +523,8 @@ pub struct CodegenContext {
     trampolines: Arc<Mutex<HashMap<String, (FuncId, UniqueFuncIndex)>>>,
     clif_module: Arc<Mutex<ObjectModule>>,
 }
+unsafe impl Send for CodegenContext {}
+unsafe impl Sync for CodegenContext {}
 
 impl CodegenContext {
     pub fn new(isa: Box<dyn TargetIsa>) -> Result<CodegenContext, Error> {

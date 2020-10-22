@@ -80,13 +80,13 @@ pub struct ModuleDecls<'a> {
 impl<'a> ModuleDecls<'a> {
     pub fn new(
         info: ModuleInfo<'a>,
-        codegen_context: CodegenContext,
+        codegen_context: &CodegenContext,
         bindings: &'a Bindings,
         runtime: Runtime,
         heap_settings: HeapSettings,
     ) -> Result<Self, Error> {
         let imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
-        let (tables_list_name, table_names) = Self::declare_tables(&info, &codegen_context)?;
+        let (tables_list_name, table_names) = Self::declare_tables(&info, codegen_context)?;
         let globals_spec = Self::build_globals_spec(&info)?;
         let linear_memory_spec = Self::build_linear_memory_spec(&info, heap_settings)?;
         let mut decls = Self {
@@ -101,8 +101,8 @@ impl<'a> ModuleDecls<'a> {
             linear_memory_spec,
         };
 
-        Self::declare_funcs(&mut decls, &codegen_context, bindings)?;
-        Self::declare_runtime(&mut decls, &codegen_context, runtime)?;
+        Self::declare_funcs(&mut decls, codegen_context, bindings)?;
+        Self::declare_runtime(&mut decls, codegen_context, runtime)?;
 
         Ok(decls)
     }
