@@ -1,4 +1,5 @@
 use super::runtime::RuntimeFunc;
+use crate::compiler::CodegenContext;
 use crate::decls::{FunctionDecl, ModuleDecls};
 use crate::module::UniqueFuncIndex;
 use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
@@ -8,8 +9,7 @@ use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_frontend::FunctionBuilder;
-use cranelift_module::{FuncId, Linkage, Module as ClifModule, ModuleError as ClifModuleError};
-use cranelift_object::ObjectModule;
+use cranelift_module::{Linkage, Module as ClifModule, ModuleError as ClifModuleError};
 use cranelift_wasm::{
     wasmparser::Operator, FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex,
     GlobalVariable, MemoryIndex, SignatureIndex, TableIndex, TargetEnvironment, WasmError,
@@ -21,8 +21,7 @@ use std::collections::HashMap;
 
 pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
-    trampolines: &'a mut HashMap<String, (FuncId, UniqueFuncIndex)>,
-    clif_module: &'a mut ObjectModule,
+    codegen_context: &'a CodegenContext,
     count_instructions: bool,
     scope_costs: Vec<u32>,
     vmctx_value: Option<ir::GlobalValue>,
@@ -33,14 +32,12 @@ pub struct FuncInfo<'a> {
 impl<'a> FuncInfo<'a> {
     pub fn new(
         module_decls: &'a ModuleDecls<'a>,
-        trampolines: &'a mut HashMap<String, (FuncId, UniqueFuncIndex)>,
-        clif_module: &'a mut ObjectModule,
+        codegen_context: &'a CodegenContext,
         count_instructions: bool,
     ) -> Self {
         Self {
             module_decls,
-            trampolines,
-            clif_module,
+            codegen_context,
             count_instructions,
             scope_costs: vec![0],
             vmctx_value: None,
@@ -279,20 +276,25 @@ impl<'a> FuncInfo<'a> {
 
 /// Get the local trampoline function to do safety checks before calling an imported hostcall.
 fn get_trampoline_func(
-    trampolines: &mut HashMap<String, (FuncId, UniqueFuncIndex)>,
-    clif_module: &mut ObjectModule,
+    codegen_context: &CodegenContext,
     hostcall_index: UniqueFuncIndex,
     func_decl: &FunctionDecl,
     signature: &ir::Signature,
 ) -> Result<ir::ExternalName, ClifModuleError> {
     use std::collections::hash_map::Entry;
-    let funcid = match trampolines.entry(func_decl.name.symbol().to_string()) {
+    let funcid = match codegen_context
+        .trampolines()
+        .entry(func_decl.name.symbol().to_string())
+    {
         Entry::Occupied(o) => o.get().0,
         Entry::Vacant(v) => {
             let trampoline_name = format!("trampoline_{}", func_decl.name.symbol());
 
-            let funcid =
-                clif_module.declare_function(&trampoline_name, Linkage::Local, signature)?;
+            let funcid = codegen_context.module().declare_function(
+                &trampoline_name,
+                Linkage::Local,
+                signature,
+            )?;
             v.insert((funcid, hostcall_index)).0
         }
     };
@@ -475,8 +477,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             func_decl.name.into()
         } else {
             get_trampoline_func(
-                &mut self.trampolines,
-                &mut self.clif_module,
+                &self.codegen_context,
                 unique_index,
                 &func_decl,
                 &func.dfg.signatures[signature],

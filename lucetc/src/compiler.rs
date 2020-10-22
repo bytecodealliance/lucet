@@ -23,7 +23,7 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{
     DataContext as ClifDataContext, DataId, FuncId, Linkage as ClifLinkage, Module as ClifModule,
 };
-use cranelift_object::{ObjectBuilder, ObjectModule};
+use cranelift_object::{ObjectBuilder, ObjectModule, ObjectProduct};
 use cranelift_wasm::{
     translate_module,
     wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
@@ -37,6 +37,7 @@ use lucet_module::{
 use memoffset::offset_of;
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::sync::{Arc, Mutex, MutexGuard};
 use target_lexicon::Triple;
 
 #[derive(Debug, Clone, Copy)]
@@ -181,10 +182,7 @@ impl CompilerBuilder {
 
 pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
-    clif_module: ObjectModule,
-    // the `FuncId` references the declared trampoline function Cranelift knows, but the
-    // `UniqueFuncIndex` references the hostcall being trampoline'd to.
-    trampolines: HashMap<String, (FuncId, UniqueFuncIndex)>,
+    codegen_context: CodegenContext,
     target: Triple,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
@@ -215,19 +213,12 @@ impl<'a> Compiler<'a> {
 
         module_validation.validation_errors()?;
 
-        let libcalls = Box::new(move |libcall| match libcall {
-            ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
-            _ => (cranelift_module::default_libcall_names())(libcall),
-        });
-
-        let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls)?;
-        builder.function_alignment(16);
-        let mut clif_module: ObjectModule = ObjectModule::new(builder);
+        let codegen_context = CodegenContext::new(isa)?;
 
         let runtime = Runtime::lucet(frontend_config);
         let decls = ModuleDecls::new(
             module_validation.info,
-            &mut clif_module,
+            codegen_context.clone(),
             bindings,
             runtime,
             heap_settings,
@@ -235,8 +226,7 @@ impl<'a> Compiler<'a> {
 
         Ok(Self {
             decls,
-            clif_module,
-            trampolines: HashMap::new(),
+            codegen_context,
             opt_level,
             cpu_features,
             count_instructions,
@@ -260,90 +250,98 @@ impl<'a> Compiler<'a> {
         self.decls.get_module_data(self.module_features())
     }
 
-    pub fn object_file(mut self) -> Result<ObjectFile, Error> {
+    pub fn object_file(self) -> Result<ObjectFile, Error> {
         let mut func_translator = FuncTranslator::new();
         let mut function_manifest_ctx = ClifDataContext::new();
         let mut function_manifest_bytes = Cursor::new(Vec::new());
-        let mut function_map: HashMap<FuncId, TrapMetadata> = HashMap::new();
 
         let module_data_bytes = self.module_data()?.serialize()?;
         let module_data_len = module_data_bytes.len();
 
-        for (unique_func_ix, (mut validator, func_body)) in self.function_bodies.into_iter() {
-            let func = self
-                .decls
-                .get_func(unique_func_ix)
-                .expect("decl exists for func body");
-            let mut func_info = FuncInfo::new(
-                &self.decls,
-                &mut self.trampolines,
-                &mut self.clif_module,
-                self.count_instructions,
-            );
-            let mut clif_context = ClifContext::new();
-            clif_context.func.name = func.name.as_externalname();
-            clif_context.func.signature = func.signature.clone();
+        let mut decls = self.decls;
+        let codegen_context = self.codegen_context.clone();
+        let count_instructions = self.count_instructions;
 
-            func_translator
-                .translate_body(
-                    &mut validator,
-                    func_body.clone(),
-                    &mut clif_context.func,
-                    &mut func_info,
-                )
-                .map_err(|source| Error::FunctionTranslation {
-                    symbol: func.name.symbol().to_string(),
-                    source: Box::new(Error::from(source)),
-                })?;
-            let func_id = func.name.as_funcid().unwrap();
-            let mut traps = TrapSites::new();
-            let compiled = self
-                .clif_module
-                .define_function(func_id, &mut clif_context, &mut traps)
-                .map_err(|source| Error::FunctionDefinition {
-                    symbol: func.name.symbol().to_string(),
-                    source,
-                })?;
+        let mut function_map = self
+            .function_bodies
+            .into_iter()
+            .map(|(unique_func_ix, (mut validator, func_body))| {
+                let func = decls
+                    .get_func(unique_func_ix)
+                    .expect("decl exists for func body");
+                let mut func_info = FuncInfo::new(&decls, &codegen_context, count_instructions);
+                let mut clif_context = ClifContext::new();
+                clif_context.func.name = func.name.as_externalname();
+                clif_context.func.signature = func.signature.clone();
 
-            let func_size = compiled.size;
+                func_translator
+                    .translate_body(
+                        &mut validator,
+                        func_body.clone(),
+                        &mut clif_context.func,
+                        &mut func_info,
+                    )
+                    .map_err(|source| Error::FunctionTranslation {
+                        symbol: func.name.symbol().to_string(),
+                        source: Box::new(Error::from(source)),
+                    })?;
+                let func_id = func.name.as_funcid().unwrap();
+                let mut traps = TrapSites::new();
+                let compiled = codegen_context
+                    .module()
+                    .define_function(func_id, &mut clif_context, &mut traps)
+                    .map_err(|source| Error::FunctionDefinition {
+                        symbol: func.name.symbol().to_string(),
+                        source,
+                    })?;
 
-            let trap_data_id = traps.write(&mut self.clif_module, func.name.symbol())?;
+                let func_size = compiled.size;
 
-            function_map.insert(
-                func_id,
-                TrapMetadata {
-                    func_size,
-                    trap_data_id,
-                    trap_len: traps.len(),
-                },
-            );
-        }
+                let trap_data_id = traps.write(&codegen_context, func.name.symbol())?;
+
+                Ok((
+                    func_id,
+                    TrapMetadata {
+                        func_size,
+                        trap_data_id,
+                        trap_len: traps.len(),
+                    },
+                ))
+            })
+            .collect::<Result<HashMap<FuncId, TrapMetadata>, Error>>()?;
 
         // Now that we've defined all functions, we know what trampolines must also be created.
-        for (hostcall_name, (trampoline_id, hostcall_func_index)) in &self.trampolines {
-            synthesize_trampoline(
-                &mut self.decls,
-                &mut self.clif_module,
-                &mut function_map,
-                hostcall_name,
-                *trampoline_id,
-                *hostcall_func_index,
-            )?;
+        let trampoline_metas = codegen_context
+            .trampolines()
+            .iter()
+            .map(|(hostcall_name, (trampoline_id, hostcall_func_index))| {
+                let meta = synthesize_trampoline(
+                    &decls,
+                    &codegen_context,
+                    hostcall_name,
+                    *trampoline_id,
+                    *hostcall_func_index,
+                )?;
+                Ok((*trampoline_id, meta))
+            })
+            .collect::<Result<Vec<(FuncId, TrapMetadata)>, Error>>()?;
+
+        for (id, m) in trampoline_metas.into_iter() {
+            function_map.insert(id, m);
         }
 
         // Write out the stack probe and associated data.
-        let probe_id = stack_probe::declare(&mut self.decls, &mut self.clif_module)?;
-        let probe_func = self.decls.get_func(probe_id).unwrap();
+        let probe_id = stack_probe::declare(&mut decls, &codegen_context)?;
+        let probe_func = decls.get_func(probe_id).unwrap();
         let probe_func_id = probe_func.name.as_funcid().unwrap();
-        let compiled = self
-            .clif_module
+        let compiled = codegen_context
+            .module()
             .define_function_bytes(probe_func_id, stack_probe::STACK_PROBE_BINARY)?;
 
         let func_size = compiled.size;
         let stack_probe_traps: TrapSites = stack_probe::trap_sites().into();
 
-        let trap_data_id =
-            stack_probe_traps.write(&mut self.clif_module, probe_func.name.symbol())?;
+        let trap_data_id = stack_probe_traps.write(&codegen_context, probe_func.name.symbol())?;
 
         function_map.insert(
             probe_func_id,
@@ -354,16 +352,16 @@ impl<'a> Compiler<'a> {
             },
         );
 
-        let module_data_id = write_module_data(&mut self.clif_module, module_data_bytes)?;
-        let (table_id, table_len) = write_table_data(&mut self.clif_module, &self.decls)?;
+        let module_data_id = write_module_data(codegen_context.clone(), module_data_bytes)?;
+        let (table_id, table_len) = write_table_data(codegen_context.clone(), &decls)?;
 
         // The function manifest must be written out in the order that
         // cranelift-module is going to lay out the functions.  We also
         // have to be careful to write function manifest entries for VM
         // functions, which will not be represented in function_map.
 
-        let ids: Vec<FuncId> = self
-            .clif_module
+        let ids: Vec<FuncId> = codegen_context
+            .module()
             .declarations()
             .get_functions()
             .map(|(func_id, _f)| func_id)
@@ -372,7 +370,7 @@ impl<'a> Compiler<'a> {
 
         for func_id in ids {
             write_function_spec(
-                &mut self.clif_module,
+                codegen_context.clone(),
                 &mut function_manifest_ctx,
                 &mut function_manifest_bytes,
                 func_id,
@@ -381,22 +379,26 @@ impl<'a> Compiler<'a> {
         }
 
         function_manifest_ctx.define(function_manifest_bytes.into_inner().into());
-        let manifest_data_id = self.clif_module.declare_data(
+        let manifest_data_id = codegen_context.module().declare_data(
             FUNCTION_MANIFEST_SYM,
             ClifLinkage::Local,
             false,
             false,
         )?;
-        self.clif_module
+        codegen_context
+            .module()
             .define_data(manifest_data_id, &function_manifest_ctx)?;
 
         // Write out the structure tying everything together.
         let mut native_data =
             Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
         let mut native_data_ctx = ClifDataContext::new();
-        let native_data_id =
-            self.clif_module
-                .declare_data(LUCET_MODULE_SYM, ClifLinkage::Export, false, false)?;
+        let native_data_id = codegen_context.module().declare_data(
+            LUCET_MODULE_SYM,
+            ClifLinkage::Export,
+            false,
+            false,
+        )?;
 
         let version =
             VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
@@ -404,13 +406,13 @@ impl<'a> Compiler<'a> {
         version.write_to(&mut native_data)?;
 
         fn write_slice(
-            module: &mut ObjectModule,
+            codegen_context: &CodegenContext,
             mut ctx: &mut ClifDataContext,
             bytes: &mut Cursor<Vec<u8>>,
             id: DataId,
             len: usize,
         ) -> Result<(), Error> {
-            let data_ref = module.declare_data_in_data(id, &mut ctx);
+            let data_ref = codegen_context.module().declare_data_in_data(id, &mut ctx);
             let offset = bytes.position() as u32;
             ctx.write_data_addr(offset, data_ref, 0);
             bytes.write_u64::<LittleEndian>(0 as u64)?;
@@ -419,21 +421,21 @@ impl<'a> Compiler<'a> {
         }
 
         write_slice(
-            &mut self.clif_module,
+            &codegen_context,
             &mut native_data_ctx,
             &mut native_data,
             module_data_id,
             module_data_len,
         )?;
         write_slice(
-            &mut self.clif_module,
+            &codegen_context,
             &mut native_data_ctx,
             &mut native_data,
             table_id,
             table_len,
         )?;
         write_slice(
-            &mut self.clif_module,
+            &codegen_context,
             &mut native_data_ctx,
             &mut native_data,
             manifest_data_id,
@@ -441,15 +443,16 @@ impl<'a> Compiler<'a> {
         )?;
 
         native_data_ctx.define(native_data.into_inner().into());
-        self.clif_module
+        codegen_context
+            .module()
             .define_data(native_data_id, &native_data_ctx)?;
 
-        let obj = ObjectFile::new(self.clif_module.finish())?;
+        let obj = ObjectFile::new(codegen_context.finish())?;
 
         Ok(obj)
     }
 
-    pub fn cranelift_funcs(mut self) -> Result<CraneliftFuncs, Error> {
+    pub fn cranelift_funcs(self) -> Result<CraneliftFuncs, Error> {
         let mut funcs = HashMap::new();
         let mut func_translator = FuncTranslator::new();
 
@@ -458,12 +461,8 @@ impl<'a> Compiler<'a> {
                 .decls
                 .get_func(unique_func_ix)
                 .expect("decl exists for func body");
-            let mut func_info = FuncInfo::new(
-                &self.decls,
-                &mut self.trampolines,
-                &mut self.clif_module,
-                self.count_instructions,
-            );
+            let mut func_info =
+                FuncInfo::new(&self.decls, &self.codegen_context, self.count_instructions);
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();
@@ -517,6 +516,52 @@ struct TrapMetadata {
     trap_len: usize,
 }
 
+#[derive(Clone)]
+pub struct CodegenContext {
+    // the `FuncId` references the declared trampoline function Cranelift knows, but the
+    // `UniqueFuncIndex` references the hostcall being trampoline'd to.
+    trampolines: Arc<Mutex<HashMap<String, (FuncId, UniqueFuncIndex)>>>,
+    clif_module: Arc<Mutex<ObjectModule>>,
+}
+
+impl CodegenContext {
+    pub fn new(isa: Box<dyn TargetIsa>) -> Result<CodegenContext, Error> {
+        let libcalls = Box::new(move |libcall| match libcall {
+            ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
+            _ => (cranelift_module::default_libcall_names())(libcall),
+        });
+        let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls)?;
+        builder.function_alignment(16);
+        let clif_module = ObjectModule::new(builder);
+        Ok(CodegenContext {
+            trampolines: Arc::new(Mutex::new(HashMap::new())),
+            clif_module: Arc::new(Mutex::new(clif_module)),
+        })
+    }
+
+    pub fn module(&self) -> MutexGuard<'_, ObjectModule> {
+        self.clif_module
+            .lock()
+            .expect("possible to lock clifmodule")
+    }
+
+    pub fn trampolines(&self) -> MutexGuard<'_, HashMap<String, (FuncId, UniqueFuncIndex)>> {
+        self.trampolines
+            .lock()
+            .expect("possible to lock trampolines")
+    }
+
+    pub fn finish(self) -> ObjectProduct {
+        match Arc::try_unwrap(self.clif_module) {
+            Ok(m) => match m.into_inner() {
+                Ok(module) => module.finish(),
+                _ => panic!("module lock somehow held"),
+            },
+            Err(e) => panic!("{} outstanding references to module", Arc::strong_count(&e)),
+        }
+    }
+}
+
 // Hostcall trampolines have the general shape of:
 //
 // ```
@@ -532,13 +577,12 @@ struct TrapMetadata {
 //
 // but are specified here as Cranelift IR for lack of source to generate them from.
 fn synthesize_trampoline(
-    decls: &mut ModuleDecls,
-    clif_module: &mut ObjectModule,
-    function_map: &mut HashMap<FuncId, TrapMetadata>,
+    decls: &ModuleDecls,
+    codegen_context: &CodegenContext,
     hostcall_name: &str,
     trampoline_id: FuncId,
     hostcall_func_index: UniqueFuncIndex,
-) -> Result<(), Error> {
+) -> Result<TrapMetadata, Error> {
     let mut trampoline_context = ClifContext::new();
     trampoline_context.func.name = ir::ExternalName::from(trampoline_id);
     // the trampoline's signature is the same as the hostcall it calls' signature
@@ -616,7 +660,8 @@ fn synthesize_trampoline(
 
     let trampoline_name = format!("trampoline_{}", hostcall_name);
 
-    let compiled = clif_module
+    let compiled = codegen_context
+        .module()
         .define_function(trampoline_id, &mut trampoline_context, &mut traps)
         .map_err(|source| Error::FunctionDefinition {
             symbol: trampoline_name.clone(),
@@ -625,22 +670,17 @@ fn synthesize_trampoline(
 
     let func_size = compiled.size;
 
-    let trap_data_id = traps.write(clif_module, &trampoline_name)?;
+    let trap_data_id = traps.write(codegen_context, &trampoline_name)?;
 
-    function_map.insert(
-        trampoline_id,
-        TrapMetadata {
-            func_size,
-            trap_data_id,
-            trap_len: traps.len(),
-        },
-    );
-
-    Ok(())
+    Ok(TrapMetadata {
+        func_size,
+        trap_data_id,
+        trap_len: traps.len(),
+    })
 }
 
 fn write_module_data(
-    clif_module: &mut impl ClifModule,
+    codegen_context: CodegenContext,
     module_data_bytes: Vec<u8>,
 ) -> Result<DataId, Error> {
     use cranelift_module::{DataContext, Linkage};
@@ -648,10 +688,12 @@ fn write_module_data(
     let mut module_data_ctx = DataContext::new();
     module_data_ctx.define(module_data_bytes.into_boxed_slice());
 
-    let module_data_decl = clif_module
+    let module_data_decl = codegen_context
+        .module()
         .declare_data(MODULE_DATA_SYM, Linkage::Local, true, false)
         .map_err(Error::ClifModuleError)?;
-    clif_module
+    codegen_context
+        .module()
         .define_data(module_data_decl, &module_data_ctx)
         .map_err(Error::ClifModuleError)?;
 
@@ -696,14 +738,23 @@ impl TrapSites {
         trap_site_bytes.to_vec().into()
     }
     /// Write traps for a given function into the cranelift module:
-    pub fn write(&self, module: &mut ObjectModule, func_name: &str) -> Result<DataId, Error> {
+    pub fn write(
+        &self,
+        codegen_context: &CodegenContext,
+        func_name: &str,
+    ) -> Result<DataId, Error> {
         let trap_sym = trap_sym_for_func(func_name);
         let mut trap_sym_ctx = ClifDataContext::new();
         trap_sym_ctx.define(self.serialize());
 
-        let trap_data_id = module.declare_data(&trap_sym, ClifLinkage::Local, false, false)?;
+        let trap_data_id =
+            codegen_context
+                .module()
+                .declare_data(&trap_sym, ClifLinkage::Local, false, false)?;
 
-        module.define_data(trap_data_id, &trap_sym_ctx)?;
+        codegen_context
+            .module()
+            .define_data(trap_data_id, &trap_sym_ctx)?;
 
         Ok(trap_data_id)
     }
@@ -728,7 +779,7 @@ impl cranelift_codegen::binemit::TrapSink for TrapSites {
 }
 
 fn write_function_spec(
-    module: &mut ObjectModule,
+    codegen_context: CodegenContext,
     mut manifest_ctx: &mut ClifDataContext,
     manifest_bytes: &mut Cursor<Vec<u8>>,
     func_id: FuncId,
@@ -738,7 +789,9 @@ fn write_function_spec(
     // This code has implicit knowledge of the layout of `FunctionSpec`!
     //
     // Write a (ptr, len) pair with relocation for the code.
-    let func_ref = module.declare_func_in_data(func_id, &mut manifest_ctx);
+    let func_ref = codegen_context
+        .module()
+        .declare_func_in_data(func_id, &mut manifest_ctx);
     let offset = manifest_bytes.position() as u32;
     manifest_ctx.write_function_addr(offset, func_ref);
     manifest_bytes.write_u64::<LittleEndian>(0 as u64)?;
@@ -746,7 +799,9 @@ fn write_function_spec(
     // Write a (ptr, len) pair with relocation for the trap table.
     if let Some(m) = metadata {
         if m.trap_len > 0 {
-            let data_ref = module.declare_data_in_data(m.trap_data_id, &mut manifest_ctx);
+            let data_ref = codegen_context
+                .module()
+                .declare_data_in_data(m.trap_data_id, &mut manifest_ctx);
             let offset = manifest_bytes.position() as u32;
             manifest_ctx.write_data_addr(offset, data_ref, 0);
         }

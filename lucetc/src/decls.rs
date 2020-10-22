@@ -1,3 +1,4 @@
+use crate::compiler::CodegenContext;
 use crate::error::Error;
 use crate::heap::HeapSettings;
 pub use crate::module::{Exportable, TableElems};
@@ -79,13 +80,13 @@ pub struct ModuleDecls<'a> {
 impl<'a> ModuleDecls<'a> {
     pub fn new(
         info: ModuleInfo<'a>,
-        clif_module: &mut impl ClifModule,
+        codegen_context: CodegenContext,
         bindings: &'a Bindings,
         runtime: Runtime,
         heap_settings: HeapSettings,
     ) -> Result<Self, Error> {
         let imports: Vec<ImportFunction<'a>> = Vec::with_capacity(info.imported_funcs.len());
-        let (tables_list_name, table_names) = Self::declare_tables(&info, clif_module)?;
+        let (tables_list_name, table_names) = Self::declare_tables(&info, &codegen_context)?;
         let globals_spec = Self::build_globals_spec(&info)?;
         let linear_memory_spec = Self::build_linear_memory_spec(&info, heap_settings)?;
         let mut decls = Self {
@@ -100,8 +101,8 @@ impl<'a> ModuleDecls<'a> {
             linear_memory_spec,
         };
 
-        Self::declare_funcs(&mut decls, clif_module, bindings)?;
-        Self::declare_runtime(&mut decls, clif_module, runtime)?;
+        Self::declare_funcs(&mut decls, &codegen_context, bindings)?;
+        Self::declare_runtime(&mut decls, &codegen_context, runtime)?;
 
         Ok(decls)
     }
@@ -110,7 +111,7 @@ impl<'a> ModuleDecls<'a> {
 
     fn declare_funcs(
         decls: &mut ModuleDecls<'a>,
-        clif_module: &mut impl ClifModule,
+        codegen_context: &CodegenContext,
         bindings: &'a Bindings,
     ) -> Result<(), Error> {
         // Get the name for this function from the module names section, if it exists.
@@ -172,12 +173,22 @@ impl<'a> ModuleDecls<'a> {
                     // if a function is an export and import, it will not have a real function body
                     // in this program, and we must not declare it with Linkage::Export (there will
                     // never be a define to satisfy the symbol!)
-                    decls.declare_function(clif_module, import_sym, Linkage::Import, func_index)?;
+                    decls.declare_function(
+                        codegen_context,
+                        import_sym,
+                        Linkage::Import,
+                        func_index,
+                    )?;
                 }
                 (None, Some(export_sym)) => {
                     // This is a function that is only exported, so there will be a body in this
                     // artifact. We can declare the export.
-                    decls.declare_function(clif_module, export_sym, Linkage::Export, func_index)?;
+                    decls.declare_function(
+                        codegen_context,
+                        export_sym,
+                        Linkage::Export,
+                        func_index,
+                    )?;
                 }
                 (None, None) => {
                     // No import or export for this function, which means that it is local. We can
@@ -185,7 +196,12 @@ impl<'a> ModuleDecls<'a> {
                     // make up a placeholder name for it using its index.
                     let local_sym = custom_name_for(ix, func_index, decls)
                         .unwrap_or_else(|| format!("guest_func_{}", ix));
-                    decls.declare_function(clif_module, local_sym, Linkage::Local, func_index)?;
+                    decls.declare_function(
+                        codegen_context,
+                        local_sym,
+                        Linkage::Local,
+                        func_index,
+                    )?;
                 }
             }
         }
@@ -198,7 +214,7 @@ impl<'a> ModuleDecls<'a> {
     /// function type, let alone name, linkage, etc. So we must do that ourselves!
     pub fn declare_new_function(
         &mut self,
-        clif_module: &mut impl ClifModule,
+        codegen_context: &CodegenContext,
         decl_sym: String,
         decl_linkage: Linkage,
         wasm_func_type: WasmFuncType,
@@ -206,7 +222,7 @@ impl<'a> ModuleDecls<'a> {
     ) -> Result<UniqueFuncIndex, Error> {
         let (new_funcidx, _) = self.info.declare_func_with_sig(wasm_func_type, signature)?;
 
-        self.declare_function(clif_module, decl_sym, decl_linkage, new_funcidx)?;
+        self.declare_function(codegen_context, decl_sym, decl_linkage, new_funcidx)?;
 
         Ok(new_funcidx)
     }
@@ -215,7 +231,7 @@ impl<'a> ModuleDecls<'a> {
     /// be done when building a ModuleDecls record of functions that were described by ModuleInfo.
     fn declare_function(
         &mut self,
-        clif_module: &mut impl ClifModule,
+        codegen_context: &CodegenContext,
         decl_sym: String,
         decl_linkage: Linkage,
         func_ix: UniqueFuncIndex,
@@ -227,7 +243,7 @@ impl<'a> ModuleDecls<'a> {
         // Regardless of the function being known internally, we must forward the additional
         // declaration to `clif_module` so functions with multiple forms of linkage (import +
         // export, exported twice, ...) are correctly declared in the resultant artifact.
-        let funcid = clif_module.declare_function(
+        let funcid = codegen_context.module().declare_function(
             &decl_sym,
             decl_linkage,
             &self.info.signature_for_function(func_ix).0,
@@ -249,19 +265,24 @@ impl<'a> ModuleDecls<'a> {
 
     fn declare_tables(
         info: &ModuleInfo<'a>,
-        clif_module: &mut impl ClifModule,
+        codegen_context: &CodegenContext,
     ) -> Result<(Name, PrimaryMap<TableIndex, Name>), Error> {
         let mut table_names = PrimaryMap::new();
         for ix in 0..info.tables.len() {
             let def_symbol = format!("guest_table_{}", ix);
             let def_data_id =
-                clif_module.declare_data(&def_symbol, Linkage::Local, false, false)?;
+                codegen_context
+                    .module()
+                    .declare_data(&def_symbol, Linkage::Local, false, false)?;
             let def_name = Name::new_data(def_symbol, def_data_id);
 
             table_names.push(def_name);
         }
 
-        let tables_list_id = clif_module.declare_data(TABLE_SYM, Linkage::Local, false, false)?;
+        let tables_list_id =
+            codegen_context
+                .module()
+                .declare_data(TABLE_SYM, Linkage::Local, false, false)?;
         let tables_list = Name::new_data(TABLE_SYM.to_string(), tables_list_id);
 
         Ok((tables_list, table_names))
@@ -269,12 +290,12 @@ impl<'a> ModuleDecls<'a> {
 
     fn declare_runtime(
         decls: &mut ModuleDecls<'a>,
-        clif_module: &mut impl ClifModule,
+        codegen_context: &CodegenContext,
         runtime: Runtime,
     ) -> Result<(), Error> {
         for (func, functype) in runtime.functions.iter() {
             let func_id = decls.declare_new_function(
-                clif_module,
+                codegen_context,
                 functype.name.clone(),
                 Linkage::Import,
                 functype.wasm_func_type.clone(),

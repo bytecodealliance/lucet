@@ -8,6 +8,7 @@
 //! adding custom entries for it into the trap table, so that stack overflows in the probe will be
 //! treated like any other guest trap.
 
+use crate::compiler::CodegenContext;
 use crate::decls::ModuleDecls;
 use crate::error::Error;
 use crate::module::UniqueFuncIndex;
@@ -15,7 +16,7 @@ use cranelift_codegen::{
     ir::{self, types, AbiParam, Signature},
     isa::CallConv,
 };
-use cranelift_module::{Linkage, Module as ClifModule, TrapSite};
+use cranelift_module::{Linkage, TrapSite};
 use cranelift_wasm::{WasmFuncType, WasmType};
 
 /// Stack probe symbol name
@@ -55,11 +56,11 @@ pub fn trap_sites() -> Vec<TrapSite> {
 
 pub fn declare<'a>(
     decls: &mut ModuleDecls<'a>,
-    clif_module: &mut impl ClifModule,
+    codegen_context: &CodegenContext,
 ) -> Result<UniqueFuncIndex, Error> {
     Ok(decls
         .declare_new_function(
-            clif_module,
+            codegen_context,
             STACK_PROBE_SYM.to_string(),
             Linkage::Local,
             WasmFuncType {

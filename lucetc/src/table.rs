@@ -1,3 +1,4 @@
+use crate::compiler::CodegenContext;
 use crate::decls::{ModuleDecls, TableDecl};
 use crate::error::Error;
 use crate::module::UniqueFuncIndex;
@@ -61,7 +62,7 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
 }
 
 pub fn write_table_data(
-    clif_module: &mut impl ClifModule,
+    codegen_context: CodegenContext,
     decls: &ModuleDecls<'_>,
 ) -> Result<(DataId, usize), Error> {
     let mut tables_vec = Cursor::new(Vec::new());
@@ -123,11 +124,15 @@ pub fn write_table_data(
             .contents_name
             .as_dataid()
             .expect("tables are data");
-        clif_module.define_data(table_id, &table_data_ctx)?;
+        codegen_context
+            .module()
+            .define_data(table_id, &table_data_ctx)?;
 
         // have to link TABLE_SYM, table_id,
         // add space for the TABLE_SYM pointer
-        let dataref = clif_module.declare_data_in_data(table_id, &mut table_ctx);
+        let dataref = codegen_context
+            .module()
+            .declare_data_in_data(table_id, &mut table_ctx);
         let position = tables_vec.position();
         assert!(position < <u32>::max_value() as u64);
         table_ctx.write_data_addr(position as u32, dataref, 0 as i64);
@@ -148,6 +153,6 @@ pub fn write_table_data(
         .get_tables_list_name()
         .as_dataid()
         .expect("lucet_tables is declared as data");
-    clif_module.define_data(table_id, &table_ctx)?;
+    codegen_context.module().define_data(table_id, &table_ctx)?;
     Ok((table_id, tables_count))
 }
