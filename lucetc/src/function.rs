@@ -549,6 +549,8 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _pos: FuncCursor,
         _index: MemoryIndex,
         _heap: ir::Heap,
+        _index2: MemoryIndex,
+        _heap2: ir::Heap,
         _dst: ir::Value,
         _src: ir::Value,
         _len: ir::Value,

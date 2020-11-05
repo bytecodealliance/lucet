@@ -11,13 +11,13 @@ edition = "2018"
 [lib]
 
 [dependencies]
-lucet-wiggle-macro = { path = "./macro", version = "0.7.0-dev" }
-lucet-wiggle-generate = { path = "./generate", version = "0.7.0-dev" }
-lucet-runtime = { path = "../lucet-runtime", version = "0.7.0-dev" }
-wiggle =  { path = "../wasmtime/crates/wiggle", version = "0.20.0" }
+lucet-wiggle-macro = { path = "./macro" }
+lucet-wiggle-generate = { path = "./generate" }
+lucet-runtime = { path = "../lucet-runtime" }
+wiggle =  { path = "../wasmtime/crates/wiggle" }
 
 [dev-dependencies]
 wiggle-test = { path = "../wasmtime/crates/wiggle/test-helpers" }
 tempfile = "3.1"
-lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.7.0-dev" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 lucetc = { path = "../lucetc", version = "0.7.0-dev" }

@@ -16,13 +16,13 @@ path = "lucetc/main.rs"
 [dependencies]
 anyhow = "1"
 bincode = "1.1.4"
-cranelift-codegen = { path = "../wasmtime/cranelift/codegen", version = "0.67.0" }
-cranelift-entity = { path = "../wasmtime/cranelift/entity", version = "0.67.0" }
-cranelift-native = { path = "../wasmtime/cranelift/native", version = "0.67.0" }
-cranelift-frontend = { path = "../wasmtime/cranelift/frontend", version = "0.67.0" }
-cranelift-module = { path = "../wasmtime/cranelift/module", version = "0.67.0" }
-cranelift-object = { path = "../wasmtime/cranelift/object", version = "0.67.0" }
-cranelift-wasm = { path = "../wasmtime/cranelift/wasm", version = "0.67.0" }
+cranelift-codegen = { path = "../wasmtime/cranelift/codegen" }
+cranelift-entity = { path = "../wasmtime/cranelift/entity" }
+cranelift-native = { path = "../wasmtime/cranelift/native" }
+cranelift-frontend = { path = "../wasmtime/cranelift/frontend" }
+cranelift-module = { path = "../wasmtime/cranelift/module" }
+cranelift-object = { path = "../wasmtime/cranelift/object" }
+cranelift-wasm = { path = "../wasmtime/cranelift/wasm" }
 target-lexicon = "0.11"
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.7.0-dev" }
@@ -32,7 +32,7 @@ clap="2.32"
 
 log = "0.4"
 env_logger = "0.6"
-object = { version = "0.21.1", default-features = false, features = ["write"] }
+object = { version = "0.22.0", default-features = false, features = ["write"] }
 byteorder = "1.2"
 wabt = "0.9.1"
 tempfile = "3.0"

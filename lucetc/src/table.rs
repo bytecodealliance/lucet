@@ -62,7 +62,7 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
 }
 
 pub fn write_table_data(
-    codegen_context: CodegenContext,
+    codegen_context: &CodegenContext,
     decls: &ModuleDecls<'_>,
 ) -> Result<(DataId, usize), Error> {
     let mut tables_vec = Cursor::new(Vec::new());

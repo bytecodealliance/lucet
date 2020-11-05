@@ -14,6 +14,7 @@ use crate::traps::{translate_trapcode, trap_sym_for_func};
 use crate::validate::Validator;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
+    binemit,
     ir::{self, InstBuilder},
     isa::TargetIsa,
     settings::{self, Configurable},
@@ -22,6 +23,7 @@ use cranelift_codegen::{
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{
     DataContext as ClifDataContext, DataId, FuncId, Linkage as ClifLinkage, Module as ClifModule,
+    RelocRecord,
 };
 use cranelift_object::{ObjectBuilder, ObjectModule, ObjectProduct};
 use cranelift_wasm::{
@@ -38,7 +40,7 @@ use memoffset::offset_of;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::io::Cursor;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 use target_lexicon::Triple;
 
 #[derive(Debug, Clone, Copy)]
@@ -205,8 +207,10 @@ impl<'a> Compiler<'a> {
         validator: Option<Validator>,
         canonicalize_nans: bool,
     ) -> Result<Self, Error> {
-        let isa = Self::target_isa(target.clone(), opt_level, &cpu_features, canonicalize_nans)?;
+        let mk_isa =
+            || Self::target_isa(target.clone(), opt_level, &cpu_features, canonicalize_nans);
 
+        let isa = mk_isa()?;
         let frontend_config = isa.frontend_config();
         let mut module_validation = ModuleValidation::new(frontend_config.clone(), validator);
 
@@ -214,7 +218,7 @@ impl<'a> Compiler<'a> {
 
         module_validation.validation_errors()?;
 
-        let codegen_context = CodegenContext::new(isa)?;
+        let codegen_context = CodegenContext::new(isa, mk_isa()?)?;
 
         let runtime = Runtime::lucet(frontend_config);
         let decls = ModuleDecls::new(
@@ -286,27 +290,10 @@ impl<'a> Compiler<'a> {
                         source: Box::new(Error::from(source)),
                     })?;
                 let func_id = func.name.as_funcid().unwrap();
-                let mut traps = TrapSites::new();
-                let compiled = codegen_context
-                    .module()
-                    .define_function(func_id, &mut clif_context, &mut traps)
-                    .map_err(|source| Error::FunctionDefinition {
-                        symbol: func.name.symbol().to_string(),
-                        source,
-                    })?;
+                let trap_metadata =
+                    codegen_context.compile(&mut clif_context, func_id, func.name.symbol())?;
 
-                let func_size = compiled.size;
-
-                let trap_data_id = traps.write(&codegen_context, func.name.symbol())?;
-
-                Ok((
-                    func_id,
-                    TrapMetadata {
-                        func_size,
-                        trap_data_id,
-                        trap_len: traps.len(),
-                    },
-                ))
+                Ok((func_id, trap_metadata))
             })
             .collect::<Result<HashMap<FuncId, TrapMetadata>, Error>>()?;
 
@@ -334,9 +321,11 @@ impl<'a> Compiler<'a> {
         let probe_id = stack_probe::declare(&mut decls, &codegen_context)?;
         let probe_func = decls.get_func(probe_id).unwrap();
         let probe_func_id = probe_func.name.as_funcid().unwrap();
-        let compiled = codegen_context
-            .module()
-            .define_function_bytes(probe_func_id, stack_probe::STACK_PROBE_BINARY)?;
+        let compiled = codegen_context.module().define_function_bytes(
+            probe_func_id,
+            stack_probe::STACK_PROBE_BINARY,
+            &[],
+        )?;
 
         let func_size = compiled.size;
         let stack_probe_traps: TrapSites = stack_probe::trap_sites().into();
@@ -352,8 +341,8 @@ impl<'a> Compiler<'a> {
             },
         );
 
-        let module_data_id = write_module_data(codegen_context.clone(), module_data_bytes)?;
-        let (table_id, table_len) = write_table_data(codegen_context.clone(), &decls)?;
+        let module_data_id = write_module_data(&codegen_context, module_data_bytes)?;
+        let (table_id, table_len) = write_table_data(&codegen_context, &decls)?;
 
         // The function manifest must be written out in the order that
         // cranelift-module is going to lay out the functions.  We also
@@ -370,7 +359,7 @@ impl<'a> Compiler<'a> {
 
         for func_id in ids {
             write_function_spec(
-                codegen_context.clone(),
+                &codegen_context,
                 &mut function_manifest_ctx,
                 &mut function_manifest_bytes,
                 func_id,
@@ -516,28 +505,34 @@ struct TrapMetadata {
     trap_len: usize,
 }
 
-#[derive(Clone)]
 pub struct CodegenContext {
+    isa: Box<dyn TargetIsa>,
     // the `FuncId` references the declared trampoline function Cranelift knows, but the
     // `UniqueFuncIndex` references the hostcall being trampoline'd to.
-    trampolines: Arc<Mutex<HashMap<String, (FuncId, UniqueFuncIndex)>>>,
-    clif_module: Arc<Mutex<ObjectModule>>,
+    trampolines: Mutex<HashMap<String, (FuncId, UniqueFuncIndex)>>,
+    clif_module: Mutex<ObjectModule>,
 }
-unsafe impl Send for CodegenContext {}
-unsafe impl Sync for CodegenContext {}
 
 impl CodegenContext {
-    pub fn new(isa: Box<dyn TargetIsa>) -> Result<CodegenContext, Error> {
+    // Note that two `TargetIsa` objects are required here since one will live
+    // inside of the lock holding `ObjectModule` and one will live outside. Not
+    // exactly a great state to be in but should hopefully get the job done for
+    // now.
+    pub fn new(
+        isa: Box<dyn TargetIsa>,
+        isa_copy: Box<dyn TargetIsa>,
+    ) -> Result<CodegenContext, Error> {
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
             _ => (cranelift_module::default_libcall_names())(libcall),
         });
-        let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls)?;
+        let mut builder = ObjectBuilder::new(isa_copy, "lucet_guest".to_owned(), libcalls)?;
         builder.function_alignment(16);
         let clif_module = ObjectModule::new(builder);
         Ok(CodegenContext {
-            trampolines: Arc::new(Mutex::new(HashMap::new())),
-            clif_module: Arc::new(Mutex::new(clif_module)),
+            isa,
+            trampolines: Mutex::new(HashMap::new()),
+            clif_module: Mutex::new(clif_module),
         })
     }
 
@@ -554,13 +549,59 @@ impl CodegenContext {
     }
 
     pub fn finish(self) -> ObjectProduct {
-        match Arc::try_unwrap(self.clif_module) {
-            Ok(m) => match m.into_inner() {
-                Ok(module) => module.finish(),
-                _ => panic!("module lock somehow held"),
-            },
-            Err(e) => panic!("{} outstanding references to module", Arc::strong_count(&e)),
+        match self.clif_module.into_inner() {
+            Ok(module) => module.finish(),
+            _ => panic!("module lock somehow held"),
         }
+    }
+
+    fn compile(
+        &self,
+        clif: &mut ClifContext,
+        func_id: FuncId,
+        symbol: &str,
+    ) -> Result<TrapMetadata, Error> {
+        let binemit::CodeInfo {
+            total_size: code_size,
+            ..
+        } = clif
+            .compile(&*self.isa)
+            .map_err(|source| Error::FunctionDefinition {
+                symbol: symbol.to_string(),
+                source: source.into(),
+            })?;
+
+        let mut code: Vec<u8> = vec![0; code_size as usize];
+        let mut reloc_sink = ObjectRelocSink::default();
+        let mut stack_map_sink = binemit::NullStackMapSink {};
+        let mut traps = TrapSites::new();
+        unsafe {
+            clif.emit_to_memory(
+                &*self.isa,
+                code.as_mut_ptr(),
+                &mut reloc_sink,
+                &mut traps,
+                &mut stack_map_sink,
+            )
+        };
+
+        let compiled = self
+            .module()
+            .define_function_bytes(func_id, &code, &reloc_sink.relocs)
+            .map_err(|source| Error::FunctionDefinition {
+                symbol: symbol.to_string(),
+                source,
+            })?;
+
+        let func_size = compiled.size;
+
+        let trap_data_id = traps.write(self, symbol)?;
+
+        Ok(TrapMetadata {
+            func_size,
+            trap_data_id,
+            trap_len: traps.len(),
+        })
     }
 }
 
@@ -658,31 +699,12 @@ fn synthesize_trampoline(
     builder.switch_to_block(stack_check_fail);
     builder.ins().trap(ir::TrapCode::StackOverflow);
 
-    let mut traps = TrapSites::new();
-
     let trampoline_name = format!("trampoline_{}", hostcall_name);
-
-    let compiled = codegen_context
-        .module()
-        .define_function(trampoline_id, &mut trampoline_context, &mut traps)
-        .map_err(|source| Error::FunctionDefinition {
-            symbol: trampoline_name.clone(),
-            source,
-        })?;
-
-    let func_size = compiled.size;
-
-    let trap_data_id = traps.write(codegen_context, &trampoline_name)?;
-
-    Ok(TrapMetadata {
-        func_size,
-        trap_data_id,
-        trap_len: traps.len(),
-    })
+    codegen_context.compile(&mut trampoline_context, trampoline_id, &trampoline_name)
 }
 
 fn write_module_data(
-    codegen_context: CodegenContext,
+    codegen_context: &CodegenContext,
     module_data_bytes: Vec<u8>,
 ) -> Result<DataId, Error> {
     use cranelift_module::{DataContext, Linkage};
@@ -781,7 +803,7 @@ impl cranelift_codegen::binemit::TrapSink for TrapSites {
 }
 
 fn write_function_spec(
-    codegen_context: CodegenContext,
+    codegen_context: &CodegenContext,
     mut manifest_ctx: &mut ClifDataContext,
     manifest_bytes: &mut Cursor<Vec<u8>>,
     func_id: FuncId,
@@ -815,4 +837,62 @@ fn write_function_spec(
     manifest_bytes.write_u64::<LittleEndian>(trap_len as u64)?;
 
     Ok(())
+}
+
+#[derive(Default)]
+struct ObjectRelocSink {
+    relocs: Vec<RelocRecord>,
+}
+
+impl binemit::RelocSink for ObjectRelocSink {
+    fn reloc_block(
+        &mut self,
+        _offset: binemit::CodeOffset,
+        _reloc: binemit::Reloc,
+        _block_offset: binemit::CodeOffset,
+    ) {
+        unimplemented!();
+    }
+
+    fn reloc_external(
+        &mut self,
+        offset: binemit::CodeOffset,
+        _srcloc: ir::SourceLoc,
+        reloc: binemit::Reloc,
+        name: &ir::ExternalName,
+        addend: binemit::Addend,
+    ) {
+        self.relocs.push(RelocRecord {
+            offset,
+            reloc,
+            addend,
+            name: name.clone(),
+        });
+    }
+
+    fn reloc_jt(
+        &mut self,
+        _offset: binemit::CodeOffset,
+        reloc: binemit::Reloc,
+        _jt: ir::JumpTable,
+    ) {
+        match reloc {
+            // skipped in cranelift-object so we do too
+            binemit::Reloc::X86PCRelRodata4 => {}
+            _ => panic!("Unhandled reloc"),
+        }
+    }
+
+    fn reloc_constant(
+        &mut self,
+        _offset: binemit::CodeOffset,
+        reloc: binemit::Reloc,
+        _jt: ir::ConstantOffset,
+    ) {
+        match reloc {
+            // skipped in cranelift-object so we do too
+            binemit::Reloc::X86PCRelRodata4 => {}
+            _ => panic!("Unhandled reloc"),
+        }
+    }
 }
