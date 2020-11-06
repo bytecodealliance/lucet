@@ -11,8 +11,10 @@ pub enum Error {
     // General #[from] implementations.
     #[error("Clif module: {0}")]
     ClifModuleError(#[from] ClifModuleError),
-    #[error("Translating: {0}")]
-    ClifWasmError(#[from] ClifWasmError),
+    #[error("Validating WebAssembly: at offset {offset}, {message}")]
+    WebAssemblyValidation { message: String, offset: usize },
+    #[error("Translation internal error: {0}")]
+    ClifWasmInternalError(#[source] ClifWasmError),
     #[error("Lucet Module: {0}")]
     LucetModule(#[from] LucetModuleError),
     #[error("Lucet validation errors: {0:?}")]
@@ -42,7 +44,7 @@ pub enum Error {
     FunctionTranslation {
         symbol: String,
         #[source]
-        source: ClifWasmError,
+        source: Box<Error>,
     },
     #[error("Inconsistent state when translating module: global {0} is declared as an import but has no entry in imported_globals")]
     GlobalDeclarationError(u32),
@@ -76,4 +78,17 @@ pub enum Error {
     Unsupported(String),
     #[error("host machine is not a supported target: {0}")]
     UnsupportedIsa(#[from] cranelift_codegen::isa::LookupError),
+}
+
+impl From<ClifWasmError> for Error {
+    fn from(e: ClifWasmError) -> Error {
+        match e {
+            ClifWasmError::User(e) => Error::Input(e),
+            ClifWasmError::InvalidWebAssembly { message, offset } => {
+                Error::WebAssemblyValidation { message, offset }
+            }
+            ClifWasmError::Unsupported(e) => Error::Unsupported(e),
+            ClifWasmError::ImplLimitExceeded { .. } => Error::ClifWasmInternalError(e),
+        }
+    }
 }

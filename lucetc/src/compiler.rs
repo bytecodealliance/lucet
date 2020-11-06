@@ -5,7 +5,7 @@ use crate::decls::ModuleDecls;
 use crate::error::Error;
 use crate::function::FuncInfo;
 use crate::heap::HeapSettings;
-use crate::module::{ModuleInfo, UniqueFuncIndex};
+use crate::module::{ModuleValidation, UniqueFuncIndex};
 use crate::output::{CraneliftFuncs, ObjectFile, FUNCTION_MANIFEST_SYM};
 use crate::runtime::Runtime;
 use crate::stack_probe;
@@ -22,11 +22,14 @@ use cranelift_codegen::{
 };
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{
-    Backend as ClifBackend, DataContext as ClifDataContext, DataId, FuncId, FuncOrDataId,
-    Linkage as ClifLinkage, Module as ClifModule,
+    DataContext as ClifDataContext, DataId, FuncId, Linkage as ClifLinkage, Module as ClifModule,
 };
-use cranelift_object::{ObjectBackend, ObjectBuilder};
-use cranelift_wasm::{translate_module, FuncTranslator, ModuleTranslationState, WasmError};
+use cranelift_object::{ObjectBuilder, ObjectModule};
+use cranelift_wasm::{
+    translate_module,
+    wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
+    FuncTranslator,
+};
 use lucet_module::bindings::Bindings;
 use lucet_module::{
     InstanceRuntimeData, ModuleData, ModuleFeatures, SerializedModule, VersionInfo,
@@ -179,7 +182,7 @@ impl CompilerBuilder {
 
 pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
-    clif_module: ClifModule<ObjectBackend>,
+    clif_module: ObjectModule,
     // the `FuncId` references the declared trampoline function Cranelift knows, but the
     // `UniqueFuncIndex` references the hostcall being trampoline'd to.
     trampolines: HashMap<String, (FuncId, UniqueFuncIndex)>,
@@ -187,8 +190,9 @@ pub struct Compiler<'a> {
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
     count_instructions: bool,
-    module_translation_state: ModuleTranslationState,
     canonicalize_nans: bool,
+    function_bodies:
+        HashMap<UniqueFuncIndex, (FuncValidator<ValidatorResources>, FunctionBody<'a>)>,
 }
 
 impl<'a> Compiler<'a> {
@@ -206,24 +210,11 @@ impl<'a> Compiler<'a> {
         let isa = Self::target_isa(target.clone(), opt_level, &cpu_features, canonicalize_nans)?;
 
         let frontend_config = isa.frontend_config();
-        let mut module_info = ModuleInfo::new(frontend_config.clone(), validator);
+        let mut module_validation = ModuleValidation::new(frontend_config.clone(), validator);
 
-        wasmparser::validate(wasm_binary).map_err(Error::WasmValidation)?;
+        let _module_translation_state = translate_module(wasm_binary, &mut module_validation)?;
 
-        let module_translation_state =
-            translate_module(wasm_binary, &mut module_info).map_err(|e| match e {
-                WasmError::User(u) => Error::Input(u),
-                WasmError::InvalidWebAssembly { .. } => {
-                    // Since wasmparser was already used to validate,
-                    // reaching this case means there's a significant
-                    // bug in either wasmparser or cranelift-wasm.
-                    unreachable!();
-                }
-                WasmError::Unsupported(s) => Error::Unsupported(s),
-                WasmError::ImplLimitExceeded { .. } => Error::ClifWasmError(e),
-            })?;
-
-        module_info.validation_errors()?;
+        module_validation.validation_errors()?;
 
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
@@ -232,11 +223,11 @@ impl<'a> Compiler<'a> {
 
         let mut builder = ObjectBuilder::new(isa, "lucet_guest".to_owned(), libcalls)?;
         builder.function_alignment(16);
-        let mut clif_module: ClifModule<ObjectBackend> = ClifModule::new(builder);
+        let mut clif_module: ObjectModule = ObjectModule::new(builder);
 
         let runtime = Runtime::lucet(frontend_config);
         let decls = ModuleDecls::new(
-            module_info,
+            module_validation.info,
             &mut clif_module,
             bindings,
             runtime,
@@ -250,9 +241,9 @@ impl<'a> Compiler<'a> {
             opt_level,
             cpu_features,
             count_instructions,
-            module_translation_state,
             target,
             canonicalize_nans,
+            function_bodies: module_validation.function_bodies,
         })
     }
 
@@ -276,7 +267,14 @@ impl<'a> Compiler<'a> {
         let mut function_manifest_bytes = Cursor::new(Vec::new());
         let mut function_map: HashMap<FuncId, (u32, DataId, usize)> = HashMap::new();
 
-        for (ref func, (code, code_offset)) in self.decls.function_bodies() {
+        let module_data_bytes = self.module_data()?.serialize()?;
+        let module_data_len = module_data_bytes.len();
+
+        for (unique_func_ix, (mut validator, func_body)) in self.function_bodies.into_iter() {
+            let func = self
+                .decls
+                .get_func(unique_func_ix)
+                .expect("decl exists for func body");
             let mut func_info = FuncInfo::new(
                 &self.decls,
                 &mut self.trampolines,
@@ -288,16 +286,15 @@ impl<'a> Compiler<'a> {
             clif_context.func.signature = func.signature.clone();
 
             func_translator
-                .translate(
-                    &self.module_translation_state,
-                    code,
-                    *code_offset,
+                .translate_body(
+                    &mut validator,
+                    func_body.clone(),
                     &mut clif_context.func,
                     &mut func_info,
                 )
                 .map_err(|source| Error::FunctionTranslation {
                     symbol: func.name.symbol().to_string(),
-                    source,
+                    source: Box::new(Error::from(source)),
                 })?;
             let func_id = func.name.as_funcid().unwrap();
             let mut traps = TrapSites::new();
@@ -344,10 +341,6 @@ impl<'a> Compiler<'a> {
 
         function_map.insert(probe_func_id, (size, trap_data_id, stack_probe_traps.len()));
 
-        let module_data_bytes = self.module_data()?.serialize()?;
-
-        let module_data_len = module_data_bytes.len();
-
         let module_data_id = write_module_data(&mut self.clif_module, module_data_bytes)?;
         let (table_id, table_len) = write_table_data(&mut self.clif_module, &self.decls)?;
 
@@ -358,14 +351,9 @@ impl<'a> Compiler<'a> {
 
         let ids: Vec<FuncId> = self
             .clif_module
-            .declared_functions()
-            .map(|f| {
-                let func_id = match self.clif_module.get_name(&f.decl.name).unwrap() {
-                    FuncOrDataId::Func(id) => id,
-                    _ => panic!(),
-                };
-                func_id
-            })
+            .declarations()
+            .get_functions()
+            .map(|(func_id, _f)| func_id)
             .collect();
         let function_manifest_len = ids.len();
 
@@ -394,7 +382,6 @@ impl<'a> Compiler<'a> {
             ClifLinkage::Local,
             false,
             false,
-            None,
         )?;
         self.clif_module
             .define_data(manifest_data_id, &function_manifest_ctx)?;
@@ -403,13 +390,9 @@ impl<'a> Compiler<'a> {
         let mut native_data =
             Cursor::new(Vec::with_capacity(std::mem::size_of::<SerializedModule>()));
         let mut native_data_ctx = ClifDataContext::new();
-        let native_data_id = self.clif_module.declare_data(
-            LUCET_MODULE_SYM,
-            ClifLinkage::Export,
-            false,
-            false,
-            None,
-        )?;
+        let native_data_id =
+            self.clif_module
+                .declare_data(LUCET_MODULE_SYM, ClifLinkage::Export, false, false)?;
 
         let version =
             VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
@@ -417,7 +400,7 @@ impl<'a> Compiler<'a> {
         version.write_to(&mut native_data)?;
 
         fn write_slice(
-            module: &mut ClifModule<ObjectBackend>,
+            module: &mut ObjectModule,
             mut ctx: &mut ClifDataContext,
             bytes: &mut Cursor<Vec<u8>>,
             id: DataId,
@@ -466,7 +449,11 @@ impl<'a> Compiler<'a> {
         let mut funcs = HashMap::new();
         let mut func_translator = FuncTranslator::new();
 
-        for (ref func, (code, code_offset)) in self.decls.function_bodies() {
+        for (unique_func_ix, (mut validator, body)) in self.function_bodies.into_iter() {
+            let func = self
+                .decls
+                .get_func(unique_func_ix)
+                .expect("decl exists for func body");
             let mut func_info = FuncInfo::new(
                 &self.decls,
                 &mut self.trampolines,
@@ -478,16 +465,15 @@ impl<'a> Compiler<'a> {
             clif_context.func.signature = func.signature.clone();
 
             func_translator
-                .translate(
-                    &self.module_translation_state,
-                    code,
-                    *code_offset,
+                .translate_body(
+                    &mut validator,
+                    body.clone(),
                     &mut clif_context.func,
                     &mut func_info,
                 )
                 .map_err(|source| Error::FunctionTranslation {
                     symbol: func.name.symbol().to_string(),
-                    source,
+                    source: Box::new(Error::from(source)),
                 })?;
 
             funcs.insert(func.name.clone(), clif_context.func);
@@ -537,7 +523,7 @@ impl<'a> Compiler<'a> {
 // but are specified here as Cranelift IR for lack of source to generate them from.
 fn synthesize_trampoline(
     decls: &mut ModuleDecls,
-    clif_module: &mut ClifModule<ObjectBackend>,
+    clif_module: &mut ObjectModule,
     function_map: &mut HashMap<FuncId, (u32, DataId, usize)>,
     hostcall_name: &str,
     trampoline_id: FuncId,
@@ -636,8 +622,8 @@ fn synthesize_trampoline(
     Ok(())
 }
 
-fn write_module_data<B: ClifBackend>(
-    clif_module: &mut ClifModule<B>,
+fn write_module_data(
+    clif_module: &mut impl ClifModule,
     module_data_bytes: Vec<u8>,
 ) -> Result<DataId, Error> {
     use cranelift_module::{DataContext, Linkage};
@@ -646,7 +632,7 @@ fn write_module_data<B: ClifBackend>(
     module_data_ctx.define(module_data_bytes.into_boxed_slice());
 
     let module_data_decl = clif_module
-        .declare_data(MODULE_DATA_SYM, Linkage::Local, true, false, None)
+        .declare_data(MODULE_DATA_SYM, Linkage::Local, true, false)
         .map_err(Error::ClifModuleError)?;
     clif_module
         .define_data(module_data_decl, &module_data_ctx)
@@ -693,17 +679,12 @@ impl TrapSites {
         trap_site_bytes.to_vec().into()
     }
     /// Write traps for a given function into the cranelift module:
-    pub fn write(
-        &self,
-        module: &mut ClifModule<ObjectBackend>,
-        func_name: &str,
-    ) -> Result<DataId, Error> {
+    pub fn write(&self, module: &mut ObjectModule, func_name: &str) -> Result<DataId, Error> {
         let trap_sym = trap_sym_for_func(func_name);
         let mut trap_sym_ctx = ClifDataContext::new();
         trap_sym_ctx.define(self.serialize());
 
-        let trap_data_id =
-            module.declare_data(&trap_sym, ClifLinkage::Local, false, false, None)?;
+        let trap_data_id = module.declare_data(&trap_sym, ClifLinkage::Local, false, false)?;
 
         module.define_data(trap_data_id, &trap_sym_ctx)?;
 
@@ -730,7 +711,7 @@ impl cranelift_codegen::binemit::TrapSink for TrapSites {
 }
 
 fn write_function_spec(
-    module: &mut ClifModule<ObjectBackend>,
+    module: &mut ObjectModule,
     mut manifest_ctx: &mut ClifDataContext,
     manifest_bytes: &mut Cursor<Vec<u8>>,
     func_id: FuncId,

@@ -371,32 +371,6 @@ mod module_data {
     // XXX adding more negative tests like the one above is valuable - lets do it
 
     #[test]
-    fn invalid_module() {
-        use lucetc::Error as LucetcError;
-        use std::fs::File;
-        use std::io::Read;
-        // I used the `wast2json` tool to produce the file invalid.wasm from an assert_invalid part
-        // of a spectest (call.wast)
-        let wasmfile = PathBuf::from("tests/wasm/invalid.wasm");
-        let mut m = Vec::new();
-        let mut file = File::open(&wasmfile).expect("open module file");
-        file.read_to_end(&mut m).expect("read contents of module");
-
-        let b = Bindings::empty();
-        let builder = Compiler::builder();
-        let c = builder.create(&m, &b);
-        assert!(
-            c.is_err(),
-            "compilation error because wasm module is invalid"
-        );
-        assert!(if let LucetcError::WasmValidation(_) = c.err().unwrap() {
-            true
-        } else {
-            false
-        });
-    }
-
-    #[test]
     fn start_section() {
         let m = load_wat_module("start_section");
         let b = Bindings::empty();
@@ -716,6 +690,45 @@ mod validate {
                 ]
             ),
             _ => panic!("should get LucetValidation error"),
+        }
+    }
+
+    #[test]
+    fn invalid_function_body() {
+        let mut m_invalid = load_wat_module("call");
+        // According to `wat2wasm call.wat && wasm-objdump -d call.wasm`:
+        //  00002e func[0] <main>:
+        //  00002f: 01 7f                      | local[0] type=i32
+        //  000031: 41 00                      | i32.const 0
+        //  000033: 21 00                      | local.set 0
+        //  ...
+        // Changing byte 0x30 to 7d makes it `local[0] type=f32`
+        // which means the subsequent instructions that set the local to an i32
+        // should fail validation.
+        m_invalid[0x30] = 0x7d;
+
+        let builder = Compiler::builder();
+        let b = lucet_module::bindings::Bindings::empty();
+        let compiler = builder
+            .create(&m_invalid, &b)
+            .expect("compiler of invalid module can be constructed");
+        let obj_file = compiler.object_file();
+        assert!(
+            obj_file.is_err(),
+            "should fail validation during code generation"
+        );
+        match obj_file.err().unwrap() {
+            Error::FunctionTranslation { symbol, source } => {
+                assert_eq!(symbol, "guest_func_main");
+                match *source {
+                    Error::WebAssemblyValidation { message, offset } => {
+                        assert_eq!(offset, 0x33); // The local.set is where the type error should occur
+                        assert_eq!(message, "type mismatch: expected f32, found i32".to_owned());
+                    }
+                    e => panic!("expected WebAssemblyValidation error, got {:?}", e),
+                }
+            }
+            e => panic!("expected FunctionTranslation error, got {:?}", e),
         }
     }
 }

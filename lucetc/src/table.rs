@@ -4,7 +4,7 @@ use crate::module::UniqueFuncIndex;
 use crate::pointer::NATIVE_POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
-use cranelift_module::{Backend as ClifBackend, DataContext, DataId, Module as ClifModule};
+use cranelift_module::{DataContext, DataId, Module as ClifModule};
 use cranelift_wasm::{TableElementType, TableIndex};
 use std::io::Cursor;
 
@@ -60,8 +60,8 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
     Ok(elems)
 }
 
-pub fn write_table_data<B: ClifBackend>(
-    clif_module: &mut ClifModule<B>,
+pub fn write_table_data(
+    clif_module: &mut impl ClifModule,
     decls: &ModuleDecls<'_>,
 ) -> Result<(DataId, usize), Error> {
     let mut tables_vec = Cursor::new(Vec::new());
