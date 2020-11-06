@@ -88,7 +88,7 @@ Install the WASI sysroot:
 mkdir -p /opt
 curl -L https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/wasi-sdk-11.0-linux.tar.gz | \
 sudo tar x -zv -C /opt -f - wasi-sdk-11.0/share && \
-  sudo ln -s /opt/wasi-sdk-*/share/wasi-sysroot /opt/wasi-sysroot
+  sudo ln -s /opt/wasi-sdk-11.0/share/wasi-sysroot /opt/wasi-sysroot
 ```
 
 Enter your clone of the Lucet repository, and then fetch/update the submodules:
