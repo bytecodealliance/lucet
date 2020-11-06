@@ -300,7 +300,7 @@ impl<'a> Compiler<'a> {
         // Now that we've defined all functions, we know what trampolines must also be created.
         let trampoline_metas = codegen_context
             .trampolines()
-            .iter()
+            .par_iter()
             .map(|(hostcall_name, (trampoline_id, hostcall_func_index))| {
                 let meta = synthesize_trampoline(
                     &decls,
