@@ -19,5 +19,5 @@ wiggle =  { path = "../wasmtime/crates/wiggle", version = "0.21.0" }
 [dev-dependencies]
 wiggle-test = { path = "../wasmtime/crates/wiggle/test-helpers" }
 tempfile = "3.1"
-lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
+lucet-wasi-sdk = { path = "../lucet-wasi-sdk", version = "0.7.0-dev" }
 lucetc = { path = "../lucetc", version = "0.7.0-dev" }
