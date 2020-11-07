@@ -22,4 +22,3 @@ Lucet uses, and is developed in collaboration with, the Bytecode Alliance's
 
 Lucet's documentation is available at <https://bytecodealliance.github.io/lucet>
 ([sources](https://github.com/bytecodealliance/lucet/tree/main/docs)).
-
