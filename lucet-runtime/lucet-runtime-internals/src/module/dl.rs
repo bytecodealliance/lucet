@@ -107,18 +107,30 @@ unsafe impl Sync for DlModule {}
 impl DlModule {
     /// Create a module, loading code from a shared object on the filesystem.
     pub fn load<P: AsRef<Path>>(so_path: P) -> Result<Arc<Self>, Error> {
-        Self::load_and_maybe_verify(so_path, None)
+        Self::load_and_maybe_verify(so_path, None, true)
+    }
+
+    pub fn load_with_version_match<P: AsRef<Path>>(
+        so_path: P,
+        enforce_version_match: bool,
+    ) -> Result<Arc<Self>, Error> {
+        Self::load_and_maybe_verify(so_path, None, enforce_version_match)
     }
 
     /// Create a module, loading code from a shared object on the filesystem
     /// and verifying it using a public key if one has been supplied.
-    pub fn load_and_verify<P: AsRef<Path>>(so_path: P, pk: PublicKey) -> Result<Arc<Self>, Error> {
-        Self::load_and_maybe_verify(so_path, Some(pk))
+    pub fn load_and_verify<P: AsRef<Path>>(
+        so_path: P,
+        pk: PublicKey,
+        enforce_version_match: bool,
+    ) -> Result<Arc<Self>, Error> {
+        Self::load_and_maybe_verify(so_path, Some(pk), enforce_version_match)
     }
 
     fn load_and_maybe_verify<P: AsRef<Path>>(
         so_path: P,
         pk: Option<PublicKey>,
+        enforce_version_match: bool,
     ) -> Result<Arc<Self>, Error> {
         // Load the dynamic library. The undefined symbols corresponding to the lucet_syscall_
         // functions will be provided by the current executable.  We trust our wasm->dylib compiler
@@ -143,13 +155,22 @@ impl DlModule {
             VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
 
         if !module_version.valid() {
-            return Err(lucet_incorrect_module!("reserved bit is not set. This module is likely too old for this lucet-runtime to load."));
+            let msg = "reserved bit is not set. This module is likely too old for this lucet-runtime to load.";
+            if enforce_version_match {
+                return Err(lucet_incorrect_module!("{}", msg));
+            } else {
+                tracing::warn!("{}", msg);
+            }
         } else if !runtime_version.compatible_with(&module_version) {
-            return Err(lucet_incorrect_module!(
+            let msg = format!(
                 "version mismatch. module has version {}, while this runtime is version {}",
-                module_version,
-                runtime_version,
-            ));
+                module_version, runtime_version
+            );
+            if enforce_version_match {
+                return Err(lucet_incorrect_module!("{}", msg));
+            } else {
+                tracing::warn!("{}", msg);
+            }
         }
 
         // Deserialize the slice into ModuleData, which will hold refs into the loaded
