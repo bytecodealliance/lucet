@@ -489,7 +489,14 @@ impl<'a> Compiler<'a> {
     ) -> Result<Box<dyn TargetIsa>, Error> {
         let mut flags_builder = settings::builder();
         let isa_builder = cpu_features.isa_builder(target)?;
-        flags_builder.enable("enable_verifier").unwrap();
+        let enable_verifier = if cfg!(debug_assertions) {
+            "true"
+        } else {
+            "false"
+        };
+        flags_builder
+            .set("enable_verifier", enable_verifier)
+            .unwrap();
         flags_builder.enable("is_pic").unwrap();
         flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
         if canonicalize_nans {
