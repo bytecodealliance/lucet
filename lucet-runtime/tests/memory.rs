@@ -15,7 +15,7 @@ cfg_if::cfg_if! {
 mod uffd_specific {
     use libc::{c_void, mincore};
     use lucet_runtime::{Limits, Region};
-    use lucet_runtime::{UffdRegion, WasmPageSizedUffdStrategy};
+    use lucet_runtime::{UffdConfig, UffdRegion};
     use lucet_runtime_tests::build::test_module_wasm;
 
     #[test]
@@ -26,7 +26,7 @@ mod uffd_specific {
     fn lazy_memory() {
         let module = test_module_wasm("memory", "uffd_memory.wat")
             .expect("compile and load uffd_memory.wasm");
-        let region = UffdRegion::create(1, &Limits::default(), WasmPageSizedUffdStrategy {})
+        let region = UffdRegion::create(1, &Limits::default(), UffdConfig::default())
             .expect("region can be created");
         let mut inst = region
             .new_instance(module)
