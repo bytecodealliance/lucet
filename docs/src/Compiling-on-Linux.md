@@ -75,6 +75,13 @@ curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/l
   sudo tar x -zf - -C /usr/lib/llvm-*/lib/clang/*
 ```
 
+On Arch Linux:
+
+```sh
+curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/libclang_rt.builtins-wasm32-wasi-11.0.tar.gz | \
+  sudo tar x -zf - -C /usr/lib/clang/11.0.0/
+```
+
 Install the latest stable version of the Rust compiler:
 
 ```sh
