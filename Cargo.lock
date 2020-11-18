@@ -464,7 +464,7 @@ dependencies = [
  "log",
  "smallvec",
  "thiserror",
- "wasmparser 0.65.0",
+ "wasmparser 0.67.0",
 ]
 
 [[package]]
@@ -2669,9 +2669,9 @@ checksum = "a950e6a618f62147fd514ff445b2a0b53120d382751960797f85f058c7eda9b9"
 
 [[package]]
 name = "wasmparser"
-version = "0.65.0"
+version = "0.67.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87cc2fe6350834b4e528ba0901e7aa405d78b89dc1fa3145359eb4de0e323fcf"
+checksum = "9f091cf3849e5fe76a60255bff169277459f2201435bc583b6656880553f0ad0"
 
 [[package]]
 name = "wast"

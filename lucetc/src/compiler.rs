@@ -852,15 +852,6 @@ struct ObjectRelocSink {
 }
 
 impl binemit::RelocSink for ObjectRelocSink {
-    fn reloc_block(
-        &mut self,
-        _offset: binemit::CodeOffset,
-        _reloc: binemit::Reloc,
-        _block_offset: binemit::CodeOffset,
-    ) {
-        unimplemented!();
-    }
-
     fn reloc_external(
         &mut self,
         offset: binemit::CodeOffset,

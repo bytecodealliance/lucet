@@ -12,8 +12,8 @@ use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_module::{Linkage, Module as ClifModule};
 use cranelift_wasm::{
-    Global, GlobalIndex, GlobalInit, MemoryIndex, SignatureIndex, Table, TableIndex,
-    TargetEnvironment, WasmFuncType,
+    Global, GlobalIndex, GlobalInit, MemoryIndex, Table, TableIndex, TargetEnvironment, TypeIndex,
+    WasmFuncType,
 };
 use lucet_module::bindings::Bindings;
 use lucet_module::ModuleFeatures;
@@ -470,7 +470,7 @@ impl<'a> ModuleDecls<'a> {
         })
     }
 
-    pub fn get_signature(&self, signature_index: SignatureIndex) -> Result<&ir::Signature, Error> {
+    pub fn get_signature(&self, signature_index: TypeIndex) -> Result<&ir::Signature, Error> {
         self.get_signature_uid(signature_index).and_then(|uid| {
             self.info
                 .signatures
@@ -485,7 +485,7 @@ impl<'a> ModuleDecls<'a> {
 
     pub fn get_signature_uid(
         &self,
-        signature_index: SignatureIndex,
+        signature_index: TypeIndex,
     ) -> Result<UniqueSignatureIndex, Error> {
         self.info
             .signature_mapping

@@ -8,8 +8,8 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
     wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
     DataIndex, ElemIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment,
-    SignatureIndex, Table, TableElementType, TableIndex, TargetEnvironment, WasmFuncType,
-    WasmResult, WasmType,
+    Table, TableElementType, TableIndex, TargetEnvironment, TypeIndex, WasmFuncType, WasmResult,
+    WasmType,
 };
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
@@ -58,8 +58,8 @@ pub struct ModuleInfo<'a> {
     pub target_config: TargetFrontendConfig,
     /// This mapping lets us merge duplicate types (permitted by the wasm spec) as they're
     /// declared.
-    pub signature_mapping: PrimaryMap<SignatureIndex, UniqueSignatureIndex>,
-    /// Provided by `declare_signature`
+    pub signature_mapping: PrimaryMap<TypeIndex, UniqueSignatureIndex>,
+    /// Provided by `declare_type_func`
     pub signatures: PrimaryMap<UniqueSignatureIndex, (ir::Signature, WasmFuncType)>,
     /// Provided by `declare_func_import`
     pub imported_funcs: PrimaryMap<UniqueFuncIndex, (&'a str, &'a str)>,
@@ -73,7 +73,7 @@ pub struct ModuleInfo<'a> {
     /// as they're declared.
     pub function_mapping: PrimaryMap<FuncIndex, UniqueFuncIndex>,
     /// Function signatures: imported and local
-    pub functions: PrimaryMap<UniqueFuncIndex, Exportable<'a, SignatureIndex>>,
+    pub functions: PrimaryMap<UniqueFuncIndex, Exportable<'a, TypeIndex>>,
     /// Function names.
     pub function_names: SecondaryMap<UniqueFuncIndex, &'a str>,
     /// Provided by `declare_table`
@@ -152,7 +152,7 @@ impl<'a> ModuleInfo<'a> {
         self.signature_by_id(sigidx)
     }
 
-    pub fn signature_by_id(&self, sig_idx: SignatureIndex) -> &(ir::Signature, WasmFuncType) {
+    pub fn signature_by_id(&self, sig_idx: TypeIndex) -> &(ir::Signature, WasmFuncType) {
         // All signatures map to some unique signature index
         let unique_sig_idx = self.signature_mapping.get(sig_idx).unwrap();
         // Unique signature indices are valid (or we're in some deeply bad state)
@@ -163,15 +163,15 @@ impl<'a> ModuleInfo<'a> {
         &mut self,
         wasm_func_type: WasmFuncType,
         sig: ir::Signature,
-    ) -> Result<(UniqueFuncIndex, SignatureIndex), Error> {
-        let new_sigidx = SignatureIndex::from_u32(self.signature_mapping.len() as u32);
-        self.declare_signature(wasm_func_type, sig)?;
+    ) -> Result<(UniqueFuncIndex, TypeIndex), Error> {
+        let new_sigidx = TypeIndex::from_u32(self.signature_mapping.len() as u32);
+        self.declare_type_func(wasm_func_type, sig)?;
         let new_funcidx = UniqueFuncIndex::from_u32(self.functions.len() as u32);
         self.declare_func_type(new_sigidx)?;
         Ok((new_funcidx, new_sigidx))
     }
 
-    fn declare_signature(
+    fn declare_type_func(
         &mut self,
         wasm_func_type: WasmFuncType,
         mut sig: ir::Signature,
@@ -195,7 +195,7 @@ impl<'a> ModuleInfo<'a> {
         self.signature_mapping.push(match_key);
         Ok(())
     }
-    fn declare_func_type(&mut self, sig_index: SignatureIndex) -> WasmResult<()> {
+    fn declare_func_type(&mut self, sig_index: TypeIndex) -> WasmResult<()> {
         self.functions.push(Exportable::new(sig_index));
         self.function_mapping
             .push(UniqueFuncIndex::from_u32(self.functions.len() as u32 - 1));
@@ -216,16 +216,16 @@ impl<'a> TargetEnvironment for ModuleValidation<'a> {
 }
 
 impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
-    fn declare_signature(
+    fn declare_type_func(
         &mut self,
         wasm_func_type: WasmFuncType,
         sig: ir::Signature,
     ) -> WasmResult<()> {
-        self.info.declare_signature(wasm_func_type, sig)
+        self.info.declare_type_func(wasm_func_type, sig)
     }
     fn declare_func_import(
         &mut self,
-        sig_index: SignatureIndex,
+        sig_index: TypeIndex,
         module: &'a str,
         field: &'a str,
     ) -> WasmResult<()> {
@@ -307,7 +307,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         Ok(())
     }
 
-    fn declare_func_type(&mut self, sig_index: SignatureIndex) -> WasmResult<()> {
+    fn declare_func_type(&mut self, sig_index: TypeIndex) -> WasmResult<()> {
         self.info.declare_func_type(sig_index)
     }
 
