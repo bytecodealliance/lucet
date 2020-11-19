@@ -12,8 +12,7 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift_module::{Linkage, Module as ClifModule, ModuleError as ClifModuleError};
 use cranelift_wasm::{
     wasmparser::Operator, FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex,
-    GlobalVariable, MemoryIndex, SignatureIndex, TableIndex, TargetEnvironment, WasmError,
-    WasmResult,
+    GlobalVariable, MemoryIndex, TableIndex, TargetEnvironment, TypeIndex, WasmError, WasmResult,
 };
 use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
@@ -395,7 +394,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         mut pos: FuncCursor<'_>,
         _table_index: TableIndex,
         table: ir::Table,
-        sig_index: SignatureIndex,
+        sig_index: TypeIndex,
         sig_ref: ir::SigRef,
         callee: ir::Value,
         call_args: &[ir::Value],
@@ -449,7 +448,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     fn make_indirect_sig(
         &mut self,
         func: &mut ir::Function,
-        index: SignatureIndex,
+        index: TypeIndex,
     ) -> Result<ir::SigRef, WasmError> {
         let sig = self.module_decls.get_signature(index).unwrap().clone();
         Ok(func.import_signature(sig))

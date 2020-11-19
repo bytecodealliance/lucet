@@ -93,7 +93,7 @@ pub fn write_table_data(
                     // Note: this is the only place we validate that the table entry points to a valid
                     // function. If this is ever removed, make sure this check happens elsewhere.
                     if let Some(func) = decls.get_func(*func_index) {
-                        // First element in row is the SignatureIndex for the function
+                        // First element in row is the TypeIndex for the function
                         putelem(&mut table_data, func.signature_index.as_u32() as u64);
 
                         // Second element in row is the pointer to the function. The Reloc is doing the work
