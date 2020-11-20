@@ -209,7 +209,6 @@ impl State {
 
 // TODO: PR into `libc`
 extern "C" {
-    #[no_mangle]
     fn strsignal(sig: libc::c_int) -> *mut libc::c_char;
 }
 
