@@ -33,4 +33,4 @@ tempfile = "3.0"
 
 [lib]
 name = "lucet_wasi"
-crate-type = ["rlib", "staticlib", "cdylib"]
+crate-type = ["lib", "staticlib", "cdylib"]

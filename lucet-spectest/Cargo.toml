@@ -10,7 +10,7 @@ categories = ["wasm"]
 edition = "2018"
 
 [lib]
-crate-type=["rlib"]
+crate-type=["lib"]
 
 [[bin]]
 name = "spec-test"
