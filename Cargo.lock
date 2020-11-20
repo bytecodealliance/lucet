@@ -1184,6 +1184,7 @@ dependencies = [
  "lucet-wasi-generate",
  "lucet-wasi-sdk",
  "lucet-wiggle",
+ "lucet-wiggle-generate",
  "lucetc",
  "nix",
  "rand 0.6.5",
@@ -1221,7 +1222,7 @@ dependencies = [
 name = "lucet-wasi-generate"
 version = "0.7.0-dev"
 dependencies = [
- "lucet-wiggle",
+ "lucet-wiggle-generate",
  "proc-macro2 1.0.24",
  "quote 1.0.6",
  "syn 1.0.48",

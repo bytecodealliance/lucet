@@ -41,7 +41,7 @@ pub fn bindings(args: TokenStream) -> TokenStream {
     };
 
     let empty = quote!();
-    ts.extend(lucet_wiggle::generate::generate(
+    ts.extend(lucet_wiggle_generate::generate(
         &doc,
         &config.ctx_name,
         &config.constructor,
