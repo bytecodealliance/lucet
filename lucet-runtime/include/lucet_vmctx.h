@@ -42,4 +42,10 @@ void *lucet_vmctx_get_func_from_idx(struct lucet_vmctx const *ctx, uint32_t tabl
 // Mostly for tests - this conversion is builtin to lucetc
 int64_t *lucet_vmctx_get_globals(struct lucet_vmctx const *ctx);
 
+// Yield that is meant to be inserted by compiler instrumentation, transparent
+// to Wasm code execution. It is intended to be invoked periodically (e.g.,
+// every N instructions) to bound runtime of any particular execution slice of
+// Wasm code.
+void lucet_vmctx_yield_at_bound_expiration(struct lucet_vmctx const *ctx);
+
 #endif // LUCET_VMCTX_H

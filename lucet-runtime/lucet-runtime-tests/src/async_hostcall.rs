@@ -31,17 +31,6 @@ macro_rules! async_hostcall_tests {
 
                 #[test]
                 fn hostcall_yield() {
-                    /// Dummy function with the same type signature as
-                    /// [`tokio::task::block_in_place`][tokio].
-                    ///
-                    /// [tokio]: https://docs.rs/tokio/0.2.21/tokio/task/fn.block_in_place.html
-                    fn block_in_place<F, R>(f: F) -> R
-                    where
-                        F: FnOnce() -> R,
-                    {
-                        f()
-                    }
-
                     let module = test_module_c("async_hostcall", "hostcall_block_on.c")
                         .expect("module compiled and loaded");
                     let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
@@ -57,7 +46,8 @@ macro_rules! async_hostcall_tests {
                             inst.run_async(
                                 "main",
                                 &[0u32.into(), 0i32.into()],
-                                |f| block_in_place(f),
+                                // Run with bounded execution to test its interaction with block_on
+                                Some(1),
                             ));
                     match correct_run_res {
                         Ok(_) => {} // expected - UntypedRetVal is (), so no reason to inspect value
@@ -84,7 +74,7 @@ macro_rules! async_hostcall_tests {
                             inst.run_async(
                                 "main",
                                 &[0u32.into(), 0i32.into()],
-                                |f| block_in_place(f),
+                                Some(1),
                             ));
                     match correct_run_res_2 {
                         Ok(_) => {} // expected

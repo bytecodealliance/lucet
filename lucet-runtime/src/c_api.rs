@@ -507,6 +507,12 @@ pub unsafe fn lucet_vmctx_yield(vmctx: &Vmctx, val: *mut c_void) -> *mut c_void 
         .unwrap_or(std::ptr::null_mut())
 }
 
+#[lucet_hostcall]
+#[no_mangle]
+pub unsafe fn lucet_vmctx_yield_at_bound_expiration(vmctx: &Vmctx) {
+    vmctx.yield_at_bound_expiration();
+}
+
 #[cfg(test)]
 mod tests {
     use super::lucet_dl_module;

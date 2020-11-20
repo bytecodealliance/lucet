@@ -20,7 +20,8 @@ pub enum State {
     /// The instance is running.
     ///
     /// Transitions to `Ready` when the guest function returns normally, or to `Faulted`,
-    /// `Terminating`, or `Yielding` if the instance faults, terminates, or yields.
+    /// `Terminating`, or `Yielding` if the instance faults, terminates, or yields, or to
+    /// `BoundExpired` if the instance is run with an instruction bound and reaches it.
     Running {
         /// Indicates whether the instance is running in an async context (`Instance::run_async`)
         /// or not. Needed by `Vmctx::block_on`.
@@ -74,6 +75,12 @@ pub enum State {
         expecting: Box<dyn Any>,
     },
 
+    /// The instance has reached an instruction-count bound.
+    ///
+    /// Transitions to `Running` if the instance is resumed, or to `Ready` or `NotStarted` if the
+    /// instance is reset.
+    BoundExpired,
+
     /// A placeholder state used with `std::mem::replace()` when a new state must be constructed by
     /// moving values out of an old state.
     ///
@@ -122,6 +129,7 @@ impl std::fmt::Display for State {
             State::Terminating { .. } => write!(f, "terminating"),
             State::Yielding { .. } => write!(f, "yielding"),
             State::Yielded { .. } => write!(f, "yielded"),
+            State::BoundExpired => write!(f, "bound expired"),
             State::Transitioning { .. } => {
                 write!(f, "transitioning (IF YOU SEE THIS, THERE'S PROBABLY A BUG)")
             }
@@ -200,6 +208,14 @@ impl State {
 
     pub fn is_yielding(&self) -> bool {
         if let State::Yielding { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_bound_expired(&self) -> bool {
+        if let State::BoundExpired = self {
             true
         } else {
             false

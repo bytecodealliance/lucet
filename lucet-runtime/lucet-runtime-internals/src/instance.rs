@@ -23,6 +23,7 @@ use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
+use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
@@ -385,6 +386,12 @@ impl RunResult {
         self.yielded_ref().is_ok()
     }
 
+    /// Returns `true` if the instance can be resumed: either it has yielded, or its bound has
+    /// expired.
+    pub fn can_resume(&self) -> bool {
+        self.is_yielded()
+    }
+
     /// Returns `true` if the instance has yielded a value of the given type.
     pub fn has_yielded<A: Any>(&self) -> bool {
         match self {
@@ -409,6 +416,30 @@ impl RunResult {
     /// Panics if the instance instead returned.
     pub fn unwrap_yielded(self) -> YieldedVal {
         self.yielded().unwrap()
+    }
+}
+
+/// An "internal" run result: either a `RunResult` or a bound expiration. We do not expose bound
+/// expirations to the caller directly; rather, we only handle them in `run_async()`.
+pub(crate) enum InternalRunResult {
+    Normal(RunResult),
+    BoundExpired,
+}
+
+impl InternalRunResult {
+    pub(crate) fn unwrap(self) -> Result<RunResult, Error> {
+        match self {
+            InternalRunResult::Normal(result) => Ok(result),
+            InternalRunResult::BoundExpired => Err(Error::InvalidArgument(
+                "should not have had a runtime bound",
+            )),
+        }
+    }
+}
+
+impl std::convert::Into<InternalRunResult> for RunResult {
+    fn into(self) -> InternalRunResult {
+        InternalRunResult::Normal(self)
     }
 }
 
@@ -486,7 +517,7 @@ impl Instance {
     /// in the future.
     pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<RunResult, Error> {
         let func = self.module.get_export_func(entrypoint)?;
-        self.run_func(func, &args, false)
+        self.run_func(func, &args, false, None)?.unwrap()
     }
 
     /// Run a function with arguments in the guest context from the [WebAssembly function
@@ -502,15 +533,14 @@ impl Instance {
         args: &[Val],
     ) -> Result<RunResult, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
-        self.run_func(func, &args, false)
+        self.run_func(func, &args, false, None)?.unwrap()
     }
 
     /// Resume execution of an instance that has yielded without providing a value to the guest.
     ///
     /// This should only be used when the guest yielded with
     /// [`Vmctx::yield_()`](vmctx/struct.Vmctx.html#method.yield_) or
-    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val). Otherwise, this call will
-    /// fail with `Error::InvalidArgument`.
+    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val).
     ///
     /// # Safety
     ///
@@ -534,14 +564,15 @@ impl Instance {
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
-        self.resume_with_val_impl(val, false)
+        self.resume_with_val_impl(val, false, None)?.unwrap()
     }
 
     pub(crate) fn resume_with_val_impl<A: Any + 'static>(
         &mut self,
         val: A,
         async_context: bool,
-    ) -> Result<RunResult, Error> {
+        max_insn_count: Option<u64>,
+    ) -> Result<InternalRunResult, Error> {
         match &self.state {
             State::Yielded { expecting, .. } => {
                 // make sure the resumed value is of the right type
@@ -556,7 +587,32 @@ impl Instance {
 
         self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static>);
 
+        self.set_instruction_bound_delta(max_insn_count.unwrap_or(0));
         self.swap_and_return(async_context)
+    }
+
+    /// Resume execution of an instance that has previously reached an instruction bound.
+    ///
+    /// The execution slice that begins with this call is bounded by the new bound provided.
+    ///
+    /// This should only be used when `run_func()` returned a `RunResult::Bounded`. This is an
+    /// internal function used by `run_async()`.
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub(crate) fn resume_bounded(
+        &mut self,
+        max_insn_count: u64,
+    ) -> Result<InternalRunResult, Error> {
+        if !self.state.is_bound_expired() {
+            return Err(Error::InvalidArgument(
+                "can only call resume_bounded() on an instance that hit an instruction bound",
+            ));
+        }
+        self.set_instruction_bound_delta(max_insn_count);
+        self.swap_and_return(true)
     }
 
     /// Run the module's [start function][start], if one exists.
@@ -594,7 +650,7 @@ impl Instance {
             if !self.is_not_started() {
                 return Err(Error::StartAlreadyRun);
             }
-            let res = self.run_func(start, &[], false)?;
+            let res = self.run_func(start, &[], false, None)?.unwrap()?;
             if res.is_yielded() {
                 return Err(Error::StartYielded);
             }
@@ -839,6 +895,10 @@ impl Instance {
         self.state.is_yielded()
     }
 
+    pub fn is_bound_expired(&self) -> bool {
+        self.state.is_bound_expired()
+    }
+
     pub fn is_faulted(&self) -> bool {
         self.state.is_faulted()
     }
@@ -869,14 +929,41 @@ impl Instance {
     #[inline]
     pub fn get_instruction_count(&self) -> Option<u64> {
         if self.module.is_instruction_count_instrumented() {
-            return Some(self.get_instance_implicits().instruction_count);
+            let implicits = self.get_instance_implicits();
+            let sum = implicits.instruction_count_bound + implicits.instruction_count_adj;
+            // This invariant is ensured as we always set up the fields to have a positive sum, and
+            // generated code only increments `adj`.
+            debug_assert!(sum >= 0);
+            return Some(sum as u64);
         }
         None
     }
 
+    /// Set the total instruction count and bound.
     #[inline]
-    pub fn set_instruction_count(&mut self, instruction_count: u64) {
-        self.get_instance_implicits_mut().instruction_count = instruction_count;
+    pub fn set_instruction_count_and_bound(&mut self, instruction_count: u64, bound: u64) {
+        let implicits = self.get_instance_implicits_mut();
+        let instruction_count =
+            i64::try_from(instruction_count).expect("instruction count too large");
+        let bound = i64::try_from(bound).expect("bound too large");
+        // These two sum to `instruction_count`, which must be non-negative.
+        implicits.instruction_count_bound = bound;
+        implicits.instruction_count_adj = instruction_count - bound;
+    }
+
+    /// Set the instruction bound to be `delta` above the current count.
+    ///
+    /// See the comments on `instruction_count_adj` in `InstanceRuntimeData` for more details on
+    /// how this bound works; most relevant is that a bound-yield is only triggered if the bound
+    /// value is *crossed*, but not if execution *begins* with the value exceeded. Hence `delta`
+    /// must be greater than zero for this to set up the instance state to trigger a yield.
+    #[inline]
+    pub fn set_instruction_bound_delta(&mut self, delta: u64) {
+        let implicits = self.get_instance_implicits_mut();
+        let sum = implicits.instruction_count_adj + implicits.instruction_count_bound;
+        let delta = i64::try_from(delta).expect("delta too large");
+        implicits.instruction_count_bound = sum + delta;
+        implicits.instruction_count_adj = -delta;
     }
 
     #[inline]
@@ -941,7 +1028,7 @@ impl Instance {
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
-        inst.set_instruction_count(0);
+        inst.set_instruction_count_and_bound(0, 0);
         // Ensure the hostcall limit tracked in this instance's guest-shared data is up-to-date.
         inst.set_hostcall_stack_reservation();
 
@@ -1008,7 +1095,8 @@ impl Instance {
         func: FunctionHandle,
         args: &[Val],
         async_context: bool,
-    ) -> Result<RunResult, Error> {
+        inst_count_bound: Option<u64>,
+    ) -> Result<InternalRunResult, Error> {
         let needs_start = self.state.is_not_started() && !func.is_start_func;
         if needs_start {
             return Err(Error::InstanceNeedsStart);
@@ -1051,6 +1139,8 @@ impl Instance {
 
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
+
+        self.set_instruction_bound_delta(inst_count_bound.unwrap_or(0));
 
         let self_ptr = self as *mut _;
         Context::init_with_callback(
@@ -1105,7 +1195,7 @@ impl Instance {
     /// This must only be called for an instance in a ready, non-fatally faulted, or yielded state,
     /// or in the not-started state on the start function. The public wrappers around this function
     /// should make sure the state is appropriate.
-    fn swap_and_return(&mut self, async_context: bool) -> Result<RunResult, Error> {
+    fn swap_and_return(&mut self, async_context: bool) -> Result<InternalRunResult, Error> {
         let is_start_func = self
             .entrypoint
             .expect("we always have an entrypoint by now")
@@ -1115,6 +1205,7 @@ impl Instance {
                 || self.state.is_not_started() && is_start_func
                 || (self.state.is_faulted() && !self.state.is_fatal())
                 || self.state.is_yielded()
+                || self.state.is_bound_expired()
         );
         self.state = State::Running { async_context };
 
@@ -1167,7 +1258,7 @@ impl Instance {
         // Set transitioning state temporarily so that we can move values out of the current state
         let st = mem::replace(&mut self.state, State::Transitioning);
 
-        if !st.is_yielding() {
+        if !st.is_yielding() && !st.is_bound_expired() {
             // If the instance is *not* yielding, initialize a fresh `KillState` for subsequent
             // executions, which will invalidate any existing `KillSwitch`'s weak references.
             #[cfg(feature = "concurrent_testpoints")]
@@ -1184,15 +1275,15 @@ impl Instance {
             State::Running { .. } => {
                 let retval = self.ctx.get_untyped_retval();
                 self.state = State::Ready;
-                Ok(RunResult::Returned(retval))
+                Ok(RunResult::Returned(retval).into())
             }
             State::Terminating { details, .. } => {
                 self.state = State::Terminated;
-                Err(Error::RuntimeTerminated(details))
+                Err(Error::RuntimeTerminated(details).into())
             }
             State::Yielding { val, expecting } => {
                 self.state = State::Yielded { expecting };
-                Ok(RunResult::Yielded(val))
+                Ok(RunResult::Yielded(val).into())
             }
             State::Faulted {
                 mut details,
@@ -1231,8 +1322,12 @@ impl Instance {
                 } else {
                     // leave the full fault details in the instance state, and return the
                     // higher-level info to the user
-                    Err(Error::RuntimeFault(details))
+                    Err(Error::RuntimeFault(details).into())
                 }
+            }
+            State::BoundExpired => {
+                self.state = State::BoundExpired;
+                Ok(InternalRunResult::BoundExpired)
             }
             State::NotStarted
             | State::Ready
@@ -1432,7 +1527,7 @@ unsafe impl Sync for TerminationDetails {}
 /// The value yielded by an instance through a [`Vmctx`](vmctx/struct.Vmctx.html) and returned to
 /// the host.
 pub struct YieldedVal {
-    val: Box<dyn Any + 'static>,
+    val: Box<dyn Any + Send + 'static>,
 }
 
 impl std::fmt::Debug for YieldedVal {
@@ -1446,7 +1541,7 @@ impl std::fmt::Debug for YieldedVal {
 }
 
 impl YieldedVal {
-    pub(crate) fn new<A: Any + 'static>(val: A) -> Self {
+    pub(crate) fn new<A: Any + Send + 'static>(val: A) -> Self {
         YieldedVal { val: Box::new(val) }
     }
 
@@ -1467,7 +1562,7 @@ impl YieldedVal {
 
     /// Attempt to downcast the yielded value to a concrete type, returning the original
     /// `YieldedVal` if unsuccessful.
-    pub fn downcast<A: Any + 'static>(self) -> Result<Box<A>, YieldedVal> {
+    pub fn downcast<A: Any + Send + 'static>(self) -> Result<Box<A>, YieldedVal> {
         match self.val.downcast() {
             Ok(val) => Ok(val),
             Err(val) => Err(YieldedVal { val }),
@@ -1476,7 +1571,7 @@ impl YieldedVal {
 
     /// Returns a reference to the yielded value if it is present and of type `A`, or `None` if it
     /// isn't.
-    pub fn downcast_ref<A: Any + 'static>(&self) -> Option<&A> {
+    pub fn downcast_ref<A: Any + Send + 'static>(&self) -> Option<&A> {
         self.val.downcast_ref()
     }
 }

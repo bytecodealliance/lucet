@@ -6,7 +6,7 @@ use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
 use crate::table::TABLE_REF_SIZE;
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::entity::EntityRef;
-use cranelift_codegen::ir::{self, InstBuilder};
+use cranelift_codegen::ir::{self, condcodes::IntCC, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_frontend::FunctionBuilder;
 use cranelift_module::{Linkage, Module as ClifModule, ModuleError as ClifModuleError};
@@ -95,32 +95,42 @@ impl<'a> FuncInfo<'a> {
         builder: &mut FunctionBuilder<'_>,
         reachable: bool,
     ) -> WasmResult<()> {
-        // So the operation counting works like this:
-        // record a stack corresponding with the stack of control flow in the wasm function.
-        // for non-control-flow-affecting instructions, increment the top of the stack.
-        // for control-flow-affecting operations (If, Else, Unreachable, Call, End, Return, Block,
-        // Loop, BrIf, CallIndirect), update the wasm instruction counter and:
-        // * if the operation introduces a new scope (If, Block, Loop), push a new 0 on the
-        // stack corresponding with that frame.
-        // * if the operation does not introduce a new scope (Else, Call, CallIndirect, BrIf),
-        // reset the top of stack to 0
-        // * if the operation completes a scope (End), pop the top of the stack and reset the new
-        // top of stack to 0
-        // * this leaves no special behavior for Unreachable and Return. This is acceptable as they
-        // are always followed by an End and are either about to trap, or return from a function.
-        // * Unreachable is either the end of VM execution and we are off by one instruction, or,
-        // is about to dispatch to an exception handler, which we should account for out of band
-        // anyway (exception dispatch is much more expensive than a single wasm op)
-        // * Return corresponds to exactly one function call, so we can count it by resetting the
-        // stack to 1 at return of a function.
+        // We count Wasm instructions, and bound runtime, using two counters in the
+        // `InstanceRuntimeData`: `instruction_count_bound` and `instruction_count_adj`. The sum of
+        // these two gives the instruction count, but we only increment the `adj` counter in
+        // generated code. When the sign of this counter flips from negative to positive, we have
+        // exceeded the bound and we must yield, which we do by invoking a particular hostcall.
+        //
+        // The operation counting works like this:
+        // - Record a stack corresponding with the stack of control flow in the wasm function.
+        //   for non-control-flow-affecting instructions, increment the top of the stack.
+        //   The sum of all stack elements represents instructions we have counted but not
+        //   yet flushed to the counter.
+        // - For control-flow-affecting operations (If, Else, Unreachable, Call, End, Return, Block,
+        //   Loop, BrIf, CallIndirect), update the wasm instruction counter and:
+        //   * if the operation introduces a new scope (If, Block, Loop), push a new 0 on the
+        //     stack corresponding with that frame.
+        //   * if the operation does not introduce a new scope (Else, Call, CallIndirect, BrIf),
+        //     reset the top of stack to 0 (because we will have flushed to the counter).
+        //   * if the operation completes a scope (End), pop the top of the stack and reset the new
+        //     top of stack to 0
+        //   * this leaves no special behavior for Unreachable and Return. This is acceptable as they
+        //     are always followed by an End and are either about to trap, or return from a function.
+        //   * Unreachable is either the end of VM execution and we are off by one instruction, or,
+        //     is about to dispatch to an exception handler, which we should account for out of band
+        //     anyway (exception dispatch is much more expensive than a single wasm op)
+        //   * Return corresponds to exactly one function call, so we can count it by resetting the
+        //     stack to 1 at return of a function.
 
+        /// Flush the currently-accumulated instruction count to the counter in the instance data,
+        /// invoking the yield hostcall if we hit the bound.
         fn flush_counter(environ: &mut FuncInfo<'_>, builder: &mut FunctionBuilder<'_>) {
             if environ.scope_costs.last() == Some(&0) {
                 return;
             }
             let instr_count_offset: ir::immediates::Offset32 =
                 (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
-                    + offset_of!(InstanceRuntimeData, instruction_count) as i32)
+                    + offset_of!(InstanceRuntimeData, instruction_count_adj) as i32)
                     .into();
             let vmctx_gv = environ.get_vmctx(builder.func);
             let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
@@ -141,10 +151,27 @@ impl<'a> FuncInfo<'a> {
                 ir::types::I64,
                 i64::from(*environ.scope_costs.last().unwrap()),
             );
-            let new_instr_count = builder.ins().iadd(cur_instr_count, update_const);
+            let (new_instr_count, flags) = builder.ins().iadd_ifcout(cur_instr_count, update_const);
             builder
                 .ins()
                 .store(trusted_mem, new_instr_count, addr, instr_count_offset);
+
+            let yield_block = builder.create_block();
+            let continuation_block = builder.create_block();
+            builder
+                .ins()
+                .brif(IntCC::UnsignedLessThan, flags, yield_block, &[]);
+            builder.ins().jump(continuation_block, &[]);
+            builder.seal_block(yield_block);
+
+            builder.switch_to_block(yield_block);
+            let yield_hostcall =
+                environ.get_runtime_func(RuntimeFunc::YieldAtBoundExpiration, &mut builder.func);
+            builder.ins().call(yield_hostcall, &[addr]);
+            builder.ins().jump(continuation_block, &[]);
+            builder.seal_block(continuation_block);
+
+            builder.switch_to_block(continuation_block);
 
             *environ.scope_costs.last_mut().unwrap() = 0;
         };
