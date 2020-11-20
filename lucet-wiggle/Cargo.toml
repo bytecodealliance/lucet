@@ -11,9 +11,9 @@ edition = "2018"
 [lib]
 
 [dependencies]
-lucet-wiggle-macro = { path = "./macro", version = "0.7.0-dev" }
-lucet-wiggle-generate = { path = "./generate", version = "0.7.0-dev" }
-lucet-runtime = { path = "../lucet-runtime", version = "0.7.0-dev" }
+lucet-wiggle-macro = { path = "./macro", version = "=0.7.0-dev" }
+lucet-wiggle-generate = { path = "./generate", version = "=0.7.0-dev" }
+lucet-runtime = { path = "../lucet-runtime", version = "=0.7.0-dev" }
 wiggle =  { path = "../wasmtime/crates/wiggle", version = "0.21.0" }
 
 [dev-dependencies]
