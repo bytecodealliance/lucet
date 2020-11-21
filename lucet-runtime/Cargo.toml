@@ -35,7 +35,7 @@ cc = "1.0"
 
 [lib]
 name = "lucet_runtime"
-crate-type = ["rlib", "staticlib", "cdylib"]
+crate-type = ["lib", "staticlib", "cdylib"]
 
 [features]
 default = ["uffd"]

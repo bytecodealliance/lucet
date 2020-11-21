@@ -409,7 +409,7 @@ fn main() {
     let witx_doc =
         lucet_wiggle::witx::load(&["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx"])
             .expect("load snapshot 1 witx");
-    let bindings = lucet_wiggle::generate::bindings(&witx_doc);
+    let bindings = lucet_wiggle_generate::bindings(&witx_doc);
 
     // Build a shared object with Lucetc:
     let native_build = Lucetc::new(wasm_file).with_bindings(bindings);

@@ -1,12 +1,7 @@
 mod borrow;
 
-pub use lucet_wiggle_generate::bindings;
 pub use lucet_wiggle_macro::from_witx;
 pub use wiggle::*;
-
-pub mod generate {
-    pub use lucet_wiggle_generate::*;
-}
 
 pub mod runtime {
     use crate::borrow::BorrowChecker;

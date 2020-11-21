@@ -19,6 +19,7 @@ lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", v
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 lucet-wasi-generate = { path = "./generate", version = "=0.7.0-dev" }
 lucet-wiggle = { path = "../lucet-wiggle", version = "=0.7.0-dev" }
+lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.7.0-dev" }
 libc = "0.2.65"
 nix = "0.17"
 rand = "0.6"
@@ -33,4 +34,4 @@ tempfile = "3.0"
 
 [lib]
 name = "lucet_wasi"
-crate-type = ["rlib", "staticlib", "cdylib"]
+crate-type = ["lib", "staticlib", "cdylib"]
