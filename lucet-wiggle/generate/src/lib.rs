@@ -69,7 +69,10 @@ pub fn generate(
                     let mut ctx: #ctx_type = #ctx_constructor;
                     let r = super::#mod_name::#method_name(&ctx, &memory, #(#call_args),*);
                     { #post_hook }
-                    r
+                    match r {
+                        Ok(r) => { r },
+                        Err(e) => { lucet_runtime::lucet_hostcall_terminate!(e); }
+                    }
                 }
             }
         });

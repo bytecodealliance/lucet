@@ -464,7 +464,7 @@ dependencies = [
  "log",
  "smallvec",
  "thiserror",
- "wasmparser 0.67.0",
+ "wasmparser 0.68.0",
 ]
 
 [[package]]
@@ -1254,6 +1254,7 @@ dependencies = [
  "lucetc",
  "tempfile",
  "wiggle",
+ "wiggle-borrow",
  "wiggle-test",
 ]
 
@@ -2595,7 +2596,6 @@ dependencies = [
  "libc",
  "thiserror",
  "tracing",
- "wig",
  "wiggle",
  "winapi 0.3.8",
  "winx",
@@ -2670,9 +2670,9 @@ checksum = "a950e6a618f62147fd514ff445b2a0b53120d382751960797f85f058c7eda9b9"
 
 [[package]]
 name = "wasmparser"
-version = "0.67.0"
+version = "0.68.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f091cf3849e5fe76a60255bff169277459f2201435bc583b6656880553f0ad0"
+checksum = "29a00e14eed9c2ecbbdbdd4fb284f49d21b6808965de24769a6379a13ec47d4c"
 
 [[package]]
 name = "wast"
@@ -2694,16 +2694,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wig"
-version = "0.21.0"
-dependencies = [
- "heck",
- "proc-macro2 1.0.24",
- "quote 1.0.6",
- "witx",
-]
-
-[[package]]
 name = "wiggle"
 version = "0.21.0"
 dependencies = [
@@ -2711,6 +2701,13 @@ dependencies = [
  "tracing",
  "wiggle-macro",
  "witx",
+]
+
+[[package]]
+name = "wiggle-borrow"
+version = "0.21.0"
+dependencies = [
+ "wiggle",
 ]
 
 [[package]]
@@ -2738,10 +2735,11 @@ dependencies = [
 
 [[package]]
 name = "wiggle-test"
-version = "0.19.0"
+version = "0.21.0"
 dependencies = [
  "proptest",
  "wiggle",
+ "wiggle-borrow",
 ]
 
 [[package]]

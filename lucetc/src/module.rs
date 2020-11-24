@@ -227,7 +227,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         &mut self,
         sig_index: TypeIndex,
         module: &'a str,
-        field: &'a str,
+        field: Option<&'a str>,
     ) -> WasmResult<()> {
         debug_assert_eq!(
             self.info.functions.len(),
@@ -235,6 +235,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
             "import functions are declared first"
         );
 
+        let field = field.expect("lucet does not support optional `field` in  imports");
         let unique_fn_index = self
             .info
             .imported_funcs
@@ -260,13 +261,15 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         &mut self,
         global: Global,
         module: &'a str,
-        field: &'a str,
+        field: Option<&'a str>,
     ) -> WasmResult<()> {
         debug_assert_eq!(
             self.info.globals.len(),
             self.info.imported_globals.len(),
             "import globals are declared first"
         );
+
+        let field = field.expect("lucet does not support optional `field` in  imports");
         self.info.globals.push(Exportable::new(global));
         self.info.imported_globals.push((module, field));
         Ok(())
@@ -276,13 +279,15 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         &mut self,
         table: Table,
         module: &'a str,
-        field: &'a str,
+        field: Option<&'a str>,
     ) -> WasmResult<()> {
         debug_assert_eq!(
             self.info.tables.len(),
             self.info.imported_tables.len(),
             "import tables are declared first"
         );
+
+        let field = field.expect("lucet does not support optional `field` in  imports");
         self.info.tables.push(Exportable::new(table));
         self.info.imported_tables.push((module, field));
         Ok(())
@@ -292,13 +297,15 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         &mut self,
         memory: Memory,
         module: &'a str,
-        field: &'a str,
+        field: Option<&'a str>,
     ) -> WasmResult<()> {
         debug_assert_eq!(
             self.info.memories.len(),
             self.info.imported_memories.len(),
             "import memories are declared first"
         );
+
+        let field = field.expect("lucet does not support optional `field` in  imports");
         self.info
             .data_initializers
             .insert(MemoryIndex::new(self.info.memories.len()), vec![]);

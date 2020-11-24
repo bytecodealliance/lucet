@@ -1,12 +1,10 @@
-mod borrow;
-
 pub use lucet_wiggle_macro::from_witx;
 pub use wiggle::*;
 
 pub mod runtime {
-    use crate::borrow::BorrowChecker;
     use lucet_runtime::vmctx::Vmctx;
     use wiggle::{BorrowHandle, GuestError, GuestMemory, Region};
+    use wiggle_borrow::BorrowChecker;
 
     pub struct LucetMemory<'a> {
         vmctx: &'a Vmctx,
@@ -35,14 +33,23 @@ pub mod runtime {
         fn has_outstanding_borrows(&self) -> bool {
             self.bc.has_outstanding_borrows()
         }
-        fn is_borrowed(&self, r: Region) -> bool {
-            self.bc.is_borrowed(r)
+        fn is_mut_borrowed(&self, r: Region) -> bool {
+            self.bc.is_mut_borrowed(r)
         }
-        fn borrow(&self, r: Region) -> Result<BorrowHandle, GuestError> {
-            self.bc.borrow(r)
+        fn is_shared_borrowed(&self, r: Region) -> bool {
+            self.bc.is_shared_borrowed(r)
         }
-        fn unborrow(&self, h: BorrowHandle) {
-            self.bc.unborrow(h)
+        fn mut_borrow(&self, r: Region) -> Result<BorrowHandle, GuestError> {
+            self.bc.mut_borrow(r)
+        }
+        fn shared_borrow(&self, r: Region) -> Result<BorrowHandle, GuestError> {
+            self.bc.shared_borrow(r)
+        }
+        fn mut_unborrow(&self, h: BorrowHandle) {
+            self.bc.mut_unborrow(h)
+        }
+        fn shared_unborrow(&self, h: BorrowHandle) {
+            self.bc.shared_unborrow(h)
         }
     }
 }
