@@ -427,12 +427,10 @@ pub(crate) enum InternalRunResult {
 }
 
 impl InternalRunResult {
-    pub(crate) fn unwrap(self) -> Result<RunResult, Error> {
+    pub(crate) fn unwrap(self) -> RunResult {
         match self {
-            InternalRunResult::Normal(result) => Ok(result),
-            InternalRunResult::BoundExpired => Err(Error::InvalidArgument(
-                "should not have had a runtime bound",
-            )),
+            InternalRunResult::Normal(result) => result,
+            InternalRunResult::BoundExpired => panic!("should not have had a runtime bound"),
         }
     }
 }
@@ -517,7 +515,7 @@ impl Instance {
     /// in the future.
     pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<RunResult, Error> {
         let func = self.module.get_export_func(entrypoint)?;
-        self.run_func(func, &args, false, None)?.unwrap()
+        Ok(self.run_func(func, &args, false, None)?.unwrap())
     }
 
     /// Run a function with arguments in the guest context from the [WebAssembly function
@@ -533,7 +531,7 @@ impl Instance {
         args: &[Val],
     ) -> Result<RunResult, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
-        self.run_func(func, &args, false, None)?.unwrap()
+        Ok(self.run_func(func, &args, false, None)?.unwrap())
     }
 
     /// Resume execution of an instance that has yielded without providing a value to the guest.
@@ -564,7 +562,7 @@ impl Instance {
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
-        self.resume_with_val_impl(val, false, None)?.unwrap()
+        Ok(self.resume_with_val_impl(val, false, None)?.unwrap())
     }
 
     pub(crate) fn resume_with_val_impl<A: Any + 'static>(
@@ -587,7 +585,7 @@ impl Instance {
 
         self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static>);
 
-        self.set_instruction_bound_delta(max_insn_count.unwrap_or(0));
+        self.set_instruction_bound_delta(max_insn_count);
         self.swap_and_return(async_context)
     }
 
@@ -611,7 +609,7 @@ impl Instance {
                 "can only call resume_bounded() on an instance that hit an instruction bound",
             ));
         }
-        self.set_instruction_bound_delta(max_insn_count);
+        self.set_instruction_bound_delta(Some(max_insn_count));
         self.swap_and_return(true)
     }
 
@@ -650,10 +648,7 @@ impl Instance {
             if !self.is_not_started() {
                 return Err(Error::StartAlreadyRun);
             }
-            let res = self.run_func(start, &[], false, None)?.unwrap()?;
-            if res.is_yielded() {
-                return Err(Error::StartYielded);
-            }
+            self.run_func(start, &[], false, None)?;
         }
         Ok(())
     }
@@ -958,11 +953,12 @@ impl Instance {
     /// value is *crossed*, but not if execution *begins* with the value exceeded. Hence `delta`
     /// must be greater than zero for this to set up the instance state to trigger a yield.
     #[inline]
-    pub fn set_instruction_bound_delta(&mut self, delta: u64) {
+    pub fn set_instruction_bound_delta(&mut self, delta: Option<u64>) {
         let implicits = self.get_instance_implicits_mut();
         let sum = implicits.instruction_count_adj + implicits.instruction_count_bound;
+        let delta = delta.unwrap_or(i64::MAX as u64);
         let delta = i64::try_from(delta).expect("delta too large");
-        implicits.instruction_count_bound = sum + delta;
+        implicits.instruction_count_bound = sum.wrapping_add(delta);
         implicits.instruction_count_adj = -delta;
     }
 
@@ -1140,7 +1136,7 @@ impl Instance {
         let mut args_with_vmctx = vec![Val::from(self.alloc.slot().heap)];
         args_with_vmctx.extend_from_slice(args);
 
-        self.set_instruction_bound_delta(inst_count_bound.unwrap_or(0));
+        self.set_instruction_bound_delta(inst_count_bound);
 
         let self_ptr = self as *mut _;
         Context::init_with_callback(

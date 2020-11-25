@@ -26,7 +26,7 @@ pub fn wasm_test<P: AsRef<Path>>(
     Ok(dlmodule)
 }
 
-pub fn get_instruction_count_test_files() -> Vec<DirEntry> {
+pub fn get_instruction_count_test_files(want_start_function: bool) -> Vec<DirEntry> {
     std::fs::read_dir("./tests/instruction_counting")
         .expect("can iterate test files")
         .map(|ent| {
@@ -37,12 +37,14 @@ pub fn get_instruction_count_test_files() -> Vec<DirEntry> {
             );
             ent
         })
+        .filter(|ent| want_start_function == ent.path().to_str().unwrap().contains("_start.wat"))
         .collect()
 }
 
 #[test]
 pub fn check_instruction_count_off() {
-    let files: Vec<DirEntry> = get_instruction_count_test_files();
+    let files: Vec<DirEntry> =
+        get_instruction_count_test_files(/* want_start_function = */ false);
 
     assert!(
         !files.is_empty(),
@@ -71,7 +73,8 @@ pub fn check_instruction_count_off() {
 
 #[test]
 pub fn check_instruction_count() {
-    let files: Vec<DirEntry> = get_instruction_count_test_files();
+    let files: Vec<DirEntry> =
+        get_instruction_count_test_files(/* want_start_function = */ false);
 
     assert!(
         !files.is_empty(),
@@ -136,7 +139,16 @@ fn dummy_waker() -> Waker {
 
 #[test]
 pub fn check_instruction_count_with_periodic_yields() {
-    let files: Vec<DirEntry> = get_instruction_count_test_files();
+    check_instruction_count_with_periodic_yields_internal(/* want_start_function = */ false);
+}
+
+#[test]
+pub fn check_instruction_count_with_periodic_yields_start_func() {
+    check_instruction_count_with_periodic_yields_internal(/* want_start_function = */ true);
+}
+
+fn check_instruction_count_with_periodic_yields_internal(want_start_function: bool) {
+    let files: Vec<DirEntry> = get_instruction_count_test_files(want_start_function);
 
     assert!(
         !files.is_empty(),
@@ -154,15 +166,13 @@ pub fn check_instruction_count_with_periodic_yields() {
             .new_instance(module)
             .expect("instance can be created");
 
-        let yields = {
+        fn future_loop(mut future: std::pin::Pin<Box<impl Future>>) -> u64 {
             let mut yields = 0;
-            let mut future = Box::pin(inst.run_async("test_function", &[], Some(1000)));
             let waker = dummy_waker();
             let mut context = Context::from_waker(&waker);
             loop {
                 match future.as_mut().poll(&mut context) {
-                    Poll::Ready(val) => {
-                        val.expect("instance runs");
+                    Poll::Ready(_) => {
                         break;
                     }
                     Poll::Pending => {
@@ -174,6 +184,14 @@ pub fn check_instruction_count_with_periodic_yields() {
                 }
             }
             yields
+        }
+
+        let yields = if want_start_function {
+            let future = Box::pin(inst.run_async_start(Some(1000)));
+            future_loop(future)
+        } else {
+            let future = Box::pin(inst.run_async("test_function", &[], Some(1000)));
+            future_loop(future)
         };
 
         let instruction_count = inst

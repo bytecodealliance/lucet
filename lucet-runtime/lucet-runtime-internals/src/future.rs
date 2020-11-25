@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::instance::{InstanceHandle, InternalRunResult, RunResult, State, TerminationDetails};
+use crate::module::FunctionHandle;
 use crate::val::{UntypedRetVal, Val};
 use crate::vmctx::{Vmctx, VmctxInternal};
 use std::any::Any;
@@ -131,6 +132,45 @@ impl InstanceHandle {
         args: &'a [Val],
         runtime_bound: Option<u64>,
     ) -> Result<UntypedRetVal, Error> {
+        let func = self.module.get_export_func(entrypoint)?;
+        self.run_async_internal(func, args, runtime_bound).await
+    }
+
+    /// Run the module's [start function][start], if one exists.
+    ///
+    /// If there is no start function in the module, this does nothing.
+    ///
+    /// All of the other restrictions on the start function, what it may do, and
+    /// the requirement that it must be invoked first, are described in the
+    /// documentation for `Instance::run_start()`. This async version of that
+    /// function satisfies the requirement to run the start function first, as
+    /// long as the async function fully returns (not just yields).
+    ///
+    /// This method is similar to `Instance::run_start()`, except that it bounds
+    /// runtime between async future yields (invocations of `.poll()` on the
+    /// underlying generated future) if `runtime_bound` is provided. This
+    /// behaves the same way as `Instance::run_async()`.
+    pub async fn run_async_start<'a>(
+        &'a mut self,
+        runtime_bound: Option<u64>,
+    ) -> Result<(), Error> {
+        if let Some(start) = self.module.get_start_func()? {
+            if !self.is_not_started() {
+                return Err(Error::StartAlreadyRun);
+            }
+            self.run_async_internal(start, &[], runtime_bound).await?;
+        }
+        Ok(())
+    }
+
+    /// Shared async run-loop implementation for both `run_async()` and
+    /// `run_start_async()`.
+    async fn run_async_internal<'a>(
+        &'a mut self,
+        func: FunctionHandle,
+        args: &'a [Val],
+        runtime_bound: Option<u64>,
+    ) -> Result<UntypedRetVal, Error> {
         if self.is_yielded() {
             return Err(Error::Unsupported(
                 "cannot run_async a yielded instance".to_owned(),
@@ -158,7 +198,6 @@ impl InstanceHandle {
                 )
             } else {
                 // This is the first iteration, call the entrypoint:
-                let func = self.module.get_export_func(entrypoint)?;
                 self.run_func(func, args, true, runtime_bound)
             };
             match run_result? {

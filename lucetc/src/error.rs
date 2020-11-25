@@ -1,6 +1,7 @@
 use crate::types::SignatureError;
 use crate::validate::Error as ValidationError;
 use cranelift_module::ModuleError as ClifModuleError;
+use cranelift_wasm::wasmparser::BinaryReaderError as ClifWasmReaderError;
 use cranelift_wasm::WasmError as ClifWasmError;
 use lucet_module::error::Error as LucetModuleError;
 use object;
@@ -27,6 +28,8 @@ pub enum Error {
     MissingWasmPreamble,
     #[error("Wasm validation: {0}")]
     WasmValidation(#[from] wasmparser::BinaryReaderError),
+    #[error("Wasm validation: {0}")]
+    ClifWasmValidation(#[from] ClifWasmReaderError),
     #[error("Wat input: {0}")]
     WatInput(#[from] wabt::Error),
     #[error("Object artifact: {1}. {0:?}")]

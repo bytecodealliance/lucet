@@ -11,16 +11,10 @@ pub struct InstanceRuntimeData {
     /// `instruction_count_adj` set to some negative value and
     /// `instruction_count_bound` adjusted upward in compensation.
     /// `instruction_count_adj` is incremented as execution proceeds; on each
-    /// increment, the Wasm code checks the carry flag. If the value crosses
-    /// zero (becomes positive), then we have exceeded the bound and we must
-    /// yield. At any point, the `adj` value can be adjusted downward by
-    /// transferring the count to the `bound`.
-    ///
-    /// Note that the bound-yield is only triggered if the `adj` value
-    /// transitions from negative to non-negative; in other words, it is
-    /// edge-triggered, not level-triggered. So entering code that has been
-    /// instrumented for instruction counting with `adj` >= 0 will result in no
-    /// bound ever triggered (until 2^64 instructions execute).
+    /// increment, the Wasm code checks the sign. If the value is greater than
+    /// zero, then we have exceeded the bound and we must yield. At any point,
+    /// the `adj` value can be adjusted downward by transferring the count to
+    /// the `bound`.
     pub instruction_count_adj: i64,
     pub instruction_count_bound: i64,
     pub stack_limit: u64,
