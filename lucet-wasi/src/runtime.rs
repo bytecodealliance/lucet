@@ -44,9 +44,9 @@ impl<'a> types::GuestErrorConversion for LucetWasiCtx<'a> {
 }
 
 impl<'a> types::UserErrorConversion for LucetWasiCtx<'a> {
-    fn errno_from_error(&self, e: Error) -> types::Errno {
+    fn errno_from_error(&self, e: Error) -> Result<types::Errno, String> {
         debug!("Error: {:?}", e);
-        e.into()
+        Ok(e.into())
     }
 }
 
