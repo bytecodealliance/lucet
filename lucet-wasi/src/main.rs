@@ -217,7 +217,7 @@ fn run(config: Config<'_>) {
             (true, None) => panic!("signature verification requires a public key"),
         };
         let module = if let Some(pk) = pk {
-            DlModule::load_and_verify(&config.lucet_module, pk)
+            DlModule::load_and_verify(&config.lucet_module, pk, true)
                 .expect("signed module can be loaded")
         } else {
             DlModule::load(&config.lucet_module).expect("module can be loaded")

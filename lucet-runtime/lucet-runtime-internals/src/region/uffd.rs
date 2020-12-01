@@ -14,7 +14,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
 use std::sync::{Arc, Mutex, Weak};
 use std::thread::{self, JoinHandle};
-use userfaultfd::{IoctlFlags, Uffd, UffdBuilder};
+use userfaultfd::{Event, IoctlFlags, Uffd, UffdBuilder};
 
 /// A [`Region`](trait.Region.html) backed by `mmap` and managed by `userfaultfd`.
 ///
@@ -43,6 +43,7 @@ use userfaultfd::{IoctlFlags, Uffd, UffdBuilder};
 ///
 /// [userfaultfd]: http://man7.org/linux/man-pages/man2/userfaultfd.2.html
 pub struct UffdRegion {
+    config: UffdConfig,
     uffd: Arc<Uffd>,
     start: *mut c_void,
     limits: Limits,
@@ -56,16 +57,115 @@ pub struct UffdRegion {
 unsafe impl Send for UffdRegion {}
 unsafe impl Sync for UffdRegion {}
 
-fn uffd_handler(
-    uffd_strategy: impl UffdStrategy,
+fn page_fault_handler(
+    fault_addr: usize,
+    config: &UffdConfig,
+    uffd: &Uffd,
+    limits: &Limits,
+    region_start: usize,
+    instance_capacity: usize,
+) -> Result<(), Error> {
+    let fault_page = fault_addr - (fault_addr % host_page_size());
+    let instance_size = limits.total_memory_size();
+
+    let in_region =
+        fault_addr >= region_start && fault_addr < region_start + instance_size * instance_capacity;
+    if !in_region {
+        lucet_bail!(
+            "fault addr {} outside uffd region {}[{}]",
+            fault_addr,
+            region_start,
+            instance_size * instance_capacity,
+        );
+    }
+
+    let fault_offs = fault_addr - region_start;
+    let fault_base = fault_offs - (fault_offs % instance_size);
+    let inst_base = region_start + fault_base;
+
+    // NB: we are blatantly lying to the compiler here! the lifetime is *not* actually
+    // static, but for the purposes of reaching in to read the sparse page data and the
+    // heap layout, we can treat it as such. The important property to maintain is that
+    // the *real* region lifetime (`'r`) lives at least as long as this handler thread,
+    // which can be shown by examining the `drop` method of `UffdRegion`.
+
+    let inst: &mut Instance = unsafe {
+        (inst_base as *mut Instance)
+            .as_mut()
+            .ok_or(lucet_format_err!("instance pointer is non-null"))?
+    };
+    if !inst.valid_magic() {
+        lucet_bail!(
+            "instance magic incorrect: fault address {:p}, region {:p}[{}]",
+            fault_addr as *mut c_void,
+            region_start as *mut c_void,
+            instance_size * instance_capacity
+        );
+    }
+
+    let alloc = inst.alloc();
+    let loc = alloc.addr_location(fault_addr as *const c_void);
+    match loc {
+        AddrLocation::InaccessibleHeap | AddrLocation::StackGuard => {
+            // page fault occurred out of bounds; trigger a fault by waking the faulting
+            // thread without copying or zeroing
+            uffd.wake(fault_page as *mut c_void, host_page_size())
+                .map_err(|e| Error::InternalError(e.into()))?;
+        }
+        AddrLocation::SigStackGuard | AddrLocation::Unknown => {
+            tracing::error!("UFFD pagefault at fatal location: {:?}", loc);
+            uffd.wake(fault_page as *mut c_void, host_page_size())
+                .map_err(|e| Error::InternalError(e.into()))?;
+        }
+        AddrLocation::Globals | AddrLocation::SigStack => {
+            tracing::error!("UFFD pagefault at unexpected location: {:?}", loc);
+            uffd.wake(fault_page as *mut c_void, host_page_size())
+                .map_err(|e| Error::InternalError(e.into()))?;
+        }
+        AddrLocation::Stack => match config.stack_init {
+            Disposition::Lazy => unsafe {
+                zeropage(
+                    uffd,
+                    fault_page as *mut c_void,
+                    host_page_size(),
+                    true,
+                    config.enoent_retry_limit,
+                )
+                .map_err(|e| Error::InternalError(e.into()))?;
+            },
+            Disposition::Eager => {
+                lucet_bail!("fault in eagerly initialized stack should be unreachable")
+            }
+        },
+
+        AddrLocation::Heap => match config.heap_page_size {
+            HeapPageSize::Host => HostPageSizedUffdStrategy.heap_fault(
+                config,
+                &uffd,
+                inst.module(),
+                alloc,
+                fault_page as *mut c_void,
+            )?,
+            HeapPageSize::Wasm => WasmPageSizedUffdStrategy.heap_fault(
+                config,
+                &uffd,
+                inst.module(),
+                alloc,
+                fault_page as *mut c_void,
+            )?,
+        },
+    }
+    Ok(())
+}
+
+fn uffd_worker_thread(
+    config: UffdConfig,
     uffd: Arc<Uffd>,
-    start: *mut c_void,
+    region_start: *mut c_void,
     instance_capacity: usize,
     handler_pipe: RawFd,
     limits: Limits,
 ) -> Result<(), Error> {
-    use userfaultfd::Event;
-
     let mut pollfds = [
         poll::PollFd::new(uffd.as_raw_fd(), poll::PollFlags::POLLIN),
         poll::PollFd::new(handler_pipe, poll::PollFlags::POLLIN),
@@ -98,78 +198,18 @@ fn uffd_handler(
             );
         }
 
-        // eprintln!("handling a fault on fd {}", uffd.as_raw_fd());
-
         match uffd.read_event() {
             Err(e) => lucet_bail!("error reading event from uffd: {}", e),
             Ok(None) => lucet_bail!("uffd had POLLIN set, but could not be read"),
-            Ok(Some(Event::Pagefault {
-                addr: fault_addr, ..
-            })) => {
-                // eprintln!("fd {} fault address: {:p}", uffd.as_raw_fd(), fault_addr);
-                let fault_addr = fault_addr as usize;
-                let fault_page = fault_addr - (fault_addr % host_page_size());
-                let instance_size = limits.total_memory_size();
-
-                let in_region = fault_addr >= start as usize
-                    && fault_addr < start as usize + instance_size * instance_capacity;
-                lucet_ensure!(in_region, "fault is within the uffd region");
-
-                let fault_offs = fault_addr - start as usize;
-                let fault_base = fault_offs - (fault_offs % instance_size);
-                let inst_base = start as usize + fault_base;
-
-                // NB: we are blatantly lying to the compiler here! the lifetime is *not* actually
-                // static, but for the purposes of reaching in to read the sparse page data and the
-                // heap layout, we can treat it as such. The important property to maintain is that
-                // the *real* region lifetime (`'r`) lives at least as long as this handler thread,
-                // which can be shown by examining the `drop` method of `UffdRegion`.
-
-                let inst: &mut Instance = unsafe {
-                    (inst_base as *mut Instance)
-                        .as_mut()
-                        .ok_or(lucet_format_err!("instance pointer is non-null"))?
-                };
-                if !inst.valid_magic() {
-                    eprintln!(
-                        "instance magic incorrect, fault address {:p}",
-                        fault_addr as *mut c_void
-                    );
-                    lucet_bail!("instance magic incorrect");
-                }
-
-                let alloc = inst.alloc();
-                let loc = alloc.addr_location(fault_addr as *const c_void);
-                match loc {
-                    AddrLocation::InaccessibleHeap | AddrLocation::StackGuard => {
-                        // eprintln!("fault in heap guard!");
-                        // page fault occurred out of bounds; trigger a fault by waking the faulting
-                        // thread without copying or zeroing
-                        uffd.wake(fault_page as *mut c_void, host_page_size())
-                            .map_err(|e| Error::InternalError(e.into()))?;
-                    }
-                    AddrLocation::SigStackGuard | AddrLocation::Unknown => {
-                        tracing::error!("UFFD pagefault at fatal location: {:?}", loc);
-                        uffd.wake(fault_page as *mut c_void, host_page_size())
-                            .map_err(|e| Error::InternalError(e.into()))?;
-                    }
-                    AddrLocation::Globals | AddrLocation::SigStack => {
-                        tracing::error!("UFFD pagefault at unexpected location: {:?}", loc);
-                        uffd.wake(fault_page as *mut c_void, host_page_size())
-                            .map_err(|e| Error::InternalError(e.into()))?;
-                    }
-                    AddrLocation::Stack => {
-                        uffd_strategy.stack_fault(&uffd, fault_page as *mut c_void)?
-                    }
-                    AddrLocation::Heap => uffd_strategy.heap_fault(
-                        &uffd,
-                        inst.module(),
-                        alloc,
-                        fault_page as *mut c_void,
-                    )?,
-                }
-            }
-            Ok(Some(ev)) => panic!("unexpected uffd event: {:?}", ev),
+            Ok(Some(Event::Pagefault { addr, .. })) => page_fault_handler(
+                addr as usize,
+                &config,
+                &uffd,
+                &limits,
+                region_start as usize,
+                instance_capacity,
+            )?,
+            Ok(Some(e)) => lucet_bail!("unexpected uffd event: {:?}", e),
         }
     }
 
@@ -187,6 +227,51 @@ impl Region for UffdRegion {
 
     fn capacity(&self) -> usize {
         self.instance_capacity
+    }
+}
+
+unsafe fn zeropage(
+    uffd: &Uffd,
+    start: *mut c_void,
+    len: usize,
+    wake: bool,
+    retry_limit: usize,
+) -> userfaultfd::Result<usize> {
+    let mut retries = 0;
+
+    loop {
+        let res = uffd.zeropage(start, len, wake);
+        if let Err(userfaultfd::Error::ZeropageFailed(nix::errno::Errno::ENOENT)) = res {
+            retries += 1;
+            if retries >= retry_limit {
+                return res;
+            }
+        } else {
+            return res;
+        }
+    }
+}
+
+unsafe fn copy(
+    uffd: &Uffd,
+    src: *const c_void,
+    dst: *mut c_void,
+    len: usize,
+    wake: bool,
+    retry_limit: usize,
+) -> userfaultfd::Result<usize> {
+    let mut retries = 0;
+
+    loop {
+        let res = uffd.copy(src, dst, len, wake);
+        if let Err(userfaultfd::Error::CopyFailed(nix::errno::Errno::ENOENT)) = res {
+            retries += 1;
+            if retries >= retry_limit {
+                return res;
+            }
+        } else {
+            return res;
+        }
     }
 }
 
@@ -220,21 +305,57 @@ impl RegionInternal for UffdRegion {
             "heap must be page-aligned"
         );
 
-        for (ptr, len) in [
-            // zero the globals
+        let mut init_list = vec![
             (slot.globals, limits.globals_size),
-            // zero the sigstack
             (slot.sigstack, limits.signal_stack_size),
-        ]
-        .iter()
-        {
+        ];
+        if let Disposition::Eager = self.config.stack_init {
+            init_list.push((slot.stack, limits.stack_size));
+        }
+
+        for (ptr, len) in init_list.into_iter() {
             // globals_size = 0 is valid, but the ioctl fails if you pass it 0
-            if *len > 0 {
-                // eprintln!("zeroing {:p}[{:x}]", *ptr, len);
+            if len > 0 {
                 unsafe {
-                    self.uffd
-                        .zeropage(*ptr, *len, true)
-                        .expect("uffd.zeropage succeeds");
+                    zeropage(&self.uffd, ptr, len, true, self.config.enoent_retry_limit)
+                        .expect("zeropage succeeds");
+                }
+            }
+        }
+
+        // if heap_init is eager and module has a linear memory, initialize it:
+        if let Disposition::Eager = self.config.heap_init {
+            if let Some(heap_spec) = module.heap_spec() {
+                let initial_size = heap_spec.initial_size as usize;
+                assert_eq!(
+                    initial_size % host_page_size(),
+                    0,
+                    "initial heap is page divisible"
+                );
+                // All associated host pages gets zeroed
+                unsafe {
+                    zeropage(
+                        &self.uffd,
+                        slot.heap,
+                        initial_size,
+                        false,
+                        self.config.enoent_retry_limit,
+                    )
+                    .map_err(|e| Error::InternalError(e.into()))?;
+                }
+
+                let heap_pages = initial_size / host_page_size();
+                for pages_into_heap in 0..heap_pages {
+                    if let Some(init_contents) = module.get_sparse_page_data(pages_into_heap) {
+                        let page_addr = slot.heap as usize + pages_into_heap * host_page_size();
+                        let page: &mut [u8] = unsafe {
+                            std::slice::from_raw_parts_mut(
+                                page_addr as *mut c_void as *mut u8,
+                                host_page_size(),
+                            )
+                        };
+                        page.copy_from_slice(init_contents)
+                    }
                 }
             }
         }
@@ -280,11 +401,9 @@ impl RegionInternal for UffdRegion {
         // set dontneed for everything past the `Instance` page
         let ptr = (slot.start as usize + instance_heap_offset()) as *mut c_void;
         let len = slot.limits.total_memory_size() - instance_heap_offset();
-        // eprintln!("setting none {:p}[{:x}]", ptr, len);
         unsafe {
             madvise(ptr, len, MmapAdvise::MADV_DONTNEED).expect("madvise succeeds during drop");
         }
-
         self.freelist.lock().unwrap().push(slot);
     }
 
@@ -329,20 +448,18 @@ impl RegionCreate for UffdRegion {
     const TYPE_NAME: &'static str = "UffdRegion";
 
     fn create(instance_capacity: usize, limits: &Limits) -> Result<Arc<Self>, Error> {
-        UffdRegion::create(instance_capacity, limits, WasmPageSizedUffdStrategy {})
+        UffdRegion::create(instance_capacity, limits, UffdConfig::default())
     }
 }
 
 impl Drop for UffdRegion {
     fn drop(&mut self) {
-        // eprintln!("UffdRegion::drop()");
         // write to the pipe to notify the handler to exit
         if let Err(e) = nix::unistd::write(self.handler_pipe, b"macht nichts") {
             // this probably means the handler errored out; note it but don't panic
-            eprintln!("couldn't write to handler shutdown pipe: {}", e);
+            tracing::error!("couldn't write to handler shutdown pipe: {}", e);
         };
 
-        // eprintln!("joining");
         // wait for the handler to exit
         let res = self
             .handler
@@ -377,7 +494,7 @@ impl UffdRegion {
     pub fn create(
         instance_capacity: usize,
         limits: &Limits,
-        strategy: impl UffdStrategy,
+        config: UffdConfig,
     ) -> Result<Arc<Self>, Error> {
         if instance_capacity == 0 {
             return Err(Error::InvalidArgument(
@@ -424,13 +541,15 @@ impl UffdRegion {
 
         let handler_uffd = uffd.clone();
         // morally equivalent to `unsafe impl Send`
+        let handler_config = config.clone();
+        let abort_on_handler_error = config.abort_on_handler_error;
         let handler_start = start as usize;
         let handler_limits = limits.clone();
         let handler = thread::Builder::new()
             .name("uffd region handler".into())
             .spawn(move || {
-                let res = uffd_handler(
-                    strategy,
+                let res = uffd_worker_thread(
+                    handler_config,
                     handler_uffd.clone(),
                     handler_start as *mut c_void,
                     instance_capacity,
@@ -440,27 +559,36 @@ impl UffdRegion {
                 // clean up the shutdown pipe before terminating
                 if let Err(e) = nix::unistd::close(handler_pipe_recv) {
                     // note but don't return an error just for the pipe
-                    eprintln!("error closing handler_pipe_recv: {}", e);
+                    tracing::error!("error closing handler_pipe_recv: {}", e);
                 }
-                if res.is_err() {
-                    // We can't currently recover from something going wrong in the handler thread,
-                    // so we unregister the region and wake all faulting threads so that they crash
-                    // rather than hanging. This is in lieu of bringing down the other threads with
-                    // `panic!`
-                    handler_uffd
-                        .unregister(handler_start as *mut c_void, total_region_size)
-                        .unwrap_or_else(|e| {
-                            eprintln!("error while unregistering in error case: {}", e)
-                        });
-                    handler_uffd
-                        .wake(handler_start as *mut c_void, total_region_size)
-                        .unwrap_or_else(|e| eprintln!("error while waking in error case: {}", e));
+                match res {
+                    Err(e) => {
+                        if abort_on_handler_error {
+                            tracing::error!("aborting due to error on uffd handler thread: {}", e);
+                            std::process::abort();
+                        }
+                        // We can't currently recover from something going wrong in the handler thread,
+                        // so we unregister the region and wake all faulting threads so that they crash
+                        // rather than hanging.
+                        handler_uffd
+                            .unregister(handler_start as *mut c_void, total_region_size)
+                            .unwrap_or_else(|e| {
+                                tracing::error!("error while unregistering in error case: {}", e)
+                            });
+                        handler_uffd
+                            .wake(handler_start as *mut c_void, total_region_size)
+                            .unwrap_or_else(|e| {
+                                tracing::error!("error while waking in error case: {}", e)
+                            });
+                        Err(e)
+                    }
+                    Ok(()) => Ok(()),
                 }
-                res
             })
             .expect("error spawning uffd region handler");
 
         let region = Arc::new(UffdRegion {
+            config,
             uffd,
             start,
             limits: limits.clone(),
@@ -491,12 +619,15 @@ impl UffdRegion {
         let sigstack = globals + region.limits.globals_size + host_page_size();
 
         // turn on the `Instance` page
-        // eprintln!("zeroing {:p}[{:x}]", start, host_page_size());
         unsafe {
-            region
-                .uffd
-                .zeropage(start, host_page_size(), true)
-                .map_err(|e| Error::InternalError(e.into()))?;
+            zeropage(
+                &region.uffd,
+                start,
+                host_page_size(),
+                true,
+                region.config.enoent_retry_limit,
+            )
+            .map_err(|e| Error::InternalError(e.into()))?;
         }
 
         Ok(Slot {
@@ -511,10 +642,49 @@ impl UffdRegion {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Disposition {
+    Eager,
+    Lazy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HeapPageSize {
+    Host,
+    Wasm,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UffdConfig {
+    pub heap_page_size: HeapPageSize,
+    pub heap_init: Disposition,
+    pub stack_init: Disposition,
+    pub abort_on_handler_error: bool,
+    pub enoent_retry_limit: usize,
+}
+
+impl Default for UffdConfig {
+    fn default() -> UffdConfig {
+        UffdConfig {
+            heap_page_size: HeapPageSize::Wasm,
+            heap_init: Disposition::Lazy,
+            stack_init: Disposition::Lazy,
+            abort_on_handler_error: false,
+            enoent_retry_limit: 4,
+        }
+    }
+}
+
 pub trait UffdStrategy: Send + Sync + 'static {
-    fn stack_fault(&self, uffd: &Uffd, fault_page: *mut c_void) -> Result<(), Error>;
+    fn stack_fault(
+        &self,
+        config: &UffdConfig,
+        uffd: &Uffd,
+        fault_page: *mut c_void,
+    ) -> Result<(), Error>;
     fn heap_fault(
         &self,
+        config: &UffdConfig,
         uffd: &Uffd,
         module: &dyn Module,
         alloc: &Alloc,
@@ -525,16 +695,28 @@ pub trait UffdStrategy: Send + Sync + 'static {
 pub struct HostPageSizedUffdStrategy;
 
 impl UffdStrategy for HostPageSizedUffdStrategy {
-    fn stack_fault(&self, uffd: &Uffd, fault_page: *mut c_void) -> Result<(), Error> {
+    fn stack_fault(
+        &self,
+        config: &UffdConfig,
+        uffd: &Uffd,
+        fault_page: *mut c_void,
+    ) -> Result<(), Error> {
         unsafe {
-            uffd.zeropage(fault_page as *mut c_void, host_page_size(), true)
-                .map_err(|e| Error::InternalError(e.into()))?;
+            zeropage(
+                uffd,
+                fault_page as *mut c_void,
+                host_page_size(),
+                true,
+                config.enoent_retry_limit,
+            )
+            .map_err(|e| Error::InternalError(e.into()))?;
         }
         Ok(())
     }
 
     fn heap_fault(
         &self,
+        config: &UffdConfig,
         uffd: &Uffd,
         module: &dyn Module,
         alloc: &Alloc,
@@ -546,19 +728,27 @@ impl UffdStrategy for HostPageSizedUffdStrategy {
         if let Some(page) = module.get_sparse_page_data(pages_into_heap) {
             // we are in the sparse data area, with a non-empty page; copy it in
             unsafe {
-                uffd.copy(
+                copy(
+                    uffd,
                     page.as_ptr() as *const c_void,
                     fault_page,
                     host_page_size(),
                     true,
+                    config.enoent_retry_limit,
                 )
                 .map_err(|e| Error::InternalError(e.into()))?;
             }
         } else {
             // else if outside the sparse data area, or with an empty page
             unsafe {
-                uffd.zeropage(fault_page, host_page_size(), true)
-                    .map_err(|e| Error::InternalError(e.into()))?;
+                zeropage(
+                    uffd,
+                    fault_page,
+                    host_page_size(),
+                    true,
+                    config.enoent_retry_limit,
+                )
+                .map_err(|e| Error::InternalError(e.into()))?;
             }
         }
         Ok(())
@@ -568,16 +758,28 @@ impl UffdStrategy for HostPageSizedUffdStrategy {
 pub struct WasmPageSizedUffdStrategy;
 
 impl UffdStrategy for WasmPageSizedUffdStrategy {
-    fn stack_fault(&self, uffd: &Uffd, fault_page: *mut c_void) -> Result<(), Error> {
+    fn stack_fault(
+        &self,
+        config: &UffdConfig,
+        uffd: &Uffd,
+        fault_page: *mut c_void,
+    ) -> Result<(), Error> {
         unsafe {
-            uffd.zeropage(fault_page as *mut c_void, host_page_size(), true)
-                .map_err(|e| Error::InternalError(e.into()))?;
+            zeropage(
+                uffd,
+                fault_page,
+                host_page_size(),
+                true,
+                config.enoent_retry_limit,
+            )
+            .map_err(|e| Error::InternalError(e.into()))?;
         }
         Ok(())
     }
 
     fn heap_fault(
         &self,
+        config: &UffdConfig,
         uffd: &Uffd,
         module: &dyn Module,
         alloc: &Alloc,
@@ -611,24 +813,32 @@ impl UffdStrategy for WasmPageSizedUffdStrategy {
             if let Some(page) = module.get_sparse_page_data(pages_into_heap) {
                 // we are in the sparse data area, with a non-empty page; copy it in
                 unsafe {
-                    uffd.copy(
+                    copy(
+                        uffd,
                         page.as_ptr() as *const c_void,
                         host_page_addr as *mut c_void,
                         host_page_size(),
                         false,
+                        config.enoent_retry_limit,
                     )
                     .map_err(|e| Error::InternalError(e.into()))?;
                 }
             } else {
                 // else if outside the sparse data area, or with an empty page
                 unsafe {
-                    uffd.zeropage(host_page_addr as *mut c_void, host_page_size(), false)
-                        .map_err(|e| Error::InternalError(e.into()))?;
+                    zeropage(
+                        uffd,
+                        host_page_addr as *mut c_void,
+                        host_page_size(),
+                        false,
+                        config.enoent_retry_limit,
+                    )
+                    .map_err(|e| Error::InternalError(e.into()))?;
                 }
             }
         }
 
-        uffd.wake(fault_page as *mut c_void, host_page_size())
+        uffd.wake(wasm_page_base_addr as *mut c_void, WASM_PAGE_SIZE as usize)
             .map_err(|e| Error::InternalError(e.into()))?;
 
         Ok(())
