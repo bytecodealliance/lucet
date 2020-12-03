@@ -234,7 +234,7 @@ macro_rules! entrypoint_tests {
                 };
                 use std::sync::Arc;
                 use $TestRegion as TestRegion;
-                use $crate::build::test_module_c;
+                use $crate::build::{test_module_c, test_module_wasm};
                 use $crate::entrypoint::{mock_calculator_module, wat_calculator_module};
 
                 #[test]
@@ -673,7 +673,7 @@ macro_rules! entrypoint_tests {
                     use byteorder::{LittleEndian, ReadBytesExt};
 
                     let module =
-                        test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
+                        test_module_wasm("entrypoint", "use_allocator.wat").expect("module builds and loads");
                     let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
@@ -681,7 +681,7 @@ macro_rules! entrypoint_tests {
                         .expect("instance can be created");
 
                     // First, we need to get an unused location in linear memory for the pointer that will be passed
-                    // as an argument to create_and_memset.
+                    // as an argument to expand_and_memset.
                     let new_page = inst.grow_memory(1).expect("grow_memory succeeds");
                     assert!(new_page > 0);
                     // wasm memory index for the start of the new page
@@ -690,17 +690,16 @@ macro_rules! entrypoint_tests {
                     // This function will call `malloc` for the given size, then `memset` the entire region to the
                     // init_as argument. The pointer to the allocated region gets stored in loc_outval.
                     inst.run(
-                        "create_and_memset",
+                        "expand_and_memset",
                         &[
                             // int init_as
                             TEST_REGION_INIT_VAL.into(),
-                            // size_t size
+                            // size_t size (in wasm pages)
                             TEST_REGION_SIZE.into(),
                             // char** ptr_outval
                             Val::GuestPtr(loc_outval),
                         ],
-                    )
-                        .expect("instance runs");
+                    ).expect("instance runs");
 
                     // The location of the created region should be in a new page that the allocator grabbed from
                     // the runtime. That page will be above the one we got above.
@@ -708,14 +707,21 @@ macro_rules! entrypoint_tests {
                     let loc_region_1 = (&heap[loc_outval as usize..])
                         .read_u32::<LittleEndian>()
                         .expect("can read outval");
-                    assert!(loc_region_1 > loc_outval);
 
+                    if loc_region_1 as i32 == -1 {
+                        panic!("heap expand in guest failed.")
+                    }
+
+                    println!("loc region 1: {}", loc_region_1);
+                    assert!(loc_region_1 > loc_outval, "expected created region {}[{}] to be greater than host-grown page {}", loc_region_1, TEST_REGION_SIZE, loc_outval);
+
+                    let region_size_bytes = TEST_REGION_SIZE as usize * WASM_PAGE_SIZE as usize;
                     // Each character in the newly created region will match the expected value.
-                    for i in 0..TEST_REGION_SIZE {
+                    for i in 0..region_size_bytes {
                         assert_eq!(
                             TEST_REGION_INIT_VAL as u8,
                             heap[loc_region_1 as usize + i],
-                            "character in new region matches"
+                            "character {} in new region matches", i
                         );
                     }
                 }
@@ -725,7 +731,7 @@ macro_rules! entrypoint_tests {
                     use byteorder::{LittleEndian, ReadBytesExt};
 
                     let module =
-                        test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
+                        test_module_wasm("entrypoint", "use_allocator.wat").expect("module builds and loads");
                     let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
@@ -733,7 +739,7 @@ macro_rules! entrypoint_tests {
                         .expect("instance can be created");
 
                     // First, we need to get an unused location in linear memory for the pointer that will be passed
-                    // as an argument to create_and_memset.
+                    // as an argument to expand_and_memset.
                     let new_page = inst.grow_memory(1).expect("grow_memory succeeds");
                     assert!(new_page > 0);
                     // wasm memory index for the start of the new page
@@ -741,7 +747,7 @@ macro_rules! entrypoint_tests {
 
                     // Create a region and initialize it, just like above
                     inst.run(
-                        "create_and_memset",
+                        "expand_and_memset",
                         &[
                             // int init_as
                             TEST_REGION_INIT_VAL.into(),
@@ -759,10 +765,17 @@ macro_rules! entrypoint_tests {
                     let loc_region_1 = (&heap[loc_outval as usize..])
                         .read_u32::<LittleEndian>()
                         .expect("can read outval");
+
+                    if loc_region_1 as i32 == -1 {
+                        panic!("heap expand in guest failed.")
+                    }
+
+                    println!("loc_region_1: {}, loc_outval: {}", loc_region_1, loc_outval);
                     assert!(loc_region_1 > loc_outval);
 
+                    let region_size_bytes = TEST_REGION_SIZE as usize * WASM_PAGE_SIZE as usize;
                     // Each character in the newly created region will match the expected value.
-                    for i in 0..TEST_REGION_SIZE {
+                    for i in 0..region_size_bytes {
                         assert_eq!(
                             TEST_REGION_INIT_VAL as u8,
                             heap[loc_region_1 as usize + i],
@@ -776,7 +789,7 @@ macro_rules! entrypoint_tests {
 
                     let heap = inst.heap();
                     // Just the first location in the region should be incremented
-                    for i in 0..TEST_REGION_SIZE {
+                    for i in 0..region_size_bytes {
                         if i == 0 {
                             assert_eq!(
                                 TEST_REGION_INIT_VAL as u8 + 1,
@@ -804,7 +817,7 @@ macro_rules! entrypoint_tests {
                     };
 
                     let module =
-                        test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
+                        test_module_wasm("entrypoint", "use_allocator.wat").expect("module builds and loads");
                     let region = <TestRegion as RegionCreate>::create(1, &limits).expect("region can be created");
 
                     let mut inst = region
@@ -812,7 +825,7 @@ macro_rules! entrypoint_tests {
                         .expect("instance can be created");
 
                     // First, we need to get an unused location in linear memory for the pointer that will be passed
-                    // as an argument to create_and_memset.
+                    // as an argument to expand_and_memset.
                     let new_page = inst.grow_memory(1).expect("grow_memory succeeds");
                     assert!(new_page > 0);
                     // wasm memory index for the start of the new page
@@ -821,32 +834,36 @@ macro_rules! entrypoint_tests {
                     // run once with normal behavior; the malloc should fail, causing the subsequent
                     // non-null assertion to fail
                     let res = inst.run(
-                        "create_and_memset",
+                        "expand_and_memset",
                         &[
                             // int init_as
                             TEST_REGION_INIT_VAL.into(),
                             // size_t size
-                            (5 * 64 * 1024).into(),
+                            Val::USize(5),
                             // char** ptr_outval
                             Val::GuestPtr(loc_outval),
                         ],
                     );
-                    match res {
-                        // the assertion failure has an unreachable instruction that traps
-                        Err(Error::RuntimeFault(FaultDetails { trapcode: Some(TrapCode::Unreachable), .. })) => (),
-                        res => panic!("unexpected result: {:?}", res),
-                    }
+
+                    // The guest writes -1 to the loc_outval when expand memory fails.
+                    let heap = inst.heap();
+                    let loc_region_1 = (&heap[loc_outval as usize..])
+                        .read_u32::<LittleEndian>()
+                        .expect("can read outval");
+                    assert_eq!(loc_region_1 as i32, -1, "guest indicates that memory.grow opcode failed");
+                    assert!(res.is_ok(), "guest returned normally");
 
                     // now reset and run the same entrypoint, but terminate on `memory.grow` failure
                     inst.reset().expect("can reset instance");
+
                     inst.set_terminate_on_heap_oom(true);
                     let res = inst.run(
-                        "create_and_memset",
+                        "expand_and_memset",
                         &[
                             // int init_as
                             TEST_REGION_INIT_VAL.into(),
                             // size_t size
-                            (5 * 64 * 1024).into(),
+                            Val::USize(5),
                             // char** ptr_outval
                             Val::GuestPtr(loc_outval),
                         ],
@@ -860,8 +877,14 @@ macro_rules! entrypoint_tests {
                     // finally reset and run the same entrypoint, but with a size that won't fail
                     inst.reset().expect("can reset instance again");
                     inst.set_terminate_on_heap_oom(false);
+
+                    // The heap has been reset, grow the memory so that loc_outval is a valid
+                    // location.
+                    let _ = inst.grow_memory(1).expect("grow_memory succeeds");
+
+                    let current_memory = inst.heap().len();
                     inst.run(
-                        "create_and_memset",
+                        "expand_and_memset",
                         &[
                             // int init_as
                             TEST_REGION_INIT_VAL.into(),
@@ -874,14 +897,14 @@ macro_rules! entrypoint_tests {
                 }
 
                 const TEST_REGION2_INIT_VAL: libc::c_int = 99;
-                const TEST_REGION2_SIZE: libc::size_t = 420;
+                const TEST_REGION2_SIZE: libc::size_t = 2;
 
                 #[test]
                 fn allocator_create_two_regions() {
                     use byteorder::{LittleEndian, ReadBytesExt};
 
                     let module =
-                        test_module_c("entrypoint", "use_allocator.c").expect("module builds and loads");
+                        test_module_wasm("entrypoint", "use_allocator.wat").expect("module builds and loads");
                     let region = <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
 
                     let mut inst = region
@@ -896,7 +919,7 @@ macro_rules! entrypoint_tests {
 
                     // same as above
                     inst.run(
-                        "create_and_memset",
+                        "expand_and_memset",
                         &[
                             // int init_as
                             TEST_REGION_INIT_VAL.into(),
@@ -916,7 +939,7 @@ macro_rules! entrypoint_tests {
 
                     // Create a second region
                     inst.run(
-                        "create_and_memset",
+                        "expand_and_memset",
                         &[
                             // int init_as
                             TEST_REGION2_INIT_VAL.into(),
@@ -928,17 +951,21 @@ macro_rules! entrypoint_tests {
                     )
                         .expect("instance runs");
 
-                    // The allocator should pick a spot *after* the first region for the second one. (It doesn't
-                    // have to, but it will.) This shows that the allocator's metadata (free list) is preserved
-                    // between the runs.
+                    // The heap will expand beyond the previous run.
                     let heap = inst.heap();
                     let loc_region_2 = (&heap[loc_outval as usize..])
                         .read_u32::<LittleEndian>()
                         .expect("can read outval");
+
+                    if loc_region_2 as i32 == -1 {
+                        panic!("heap expand in region 2 failed.")
+                    }
+
                     assert!(loc_region_2 > loc_region_1);
 
+                    let region_size_bytes = TEST_REGION_SIZE as usize * WASM_PAGE_SIZE as usize;
                     // After this, both regions should be initialized as expected
-                    for i in 0..TEST_REGION_SIZE {
+                    for i in 0..region_size_bytes {
                         assert_eq!(
                             TEST_REGION_INIT_VAL as u8,
                             heap[loc_region_1 as usize + i],
@@ -946,7 +973,8 @@ macro_rules! entrypoint_tests {
                         );
                     }
 
-                    for i in 0..TEST_REGION2_SIZE {
+                    let region2_size_bytes = TEST_REGION2_SIZE as usize * WASM_PAGE_SIZE as usize;
+                    for i in 0..region2_size_bytes {
                         assert_eq!(
                             TEST_REGION2_INIT_VAL as u8,
                             heap[loc_region_2 as usize + i],
@@ -966,7 +994,7 @@ macro_rules! entrypoint_tests {
                         .expect("instance can be created");
 
                     // First, we need to get an unused location in linear memory for the pointer that will be passed
-                    // as an argument to create_and_memset.
+                    // as an argument to expand_and_memset.
                     let new_page = inst.grow_memory(1).expect("grow_memory succeeds");
                     assert!(new_page > 0);
                     // wasm memory index for the start of the new page
