@@ -31,8 +31,7 @@ where
     let workdir = TempDir::new().expect("create working directory");
 
     let wasm_build = Link::new(&[c_file])
-        .with_cflag("-nostartfiles")
-        .with_link_opt(LinkOpt::NoDefaultEntryPoint)
+        .with_cflag("-mexec-model=reactor")
         .with_link_opt(LinkOpt::AllowUndefinedAll)
         .with_link_opt(LinkOpt::ExportAll);
 

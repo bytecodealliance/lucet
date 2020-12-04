@@ -251,7 +251,7 @@ impl<'t> LinkOpt<'t> {
     fn as_ldflags(&self) -> Vec<String> {
         match self {
             LinkOpt::AllowUndefinedAll => vec!["--allow-undefined".to_string()],
-            LinkOpt::DefaultOpts => vec!["--no-threads".to_string()],
+            LinkOpt::DefaultOpts => vec![],
             LinkOpt::Export(symbol) => vec![format!("--export={}", symbol)],
             LinkOpt::ExportAll => vec!["--export-all".to_string()],
             LinkOpt::NoDefaultEntryPoint => vec!["--no-entry".to_string()],
