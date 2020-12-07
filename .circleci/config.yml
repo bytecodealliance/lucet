@@ -48,6 +48,23 @@ jobs:
       - mac_ci:
           cache_target: false
 
+  ###################################################
+  # Linux `make test-ci` targets on new x64 backend #
+  ###################################################
+  new_backend_ci_branch:
+    executor: linux
+    steps:
+      - full_ci:
+          cache_target: true
+          lucetc_features: new-x64-backend
+
+  new_backend_ci_main:
+    executor: linux
+    steps:
+      - full_ci:
+          cache_target: false
+          lucetc_features: new-x64-backend
+
 workflows:
   build:
     jobs:
@@ -81,6 +98,10 @@ commands:
       cache_target:
         type: boolean
         description: "If `true`, the target/ directory will be cached between builds"
+      lucetc_features:
+        type: string
+        description: "Non-default features with which to build Lucetc"
+        default: ""
     steps:
       - checkout_recursively
       - when:
@@ -107,6 +128,7 @@ commands:
       - build_container
       - make_in_container:
           target: test-full
+          make_vars: "LUCETC_FEATURES=<<parameters.lucetc_features>>"
       - make_in_container:
           target: test-release test-release-executables
       - ensure_sources_unchanged
@@ -216,12 +238,15 @@ commands:
     parameters:
       target:
         type: string
+      make_vars:
+        type: string
+        default: ""
     steps:
       - run:
           name: "Run Make target in Docker: << parameters.target >>"
           command: |
             set -x
-            docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "make -C /lucet << parameters.target >>"
+            docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "make -C /lucet << parameters.make_vars >> << parameters.target >>"
 
   ensure_sources_unchanged:
     description: "Make sure that previous steps did not change the source files from git"
