@@ -150,7 +150,12 @@ commands:
           target: test-full
       - make_in_container:
           target: test-release test-release-executables
-      - ensure_sources_unchanged
+      - when:
+          condition:
+            not:
+              << parameters.new_cranelift_backend >>
+          steps:
+            - ensure_sources_unchanged
       - when:
           condition: << parameters.cache_target >>
           steps:
