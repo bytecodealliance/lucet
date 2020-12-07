@@ -38,8 +38,7 @@ test-release:
 
 .PHONY: test-release-executables
 test-release-executables:
-	(cd lucetc; cargo build --release --features "$(LUCETC_FEATURES)")
-	cargo build --release -p lucet-wasi -p lucet-objdump
+	cargo build --release -p lucetc -p lucet-wasi -p lucet-objdump
 	helpers/lucet-toolchain-tests/signature.sh release
 	helpers/lucet-toolchain-tests/objdump.sh release
 

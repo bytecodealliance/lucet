@@ -47,4 +47,5 @@ raw-cpuid = "6.0.0"
 rayon = "1.5.0"
 
 [features]
+default = []
 new-x64-backend = ["cranelift-codegen/x64"]

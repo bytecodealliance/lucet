@@ -56,14 +56,14 @@ jobs:
     steps:
       - full_ci:
           cache_target: true
-          lucetc_features: new-x64-backend
+          new_cranelift_backend: true
 
   new_backend_ci_main:
     executor: linux
     steps:
       - full_ci:
           cache_target: false
-          lucetc_features: new-x64-backend
+          new_cranelift_backend: true
 
 workflows:
   build:
@@ -110,12 +110,20 @@ commands:
       cache_target:
         type: boolean
         description: "If `true`, the target/ directory will be cached between builds"
-      lucetc_features:
-        type: string
-        description: "Non-default features with which to build Lucetc"
-        default: ""
+      new_cranelift_backend:
+        type: boolean
+        description: "If `true`, edit `lucetc/Cargo.toml` to select the new Cranelift x86-64 backend"
+        default: false
     steps:
       - checkout_recursively
+      - when:
+          condition: << parameters.new_cranelift_backend >>
+          steps:
+            - run:
+                name: "Switch lucetc to new Cranelift backend"
+                command: |
+                  set -x
+                  sed -i -e 's/default = \[\]/default = \["new-x64-backend"\]/' lucetc/Cargo.toml
       - when:
           condition: << parameters.cache_target >>
           steps:
@@ -140,7 +148,6 @@ commands:
       - build_container
       - make_in_container:
           target: test-full
-          make_vars: "LUCETC_FEATURES=<<parameters.lucetc_features>>"
       - make_in_container:
           target: test-release test-release-executables
       - ensure_sources_unchanged
@@ -250,15 +257,12 @@ commands:
     parameters:
       target:
         type: string
-      make_vars:
-        type: string
-        default: ""
     steps:
       - run:
           name: "Run Make target in Docker: << parameters.target >>"
           command: |
             set -x
-            docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "make -C /lucet << parameters.make_vars >> << parameters.target >>"
+            docker run --privileged -v `pwd`:/lucet -it lucet /bin/bash -c "make -C /lucet << parameters.target >>"
 
   ensure_sources_unchanged:
     description: "Make sure that previous steps did not change the source files from git"
