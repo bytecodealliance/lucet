@@ -91,6 +91,18 @@ workflows:
             branches:
               only: main
 
+      ###################################################
+      # Linux `make test-ci` targets on new x64 backend #
+      ###################################################
+      - new_backend_ci_branch:
+          filters:
+            branches:
+              ignore: main
+      - new_backend_ci_main:
+          filters:
+            branches:
+              only: main
+
 commands:
   full_ci:
     description: "Run the full CI for Lucet"
