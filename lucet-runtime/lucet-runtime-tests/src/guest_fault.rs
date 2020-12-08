@@ -203,7 +203,7 @@ macro_rules! guest_fault_common_defs {
                 let native_build = Lucetc::try_from_bytes($crate::stack::generate_test_wat(
                     num_locals,
                     &["onetwothree"],
-                    Some("      (i32.add (i32.wrap_i64 (call $onetwothree)))\n"),
+                    Some("      (i64.add (call $onetwothree))\n"),
                 ))?
                 .with_bindings(Bindings::from_str(
                     r#"
@@ -586,6 +586,7 @@ macro_rules! guest_fault_tests {
                         .new_instance(module)
                         .expect("instance can be created");
 
+                    let recursion_depth = recursion_depth as i64;
                     inst.run("localpalooza", &[recursion_depth.into()])
                         .and_then(|rr| rr.returned())
                 }
@@ -619,11 +620,11 @@ macro_rules! guest_fault_tests {
                 #[test]
                 // Exhausting most stack space with the default hostcall reservation will fail,
                 // we've used far more than the limit in the guest.
-                fn expect_hostcall_reservation_stack_overflow_locals64_441() {
+                fn expect_hostcall_reservation_stack_overflow_locals64_481() {
                     expect_stack_overflow(
                         &Limits::default(),
                         stack_testcase(64 - 4).expect("generate stack_testcase 64"),
-                        461,
+                        481,
                         true,
                     );
                 }
