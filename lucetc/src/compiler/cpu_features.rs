@@ -184,16 +184,20 @@ impl CpuFeatures {
 
     /// Return a `cranelift_codegen::isa::Builder` configured with these CPU features.
 
-    pub fn isa_builder(&self, target: Triple) -> Result<isa::Builder, Error> {
+    pub fn isa_builder(
+        &self,
+        target: Triple,
+        variant: isa::BackendVariant,
+    ) -> Result<isa::Builder, Error> {
         use SpecificFeature::*;
         use TargetCpu::*;
 
         let mut isa_builder = if let Native = self.cpu {
-            cranelift_native::builder().map_err(|_| {
+            cranelift_native::builder_with_backend_variant(variant).map_err(|_| {
                 Error::Unsupported("host machine is not a supported target".to_string())
             })
         } else {
-            isa::lookup(target).map_err(Error::UnsupportedIsa)
+            isa::lookup_variant(target, variant).map_err(Error::UnsupportedIsa)
         }?;
 
         let mut specific_features = self.specific_features.clone();

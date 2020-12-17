@@ -19,6 +19,7 @@ members = [
   "lucet-wiggle/generate",
   "lucetc",
   "sightglass",
+  "fuzz",
 ]
 exclude = ["wasmtime"]
 
