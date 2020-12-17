@@ -1,0 +1,26 @@
+[package]
+name = "lucet-fuzz"
+version = "0.0.0"
+authors = ["Lucet team <lucet@fastly.com>"]
+license = "Apache-2.0 WITH LLVM-exception"
+edition = "2018"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+lucetc = { path = "../lucetc" }
+lucet-runtime = { path = "../lucet-runtime" }
+lucet-module = { path = "../lucet-module" }
+libfuzzer-sys = "0.3.3"
+wasm-smith = "0.3"
+tempfile = "3.0"
+anyhow = "1"
+arbitrary = { version = "0.4.1", features = ["derive"] }
+
+[[bin]]
+name = "differential_backends"
+path = "fuzz_targets/differential_backends.rs"
+test = false
+doc = false

@@ -16,7 +16,7 @@ path = "lucetc/main.rs"
 [dependencies]
 anyhow = "1"
 bincode = "1.1.4"
-cranelift-codegen = { path = "../wasmtime/cranelift/codegen", version = "0.68.0" }
+cranelift-codegen = { path = "../wasmtime/cranelift/codegen", version = "0.68.0", features = ["x86", "x64"] }
 cranelift-entity = { path = "../wasmtime/cranelift/entity", version = "0.68.0" }
 cranelift-native = { path = "../wasmtime/cranelift/native", version = "0.68.0" }
 cranelift-frontend = { path = "../wasmtime/cranelift/frontend", version = "0.68.0" }
@@ -48,4 +48,4 @@ rayon = "1.5.0"
 
 [features]
 default = []
-new-x64-backend = ["cranelift-codegen/x64"]
+new-x64-backend = []

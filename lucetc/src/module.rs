@@ -8,8 +8,8 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
     wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
     DataIndex, ElemIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment,
-    Table, TableElementType, TableIndex, TargetEnvironment, TypeIndex, WasmFuncType, WasmResult,
-    WasmType,
+    Table, TableElementType, TableIndex, TargetEnvironment, TypeIndex, WasmError, WasmFuncType,
+    WasmResult, WasmType,
 };
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
@@ -455,8 +455,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
                     self.info.tables.push(Exportable::new(table));
                     vac.insert(vec![table_elems]);
                 } else {
-                    panic!("creation of elements for undeclared table! only table 0 is implicitly declared")
-                    // Do we implicitly declare them all???? i sure hope not
+                    return Err(WasmError::User("creation of elements for undeclared table! only table 0 is implicitly declared".to_string()));
                 }
             }
         }

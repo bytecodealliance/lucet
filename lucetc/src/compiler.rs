@@ -16,6 +16,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
     binemit,
     ir::{self, InstBuilder},
+    isa::BackendVariant,
     isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
@@ -68,6 +69,7 @@ impl OptLevel {
 
 pub struct CompilerBuilder {
     target: Triple,
+    variant: BackendVariant,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
     heap_settings: HeapSettings,
@@ -76,10 +78,21 @@ pub struct CompilerBuilder {
     validator: Option<Validator>,
 }
 
+#[cfg(not(feature = "new-x64-backend"))]
+fn default_backend_variant() -> BackendVariant {
+    BackendVariant::Legacy
+}
+
+#[cfg(feature = "new-x64-backend")]
+fn default_backend_variant() -> BackendVariant {
+    BackendVariant::MachInst
+}
+
 impl CompilerBuilder {
     pub fn new() -> Self {
         Self {
             target: Triple::host(),
+            variant: default_backend_variant(),
             opt_level: OptLevel::default(),
             cpu_features: CpuFeatures::default(),
             heap_settings: HeapSettings::default(),
@@ -99,6 +112,15 @@ impl CompilerBuilder {
 
     pub fn with_target(mut self, target: Triple) -> Self {
         self.target(target);
+        self
+    }
+
+    pub fn backend_variant(&mut self, variant: BackendVariant) {
+        self.variant = variant;
+    }
+
+    pub fn with_backend_variant(mut self, variant: BackendVariant) -> Self {
+        self.backend_variant(variant);
         self
     }
 
@@ -172,6 +194,7 @@ impl CompilerBuilder {
         Compiler::new(
             wasm_binary,
             self.target.clone(),
+            self.variant,
             self.opt_level,
             self.cpu_features.clone(),
             bindings,
@@ -187,6 +210,7 @@ pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
     codegen_context: CodegenContext,
     target: Triple,
+    variant: BackendVariant,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
     count_instructions: bool,
@@ -199,6 +223,7 @@ impl<'a> Compiler<'a> {
     pub fn new(
         wasm_binary: &'a [u8],
         target: Triple,
+        variant: BackendVariant,
         opt_level: OptLevel,
         cpu_features: CpuFeatures,
         bindings: &'a Bindings,
@@ -207,8 +232,15 @@ impl<'a> Compiler<'a> {
         validator: Option<Validator>,
         canonicalize_nans: bool,
     ) -> Result<Self, Error> {
-        let mk_isa =
-            || Self::target_isa(target.clone(), opt_level, &cpu_features, canonicalize_nans);
+        let mk_isa = || {
+            Self::target_isa(
+                target.clone(),
+                variant,
+                opt_level,
+                &cpu_features,
+                canonicalize_nans,
+            )
+        };
 
         let isa = mk_isa()?;
         let frontend_config = isa.frontend_config();
@@ -236,6 +268,7 @@ impl<'a> Compiler<'a> {
             cpu_features,
             count_instructions,
             target,
+            variant,
             canonicalize_nans,
             function_bodies: module_validation.function_bodies,
         })
@@ -474,6 +507,7 @@ impl<'a> Compiler<'a> {
             funcs,
             Self::target_isa(
                 self.target,
+                self.variant,
                 self.opt_level,
                 &self.cpu_features,
                 self.canonicalize_nans,
@@ -483,12 +517,13 @@ impl<'a> Compiler<'a> {
 
     fn target_isa(
         target: Triple,
+        variant: BackendVariant,
         opt_level: OptLevel,
         cpu_features: &CpuFeatures,
         canonicalize_nans: bool,
     ) -> Result<Box<dyn TargetIsa>, Error> {
         let mut flags_builder = settings::builder();
-        let isa_builder = cpu_features.isa_builder(target)?;
+        let isa_builder = cpu_features.isa_builder(target, variant)?;
         let enable_verifier = if cfg!(debug_assertions) {
             "true"
         } else {
