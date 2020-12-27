@@ -61,7 +61,7 @@ source /opt/lucet/bin/setenv.sh
 If you want to run the test suite, and in addition to `WASI_SYSROOT`, the following environment variables must be set:
 
 ```sh
-export CLANG_ROOT="$(echo /usr/local/opt/llvm/lib/clang/10*)"
+export CLANG_ROOT="$(echo /usr/local/opt/llvm/lib/clang/*)"
 export CLANG=/usr/local/opt/llvm/bin/clang
 ```
 
