@@ -12,7 +12,7 @@ In order to compile applications written in C to WebAssembly, `clang` builtins n
 
 ```sh
 curl -sL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-11/libclang_rt.builtins-wasm32-wasi-11.0.tar.gz | \
-  tar x -zf - -C /usr/local/opt/llvm/lib/clang/10*
+  tar x -zf - -C /usr/local/opt/llvm/lib/clang/*
 ```
 
 As well as the WASI sysroot:
