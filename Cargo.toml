@@ -18,10 +18,9 @@ members = [
   "lucet-wiggle/macro",
   "lucet-wiggle/generate",
   "lucetc",
-  "sightglass",
   "fuzz",
 ]
-exclude = ["wasmtime"]
+exclude = ["wasmtime", "sightglass"]
 
 [profile.test]
 rpath = true
