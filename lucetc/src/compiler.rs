@@ -67,6 +67,44 @@ impl OptLevel {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
+#[derive(Default, Debug, Clone)]
+pub struct TargetVersion;
+
+#[cfg(target_os = "macos")]
+#[derive(Debug, Clone)]
+pub struct TargetVersion {
+    pub min_os_version: String,
+    pub sdk_version: String,
+}
+
+#[cfg(target_os = "macos")]
+impl Default for TargetVersion {
+    fn default() -> Self {
+        TargetVersion {
+            min_os_version: "10.9".to_owned(),
+            sdk_version: "11.0".to_owned(),
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+impl TargetVersion {
+    pub(crate) fn ld_flags(&self) -> Option<String> {
+        None
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl TargetVersion {
+    pub(crate) fn ld_flags(&self) -> Option<String> {
+        Some(format!(
+            "-platform_version macos {} {}",
+            self.min_os_version, self.sdk_version
+        ))
+    }
+}
+
 pub struct CompilerBuilder {
     target: Triple,
     variant: BackendVariant,
@@ -76,6 +114,7 @@ pub struct CompilerBuilder {
     count_instructions: bool,
     canonicalize_nans: bool,
     validator: Option<Validator>,
+    target_version: TargetVersion,
 }
 
 #[cfg(not(feature = "new-x64-backend"))]
@@ -99,6 +138,7 @@ impl CompilerBuilder {
             count_instructions: false,
             canonicalize_nans: false,
             validator: None,
+            target_version: TargetVersion::default(),
         }
     }
 
@@ -112,6 +152,19 @@ impl CompilerBuilder {
 
     pub fn with_target(mut self, target: Triple) -> Self {
         self.target(target);
+        self
+    }
+
+    pub(crate) fn target_version_ref(&self) -> &TargetVersion {
+        &self.target_version
+    }
+
+    pub fn target_version(&mut self, target_version: TargetVersion) {
+        self.target_version = target_version;
+    }
+
+    pub fn with_target_version(mut self, target_version: TargetVersion) -> Self {
+        self.target_version(target_version);
         self
     }
 

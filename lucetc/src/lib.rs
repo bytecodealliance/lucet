@@ -21,7 +21,9 @@ mod validate;
 
 use crate::load::read_bytes;
 pub use crate::{
-    compiler::{Compiler, CompilerBuilder, CpuFeatures, OptLevel, SpecificFeature, TargetCpu},
+    compiler::{
+        Compiler, CompilerBuilder, CpuFeatures, OptLevel, SpecificFeature, TargetCpu, TargetVersion,
+    },
     error::Error,
     heap::HeapSettings,
     load::read_module,
@@ -70,6 +72,9 @@ pub trait LucetcOpts {
 
     fn target(&mut self, target: Triple);
     fn with_target(self, target: Triple) -> Self;
+
+    fn target_version(&mut self, target: TargetVersion);
+    fn with_target_version(self, target: TargetVersion) -> Self;
 
     fn backend_variant(&mut self, variant: BackendVariant);
     fn with_backend_variant(self, variant: BackendVariant) -> Self;
@@ -133,6 +138,15 @@ impl<T: AsLucetc> LucetcOpts for T {
 
     fn with_target(mut self, target: Triple) -> Self {
         self.target(target);
+        self
+    }
+
+    fn target_version(&mut self, target_version: TargetVersion) {
+        self.as_lucetc().builder.target_version(target_version);
+    }
+
+    fn with_target_version(mut self, target_version: TargetVersion) -> Self {
+        self.target_version(target_version);
         self
     }
 
@@ -357,7 +371,12 @@ impl Lucetc {
         let dir = tempfile::Builder::new().prefix("lucetc").tempdir()?;
         let objpath = dir.path().join("tmp.o");
         self.object_file(objpath.clone())?;
-        link_so(objpath, self.builder.target_ref(), &output)?;
+        link_so(
+            objpath,
+            self.builder.target_ref(),
+            &output,
+            self.builder.target_version_ref(),
+        )?;
         if self.sign {
             let sk = self.sk.as_ref().ok_or(Error::Signature(
                 "signing requires a secret key".to_string(),
@@ -374,6 +393,7 @@ fn link_so(
     objpath: impl AsRef<Path>,
     target: &Triple,
     sopath: impl AsRef<Path>,
+    target_version: &TargetVersion,
 ) -> Result<(), Error> {
     // Let `LD` be something like "clang --target=... ..." for convenience.
     let env_ld = env::var("LD").unwrap_or(LD_DEFAULT.into());
@@ -385,7 +405,8 @@ fn link_so(
     }
 
     cmd_ld.arg(objpath.as_ref());
-    let env_ldflags = env::var("LDFLAGS").unwrap_or_else(|_| ldflags_default(target));
+    let env_ldflags =
+        env::var("LDFLAGS").unwrap_or_else(|_| ldflags_default(target, target_version));
     for flag in env_ldflags.split_whitespace() {
         cmd_ld.arg(flag);
     }
@@ -420,10 +441,10 @@ fn output_arg_for(cmd_ld: &mut Command, target: &Triple, sopath: impl AsRef<Path
     cmd_ld.arg(format!("/out:{:?}", sopath.as_ref()));
 }
 
-fn ldflags_default(target: &Triple) -> String {
+fn ldflags_default(target: &Triple, target_version: &TargetVersion) -> String {
     use target_lexicon::OperatingSystem;
 
-    match target.operating_system {
+    let mut flags = match target.operating_system {
         OperatingSystem::Linux
         | OperatingSystem::Freebsd
         | OperatingSystem::Dragonfly
@@ -440,5 +461,10 @@ flags for generating shared libraries.",
             target
         ),
     }
-    .into()
+    .to_owned();
+    if let Some(version_settings) = target_version.ld_flags() {
+        flags.push(' ');
+        flags.push_str(&version_settings);
+    }
+    flags
 }
