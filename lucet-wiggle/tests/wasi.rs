@@ -4,6 +4,7 @@ use lucet_wasi_sdk::{CompileOpts, Link, LinkOpt, LinkOpts};
 use lucet_wiggle::{GuestError, GuestErrorType, GuestPtr};
 use lucetc::{Lucetc, LucetcOpts};
 use std::cell::{RefCell, RefMut};
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Context struct used to implement the wiggle trait:
@@ -406,9 +407,11 @@ fn main() {
     // We used lucet_wiggle to define the hostcall functions, so we must use
     // it to define our bindings as well. This is a good thing! No more
     // bindings json files to keep in sync with implementations.
-    let witx_doc =
-        lucet_wiggle::witx::load(&["../wasi/phases/snapshot/witx/wasi_snapshot_preview1.witx"])
-            .expect("load snapshot 1 witx");
+    let mut witx_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    witx_path.push(
+        "../wasmtime/crates/wasi-common/WASI/phases/snapshot/witx/wasi_snapshot_preview1.witx",
+    );
+    let witx_doc = lucet_wiggle::witx::load(&[witx_path]).expect("load snapshot 1 witx");
     let bindings = lucet_wiggle_generate::bindings(&witx_doc);
 
     // Build a shared object with Lucetc:
