@@ -37,14 +37,17 @@ bench: run
 
 .PHONY: run
 run: build
-	$(LUCET_ROOT)/target/release/sightglass -c sightglass.toml $(SIGHTGLASS_ARGS)
+	$(SIGHTGLASS)/target/release/sightglass -c sightglass.toml $(SIGHTGLASS_ARGS)
 
 .PHONY: build
 build: $(LUCETC)
 build: build/native/implementation.so
 build: build/lucet/implementation.so
 build: build/lucet/module.so
-build: $(LUCET_ROOT)/target/release/sightglass
+build: $(SIGHTGLASS)/target/release/sightglass
+
+$(SIGHTGLASS)/target/release/sightglass:
+	cd $(SIGHTGLASS) && cargo build --release
 
 # With the xenial gcc (5.4.0) this pins the CPU for minutes if above -O1, so its getting downgraded to -O1
 build/native/shootout/switch2.o: $(SHOOTOUT)/switch2.c
@@ -103,9 +106,6 @@ build/lucet/implementation.so: build/lucet/hostcalls.o
 		-L $(LUCET_ROOT)/target/release \
 		-Wl,-rpath $(LUCET_ROOT)/target/release \
 		-llucet_runtime -llucet_wasi -ldl -o $@
-
-$(LUCET_ROOT)/target/release/sightglass:
-	cargo build --release -p sightglass
 
 $(LUCETC):
 	cargo build --release -p lucetc
