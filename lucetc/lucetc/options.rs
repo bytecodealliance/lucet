@@ -1,6 +1,6 @@
 use anyhow::Error;
 use clap::{Arg, ArgMatches, Values};
-use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu};
+use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu, TargetVersion};
 use std::path::PathBuf;
 use std::str::FromStr;
 use target_lexicon::{Architecture, Triple};
@@ -122,6 +122,7 @@ pub struct Options {
     pub count_instructions: bool,
     pub error_style: ErrorStyle,
     pub target: Triple,
+    pub target_version: TargetVersion,
     pub translate_wat: bool,
 }
 
@@ -197,6 +198,18 @@ impl Options {
             },
         };
 
+        #[allow(unused_mut)]
+        let mut target_version = TargetVersion::default();
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(min_os_version) = m.value_of("min_os_version") {
+                target_version.min_os_version = min_os_version.into();
+            }
+            if let Some(sdk_version) = m.value_of("sdk_version") {
+                target_version.sdk_version = sdk_version.into();
+            }
+        }
+
         let cpu_features = cpu_features_from_args(
             m.value_of("target-cpu"),
             m.values_of("target-feature").unwrap_or_default(),
@@ -243,12 +256,28 @@ impl Options {
             count_instructions,
             error_style,
             target,
+            target_version,
             translate_wat,
         })
     }
     pub fn get() -> Result<Self, Error> {
         let _ = include_str!("../Cargo.toml");
-        let m = app_from_crate!()
+
+        let help_target = format!(
+            "target to compile for, defaults to {} if unspecified",
+            Triple::host()
+        );
+        let help_guard_size = format!(
+            "size of linear memory guard. must be multiple of 4k. default: {}",
+            humansized(HeapSettings::default().guard_size)
+        );
+        let help_min_reserved_size = format!(
+            "minimum size of usable linear memory region. must be multiple of 4k. default: {}",
+            humansized(HeapSettings::default().min_reserved_size)
+        );
+
+        let mut options = app_from_crate!();
+        options = options
             .arg(
                 Arg::with_name("precious")
                     .long("--precious")
@@ -275,7 +304,7 @@ impl Options {
                     .long("target")
                     .takes_value(true)
                     .multiple(false)
-                    .help(format!("target to compile for, defaults to {} if unspecified", Triple::host()).as_str()),
+                    .help(&help_target),
             )
             .arg(
                 Arg::with_name("target-cpu")
@@ -377,10 +406,7 @@ SSE3 but not AVX:
                     .long("--min-reserved-size")
                     .takes_value(true)
                     .multiple(false)
-                    .help(&format!(
-                        "minimum size of usable linear memory region. must be multiple of 4k. default: {}",
-                        humansized(HeapSettings::default().min_reserved_size)
-                    )),
+                    .help(&help_min_reserved_size),
             )
             .arg(
                 Arg::with_name("max_reserved_size")
@@ -401,10 +427,7 @@ SSE3 but not AVX:
                     .long("--guard-size")
                     .takes_value(true)
                     .multiple(false)
-                    .help(&format!(
-                        "size of linear memory guard. must be multiple of 4k. default: {}",
-                        humansized(HeapSettings::default().guard_size)
-                    )),
+                    .help(&help_guard_size),
             )
             .arg(
                 Arg::with_name("input")
@@ -467,9 +490,28 @@ SSE3 but not AVX:
                     .long("--no-translate-wat")
                     .takes_value(false)
                     .help("Disable translating wat input files to wasm")
-            )
-            .get_matches();
+            );
 
-        Self::from_args(&m)
+        #[cfg(target_os = "macos")]
+        {
+            options = options
+                .arg(
+                    Arg::with_name("min_os_version")
+                        .long("--min-os-version")
+                        .takes_value(true)
+                        .multiple(false)
+                        .help("Minimum macOS version to support"),
+                )
+                .arg(
+                    Arg::with_name("sdk_version")
+                        .long("--sdk-version")
+                        .takes_value(true)
+                        .multiple(false)
+                        .help("MacOS SDK version to support"),
+                );
+        }
+
+        let matches = options.get_matches();
+        Self::from_args(&matches)
     }
 }
