@@ -23,7 +23,8 @@ lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.7.0-d
 libc = "0.2.65"
 nix = "0.17"
 rand = "0.6"
-wasi-common = { path = "../wasmtime/crates/wasi-common", version = "0.21.0", default-features = false,  features = ["wiggle_metadata"] }
+wasi-common = { path = "../wasmtime/crates/wasi-common", version = "0.22.0", default-features = false,  features = ["wiggle_metadata"] }
+wiggle = { path = "../wasmtime/crates/wiggle", version = "0.22.0" }
 tracing = "0.1.19"
 tracing-subscriber = "0.2.0"
 

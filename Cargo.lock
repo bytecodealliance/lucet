@@ -382,14 +382,14 @@ dependencies = [
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.68.0"
+version = "0.69.0"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.68.0"
+version = "0.69.0"
 dependencies = [
  "byteorder",
  "cranelift-bforest",
@@ -406,7 +406,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.68.0"
+version = "0.69.0"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
@@ -414,15 +414,15 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.68.0"
+version = "0.69.0"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.68.0"
+version = "0.69.0"
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.68.0"
+version = "0.69.0"
 dependencies = [
  "cranelift-codegen",
  "log",
@@ -432,7 +432,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-module"
-version = "0.68.0"
+version = "0.69.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -443,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-native"
-version = "0.68.0"
+version = "0.69.0"
 dependencies = [
  "cranelift-codegen",
  "raw-cpuid 8.1.2",
@@ -452,7 +452,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-object"
-version = "0.68.0"
+version = "0.69.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.68.0"
+version = "0.69.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -473,7 +473,7 @@ dependencies = [
  "log",
  "smallvec",
  "thiserror",
- "wasmparser 0.70.0",
+ "wasmparser 0.71.0",
 ]
 
 [[package]]
@@ -1236,6 +1236,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "wasi-common",
+ "wiggle",
 ]
 
 [[package]]
@@ -2629,7 +2630,7 @@ checksum = "1a143597ca7c7793eff794def352d41792a93c481eb1042423ff7ff72ba2c31f"
 
 [[package]]
 name = "wasi-common"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "anyhow",
  "cfg-if 1.0.0",
@@ -2734,9 +2735,9 @@ checksum = "a950e6a618f62147fd514ff445b2a0b53120d382751960797f85f058c7eda9b9"
 
 [[package]]
 name = "wasmparser"
-version = "0.70.0"
+version = "0.71.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed1b3f9e9cf01a580b9f3281214dfdb1922b5dfb8494ee312ca03ae10036c2a2"
+checksum = "89a30c99437829ede826802bfcf28500cf58df00e66cb9114df98813bc145ff1"
 
 [[package]]
 name = "wast"
@@ -2759,7 +2760,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "thiserror",
  "tracing",
@@ -2769,14 +2770,14 @@ dependencies = [
 
 [[package]]
 name = "wiggle-borrow"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "wiggle",
 ]
 
 [[package]]
 name = "wiggle-generate"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "anyhow",
  "heck",
@@ -2789,7 +2790,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle-macro"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "quote 1.0.6",
  "syn 1.0.48",
@@ -2851,7 +2852,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "winx"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "bitflags 1.2.1",
  "cvt",
@@ -2860,7 +2861,7 @@ dependencies = [
 
 [[package]]
 name = "witx"
-version = "0.8.7"
+version = "0.8.8"
 dependencies = [
  "anyhow",
  "log",
@@ -2876,7 +2877,7 @@ checksum = "da90eac47bf1d7871b75004b9b631d107df15f37669383b23f0b5297bc7516b6"
 
 [[package]]
 name = "yanix"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "bitflags 1.2.1",
  "cfg-if 1.0.0",

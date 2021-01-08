@@ -1,6 +1,7 @@
-use lucet_runtime::{lucet_hostcall_terminate, vmctx::Vmctx};
+use lucet_runtime::vmctx::Vmctx;
 use lucet_wiggle::{GuestError, GuestPtr};
 use std::cell::Ref;
+use std::convert::TryInto;
 use tracing::debug;
 use wasi_common::wasi::wasi_snapshot_preview1::WasiSnapshotPreview1;
 use wasi_common::Error;
@@ -44,9 +45,9 @@ impl<'a> types::GuestErrorConversion for LucetWasiCtx<'a> {
 }
 
 impl<'a> types::UserErrorConversion for LucetWasiCtx<'a> {
-    fn errno_from_error(&self, e: Error) -> Result<types::Errno, String> {
+    fn errno_from_error(&self, e: Error) -> Result<types::Errno, lucet_wiggle::Trap> {
         debug!("Error: {:?}", e);
-        Ok(e.into())
+        e.try_into()
     }
 }
 
@@ -337,8 +338,8 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         self.wasi().poll_oneoff(in_, out, nsubscriptions)
     }
 
-    fn proc_exit(&self, rval: types::Exitcode) -> Result<(), ()> {
-        lucet_hostcall_terminate!(rval)
+    fn proc_exit(&self, rval: types::Exitcode) -> lucet_wiggle::Trap {
+        self.wasi().proc_exit(rval)
     }
 
     fn proc_raise(&self, _sig: types::Signal) -> Result<(), Error> {
