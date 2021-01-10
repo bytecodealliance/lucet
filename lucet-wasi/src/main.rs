@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tracing_subscriber;
 
 struct Config<'a> {
     lucet_module: &'a str,
@@ -148,7 +147,7 @@ fn main() {
             })
             .collect()
         })
-        .unwrap_or(vec![]);
+        .unwrap_or_default();
 
     let heap_memory_size = matches
         .value_of("heap_memory_size")
@@ -187,7 +186,7 @@ fn main() {
     let guest_args = matches
         .values_of("guest_args")
         .map(|vals| vals.collect())
-        .unwrap_or(vec![]);
+        .unwrap_or_default();
 
     let verify = matches.is_present("verify");
     let pk_path = matches.value_of("pk_path").map(PathBuf::from);

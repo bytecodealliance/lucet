@@ -90,7 +90,7 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
         }
     }
 
-    extern "C" fn do_nothing(_vmctx: *const lucet_vmctx) -> () {}
+    extern "C" fn do_nothing(_vmctx: *const lucet_vmctx) {}
 
     extern "C" fn run_hostcall(vmctx: *const lucet_vmctx) -> bool {
         extern "C" {
@@ -99,9 +99,9 @@ pub fn mock_killswitch_module() -> Arc<dyn Module> {
         unsafe { real_hostcall(vmctx) }
     }
 
-    extern "C" fn run_yielding_hostcall(vmctx: *const lucet_vmctx) -> () {
+    extern "C" fn run_yielding_hostcall(vmctx: *const lucet_vmctx) {
         extern "C" {
-            fn yielding_hostcall(vmctx: *const lucet_vmctx) -> ();
+            fn yielding_hostcall(vmctx: *const lucet_vmctx);
         }
         unsafe { yielding_hostcall(vmctx) }
     }

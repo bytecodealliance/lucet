@@ -261,7 +261,7 @@ impl OwnedModuleData {
             self.imports.iter().map(|imp| imp.to_ref()).collect(),
             self.exports.iter().map(|exp| exp.to_ref()).collect(),
             self.signatures.clone(),
-            self.features.clone(),
+            self.features,
             self.start_function,
         )
     }

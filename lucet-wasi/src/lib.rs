@@ -38,11 +38,11 @@ mod test {
             let fbs = file
                 .hash_map()
                 .get(m)
-                .expect(&format!("file has module {}", m));
+                .unwrap_or_else(|| panic!("file has module {}", m));
             for (name, binding) in bs.iter() {
                 let file_binding = fbs
                     .get(name)
-                    .expect(&format!("bindings file missing {}:{}", name, binding));
+                    .unwrap_or_else(|| panic!("bindings file missing {}:{}", name, binding));
                 assert_eq!(
                     binding, file_binding,
                     "canonical vs file binding for module {}",

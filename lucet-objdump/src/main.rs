@@ -45,8 +45,8 @@ struct DataSegment {
 impl<'a> ArtifactSummary<'a> {
     fn new(buffer: &'a Vec<u8>, obj: &'a object::File<'_>) -> Self {
         Self {
-            buffer: buffer,
-            obj: obj,
+            buffer,
+            obj,
             symbols: StandardSymbols { lucet_module: None },
             data_segments: None,
             serialized_module: None,
@@ -75,9 +75,9 @@ impl<'a> ArtifactSummary<'a> {
                 Err(_) => continue,
                 _ => {
                     if sym.kind() == SymbolKind::Text && sym.scope() == SymbolScope::Dynamic {
-                        self.exported_functions.push(sym.name().unwrap().into());
+                        self.exported_functions.push(sym.name().unwrap());
                     } else if sym.scope() == SymbolScope::Unknown {
-                        self.imported_symbols.push(sym.name().unwrap().into());
+                        self.imported_symbols.push(sym.name().unwrap());
                     }
                 }
             }
@@ -214,7 +214,7 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
         println!("  {}", "MISSING".red().bold());
     }
 
-    println!("");
+    println!();
     println!("  Sparse Page Data:");
     if let Some(sparse_page_data) = module_data.sparse_data() {
         println!("  {:6}: {}", "Count", sparse_page_data.pages().len());
@@ -244,7 +244,7 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
                 }
             };
         }
-        if allempty && sparse_page_data.pages().len() > 0 {
+        if allempty && !sparse_page_data.pages().is_empty() {
             println!("  (all pages empty)");
         } else if anyempty {
             println!("  (empty pages omitted)");
@@ -253,9 +253,9 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
         println!("  {}", "MISSING!".red().bold());
     }
 
-    println!("");
+    println!();
     println!("Tables:");
-    if tables.len() == 0 {
+    if tables.is_empty() {
         println!("  No tables.");
     } else {
         for (i, table) in tables.iter().enumerate() {
@@ -263,13 +263,13 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
         }
     }
 
-    println!("");
+    println!();
     println!("Signatures:");
     for (i, s) in module_data.signatures().iter().enumerate() {
         println!("  Signature {}: {}", i, s);
     }
 
-    println!("");
+    println!();
     println!("Functions:");
     if function_manifest.len() != module_data.function_info().len() {
         println!(
@@ -351,9 +351,9 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
         }
     }
 
-    println!("");
+    println!();
     println!("Globals:");
-    if module_data.globals_spec().len() > 0 {
+    if !module_data.globals_spec().is_empty() {
         for global_spec in module_data.globals_spec().iter() {
             println!("  {:?}", global_spec.global());
             for name in global_spec.export_names() {
@@ -364,7 +364,7 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
         println!("  None");
     }
 
-    println!("");
+    println!();
     println!("Exported Functions/Symbols:");
     let mut exported_symbols = summary.exported_functions.clone();
     for export in module_data.export_functions() {
@@ -389,15 +389,15 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
         println!("    Exported as: {}", export.names.join(", "));
     }
 
-    if exported_symbols.len() > 0 {
-        println!("");
+    if !exported_symbols.is_empty() {
+        println!();
         println!("  Other exported symbols (from ELF headers):");
         for export in exported_symbols {
             println!("    {}", export);
         }
     }
 
-    println!("");
+    println!();
     println!("Imported Functions/Symbols:");
     let mut imported_symbols = summary.imported_symbols.clone();
     for import in module_data.import_functions() {
@@ -417,8 +417,8 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
         }
     }
 
-    if imported_symbols.len() > 0 {
-        println!("");
+    if !imported_symbols.is_empty() {
+        println!();
         println!("  Other imported symbols (from ELF headers):");
         for import in &imported_symbols {
             println!("    {}", import);
@@ -499,7 +499,7 @@ fn print_summary(summary: ArtifactSummary<'_>) {
         println!("The symbol `lucet_module` is {}, so lucet-objdump cannot look at most of the interesting parts.", "MISSING".red().bold());
     }
 
-    println!("");
+    println!();
     println!("Data Segments:");
     if let Some(data_segments) = summary.data_segments {
         println!("  {:6}: {}", "Count", data_segments.segments.len());
@@ -523,8 +523,8 @@ fn ptr_to_str(p: u64) -> colored::ColoredString {
 }
 
 fn exists_to_str<T>(p: &Option<T>) -> colored::ColoredString {
-    return match p {
+    match p {
         Some(_) => "exists".green(),
         None => "MISSING!".red().bold(),
-    };
+    }
 }

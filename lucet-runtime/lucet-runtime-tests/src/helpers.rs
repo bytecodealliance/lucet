@@ -42,7 +42,7 @@ pub fn with_unchanged_signal_handlers<F: FnOnce()>(f: F) {
     fn get_handlers() -> Vec<libc::sigaction> {
         use libc::*;
         use std::mem::MaybeUninit;
-        const SIGNALS: &'static [c_int] = &[SIGBUS, SIGFPE, SIGILL, SIGSEGV, SIGALRM];
+        const SIGNALS: &[c_int] = &[SIGBUS, SIGFPE, SIGILL, SIGSEGV, SIGALRM];
 
         SIGNALS
             .iter()

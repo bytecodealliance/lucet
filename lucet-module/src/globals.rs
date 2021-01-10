@@ -154,7 +154,7 @@ impl OwnedGlobal {
     /// Create a [`Global`](../struct.Global.html) backed by the values in this `OwnedGlobal`.
     pub fn to_ref<'a>(&'a self) -> Global<'a> {
         match self {
-            OwnedGlobal::Def(def) => Global::Def(def.clone()),
+            OwnedGlobal::Def(def) => Global::Def(*def),
             OwnedGlobal::Import { module, field } => Global::Import {
                 module: module.as_str(),
                 field: field.as_str(),

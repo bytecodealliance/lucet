@@ -311,7 +311,7 @@ impl MmapRegion {
         let region = Arc::new(MmapRegion {
             capacity: instance_capacity,
             freelist: RwLock::new(Vec::with_capacity(instance_capacity)),
-            limits: limits.clone(),
+            limits: *limits,
             min_heap_alignment: 0, // No constaints on heap alignment by default
         });
         {
@@ -348,7 +348,7 @@ impl MmapRegion {
         let region = Arc::new(MmapRegion {
             capacity: instance_capacity,
             freelist: RwLock::new(Vec::with_capacity(instance_capacity)),
-            limits: limits.clone(),
+            limits: *limits,
             min_heap_alignment: heap_alignment,
         });
         {
@@ -415,7 +415,7 @@ impl MmapRegion {
             stack: stack as *mut c_void,
             globals: globals as *mut c_void,
             sigstack: sigstack as *mut c_void,
-            limits: region.limits.clone(),
+            limits: region.limits,
             region: Arc::downgrade(region) as Weak<dyn RegionInternal>,
         })
     }

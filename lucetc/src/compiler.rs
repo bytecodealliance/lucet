@@ -297,7 +297,7 @@ impl<'a> Compiler<'a> {
 
         let isa = mk_isa()?;
         let frontend_config = isa.frontend_config();
-        let mut module_validation = ModuleValidation::new(frontend_config.clone(), validator);
+        let mut module_validation = ModuleValidation::new(frontend_config, validator);
 
         let _module_translation_state = translate_module(wasm_binary, &mut module_validation)?;
 
@@ -490,7 +490,7 @@ impl<'a> Compiler<'a> {
             let data_ref = codegen_context.module().declare_data_in_data(id, &mut ctx);
             let offset = bytes.position() as u32;
             ctx.write_data_addr(offset, data_ref, 0);
-            bytes.write_u64::<LittleEndian>(0 as u64)?;
+            bytes.write_u64::<LittleEndian>(0_u64)?;
             bytes.write_u64::<LittleEndian>(len as u64)?;
             Ok(())
         }
@@ -913,7 +913,7 @@ fn write_function_spec(
         .declare_func_in_data(func_id, &mut manifest_ctx);
     let offset = manifest_bytes.position() as u32;
     manifest_ctx.write_function_addr(offset, func_ref);
-    manifest_bytes.write_u64::<LittleEndian>(0 as u64)?;
+    manifest_bytes.write_u64::<LittleEndian>(0_u64)?;
     manifest_bytes.write_u64::<LittleEndian>(size as u64)?;
     // Write a (ptr, len) pair with relocation for the trap table.
     if let Some(m) = metadata {
@@ -926,7 +926,7 @@ fn write_function_spec(
         }
     }
     // ptr data
-    manifest_bytes.write_u64::<LittleEndian>(0 as u64)?;
+    manifest_bytes.write_u64::<LittleEndian>(0_u64)?;
     // len data
     let trap_len = metadata.as_ref().map(|m| m.trap_len).unwrap_or(0);
     manifest_bytes.write_u64::<LittleEndian>(trap_len as u64)?;
