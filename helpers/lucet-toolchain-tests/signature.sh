@@ -3,11 +3,6 @@
 set -e
 set -x
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "code signing temporarily broken on Mac OS; exiting success as a workaround"
-    exit 0
-fi
-
 LUCET_DIR="."
 TMPDIR="$(mktemp -d)"
 
