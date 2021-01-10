@@ -3,7 +3,6 @@ use crate::validate::Error as ValidationError;
 use cranelift_module::ModuleError as ClifModuleError;
 use cranelift_wasm::WasmError as ClifWasmError;
 use lucet_module::error::Error as LucetModuleError;
-use object;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -30,7 +29,7 @@ pub enum Error {
     #[error("Wat input: {0}")]
     WatInput(#[from] wabt::Error),
     #[error("Object artifact: {1}. {0:?}")]
-    ObjectArtifact(#[source] object::write::Error, String),
+    ObjectArtifact(#[source] cranelift_object::object::write::Error, String),
     // And all the rest
     #[error("Function definition error in {symbol}")]
     FunctionDefinition {

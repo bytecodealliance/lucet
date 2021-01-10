@@ -3,10 +3,10 @@ use crate::module::{SerializedModule, LUCET_MODULE_SYM};
 use crate::module_data::MODULE_DATA_SYM;
 use crate::ModuleData;
 use byteorder::{ByteOrder, LittleEndian};
+use cranelift_object::object::{NativeFile as ObjectFile, Object, ObjectSymbol, SymbolKind};
 use memoffset::offset_of;
 pub use minisign::{PublicKey, SecretKey};
 use minisign::{SignatureBones, SignatureBox};
-use object::{NativeFile as ObjectFile, Object, ObjectSymbol, SymbolKind};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -146,7 +146,7 @@ impl RawModuleAndData {
         symbol_name: &str,
         _mangle: bool,
     ) -> Result<Option<SymbolData>, io::Error> {
-        use object::read::ObjectSection;
+        use cranelift_object::object::read::ObjectSection;
 
         let obj = ObjectFile::parse(obj_bin)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;

@@ -1,8 +1,8 @@
 use crate::error::Error;
 use crate::name::Name;
 use cranelift_codegen::{ir, isa};
+use cranelift_object::object::write::Object;
 use cranelift_object::ObjectProduct;
-use object::write::Object;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
