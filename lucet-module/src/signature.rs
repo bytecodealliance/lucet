@@ -6,7 +6,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use memoffset::offset_of;
 pub use minisign::{PublicKey, SecretKey};
 use minisign::{SignatureBones, SignatureBox};
-use object::{NativeFile as ObjectFile, Object, SymbolKind};
+use object::{NativeFile as ObjectFile, Object, ObjectSymbol, SymbolKind};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -150,12 +150,10 @@ impl RawModuleAndData {
 
         let obj = ObjectFile::parse(obj_bin)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
-        let symbol_map = obj.symbol_map();
-        for symbol in symbol_map
+        for symbol in obj
             .symbols()
-            .iter()
             .filter(|sym| sym.kind() == SymbolKind::Data)
-            .filter(|sym| sym.name() == Some(symbol_name))
+            .filter(|sym| sym.name() == Ok(symbol_name))
             .filter(|sym| sym.section_index().is_some())
         {
             let section_index = symbol.section_index().unwrap();
@@ -185,18 +183,16 @@ impl RawModuleAndData {
     ) -> Result<Option<SymbolData>, io::Error> {
         let obj = ObjectFile::parse(obj_bin)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
-        let symbol_map = obj.symbol_map();
         let mangled_symbol_name = format!("_{}", symbol_name);
         let symbol_name = if mangle {
             &mangled_symbol_name
         } else {
             symbol_name
         };
-        if let Some(symbol) = symbol_map
+        if let Some(symbol) = obj
             .symbols()
-            .iter()
             .filter(|sym| sym.kind() == SymbolKind::Data || sym.kind() == SymbolKind::Unknown)
-            .find(|sym| sym.name() == Some(symbol_name))
+            .find(|sym| sym.name() == Ok(symbol_name))
         {
             let offset = symbol.address() as usize;
             let len = symbol.size() as usize;

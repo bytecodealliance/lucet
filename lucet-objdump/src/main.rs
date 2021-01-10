@@ -7,7 +7,7 @@ use lucet_module::{
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use colored::Colorize;
-use object::{Object, ObjectSection, SymbolKind, SymbolScope};
+use object::{Object, ObjectSection, ObjectSymbol, SymbolKind, SymbolScope};
 use std::env;
 use std::fs::File;
 use std::io::Cursor;
@@ -27,7 +27,7 @@ struct ArtifactSummary<'a> {
 
 #[derive(Debug)]
 struct StandardSymbols<'a> {
-    lucet_module: Option<object::read::Symbol<'a>>,
+    lucet_module: Option<object::read::Symbol<'a, 'a>>,
 }
 
 #[derive(Debug)]
@@ -69,13 +69,10 @@ impl<'a> ArtifactSummary<'a> {
 
     fn gather(&mut self) {
         for sym in self.obj.symbols() {
-            let sym = sym.1;
             match sym.name() {
-                Some(ref name) if name == &"lucet_module" => {
-                    self.symbols.lucet_module = Some(sym.clone())
-                }
-                Some(ref name) if name == &"" => continue,
-                None => continue,
+                Ok(ref name) if name == &"lucet_module" => self.symbols.lucet_module = Some(sym),
+                Ok(ref name) if name == &"" => continue,
+                Err(_) => continue,
                 _ => {
                     if sym.kind() == SymbolKind::Text && sym.scope() == SymbolScope::Dynamic {
                         self.exported_functions.push(sym.name().unwrap().into());
@@ -110,10 +107,7 @@ impl<'a> ArtifactSummary<'a> {
     }
 
     fn get_symbol_name_for_addr(&self, addr: u64) -> Option<&str> {
-        self.obj
-            .symbol_map()
-            .get(addr)
-            .map(|sym| sym.name().unwrap_or("(no name)"))
+        self.obj.symbol_map().get(addr).map(|sym| sym.name())
     }
 }
 
