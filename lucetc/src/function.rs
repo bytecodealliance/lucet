@@ -6,9 +6,9 @@ use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
 use crate::table::TABLE_REF_SIZE;
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::entity::EntityRef;
-use cranelift_codegen::ir::{self, InstBuilder};
+use cranelift_codegen::ir::{self, condcodes::IntCC, InstBuilder};
 use cranelift_codegen::isa::TargetFrontendConfig;
-use cranelift_frontend::FunctionBuilder;
+use cranelift_frontend::{FunctionBuilder, Variable};
 use cranelift_module::{Linkage, Module as ClifModule, ModuleError as ClifModuleError};
 use cranelift_wasm::{
     wasmparser::Operator, FuncEnvironment, FuncIndex, FuncTranslationState, GlobalIndex,
@@ -22,10 +22,16 @@ pub struct FuncInfo<'a> {
     module_decls: &'a ModuleDecls<'a>,
     codegen_context: &'a CodegenContext,
     count_instructions: bool,
-    scope_costs: Vec<u32>,
+    scope_costs: Vec<ScopeInfo>,
     vmctx_value: Option<ir::GlobalValue>,
     global_base_value: Option<ir::GlobalValue>,
     runtime_funcs: HashMap<RuntimeFunc, ir::FuncRef>,
+    instr_count_var: Variable,
+}
+
+struct ScopeInfo {
+    cost: u32,
+    is_loop: bool,
 }
 
 impl<'a> FuncInfo<'a> {
@@ -33,15 +39,24 @@ impl<'a> FuncInfo<'a> {
         module_decls: &'a ModuleDecls<'a>,
         codegen_context: &'a CodegenContext,
         count_instructions: bool,
+        arg_count: u32,
+        local_count: u32,
     ) -> Self {
         Self {
             module_decls,
             codegen_context,
             count_instructions,
-            scope_costs: vec![0],
+            scope_costs: vec![ScopeInfo {
+                cost: 0,
+                is_loop: false,
+            }],
             vmctx_value: None,
             global_base_value: None,
             runtime_funcs: HashMap::new(),
+            // variable indices correspond to Wasm bytecode's index space,
+            // so we designate a new one after all the Wasm locals to hold
+            // the instruction count.
+            instr_count_var: Variable::with_u32(arg_count + local_count),
         }
     }
 
@@ -89,65 +104,139 @@ impl<'a> FuncInfo<'a> {
         })
     }
 
-    fn update_instruction_count_instrumentation(
+    fn get_instr_count_addr_offset(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+    ) -> (ir::Value, ir::immediates::Offset32) {
+        let instr_count_offset: ir::immediates::Offset32 =
+            (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
+                + offset_of!(InstanceRuntimeData, instruction_count_adj) as i32)
+                .into();
+        let vmctx_gv = self.get_vmctx(builder.func);
+        let addr = builder.ins().global_value(self.pointer_type(), vmctx_gv);
+        (addr, instr_count_offset)
+    }
+
+    fn load_instr_count(&mut self, builder: &mut FunctionBuilder<'_>) {
+        let (addr, instr_count_offset) = self.get_instr_count_addr_offset(builder);
+        let trusted_mem = ir::MemFlags::trusted();
+
+        // Do the equivalent of:
+        //
+        //    let instruction_count_ptr: &mut i64 = vmctx.instruction_count;
+        //    let instruction_count: i64 = *instruction_count_ptr;
+        //    vars[instr_count] = instruction_count;
+        let cur_instr_count =
+            builder
+                .ins()
+                .load(ir::types::I64, trusted_mem, addr, instr_count_offset);
+        builder.def_var(self.instr_count_var, cur_instr_count);
+    }
+
+    fn save_instr_count(&mut self, builder: &mut FunctionBuilder<'_>) {
+        let (addr, instr_count_offset) = self.get_instr_count_addr_offset(builder);
+        let trusted_mem = ir::MemFlags::trusted();
+
+        // Do the equivalent of:
+        //
+        //    let instruction_count_ptr: &mut i64 = vmctx.instruction_count;
+        //    let instruction_count = vars[instr_count];
+        //    *instruction_count_ptr = instruction_count;
+        let new_instr_count = builder.use_var(self.instr_count_var);
+        builder
+            .ins()
+            .store(trusted_mem, new_instr_count, addr, instr_count_offset);
+    }
+
+    fn update_instruction_count_instrumentation_pre(
         &mut self,
         op: &Operator<'_>,
         builder: &mut FunctionBuilder<'_>,
         reachable: bool,
     ) -> WasmResult<()> {
-        // So the operation counting works like this:
-        // record a stack corresponding with the stack of control flow in the wasm function.
-        // for non-control-flow-affecting instructions, increment the top of the stack.
-        // for control-flow-affecting operations (If, Else, Unreachable, Call, End, Return, Block,
-        // Loop, BrIf, CallIndirect), update the wasm instruction counter and:
-        // * if the operation introduces a new scope (If, Block, Loop), push a new 0 on the
-        // stack corresponding with that frame.
-        // * if the operation does not introduce a new scope (Else, Call, CallIndirect, BrIf),
-        // reset the top of stack to 0
-        // * if the operation completes a scope (End), pop the top of the stack and reset the new
-        // top of stack to 0
-        // * this leaves no special behavior for Unreachable and Return. This is acceptable as they
-        // are always followed by an End and are either about to trap, or return from a function.
-        // * Unreachable is either the end of VM execution and we are off by one instruction, or,
-        // is about to dispatch to an exception handler, which we should account for out of band
-        // anyway (exception dispatch is much more expensive than a single wasm op)
-        // * Return corresponds to exactly one function call, so we can count it by resetting the
-        // stack to 1 at return of a function.
+        // We count Wasm instructions, and bound runtime, using two counters in the
+        // `InstanceRuntimeData`: `instruction_count_bound` and `instruction_count_adj`. The sum of
+        // these two gives the instruction count, but we only increment the `adj` counter in
+        // generated code. When the sign of this counter flips from negative to positive, we have
+        // exceeded the bound and we must yield, which we do by invoking a particular hostcall.
+        //
+        // The operation counting works like this:
+        // - Record a stack corresponding with the stack of control flow in the wasm function.
+        //   for non-control-flow-affecting instructions, increment the top of the stack.
+        //   The sum of all stack elements represents instructions we have counted but not
+        //   yet flushed to the counter.
+        // - For control-flow-affecting operations (If, Else, Unreachable, Call, End, Return, Block,
+        //   Loop, BrIf, CallIndirect), update the wasm instruction counter and:
+        //   * if the operation introduces a new scope (If, Block, Loop), push a new 0 on the
+        //     stack corresponding with that frame.
+        //   * if the operation does not introduce a new scope (Else, Call, CallIndirect, BrIf),
+        //     reset the top of stack to 0 (because we will have flushed to the counter).
+        //   * if the operation completes a scope (End), pop the top of the stack and reset the new
+        //     top of stack to 0
+        //   * this leaves no special behavior for Unreachable and Return. This is acceptable as they
+        //     are always followed by an End and are either about to trap, or return from a function.
+        //   * Unreachable is either the end of VM execution and we are off by one instruction, or,
+        //     is about to dispatch to an exception handler, which we should account for out of band
+        //     anyway (exception dispatch is much more expensive than a single wasm op)
+        //   * Return corresponds to exactly one function call, so we can count it by resetting the
+        //     stack to 1 at return of a function.
+        //
+        // We keep a cache of the counter in the pinned register. We load it in the prologue, save
+        // it in the epilogue, and save and reload it around calls. (We could alter our ABI to
+        // preserve the pinned reg across calls within Wasm, and save and reload it only around
+        // hostcalls, as long as we could load and save it in a trampoline wrapping the initial
+        // Wasm entry. We haven't yet done this.)
 
+        /// Flush the currently-accumulated instruction count to the counter in the instance data,
+        /// invoking the yield hostcall if we hit the bound.
         fn flush_counter(environ: &mut FuncInfo<'_>, builder: &mut FunctionBuilder<'_>) {
-            if environ.scope_costs.last() == Some(&0) {
-                return;
+            match environ.scope_costs.last() {
+                Some(info) if info.cost == 0 => return,
+                _ => {}
             }
-            let instr_count_offset: ir::immediates::Offset32 =
-                (-(std::mem::size_of::<InstanceRuntimeData>() as i32)
-                    + offset_of!(InstanceRuntimeData, instruction_count) as i32)
-                    .into();
-            let vmctx_gv = environ.get_vmctx(builder.func);
-            let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
-            let trusted_mem = ir::MemFlags::trusted();
 
             //    Now insert a sequence of clif that is, functionally:
             //
-            //    let instruction_count_ptr: &mut u64 = vmctx.instruction_count;
-            //    let mut instruction_count: u64 = *instruction_count_ptr;
+            //    let mut instruction_count = vars[instr_count];
             //    instruction_count += <counter>;
-            //    *instruction_count_ptr = instruction_count;
+            //    vars[instr_count] = instruction_count;
 
-            let cur_instr_count =
-                builder
-                    .ins()
-                    .load(ir::types::I64, trusted_mem, addr, instr_count_offset);
+            let cur_instr_count = builder.use_var(environ.instr_count_var);
             let update_const = builder.ins().iconst(
                 ir::types::I64,
-                i64::from(*environ.scope_costs.last().unwrap()),
+                i64::from(environ.scope_costs.last().unwrap().cost),
             );
             let new_instr_count = builder.ins().iadd(cur_instr_count, update_const);
+            builder.def_var(environ.instr_count_var, new_instr_count);
+            environ.scope_costs.last_mut().unwrap().cost = 0;
+        };
+
+        fn do_check(environ: &mut FuncInfo<'_>, builder: &mut FunctionBuilder<'_>) {
+            let yield_block = builder.create_block();
+            let continuation_block = builder.create_block();
+            // If `adj` is positive, branch to yield block.
+            let zero = builder.ins().iconst(ir::types::I64, 0);
+            let new_instr_count = builder.use_var(environ.instr_count_var);
+            let cmp = builder.ins().ifcmp(new_instr_count, zero);
             builder
                 .ins()
-                .store(trusted_mem, new_instr_count, addr, instr_count_offset);
+                .brif(IntCC::SignedGreaterThanOrEqual, cmp, yield_block, &[]);
+            builder.ins().jump(continuation_block, &[]);
+            builder.seal_block(yield_block);
 
-            *environ.scope_costs.last_mut().unwrap() = 0;
-        };
+            builder.switch_to_block(yield_block);
+            environ.save_instr_count(builder);
+            let yield_hostcall =
+                environ.get_runtime_func(RuntimeFunc::YieldAtBoundExpiration, &mut builder.func);
+            let vmctx_gv = environ.get_vmctx(builder.func);
+            let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
+            builder.ins().call(yield_hostcall, &[addr]);
+            environ.load_instr_count(builder);
+            builder.ins().jump(continuation_block, &[]);
+            builder.seal_block(continuation_block);
+
+            builder.switch_to_block(continuation_block);
+        }
 
         // Only update or flush the counter when the scope is not sealed.
         //
@@ -189,7 +278,9 @@ impl<'a> FuncInfo<'a> {
                 // everything else, just call it one operation.
                 _ => 1,
             };
-            self.scope_costs.last_mut().map(|x| *x += op_cost);
+            self.scope_costs
+                .last_mut()
+                .map(|ref mut info| info.cost += op_cost);
 
             // apply flushing behavior if applicable
             match op {
@@ -204,7 +295,22 @@ impl<'a> FuncInfo<'a> {
                 | Operator::Br { .. }
                 | Operator::BrIf { .. }
                 | Operator::BrTable { .. } => {
+                    let do_check_and_save = match op {
+                        Operator::Call { .. }
+                        | Operator::CallIndirect { .. }
+                        | Operator::Return => true,
+                        Operator::Br { relative_depth } | Operator::BrIf { relative_depth } => {
+                            // only if loop backedge
+                            self.scope_costs[self.scope_costs.len() - 1 - *relative_depth as usize]
+                                .is_loop
+                        }
+                        _ => false,
+                    };
                     flush_counter(self, builder);
+                    if do_check_and_save {
+                        self.save_instr_count(builder);
+                        do_check(self, builder);
+                    }
                 }
                 Operator::End => {
                     // We have to be really careful here to avoid violating a cranelift invariant:
@@ -242,7 +348,7 @@ impl<'a> FuncInfo<'a> {
             // we shouldn't (because they're unreachable), or we didn't flush the counter before
             // starting to also instrument unreachable instructions (and would have tried to
             // overcount)
-            assert_eq!(*self.scope_costs.last().unwrap(), 0);
+            assert_eq!(self.scope_costs.last().unwrap().cost, 0);
         }
 
         // finally, we might have to set up a new counter for a new scope, or fix up counts a bit.
@@ -256,18 +362,63 @@ impl<'a> FuncInfo<'a> {
                 // reachable, the "called" function won't return!
                 if reachable {
                     // add 1 to count the return from the called function
-                    self.scope_costs.last_mut().map(|x| *x = 1);
+                    self.scope_costs
+                        .last_mut()
+                        .map(|ref mut info| info.cost += 1);
                 }
             }
             Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
                 // opening a scope, which starts having executed zero wasm ops
-                self.scope_costs.push(0);
+                let is_loop = match op {
+                    Operator::Loop { .. } => true,
+                    _ => false,
+                };
+                self.scope_costs.push(ScopeInfo { cost: 0, is_loop });
             }
             Operator::End => {
                 // close the top scope
                 self.scope_costs.pop();
             }
             _ => {}
+        }
+        Ok(())
+    }
+
+    fn update_instruction_count_instrumentation_post(
+        &mut self,
+        op: &Operator<'_>,
+        builder: &mut FunctionBuilder<'_>,
+        reachable: bool,
+    ) -> WasmResult<()> {
+        // Handle reloads after calls.
+        let is_call = match op {
+            Operator::Call { .. } | Operator::CallIndirect { .. } => true,
+            _ => false,
+        };
+        if reachable && is_call {
+            self.load_instr_count(builder);
+        }
+        Ok(())
+    }
+
+    fn update_instruction_count_instrumentation_before_func(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+    ) -> WasmResult<()> {
+        if self.count_instructions {
+            builder.declare_var(self.instr_count_var, ir::types::I64);
+            self.load_instr_count(builder);
+        }
+        Ok(())
+    }
+
+    fn update_instruction_count_instrumentation_after_func(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        reachable: bool,
+    ) -> WasmResult<()> {
+        if reachable {
+            self.save_instr_count(builder);
         }
         Ok(())
     }
@@ -734,7 +885,41 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         state: &FuncTranslationState,
     ) -> WasmResult<()> {
         if self.count_instructions {
-            self.update_instruction_count_instrumentation(op, builder, state.reachable())?;
+            self.update_instruction_count_instrumentation_pre(op, builder, state.reachable())?;
+        }
+        Ok(())
+    }
+
+    fn after_translate_operator(
+        &mut self,
+        op: &Operator<'_>,
+        builder: &mut FunctionBuilder<'_>,
+        state: &FuncTranslationState,
+    ) -> WasmResult<()> {
+        if self.count_instructions {
+            self.update_instruction_count_instrumentation_post(op, builder, state.reachable())?;
+        }
+        Ok(())
+    }
+
+    fn before_translate_function(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        _state: &FuncTranslationState,
+    ) -> WasmResult<()> {
+        if self.count_instructions {
+            self.update_instruction_count_instrumentation_before_func(builder)?;
+        }
+        Ok(())
+    }
+
+    fn after_translate_function(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        state: &FuncTranslationState,
+    ) -> WasmResult<()> {
+        if self.count_instructions {
+            self.update_instruction_count_instrumentation_after_func(builder, state.reachable())?;
         }
         Ok(())
     }

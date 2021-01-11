@@ -1,10 +1,12 @@
 use crate::error::Error;
-use crate::instance::{InstanceHandle, RunResult, State, TerminationDetails};
+use crate::instance::{InstanceHandle, InternalRunResult, RunResult, State, TerminationDetails};
+use crate::module::FunctionHandle;
 use crate::val::{UntypedRetVal, Val};
 use crate::vmctx::{Vmctx, VmctxInternal};
 use std::any::Any;
 use std::future::Future;
 use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// This is the same type defined by the `futures` library, but we don't need the rest of the
 /// library for this purpose.
@@ -75,7 +77,7 @@ impl Vmctx {
         // Wrap the computation in `YieldedFuture` so that
         // `Instance::run_async` can catch and run it.  We will get the
         // `ResumeVal` we applied to `f` above.
-        self.yield_impl::<YieldedFuture, ResumeVal>(YieldedFuture(f), false);
+        self.yield_impl::<YieldedFuture, ResumeVal>(YieldedFuture(f), false, false);
         let ResumeVal(v) = self.take_resumed_val();
         // We may now downcast and unbox the returned Box<dyn Any> into an `R`
         // again.
@@ -83,15 +85,30 @@ impl Vmctx {
     }
 }
 
-/// This struct needs to be exposed publicly in order for the signature of a
-/// "block_in_place" function to be writable, a concession we must make because
-/// Rust does not have rank 2 types. To prevent the user from inspecting or
-/// constructing the inside of this type, it is completely opaque.
-pub struct Bounce<'a>(BounceInner<'a>);
+/// A simple future that yields once. We use this to yield when a runtime bound is reached.
+///
+/// Inspired by Tokio's `yield_now()`.
+struct YieldNow {
+    yielded: bool,
+}
 
-enum BounceInner<'a> {
-    Done(UntypedRetVal),
-    More(BoxFuture<'a, ResumeVal>),
+impl YieldNow {
+    fn new() -> Self {
+        Self { yielded: false }
+    }
+}
+
+impl Future for YieldNow {
+    type Output = ();
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        if self.yielded {
+            Poll::Ready(())
+        } else {
+            self.yielded = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
 }
 
 impl InstanceHandle {
@@ -101,51 +118,59 @@ impl InstanceHandle {
     /// that use `Vmctx::block_on` and provides the trampoline that `.await`s those futures on
     /// behalf of the guest.
     ///
+    /// If `runtime_bound` is provided, it will also pause the Wasm execution and yield a future
+    /// that resumes it after (approximately) that many Wasm opcodes have executed.
+    ///
     /// # `Vmctx` Restrictions
     ///
     /// This method permits the use of `Vmctx::block_on`, but disallows all other uses of `Vmctx::
     /// yield_val_expecting_val` and family (`Vmctx::yield_`, `Vmctx::yield_expecting_val`,
     /// `Vmctx::yield_val`).
-    ///
-    /// # Blocking thread
-    ///
-    /// The `wrap_blocking` argument is a function that is called with a closure that runs the Wasm
-    /// program. Since Wasm may execute for an arbitrarily long time without `await`ing, we need to
-    /// make sure that it runs on a thread that is allowed to block.
-    ///
-    /// This argument is designed with [`tokio::task::block_in_place`][tokio] in mind. The odd type
-    /// is a concession to the fact that we don't have rank 2 types in Rust, and so must fall back
-    /// to trait objects in order to be able to take an argument that is itself a function that
-    /// takes a closure.
-    ///
-    /// In order to provide an appropriate function, you may have to wrap the library function in
-    /// another closure so that the types are compatible. For example:
-    ///
-    /// ```no_run
-    /// # async fn f() {
-    /// # let instance: lucet_runtime_internals::instance::InstanceHandle = unimplemented!();
-    /// fn block_in_place<F, R>(f: F) -> R
-    /// where
-    ///     F: FnOnce() -> R,
-    /// {
-    ///     // ...
-    ///     # f()
-    /// }
-    ///
-    /// instance.run_async("entrypoint", &[], |f| block_in_place(f)).await.unwrap();
-    /// # }
-    /// ```
-    ///
-    /// [tokio]: https://docs.rs/tokio/0.2.21/tokio/task/fn.block_in_place.html
-    pub async fn run_async<'a, F>(
+    pub async fn run_async<'a>(
         &'a mut self,
         entrypoint: &'a str,
         args: &'a [Val],
-        wrap_blocking: F,
-    ) -> Result<UntypedRetVal, Error>
-    where
-        F: for<'b> Fn(&mut (dyn FnMut() -> Result<Bounce<'b>, Error>)) -> Result<Bounce<'b>, Error>,
-    {
+        runtime_bound: Option<u64>,
+    ) -> Result<UntypedRetVal, Error> {
+        let func = self.module.get_export_func(entrypoint)?;
+        self.run_async_internal(func, args, runtime_bound).await
+    }
+
+    /// Run the module's [start function][start], if one exists.
+    ///
+    /// If there is no start function in the module, this does nothing.
+    ///
+    /// All of the other restrictions on the start function, what it may do, and
+    /// the requirement that it must be invoked first, are described in the
+    /// documentation for `Instance::run_start()`. This async version of that
+    /// function satisfies the requirement to run the start function first, as
+    /// long as the async function fully returns (not just yields).
+    ///
+    /// This method is similar to `Instance::run_start()`, except that it bounds
+    /// runtime between async future yields (invocations of `.poll()` on the
+    /// underlying generated future) if `runtime_bound` is provided. This
+    /// behaves the same way as `Instance::run_async()`.
+    pub async fn run_async_start<'a>(
+        &'a mut self,
+        runtime_bound: Option<u64>,
+    ) -> Result<(), Error> {
+        if let Some(start) = self.module.get_start_func()? {
+            if !self.is_not_started() {
+                return Err(Error::StartAlreadyRun);
+            }
+            self.run_async_internal(start, &[], runtime_bound).await?;
+        }
+        Ok(())
+    }
+
+    /// Shared async run-loop implementation for both `run_async()` and
+    /// `run_start_async()`.
+    async fn run_async_internal<'a>(
+        &'a mut self,
+        func: FunctionHandle,
+        args: &'a [Val],
+        runtime_bound: Option<u64>,
+    ) -> Result<UntypedRetVal, Error> {
         if self.is_yielded() {
             return Err(Error::Unsupported(
                 "cannot run_async a yielded instance".to_owned(),
@@ -156,55 +181,55 @@ impl InstanceHandle {
         let mut resume_val: Option<ResumeVal> = None;
         loop {
             // Run the WebAssembly program
-            let bounce = wrap_blocking(&mut || {
-                let run_result = if self.is_yielded() {
-                    // A previous iteration of the loop stored the ResumeVal in
-                    // `resume_val`, send it back to the guest ctx and continue
-                    // running:
-                    self.resume_with_val_impl(
-                        resume_val
-                            .take()
-                            .expect("is_yielded implies resume_value is some"),
-                        true,
-                    )
-                } else {
-                    // This is the first iteration, call the entrypoint:
-                    let func = self.module.get_export_func(entrypoint)?;
-                    self.run_func(func, args, true)
-                };
-                match run_result? {
-                    RunResult::Returned(rval) => {
-                        // Finished running, return UntypedReturnValue
-                        return Ok(Bounce(BounceInner::Done(rval)));
-                    }
-                    RunResult::Yielded(yval) => {
-                        // Check if the yield came from Vmctx::block_on:
-                        if yval.is::<YieldedFuture>() {
-                            let YieldedFuture(future) = *yval.downcast::<YieldedFuture>().unwrap();
-                            // Rehydrate the lifetime from `'static` to `'a`, which
-                            // is morally the same lifetime as was passed into
-                            // `Vmctx::block_on`.
-                            Ok(Bounce(BounceInner::More(
-                                future as BoxFuture<'a, ResumeVal>,
-                            )))
-                        } else {
-                            // Any other yielded value is not supported - die with an error.
-                            Err(Error::Unsupported(
-                                "cannot yield anything besides a future in Instance::run_async"
-                                    .to_owned(),
-                            ))
-                        }
-                    }
+            let run_result = if self.is_yielded() {
+                // A previous iteration of the loop stored the ResumeVal in
+                // `resume_val`, send it back to the guest ctx and continue
+                // running:
+                self.resume_with_val_impl(
+                    resume_val
+                        .take()
+                        .expect("is_yielded implies resume_value is some"),
+                    true,
+                    runtime_bound,
+                )
+            } else if self.is_bound_expired() {
+                self.resume_bounded(
+                    runtime_bound.expect("should have bound if guest had expired bound"),
+                )
+            } else {
+                // This is the first iteration, call the entrypoint:
+                self.run_func(func, args, true, runtime_bound)
+            };
+            match run_result? {
+                InternalRunResult::Normal(RunResult::Returned(rval)) => {
+                    // Finished running, return UntypedReturnValue
+                    return Ok(rval);
                 }
-            })?;
-            match bounce {
-                Bounce(BounceInner::Done(rval)) => return Ok(rval),
-                Bounce(BounceInner::More(fut)) => {
-                    // await on the computation. Store its result in
-                    // `resume_val`.
-                    resume_val = Some(fut.await);
+                InternalRunResult::Normal(RunResult::Yielded(yval)) => {
+                    // Check if the yield came from Vmctx::block_on:
+                    if yval.is::<YieldedFuture>() {
+                        let YieldedFuture(future) = *yval.downcast::<YieldedFuture>().unwrap();
+                        // Rehydrate the lifetime from `'static` to `'a`, which
+                        // is morally the same lifetime as was passed into
+                        // `Vmctx::block_on`.
+                        let future = future as BoxFuture<'a, ResumeVal>;
+
+                        // await on the computation. Store its result in
+                        // `resume_val`.
+                        resume_val = Some(future.await);
                     // Now we want to `Instance::resume_with_val` and start
                     // this cycle over.
+                    } else {
+                        // Any other yielded value is not supported - die with an error.
+                        return Err(Error::Unsupported(
+                            "cannot yield anything besides a future in Instance::run_async"
+                                .to_owned(),
+                        ));
+                    }
+                }
+                InternalRunResult::BoundExpired => {
+                    // Await on a simple future that yields once then is ready.
+                    YieldNow::new().await
                 }
             }
         }

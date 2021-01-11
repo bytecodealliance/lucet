@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub enum RuntimeFunc {
     MemSize,
     MemGrow,
+    YieldAtBoundExpiration,
 }
 
 pub struct RuntimeFuncType {
@@ -51,6 +52,21 @@ impl Runtime {
                 wasm_func_type: WasmFuncType {
                     params: vec![WasmType::I32].into_boxed_slice(),
                     returns: vec![WasmType::I32].into_boxed_slice(),
+                },
+            },
+        );
+        functions.insert(
+            RuntimeFunc::YieldAtBoundExpiration,
+            RuntimeFuncType {
+                name: "lucet_vmctx_yield_at_bound_expiration".to_owned(),
+                signature: Signature {
+                    params: vec![],
+                    returns: vec![],
+                    call_conv: target.default_call_conv,
+                },
+                wasm_func_type: WasmFuncType {
+                    params: vec![].into_boxed_slice(),
+                    returns: vec![].into_boxed_slice(),
                 },
             },
         );

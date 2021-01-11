@@ -341,6 +341,22 @@ impl<'a> Compiler<'a> {
         self.decls.get_module_data(self.module_features())
     }
 
+    fn get_local_count(body: &FunctionBody, name: &str) -> Result<u32, Error> {
+        let error_mapper = |e| Error::FunctionTranslation {
+            symbol: name.to_string(),
+            source: Box::new(Error::from(e)),
+        };
+        Ok(body
+            .get_locals_reader()
+            .map_err(error_mapper)?
+            .into_iter()
+            .map(|result| result.map_err(error_mapper))
+            .collect::<Result<Vec<(u32, _)>, Error>>()?
+            .into_iter()
+            .map(|(count, _ty)| count)
+            .sum())
+    }
+
     pub fn object_file(self) -> Result<ObjectFile, Error> {
         let mut function_manifest_ctx = ClifDataContext::new();
         let mut function_manifest_bytes = Cursor::new(Vec::new());
@@ -359,7 +375,15 @@ impl<'a> Compiler<'a> {
                 let func = decls
                     .get_func(unique_func_ix)
                     .expect("decl exists for func body");
-                let mut func_info = FuncInfo::new(&decls, &codegen_context, count_instructions);
+                let arg_count = func.signature.params.len() as u32;
+                let local_count = Self::get_local_count(&func_body, func.name.symbol())?;
+                let mut func_info = FuncInfo::new(
+                    &decls,
+                    &codegen_context,
+                    count_instructions,
+                    arg_count,
+                    local_count,
+                );
                 let mut clif_context = ClifContext::new();
                 clif_context.func.name = func.name.as_externalname();
                 clif_context.func.signature = func.signature.clone();
@@ -536,8 +560,15 @@ impl<'a> Compiler<'a> {
                 .decls
                 .get_func(unique_func_ix)
                 .expect("decl exists for func body");
-            let mut func_info =
-                FuncInfo::new(&self.decls, &self.codegen_context, self.count_instructions);
+            let arg_count = func.signature.params.len() as u32;
+            let local_count = Self::get_local_count(&body, func.name.symbol())?;
+            let mut func_info = FuncInfo::new(
+                &self.decls,
+                &self.codegen_context,
+                self.count_instructions,
+                arg_count,
+                local_count,
+            );
             let mut clif_context = ClifContext::new();
             clif_context.func.name = func.name.as_externalname();
             clif_context.func.signature = func.signature.clone();
