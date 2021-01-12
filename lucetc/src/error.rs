@@ -4,7 +4,7 @@ use cranelift_module::ModuleError as ClifModuleError;
 use cranelift_wasm::wasmparser::BinaryReaderError as ClifWasmReaderError;
 use cranelift_wasm::WasmError as ClifWasmError;
 use lucet_module::error::Error as LucetModuleError;
-use object;
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]

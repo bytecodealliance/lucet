@@ -189,12 +189,12 @@ impl Validator {
                 .ok_or(not_found)?;
             let spec_type = witx_to_functype(&func.core_type());
             if &spec_type != type_ {
-                return Err(Error::ImportTypeError {
+                Err(Error::ImportTypeError {
                     module: module.to_owned(),
                     field: field.to_owned(),
                     got: type_.clone(),
                     expected: spec_type,
-                });
+                })
             } else {
                 Ok(())
             }

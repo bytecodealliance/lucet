@@ -21,12 +21,10 @@ pub fn read_module(
     }
     if translate_wat {
         read_bytes(contents)
+    } else if wasm_preamble(&contents) {
+        Ok(contents)
     } else {
-        if wasm_preamble(&contents) {
-            Ok(contents)
-        } else {
-            Err(Error::MissingWasmPreamble)
-        }
+        Err(Error::MissingWasmPreamble)
     }
 }
 

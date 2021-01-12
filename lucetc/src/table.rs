@@ -50,7 +50,7 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
         if final_len > elems.len() {
             return Err(Error::ElementInitializerOutOfRange(
                 initializer.clone(),
-                decl.table.clone(),
+                *decl.table,
             ));
         }
         for (ix, func_ix) in initializer.elements.iter().enumerate() {
@@ -135,7 +135,7 @@ pub fn write_table_data(
             .declare_data_in_data(table_id, &mut table_ctx);
         let position = tables_vec.position();
         assert!(position < <u32>::max_value() as u64);
-        table_ctx.write_data_addr(position as u32, dataref, 0 as i64);
+        table_ctx.write_data_addr(position as u32, dataref, 0_i64);
         tables_vec.write_u64::<LittleEndian>(0).unwrap();
 
         // Define the length of the table as a u64:

@@ -1,4 +1,3 @@
-extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
@@ -19,8 +18,8 @@ pub fn from_witx(args: TokenStream) -> TokenStream {
         &config.wiggle.ctx.name,
         &config.constructor,
         &quote!(super),
-        &config.pre_hook.unwrap_or(quote!()),
-        &config.post_hook.unwrap_or(quote!()),
+        &config.pre_hook.unwrap_or_default(),
+        &config.post_hook.unwrap_or_default(),
     ));
     TokenStream::from(ts)
 }

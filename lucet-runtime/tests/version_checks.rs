@@ -7,7 +7,7 @@ pub fn reject_old_modules() {
     #[cfg(all(unix, not(target_os = "macos")))]
     const MODULE_PATH: &'static str = "./tests/version_checks/old_module.so";
     #[cfg(target_os = "macos")]
-    const MODULE_PATH: &'static str = "./tests/version_checks/old_module.dylib";
+    const MODULE_PATH: &str = "./tests/version_checks/old_module.dylib";
 
     let err = DlModule::load(MODULE_PATH).err().unwrap();
 

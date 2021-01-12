@@ -497,11 +497,11 @@ unsafe fn reraise_host_signal_in_handler(
         // function
         if let Some(state) = LUCET_SIGNAL_STATE.lock().unwrap().as_ref() {
             match sig {
-                Signal::SIGBUS => state.saved_sigbus.clone(),
-                Signal::SIGFPE => state.saved_sigfpe.clone(),
-                Signal::SIGILL => state.saved_sigill.clone(),
-                Signal::SIGSEGV => state.saved_sigsegv.clone(),
-                Signal::SIGALRM => state.saved_sigalrm.clone(),
+                Signal::SIGBUS => state.saved_sigbus,
+                Signal::SIGFPE => state.saved_sigfpe,
+                Signal::SIGILL => state.saved_sigill,
+                Signal::SIGSEGV => state.saved_sigsegv,
+                Signal::SIGALRM => state.saved_sigalrm,
                 sig => panic!(
                     "unexpected signal in reraise_host_signal_in_handler: {:?}",
                     sig

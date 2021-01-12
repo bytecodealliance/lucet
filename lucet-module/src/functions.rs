@@ -46,7 +46,7 @@ pub struct OwnedExportFunction {
 impl OwnedExportFunction {
     pub fn to_ref<'a>(&'a self) -> ExportFunction<'a> {
         ExportFunction {
-            fn_idx: self.fn_idx.clone(),
+            fn_idx: self.fn_idx,
             names: self.names.iter().map(|x| x.as_str()).collect(),
         }
     }
@@ -61,7 +61,7 @@ pub struct OwnedImportFunction {
 impl OwnedImportFunction {
     pub fn to_ref<'a>(&'a self) -> ImportFunction<'a> {
         ImportFunction {
-            fn_idx: self.fn_idx.clone(),
+            fn_idx: self.fn_idx,
             module: self.module.as_str(),
             name: self.name.as_str(),
         }
@@ -119,7 +119,7 @@ pub struct OwnedFunctionMetadata {
 impl OwnedFunctionMetadata {
     pub fn to_ref(&self) -> FunctionMetadata<'_> {
         FunctionMetadata {
-            signature: self.signature.clone(),
+            signature: self.signature,
             name: self.name.as_deref(),
         }
     }

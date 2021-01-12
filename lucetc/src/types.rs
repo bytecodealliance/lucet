@@ -36,7 +36,7 @@ pub fn to_lucet_signature(func_type: &WasmFuncType) -> Result<Signature, Signatu
         .params
         .iter()
         .map(|paramtype| {
-            to_lucet_valuetype(paramtype).map_err(|e| SignatureError::Type(paramtype.clone(), e))
+            to_lucet_valuetype(paramtype).map_err(|e| SignatureError::Type(*paramtype, e))
         })
         .collect::<Result<Vec<ValueType>, SignatureError>>()?;
 
@@ -44,7 +44,7 @@ pub fn to_lucet_signature(func_type: &WasmFuncType) -> Result<Signature, Signatu
         &[] => None,
         &[ref ret_ty] => {
             let value_ty =
-                to_lucet_valuetype(ret_ty).map_err(|e| SignatureError::Type(ret_ty.clone(), e))?;
+                to_lucet_valuetype(ret_ty).map_err(|e| SignatureError::Type(*ret_ty, e))?;
 
             Some(value_ty)
         }
