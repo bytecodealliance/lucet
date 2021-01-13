@@ -2491,6 +2491,7 @@ dependencies = [
 name = "wiggle"
 version = "0.22.0"
 dependencies = [
+ "bitflags",
  "thiserror",
  "tracing",
  "wiggle-macro",
