@@ -154,12 +154,14 @@ impl InstanceHandle {
         &'a mut self,
         runtime_bound: Option<u64>,
     ) -> Result<(), Error> {
-        if let Some(start) = self.module.get_start_func()? {
-            if !self.is_not_started() {
-                return Err(Error::StartAlreadyRun);
-            }
-            self.run_async_internal(start, &[], runtime_bound).await?;
+        if !self.is_not_started() {
+            return Err(Error::StartAlreadyRun);
         }
+        let start = match self.module.get_start_func()? {
+            Some(start) => start,
+            None => return Ok(()),
+        };
+        self.run_async_internal(start, &[], runtime_bound).await?;
         Ok(())
     }
 
@@ -232,6 +234,25 @@ impl InstanceHandle {
                     YieldNow::new().await
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// Show that the futures returned by `InstanceHandle` methods are `Send`.
+    ///
+    /// This doesn't actually do anything at runtime, the fact that it compiles is what counts.
+    #[test]
+    fn async_futures_are_send() {
+        fn _assert_send<T: Send>(_: &T) {}
+        #[allow(unreachable_code)]
+        fn _dont_run_me() {
+            let mut _inst: InstanceHandle = unimplemented!();
+            _assert_send(&_inst.run_async("", &[], None));
+            _assert_send(&_inst.run_async_start(None));
         }
     }
 }
