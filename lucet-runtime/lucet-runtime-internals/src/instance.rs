@@ -20,6 +20,7 @@ use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, pthread_self, siginfo_t, uintptr_t};
 use lucet_module::InstanceRuntimeData;
+use mem::transmute;
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
@@ -29,6 +30,7 @@ use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
+use std::task;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746_932_922;
 
@@ -515,7 +517,7 @@ impl Instance {
     /// in the future.
     pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<RunResult, Error> {
         let func = self.module.get_export_func(entrypoint)?;
-        Ok(self.run_func(func, &args, false, None)?.unwrap())
+        Ok(self.run_func(func, &args, None, None)?.unwrap())
     }
 
     /// Run a function with arguments in the guest context from the [WebAssembly function
@@ -531,7 +533,7 @@ impl Instance {
         args: &[Val],
     ) -> Result<RunResult, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
-        Ok(self.run_func(func, &args, false, None)?.unwrap())
+        Ok(self.run_func(func, &args, None, None)?.unwrap())
     }
 
     /// Resume execution of an instance that has yielded without providing a value to the guest.
@@ -562,13 +564,13 @@ impl Instance {
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
-        Ok(self.resume_with_val_impl(val, false, None)?.unwrap())
+        Ok(self.resume_with_val_impl(val, None, None)?.unwrap())
     }
 
     pub(crate) fn resume_with_val_impl<A: Any + 'static>(
         &mut self,
         val: A,
-        async_context: bool,
+        async_context: Option<&mut task::Context<'_>>,
         max_insn_count: Option<u64>,
     ) -> Result<InternalRunResult, Error> {
         match &self.state {
@@ -610,7 +612,7 @@ impl Instance {
             ));
         }
         self.set_instruction_bound_delta(Some(max_insn_count));
-        self.swap_and_return(true)
+        self.swap_and_return(None)
     }
 
     /// Run the module's [start function][start], if one exists.
@@ -648,7 +650,7 @@ impl Instance {
             if !self.is_not_started() {
                 return Err(Error::StartAlreadyRun);
             }
-            self.run_func(start, &[], false, None)?;
+            self.run_func(start, &[], None, None)?;
         }
         Ok(())
     }
@@ -1090,7 +1092,7 @@ impl Instance {
         &mut self,
         func: FunctionHandle,
         args: &[Val],
-        async_context: bool,
+        async_context: Option<&mut task::Context<'_>>,
         inst_count_bound: Option<u64>,
     ) -> Result<InternalRunResult, Error> {
         let needs_start = self.state.is_not_started() && !func.is_start_func;
@@ -1191,7 +1193,10 @@ impl Instance {
     /// This must only be called for an instance in a ready, non-fatally faulted, or yielded state,
     /// or in the not-started state on the start function. The public wrappers around this function
     /// should make sure the state is appropriate.
-    fn swap_and_return(&mut self, async_context: bool) -> Result<InternalRunResult, Error> {
+    fn swap_and_return(
+        &mut self,
+        async_context: Option<&mut task::Context<'_>>,
+    ) -> Result<InternalRunResult, Error> {
         let is_start_func = self
             .entrypoint
             .expect("we always have an entrypoint by now")
@@ -1203,7 +1208,18 @@ impl Instance {
                 || self.state.is_yielded()
                 || self.state.is_bound_expired()
         );
-        self.state = State::Running { async_context };
+
+        self.state = State::Running {
+            async_context: async_context.map(|ctx| {
+                // SAFETY: We have to lie about the lifetime of async_context to pass it into the instance.
+                // As State::Running will only last for as long as this function's lifespan, this is safe.
+                let ctx = unsafe {
+                    transmute::<&mut task::Context<'_>, &'static mut task::Context<'static>>(ctx)
+                };
+
+                RefCell::new(ctx)
+            }),
+        };
 
         let res = self.with_current_instance(|i| {
             i.with_signals_on(|i| {

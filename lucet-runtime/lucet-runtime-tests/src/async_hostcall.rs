@@ -1,14 +1,39 @@
 #[macro_export]
 macro_rules! async_hostcall_tests {
     ( $( $region_id:ident => $TestRegion:path ),* ) => {
-
         use lucet_runtime::{vmctx::Vmctx, lucet_hostcall};
+        use std::future::Future;
 
         #[lucet_hostcall]
         #[no_mangle]
         pub fn hostcall_containing_block_on(vmctx: &Vmctx, value: u32) {
             let asynced_value = vmctx.block_on(async move { value });
             assert_eq!(asynced_value, value);
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_containing_yielding_block_on(vmctx: &Vmctx, times: u32) {
+
+            struct YieldingFuture { times: u32 }
+
+            impl Future for YieldingFuture {
+                type Output = ();
+
+                fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+                    if self.times == 0 {
+                        return std::task::Poll::Ready(())
+                    } else {
+                        self.get_mut().times -= 1;
+
+                        cx.waker().wake_by_ref();
+
+                        return std::task::Poll::Pending
+                    }
+                }
+            }
+
+            vmctx.block_on(YieldingFuture { times });
         }
 
         $(
@@ -45,10 +70,11 @@ macro_rules! async_hostcall_tests {
                         futures_executor::block_on(
                             inst.run_async(
                                 "main",
-                                &[0u32.into(), 0i32.into()],
-                                // Run with bounded execution to test its interaction with block_on
-                                Some(1),
-                            ));
+                                &[0u32.into(), 0i32.into()]
+                            )
+                            // Run with bounded execution to test its interaction with block_on
+                            .bound_inst_count(1)
+                        );
                     match correct_run_res {
                         Ok(_) => {} // expected - UntypedRetVal is (), so no reason to inspect value
                         _ => panic!(
@@ -73,14 +99,30 @@ macro_rules! async_hostcall_tests {
                         futures_executor::block_on(
                             inst.run_async(
                                 "main",
-                                &[0u32.into(), 0i32.into()],
-                                Some(1),
-                            ));
+                                &[0u32.into(), 0i32.into()]
+                            ).bound_inst_count(1));
                     match correct_run_res_2 {
                         Ok(_) => {} // expected
                         _ => panic!(
                             "second run_async main should return successfully, got {:?}",
                             correct_run_res_2
+                        ),
+                    }
+
+
+
+                    let correct_run_res_3 =
+                        futures_executor::block_on(
+                            inst.run_async(
+                                "yielding",
+                                &[]
+                            ).bound_inst_count(10));
+
+                    match correct_run_res_3 {
+                        Ok(_) => {} // expected
+                        _ => panic!(
+                            "run_async yielding should return successfully, got {:?}",
+                            correct_run_res_3
                         ),
                     }
                 }

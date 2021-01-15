@@ -6,22 +6,27 @@ use crate::vmctx::{Vmctx, VmctxInternal};
 use std::any::Any;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::Context;
+use std::task::Poll;
+use std::{
+    cell::UnsafeCell,
+    mem::{transmute, MaybeUninit},
+};
 
-/// This is the same type defined by the `futures` library, but we don't need the rest of the
-/// library for this purpose.
-type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+const DEFAULT_INST_COUNT_BOUND: u64 = i64::MAX as u64;
 
-/// A unique type that wraps a boxed future with a boxed return value.
+/// A unique type that wraps a future and its returned value
 ///
 /// Type and lifetime guarantees are maintained by `Vmctx::block_on` and `Instance::run_async`. The
 /// user never sees this type.
-struct YieldedFuture(BoxFuture<'static, ResumeVal>);
+struct YieldedFuture<'a>(Pin<&'a mut (dyn Future<Output = ResumeAsync>)>);
 
-/// A unique type for a boxed return value. The user never sees this type.
-pub struct ResumeVal(Box<dyn Any + Send + 'static>);
+unsafe impl<'a> Send for YieldedFuture<'a> {}
 
-unsafe impl Send for ResumeVal {}
+/// The return value for a blocked async.
+///
+/// SAFETY: should only be constructed if the future has been polled to completion
+struct ResumeAsync;
 
 impl Vmctx {
     /// Block on the result of an `async` computation from an instance run by `Instance::run_async`.
@@ -47,67 +52,74 @@ impl Vmctx {
     /// `run_async`, avoiding problems of nesting, and allowing the current OS thread to continue
     /// performing other async work.
     ///
-    /// Note that this method may only be used if `Instance::run_async` was used to run the VM,
-    /// otherwise it will terminate the instance with `TerminationDetails::BlockOnNeedsAsync`.
-    pub fn block_on<'a, R>(&'a self, f: impl Future<Output = R> + Send + 'a) -> R
+    /// Note:
+    /// - This method may only be used if `Instance::run_async` was used to run the VM,
+    ///   otherwise it will terminate the instance with `TerminationDetails::BlockOnNeedsAsync`.
+    /// - This method is not reentrant. Use `.await` rather than `block_on` within the future.
+    ///   Calling block_on from within the future will result in a panic.
+    /// - It is not valid to re-enter guest code from the future, as guest execution may be paused.
+    pub fn block_on<R>(&self, f: impl Future<Output = R> + Send) -> R
     where
         R: Any + Send + 'static,
     {
-        // Die if we aren't in Instance::run_async
-        match self.instance().state {
-            State::Running { async_context } => {
-                if !async_context {
-                    panic!(TerminationDetails::BlockOnNeedsAsync)
-                }
+        // Get the std::task::Context, or die if we aren't async
+        let mut cx = match &self.instance().state {
+            State::Running {
+                async_context: Some(cx),
+            } => cx.borrow_mut(),
+            State::Running {
+                async_context: None,
+            } => {
+                panic!(TerminationDetails::BlockOnNeedsAsync);
             }
             _ => unreachable!("Access to vmctx implies instance is Running"),
-        }
-        // Wrap the Output of `f` as a boxed ResumeVal. Then, box the entire
-        // async computation.
-        let f = Box::pin(async move { ResumeVal(Box::new(f.await)) });
-        // Change the lifetime of the async computation from `'a` to `'static.
-        // We need to lie about this lifetime so that `YieldedFuture` may impl
-        // `Any` and be passed through the yield. `Instance::run_async`
-        // rehydrates this lifetime to be at most as long as the Vmctx's `'a`.
-        // This is safe because the stack frame that `'a` is tied to gets
-        // frozen in place as part of `self.yield_val_expecting_val`.
-        let f = unsafe {
-            std::mem::transmute::<BoxFuture<'a, ResumeVal>, BoxFuture<'static, ResumeVal>>(f)
         };
-        // Wrap the computation in `YieldedFuture` so that
-        // `Instance::run_async` can catch and run it.  We will get the
-        // `ResumeVal` we applied to `f` above.
-        self.yield_impl::<YieldedFuture, ResumeVal>(YieldedFuture(f), false, false);
-        let ResumeVal(v) = self.take_resumed_val();
-        // We may now downcast and unbox the returned Box<dyn Any> into an `R`
-        // again.
-        *v.downcast().expect("run_async broke invariant")
-    }
-}
 
-/// A simple future that yields once. We use this to yield when a runtime bound is reached.
-///
-/// Inspired by Tokio's `yield_now()`.
-struct YieldNow {
-    yielded: bool,
-}
+        // Wrap the future, so that we don't have to worry about sending back the return value
+        let ret = UnsafeCell::new(MaybeUninit::uninit());
 
-impl YieldNow {
-    fn new() -> Self {
-        Self { yielded: false }
-    }
-}
+        let ret_ptr = ret.get();
 
-impl Future for YieldNow {
-    type Output = ();
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        if self.yielded {
-            Poll::Ready(())
-        } else {
-            self.yielded = true;
-            cx.waker().wake_by_ref();
-            Poll::Pending
+        let mut f = async move {
+            let ret = f.await;
+            // SAFETY: we are the only possible writer to ret_ptr, and the future must be polled to completion before this function returns
+            unsafe {
+                std::ptr::write(ret_ptr, MaybeUninit::new(ret));
+            }
+            ResumeAsync
+        };
+
+        // We pin the future to the stack (a requirement for being able to poll the future).
+        // By pinning to the stack instead of using `Box::pin`, we avoid heap allocations for immediately-ready futures.
+        //
+        // SAFETY: We must uphold the invariants of Pin, namely that future does not move until it is dropped.
+        // By overriding the variable named `f`, it is impossible to access f again, except through the pinned reference.
+        let mut f = unsafe { Pin::new_unchecked(&mut f) };
+
+        if let Poll::Pending = f.as_mut().poll(*cx) {
+            // The future is pending, so we need to yield it to the async executor to be polled to completion
+
+            // SAFTEY: YieldedFuture is marked Send, which would not normally be the case due to ownership of ret_ptr, a raw pointer.
+            // Safe because:
+            // 1) We ensure that the inner future is Send
+            // 2) The pointer is only written to once, preventing race conditions
+            // 3) the pointer is not read from until after the future is polled to completion
+            let f = YieldedFuture(f);
+
+            // We need to lie about this lifetime so that `YieldedFuture` may be passed through the yield.
+            // `Instance::run_async` rehydrates this lifetime to be at most as long as the Vmctx's `'_`.
+            // This is safe because the stack frame that `'_` is tied to gets frozen in place as part of `self.yield_val_expecting_val`.
+            let f = unsafe { transmute::<YieldedFuture<'_>, YieldedFuture<'static>>(f) };
+
+            // Yield so that `Instance::run_async` can catch and execute our future.
+            self.yield_impl::<YieldedFuture<'static>, ResumeAsync>(f, false, false);
+
+            // Resuming with a ResumeAsync asserts that the future has been polled to completion
+            let ResumeAsync = self.take_resumed_val();
         }
+
+        // SAFETY: the future must have been polled to completion
+        unsafe { ret.into_inner().assume_init() }
     }
 }
 
@@ -126,14 +138,9 @@ impl InstanceHandle {
     /// This method permits the use of `Vmctx::block_on`, but disallows all other uses of `Vmctx::
     /// yield_val_expecting_val` and family (`Vmctx::yield_`, `Vmctx::yield_expecting_val`,
     /// `Vmctx::yield_val`).
-    pub async fn run_async<'a>(
-        &'a mut self,
-        entrypoint: &'a str,
-        args: &'a [Val],
-        runtime_bound: Option<u64>,
-    ) -> Result<UntypedRetVal, Error> {
-        let func = self.module.get_export_func(entrypoint)?;
-        self.run_async_internal(func, args, runtime_bound).await
+    pub fn run_async<'a>(&'a mut self, entrypoint: &'a str, args: &'a [Val]) -> RunAsync<'a> {
+        let func = self.module.get_export_func(entrypoint);
+        self.run_async_internal(func, args)
     }
 
     /// Run the module's [start function][start], if one exists.
@@ -150,91 +157,123 @@ impl InstanceHandle {
     /// runtime between async future yields (invocations of `.poll()` on the
     /// underlying generated future) if `runtime_bound` is provided. This
     /// behaves the same way as `Instance::run_async()`.
-    pub async fn run_async_start<'a>(
-        &'a mut self,
-        runtime_bound: Option<u64>,
-    ) -> Result<(), Error> {
-        if !self.is_not_started() {
-            return Err(Error::StartAlreadyRun);
-        }
-        let start = match self.module.get_start_func()? {
-            Some(start) => start,
-            None => return Ok(()),
+    pub fn run_async_start<'a>(&'a mut self) -> RunAsync<'a> {
+        let func = if self.is_not_started() {
+            self.module
+                .get_start_func()
+                // Invariant: can only be in NotStarted state if a start function exists
+                .map(|start| start.expect("NotStarted, but no start function"))
+        } else {
+            Err(Error::StartAlreadyRun)
         };
-        self.run_async_internal(start, &[], runtime_bound).await?;
-        Ok(())
+
+        self.run_async_internal(func, &[])
     }
 
-    /// Shared async run-loop implementation for both `run_async()` and
-    /// `run_start_async()`.
-    async fn run_async_internal<'a>(
+    fn run_async_internal<'a>(
         &'a mut self,
-        func: FunctionHandle,
+        func: Result<FunctionHandle, Error>,
         args: &'a [Val],
-        runtime_bound: Option<u64>,
-    ) -> Result<UntypedRetVal, Error> {
-        if self.is_yielded() {
-            return Err(Error::Unsupported(
-                "cannot run_async a yielded instance".to_owned(),
-            ));
-        }
+    ) -> RunAsync<'a> {
+        let state = match func {
+            Ok(func) => RunAsyncState::Start(func, args),
+            Err(err) => RunAsyncState::Failed(Some(err)),
+        };
 
-        // Store the ResumeVal here when we get it.
-        let mut resume_val: Option<ResumeVal> = None;
-        loop {
-            // Run the WebAssembly program
-            let run_result = if self.is_yielded() {
-                // A previous iteration of the loop stored the ResumeVal in
-                // `resume_val`, send it back to the guest ctx and continue
-                // running:
-                self.resume_with_val_impl(
-                    resume_val
-                        .take()
-                        .expect("is_yielded implies resume_value is some"),
-                    true,
-                    runtime_bound,
-                )
-            } else if self.is_bound_expired() {
-                self.resume_bounded(
-                    runtime_bound.expect("should have bound if guest had expired bound"),
-                )
-            } else {
+        RunAsync {
+            inst: self,
+            inst_count_bound: DEFAULT_INST_COUNT_BOUND,
+            state,
+        }
+    }
+}
+
+pub struct RunAsync<'a> {
+    inst: &'a mut InstanceHandle,
+    state: RunAsyncState<'a>,
+    /// The instance count bound. Can be changed at any time, taking effect on the next guest entry
+    pub inst_count_bound: u64,
+}
+
+impl<'a> RunAsync<'a> {
+    /// Set the instance count bound
+    pub fn bound_inst_count(&mut self, inst_count_bound: u64) -> &mut Self {
+        self.inst_count_bound = inst_count_bound;
+        self
+    }
+}
+
+enum RunAsyncState<'a> {
+    Start(FunctionHandle, &'a [Val]),
+    Blocked(YieldedFuture<'a>),
+    Yielded,
+    Failed(Option<Error>),
+}
+
+impl<'a> Future for RunAsync<'a> {
+    type Output = Result<UntypedRetVal, Error>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let inst_count_bound = self.inst_count_bound;
+
+        let run_result = match self.state {
+            RunAsyncState::Failed(ref mut err) => {
+                return Poll::Ready(Err(err.take().expect("failed future polled twice")))
+            }
+            RunAsyncState::Start(func, args) => {
                 // This is the first iteration, call the entrypoint:
-                self.run_func(func, args, true, runtime_bound)
-            };
-            match run_result? {
-                InternalRunResult::Normal(RunResult::Returned(rval)) => {
-                    // Finished running, return UntypedReturnValue
-                    return Ok(rval);
-                }
-                InternalRunResult::Normal(RunResult::Yielded(yval)) => {
-                    // Check if the yield came from Vmctx::block_on:
-                    if yval.is::<YieldedFuture>() {
-                        let YieldedFuture(future) = *yval.downcast::<YieldedFuture>().unwrap();
+                self.inst
+                    .run_func(func, args, Some(cx), Some(inst_count_bound))
+            }
+            RunAsyncState::Blocked(ref mut fut) => {
+                let resume = match fut.0.as_mut().poll(cx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(resume) => resume,
+                };
+
+                // Resume the instance now that the future is ready
+                self.inst
+                    .resume_with_val_impl(resume, Some(cx), Some(inst_count_bound))
+            }
+            RunAsyncState::Yielded => self.inst.resume_bounded(inst_count_bound),
+        };
+
+        match run_result {
+            Ok(InternalRunResult::Normal(RunResult::Returned(rval))) => {
+                // Finished running, return UntypedReturnValue
+                return Poll::Ready(Ok(rval));
+            }
+            Ok(InternalRunResult::Normal(RunResult::Yielded(yval))) => {
+                match yval.downcast::<YieldedFuture<'static>>() {
+                    Ok(future) => {
                         // Rehydrate the lifetime from `'static` to `'a`, which
                         // is morally the same lifetime as was passed into
                         // `Vmctx::block_on`.
-                        let future = future as BoxFuture<'a, ResumeVal>;
+                        let future = unsafe {
+                            transmute::<YieldedFuture<'static>, YieldedFuture<'a>>(*future)
+                        };
 
-                        // await on the computation. Store its result in
-                        // `resume_val`.
-                        resume_val = Some(future.await);
-                    // Now we want to `Instance::resume_with_val` and start
-                    // this cycle over.
-                    } else {
+                        self.state = RunAsyncState::Blocked(future);
+                    }
+                    Err(_) => {
                         // Any other yielded value is not supported - die with an error.
-                        return Err(Error::Unsupported(
+                        return Poll::Ready(Err(Error::Unsupported(
                             "cannot yield anything besides a future in Instance::run_async"
                                 .to_owned(),
-                        ));
+                        )));
                     }
                 }
-                InternalRunResult::BoundExpired => {
-                    // Await on a simple future that yields once then is ready.
-                    YieldNow::new().await
-                }
             }
+            Ok(InternalRunResult::BoundExpired) => {
+                self.state = RunAsyncState::Yielded;
+
+                // Yield, giving control back to the async executor
+                cx.waker().wake_by_ref();
+            }
+            Err(err) => return Poll::Ready(Err(err)),
         }
+
+        return Poll::Pending;
     }
 }
 
@@ -251,8 +290,8 @@ mod test {
         #[allow(unreachable_code)]
         fn _dont_run_me() {
             let mut _inst: InstanceHandle = unimplemented!();
-            _assert_send(&_inst.run_async("", &[], None));
-            _assert_send(&_inst.run_async_start(None));
+            _assert_send(&_inst.run_async("", &[]));
+            _assert_send(&_inst.run_async_start());
         }
     }
 }
