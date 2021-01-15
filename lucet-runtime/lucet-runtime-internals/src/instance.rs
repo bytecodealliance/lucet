@@ -496,6 +496,21 @@ impl Instance {
         self.run_func(func, &args, false, None)
     }
 
+    /// Run a function with arguments in the guest context at the given entrypoint, with a given bound.
+    ///
+    /// # Safety
+    ///
+    /// The same safety caveats of [`Instance::run()`](struct.Instance.html#method.run) apply.
+    pub fn run_bounded(
+        &mut self,
+        entrypoint: &str,
+        args: &[Val],
+        inst_count_bound: u64,
+    ) -> Result<RunResult, Error> {
+        let func = self.module.get_export_func(entrypoint)?;
+        self.run_func(func, &args, false, Some(inst_count_bound))
+    }
+
     /// Run a function with arguments in the guest context from the [WebAssembly function
     /// table](https://webassembly.github.io/spec/core/syntax/modules.html#tables).
     ///
