@@ -2,7 +2,7 @@ use crate::instance::siginfo_ext::SiginfoExt;
 use crate::instance::{FaultDetails, TerminationDetails, YieldedVal};
 use crate::sysdeps::UContext;
 use libc::{SIGBUS, SIGSEGV};
-use std::any::Any;
+use std::any::TypeId;
 use std::ffi::{CStr, CString};
 
 /// The representation of a Lucet instance's state machine.
@@ -22,11 +22,7 @@ pub enum State {
     /// Transitions to `Ready` when the guest function returns normally, or to `Faulted`,
     /// `Terminating`, or `Yielding` if the instance faults, terminates, or yields, or to
     /// `BoundExpired` if the instance is run with an instruction bound and reaches it.
-    Running {
-        /// Indicates whether the instance is running in an async context (`Instance::run_async`)
-        /// or not. Needed by `Vmctx::block_on`.
-        async_context: bool,
-    },
+    Running,
 
     /// The instance has faulted, potentially fatally.
     ///
@@ -56,11 +52,8 @@ pub enum State {
     /// `RunResult` before anything else happens to the instance.
     Yielding {
         val: YieldedVal,
-        /// A phantom value carrying the type of the expected resumption value.
-        ///
-        /// Concretely, this should only ever be `Box<PhantomData<R>>` where `R` is the type
-        /// the guest expects upon resumption.
-        expecting: Box<dyn Any>,
+        /// The type of the expected resumption value
+        expecting: TypeId,
     },
 
     /// The instance has yielded.
@@ -69,10 +62,7 @@ pub enum State {
     /// instance is reset.
     Yielded {
         /// A phantom value carrying the type of the expected resumption value.
-        ///
-        /// Concretely, this should only ever be `Box<PhantomData<R>>` where `R` is the type
-        /// the guest expects upon resumption.
-        expecting: Box<dyn Any>,
+        expecting: TypeId,
     },
 
     /// The instance has reached an instruction-count bound.
@@ -96,12 +86,7 @@ impl std::fmt::Display for State {
         match self {
             State::NotStarted => write!(f, "not started"),
             State::Ready => write!(f, "ready"),
-            State::Running {
-                async_context: false,
-            } => write!(f, "running"),
-            State::Running {
-                async_context: true,
-            } => write!(f, "running (in async context)"),
+            State::Running => write!(f, "running"),
             State::Faulted {
                 details, siginfo, ..
             } => {
@@ -157,14 +142,6 @@ impl State {
     pub fn is_running(&self) -> bool {
         if let State::Running { .. } = self {
             true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_running_async(&self) -> bool {
-        if let State::Running { async_context } = self {
-            *async_context
         } else {
             false
         }
