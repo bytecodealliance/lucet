@@ -187,10 +187,12 @@ fn check_instruction_count_with_periodic_yields_internal(want_start_function: bo
         }
 
         let yields = if want_start_function {
-            let future = Box::pin(inst.run_async_start(Some(1000)));
+            let mut future = Box::pin(inst.run_async_start());
+            future.bound_inst_count(1000);
             future_loop(future)
         } else {
-            let future = Box::pin(inst.run_async("test_function", &[], Some(1000)));
+            let mut future = Box::pin(inst.run_async("test_function", &[]));
+            future.bound_inst_count(1000);
             future_loop(future)
         };
 

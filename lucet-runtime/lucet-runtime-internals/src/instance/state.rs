@@ -2,8 +2,9 @@ use crate::instance::siginfo_ext::SiginfoExt;
 use crate::instance::{FaultDetails, TerminationDetails, YieldedVal};
 use crate::sysdeps::UContext;
 use libc::{SIGBUS, SIGSEGV};
-use std::any::Any;
 use std::ffi::{CStr, CString};
+use std::task;
+use std::{any::Any, cell::RefCell};
 
 /// The representation of a Lucet instance's state machine.
 pub enum State {
@@ -25,7 +26,10 @@ pub enum State {
     Running {
         /// Indicates whether the instance is running in an async context (`Instance::run_async`)
         /// or not. Needed by `Vmctx::block_on`.
-        async_context: bool,
+        ///
+        /// Safety: the context must be valid for as long as the instance remains in the running state
+        /// The logic in swap_and_return guarantees this.
+        async_context: Option<RefCell<&'static mut task::Context<'static>>>,
     },
 
     /// The instance has faulted, potentially fatally.
@@ -97,10 +101,10 @@ impl std::fmt::Display for State {
             State::NotStarted => write!(f, "not started"),
             State::Ready => write!(f, "ready"),
             State::Running {
-                async_context: false,
+                async_context: None,
             } => write!(f, "running"),
             State::Running {
-                async_context: true,
+                async_context: Some(_),
             } => write!(f, "running (in async context)"),
             State::Faulted {
                 details, siginfo, ..
@@ -163,8 +167,11 @@ impl State {
     }
 
     pub fn is_running_async(&self) -> bool {
-        if let State::Running { async_context } = self {
-            *async_context
+        if let State::Running {
+            async_context: Some(_),
+        } = self
+        {
+            true
         } else {
             false
         }
