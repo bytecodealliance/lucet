@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::instance::{InstanceHandle, InternalRunResult, RunResult, State, TerminationDetails};
+use crate::instance::{InstanceHandle, RunResult, State, TerminationDetails};
 use crate::module::FunctionHandle;
 use crate::val::{UntypedRetVal, Val};
 use crate::vmctx::{Vmctx, VmctxInternal};
@@ -195,19 +195,19 @@ impl InstanceHandle {
                     runtime_bound,
                 )
             } else if self.is_bound_expired() {
-                self.resume_bounded(
+                self.resume_bound_expired(
                     runtime_bound.expect("should have bound if guest had expired bound"),
                 )
             } else {
                 // This is the first iteration, call the entrypoint:
                 self.run_func(func, args, true, runtime_bound)
             };
-            match run_result? {
-                InternalRunResult::Normal(RunResult::Returned(rval)) => {
+            match run_result {
+                Ok(RunResult::Returned(rval)) => {
                     // Finished running, return UntypedReturnValue
                     return Ok(rval);
                 }
-                InternalRunResult::Normal(RunResult::Yielded(yval)) => {
+                Ok(RunResult::Yielded(yval)) => {
                     // Check if the yield came from Vmctx::block_on:
                     if yval.is::<YieldedFuture>() {
                         let YieldedFuture(future) = *yval.downcast::<YieldedFuture>().unwrap();
@@ -229,10 +229,11 @@ impl InstanceHandle {
                         ));
                     }
                 }
-                InternalRunResult::BoundExpired => {
+                Err(Error::BoundExpired) => {
                     // Await on a simple future that yields once then is ready.
                     YieldNow::new().await
                 }
+                Err(err) => return Err(err),
             }
         }
     }

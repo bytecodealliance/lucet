@@ -53,6 +53,7 @@ pub extern "C" fn lucet_error_name(e: c_int) -> *const c_char {
             InstanceNeedsStart => "lucet_error_instance_needs_start\0".as_ptr() as _,
             StartAlreadyRun => "lucet_error_start_already_run\0".as_ptr() as _,
             StartYielded => "lucet_error_start_yielded\0".as_ptr() as _,
+            BoundExpired => "lucet_error_bound_expired\0".as_ptr() as _,
             Internal => "lucet_error_internal\0".as_ptr() as _,
             Unsupported => "lucet_error_unsupported\0".as_ptr() as _,
         }

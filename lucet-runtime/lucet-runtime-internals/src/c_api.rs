@@ -81,6 +81,7 @@ pub enum lucet_error {
     InstanceNeedsStart,
     StartAlreadyRun,
     StartYielded,
+    BoundExpired,
     Internal,
     Unsupported,
 }
@@ -109,6 +110,7 @@ impl From<&Error> for lucet_error {
             Error::InstanceNeedsStart => lucet_error::InstanceNeedsStart,
             Error::StartAlreadyRun => lucet_error::StartAlreadyRun,
             Error::StartYielded => lucet_error::StartYielded,
+            Error::BoundExpired => lucet_error::BoundExpired,
             Error::InternalError(_) => lucet_error::Internal,
             Error::Unsupported(_) => lucet_error::Unsupported,
         }

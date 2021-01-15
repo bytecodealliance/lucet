@@ -419,28 +419,6 @@ impl RunResult {
     }
 }
 
-/// An "internal" run result: either a `RunResult` or a bound expiration. We do not expose bound
-/// expirations to the caller directly; rather, we only handle them in `run_async()`.
-pub(crate) enum InternalRunResult {
-    Normal(RunResult),
-    BoundExpired,
-}
-
-impl InternalRunResult {
-    pub(crate) fn unwrap(self) -> RunResult {
-        match self {
-            InternalRunResult::Normal(result) => result,
-            InternalRunResult::BoundExpired => panic!("should not have had a runtime bound"),
-        }
-    }
-}
-
-impl std::convert::Into<InternalRunResult> for RunResult {
-    fn into(self) -> InternalRunResult {
-        InternalRunResult::Normal(self)
-    }
-}
-
 /// APIs that are internal, but useful to implementors of extension modules; you probably don't want
 /// this trait!
 ///
@@ -515,7 +493,7 @@ impl Instance {
     /// in the future.
     pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<RunResult, Error> {
         let func = self.module.get_export_func(entrypoint)?;
-        Ok(self.run_func(func, &args, false, None)?.unwrap())
+        self.run_func(func, &args, false, None)
     }
 
     /// Run a function with arguments in the guest context from the [WebAssembly function
@@ -531,7 +509,24 @@ impl Instance {
         args: &[Val],
     ) -> Result<RunResult, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
-        Ok(self.run_func(func, &args, false, None)?.unwrap())
+        self.run_func(func, &args, false, None)
+    }
+
+    /// Run a function with arguments in the guest context from the [WebAssembly function
+    /// table](https://webassembly.github.io/spec/core/syntax/modules.html#tables), with a bound.
+    ///
+    /// # Safety
+    ///
+    /// The same safety caveats of [`Instance::run()`](struct.Instance.html#method.run) apply.
+    pub fn run_func_idx_bounded(
+        &mut self,
+        table_idx: u32,
+        func_idx: u32,
+        args: &[Val],
+        inst_count_bound: u64,
+    ) -> Result<RunResult, Error> {
+        let func = self.module.get_func_from_idx(table_idx, func_idx)?;
+        self.run_func(func, &args, false, Some(inst_count_bound))
     }
 
     /// Resume execution of an instance that has yielded without providing a value to the guest.
@@ -548,6 +543,23 @@ impl Instance {
         self.resume_with_val(EmptyYieldVal)
     }
 
+    /// Resume execution of an instance that has yielded without providing a value to the guest, with an execution bound.
+    ///
+    /// This should only be used when the guest yielded with
+    /// [`Vmctx::yield_()`](vmctx/struct.Vmctx.html#method.yield_) or
+    /// [`Vmctx::yield_val()`](vmctx/struct.Vmctx.html#method.yield_val).
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub fn resume_bounded<A: Any + 'static>(
+        &mut self,
+        max_insn_count: u64,
+    ) -> Result<RunResult, Error> {
+        self.resume_with_val_impl(EmptyYieldVal, false, Some(max_insn_count))
+    }
+
     /// Resume execution of an instance that has yielded, providing a value to the guest.
     ///
     /// The type of the provided value must match the type expected by
@@ -562,15 +574,37 @@ impl Instance {
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
-        Ok(self.resume_with_val_impl(val, false, None)?.unwrap())
+        self.resume_with_val_impl(val, false, None)
     }
 
+    /// Resume execution of an instance that has yielded, providing a value to the guest.
+    ///
+    /// The type of the provided value must match the type expected by
+    /// [`Vmctx::yield_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_expecting_val) or
+    /// [`Vmctx::yield_val_expecting_val()`](vmctx/struct.Vmctx.html#method.yield_val_expecting_val).
+    ///
+    /// The provided value will be dynamically typechecked against the type the guest expects to
+    /// receive, and if that check fails, this call will fail with `Error::InvalidArgument`.
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub fn resume_with_val_bounded<A: Any + 'static>(
+        &mut self,
+        val: A,
+        max_insn_count: u64,
+    ) -> Result<RunResult, Error> {
+        self.resume_with_val_impl(val, false, Some(max_insn_count))
+    }
+
+    /// Resume execution of an instance that has yielded, providing a value to the guest.
     pub(crate) fn resume_with_val_impl<A: Any + 'static>(
         &mut self,
         val: A,
         async_context: bool,
         max_insn_count: Option<u64>,
-    ) -> Result<InternalRunResult, Error> {
+    ) -> Result<RunResult, Error> {
         match &self.state {
             State::Yielded { expecting, .. } => {
                 // make sure the resumed value is of the right type
@@ -593,20 +627,16 @@ impl Instance {
     ///
     /// The execution slice that begins with this call is bounded by the new bound provided.
     ///
-    /// This should only be used when `run_func()` returned a `RunResult::Bounded`. This is an
-    /// internal function used by `run_async()`.
+    /// This should only be used when `run_func()` returned a `Err(Error::BoundExpired)`.
     ///
     /// # Safety
     ///
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
-    pub(crate) fn resume_bounded(
-        &mut self,
-        max_insn_count: u64,
-    ) -> Result<InternalRunResult, Error> {
+    pub fn resume_bound_expired(&mut self, max_insn_count: u64) -> Result<RunResult, Error> {
         if !self.state.is_bound_expired() {
             return Err(Error::InvalidArgument(
-                "can only call resume_bounded() on an instance that hit an instruction bound",
+                "can only call resume_bound_expired() on an instance that hit an instruction bound",
             ));
         }
         self.set_instruction_bound_delta(Some(max_insn_count));
@@ -649,6 +679,46 @@ impl Instance {
                 return Err(Error::StartAlreadyRun);
             }
             self.run_func(start, &[], false, None)?;
+        }
+        Ok(())
+    }
+
+    /// Run the module's [start function][start], if one exists, with an execution bound.
+    ///
+    /// If there is no start function in the module, this does nothing.
+    ///
+    /// If the module contains a start function, you must run it before running any other exported
+    /// functions. If an instance is reset, you must run the start function again.
+    ///
+    /// Start functions may assume that Wasm tables and memories are properly initialized, but may
+    /// not assume that imported functions or globals are available.
+    ///
+    /// # Errors
+    ///
+    /// In addition to the errors that can be returned from [`Instance::run()`][run], this can also
+    /// return `Error::StartYielded` if the start function attempts to yield. This should not arise
+    /// as long as the start function does not attempt to use any imported functions.
+    ///
+    /// This also returns `Error::StartAlreadyRun` if the start function has already run since the
+    /// instance was created or last reset.
+    ///
+    /// Wasm start functions are not allowed to call imported functions. If the start function
+    /// attempts to do so, the instance will be terminated with
+    /// `TerminationDetails::StartCalledImportFunc`.
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`][run]
+    /// applies.
+    ///
+    /// [run]: struct.Instance.html#method.run
+    /// [start]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
+    pub fn run_start_bounded(&mut self, inst_count_bound: Option<u64>) -> Result<(), Error> {
+        if let Some(start) = self.module.get_start_func()? {
+            if !self.is_not_started() {
+                return Err(Error::StartAlreadyRun);
+            }
+            self.run_func(start, &[], false, inst_count_bound)?;
         }
         Ok(())
     }
@@ -1092,7 +1162,7 @@ impl Instance {
         args: &[Val],
         async_context: bool,
         inst_count_bound: Option<u64>,
-    ) -> Result<InternalRunResult, Error> {
+    ) -> Result<RunResult, Error> {
         let needs_start = self.state.is_not_started() && !func.is_start_func;
         if needs_start {
             return Err(Error::InstanceNeedsStart);
@@ -1191,7 +1261,7 @@ impl Instance {
     /// This must only be called for an instance in a ready, non-fatally faulted, or yielded state,
     /// or in the not-started state on the start function. The public wrappers around this function
     /// should make sure the state is appropriate.
-    fn swap_and_return(&mut self, async_context: bool) -> Result<InternalRunResult, Error> {
+    fn swap_and_return(&mut self, async_context: bool) -> Result<RunResult, Error> {
         let is_start_func = self
             .entrypoint
             .expect("we always have an entrypoint by now")
@@ -1271,15 +1341,15 @@ impl Instance {
             State::Running { .. } => {
                 let retval = self.ctx.get_untyped_retval();
                 self.state = State::Ready;
-                Ok(RunResult::Returned(retval).into())
+                Ok(RunResult::Returned(retval))
             }
             State::Terminating { details, .. } => {
                 self.state = State::Terminated;
-                Err(Error::RuntimeTerminated(details).into())
+                Err(Error::RuntimeTerminated(details))
             }
             State::Yielding { val, expecting } => {
                 self.state = State::Yielded { expecting };
-                Ok(RunResult::Yielded(val).into())
+                Ok(RunResult::Yielded(val))
             }
             State::Faulted {
                 mut details,
@@ -1318,12 +1388,12 @@ impl Instance {
                 } else {
                     // leave the full fault details in the instance state, and return the
                     // higher-level info to the user
-                    Err(Error::RuntimeFault(details).into())
+                    Err(Error::RuntimeFault(details))
                 }
             }
             State::BoundExpired => {
                 self.state = State::BoundExpired;
-                Ok(InternalRunResult::BoundExpired)
+                Err(Error::BoundExpired)
             }
             State::NotStarted
             | State::Ready
