@@ -554,6 +554,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn uffd_expand_heap() {
         let workdir = TempDir::new().expect("create working directory");
 
