@@ -248,7 +248,8 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let ctx = WasiCtxBuilder::new()
-                    .args(["hello"].iter())
+                    .args(&["hello".to_owned()])
+                    .unwrap()
                     .build()
                     .expect("build WasiCtx");
                 region

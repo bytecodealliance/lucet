@@ -103,14 +103,14 @@ pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<Exitcode, Error> {
 
 pub fn run_with_stdout<P: AsRef<Path>>(
     path: P,
-    ctx: &mut WasiCtxBuilder,
+    mut ctx: WasiCtxBuilder,
 ) -> Result<(Exitcode, String), Error> {
-    let stdout = wasi_common::virtfs::pipe::WritePipe::new_in_memory();
-    ctx.stdout(stdout.clone());
+    let stdout = wasi_common::pipe::WritePipe::new_in_memory();
+    ctx = ctx.stdout(Box::new(stdout.clone()));
 
     let ctx = ctx.build()?;
 
-    let exitcode = run(path, ctx)?;
+    let run_result = run(path, ctx);
 
     let stdout = String::from_utf8(
         stdout
@@ -119,15 +119,21 @@ pub fn run_with_stdout<P: AsRef<Path>>(
             .into_inner(),
     )?;
 
+    if !stdout.is_empty() {
+        println!("guest stdout:\n{}", stdout);
+    }
+
+    // Delay erroring on the run result until stdout has been printed
+    let exitcode = run_result?;
     Ok((exitcode, stdout))
 }
 
 pub fn run_with_null_stdin<P: AsRef<Path>>(
     path: P,
-    ctx: &mut WasiCtxBuilder,
+    mut ctx: WasiCtxBuilder,
 ) -> Result<Exitcode, Error> {
-    let stdin = wasi_common::virtfs::pipe::ReadPipe::from("");
-    ctx.stdin(stdin);
+    let stdin = wasi_common::pipe::ReadPipe::new(std::io::empty());
+    ctx = ctx.stdin(Box::new(stdin));
 
     let ctx = ctx.build()?;
 
