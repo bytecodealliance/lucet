@@ -1023,7 +1023,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "rand 0.7.3",
- "raw-cpuid 6.1.0",
+ "raw-cpuid 9.0.0",
  "thiserror",
  "tracing",
  "userfaultfd",
@@ -1206,7 +1206,7 @@ dependencies = [
  "memoffset",
  "minisign",
  "object",
- "raw-cpuid 6.1.0",
+ "raw-cpuid 9.0.0",
  "rayon",
  "serde",
  "serde_json",
@@ -1669,9 +1669,9 @@ dependencies = [
 
 [[package]]
 name = "raw-cpuid"
-version = "6.1.0"
+version = "8.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
+checksum = "1fdf7d9dbd43f3d81d94a49c1c3df73cc2b3827995147e6cf7f89d4ec5483e73"
 dependencies = [
  "bitflags",
  "cc",
@@ -1680,13 +1680,11 @@ dependencies = [
 
 [[package]]
 name = "raw-cpuid"
-version = "8.1.2"
+version = "9.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fdf7d9dbd43f3d81d94a49c1c3df73cc2b3827995147e6cf7f89d4ec5483e73"
+checksum = "c27cb5785b85bd05d4eb171556c9a1a514552e26123aeae6bb7d811353148026"
 dependencies = [
  "bitflags",
- "cc",
- "rustc_version",
 ]
 
 [[package]]
