@@ -176,12 +176,12 @@ int main(void)
         exit(33);
     }
 
-    res = symlink("/sandbox/testfile-link", "/sandbox/testfile-symlink");
+    res = symlink("./testfile-link", "/sandbox/testfile-symlink");
     if (res != 0) {
         exit(34);
     }
 
-    res = symlink("/sandbox/testfile2", "/sandbox/testfile-symlink");
+    res = symlink("./testfile2", "/sandbox/testfile-symlink");
     if (res != -1) {
         exit(35);
     }
