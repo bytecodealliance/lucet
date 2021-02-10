@@ -1,7 +1,7 @@
 mod test_helpers;
 use crate::test_helpers::{
-    lucet_wasi_tests_internal_ensure_linked, run, run_with_null_stdin, run_with_stdout,
-    LUCET_WASI_ROOT,
+    init_tracing, lucet_wasi_tests_internal_ensure_linked, run, run_with_null_stdin,
+    run_with_stdout, LUCET_WASI_ROOT,
 };
 use lucet_wasi::WasiCtxBuilder;
 use std::io::{Read, Write};
@@ -9,6 +9,7 @@ use std::path::Path;
 
 #[test]
 fn double_import() {
+    init_tracing();
     lucet_wasi_tests_internal_ensure_linked();
 
     let ctx = WasiCtxBuilder::new();
@@ -21,6 +22,7 @@ fn double_import() {
 
 #[test]
 fn hello() {
+    init_tracing();
     let ctx = WasiCtxBuilder::new().args(&["hello".to_owned()]).unwrap();
 
     let (exitcode, stdout) = run_with_stdout(
@@ -35,6 +37,7 @@ fn hello() {
 
 #[test]
 fn hello_args() {
+    init_tracing();
     let mut ctx = WasiCtxBuilder::new();
     ctx = ctx
         .args(&["hello".to_owned(), "test suite".to_owned()])
@@ -52,6 +55,7 @@ fn hello_args() {
 
 #[test]
 fn hello_env() {
+    init_tracing();
     let mut ctx = WasiCtxBuilder::new();
     ctx = ctx
         .args(&["hello".to_owned(), "test suite".to_owned()])
@@ -70,6 +74,7 @@ fn hello_env() {
 
 #[test]
 fn exitcode() {
+    init_tracing();
     let ctx = WasiCtxBuilder::new()
         .args(&["exitcode".to_owned()])
         .unwrap()
@@ -83,6 +88,7 @@ fn exitcode() {
 
 #[test]
 fn clock_getres() {
+    init_tracing();
     let ctx = WasiCtxBuilder::new()
         .args(&["clock_getres".to_owned()])
         .unwrap();
@@ -94,6 +100,7 @@ fn clock_getres() {
 
 #[test]
 fn gettimeofday() {
+    init_tracing();
     let ctx = WasiCtxBuilder::new()
         .args(&["gettimeofday".to_owned()])
         .unwrap()
@@ -107,6 +114,7 @@ fn gettimeofday() {
 
 #[test]
 fn getentropy() {
+    init_tracing();
     let ctx = WasiCtxBuilder::new()
         .args(&["getentropy".to_owned()])
         .unwrap()
@@ -120,6 +128,7 @@ fn getentropy() {
 
 #[test]
 fn stdin() {
+    init_tracing();
     let stdin = wasi_common::pipe::ReadPipe::from("hello from stdin!");
 
     let ctx = WasiCtxBuilder::new()
@@ -135,6 +144,7 @@ fn stdin() {
 
 #[test]
 fn preopen_populates() {
+    init_tracing();
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
@@ -156,6 +166,7 @@ fn preopen_populates() {
 
 #[test]
 fn write_file() {
+    init_tracing();
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
@@ -212,6 +223,7 @@ fn read_file() {
 
 #[test]
 fn read_file_twice() {
+    init_tracing();
     const MESSAGE: &str = "hello from file!";
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
     tmpdir.create_dir("preopen").unwrap();
@@ -240,6 +252,7 @@ fn read_file_twice() {
 
 #[test]
 fn cant_dotdot() {
+    init_tracing();
     const MESSAGE: &str = "hello from file!";
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
     tmpdir.create_dir("preopen").unwrap();
@@ -265,6 +278,7 @@ fn cant_dotdot() {
 
 #[test]
 fn notdir() {
+    init_tracing();
     const MESSAGE: &str = "hello from file!";
 
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
@@ -293,6 +307,7 @@ fn notdir() {
 
 #[test]
 fn follow_symlink() {
+    init_tracing();
     const MESSAGE: &str = "hello from file!";
 
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
@@ -329,6 +344,7 @@ fn follow_symlink() {
 
 #[test]
 fn symlink_loop() {
+    init_tracing();
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
@@ -358,6 +374,7 @@ fn symlink_loop() {
 
 #[test]
 fn symlink_escape() {
+    init_tracing();
     const MESSAGE: &str = "hello from file!";
 
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
@@ -390,6 +407,7 @@ fn symlink_escape() {
 
 #[test]
 fn pseudoquine() {
+    init_tracing();
     let examples_dir = Path::new(LUCET_WASI_ROOT).join("examples");
     let pseudoquine_c = examples_dir.join("pseudoquine.c");
 
@@ -416,6 +434,7 @@ fn pseudoquine() {
 #[ignore]
 #[test]
 fn poll() {
+    init_tracing();
     let ctx = WasiCtxBuilder::new().args(&["poll".to_owned()]).unwrap();
     let exitcode = run_with_null_stdin("poll.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
@@ -423,6 +442,7 @@ fn poll() {
 
 #[test]
 fn stat() {
+    init_tracing();
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
@@ -440,6 +460,7 @@ fn stat() {
 
 #[test]
 fn fs() {
+    init_tracing();
     let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
@@ -448,9 +469,21 @@ fn fs() {
         .args(&["stat".to_owned()])
         .unwrap()
         .preopened_dir(preopen_dir, "/sandbox")
-        .unwrap()
-        .build()
         .unwrap();
-    let exitcode = run("fs.c", ctx).unwrap();
+    let (exitcode, _) = run_with_stdout("fs.c", ctx).unwrap();
+    assert_eq!(exitcode, 0);
+}
+
+#[test]
+fn readdir() {
+    init_tracing();
+    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    tmpdir.create_dir("preopen").unwrap();
+    let preopen_dir = tmpdir.open_dir("preopen").unwrap();
+
+    let ctx = WasiCtxBuilder::new()
+        .preopened_dir(preopen_dir, "/sandbox")
+        .unwrap();
+    let (exitcode, _) = run_with_stdout("readdir.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 }
