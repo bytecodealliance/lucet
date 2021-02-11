@@ -1,13 +1,14 @@
-use crate::error::Error;
 use crate::instance::{InstanceHandle, InternalRunResult, RunResult, State, TerminationDetails};
 use crate::module::FunctionHandle;
-use crate::val::{UntypedRetVal, Val};
+use crate::val::Val;
 use crate::vmctx::{Vmctx, VmctxInternal};
-use std::future::Future;
+use crate::{error::Error, instance::EmptyYieldVal};
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 use std::task::Waker;
+use std::{any::Any, future::Future};
 
 /// a representation of AsyncContext which can be freely cloned
 #[doc(hidden)]
@@ -19,9 +20,6 @@ pub struct AsyncContext {
 const DEFAULT_INST_COUNT_BOUND: u64 = i64::MAX as u64;
 
 /// A value representing that the guest instance yielded because it was blocked on a future.
-///
-/// In the future, we could provide a value from the guest that can be accessed before resuming the future,
-/// such as if we wanted to do something from the host context.
 struct AsyncYielded;
 
 /// Providing the private `AsyncResume` as a resume value certifies that
@@ -81,10 +79,10 @@ impl Vmctx {
 
         loop {
             // Get the AsyncContext, or die if we aren't async
-            let cx = match &self.instance().state {
+            let arc_cx = match &self.instance().state {
                 State::Running {
                     async_context: Some(cx),
-                } => cx,
+                } => cx.clone(),
                 State::Running {
                     async_context: None,
                 } => return Err(BlockOnError::NeedsAsyncContext),
@@ -92,13 +90,29 @@ impl Vmctx {
             };
 
             // build an std::task::Context
-            let mut cx = Context::from_waker(&cx.waker);
+            let mut cx = Context::from_waker(&arc_cx.waker);
 
             match f.as_mut().poll(&mut cx) {
                 Poll::Ready(ret) => return Ok(ret),
                 Poll::Pending => {
                     // The future is pending, so we need to yield to the async executor
                     self.yield_impl::<AsyncYielded, AsyncResume>(AsyncYielded, false, false);
+
+                    // Check that the async context hasn't changed (this could happen if the instance yielded)
+                    match &self.instance().state {
+                        State::Running { async_context: Some(new_cx) } => {
+                            let same_waker = Arc::ptr_eq(&arc_cx, &new_cx) || arc_cx.waker.will_wake(&new_cx.waker);
+
+                            if !same_waker {
+                                // The AsyncContext changed on us. This is because the instance is running from a new RunAsync.
+                                // This probably happened because the instance yielded and was resumed up by `resume_async`.
+                                //
+                                // Poll the future again before yielding to the executor in order to register the new waker.
+                                continue;
+                            }
+                        },
+                        _ => panic!("Lucet instance blocked on a future, but no longer running in async context. Make sure to use resume_async when resuming an async guest.")
+                    }
 
                     // Providing the private `AsyncResume` as a resume value certifies that
                     // RunAsync upheld the invarriants necessary for us to avoid a borrow check.
@@ -132,12 +146,6 @@ impl InstanceHandle {
     ///
     /// If `runtime_bound` is provided, it will also pause the Wasm execution and yield a future
     /// that resumes it after (approximately) that many Wasm opcodes have executed.
-    ///
-    /// # `Vmctx` Restrictions
-    ///
-    /// This method permits the use of async hostcalls, but disallows all other uses of `Vmctx::
-    /// yield_val_expecting_val` and family (`Vmctx::yield_`, `Vmctx::yield_expecting_val`,
-    /// `Vmctx::yield_val`).
     pub fn run_async<'a>(&'a mut self, entrypoint: &'a str, args: &'a [Val]) -> RunAsync<'a> {
         let func = self.module.get_export_func(entrypoint);
 
@@ -177,6 +185,34 @@ impl InstanceHandle {
         };
 
         self.run_async_internal(func, &[])
+    }
+
+    /// Resume async execution of an instance that has yielded, optionally providing a value to the guest.
+    ///
+    /// If an async execution context yields from within a future, resuming with [`Instance::resume()`],
+    /// [`Instance::resume_with_val()`], may panic if the instance needs to block on an async function.
+    /// Use this function instead, which will resume the instance within an async context.
+    ///
+    /// The provided value will be dynamically typechecked against the type the guest expects to
+    /// receive, and if that check fails, this call will fail with `Error::InvalidArgument`.
+    ///
+    /// See [`Instance::resume()`], [`Instance::resume_with_val()`], and [`Instance::run_async()`].
+    ///
+    /// # Safety
+    ///
+    /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
+    /// applies.
+    pub fn resume_async<'a>(&'a mut self, val: Option<impl Any + 'static + Send>) -> RunAsync<'a> {
+        let val = match val {
+            Some(val) => Box::new(val) as Box<dyn Any + 'static + Send>,
+            None => Box::new(EmptyYieldVal),
+        };
+
+        RunAsync {
+            inst: self,
+            inst_count_bound: DEFAULT_INST_COUNT_BOUND,
+            state: RunAsyncState::ResumeYielded(val),
+        }
     }
 
     /// Returns a `RunAsync` that will asynchronously execute the guest instnace.
@@ -248,19 +284,13 @@ impl<'a> RunAsync<'a> {
 
 enum RunAsyncState<'a> {
     Start(FunctionHandle, &'a [Val]),
-    /// The instance is currently blocked on a future.
-    ///
-    /// We keep the async yielded around - although the value of AsyncYielded isn't used for
-    /// anything, there's not much additional overhead in keeping it around, and it gives us
-    /// the option to pass data from the yield and potentially add other types of execution
-    /// in the future (such as bringing back host-context future execution).
-    BlockedOnFuture(Box<AsyncYielded>),
+    ResumeYielded(Box<dyn Any + 'static + Send>),
     BoundExpired,
     Failed(Error),
 }
 
 impl<'a> Future for RunAsync<'a> {
-    type Output = Result<UntypedRetVal, Error>;
+    type Output = Result<RunResult, Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let inst_count_bound = self.inst_count_bound;
@@ -280,30 +310,24 @@ impl<'a> Future for RunAsync<'a> {
                 self.inst
                     .run_func(func, args, Some(cx), Some(inst_count_bound))
             }
-            RunAsyncState::BlockedOnFuture(_) => {
-                // Resume the instance and poll the future
+            RunAsyncState::ResumeYielded(val) => {
                 self.inst
-                    .resume_with_val_impl(AsyncResume, Some(cx), Some(inst_count_bound))
+                    .resume_with_val_impl(val, Some(cx), Some(inst_count_bound))
             }
             RunAsyncState::BoundExpired => self.inst.resume_bounded(cx, inst_count_bound),
             RunAsyncState::Failed(err) => Err(err),
         };
 
         let res = match run_result {
-            Ok(InternalRunResult::Normal(RunResult::Returned(rval))) => Ok(rval),
+            Ok(InternalRunResult::Normal(r @ RunResult::Returned(_))) => Ok(r),
             Ok(InternalRunResult::Normal(RunResult::Yielded(yval))) => {
                 match yval.downcast::<AsyncYielded>() {
-                    Ok(ye) => {
-                        self.state = RunAsyncState::BlockedOnFuture(ye);
+                    Ok(_) => {
+                        // When this future is polled next, we'll resume the guest instance using `AsyncResume`
+                        self.state = RunAsyncState::ResumeYielded(Box::new(AsyncResume));
                         return Poll::Pending;
                     }
-                    Err(_) => {
-                        // Any other yielded value is not supported - die with an error.
-                        Err(Error::Unsupported(
-                            "cannot yield anything besides a future in Instance::run_async"
-                                .to_owned(),
-                        ))
-                    }
+                    Err(yval) => Ok(RunResult::Yielded(yval)),
                 }
             }
             Ok(InternalRunResult::BoundExpired) => {

@@ -24,7 +24,6 @@ use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
 use std::convert::TryFrom;
-use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
@@ -562,19 +561,21 @@ impl Instance {
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
-        Ok(self.resume_with_val_impl(val, None, None)?.unwrap())
+        Ok(self
+            .resume_with_val_impl(Box::new(val), None, None)?
+            .unwrap())
     }
 
-    pub(crate) fn resume_with_val_impl<A: Any + 'static>(
+    pub(crate) fn resume_with_val_impl(
         &mut self,
-        val: A,
+        val: Box<dyn Any + 'static>,
         async_context: Option<AsyncContext>,
         max_insn_count: Option<u64>,
     ) -> Result<InternalRunResult, Error> {
         match &self.state {
             State::Yielded { expecting, .. } => {
                 // make sure the resumed value is of the right type
-                if !expecting.is::<PhantomData<A>>() {
+                if &(*val).type_id() != expecting {
                     return Err(Error::InvalidArgument(
                         "type mismatch between yielded instance expected value and resumed value",
                     ));
@@ -583,7 +584,7 @@ impl Instance {
             _ => return Err(Error::InvalidArgument("can only resume a yielded instance")),
         }
 
-        self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static>);
+        self.resumed_val = Some(val);
 
         self.set_instruction_bound_delta(max_insn_count);
         self.swap_and_return(async_context)
@@ -1208,7 +1209,9 @@ impl Instance {
                 || self.state.is_bound_expired()
         );
 
-        self.state = State::Running { async_context };
+        self.state = State::Running {
+            async_context: async_context.map(|cx| Arc::new(cx)),
+        };
 
         let res = self.with_current_instance(|i| {
             i.with_signals_on(|i| {
