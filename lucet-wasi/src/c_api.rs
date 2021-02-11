@@ -27,15 +27,18 @@ pub unsafe extern "C" fn lucet_wasi_ctx_args(
     assert_nonnull!(wasi_ctx);
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
     let args_raw = std::slice::from_raw_parts(argv, argc);
-    let args: Result<Vec<&str>, _> = args_raw
+    let args: Result<Vec<String>, std::str::Utf8Error> = args_raw
         .iter()
-        .map(|arg| CStr::from_ptr(*arg).to_str())
+        .map(|arg| Ok(CStr::from_ptr(*arg).to_str()?.to_owned()))
         .collect();
     let args = match args {
         Ok(args) => args,
         Err(_) => return lucet_error::InvalidArgument,
     };
-    b.args(args.iter());
+    *b = match b.args(&args) {
+        Ok(b) => b,
+        Err(_) => return lucet_error::InvalidArgument,
+    };
     Box::into_raw(b);
     lucet_error::Ok
 }
@@ -44,7 +47,10 @@ pub unsafe extern "C" fn lucet_wasi_ctx_args(
 pub unsafe extern "C" fn lucet_wasi_ctx_inherit_env(wasi_ctx: *mut lucet_wasi_ctx) -> lucet_error {
     assert_nonnull!(wasi_ctx);
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
-    b.inherit_env();
+    *b = match b.inherit_env() {
+        Ok(b) => b,
+        Err(_) => return lucet_error::InvalidArgument,
+    };
     Box::into_raw(b);
     lucet_error::Ok
 }
@@ -55,7 +61,7 @@ pub unsafe extern "C" fn lucet_wasi_ctx_inherit_stdio(
 ) -> lucet_error {
     assert_nonnull!(wasi_ctx);
     let mut b = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
-    b.inherit_stdio();
+    *b = b.inherit_stdio();
     Box::into_raw(b);
     lucet_error::Ok
 }
@@ -78,7 +84,7 @@ pub unsafe extern "C" fn lucet_region_new_instance_with_wasi_ctx(
     assert_nonnull!(wasi_ctx);
     assert_nonnull!(inst_out);
     with_ffi_arcs!([region: dyn Region, module: DlModule], {
-        let mut wasi_ctx = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
+        let wasi_ctx = Box::from_raw(wasi_ctx as *mut WasiCtxBuilder);
         region
             .new_instance_builder(module.clone() as Arc<dyn Module>)
             .with_embed_ctx(wasi_ctx.build())

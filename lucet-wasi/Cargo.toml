@@ -24,14 +24,17 @@ libc = "0.2.65"
 nix = "0.17"
 rand = "0.6"
 wasi-common = { path = "../wasmtime/crates/wasi-common", version = "0.22.0", default-features = false,  features = ["wiggle_metadata"] }
+wasi-cap-std-sync = { path = "../wasmtime/crates/wasi-common/cap-std-sync", version = "0.22.0"}
 wiggle = { path = "../wasmtime/crates/wiggle", version = "0.22.0" }
 tracing = "0.1.19"
 tracing-subscriber = "0.2.0"
+cap-std = "0.13"
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 lucetc = { path = "../lucetc" }
 tempfile = "3.0"
+cap-tempfile = "0.13"
 
 [lib]
 name = "lucet_wasi"

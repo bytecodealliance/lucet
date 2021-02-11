@@ -193,7 +193,7 @@ impl CpuFeatures {
         use TargetCpu::*;
 
         let mut isa_builder = if let Native = self.cpu {
-            cranelift_native::builder_with_backend_variant(variant).map_err(|_| {
+            cranelift_native::builder_with_options(variant, false).map_err(|_| {
                 Error::Unsupported("host machine is not a supported target".to_string())
             })
         } else {

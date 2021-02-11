@@ -4,10 +4,10 @@
 extern crate clap;
 
 use anyhow::{format_err, Error};
+use cap_std::fs::Dir;
 use clap::Arg;
 use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region, RunResult};
 use lucet_wasi::{self, types::Exitcode, WasiCtxBuilder};
-use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
@@ -17,7 +17,7 @@ struct Config<'a> {
     lucet_module: &'a str,
     guest_args: Vec<&'a str>,
     entrypoint: &'a str,
-    preopen_dirs: Vec<(File, &'a str)>,
+    preopen_dirs: Vec<(Dir, &'a str)>,
     limits: Limits,
     timeout: Option<Duration>,
     verify: bool,
@@ -137,7 +137,7 @@ fn main() {
                 if let [host_path, guest_path] =
                     preopen_dir.split(':').collect::<Vec<&str>>().as_slice()
                 {
-                    let host_dir = File::open(host_path).unwrap();
+                    let host_dir = unsafe { Dir::open_ambient_dir(host_path) }.unwrap();
                     (host_dir, *guest_path)
                 } else {
                     println!("Invalid directory specification: {}", preopen_dir);
@@ -230,19 +230,19 @@ fn run(config: Config<'_>) {
             .expect("region can be created");
 
         // put the path to the module on the front for argv[0]
-        let args = std::iter::once(config.lucet_module)
-            .chain(config.guest_args.into_iter())
-            .collect::<Vec<&str>>();
-        let mut ctx = WasiCtxBuilder::new();
-        ctx.args(args.iter());
-        ctx.inherit_stdio();
-        ctx.inherit_env();
+        let args = std::iter::once(config.lucet_module.to_owned())
+            .chain(config.guest_args.into_iter().map(|s| s.to_owned()))
+            .collect::<Vec<String>>();
+        let mut builder = WasiCtxBuilder::new();
+        builder = builder.args(&args).expect("add args to WasiCtx");
+        builder = builder.inherit_stdio();
+        builder = builder.inherit_env().expect("inherit env");
         for (dir, guest_path) in config.preopen_dirs {
-            ctx.preopened_dir(dir, guest_path);
+            builder = builder.preopened_dir(dir, guest_path).expect("preopen dir");
         }
         let mut inst = region
             .new_instance_builder(module as Arc<dyn Module>)
-            .with_embed_ctx(ctx.build().expect("WASI ctx can be created"))
+            .with_embed_ctx(builder.build().expect("WASI ctx can be created"))
             .build()
             .expect("instance can be created");
 
