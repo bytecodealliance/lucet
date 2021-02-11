@@ -8,9 +8,12 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 pub fn init_tracing() {
-    tracing_subscriber::FmtSubscriber::builder()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        tracing_subscriber::FmtSubscriber::builder()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .init()
+    })
 }
 
 pub const LUCET_WASI_ROOT: &str = env!("CARGO_MANIFEST_DIR");
