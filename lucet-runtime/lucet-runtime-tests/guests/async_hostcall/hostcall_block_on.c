@@ -22,3 +22,9 @@ int yielding()
 
     return 0;
 }
+
+int manual_future()
+{
+    await_manual_future();
+    return 0;
+}
