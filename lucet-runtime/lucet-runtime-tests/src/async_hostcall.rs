@@ -14,7 +14,6 @@ macro_rules! async_hostcall_tests {
         #[lucet_hostcall]
         #[no_mangle]
         pub fn hostcall_containing_yielding_block_on(vmctx: &Vmctx, times: u32) {
-
             struct YieldingFuture { times: u32 }
 
             impl Future for YieldingFuture {
@@ -34,6 +33,36 @@ macro_rules! async_hostcall_tests {
             }
 
             vmctx.block_on(YieldingFuture { times });
+        }
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub async fn hostcall_async_containing_yielding_block_on(vmctx: &Vmctx, times: u32, times_double: u32) -> u32 {
+            assert_eq!(times * 2, times_double);
+
+            struct YieldingFuture { times: u32 }
+
+            impl Future for YieldingFuture {
+                type Output = ();
+
+                fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+                    if self.times == 0 {
+                        return std::task::Poll::Ready(())
+                    } else {
+                        self.get_mut().times -= 1;
+
+                        cx.waker().wake_by_ref();
+
+                        return std::task::Poll::Pending
+                    }
+                }
+            }
+
+            for i in 0..times {
+                YieldingFuture { times: 2 }.await
+            }
+
+            return times * 2;
         }
 
         $(
