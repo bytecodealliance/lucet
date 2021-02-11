@@ -3,9 +3,8 @@ use lucet_wiggle::{GuestError, GuestPtr};
 use std::cell::Ref;
 use std::convert::TryInto;
 use tracing::debug;
-use wasi_common::wasi::wasi_snapshot_preview1::WasiSnapshotPreview1;
-use wasi_common::Error;
-use wasi_common::WasiCtx;
+use wasi_common::snapshots::preview_1::wasi_snapshot_preview1::WasiSnapshotPreview1;
+use wasi_common::{Error, WasiCtx};
 
 lucet_wasi_generate::bindings!({
     // The context type, which we will implement the GuestErrorConversion and
@@ -20,7 +19,7 @@ lucet_wasi_generate::bindings!({
 });
 
 pub mod types {
-    pub use wasi_common::wasi::types::*;
+    pub use wasi_common::snapshots::preview_1::types::*;
 }
 
 pub fn export_wasi_funcs() {
@@ -48,6 +47,7 @@ impl<'a> types::UserErrorConversion for LucetWasiCtx<'a> {
     fn errno_from_error(&self, e: Error) -> Result<types::Errno, lucet_wiggle::Trap> {
         debug!("Error: {:?}", e);
         e.try_into()
+            .map_err(|e| lucet_wiggle::Trap::String(format!("{:?}", e)))
     }
 }
 
@@ -342,12 +342,12 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
         self.wasi().proc_exit(rval)
     }
 
-    fn proc_raise(&self, _sig: types::Signal) -> Result<(), Error> {
-        Err(Error::Inval)
+    fn proc_raise(&self, sig: types::Signal) -> Result<(), Error> {
+        self.wasi().proc_raise(sig)
     }
 
     fn sched_yield(&self) -> Result<(), Error> {
-        Ok(())
+        self.wasi().sched_yield()
     }
 
     fn random_get(&self, buf: &GuestPtr<u8>, buf_len: types::Size) -> Result<(), Error> {
@@ -356,23 +356,23 @@ impl<'a> wasi_snapshot_preview1::WasiSnapshotPreview1 for LucetWasiCtx<'a> {
 
     fn sock_recv(
         &self,
-        _fd: types::Fd,
-        _ri_data: &types::IovecArray<'_>,
-        _ri_flags: types::Riflags,
+        fd: types::Fd,
+        ri_data: &types::IovecArray<'_>,
+        ri_flags: types::Riflags,
     ) -> Result<(types::Size, types::Roflags), Error> {
-        Err(Error::Inval)
+        self.wasi().sock_recv(fd, ri_data, ri_flags)
     }
 
     fn sock_send(
         &self,
-        _fd: types::Fd,
-        _si_data: &types::CiovecArray<'_>,
-        _si_flags: types::Siflags,
+        fd: types::Fd,
+        si_data: &types::CiovecArray<'_>,
+        si_flags: types::Siflags,
     ) -> Result<types::Size, Error> {
-        Err(Error::Inval)
+        self.wasi().sock_send(fd, si_data, si_flags)
     }
 
-    fn sock_shutdown(&self, _fd: types::Fd, _how: types::Sdflags) -> Result<(), Error> {
-        Err(Error::Inval)
+    fn sock_shutdown(&self, fd: types::Fd, how: types::Sdflags) -> Result<(), Error> {
+        self.wasi().sock_shutdown(fd, how)
     }
 }

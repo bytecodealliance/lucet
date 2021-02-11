@@ -376,13 +376,11 @@ fn run_with_stdout<P: AsRef<Path>>(
     tmpdir: &TempDir,
     path: P,
 ) -> Result<(Exitcode, Vec<u8>), Error> {
-    let mut ctx = WasiCtxBuilder::new();
-    ctx.args(&["gen"]);
-
-    let stdout = wasi_common::virtfs::pipe::WritePipe::new_in_memory();
-    ctx.stdout(stdout.clone());
-
-    let ctx = ctx.build()?;
+    let stdout = wasi_common::pipe::WritePipe::new_in_memory();
+    let ctx = WasiCtxBuilder::new()
+        .args(&["gen".to_owned()])?
+        .stdout(Box::new(stdout.clone()))
+        .build()?;
 
     let exitcode = run(tmpdir, path, ctx)?;
 

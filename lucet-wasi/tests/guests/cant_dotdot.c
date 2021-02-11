@@ -6,7 +6,7 @@ int main()
 {
     FILE *file = fopen("/sandbox/../outside.txt", "r");
     assert(file == NULL);
-    assert(errno == ENOTCAPABLE);
+    assert(errno == EPERM);
 
     return 0;
 }
