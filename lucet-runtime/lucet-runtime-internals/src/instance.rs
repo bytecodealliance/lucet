@@ -603,7 +603,7 @@ impl Instance {
     pub(crate) fn resume_bounded(
         &mut self,
         async_context: AsyncContext,
-        max_insn_count: u64
+        max_insn_count: u64,
     ) -> Result<InternalRunResult, Error> {
         if !self.state.is_bound_expired() {
             return Err(Error::InvalidArgument(
