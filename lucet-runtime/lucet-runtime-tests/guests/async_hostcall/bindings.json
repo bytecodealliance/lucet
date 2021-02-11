@@ -1,6 +1,7 @@
 {
     "env": {
         "hostcall_containing_block_on": "hostcall_containing_block_on",
-        "hostcall_containing_yielding_block_on": "hostcall_containing_yielding_block_on"
+        "hostcall_containing_yielding_block_on": "hostcall_containing_yielding_block_on",
+        "hostcall_async_containing_yielding_block_on": "hostcall_async_containing_yielding_block_on"
     }
 }
