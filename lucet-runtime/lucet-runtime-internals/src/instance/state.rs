@@ -1,10 +1,9 @@
-use crate::instance::siginfo_ext::SiginfoExt;
 use crate::instance::{FaultDetails, TerminationDetails, YieldedVal};
 use crate::sysdeps::UContext;
+use crate::{future::AsyncContext, instance::siginfo_ext::SiginfoExt};
 use libc::{SIGBUS, SIGSEGV};
+use std::any::Any;
 use std::ffi::{CStr, CString};
-use std::task;
-use std::{any::Any, cell::RefCell};
 
 /// The representation of a Lucet instance's state machine.
 pub enum State {
@@ -26,10 +25,7 @@ pub enum State {
     Running {
         /// Indicates whether the instance is running in an async context (`Instance::run_async`)
         /// or not. Needed by `Vmctx::block_on`.
-        ///
-        /// Safety: the context must be valid for as long as the instance remains in the running state
-        /// The logic in swap_and_return guarantees this.
-        async_context: Option<RefCell<&'static mut task::Context<'static>>>,
+        async_context: Option<AsyncContext>,
     },
 
     /// The instance has faulted, potentially fatally.

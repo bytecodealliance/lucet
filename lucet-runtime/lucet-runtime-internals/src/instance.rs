@@ -7,7 +7,6 @@ pub use crate::instance::execution::{KillError, KillState, KillSuccess, KillSwit
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 pub use crate::instance::state::State;
 
-use crate::alloc::Alloc;
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
@@ -18,9 +17,9 @@ use crate::region::RegionInternal;
 use crate::sysdeps::HOST_PAGE_SIZE_EXPECTED;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
+use crate::{alloc::Alloc, future::AsyncContext};
 use libc::{c_void, pthread_self, siginfo_t, uintptr_t};
 use lucet_module::InstanceRuntimeData;
-use mem::transmute;
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
@@ -30,7 +29,6 @@ use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
-use std::task;
 
 pub const LUCET_INSTANCE_MAGIC: u64 = 746_932_922;
 
@@ -570,7 +568,7 @@ impl Instance {
     pub(crate) fn resume_with_val_impl<A: Any + 'static>(
         &mut self,
         val: A,
-        async_context: Option<&mut task::Context<'_>>,
+        async_context: Option<AsyncContext>,
         max_insn_count: Option<u64>,
     ) -> Result<InternalRunResult, Error> {
         match &self.state {
@@ -604,7 +602,8 @@ impl Instance {
     /// applies.
     pub(crate) fn resume_bounded(
         &mut self,
-        max_insn_count: u64,
+        async_context: AsyncContext,
+        max_insn_count: u64
     ) -> Result<InternalRunResult, Error> {
         if !self.state.is_bound_expired() {
             return Err(Error::InvalidArgument(
@@ -612,7 +611,7 @@ impl Instance {
             ));
         }
         self.set_instruction_bound_delta(Some(max_insn_count));
-        self.swap_and_return(None)
+        self.swap_and_return(Some(async_context))
     }
 
     /// Run the module's [start function][start], if one exists.
@@ -1092,7 +1091,7 @@ impl Instance {
         &mut self,
         func: FunctionHandle,
         args: &[Val],
-        async_context: Option<&mut task::Context<'_>>,
+        async_context: Option<AsyncContext>,
         inst_count_bound: Option<u64>,
     ) -> Result<InternalRunResult, Error> {
         let needs_start = self.state.is_not_started() && !func.is_start_func;
@@ -1193,9 +1192,9 @@ impl Instance {
     /// This must only be called for an instance in a ready, non-fatally faulted, or yielded state,
     /// or in the not-started state on the start function. The public wrappers around this function
     /// should make sure the state is appropriate.
-    fn swap_and_return(
+    fn swap_and_return<'a>(
         &mut self,
-        async_context: Option<&mut task::Context<'_>>,
+        async_context: Option<AsyncContext>,
     ) -> Result<InternalRunResult, Error> {
         let is_start_func = self
             .entrypoint
@@ -1209,17 +1208,7 @@ impl Instance {
                 || self.state.is_bound_expired()
         );
 
-        self.state = State::Running {
-            async_context: async_context.map(|ctx| {
-                // SAFETY: We have to lie about the lifetime of async_context to pass it into the instance.
-                // As State::Running will only last for as long as this function's lifespan, this is safe.
-                let ctx = unsafe {
-                    transmute::<&mut task::Context<'_>, &'static mut task::Context<'static>>(ctx)
-                };
-
-                RefCell::new(ctx)
-            }),
-        };
+        self.state = State::Running { async_context };
 
         let res = self.with_current_instance(|i| {
             i.with_signals_on(|i| {
