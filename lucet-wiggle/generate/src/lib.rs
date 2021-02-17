@@ -71,17 +71,7 @@ pub fn generate(
                     { #post_hook }
                     match r {
                         Ok(r) => { r },
-                        Err(wiggle::Trap::String(s)) => { lucet_runtime::lucet_hostcall_terminate!(s); }
-                        // I apologize for this load-bearing `as u32`.
-                        // Wasi uses an u32 for the proc_exit status (`lucet_wasi::Exitcode`) in
-                        // the witx. However, wasmtime::Trap exit status is an i32, so the
-                        // wiggle::Trap::I32Exit variant mirrors Wasmtime. The value passed to
-                        // lucet_hostcall_terminate gets Any-downcast back to an
-                        // `lucet_wasi::Exitcode` when inspected in Wasi embeddings.
-                        // On the upside, one day all of this code will be deleted and these sins
-                        // will be washed away.
-                        Err(wiggle::Trap::I32Exit(e)) => {
-                            lucet_runtime::lucet_hostcall_terminate!(e as u32); }
+                        Err(trap) => { lucet_runtime::lucet_hostcall_terminate!(trap); }
                     }
                 }
             }
