@@ -18,6 +18,8 @@
 
 - Added `terminate_on_heap_oom` as an option for instances. This causes instances to terminate with an OOM-specific termination value rather than returning `-1` when a `memory.grow` instruction fails.
 
+- Lucet will no longer try to translate `wiggle::Trap` to primitives for `lucet_hostcall_terminate!`. Instead, the underlying `wiggle::Trap` is passed directly to the embedder.
+
 [start-function]: https://webassembly.github.io/spec/core/syntax/modules.html#syntax-start
 
 ### 0.6.1 (2020-02-18)
