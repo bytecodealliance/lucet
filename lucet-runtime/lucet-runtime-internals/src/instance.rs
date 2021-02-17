@@ -1429,7 +1429,10 @@ pub enum TerminationDetails {
     /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
     BorrowError(&'static str),
     /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
-    Provided(Box<dyn Any + 'static>),
+    Provided {
+        type_name: &'static str,
+        provided: Box<dyn Any + 'static>,
+    },
     /// The instance was terminated by its `KillSwitch`.
     Remote,
     /// A panic occurred during a hostcall other than the specialized panic used to implement
@@ -1463,11 +1466,14 @@ pub enum TerminationDetails {
 
 impl TerminationDetails {
     pub fn provide<A: Any + 'static>(details: A) -> Self {
-        TerminationDetails::Provided(Box::new(details))
+        TerminationDetails::Provided {
+            type_name: std::any::type_name::<A>(),
+            provided: Box::new(details),
+        }
     }
     pub fn provided_details(&self) -> Option<&dyn Any> {
         match self {
-            TerminationDetails::Provided(a) => Some(a.as_ref()),
+            TerminationDetails::Provided { provided, .. } => Some(provided.as_ref()),
             _ => None,
         }
     }
@@ -1508,7 +1514,7 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::BorrowError(msg) => write!(f, "BorrowError({})", msg),
             TerminationDetails::CtxNotFound => write!(f, "CtxNotFound"),
             TerminationDetails::YieldTypeMismatch => write!(f, "YieldTypeMismatch"),
-            TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
+            TerminationDetails::Provided { type_name, .. } => write!(f, "Provided({})", type_name),
             TerminationDetails::Remote => write!(f, "Remote"),
             TerminationDetails::OtherPanic(_) => write!(f, "OtherPanic(Any)"),
             TerminationDetails::BlockOnNeedsAsync => write!(f, "BlockOnNeedsAsync"),

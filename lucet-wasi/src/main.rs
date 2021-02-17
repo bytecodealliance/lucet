@@ -264,8 +264,8 @@ fn run(config: Config<'_>) {
             // none of the WASI hostcalls use yield yet, so this shouldn't happen
             Ok(RunResult::Yielded(_)) => panic!("lucet-wasi unexpectedly yielded"),
             Err(lucet_runtime::Error::RuntimeTerminated(
-                lucet_runtime::TerminationDetails::Provided(any),
-            )) => *any
+                lucet_runtime::TerminationDetails::Provided { provided, .. },
+            )) => *provided
                 .downcast_ref::<Exitcode>()
                 .expect("termination yields an exitcode"),
             Err(lucet_runtime::Error::RuntimeTerminated(

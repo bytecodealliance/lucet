@@ -102,8 +102,8 @@ pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<Exitcode, Error> {
         // normal termination implies 0 exit code
         Ok(_) => Ok(0),
         Err(lucet_runtime::Error::RuntimeTerminated(
-            lucet_runtime::TerminationDetails::Provided(any),
-        )) => Ok(*any
+            lucet_runtime::TerminationDetails::Provided { provided, .. },
+        )) => Ok(*provided
             .downcast_ref::<Exitcode>()
             .expect("termination yields an exitcode")),
         Err(e) => bail!("runtime error: {}", e),
