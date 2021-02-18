@@ -268,11 +268,10 @@ fn run(config: Config<'_>) {
             )) => {
                 println!("Terminated via remote kill switch (likely a timeout)");
                 std::u32::MAX
-            },
-            Err(lucet_runtime::Error::RuntimeTerminated(details)) => {
-                details.as_exitcode()
-                .expect("termination yields an exitcode")
-            },
+            }
+            Err(lucet_runtime::Error::RuntimeTerminated(details)) => details
+                .as_exitcode()
+                .expect("termination yields an exitcode"),
             Err(e) => panic!("lucet-wasi runtime error: {}", e),
         }
     };
