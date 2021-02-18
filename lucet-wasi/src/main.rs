@@ -7,7 +7,7 @@ use anyhow::{format_err, Error};
 use cap_std::fs::Dir;
 use clap::Arg;
 use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region, RunResult};
-use lucet_wasi::{self, types::Exitcode, WasiCtxBuilder};
+use lucet_wasi::{self, WasiCtxBuilder};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
@@ -264,16 +264,14 @@ fn run(config: Config<'_>) {
             // none of the WASI hostcalls use yield yet, so this shouldn't happen
             Ok(RunResult::Yielded(_)) => panic!("lucet-wasi unexpectedly yielded"),
             Err(lucet_runtime::Error::RuntimeTerminated(
-                lucet_runtime::TerminationDetails::Provided(any),
-            )) => *any
-                .downcast_ref::<Exitcode>()
-                .expect("termination yields an exitcode"),
-            Err(lucet_runtime::Error::RuntimeTerminated(
                 lucet_runtime::TerminationDetails::Remote,
             )) => {
                 println!("Terminated via remote kill switch (likely a timeout)");
                 std::u32::MAX
             }
+            Err(lucet_runtime::Error::RuntimeTerminated(details)) => details
+                .as_exitcode()
+                .expect("termination yields an exitcode"),
             Err(e) => panic!("lucet-wasi runtime error: {}", e),
         }
     };

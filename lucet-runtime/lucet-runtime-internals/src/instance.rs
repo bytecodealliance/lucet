@@ -1471,6 +1471,29 @@ impl TerminationDetails {
             _ => None,
         }
     }
+    /// Try to interpret the termination details as a provided exit code.
+    ///
+    /// The most consistent form of `TerminationDetails::Provided` comes from Lucet's
+    /// implementation of `proc_exit`, which exits with a `Provided` holding the given exit code.
+    /// For cases where a Lucet user simply wants "`proc_exit` or continue panicking" behavior,
+    /// `as_exitcode` can simplify handling `TerminationDetails`.
+    pub fn as_exitcode(&self) -> Option<u32> {
+        match self {
+            TerminationDetails::Provided(a) => {
+                // I apologize for this load-bearing `as u32`.
+                // Wasi uses an u32 for the proc_exist status (`lucet_wasi::Exitcode`) in the
+                // witx. However, wasmtime::Trap exit status is an i32, so the
+                // wiggle::Trap::I32Exit variant mirrors Wasmtime. The `as u32` lets this method
+                // return a type equivalent to `lucet_wasi::Exitcode`, but users interested in the
+                // full range of `wiggle::Trap` will have to handle an i32 variant.
+                match a.downcast_ref::<wiggle::Trap>() {
+                    Some(wiggle::Trap::I32Exit(code)) => Some(*code as u32),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 // Because of deref coercions, the code above was tricky to get right-
