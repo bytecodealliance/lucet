@@ -1102,6 +1102,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "userfaultfd",
+ "wiggle",
 ]
 
 [[package]]

@@ -12,6 +12,7 @@ edition = "2018"
 [dependencies]
 lucet-module = { path = "../../lucet-module", version = "=0.7.0-dev" }
 lucet-runtime-macros = { path = "../lucet-runtime-macros", version = "=0.7.0-dev" }
+wiggle = { path = "../../wasmtime/crates/wiggle", version = "0.22.0" }
 
 anyhow = "1.0"
 bitflags = "1.0"
