@@ -70,7 +70,7 @@ impl Vmctx {
     ///    foobar().await
     /// }
     /// ```
-    /// 
+    ///
     /// Of course, we can only expose synchronous interfaces to Wasm guests. To implement
     /// async hostcalls, Lucet blocks guest execution while waiting the future to complete,
     /// yielding control of the thread back the async executor so that other tasks can make
@@ -97,7 +97,7 @@ impl Vmctx {
     /// `Err(BlockOnError::NeedsAsyncContext)`.
     pub fn try_block_on<R>(&self, mut f: impl Future<Output = R>) -> Result<R, BlockOnError> {
         // We pin the future to the stack (a requirement for being able to poll the future).
-        // By pinning to the stack instead of using `Box::pin`, we avoid heap allocations for 
+        // By pinning to the stack instead of using `Box::pin`, we avoid heap allocations for
         // immediately-ready futures.
         //
         // SAFETY: We must uphold the invariants of Pin, namely that future does not move until

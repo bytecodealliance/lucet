@@ -1,25 +1,25 @@
-
-
 use std::future::Future;
-use std::task::{Waker, Context, Poll};
 use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll, Waker};
 
 enum StubFutureInner {
     NeverPolled,
     Polled(Waker),
-    Ready
+    Ready,
 }
 #[derive(Clone)]
 pub struct StubFuture(Arc<Mutex<StubFutureInner>>);
 impl StubFuture {
-    pub fn new() -> Self { StubFuture(Arc::new(Mutex::new(StubFutureInner::NeverPolled))) }
+    pub fn new() -> Self {
+        StubFuture(Arc::new(Mutex::new(StubFutureInner::NeverPolled)))
+    }
     pub fn make_ready(&self) {
         let mut inner = self.0.lock().unwrap();
         match std::mem::replace(&mut *inner, StubFutureInner::Ready) {
             StubFutureInner::Polled(waker) => {
                 waker.wake();
             }
-            _ => panic!("never polled")
+            _ => panic!("never polled"),
         }
     }
 }
@@ -39,7 +39,6 @@ impl Future for StubFuture {
         }
     }
 }
-
 
 #[macro_export]
 macro_rules! async_hostcall_tests {
@@ -232,8 +231,8 @@ macro_rules! async_hostcall_tests {
                                 "manual_future",
                                 &[]
                             ));
-                    
-                    if let Ok(RunResult::Yielded(_)) = run_res { /* expected */ } else { panic!("did not yield"); } 
+
+                    if let Ok(RunResult::Yielded(_)) = run_res { /* expected */ } else { panic!("did not yield"); }
 
                     // The loop within try_block_on polled the future returned by await_manual_future,
                     // and the waker that will be passed to poll `manuall_future` is from the old
@@ -249,8 +248,8 @@ macro_rules! async_hostcall_tests {
                     });
 
                     let run_res = futures_executor::block_on(inst.resume_async());
-                    
-                    if let Ok(RunResult::Returned(_)) = run_res { /* expected */ } else { panic!("did not return"); } 
+
+                    if let Ok(RunResult::Returned(_)) = run_res { /* expected */ } else { panic!("did not return"); }
                 }
             }
         )*
