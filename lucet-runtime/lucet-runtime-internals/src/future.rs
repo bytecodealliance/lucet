@@ -23,7 +23,7 @@ const DEFAULT_INST_COUNT_BOUND: u64 = i64::MAX as u64;
 struct AsyncYielded;
 
 /// Providing the private `AsyncResume` as a resume value certifies that
-/// RunAsync upheld the invarriants necessary to safely resume the instance.
+/// RunAsync upheld the invariants necessary to safely resume the instance.
 struct AsyncResume;
 
 /// An error representing a failure of `try_block_on`
@@ -44,10 +44,8 @@ impl Vmctx {
     /// Block on the result of an `async` computation from an instance run by `Instance::run_async`.
     ///
     /// While this method is supported and part of the public API, it's easiest to define the hostcall
-    /// function itself as async. The `#[lucet_hostcall]` macro simply calls this function.
-    ///
-    /// There's no performance penalty for doing so: futures that are immediately ready without waiting
-    /// don't require a context switch, just like using `.await`.
+    /// function itself as async (the `#[lucet_hostcall]` macro simply calls this function).
+    /// If you need to provide a synchronous fallback, use [`Vmctx::try_block_on()`] instead.
     ///
     /// Note:
     /// - This method may only be used if `Instance::run_async` was used to run the VM,
@@ -63,18 +61,48 @@ impl Vmctx {
 
     /// Block on the result of an `async` computation from an instance run by `Instance::run_async`.
     ///
-    /// The primary reason you may want to use `try_block_on` manually is to provide a fallback
-    /// implementation for if your hostcall is called from outside of an asynchronous context.
+    /// The easiest way to make a hostcall async is simply to add the `async` modifier:
+    ///
+    /// ```ignore
+    /// #[lucet_hostcall]
+    /// #[no_mangle]
+    /// pub async fn hostcall_async(vmctx: &Vmctx) {
+    ///    foobar().await
+    /// }
+    /// ```
+    ///
+    /// Of course, we can only expose synchronous interfaces to Wasm guests. To implement
+    /// async hostcalls, Lucet blocks guest execution while waiting the future to complete,
+    /// yielding control of the thread back the async executor so that other tasks can make
+    /// progress in the meantime.
+    ///
+    /// It's recommended to use the async modifier, rather than call this function directly.
+    /// The primary reason you may want to do so directly is if you want to provide a fallback
+    /// implementation for the case when calling a hostcall from outside of an async context.
+    ///
+    /// There is no additional yield to the host when the future passed is immediately ready.
+    /// This behavior is the same as implemented by the `.await` operator.
+    ///
+    /// The future passed is polled from within the guest execution context. If the future is not
+    /// immediately ready, the instance will yield and return control to the async executor.
+    /// Later, once the future is ready to make progress, the async executor will return us to
+    /// the guest context, where Lucet will resume polling the future to completion.
+    ///
+    /// For async hostcalls that may yield to the async executor many times, it's recommended that
+    /// you use `tokio::spawn`, or the equivalent from your async executor, which will spawn the task
+    /// to be run from the host execution context. This avoids the overhead of context switching into
+    /// the guest execution context every time the future needs to make progress.
     ///
     /// If `Instance::run_async` is not being used to run the VM, this function will return
     /// `Err(BlockOnError::NeedsAsyncContext)`.
-    #[doc(hidden)]
     pub fn try_block_on<R>(&self, mut f: impl Future<Output = R>) -> Result<R, BlockOnError> {
         // We pin the future to the stack (a requirement for being able to poll the future).
-        // By pinning to the stack instead of using `Box::pin`, we avoid heap allocations for immediately-ready futures.
+        // By pinning to the stack instead of using `Box::pin`, we avoid heap allocations for
+        // immediately-ready futures.
         //
-        // SAFETY: We must uphold the invariants of Pin, namely that future does not move until it is dropped.
-        // By overriding the variable named `f`, it is impossible to access f again, except through the pinned reference.
+        // SAFETY: We must uphold the invariants of Pin, namely that future does not move until
+        // it is dropped. By overriding the variable named `f`, it is impossible to access f again,
+        // except through the pinned reference.
         let mut f = unsafe { Pin::new_unchecked(&mut f) };
 
         loop {
@@ -98,15 +126,24 @@ impl Vmctx {
                     // The future is pending, so we need to yield to the async executor
                     self.yield_impl::<AsyncYielded, AsyncResume>(AsyncYielded, false, false);
 
-                    // Check that the async context hasn't changed (this could happen if the instance yielded)
+                    // Poll is synchronous and may have yielded back to this host, so it is possible that we are
+                    // executing from a new RunAsync future (and thus, a new async executor). If the future has awoken
+                    // the previous waker, we would miss a wakeup.
+                    //
+                    // Rather than try to prevent this from happening at all, we check if the waker changed from under us,
+                    // and if so, we simply poll the future again. If the future is Ready by that point, there's no need
+                    // for another wakeup (we've already done so!). Otherwise, polling the future registers the new waker,
+                    // allowing us to yield back to the async executor without risking a missed wakup.
+                    //
+                    // Note: Waking a waker unnecessarily will not cause unsafety or logic errors. In the worst case, the
+                    // async executor may waste CPU time polling pending futures an extra time.
+
                     match &self.instance().state {
                         State::Running { async_context: Some(new_cx) } => {
                             let same_waker = Arc::ptr_eq(&arc_cx, &new_cx) || arc_cx.waker.will_wake(&new_cx.waker);
 
                             if !same_waker {
-                                // The AsyncContext changed on us. This is because the instance is running from a new RunAsync.
-                                // This probably happened because the instance yielded and was resumed up by `resume_async`.
-                                //
+                                // The AsyncContext changed on us.
                                 // Poll the future again before yielding to the executor in order to register the new waker.
                                 continue;
                             }
@@ -115,7 +152,7 @@ impl Vmctx {
                     }
 
                     // Providing the private `AsyncResume` as a resume value certifies that
-                    // RunAsync upheld the invarriants necessary for us to avoid a borrow check.
+                    // RunAsync upheld the invariants necessary for us to avoid a borrow check.
                     //
                     // If we resume with any other value, the instance may have been modified, and it is
                     // unsound to resume the instance.
@@ -129,8 +166,7 @@ impl Vmctx {
 impl InstanceHandle {
     /// Run a WebAssembly function with arguments in the guest context at the given entrypoint.
     ///
-    /// This method is similar to `Instance::run()`, but allows the Wasm program to invoke async hostcalls
-    /// and provides the trampoline that `.await`s those futures on behalf of the guest.
+    /// This method is similar to `Instance::run()`, but allows the Wasm program to invoke async hostcalls.
     ///
     /// To define an async hostcall, simply add an `async` modifier to your hostcall:
     ///
@@ -142,7 +178,7 @@ impl InstanceHandle {
     /// }
     /// ```
     ///
-    /// See `[RunAsync]` for details.
+    /// See [`Vmctx::try_block_on()`] for details.
     ///
     /// If `runtime_bound` is provided, it will also pause the Wasm execution and yield a future
     /// that resumes it after (approximately) that many Wasm opcodes have executed.
@@ -238,39 +274,11 @@ impl InstanceHandle {
     }
 }
 
-/// A future implementation that enables running a guest instance which can call async hostcalls.
+/// A Future implementation that enables asynchronous execution of bounded slices of
+/// WebAssembly, and of underlying async hostcalls that it invokes.
 ///
-/// Lucet hostcalls are synchronous `extern "C" fn` functions called from WebAssembly. In that
-/// context, we cannot use `.await` directly because the hostcall is not `async`. While we could
-/// block on an executor such as `futures::executor::block_on`, that would block the OS thread,
-/// preventing us from running other async tasks while awaiting. This means an application will need more
-/// threads than otherwise would be necessary.
-///
-/// `RunAsync` allows the guest to call async hostcalls just as if the guest had called the async function
-/// and immediately `.await`ed it.
-///
-/// To define a async hostcall, simply add the async modifier to a hostcall definition:
-///
-/// ```ignore
-/// #[lucet_hostcall]
-/// #[no_mangle]
-/// pub async fn hostcall_async(vmctx: &Vmctx) {
-///    foobar().await
-/// }
-/// ```
-///
-/// Note: Async hostcalls may only be used if `Instance::run_async` was used to run the VM,
-/// otherwise it will terminate the instance with `TerminationDetails::BlockOnNeedsAsync`.
-///
-/// Behind the scenes, lucet polls the future from within the guest execution context. If the future is not immediately ready,
-/// the instance will yield and return control to the async executor. Later, when the future is ready to make progress,
-/// the async executor will return to the guest context, where lucet will poll the future to completion.
-///
-/// Just like `.await`, there is no overhead for futures that are immediately ready (such as `async { 5 }`).
-///
-/// For async hostcalls that may yield to the async executor many times, it's recommended that you use `tokio::spawn`,
-/// or the equivalent from your async executor, which will spawn the task to be run from the host execution context.
-/// This avoids the overhead of context switching into the guest execution context every time the future needs to make progress.
+/// See [`Vmctx::try_block_on()`] for more details about how this works, and how
+/// to define an async hostcall.
 pub struct RunAsync<'a> {
     inst: &'a mut InstanceHandle,
     state: RunAsyncState<'a>,
