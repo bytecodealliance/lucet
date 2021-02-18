@@ -223,7 +223,7 @@ impl InstanceHandle {
         self.run_async_internal(func, &[])
     }
 
-    /// Resume async execution of an instance that has yielded, optionally providing a value to the guest.
+    /// Resume async execution of an instance that has yielded, providing a value to the guest.
     ///
     /// If an async execution context yields from within a future, resuming with [`Instance::resume()`],
     /// [`Instance::resume_with_val()`], may panic if the instance needs to block on an async function.
@@ -238,17 +238,21 @@ impl InstanceHandle {
     ///
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
-    pub fn resume_async<'a>(&'a mut self, val: Option<impl Any + 'static + Send>) -> RunAsync<'a> {
-        let val = match val {
-            Some(val) => Box::new(val) as Box<dyn Any + 'static + Send>,
-            None => Box::new(EmptyYieldVal),
-        };
+    pub fn resume_async_with_val<'a>(&'a mut self, val: impl Any + 'static + Send) -> RunAsync<'a> {
+        let val = Box::new(val) as Box<dyn Any + 'static + Send>;
 
         RunAsync {
             inst: self,
             inst_count_bound: DEFAULT_INST_COUNT_BOUND,
             state: RunAsyncState::ResumeYielded(val),
         }
+    }
+
+    /// Resume execution of an instance that has yielded without providing a value to the guest.
+    ///
+    /// See [`Instance::resume_async_with_val()`]
+    pub fn resume_async<'a>(&'a mut self) -> RunAsync<'a> {
+        self.resume_async_with_val(EmptyYieldVal)
     }
 
     /// Returns a `RunAsync` that will asynchronously execute the guest instnace.

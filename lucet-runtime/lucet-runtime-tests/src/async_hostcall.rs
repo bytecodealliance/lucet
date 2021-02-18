@@ -1,8 +1,54 @@
+
+
+use std::future::Future;
+use std::task::{Waker, Context, Poll};
+use std::sync::{Arc, Mutex};
+
+enum StubFutureInner {
+    NeverPolled,
+    Polled(Waker),
+    Ready
+}
+#[derive(Clone)]
+pub struct StubFuture(Arc<Mutex<StubFutureInner>>);
+impl StubFuture {
+    pub fn new() -> Self { StubFuture(Arc::new(Mutex::new(StubFutureInner::NeverPolled))) }
+    pub fn make_ready(&self) {
+        let mut inner = self.0.lock().unwrap();
+        match std::mem::replace(&mut *inner, StubFutureInner::Ready) {
+            StubFutureInner::Polled(waker) => {
+                waker.wake();
+            }
+            _ => panic!("never polled")
+        }
+    }
+}
+
+impl Future for StubFuture {
+    type Output = ();
+
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut inner = self.0.lock().unwrap();
+
+        match *inner {
+            StubFutureInner::Ready => Poll::Ready(()),
+            _ => {
+                *inner = StubFutureInner::Polled(cx.waker().clone());
+                Poll::Pending
+            }
+        }
+    }
+}
+
+
 #[macro_export]
 macro_rules! async_hostcall_tests {
     ( $( $region_id:ident => $TestRegion:path ),* ) => {
         use lucet_runtime::{vmctx::Vmctx, lucet_hostcall};
         use std::future::Future;
+        use std::task::{Waker, Context};
+        use $crate::async_hostcall::StubFuture;
+
 
         #[lucet_hostcall]
         #[no_mangle]
@@ -65,12 +111,21 @@ macro_rules! async_hostcall_tests {
             return times * 2;
         }
 
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub async fn await_manual_future(vmctx: &Vmctx) {
+            vmctx.yield_();
+            vmctx.get_embed_ctx_mut::<Option<StubFuture>>().take().unwrap().await;
+        }
+
         $(
             mod $region_id {
-                use lucet_runtime::{DlModule, Error, Limits, Region, RegionCreate, TerminationDetails};
-                use std::sync::Arc;
+                use lucet_runtime::{DlModule, Error, Limits, Region, RegionCreate, TerminationDetails, RunResult};
+                use std::sync::{Arc};
                 use $TestRegion as TestRegion;
                 use $crate::build::test_module_c;
+
+                use $crate::async_hostcall::StubFuture;
 
                 #[test]
                 fn ensure_linked() {
@@ -138,8 +193,6 @@ macro_rules! async_hostcall_tests {
                         ),
                     }
 
-
-
                     let correct_run_res_3 =
                         futures_executor::block_on(
                             inst.run_async(
@@ -156,6 +209,49 @@ macro_rules! async_hostcall_tests {
                     }
                 }
 
+
+                #[test]
+                fn yield_from_within_future() {
+                    let module = test_module_c("async_hostcall", "hostcall_block_on.c")
+                        .expect("module compiled and loaded");
+                    let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
+                        .expect("region can be created");
+                    let mut inst = region
+                        .new_instance(module)
+                        .expect("instance can be created");
+
+                    inst.run_start().expect("start section runs");
+
+                    let manual_future = StubFuture::new();
+
+                    inst.insert_embed_ctx(Some(manual_future.clone()));
+
+                    let run_res =
+                        futures_executor::block_on(
+                            inst.run_async(
+                                "manual_future",
+                                &[]
+                            ));
+                    
+                    if let Ok(RunResult::Yielded(_)) = run_res { /* expected */ } else { panic!("did not yield"); } 
+
+                    // The loop within try_block_on polled the future returned by await_manual_future,
+                    // and the waker that will be passed to poll `manuall_future` is from the old
+                    // executor.
+                    //
+                    // However, we yielded from the guest prior to polling manual_future, so we
+                    // need to spawn a thread that will wake manual_future _after_ it has been polled.
+                    std::thread::spawn(move || {
+                        // the instance some time, so that it polls and blocks on manual_future
+                        std::thread::sleep(std::time::Duration::from_millis(5));
+                        // wake the future manually. this will force us to miss the wakeup
+                        manual_future.make_ready();
+                    });
+
+                    let run_res = futures_executor::block_on(inst.resume_async());
+                    
+                    if let Ok(RunResult::Returned(_)) = run_res { /* expected */ } else { panic!("did not return"); } 
+                }
             }
         )*
     };
