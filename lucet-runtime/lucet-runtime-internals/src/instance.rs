@@ -7,7 +7,6 @@ pub use crate::instance::execution::{KillError, KillState, KillSuccess, KillSwit
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 pub use crate::instance::state::State;
 
-use crate::alloc::Alloc;
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
@@ -18,13 +17,13 @@ use crate::region::RegionInternal;
 use crate::sysdeps::HOST_PAGE_SIZE_EXPECTED;
 use crate::val::{UntypedRetVal, Val};
 use crate::WASM_PAGE_SIZE;
+use crate::{alloc::Alloc, future::AsyncContext};
 use libc::{c_void, pthread_self, siginfo_t, uintptr_t};
 use lucet_module::InstanceRuntimeData;
 use memoffset::offset_of;
 use std::any::Any;
 use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
 use std::convert::TryFrom;
-use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
@@ -515,7 +514,7 @@ impl Instance {
     /// in the future.
     pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<RunResult, Error> {
         let func = self.module.get_export_func(entrypoint)?;
-        Ok(self.run_func(func, &args, false, None)?.unwrap())
+        Ok(self.run_func(func, &args, None, None)?.unwrap())
     }
 
     /// Run a function with arguments in the guest context from the [WebAssembly function
@@ -531,7 +530,7 @@ impl Instance {
         args: &[Val],
     ) -> Result<RunResult, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
-        Ok(self.run_func(func, &args, false, None)?.unwrap())
+        Ok(self.run_func(func, &args, None, None)?.unwrap())
     }
 
     /// Resume execution of an instance that has yielded without providing a value to the guest.
@@ -562,19 +561,21 @@ impl Instance {
     /// The foreign code safety caveat of [`Instance::run()`](struct.Instance.html#method.run)
     /// applies.
     pub fn resume_with_val<A: Any + 'static>(&mut self, val: A) -> Result<RunResult, Error> {
-        Ok(self.resume_with_val_impl(val, false, None)?.unwrap())
+        Ok(self
+            .resume_with_val_impl(Box::new(val), None, None)?
+            .unwrap())
     }
 
-    pub(crate) fn resume_with_val_impl<A: Any + 'static>(
+    pub(crate) fn resume_with_val_impl(
         &mut self,
-        val: A,
-        async_context: bool,
+        val: Box<dyn Any + 'static>,
+        async_context: Option<AsyncContext>,
         max_insn_count: Option<u64>,
     ) -> Result<InternalRunResult, Error> {
         match &self.state {
             State::Yielded { expecting, .. } => {
                 // make sure the resumed value is of the right type
-                if !expecting.is::<PhantomData<A>>() {
+                if &(*val).type_id() != expecting {
                     return Err(Error::InvalidArgument(
                         "type mismatch between yielded instance expected value and resumed value",
                     ));
@@ -583,7 +584,7 @@ impl Instance {
             _ => return Err(Error::InvalidArgument("can only resume a yielded instance")),
         }
 
-        self.resumed_val = Some(Box::new(val) as Box<dyn Any + 'static>);
+        self.resumed_val = Some(val);
 
         self.set_instruction_bound_delta(max_insn_count);
         self.swap_and_return(async_context)
@@ -602,6 +603,7 @@ impl Instance {
     /// applies.
     pub(crate) fn resume_bounded(
         &mut self,
+        async_context: AsyncContext,
         max_insn_count: u64,
     ) -> Result<InternalRunResult, Error> {
         if !self.state.is_bound_expired() {
@@ -610,7 +612,7 @@ impl Instance {
             ));
         }
         self.set_instruction_bound_delta(Some(max_insn_count));
-        self.swap_and_return(true)
+        self.swap_and_return(Some(async_context))
     }
 
     /// Run the module's [start function][start], if one exists.
@@ -648,7 +650,7 @@ impl Instance {
             if !self.is_not_started() {
                 return Err(Error::StartAlreadyRun);
             }
-            self.run_func(start, &[], false, None)?;
+            self.run_func(start, &[], None, None)?;
         }
         Ok(())
     }
@@ -1090,7 +1092,7 @@ impl Instance {
         &mut self,
         func: FunctionHandle,
         args: &[Val],
-        async_context: bool,
+        async_context: Option<AsyncContext>,
         inst_count_bound: Option<u64>,
     ) -> Result<InternalRunResult, Error> {
         let needs_start = self.state.is_not_started() && !func.is_start_func;
@@ -1191,7 +1193,10 @@ impl Instance {
     /// This must only be called for an instance in a ready, non-fatally faulted, or yielded state,
     /// or in the not-started state on the start function. The public wrappers around this function
     /// should make sure the state is appropriate.
-    fn swap_and_return(&mut self, async_context: bool) -> Result<InternalRunResult, Error> {
+    fn swap_and_return<'a>(
+        &mut self,
+        async_context: Option<AsyncContext>,
+    ) -> Result<InternalRunResult, Error> {
         let is_start_func = self
             .entrypoint
             .expect("we always have an entrypoint by now")
@@ -1203,7 +1208,10 @@ impl Instance {
                 || self.state.is_yielded()
                 || self.state.is_bound_expired()
         );
-        self.state = State::Running { async_context };
+
+        self.state = State::Running {
+            async_context: async_context.map(|cx| Arc::new(cx)),
+        };
 
         let res = self.with_current_instance(|i| {
             i.with_signals_on(|i| {
