@@ -307,9 +307,9 @@ pub mod lucet_result {
                                 reason: lucet_terminated_reason::BorrowError,
                                 provided: ptr::null_mut(),
                             },
-                            TerminationDetails::Provided(p) => lucet_terminated {
+                            TerminationDetails::Provided { provided, .. } => lucet_terminated {
                                 reason: lucet_terminated_reason::Provided,
-                                provided: *p
+                                provided: *provided
                                     .downcast_ref()
                                     .map(|CTerminationDetails { details }| details)
                                     .unwrap_or(&ptr::null_mut()),

@@ -1429,7 +1429,10 @@ pub enum TerminationDetails {
     /// Returned when dynamic borrowing rules of methods like `Vmctx::heap()` are violated.
     BorrowError(&'static str),
     /// Calls to `lucet_hostcall_terminate` provide a payload for use by the embedder.
-    Provided(Box<dyn Any + 'static>),
+    Provided {
+        type_name: &'static str,
+        provided: Box<dyn Any + 'static>,
+    },
     /// The instance was terminated by its `KillSwitch`.
     Remote,
     /// A panic occurred during a hostcall other than the specialized panic used to implement
@@ -1463,11 +1466,14 @@ pub enum TerminationDetails {
 
 impl TerminationDetails {
     pub fn provide<A: Any + 'static>(details: A) -> Self {
-        TerminationDetails::Provided(Box::new(details))
+        TerminationDetails::Provided {
+            type_name: std::any::type_name::<A>(),
+            provided: Box::new(details),
+        }
     }
     pub fn provided_details(&self) -> Option<&dyn Any> {
         match self {
-            TerminationDetails::Provided(a) => Some(a.as_ref()),
+            TerminationDetails::Provided { provided, .. } => Some(provided.as_ref()),
             _ => None,
         }
     }
@@ -1479,14 +1485,14 @@ impl TerminationDetails {
     /// `as_exitcode` can simplify handling `TerminationDetails`.
     pub fn as_exitcode(&self) -> Option<u32> {
         match self {
-            TerminationDetails::Provided(a) => {
+            TerminationDetails::Provided { provided, .. } => {
                 // I apologize for this load-bearing `as u32`.
                 // Wasi uses an u32 for the proc_exist status (`lucet_wasi::Exitcode`) in the
                 // witx. However, wasmtime::Trap exit status is an i32, so the
                 // wiggle::Trap::I32Exit variant mirrors Wasmtime. The `as u32` lets this method
                 // return a type equivalent to `lucet_wasi::Exitcode`, but users interested in the
                 // full range of `wiggle::Trap` will have to handle an i32 variant.
-                match a.downcast_ref::<wiggle::Trap>() {
+                match provided.downcast_ref::<wiggle::Trap>() {
                     Some(wiggle::Trap::I32Exit(code)) => Some(*code as u32),
                     _ => None,
                 }
@@ -1531,7 +1537,7 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::BorrowError(msg) => write!(f, "BorrowError({})", msg),
             TerminationDetails::CtxNotFound => write!(f, "CtxNotFound"),
             TerminationDetails::YieldTypeMismatch => write!(f, "YieldTypeMismatch"),
-            TerminationDetails::Provided(_) => write!(f, "Provided(Any)"),
+            TerminationDetails::Provided { type_name, .. } => write!(f, "Provided({})", type_name),
             TerminationDetails::Remote => write!(f, "Remote"),
             TerminationDetails::OtherPanic(_) => write!(f, "OtherPanic(Any)"),
             TerminationDetails::BlockOnNeedsAsync => write!(f, "BlockOnNeedsAsync"),
