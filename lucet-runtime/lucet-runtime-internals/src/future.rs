@@ -120,45 +120,44 @@ impl Vmctx {
             // build an std::task::Context
             let mut cx = Context::from_waker(&arc_cx.waker);
 
-            match f.as_mut().poll(&mut cx) {
-                Poll::Ready(ret) => return Ok(ret),
-                Poll::Pending => {
-                    // The future is pending, so we need to yield to the async executor
-                    self.yield_impl::<AsyncYielded, AsyncResume>(AsyncYielded, false, false);
-
-                    // Poll is synchronous and may have yielded back to this host, so it is possible that we are
-                    // executing from a new RunAsync future (and thus, a new async executor). If the future has awoken
-                    // the previous waker, we would miss a wakeup.
-                    //
-                    // Rather than try to prevent this from happening at all, we check if the waker changed from under us,
-                    // and if so, we simply poll the future again. If the future is Ready by that point, there's no need
-                    // for another wakeup (we've already done so!). Otherwise, polling the future registers the new waker,
-                    // allowing us to yield back to the async executor without risking a missed wakup.
-                    //
-                    // Note: Waking a waker unnecessarily will not cause unsafety or logic errors. In the worst case, the
-                    // async executor may waste CPU time polling pending futures an extra time.
-
-                    match &self.instance().state {
-                        State::Running { async_context: Some(new_cx) } => {
-                            let same_waker = Arc::ptr_eq(&arc_cx, &new_cx) || arc_cx.waker.will_wake(&new_cx.waker);
-
-                            if !same_waker {
-                                // The AsyncContext changed on us.
-                                // Poll the future again before yielding to the executor in order to register the new waker.
-                                continue;
-                            }
-                        },
-                        _ => panic!("Lucet instance blocked on a future, but no longer running in async context. Make sure to use resume_async when resuming an async guest.")
-                    }
-
-                    // Providing the private `AsyncResume` as a resume value certifies that
-                    // RunAsync upheld the invariants necessary for us to avoid a borrow check.
-                    //
-                    // If we resume with any other value, the instance may have been modified, and it is
-                    // unsound to resume the instance.
-                    let AsyncResume = self.take_resumed_val::<AsyncResume>();
-                }
+            if let Poll::Ready(ret) = f.as_mut().poll(&mut cx) {
+                return Ok(ret);
             }
+
+            // The future is pending, so we need to yield to the async executor
+            self.yield_impl::<AsyncYielded, AsyncResume>(AsyncYielded, false, false);
+
+            // Poll is synchronous and may have yielded back to this host, so it is possible that we are
+            // executing from a new RunAsync future (and thus, a new async executor). If the future has awoken
+            // the previous waker, we would miss a wakeup.
+            //
+            // Rather than try to prevent this from happening at all, we check if the waker changed from under us,
+            // and if so, we simply poll the future again. If the future is Ready by that point, there's no need
+            // for another wakeup (we've already done so!). Otherwise, polling the future registers the new waker,
+            // allowing us to yield back to the async executor without risking a missed wakup.
+            //
+            // Note: Waking a waker unnecessarily will not cause unsafety or logic errors. In the worst case, the
+            // async executor may waste CPU time polling pending futures an extra time.
+
+            match &self.instance().state {
+                State::Running { async_context: Some(new_cx) } => {
+                    let same_waker = Arc::ptr_eq(&arc_cx, &new_cx) || arc_cx.waker.will_wake(&new_cx.waker);
+
+                    if !same_waker {
+                        // The AsyncContext changed on us.
+                        // Poll the future again before yielding to the executor in order to register the new waker.
+                        continue;
+                    }
+                },
+                _ => panic!("Lucet instance blocked on a future, but no longer running in async context. Make sure to use resume_async when resuming an async guest.")
+            }
+
+            // Providing the private `AsyncResume` as a resume value certifies that
+            // RunAsync upheld the invariants necessary for us to avoid a borrow check.
+            //
+            // If we resume with any other value, the instance may have been modified, and it is
+            // unsound to resume the instance.
+            let AsyncResume = self.take_resumed_val::<AsyncResume>();
         }
     }
 }
