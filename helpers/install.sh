@@ -38,9 +38,9 @@ else
     DYLIB_SUFFIX="so"
 fi
 
-BINS="lucet-objdump lucet-validate lucet-wasi lucetc sightglass spec-test wasmonkey"
+BINS="lucet-objdump lucet-validate lucet-wasi lucetc spec-test"
 LIBS="liblucet_runtime.${DYLIB_SUFFIX}"
-DOCS="sightglass/README.md"
+DOCS=""
 BUNDLE_DOCS="README.md"
 
 if test -t 0; then
