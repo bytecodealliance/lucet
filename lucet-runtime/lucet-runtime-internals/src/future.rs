@@ -55,7 +55,7 @@ impl Vmctx {
     pub fn block_on<R>(&self, f: impl Future<Output = R>) -> R {
         match self.try_block_on(f) {
             Ok(res) => res,
-            Err(err) => panic!(TerminationDetails::from(err)),
+            Err(err) => panic!("{:?}", TerminationDetails::from(err)),
         }
     }
 

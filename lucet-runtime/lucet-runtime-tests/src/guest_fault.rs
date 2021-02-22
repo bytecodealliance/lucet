@@ -33,7 +33,7 @@ macro_rules! guest_fault_common_defs {
             #[lucet_hostcall]
             #[no_mangle]
             pub fn raise_other_panic(_vmctx: &Vmctx) {
-                panic!(OtherPanicPayload);
+                panic!("{:?}", OtherPanicPayload);
             }
 
             pub static mut RECOVERABLE_PTR: *mut libc::c_char = std::ptr::null_mut();

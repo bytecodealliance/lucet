@@ -1044,7 +1044,7 @@ impl Instance {
     pub fn grow_memory_from_hostcall(&mut self, additional_pages: u32) -> Result<u32, Error> {
         let res = self.grow_memory(additional_pages);
         if self.terminate_on_heap_oom() && res.is_err() {
-            panic!(TerminationDetails::HeapOutOfMemory)
+            panic!("{:?}", TerminationDetails::HeapOutOfMemory)
         } else {
             res
         }

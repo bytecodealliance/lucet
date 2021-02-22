@@ -67,7 +67,7 @@ macro_rules! lucet_hostcall_terminate {
         lucet_hostcall_terminate!("lucet_hostcall_terminate")
     };
     ( $payload:expr ) => {
-        panic!($crate::instance::TerminationDetails::provide($payload))
+        panic!("{:?}", $crate::instance::TerminationDetails::provide($payload))
     };
     ( $payload:expr, ) => {
         lucet_hostcall_terminate!($payload)

@@ -171,7 +171,7 @@ impl Vmctx {
         let r = self
             .heap_view
             .try_borrow()
-            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("heap")));
+            .unwrap_or_else(|_| panic!("{:?}", TerminationDetails::BorrowError("heap")));
         Ref::map(r, |b| b.borrow())
     }
 
@@ -186,7 +186,7 @@ impl Vmctx {
         let r = self
             .heap_view
             .try_borrow_mut()
-            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("heap_mut")));
+            .unwrap_or_else(|_| panic!("{:?}", TerminationDetails::BorrowError("heap_mut")));
         RefMut::map(r, |b| b.borrow_mut())
     }
 
@@ -235,8 +235,8 @@ impl Vmctx {
     pub fn get_embed_ctx<T: Any>(&self) -> Ref<'_, T> {
         match self.instance().embed_ctx.try_get::<T>() {
             Some(Ok(t)) => t,
-            Some(Err(_)) => panic!(TerminationDetails::BorrowError("get_embed_ctx")),
-            None => panic!(TerminationDetails::CtxNotFound),
+            Some(Err(_)) => panic!("{:?}", TerminationDetails::BorrowError("get_embed_ctx")),
+            None => panic!("{:?}", TerminationDetails::CtxNotFound),
         }
     }
 
@@ -250,8 +250,8 @@ impl Vmctx {
     pub fn get_embed_ctx_mut<T: Any>(&self) -> RefMut<'_, T> {
         match unsafe { self.instance_mut().embed_ctx.try_get_mut::<T>() } {
             Some(Ok(t)) => t,
-            Some(Err(_)) => panic!(TerminationDetails::BorrowError("get_embed_ctx_mut")),
-            None => panic!(TerminationDetails::CtxNotFound),
+            Some(Err(_)) => panic!("{:?}", TerminationDetails::BorrowError("get_embed_ctx_mut")),
+            None => panic!("{:?}", TerminationDetails::CtxNotFound),
         }
     }
 
@@ -286,7 +286,7 @@ impl Vmctx {
         let r = self
             .globals_view
             .try_borrow()
-            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("globals")));
+            .unwrap_or_else(|_| panic!("{:?}", TerminationDetails::BorrowError("globals")));
         Ref::map(r, |b| b.borrow())
     }
 
@@ -298,7 +298,7 @@ impl Vmctx {
         let r = self
             .globals_view
             .try_borrow_mut()
-            .unwrap_or_else(|_| panic!(TerminationDetails::BorrowError("globals_mut")));
+            .unwrap_or_else(|_| panic!("{:?}", TerminationDetails::BorrowError("globals_mut")));
         RefMut::map(r, |b| b.borrow_mut())
     }
 
@@ -451,7 +451,7 @@ impl Vmctx {
     /// `crate::future`.
     pub(crate) fn take_resumed_val<R: Any + 'static>(&self) -> R {
         self.try_take_resumed_val()
-            .unwrap_or_else(|| panic!(TerminationDetails::YieldTypeMismatch))
+            .unwrap_or_else(|| panic!("{:?}", TerminationDetails::YieldTypeMismatch))
     }
 
     /// Ensure there are no outstanding borrows to the contents of the `Vmctx`.
@@ -464,10 +464,10 @@ impl Vmctx {
     fn ensure_no_borrows(&self) {
         self.ensure_no_heap_borrows();
         if self.globals_view.try_borrow_mut().is_err() {
-            panic!(TerminationDetails::BorrowError("globals"));
+            panic!("{:?}", TerminationDetails::BorrowError("globals"));
         }
         if self.instance().embed_ctx.is_any_value_borrowed() {
-            panic!(TerminationDetails::BorrowError("embed_ctx"));
+            panic!("{:?}", TerminationDetails::BorrowError("embed_ctx"));
         }
     }
 
@@ -476,7 +476,7 @@ impl Vmctx {
     /// Terminates the instance with a `TerminationDetails::BorrowError` if a borrow exists.
     fn ensure_no_heap_borrows(&self) {
         if self.heap_view.try_borrow_mut().is_err() {
-            panic!(TerminationDetails::BorrowError("heap"));
+            panic!("{:?}", TerminationDetails::BorrowError("heap"));
         }
     }
 }
