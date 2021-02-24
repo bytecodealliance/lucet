@@ -10,11 +10,10 @@ jobs:
       with:
         submodules: 'recursive'
 
-    # Testing uses the development environment Docker container.
-    # This action builds the container and executes the test suite inside it.
-    - uses: ./.github/actions/test
-      with:
-        target: test-ci
+    - name: Install Rust (rustup)
+      run: rustup update
+
+    - run: make test-ci
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code
@@ -27,11 +26,10 @@ jobs:
       with:
         submodules: 'recursive'
 
-    # Testing uses the development environment Docker container.
-    # This action builds the container and executes the test suite inside it.
-    - uses: ./.github/actions/test
-      with:
-        target: test-benchmarks
+    - name: Install Rust (rustup)
+      run: rustup update
+
+    - run: make test-benchmarks
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code
@@ -44,11 +42,10 @@ jobs:
       with:
         submodules: 'recursive'
 
-    # Testing uses the development environment Docker container.
-    # This action builds the container and executes the test suite inside it.
-    - uses: ./.github/actions/test
-      with:
-        target: test-fuzz
+    - name: Install Rust (rustup)
+      run: rustup update
+
+    - run: make test-fuzz
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code
@@ -61,11 +58,10 @@ jobs:
       with:
         submodules: 'recursive'
 
-    # Testing uses the development environment Docker container.
-    # This action builds the container and executes the test suite inside it.
-    - uses: ./.github/actions/test
-      with:
-        target: test-release
+    - name: Install Rust (rustup)
+      run: rustup update
+
+    - run: make test-release
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code
@@ -78,11 +74,10 @@ jobs:
       with:
         submodules: 'recursive'
 
-    # Testing uses the development environment Docker container.
-    # This action builds the container and executes the test suite inside it.
-    - uses: ./.github/actions/test
-      with:
-        target: test-release-executables
+    - name: Install Rust (rustup)
+      run: rustup update
+
+    - run: make test-release-executables
 
     - name: Ensure testing did not change sources
       run: git diff --exit-code
