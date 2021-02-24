@@ -4,7 +4,7 @@ use thiserror::Error;
 use witx::Id;
 
 pub use cranelift_wasm::{WasmFuncType, WasmType};
-pub use witx::{AtomType, Document, WitxError};
+pub use witx::{Document, WitxError};
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -187,7 +187,7 @@ impl Validator {
                 .ok_or(not_found.clone())?
                 .func(&Id::new(field))
                 .ok_or(not_found)?;
-            let spec_type = witx_to_functype(&func.core_type());
+            let spec_type = witx_to_functype(&func);
             if &spec_type != type_ {
                 Err(Error::ImportTypeError {
                     module: module.to_owned(),
@@ -235,25 +235,25 @@ impl Validator {
     }
 }
 
-fn witx_to_functype(coretype: &witx::CoreFuncType) -> WasmFuncType {
-    fn atom_to_type(atom: &witx::AtomType) -> WasmType {
+fn witx_to_functype(func: &witx::InterfaceFunc) -> WasmFuncType {
+    fn atom_to_type(atom: &witx::WasmType) -> WasmType {
         match atom {
-            witx::AtomType::I32 => WasmType::I32,
-            witx::AtomType::I64 => WasmType::I64,
-            witx::AtomType::F32 => WasmType::F32,
-            witx::AtomType::F64 => WasmType::F64,
+            witx::WasmType::I32 => WasmType::I32,
+            witx::WasmType::I64 => WasmType::I64,
+            witx::WasmType::F32 => WasmType::F32,
+            witx::WasmType::F64 => WasmType::F64,
         }
     }
-    let params = coretype
-        .args
+    let (params, results) = func.wasm_signature();
+    let params = params
         .iter()
-        .map(|a| atom_to_type(&a.repr()))
+        .map(|a| atom_to_type(&a))
         .collect::<Vec<_>>()
         .into_boxed_slice();
-    let returns = if let Some(ref r) = coretype.ret {
-        vec![atom_to_type(&r.repr())].into_boxed_slice()
-    } else {
-        vec![].into_boxed_slice()
+    let returns = match results.len() {
+        0 => vec![].into_boxed_slice(),
+        1 => vec![atom_to_type(&results[0])].into_boxed_slice(),
+        _ => unimplemented!("multiple result types"),
     };
     WasmFuncType { params, returns }
 }
