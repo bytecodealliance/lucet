@@ -16,8 +16,7 @@ jobs:
     - name: Install dependencies
       run: >
         curl -sSLO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-12/wasi-sdk_12.0_amd64.deb &&
-        sudo dpkg -i wasi-sdk_12.0_amd64.deb &&
-        cargo install --debug rsign2
+        sudo dpkg -i wasi-sdk_12.0_amd64.deb
 
     - run: make test-ci
 
@@ -88,8 +87,7 @@ jobs:
     - name: Install dependencies
       run: >
         curl -sSLO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-12/wasi-sdk_12.0_amd64.deb &&
-        sudo dpkg -i wasi-sdk_12.0_amd64.deb &&
-        cargo install --debug rsign2
+        sudo dpkg -i wasi-sdk_12.0_amd64.deb
 
     - run: make test-release
 
