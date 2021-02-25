@@ -3,7 +3,7 @@ pub use config::Config;
 
 use heck::SnakeCase;
 use lucet_module::bindings::Bindings;
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 
 pub fn hostcall_name(m: &witx::Module, f: &witx::InterfaceFunc) -> String {
@@ -40,34 +40,34 @@ pub fn generate(
     let fs = doc.modules().map(|m| {
         let fs = m.funcs().map(|f| {
             let name = format_ident!("{}", hostcall_name(&m, &f));
-            let coretype = f.core_type();
-            let func_args = coretype.args.iter().map(|a| {
-                let name = names.func_core_arg(a);
-                let atom = names.atom_type(a.repr());
+            let (params, results) = f.wasm_signature();
+            let arg_names = (0..params.len())
+                .map(|i| Ident::new(&format!("arg{}", i), Span::call_site()))
+                .collect::<Vec<_>>();
+            let func_args = params.iter().enumerate().map(|(i, ty)| {
+                let name = &arg_names[i];
+                let atom = names.wasm_type(*ty);
                 quote!(#name: #atom)
             });
-            let call_args = coretype.args.iter().map(|a| {
-                let name = names.func_core_arg(a);
-                quote!(#name)
-            });
-            let rets = coretype
-                .ret
-                .as_ref()
-                .map(|r| {
-                    let atom = names.atom_type(r.repr());
-                    quote!(#atom)
-                })
-                .unwrap_or(quote!(()));
+            let ret_ty = match results.len() {
+                0 => quote!(()),
+                1 => names.wasm_type(results[0]),
+                _ => panic!(
+                    "lucet-wiggle only supports 0 or 1 result type. function {} has: {:?}",
+                    hostcall_name(&m, &f),
+                    results
+                ),
+            };
             let mod_name = names.module(&m.name);
             let method_name = names.func(&f.name);
             quote! {
                 #[lucet_hostcall]
                 #[no_mangle]
-                pub fn #name(vmctx: &lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #rets {
+                pub fn #name(vmctx: &lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #ret_ty {
                     { #pre_hook }
                     let memory = lucet_wiggle::runtime::LucetMemory::new(vmctx);
                     let mut ctx: #ctx_type = #ctx_constructor;
-                    let r = super::#mod_name::#method_name(&ctx, &memory, #(#call_args),*);
+                    let r = super::#mod_name::#method_name(&ctx, &memory, #(#arg_names),*);
                     { #post_hook }
                     match r {
                         Ok(r) => { r },

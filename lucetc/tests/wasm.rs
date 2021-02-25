@@ -640,7 +640,7 @@ mod validate {
         let b = stub_wasi_bindings();
 
         let witx = "
-(typename $errno (enum u8 $inval))
+(typename $errno (enum (@witx tag u8) $inval))
 (module $wasi_snapshot_preview1
   (import \"memory\" (memory))
   ;;; Read command-line argument data.
@@ -648,7 +648,7 @@ mod validate {
   (@interface func (export \"args_get\")
     (param $argv (@witx pointer (@witx pointer u8)))
     (param $argv_buf (@witx pointer u8))
-    (result $error $errno)
+    (result $error (expected (error $errno)))
   )
 )";
         let v = Validator::builder()
