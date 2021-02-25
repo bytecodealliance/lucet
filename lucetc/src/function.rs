@@ -298,7 +298,8 @@ impl<'a> FuncInfo<'a> {
                     let do_check_and_save = match op {
                         Operator::Call { .. }
                         | Operator::CallIndirect { .. }
-                        | Operator::Return => true,
+                        | Operator::Return
+                        | Operator::BrTable { .. } => true,
                         Operator::Br { relative_depth } | Operator::BrIf { relative_depth } => {
                             // only if loop backedge
                             self.scope_costs[self.scope_costs.len() - 1 - *relative_depth as usize]
