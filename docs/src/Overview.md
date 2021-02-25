@@ -3,7 +3,7 @@
 ## Getting started
 
 To learn how to set up the toolchain, and then compile and run your first WebAssembly application
-using Lucet, see [Getting started](./Getting-started.md).
+using Lucet, see [Using Lucet](./Using-lucet.md).
 
 ## Development environment
 
