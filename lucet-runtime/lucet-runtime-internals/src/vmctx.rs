@@ -13,9 +13,10 @@ use crate::instance::{
     CURRENT_INSTANCE, HOST_CTX,
 };
 use lucet_module::{FunctionHandle, GlobalValue};
-use std::any::{Any, TypeId};
+use std::any::Any;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Ref, RefCell, RefMut};
+use std::marker::PhantomData;
 
 /// An opaque handle to a running instance's context.
 #[derive(Debug)]
@@ -435,9 +436,10 @@ impl Vmctx {
         if is_bound_expiration {
             inst.state = State::BoundExpired;
         } else {
+            let expecting: Box<PhantomData<R>> = Box::new(PhantomData);
             inst.state = State::Yielding {
                 val: YieldedVal::new(val),
-                expecting: TypeId::of::<R>(),
+                expecting: expecting as Box<dyn Any>,
             };
         }
 
