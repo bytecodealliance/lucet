@@ -111,7 +111,6 @@ impl Vmctx {
                 Some(cx) => cx.clone(),
                 None => return Err(BlockOnError::NeedsAsyncContext),
             };
-            
 
             // build an std::task::Context
             let mut cx = Context::from_waker(&arc_cx.waker);

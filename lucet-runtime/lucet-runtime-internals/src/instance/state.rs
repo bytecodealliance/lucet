@@ -1,6 +1,6 @@
+use crate::instance::siginfo_ext::SiginfoExt;
 use crate::instance::{FaultDetails, TerminationDetails, YieldedVal};
 use crate::sysdeps::UContext;
-use crate::{instance::siginfo_ext::SiginfoExt};
 use libc::{SIGBUS, SIGSEGV};
 use std::any::TypeId;
 use std::ffi::{CStr, CString};
@@ -148,8 +148,7 @@ impl State {
     }
 
     pub fn is_running_async(&self) -> bool {
-        if let State::Running = self
-        {
+        if let State::Running = self {
             true
         } else {
             false
