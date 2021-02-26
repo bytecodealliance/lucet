@@ -1,6 +1,6 @@
 use crate::instance::{FaultDetails, TerminationDetails, YieldedVal};
 use crate::sysdeps::UContext;
-use crate::{future::AsyncContext, instance::siginfo_ext::SiginfoExt};
+use crate::{instance::siginfo_ext::SiginfoExt};
 use libc::{SIGBUS, SIGSEGV};
 use std::any::TypeId;
 use std::ffi::{CStr, CString};
@@ -22,11 +22,7 @@ pub enum State {
     /// Transitions to `Ready` when the guest function returns normally, or to `Faulted`,
     /// `Terminating`, or `Yielding` if the instance faults, terminates, or yields, or to
     /// `BoundExpired` if the instance is run with an instruction bound and reaches it.
-    Running {
-        /// Indicates whether the instance is running in an async context (`Instance::run_async`)
-        /// or not. Needed by `Vmctx::block_on`.
-        async_context: Option<std::sync::Arc<AsyncContext>>,
-    },
+    Running,
 
     /// The instance has faulted, potentially fatally.
     ///
@@ -90,12 +86,7 @@ impl std::fmt::Display for State {
         match self {
             State::NotStarted => write!(f, "not started"),
             State::Ready => write!(f, "ready"),
-            State::Running {
-                async_context: None,
-            } => write!(f, "running"),
-            State::Running {
-                async_context: Some(_),
-            } => write!(f, "running (in async context)"),
+            State::Running => write!(f, "running"),
             State::Faulted {
                 details, siginfo, ..
             } => {
@@ -157,9 +148,7 @@ impl State {
     }
 
     pub fn is_running_async(&self) -> bool {
-        if let State::Running {
-            async_context: Some(_),
-        } = self
+        if let State::Running = self
         {
             true
         } else {

@@ -1,4 +1,4 @@
-use crate::instance::{InstanceHandle, InternalRunResult, RunResult, State, TerminationDetails};
+use crate::instance::{InstanceHandle, InternalRunResult, RunResult, TerminationDetails};
 use crate::module::FunctionHandle;
 use crate::val::Val;
 use crate::vmctx::{Vmctx, VmctxInternal};
@@ -107,15 +107,11 @@ impl Vmctx {
 
         loop {
             // Get the AsyncContext, or die if we aren't async
-            let arc_cx = match &self.instance().state {
-                State::Running {
-                    async_context: Some(cx),
-                } => cx.clone(),
-                State::Running {
-                    async_context: None,
-                } => return Err(BlockOnError::NeedsAsyncContext),
-                _ => unreachable!("Access to vmctx implies instance is Running"),
+            let arc_cx = match &self.instance().async_ctx {
+                Some(cx) => cx.clone(),
+                None => return Err(BlockOnError::NeedsAsyncContext),
             };
+            
 
             // build an std::task::Context
             let mut cx = Context::from_waker(&arc_cx.waker);
@@ -139,8 +135,8 @@ impl Vmctx {
             // Note: Waking a waker unnecessarily will not cause unsafety or logic errors. In the worst case, the
             // async executor may waste CPU time polling pending futures an extra time.
 
-            match &self.instance().state {
-                State::Running { async_context: Some(new_cx) } => {
+            match &self.instance().async_ctx {
+                Some(new_cx) => {
                     let same_waker = Arc::ptr_eq(&arc_cx, &new_cx) || arc_cx.waker.will_wake(&new_cx.waker);
 
                     if !same_waker {

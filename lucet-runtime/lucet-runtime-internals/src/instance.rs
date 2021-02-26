@@ -227,6 +227,10 @@ pub struct Instance {
     /// Small mutexed state used for remote kill switch functionality
     pub(crate) kill_state: Arc<KillState>,
 
+    /// Indicates whether the instance is running in an async context (`Instance::run_async`)
+    /// or not. Needed by `Vmctx::block_on`.
+    pub(crate) async_ctx: Option<std::sync::Arc<AsyncContext>>,
+
     #[cfg(feature = "concurrent_testpoints")]
     /// Conditionally-present helpers to force permutations of possible races in testing.
     pub lock_testpoints: Arc<LockTestpoints>,
@@ -1023,6 +1027,7 @@ impl Instance {
             entrypoint: None,
             resumed_val: None,
             terminate_on_heap_oom: false,
+            async_ctx: None,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
@@ -1209,9 +1214,9 @@ impl Instance {
                 || self.state.is_bound_expired()
         );
 
-        self.state = State::Running {
-            async_context: async_context.map(|cx| Arc::new(cx)),
-        };
+        self.async_ctx = async_context.map(|cx| Arc::new(cx));
+
+        self.state = State::Running;
 
         let res = self.with_current_instance(|i| {
             i.with_signals_on(|i| {
@@ -1224,6 +1229,9 @@ impl Instance {
                 })
             })
         });
+
+        // remove async ctx
+        self.async_ctx.take();
 
         #[cfg(feature = "concurrent_testpoints")]
         self.lock_testpoints
