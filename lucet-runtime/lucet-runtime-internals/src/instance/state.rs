@@ -147,14 +147,6 @@ impl State {
         }
     }
 
-    pub fn is_running_async(&self) -> bool {
-        if let State::Running = self {
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn is_faulted(&self) -> bool {
         if let State::Faulted { .. } = self {
             true
