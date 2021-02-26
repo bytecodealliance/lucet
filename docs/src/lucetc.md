@@ -27,42 +27,108 @@ purposes or code analysis, it can also dump Cranelift code.
     lucetc [FLAGS] [OPTIONS] [--] [input]
 
 FLAGS:
-        --count-instructions    Instrument the produced binary to count the number of wasm operations the translated
-                                program executes
-    -h, --help                  Prints help information
-        --signature-keygen      Create a new key pair
-        --signature-create      Sign the object file
-    -V, --version               Prints version information
-        --signature-verify      Verify the signature of the source file
+        --count-instructions
+            Instrument the produced binary to count the number of wasm operations the translated program executes
+
+    -h, --help
+            Prints help information
+
+        --signature-keygen
+            Create a new key pair
+
+        --no-translate-wat
+            Disable translating wat input files to wasm
+
+        --signature-create
+            Sign the object file
+
+    -V, --version
+            Prints version information
+
+        --signature-verify
+            Verify the signature of the source file
+
+        --wasi_exe
+            validate as a wasi executable
+
+        --wiggle-bindings
+            use wiggle to calculate bindings
+
 
 OPTIONS:
-        --bindings <bindings>...                   path to bindings json file
+        --bindings <bindings>...
+            path to bindings json file
+
         --emit <emit>
             type of code to generate (default: so) [possible values: obj, so, clif]
 
-        --guard-size <guard_size>                  size of linear memory guard. must be multiple of 4k. default: 4 MiB
-        --max-reserved-size <max_reserved_size>
-            maximum size of usable linear memory region. must be multiple of 4k. default: 4 GiB
+        --error-style <error_style>
+            Style of error reporting (default: human) [possible values: human, json]
 
-        --min-reserved-size <min_reserved_size>
-            minimum size of usable linear memory region. must be multiple of 4k. default: 4 MiB
+        --guard-size <guard_size>
+            size of linear memory guard. must be multiple of 4k. default: 4 MiB
+
+        --min-os-version <min_os_version>
+            Minimum macOS version to support
 
         --opt-level <opt_level>
             optimization level (default: 'speed_and_size'). 0 is alias to 'none', 1 to 'speed', 2 to 'speed_and_size'
             [possible values: 0, 1, 2, none, speed, speed_and_size]
-    -o, --output <output>                          output destination, defaults to a.out if unspecified
-        --signature-pk <pk_path>                   Path to the public key to verify the source code signature
-        --precious <precious>                      directory to keep intermediate build artifacts in
+    -o, --output <output>
+            output destination, defaults to a.out if unspecified
+
+        --signature-pk <pk_path>
+            Path to the public key to verify the source code signature
+
+        --precious <precious>
+            directory to keep intermediate build artifacts in
+
         --reserved-size <reserved_size>
             exact size of usable linear memory region, overriding --{min,max}-reserved-size. must be multiple of 4k
+
+        --sdk-version <sdk_version>
+            MacOS SDK version to support
 
         --signature-sk <sk_path>
             Path to the secret key to sign the object file. The file can be prefixed with "raw:" in order to store a
             raw, unencrypted secret key
+        --target <target>
+            target to compile for, defaults to x86_64-apple-darwin if unspecified
+
+        --target-cpu <target-cpu>
+            Generate code for a particular type of CPU.
+
+            If neither `--target-cpu` nor `--target-feature` is provided, `lucetc`
+            will automatically detect and use the features available on the host CPU.
+            This is equivalent to choosing `--target-cpu=native`.
+
+             [possible values: native, baseline, nehalem, sandybridge, haswell, broadwell, skylake, cannonlake, icelake,
+            znver1]
+        --target-feature <target-feature>...
+            Enable (+) or disable (-) specific CPU features.
+
+            If neither `--target-cpu` nor `--target-feature` is provided, `lucetc`
+            will automatically detect and use the features available on the host CPU.
+
+            This option is additive with, but takes precedence over `--target-cpu`.
+            For example, `--target-cpu=haswell --target-feature=-avx` will disable
+            AVX, but leave all other default Haswell features enabled.
+
+            Multiple `--target-feature` groups may be specified, with precedence
+            increasing from left to right. For example, these arguments will enable
+            SSE3 but not AVX:
+
+                --target-feature=+sse3,+avx --target-feature=-avx
+
+             [possible values: +sse3, -sse3, +ssse3, -ssse3, +sse41, -sse41, +sse42, -sse42, +popcnt, -popcnt, +avx,
+            -avx, +bmi1, -bmi1, +bmi2, -bmi2, +lzcnt, -lzcnt]
+        --witx <witx_specs>...
+            path to witx spec to validate against
+
 
 ARGS:
-    <input>    input file
-
+    <input>
+            input file
 ```
 
 ## External symbols
@@ -90,16 +156,9 @@ all the symbols available in the `lucet-wasi` runtime.
 
 ## Memory limits
 
-* `--max-reserved-size <size>` makes the compiler assume that the heap will never grow more than
-  `<size>` bytes. The compiler will generate code optimized for that size, inserting bound checks
-  with static values whenever necessary. As a side effect, the module will trap if the limit is ever
-  reached, even if the runtime could allow the heap to grow even further.
-
-* `--min-reserved-size <size>` sets the maximum heap size the runtime should use.
-
-* `--reserved-size <size>` is a shortcut to set both values simultaneously, and is the recommended
-  way to configure how much memory the module can use. The default is only 4 MiB, so this is
-  something you may want to increase.
+* `--reserved-size <size>` indicates how much virtual memory (not including guard pages) will be
+  reserved by the runtime for the module's linear memory. The default is 4GiB. A smaller value
+  would prevent bounds checking elision, significantly reducing performance.
 
 * `--guard-size <size>` controls how much virtual memory with no read nor write access is reserved
   after an instance's heap. The compiler can avoid some bound checking when it is safe to do so

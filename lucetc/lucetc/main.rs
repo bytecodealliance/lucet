@@ -117,14 +117,6 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.validator(validator);
     }
 
-    if let Some(min_reserved_size) = opts.min_reserved_size {
-        c.min_reserved_size(min_reserved_size);
-    }
-
-    if let Some(max_reserved_size) = opts.max_reserved_size {
-        c.max_reserved_size(max_reserved_size);
-    }
-
     // this comes after min and max, so it overrides them if present
     if let Some(reserved_size) = opts.reserved_size {
         c.reserved_size(reserved_size);

@@ -108,8 +108,6 @@ pub struct Options {
     pub witx_specs: Vec<PathBuf>,
     pub wasi_exe: bool,
     pub wiggle_bindings: bool,
-    pub min_reserved_size: Option<u64>,
-    pub max_reserved_size: Option<u64>,
     pub reserved_size: Option<u64>,
     pub guard_size: Option<u64>,
     pub opt_level: OptLevel,
@@ -156,18 +154,6 @@ impl Options {
             Some("obj") => CodegenOutput::Obj,
             Some("so") => CodegenOutput::SharedObj,
             Some(_) => panic!("unknown value for emit"),
-        };
-
-        let min_reserved_size = if let Some(min_reserved_str) = m.value_of("min_reserved_size") {
-            Some(parse_humansized(min_reserved_str)?)
-        } else {
-            None
-        };
-
-        let max_reserved_size = if let Some(max_reserved_str) = m.value_of("max_reserved_size") {
-            Some(parse_humansized(max_reserved_str)?)
-        } else {
-            None
         };
 
         let reserved_size = if let Some(reserved_str) = m.value_of("reserved_size") {
@@ -242,8 +228,6 @@ impl Options {
             witx_specs,
             wasi_exe,
             wiggle_bindings,
-            min_reserved_size,
-            max_reserved_size,
             reserved_size,
             guard_size,
             opt_level,
@@ -270,10 +254,6 @@ impl Options {
         let help_guard_size = format!(
             "size of linear memory guard. must be multiple of 4k. default: {}",
             humansized(HeapSettings::default().guard_size)
-        );
-        let help_min_reserved_size = format!(
-            "minimum size of usable linear memory region. must be multiple of 4k. default: {}",
-            humansized(HeapSettings::default().min_reserved_size)
         );
 
         let mut options = app_from_crate!();
@@ -402,25 +382,11 @@ SSE3 but not AVX:
                     .help("validate as a wasi executable"),
             )
             .arg(
-                Arg::with_name("min_reserved_size")
-                    .long("--min-reserved-size")
-                    .takes_value(true)
-                    .multiple(false)
-                    .help(&help_min_reserved_size),
-            )
-            .arg(
-                Arg::with_name("max_reserved_size")
-                    .long("--max-reserved-size")
-                    .takes_value(true)
-                    .multiple(false)
-                    .help("maximum size of usable linear memory region. must be multiple of 4k. default: 4 GiB"),
-            )
-            .arg(
                 Arg::with_name("reserved_size")
                     .long("--reserved-size")
                     .takes_value(true)
                     .multiple(false)
-                    .help("exact size of usable linear memory region, overriding --{min,max}-reserved-size. must be multiple of 4k"),
+                    .help("exact size of usable linear memory region. Must be multiple of 4k. Values below 4GiB prevent bounds-checking elision."),
             )
             .arg(
                 Arg::with_name("guard_size")

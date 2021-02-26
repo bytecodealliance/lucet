@@ -8,8 +8,8 @@ pub struct HeapSettings {
 impl Default for HeapSettings {
     fn default() -> Self {
         Self {
-            min_reserved_size: 4 * 1024 * 1024,
-            max_reserved_size: 6 * 1024 * 1024 * 1024,
+            min_reserved_size: 4 * 1024 * 1024 * 1024,
+            max_reserved_size: 4 * 1024 * 1024 * 1024,
             guard_size: 4 * 1024 * 1024,
         }
     }
