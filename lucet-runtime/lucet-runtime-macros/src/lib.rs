@@ -101,17 +101,6 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! { lucet_runtime::TerminationDetails }
     };
 
-    let res_ident = quote::format_ident!("res");
-
-    let block_if_async = match raw_sig.asyncness.take() {
-        Some(_) => {
-            quote! { let #res_ident = vmctx.block_on(#res_ident); }
-        }
-        None => {
-            quote! {}
-        }
-    };
-
     let raw_hostcall = quote! {
         #(#attrs)*
         #vis
@@ -122,13 +111,7 @@ pub fn lucet_hostcall(_attr: TokenStream, item: TokenStream) -> TokenStream {
             let vmctx = #vmctx_mod::Vmctx::from_raw(vmctx_raw);
             #vmctx_mod::VmctxInternal::instance_mut(&vmctx).uninterruptable(|| {
                 let res = std::panic::catch_unwind(move || {
-                    let vmctx = #vmctx_mod::Vmctx::from_raw(vmctx_raw);
-
-                    let #res_ident = #hostcall_ident(&vmctx, #(#impl_args),*);
-
-                    #block_if_async
-
-                    #res_ident
+                    #hostcall_ident(&#vmctx_mod::Vmctx::from_raw(vmctx_raw), #(#impl_args),*)
                 });
                 match res {
                     Ok(res) => res,
