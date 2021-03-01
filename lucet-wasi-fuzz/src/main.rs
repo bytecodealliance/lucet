@@ -1,6 +1,6 @@
 #![deny(bare_trait_objects)]
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context, Error};
 use libc::c_ulong;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Module, Region};
 use lucet_wasi::{types::Exitcode, WasiCtx, WasiCtxBuilder};
@@ -103,7 +103,7 @@ fn run_creduce_driver(seed: Seed) {
         .arg("-o")
         .arg(tmpdir.path().join("gen-original.c"))
         .status()
-        .unwrap();
+        .expect("execute csmith");
     assert!(st.success());
 
     let st = Command::new(host_clang())
@@ -115,7 +115,7 @@ fn run_creduce_driver(seed: Seed) {
         .arg("-o")
         .arg(tmpdir.path().join("gen.c"))
         .status()
-        .unwrap();
+        .expect("execute clang");
     assert!(st.success());
 
     let st = Command::new("creduce")
@@ -125,7 +125,7 @@ fn run_creduce_driver(seed: Seed) {
         .arg("script.sh")
         .arg("gen.c")
         .status()
-        .unwrap();
+        .expect("execute creduce");
     assert!(st.success());
 
     print!(
@@ -185,7 +185,7 @@ fn run_creduce_interestingness<P: AsRef<Path>>(src: P) {
                 exit(0);
             }
         }
-        Ok(TestResult::Errored { error }) | Err(error) => println!("test errored: {}", error),
+        Ok(TestResult::Errored { error }) | Err(error) => println!("test errored: {:?}", error),
     }
     exit(1);
 }
@@ -203,7 +203,7 @@ fn run_one_seed(seed: Seed) {
             exit(1);
         }
         Ok(TestResult::Errored { error }) | Err(error) => {
-            println!("test errored: {}", error);
+            println!("test errored: {:?}", error);
             exit(1);
         }
     }
@@ -246,7 +246,7 @@ fn run_many(num_tests: usize) {
             println!("lucet-wasi: {}", String::from_utf8_lossy(&actual));
             exit(1);
         }
-        Err(TestResult::Errored { error }) => println!("test errored: {}", error),
+        Err(TestResult::Errored { error }) => println!("test errored: {:?}", error),
         Err(_) => unreachable!(),
         Ok(()) => println!("all tests passed"),
     }
@@ -258,7 +258,8 @@ fn gen_c<P: AsRef<Path>>(gen_c_path: P, seed: Seed) -> Result<(), Error> {
         .arg(format!("{}", seed))
         .arg("-o")
         .arg(gen_c_path.as_ref())
-        .status()?;
+        .status()
+        .context("executing csmith")?;
     Ok(())
 }
 
