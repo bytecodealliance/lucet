@@ -117,12 +117,12 @@ pub struct CompilerBuilder {
     target_version: TargetVersion,
 }
 
-#[cfg(not(feature = "new-x64-backend"))]
+#[cfg(feature = "old-x64-backend")]
 fn default_backend_variant() -> BackendVariant {
     BackendVariant::Legacy
 }
 
-#[cfg(feature = "new-x64-backend")]
+#[cfg(not(feature = "old-x64-backend"))]
 fn default_backend_variant() -> BackendVariant {
     BackendVariant::MachInst
 }
