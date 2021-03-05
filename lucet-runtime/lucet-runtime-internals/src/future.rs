@@ -10,7 +10,7 @@ use std::task::{Context, Poll};
 
 /// This is the same type defined by the `futures` library, but we don't need the rest of the
 /// library for this purpose.
-type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
 /// A unique type that wraps a boxed future with a boxed return value.
 ///
@@ -19,9 +19,7 @@ type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 struct YieldedFuture(BoxFuture<'static, ResumeVal>);
 
 /// A unique type for a boxed return value. The user never sees this type.
-pub struct ResumeVal(Box<dyn Any + Send + 'static>);
-
-unsafe impl Send for ResumeVal {}
+pub struct ResumeVal(Box<dyn Any + 'static>);
 
 impl Vmctx {
     /// Block on the result of an `async` computation from an instance run by `Instance::run_async`.
@@ -49,9 +47,9 @@ impl Vmctx {
     ///
     /// Note that this method may only be used if `Instance::run_async` was used to run the VM,
     /// otherwise it will terminate the instance with `TerminationDetails::BlockOnNeedsAsync`.
-    pub fn block_on<'a, R>(&'a self, f: impl Future<Output = R> + Send + 'a) -> R
+    pub fn block_on<'a, R>(&'a self, f: impl Future<Output = R> + 'a) -> R
     where
-        R: Any + Send + 'static,
+        R: Any + 'static,
     {
         // Die if we aren't in Instance::run_async
         match self.instance().state {
@@ -234,25 +232,6 @@ impl InstanceHandle {
                     YieldNow::new().await
                 }
             }
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    /// Show that the futures returned by `InstanceHandle` methods are `Send`.
-    ///
-    /// This doesn't actually do anything at runtime, the fact that it compiles is what counts.
-    #[test]
-    fn async_futures_are_send() {
-        fn _assert_send<T: Send>(_: &T) {}
-        #[allow(unreachable_code)]
-        fn _dont_run_me() {
-            let mut _inst: InstanceHandle = unimplemented!();
-            _assert_send(&_inst.run_async("", &[], None));
-            _assert_send(&_inst.run_async_start(None));
         }
     }
 }

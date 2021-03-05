@@ -81,7 +81,7 @@ pub trait VmctxInternal {
     ///
     /// The dynamic type checks used by the other yield methods should make this explicit option
     /// type redundant, however this interface is used to avoid exposing a panic to the C API.
-    fn yield_val_try_val<A: Any + Send + 'static, R: Any + 'static>(&self, val: A) -> Option<R>;
+    fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> Option<R>;
 
     /// Suspend the instance, returning a
     /// [`RunResult::ReachedBound`](../enum.RunResult.html#variant.ReachedBound) to where the
@@ -119,7 +119,7 @@ impl VmctxInternal for Vmctx {
         }
     }
 
-    fn yield_val_try_val<A: Any + Send + 'static, R: Any + 'static>(&self, val: A) -> Option<R> {
+    fn yield_val_try_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> Option<R> {
         self.yield_impl::<A, R>(
             val, /* borrow_check = */ true, /* bound_expiration = */ false,
         );
@@ -395,7 +395,7 @@ impl Vmctx {
     ///
     /// After suspending, the instance may be resumed by the host using
     /// [`Instance::resume()`](../struct.Instance.html#method.resume).
-    pub fn yield_val<A: Any + Send + 'static>(&self, val: A) {
+    pub fn yield_val<A: Any + 'static>(&self, val: A) {
         self.yield_val_expecting_val::<A, EmptyYieldVal>(val);
     }
 
@@ -409,7 +409,7 @@ impl Vmctx {
     /// After suspending, the instance may be resumed by calling
     /// [`Instance::resume_with_val()`](../struct.Instance.html#method.resume_with_val) from the
     /// host with a value of type `R`.
-    pub fn yield_val_expecting_val<A: Any + Send + 'static, R: Any + 'static>(&self, val: A) -> R {
+    pub fn yield_val_expecting_val<A: Any + 'static, R: Any + 'static>(&self, val: A) -> R {
         self.yield_impl::<A, R>(
             val, /* borrow_check = */ true, /* bound_expiration = */ false,
         );
@@ -422,7 +422,7 @@ impl Vmctx {
     /// check of Vmctx resources is performed. This should be `true` in every
     /// case except for use from `Vmctx::block_on`, whose safety is guaranteed
     /// by the construction of `InstanceHandle::run_async`.
-    pub(crate) fn yield_impl<A: Any + Send + 'static, R: Any + 'static>(
+    pub(crate) fn yield_impl<A: Any + 'static, R: Any + 'static>(
         &self,
         val: A,
         borrow_check: bool,

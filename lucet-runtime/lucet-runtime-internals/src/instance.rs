@@ -1552,7 +1552,7 @@ unsafe impl Sync for TerminationDetails {}
 /// The value yielded by an instance through a [`Vmctx`](vmctx/struct.Vmctx.html) and returned to
 /// the host.
 pub struct YieldedVal {
-    val: Box<dyn Any + Send + 'static>,
+    val: Box<dyn Any + 'static>,
 }
 
 impl std::fmt::Debug for YieldedVal {
@@ -1566,7 +1566,7 @@ impl std::fmt::Debug for YieldedVal {
 }
 
 impl YieldedVal {
-    pub(crate) fn new<A: Any + Send + 'static>(val: A) -> Self {
+    pub(crate) fn new<A: Any + 'static>(val: A) -> Self {
         YieldedVal { val: Box::new(val) }
     }
 
@@ -1587,7 +1587,7 @@ impl YieldedVal {
 
     /// Attempt to downcast the yielded value to a concrete type, returning the original
     /// `YieldedVal` if unsuccessful.
-    pub fn downcast<A: Any + Send + 'static>(self) -> Result<Box<A>, YieldedVal> {
+    pub fn downcast<A: Any + 'static>(self) -> Result<Box<A>, YieldedVal> {
         match self.val.downcast() {
             Ok(val) => Ok(val),
             Err(val) => Err(YieldedVal { val }),
@@ -1596,7 +1596,7 @@ impl YieldedVal {
 
     /// Returns a reference to the yielded value if it is present and of type `A`, or `None` if it
     /// isn't.
-    pub fn downcast_ref<A: Any + Send + 'static>(&self) -> Option<&A> {
+    pub fn downcast_ref<A: Any + 'static>(&self) -> Option<&A> {
         self.val.downcast_ref()
     }
 }
