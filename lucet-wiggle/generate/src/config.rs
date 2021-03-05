@@ -66,10 +66,6 @@ impl Parse for ConfigField {
             Ok(ConfigField::Wiggle(w::ConfigField::Witx(
                 w::WitxConf::Literal(input.parse()?),
             )))
-        } else if lookahead.peek(kw::ctx) {
-            input.parse::<kw::ctx>()?;
-            input.parse::<Token![:]>()?;
-            Ok(ConfigField::Wiggle(w::ConfigField::Ctx(input.parse()?)))
         } else if lookahead.peek(kw::errors) {
             input.parse::<kw::errors>()?;
             input.parse::<Token![:]>()?;

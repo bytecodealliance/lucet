@@ -13,7 +13,7 @@ lucet_wasi_generate::bindings!({
     // Describe how to construct the context type. The expression inside the first set
     // of braces will be used each time LucetWasiCtx needs to be constructed.
     // `vmctx: &Vmctx` is a free variable at the construction site.
-    constructor: { LucetWasiCtx { vmctx } },
+    constructor: { crate::LucetWasiCtx { vmctx } },
     // Need to use the exact same error mapping as wasi-common does:
     errors: { errno => Error },
 });
