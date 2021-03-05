@@ -46,13 +46,11 @@ pub struct TestCtx {
 // and the trait definition for the snapshot will end up in `pub mod
 // wasi_snapshot_preview1`.
 //
-// `ctx`: Dispatch method calls to the LucetWasiCtx struct defined here.
 // `constructor`: Show how to construct a ctx struct.
 // `vmctx` is in scope at use sites.
 lucet_wiggle::from_witx!({
     witx: ["$CARGO_MANIFEST_DIR/../wasmtime/crates/wasi-common/WASI/phases/snapshot/witx/wasi_snapshot_preview1.witx"],
-    ctx: LucetWasiCtx,
-    constructor: { LucetWasiCtx::build(vmctx) },
+    constructor: { crate::LucetWasiCtx::build(vmctx) },
 });
 
 /// Convenience type for writing the trait result types.

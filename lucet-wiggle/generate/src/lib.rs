@@ -30,13 +30,12 @@ pub fn bindings(doc: &witx::Document) -> Bindings {
 
 pub fn generate(
     doc: &witx::Document,
-    ctx_type: &Ident,
     ctx_constructor: &TokenStream,
     wiggle_mod_path: &TokenStream,
     pre_hook: &TokenStream,
     post_hook: &TokenStream,
 ) -> TokenStream {
-    let names = wiggle_generate::Names::new(ctx_type, quote!(lucet_wiggle));
+    let names = wiggle_generate::Names::new(quote!(lucet_wiggle));
     let fs = doc.modules().map(|m| {
         let fs = m.funcs().map(|f| {
             let name = format_ident!("{}", hostcall_name(&m, &f));
@@ -66,7 +65,7 @@ pub fn generate(
                 pub fn #name(vmctx: &lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #ret_ty {
                     { #pre_hook }
                     let memory = lucet_wiggle::runtime::LucetMemory::new(vmctx);
-                    let mut ctx: #ctx_type = #ctx_constructor;
+                    let mut ctx = #ctx_constructor;
                     let r = super::#mod_name::#method_name(&ctx, &memory, #(#arg_names),*);
                     { #post_hook }
                     match r {
@@ -90,7 +89,6 @@ pub fn generate(
     quote! {
         pub mod hostcalls {
             use lucet_runtime::lucet_hostcall;
-            use super::#ctx_type;
             use #wiggle_mod_path::types::*;
             #(#fs)*
             /// Lucet-runtime expects hostcalls to be resolved by the runtime
