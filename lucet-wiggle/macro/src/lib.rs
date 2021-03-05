@@ -20,6 +20,7 @@ pub fn from_witx(args: TokenStream) -> TokenStream {
         &quote!(super),
         &config.pre_hook.unwrap_or_default(),
         &config.post_hook.unwrap_or_default(),
+        &codegen_settings,
     ));
     TokenStream::from(ts)
 }
