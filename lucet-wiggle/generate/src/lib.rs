@@ -34,6 +34,7 @@ pub fn generate(
     wiggle_mod_path: &TokenStream,
     pre_hook: &TokenStream,
     post_hook: &TokenStream,
+    codegen_settings: &wiggle_generate::CodegenSettings,
 ) -> TokenStream {
     let names = wiggle_generate::Names::new(quote!(lucet_wiggle));
     let fs = doc.modules().map(|m| {
@@ -59,6 +60,16 @@ pub fn generate(
             };
             let mod_name = names.module(&m.name);
             let method_name = names.func(&f.name);
+
+            let body = if codegen_settings.is_async(&m, &f) {
+                quote!(vmctx.block_on(async move {
+                    super::#mod_name::#method_name(&ctx, &memory, #(#arg_names),*)
+                }))
+            } else {
+                quote!(
+                    super::#mod_name::#method_name(&ctx, &memory, #(#arg_names),*)
+                )
+            };
             quote! {
                 #[lucet_hostcall]
                 #[no_mangle]
@@ -66,7 +77,7 @@ pub fn generate(
                     { #pre_hook }
                     let memory = lucet_wiggle::runtime::LucetMemory::new(vmctx);
                     let mut ctx = #ctx_constructor;
-                    let r = super::#mod_name::#method_name(&ctx, &memory, #(#arg_names),*);
+                    let r = #body;
                     { #post_hook }
                     match r {
                         Ok(r) => { r },
