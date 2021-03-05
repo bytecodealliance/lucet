@@ -63,7 +63,7 @@ pub fn generate(
 
             let body = if codegen_settings.is_async(&m, &f) {
                 quote!(vmctx.block_on(async move {
-                    super::#mod_name::#method_name(&ctx, &memory, #(#arg_names),*)
+                    super::#mod_name::#method_name(&ctx, &memory, #(#arg_names),*).await
                 }))
             } else {
                 quote!(
