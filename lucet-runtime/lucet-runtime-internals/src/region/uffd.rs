@@ -69,7 +69,12 @@ fn wake_invalid_access(
             .map_err(|e| Error::InternalError(e.into()))?;
     }
 
-    inst.alloc_mut().invalid_pages.push((page_addr, page_size));
+    let pages = &mut inst.alloc_mut().invalid_pages;
+    pages.push((page_addr, page_size));
+
+    if pages.len() > 2 {
+        tracing::warn!("more than two invalid page faults were observed for a single instance");
+    }
 
     uffd.wake(page_addr as _, page_size)
         .map_err(|e| Error::InternalError(e.into()))?;
