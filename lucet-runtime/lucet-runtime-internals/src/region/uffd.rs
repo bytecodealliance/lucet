@@ -9,7 +9,7 @@ use crate::WASM_PAGE_SIZE;
 use crate::{lucet_bail, lucet_ensure, lucet_format_err};
 use libc::c_void;
 use nix::poll;
-use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
+use nix::sys::mman::{madvise, mmap, mprotect, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
 use std::sync::{Arc, Mutex, Weak};
@@ -57,6 +57,38 @@ pub struct UffdRegion {
 unsafe impl Send for UffdRegion {}
 unsafe impl Sync for UffdRegion {}
 
+fn wake_invalid_access(
+    inst: &mut Instance,
+    uffd: &Uffd,
+    page_addr: usize,
+    page_size: usize,
+) -> Result<(), Error> {
+    // Set the protection to NONE to induce a SIGBUS for the access on the next retry
+    unsafe {
+        mprotect(page_addr as _, page_size, ProtFlags::PROT_NONE)
+            .map_err(|e| Error::InternalError(e.into()))?;
+    }
+
+    inst.alloc_mut().invalid_pages.push((page_addr, page_size));
+
+    uffd.wake(page_addr as _, page_size)
+        .map_err(|e| Error::InternalError(e.into()))?;
+
+    Ok(())
+}
+
+fn reset_invalid_pages(alloc: &mut Alloc) -> Result<(), Error> {
+    // Reset the protection level for invalid page accesses
+    for (addr, len) in alloc.invalid_pages.drain(..) {
+        unsafe {
+            mprotect(addr as _, len, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE)
+                .map_err(|e| Error::InternalError(e.into()))?;
+        }
+    }
+
+    Ok(())
+}
+
 fn page_fault_handler(
     fault_addr: usize,
     config: &UffdConfig,
@@ -103,24 +135,20 @@ fn page_fault_handler(
         );
     }
 
-    let alloc = inst.alloc();
-    let loc = alloc.addr_location(fault_addr as *const c_void);
+    let loc = inst.alloc().addr_location(fault_addr as *const c_void);
     match loc {
         AddrLocation::InaccessibleHeap | AddrLocation::StackGuard => {
             // page fault occurred out of bounds; trigger a fault by waking the faulting
             // thread without copying or zeroing
-            uffd.wake(fault_page as *mut c_void, host_page_size())
-                .map_err(|e| Error::InternalError(e.into()))?;
+            wake_invalid_access(inst, &uffd, fault_page as _, host_page_size())?;
         }
         AddrLocation::SigStackGuard | AddrLocation::Unknown => {
             tracing::error!("UFFD pagefault at fatal location: {:?}", loc);
-            uffd.wake(fault_page as *mut c_void, host_page_size())
-                .map_err(|e| Error::InternalError(e.into()))?;
+            wake_invalid_access(inst, &uffd, fault_page as _, host_page_size())?;
         }
         AddrLocation::Globals | AddrLocation::SigStack => {
             tracing::error!("UFFD pagefault at unexpected location: {:?}", loc);
-            uffd.wake(fault_page as *mut c_void, host_page_size())
-                .map_err(|e| Error::InternalError(e.into()))?;
+            wake_invalid_access(inst, &uffd, fault_page as _, host_page_size())?;
         }
         AddrLocation::Stack => match config.stack_init {
             Disposition::Lazy => unsafe {
@@ -143,14 +171,14 @@ fn page_fault_handler(
                 config,
                 &uffd,
                 inst.module(),
-                alloc,
+                inst.alloc(),
                 fault_page as *mut c_void,
             )?,
             HeapPageSize::Wasm => WasmPageSizedUffdStrategy.heap_fault(
                 config,
                 &uffd,
                 inst.module(),
-                alloc,
+                inst.alloc(),
                 fault_page as *mut c_void,
             )?,
         },
@@ -380,6 +408,7 @@ impl RegionInternal for UffdRegion {
             heap_memory_size_limit,
             slot: Some(slot),
             region,
+            invalid_pages: Vec::new(),
         };
 
         let mut inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
@@ -398,6 +427,9 @@ impl RegionInternal for UffdRegion {
             panic!("heap is not page-aligned");
         }
 
+        // Reset the protection level for invalid page accesses
+        reset_invalid_pages(alloc).expect("invalid pages are reset during drop");
+
         // set dontneed for everything past the `Instance` page
         let ptr = (slot.start as usize + instance_heap_offset()) as *mut c_void;
         let len = slot.limits.total_memory_size() - instance_heap_offset();
@@ -414,6 +446,9 @@ impl RegionInternal for UffdRegion {
     }
 
     fn reset_heap(&self, alloc: &mut Alloc, module: &dyn Module) -> Result<(), Error> {
+        // Reset the protection level for invalid page accesses
+        reset_invalid_pages(alloc)?;
+
         // zero the heap, if any of it is currently accessible
         if alloc.heap_accessible_size > 0 {
             unsafe {
