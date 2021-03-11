@@ -130,11 +130,15 @@ pub struct Alloc {
     pub heap_memory_size_limit: usize,
     pub slot: Option<Slot>,
     pub region: Arc<dyn RegionInternal>,
+    // The uffd region needs to keep track of accesses to pages that were "invalid" (i.e. should
+    // signal SIGBUS when accessed) so that the pages can be reset back to the appropriate
+    // protection level.
+    #[cfg(all(target_os = "linux", feature = "uffd"))]
+    pub invalid_pages: Vec<(usize, usize)>,
 }
 
 impl Drop for Alloc {
     fn drop(&mut self) {
-        // eprintln!("Alloc::drop()");
         self.region.clone().drop_alloc(self);
     }
 }

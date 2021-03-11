@@ -8,7 +8,7 @@ use crate::sysdeps::host_page_size;
 use libc::c_void;
 #[cfg(not(target_os = "linux"))]
 use libc::memset;
-use nix::sys::mman::{madvise, mmap, munmap, MapFlags, MmapAdvise, ProtFlags};
+use nix::sys::mman::{madvise, mmap, mprotect, munmap, MapFlags, MmapAdvise, ProtFlags};
 use std::ptr;
 use std::sync::{Arc, RwLock, Weak};
 
@@ -140,6 +140,8 @@ impl RegionInternal for MmapRegion {
             heap_memory_size_limit,
             slot: Some(slot),
             region,
+            #[cfg(all(target_os = "linux", feature = "uffd"))]
+            invalid_pages: Vec::new(),
         };
 
         // Though this is a potential early return from the function, the Drop impl
@@ -489,11 +491,6 @@ unsafe fn mmap_aligned(
     }
 
     Ok(aligned as *mut c_void)
-}
-
-// TODO: remove this once `nix` PR https://github.com/nix-rust/nix/pull/991 is merged
-unsafe fn mprotect(addr: *mut c_void, length: libc::size_t, prot: ProtFlags) -> nix::Result<()> {
-    nix::errno::Errno::result(libc::mprotect(addr, length, prot.bits())).map(drop)
 }
 
 #[cfg(test)]
