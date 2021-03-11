@@ -11,7 +11,7 @@ The following instructions only work on Ubuntu. They install a recent version of
 First, the `curl` and `cmake` packages must be installed:
 
 ```sh
-apt install curl ca-certificates cmake
+apt install curl ca-certificates cmake llvm
 ```
 
 You will need to install `wasi-sdk` as well. Note that you may need to run `dpkg` with elevated
