@@ -44,7 +44,6 @@ impl std::str::FromStr for VersionInfo {
     fn from_str(s: &str) -> Result<VersionInfo, Self::Err> {
         let re = regex::Regex::new(r"^(\d+)\.(\d+)\.(\d+)(\-[0-9a-f]{8})?$").unwrap();
         let captures = re.captures(s).ok_or("malformed")?;
-        println!("{:?}", captures);
         let major = str::parse::<u16>(&captures[1]).map_err(|_| "major isnt u16")?;
         let minor = str::parse::<u16>(&captures[2]).map_err(|_| "minor isnt u16")?;
         let patch = str::parse::<u16>(&captures[3]).map_err(|_| "patch isnt u16")?;
