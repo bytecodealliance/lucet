@@ -115,6 +115,7 @@ pub struct CompilerBuilder {
     canonicalize_nans: bool,
     validator: Option<Validator>,
     target_version: TargetVersion,
+    version_info: Option<VersionInfo>,
 }
 
 #[cfg(feature = "old-x64-backend")]
@@ -139,6 +140,7 @@ impl CompilerBuilder {
             canonicalize_nans: false,
             validator: None,
             target_version: TargetVersion::default(),
+            version_info: None,
         }
     }
 
@@ -239,6 +241,15 @@ impl CompilerBuilder {
         self
     }
 
+    pub fn version_info(&mut self, version_info: Option<VersionInfo>) {
+        self.version_info = version_info;
+    }
+
+    pub fn with_version_info(mut self, version_info: Option<VersionInfo>) -> Self {
+        self.version_info(version_info);
+        self
+    }
+
     pub fn create<'a>(
         &'a self,
         wasm_binary: &'a [u8],
@@ -255,6 +266,7 @@ impl CompilerBuilder {
             self.count_instructions,
             self.validator.clone(),
             self.canonicalize_nans,
+            self.version_info.clone(),
         )
     }
 }
@@ -270,6 +282,7 @@ pub struct Compiler<'a> {
     canonicalize_nans: bool,
     function_bodies:
         HashMap<UniqueFuncIndex, (FuncValidator<ValidatorResources>, FunctionBody<'a>)>,
+    version_info: Option<VersionInfo>,
 }
 
 impl<'a> Compiler<'a> {
@@ -284,6 +297,7 @@ impl<'a> Compiler<'a> {
         count_instructions: bool,
         validator: Option<Validator>,
         canonicalize_nans: bool,
+        version_info: Option<VersionInfo>,
     ) -> Result<Self, Error> {
         let mk_isa = || {
             Self::target_isa(
@@ -324,6 +338,7 @@ impl<'a> Compiler<'a> {
             variant,
             canonicalize_nans,
             function_bodies: module_validation.function_bodies,
+            version_info,
         })
     }
 
@@ -499,8 +514,9 @@ impl<'a> Compiler<'a> {
             false,
         )?;
 
-        let version =
-            VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes());
+        let version = self.version_info.unwrap_or_else(|| {
+            VersionInfo::current(include_str!(concat!(env!("OUT_DIR"), "/commit_hash")).as_bytes())
+        });
 
         version.write_to(&mut native_data)?;
 
