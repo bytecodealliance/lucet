@@ -60,6 +60,7 @@ mod module_data {
             false,
             None,
             false,
+            None,
         )
         .expect("compiling exported_import");
         let mdata = c.module_data().unwrap();
@@ -555,6 +556,7 @@ mod validate {
             false,
             Some(v),
             false,
+            None,
         )
         .expect("compile");
         let _obj = c.object_file().expect("codegen");

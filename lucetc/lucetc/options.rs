@@ -1,6 +1,8 @@
 use anyhow::Error;
 use clap::{Arg, ArgMatches, Values};
-use lucetc::{CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu, TargetVersion};
+use lucetc::{
+    CpuFeatures, HeapSettings, OptLevel, SpecificFeature, TargetCpu, TargetVersion, VersionInfo,
+};
 use std::path::PathBuf;
 use std::str::FromStr;
 use target_lexicon::{Architecture, Triple};
@@ -124,6 +126,7 @@ pub struct Options {
     pub target: Triple,
     pub target_version: TargetVersion,
     pub translate_wat: bool,
+    pub version_info: Option<VersionInfo>,
 }
 
 impl Options {
@@ -226,6 +229,9 @@ impl Options {
         let pk_path = m.value_of("pk_path").map(PathBuf::from);
         let count_instructions = m.is_present("count_instructions");
         let translate_wat = !m.is_present("no_translate_wat");
+        let version_info = m
+            .value_of("version_info")
+            .map(|v| VersionInfo::from_str(v).expect("parsing version-info"));
 
         let error_style = match m.value_of("error_style") {
             None => ErrorStyle::default(),
@@ -258,6 +264,7 @@ impl Options {
             target,
             target_version,
             translate_wat,
+            version_info,
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -510,6 +517,13 @@ SSE3 but not AVX:
                         .help("MacOS SDK version to support"),
                 );
         }
+
+        options = options.arg(
+            Arg::with_name("version_info")
+                .long("--version-info")
+                .takes_value(true)
+                .help("Override compiler version info in emitted object code"),
+        );
 
         let matches = options.get_matches();
         Self::from_args(&matches)

@@ -1,5 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::cmp::min;
+use std::convert::TryInto;
 use std::fmt;
 use std::io;
 
@@ -35,6 +36,85 @@ impl fmt::Display for VersionInfo {
             )?;
         }
         Ok(())
+    }
+}
+
+impl std::str::FromStr for VersionInfo {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<VersionInfo, Self::Err> {
+        let re = regex::Regex::new(r"^(\d+)\.(\d+)\.(\d+)(\-[0-9a-f]{8})?$").unwrap();
+        let captures = re.captures(s).ok_or("malformed")?;
+        let major = str::parse::<u16>(&captures[1]).map_err(|_| "major isnt u16")?;
+        let minor = str::parse::<u16>(&captures[2]).map_err(|_| "minor isnt u16")?;
+        let patch = str::parse::<u16>(&captures[3]).map_err(|_| "patch isnt u16")?;
+        if let Some(version_hash) = captures.get(4) {
+            // Get it as a str, drop the leading dash
+            let chars = &version_hash.as_str()[1..];
+            let array = chars
+                .as_bytes()
+                .try_into()
+                .map_err(|_| "hash must be 8 bytes")?;
+            Ok(VersionInfo::new(major, minor, patch, array))
+        } else {
+            Ok(VersionInfo::new(major, minor, patch, [0; 8]))
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn valid_version_info_strings() {
+        use super::VersionInfo;
+        use std::str::FromStr;
+
+        let v = VersionInfo::from_str("1.2.3").unwrap();
+        assert_eq!(v.major, 1);
+        assert_eq!(v.minor, 2);
+        assert_eq!(v.patch, 3);
+        assert_eq!(v.version_hash, [0; 8]);
+
+        let v = VersionInfo::from_str("44.5.6666-abcdef12").unwrap();
+        assert_eq!(v.major, 44);
+        assert_eq!(v.minor, 5);
+        assert_eq!(v.patch, 6666);
+        assert_eq!(
+            v.version_hash,
+            [
+                'a' as u8, 'b' as u8, 'c' as u8, 'd' as u8, 'e' as u8, 'f' as u8, '1' as u8,
+                '2' as u8
+            ]
+        );
+    }
+
+    #[test]
+    fn invalid_version_info_strings() {
+        use super::VersionInfo;
+        use std::str::FromStr;
+
+        // Trailing space
+        let v = VersionInfo::from_str("1.2.3 ").unwrap_err();
+        assert_eq!(v, "malformed");
+
+        // Leading space
+        let v = VersionInfo::from_str(" 1.2.3").unwrap_err();
+        assert_eq!(v, "malformed");
+
+        // No version hash
+        let v = VersionInfo::from_str("1.2.3-").unwrap_err();
+        assert_eq!(v, "malformed");
+
+        // hash too short
+        let v = VersionInfo::from_str("1.2.3-abcde").unwrap_err();
+        assert_eq!(v, "malformed");
+
+        // hash uppercase
+        let v = VersionInfo::from_str("1.2.3-ABCDEF12").unwrap_err();
+        assert_eq!(v, "malformed");
+
+        // hash too long
+        let v = VersionInfo::from_str("1.2.3-abcdef123").unwrap_err();
+        assert_eq!(v, "malformed");
     }
 }
 

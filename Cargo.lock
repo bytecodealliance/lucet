@@ -1033,6 +1033,7 @@ dependencies = [
  "memoffset 0.5.6",
  "minisign",
  "object 0.22.0",
+ "regex",
  "serde",
  "serde-big-array",
  "serde_json",

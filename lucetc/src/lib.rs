@@ -28,7 +28,7 @@ pub use crate::{
     heap::HeapSettings,
     load::read_module,
 };
-pub use lucet_module::bindings::Bindings;
+pub use lucet_module::{bindings::Bindings, VersionInfo};
 use signature::{PublicKey, SecretKey};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -87,6 +87,9 @@ pub trait LucetcOpts {
 
     fn validator(&mut self, validator: Validator);
     fn with_validator(self, validator: Validator) -> Self;
+
+    fn version_info(&mut self, version_info: VersionInfo);
+    fn with_version_info(self, version_info: VersionInfo) -> Self;
 
     fn min_reserved_size(&mut self, min_reserved_size: u64);
     fn with_min_reserved_size(self, min_reserved_size: u64) -> Self;
@@ -183,6 +186,15 @@ impl<T: AsLucetc> LucetcOpts for T {
 
     fn with_validator(mut self, validator: Validator) -> Self {
         self.validator(validator);
+        self
+    }
+
+    fn version_info(&mut self, version_info: VersionInfo) {
+        self.as_lucetc().builder.version_info(Some(version_info));
+    }
+
+    fn with_version_info(mut self, version_info: VersionInfo) -> Self {
+        self.version_info(version_info);
         self
     }
 

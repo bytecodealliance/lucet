@@ -117,6 +117,10 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.validator(validator);
     }
 
+    if let Some(version_info) = &opts.version_info {
+        c.version_info(version_info.clone());
+    }
+
     if let Some(min_reserved_size) = opts.min_reserved_size {
         c.min_reserved_size(min_reserved_size);
     }
