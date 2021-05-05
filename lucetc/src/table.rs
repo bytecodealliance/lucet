@@ -39,8 +39,7 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
             return Err(Error::Unsupported(message));
         }
 
-        let final_len = initializer
-            .offset
+        let final_len = (initializer.offset as usize)
             .checked_add(initializer.elements.len())
             // `offset` comes from a Wasm i32, so it can't be very big. To observe overflow,
             // `initializer.elements.len()` would have to be greater than `usize::MAX - u32::MAX`,
@@ -54,7 +53,7 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
             ));
         }
         for (ix, func_ix) in initializer.elements.iter().enumerate() {
-            elems[initializer.offset + ix] = Elem::Func(*func_ix);
+            elems[initializer.offset as usize + ix] = Elem::Func(*func_ix);
         }
     }
 

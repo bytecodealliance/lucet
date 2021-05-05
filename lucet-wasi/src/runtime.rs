@@ -1,5 +1,5 @@
 use lucet_runtime::vmctx::Vmctx;
-use lucet_wiggle::{GuestError, GuestPtr};
+use lucet_wiggle::GuestPtr;
 use std::cell::Ref;
 use std::convert::TryInto;
 use tracing::debug;
@@ -33,13 +33,6 @@ pub struct LucetWasiCtx<'a> {
 impl<'a> LucetWasiCtx<'a> {
     pub fn wasi(&self) -> Ref<WasiCtx> {
         self.vmctx.get_embed_ctx()
-    }
-}
-
-impl<'a> types::GuestErrorConversion for LucetWasiCtx<'a> {
-    fn into_errno(&self, e: GuestError) -> types::Errno {
-        debug!("Guest error: {:?}", e);
-        e.into()
     }
 }
 

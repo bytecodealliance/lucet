@@ -49,6 +49,7 @@ pub fn bindings(args: TokenStream) -> TokenStream {
         &quote!(wasi_common::snapshots::preview_1),
         config.pre_hook.as_ref().unwrap_or(&empty),
         config.post_hook.as_ref().unwrap_or(&empty),
+        &codegen_settings,
     ));
 
     TokenStream::from(ts)

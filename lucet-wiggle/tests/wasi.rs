@@ -1,15 +1,14 @@
 use lucet_runtime::vmctx::Vmctx;
 use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
 use lucet_wasi_sdk::{CompileOpts, Link, LinkOpt, LinkOpts};
-use lucet_wiggle::{GuestError, GuestErrorType, GuestPtr};
+use lucet_wiggle::{GuestErrorType, GuestPtr};
 use lucetc::{Lucetc, LucetcOpts};
-use std::cell::{RefCell, RefMut};
+use std::cell::RefMut;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Context struct used to implement the wiggle trait:
 pub struct LucetWasiCtx<'a> {
-    guest_errors: RefCell<Vec<GuestError>>,
     vmctx: &'a Vmctx,
 }
 
@@ -17,10 +16,7 @@ impl<'a> LucetWasiCtx<'a> {
     /// Constructor from vmctx. Given to lucet_wiggle::generate by the `constructor` field in proc
     /// macro.
     pub fn build(vmctx: &'a Vmctx) -> Self {
-        LucetWasiCtx {
-            guest_errors: RefCell::new(Vec::new()),
-            vmctx,
-        }
+        LucetWasiCtx { vmctx }
     }
 
     /// Getter for embed ctx, used in trait implementation
@@ -61,14 +57,6 @@ type Result<T> = std::result::Result<T, types::Errno>;
 impl GuestErrorType for types::Errno {
     fn success() -> types::Errno {
         types::Errno::Success
-    }
-}
-
-impl<'a> types::GuestErrorConversion for LucetWasiCtx<'a> {
-    fn into_errno(&self, e: GuestError) -> types::Errno {
-        eprintln!("GUEST ERROR: {:?}", e);
-        self.guest_errors.borrow_mut().push(e);
-        types::Errno::Io
     }
 }
 

@@ -3,8 +3,8 @@ use crate::error::Error;
 use crate::pointer::NATIVE_POINTER;
 use crate::validate::Validator;
 use cranelift_codegen::entity::{entity_impl, EntityRef, PrimaryMap, SecondaryMap};
-use cranelift_codegen::ir;
 use cranelift_codegen::isa::TargetFrontendConfig;
+use cranelift_codegen::{ir, isa};
 use cranelift_wasm::{
     wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
     DataIndex, ElemIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment,
@@ -42,14 +42,14 @@ impl<'a, T> Exportable<'a, T> {
 #[derive(Debug, Clone)]
 pub struct TableElems {
     pub base: Option<GlobalIndex>,
-    pub offset: usize,
+    pub offset: u32,
     pub elements: Box<[UniqueFuncIndex]>,
 }
 
 #[derive(Debug, Clone)]
 pub struct DataInitializer<'a> {
     pub base: Option<GlobalIndex>,
-    pub offset: usize,
+    pub offset: u32,
     pub data: &'a [u8],
 }
 
@@ -216,11 +216,21 @@ impl<'a> TargetEnvironment for ModuleValidation<'a> {
 }
 
 impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
-    fn declare_type_func(
-        &mut self,
-        wasm_func_type: WasmFuncType,
-        sig: ir::Signature,
-    ) -> WasmResult<()> {
+    fn declare_type_func(&mut self, wasm_func_type: WasmFuncType) -> WasmResult<()> {
+        let cvt = |ty: &WasmType| {
+            ir::AbiParam::new(match ty {
+                WasmType::I32 => ir::types::I32,
+                WasmType::I64 => ir::types::I64,
+                WasmType::F32 => ir::types::F32,
+                WasmType::F64 => ir::types::F64,
+                WasmType::V128 | WasmType::FuncRef | WasmType::ExternRef | WasmType::ExnRef => {
+                    unimplemented!()
+                }
+            })
+        };
+        let mut sig = ir::Signature::new(isa::CallConv::SystemV);
+        sig.params.extend(wasm_func_type.params.iter().map(&cvt));
+        sig.returns.extend(wasm_func_type.returns.iter().map(&cvt));
         self.info.declare_type_func(wasm_func_type, sig)
     }
     fn declare_func_import(
@@ -423,7 +433,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         &mut self,
         table_index: TableIndex,
         base: Option<GlobalIndex>,
-        offset: usize,
+        offset: u32,
         elements: Box<[FuncIndex]>,
     ) -> WasmResult<()> {
         let elements_vec: Vec<FuncIndex> = elements.into();
@@ -466,7 +476,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         &mut self,
         memory_index: MemoryIndex,
         base: Option<GlobalIndex>,
-        offset: usize,
+        offset: u32,
         data: &'a [u8],
     ) -> WasmResult<()> {
         let data_init = DataInitializer { base, offset, data };

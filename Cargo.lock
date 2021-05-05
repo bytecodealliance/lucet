@@ -178,9 +178,9 @@ checksum = "ae44d1a3d5a19df61dd0c8beb138458ac2a53a7ac09eba97d55592540004306b"
 
 [[package]]
 name = "cap-fs-ext"
-version = "0.13.7"
+version = "0.13.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dee87a3a916d6f051fc6809c39c4627f0c3a73b2a803bcfbb5fdf2bdfa1da0cb"
+checksum = "c4a7f9bdd49f3979c659811723041929803c986b3ed5381af726a4082e806c27"
 dependencies = [
  "cap-primitives",
  "cap-std",
@@ -191,9 +191,9 @@ dependencies = [
 
 [[package]]
 name = "cap-primitives"
-version = "0.13.7"
+version = "0.13.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c3e3ea29994a34f3bc67b5396a43c87597d302d9e2e5e3b3d5ba952d86c7b41"
+checksum = "0e206e688244a8f8158f91d77d3d8ed5891eb27aef2542bb26ceb98b970d5597"
 dependencies = [
  "errno",
  "fs-set-times",
@@ -211,18 +211,18 @@ dependencies = [
 
 [[package]]
 name = "cap-rand"
-version = "0.13.2"
+version = "0.13.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd7853689263850e5b446c252e4a0a7876ca8e739c791953c41566fea8204019"
+checksum = "0842ea6c9a2e078ab901b3b805608af65e11fcbfb87024d37fb129b2b74cb1ac"
 dependencies = [
  "rand 0.8.3",
 ]
 
 [[package]]
 name = "cap-std"
-version = "0.13.7"
+version = "0.13.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5f20cbb3055e9c72b16ba45913fe9f92836d2aa7a880e1ffacb8d244f454319"
+checksum = "36d8cb4b761a2fb1ccf0e92d795c717bba9dcb1e54636ee0579fca628abfa305"
 dependencies = [
  "cap-primitives",
  "posish",
@@ -243,9 +243,9 @@ dependencies = [
 
 [[package]]
 name = "cap-time-ext"
-version = "0.13.7"
+version = "0.13.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b684f9db089b0558520076b4eeda2b719a5c4c06f329be96c9497f2b48c3944"
+checksum = "bc5c279d213dfe8f71c02c4cd740bd130d1dce39f45fdcdb745ae3de8a777fbd"
 dependencies = [
  "cap-primitives",
  "once_cell",
@@ -380,16 +380,15 @@ checksum = "8aebca1129a03dc6dc2b127edd729435bbc4a37e1d5f4d7513165089ceb02634"
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.70.0"
+version = "0.73.0"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.70.0"
+version = "0.73.0"
 dependencies = [
- "byteorder",
  "cranelift-bforest",
  "cranelift-codegen-meta",
  "cranelift-codegen-shared",
@@ -398,13 +397,12 @@ dependencies = [
  "log",
  "regalloc",
  "smallvec",
- "target-lexicon",
- "thiserror",
+ "target-lexicon 0.12.0",
 ]
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.70.0"
+version = "0.73.0"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
@@ -412,56 +410,55 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.70.0"
+version = "0.73.0"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.70.0"
+version = "0.73.0"
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.70.0"
+version = "0.73.0"
 dependencies = [
  "cranelift-codegen",
  "log",
  "smallvec",
- "target-lexicon",
+ "target-lexicon 0.12.0",
 ]
 
 [[package]]
 name = "cranelift-module"
-version = "0.70.0"
+version = "0.73.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
  "cranelift-entity",
  "log",
- "thiserror",
 ]
 
 [[package]]
 name = "cranelift-native"
-version = "0.70.0"
+version = "0.73.0"
 dependencies = [
  "cranelift-codegen",
- "target-lexicon",
+ "target-lexicon 0.12.0",
 ]
 
 [[package]]
 name = "cranelift-object"
-version = "0.70.0"
+version = "0.73.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
  "cranelift-module",
  "log",
  "object 0.23.0",
- "target-lexicon",
+ "target-lexicon 0.12.0",
 ]
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.70.0"
+version = "0.73.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -470,7 +467,7 @@ dependencies = [
  "log",
  "smallvec",
  "thiserror",
- "wasmparser 0.76.0",
+ "wasmparser 0.77.0",
 ]
 
 [[package]]
@@ -873,7 +870,7 @@ version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df004cfca50ef23c36850aaaa59ad52cc70d0e90243c3c7737a4dd32dc7a3c4f"
 dependencies = [
- "quick-error",
+ "quick-error 1.2.3",
 ]
 
 [[package]]
@@ -1145,7 +1142,7 @@ dependencies = [
  "lucetc",
  "serde",
  "serde_json",
- "target-lexicon",
+ "target-lexicon 0.11.2",
  "tempfile",
  "thiserror",
  "wabt",
@@ -1224,7 +1221,7 @@ dependencies = [
  "lucet-module",
  "lucet-wasi",
  "lucetc",
- "target-lexicon",
+ "target-lexicon 0.11.2",
  "tempfile",
  "thiserror",
 ]
@@ -1296,7 +1293,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
- "target-lexicon",
+ "target-lexicon 0.12.0",
  "tempfile",
  "thiserror",
  "wabt",
@@ -1586,19 +1583,19 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "0.10.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12e6c80c1139113c28ee4670dc50cc42915228b51f56a9e407f0ec60f966646f"
+checksum = "1e0d9cc07f18492d879586c92b485def06bc850da3118075cd45d50e9c95b0e5"
 dependencies = [
  "bit-set",
  "bitflags",
  "byteorder",
  "lazy_static",
  "num-traits",
- "quick-error",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "rand_xorshift 0.2.0",
+ "quick-error 2.0.0",
+ "rand 0.8.3",
+ "rand_chacha 0.3.0",
+ "rand_xorshift 0.3.0",
  "regex-syntax",
  "rusty-fork",
  "tempfile",
@@ -1609,6 +1606,12 @@ name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
+
+[[package]]
+name = "quick-error"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ac73b1112776fc109b2e61909bc46c7e1bf0d7f690ffb1676553acce16d5cda"
 
 [[package]]
 name = "quote"
@@ -1817,11 +1820,11 @@ dependencies = [
 
 [[package]]
 name = "rand_xorshift"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77d416b86801d23dde1aa643023b775c3a462efc0ed96443add11546cdf1dca8"
+checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
 dependencies = [
- "rand_core 0.5.1",
+ "rand_core 0.6.2",
 ]
 
 [[package]]
@@ -1975,7 +1978,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb3dcc6e454c328bb824492db107ab7c0ae8fcffe4ad210136ef014458c1bc4f"
 dependencies = [
  "fnv",
- "quick-error",
+ "quick-error 1.2.3",
  "tempfile",
  "wait-timeout",
 ]
@@ -2235,6 +2238,12 @@ name = "target-lexicon"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "422045212ea98508ae3d28025bc5aaa2bd4a9cdaecd442a08da2ee620ee9ea95"
+
+[[package]]
+name = "target-lexicon"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64ae3b39281e4b14b8123bdbaddd472b7dfe215e444181f2f9d2443c2444f834"
 
 [[package]]
 name = "tempfile"
@@ -2563,7 +2572,7 @@ checksum = "fd6fbd9a79829dd1ad0cc20627bf1ed606756a7f77edff7b66b7064f9cb327c6"
 
 [[package]]
 name = "wasi-cap-std-sync"
-version = "0.23.0"
+version = "0.26.0"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -2583,7 +2592,7 @@ dependencies = [
 
 [[package]]
 name = "wasi-common"
-version = "0.23.0"
+version = "0.26.0"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -2685,9 +2694,9 @@ checksum = "a950e6a618f62147fd514ff445b2a0b53120d382751960797f85f058c7eda9b9"
 
 [[package]]
 name = "wasmparser"
-version = "0.76.0"
+version = "0.77.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "755a9a4afe3f6cccbbe6d7e965eef44cf260b001f93e547eba84255c1d0187d8"
+checksum = "b35c86d22e720a07d954ebbed772d01180501afe7d03d464f413bb5f8914a8d6"
 
 [[package]]
 name = "wast"
@@ -2710,7 +2719,7 @@ dependencies = [
 
 [[package]]
 name = "wiggle"
-version = "0.23.0"
+version = "0.26.0"
 dependencies = [
  "async-trait",
  "bitflags",
@@ -2722,14 +2731,14 @@ dependencies = [
 
 [[package]]
 name = "wiggle-borrow"
-version = "0.23.0"
+version = "0.26.0"
 dependencies = [
  "wiggle",
 ]
 
 [[package]]
 name = "wiggle-generate"
-version = "0.23.0"
+version = "0.26.0"
 dependencies = [
  "anyhow",
  "heck",
@@ -2742,8 +2751,9 @@ dependencies = [
 
 [[package]]
 name = "wiggle-macro"
-version = "0.23.0"
+version = "0.26.0"
 dependencies = [
+ "proc-macro2 1.0.24",
  "quote 1.0.9",
  "syn 1.0.60",
  "wiggle-generate",

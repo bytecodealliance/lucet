@@ -16,14 +16,14 @@ path = "lucetc/main.rs"
 [dependencies]
 anyhow = "1"
 bincode = "1.1.4"
-cranelift-codegen = { path = "../wasmtime/cranelift/codegen", version = "0.70.0", features = ["x86", "x64"] }
-cranelift-entity = { path = "../wasmtime/cranelift/entity", version = "0.70.0" }
-cranelift-native = { path = "../wasmtime/cranelift/native", version = "0.70.0" }
-cranelift-frontend = { path = "../wasmtime/cranelift/frontend", version = "0.70.0" }
-cranelift-module = { path = "../wasmtime/cranelift/module", version = "0.70.0" }
-cranelift-object = { path = "../wasmtime/cranelift/object", version = "0.70.0" }
-cranelift-wasm = { path = "../wasmtime/cranelift/wasm", version = "0.70.0" }
-target-lexicon = "0.11"
+cranelift-codegen = { path = "../wasmtime/cranelift/codegen", version = "0.73.0", features = ["x86" ] }
+cranelift-entity = { path = "../wasmtime/cranelift/entity", version = "0.73.0" }
+cranelift-native = { path = "../wasmtime/cranelift/native", version = "0.73.0" }
+cranelift-frontend = { path = "../wasmtime/cranelift/frontend", version = "0.73.0" }
+cranelift-module = { path = "../wasmtime/cranelift/module", version = "0.73.0" }
+cranelift-object = { path = "../wasmtime/cranelift/object", version = "0.73.0" }
+cranelift-wasm = { path = "../wasmtime/cranelift/wasm", version = "0.73.0" }
+target-lexicon = "0.12"
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.7.0-dev" }
 witx = { path = "../wasmtime/crates/wasi-common/WASI/tools/witx", version = "0.9" }

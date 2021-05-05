@@ -44,7 +44,7 @@ fn split<'a>(di: &DataInitializer<'a>) -> Vec<(usize, DataInitializer<'a>)> {
             page,
             DataInitializer {
                 base: None,
-                offset: page_offs,
+                offset: page_offs as u32,
                 data: subslice,
             },
         ));
