@@ -1,4 +1,4 @@
-pub use lucet_wiggle_macro::from_witx;
+pub use lucet_wiggle_macro::lucet_integration;
 pub use wiggle::*;
 
 pub mod runtime {

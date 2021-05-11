@@ -2,13 +2,22 @@ use std::convert::TryInto;
 
 lucet_wiggle::from_witx!({
     witx: ["$CARGO_MANIFEST_DIR/tests/atoms.witx"],
-    constructor: { crate::Ctx },
-    async_: {
+    async: {
+        atoms::double_int_return_float
+    }
+});
+
+lucet_wiggle::lucet_integration!({
+    target: crate,
+    witx: ["$CARGO_MANIFEST_DIR/tests/atoms.witx"],
+    ctx: { crate::Ctx },
+    async: {
         atoms::double_int_return_float
     }
 });
 
 pub struct Ctx;
+
 impl wiggle::GuestErrorType for types::Errno {
     fn success() -> Self {
         types::Errno::Ok

@@ -11,38 +11,38 @@ mod kw {
     syn::custom_keyword!(witx);
     syn::custom_keyword!(witx_literal);
     syn::custom_keyword!(ctx);
-    syn::custom_keyword!(errors);
-    syn::custom_keyword!(constructor);
     syn::custom_keyword!(pre_hook);
     syn::custom_keyword!(post_hook);
-    syn::custom_keyword!(async_);
+    syn::custom_keyword!(target);
 }
 
-#[derive(Debug, Clone)]
 pub struct Config {
-    pub wiggle: w::Config,
-    pub constructor: TokenStream,
-    pub pre_hook: Option<TokenStream>,
-    pub post_hook: Option<TokenStream>,
+    pub witx: w::WitxConf,
+    pub async_: w::AsyncConf,
+    pub ctx: TokenStream,
+    pub pre_hook: TokenStream,
+    pub post_hook: TokenStream,
+    pub target: syn::Path,
 }
 
-#[derive(Debug, Clone)]
 pub enum ConfigField {
-    Wiggle(w::ConfigField),
-    Constructor(TokenStream),
+    Witx(w::WitxConf),
+    Async(w::AsyncConf),
+    Ctx(TokenStream),
     PreHook(TokenStream),
     PostHook(TokenStream),
+    Target(syn::Path),
 }
 
 impl Parse for ConfigField {
     fn parse(input: ParseStream) -> Result<Self> {
         let lookahead = input.lookahead1();
-        if lookahead.peek(kw::constructor) {
-            input.parse::<kw::constructor>()?;
+        if lookahead.peek(kw::ctx) {
+            input.parse::<kw::ctx>()?;
             input.parse::<Token![:]>()?;
             let contents;
             let _lbrace = braced!(contents in input);
-            Ok(ConfigField::Constructor(contents.parse()?))
+            Ok(ConfigField::Ctx(contents.parse()?))
         } else if lookahead.peek(kw::pre_hook) {
             input.parse::<kw::pre_hook>()?;
             input.parse::<Token![:]>()?;
@@ -58,23 +58,19 @@ impl Parse for ConfigField {
         } else if lookahead.peek(kw::witx) {
             input.parse::<kw::witx>()?;
             input.parse::<Token![:]>()?;
-            Ok(ConfigField::Wiggle(w::ConfigField::Witx(
-                w::WitxConf::Paths(input.parse()?),
-            )))
+            Ok(ConfigField::Witx(w::WitxConf::Paths(input.parse()?)))
         } else if lookahead.peek(kw::witx_literal) {
             input.parse::<kw::witx_literal>()?;
             input.parse::<Token![:]>()?;
-            Ok(ConfigField::Wiggle(w::ConfigField::Witx(
-                w::WitxConf::Literal(input.parse()?),
-            )))
-        } else if lookahead.peek(kw::async_) {
-            input.parse::<kw::async_>()?;
+            Ok(ConfigField::Witx(w::WitxConf::Literal(input.parse()?)))
+        } else if lookahead.peek(Token![async]) {
+            input.parse::<Token![async]>()?;
             input.parse::<Token![:]>()?;
-            Ok(ConfigField::Wiggle(w::ConfigField::Async(input.parse()?)))
-        } else if lookahead.peek(kw::errors) {
-            input.parse::<kw::errors>()?;
+            Ok(ConfigField::Async(input.parse()?))
+        } else if lookahead.peek(kw::target) {
+            input.parse::<kw::target>()?;
             input.parse::<Token![:]>()?;
-            Ok(ConfigField::Wiggle(w::ConfigField::Error(input.parse()?)))
+            Ok(ConfigField::Target(input.parse()?))
         } else {
             Err(lookahead.error())
         }
@@ -82,38 +78,66 @@ impl Parse for ConfigField {
 }
 
 impl Config {
-    pub fn build(fields: impl Iterator<Item = ConfigField> + Clone, err_loc: Span) -> Result<Self> {
-        let wiggle = w::Config::build(
-            fields.clone().filter_map(|f| match f {
-                ConfigField::Wiggle(w) => Some(w),
-                _ => None,
-            }),
-            err_loc,
-        )?;
-        let mut constructor = None;
+    pub fn build(fields: impl Iterator<Item = ConfigField>, err_loc: Span) -> Result<Self> {
+        let mut witx = None;
+        let mut async_ = None;
+        let mut ctx = None;
         let mut pre_hook = None;
         let mut post_hook = None;
+        let mut target = None;
         for f in fields {
             match f {
-                ConfigField::Constructor(c) => {
-                    constructor = Some(c);
+                ConfigField::Witx(c) => {
+                    if witx.is_some() {
+                        return Err(Error::new(err_loc, "duplicate `witx` field"));
+                    }
+                    witx = Some(c);
+                }
+                ConfigField::Async(c) => {
+                    if async_.is_some() {
+                        return Err(Error::new(err_loc, "duplicate `async` field"));
+                    }
+                    async_ = Some(c);
+                }
+                ConfigField::Ctx(c) => {
+                    if ctx.is_some() {
+                        return Err(Error::new(err_loc, "duplicate `ctx` field"));
+                    }
+                    ctx = Some(c);
                 }
                 ConfigField::PreHook(c) => {
+                    if pre_hook.is_some() {
+                        return Err(Error::new(err_loc, "duplicate `pre_hook` field"));
+                    }
                     pre_hook = Some(c);
                 }
                 ConfigField::PostHook(c) => {
+                    if post_hook.is_some() {
+                        return Err(Error::new(err_loc, "duplicate `post_hook` field"));
+                    }
                     post_hook = Some(c);
                 }
-                ConfigField::Wiggle { .. } => {} // Ignore
+                ConfigField::Target(c) => {
+                    if target.is_some() {
+                        return Err(Error::new(err_loc, "duplicate `target` field"));
+                    }
+                    target = Some(c);
+                }
             }
         }
         Ok(Config {
-            wiggle,
-            constructor: constructor
+            witx: witx
                 .take()
-                .ok_or_else(|| Error::new(err_loc, "`constructor` field required"))?,
-            pre_hook,
-            post_hook,
+                .ok_or_else(|| Error::new(err_loc, "`witx` field required"))?,
+            async_: async_.take().unwrap_or_else(w::AsyncConf::default),
+            ctx: ctx
+                .take()
+                .ok_or_else(|| Error::new(err_loc, "`ctx` field required"))?,
+            pre_hook: pre_hook.take().unwrap_or_else(TokenStream::new),
+            post_hook: post_hook.take().unwrap_or_else(TokenStream::new),
+            target: target
+                .take()
+                .ok_or_else(|| Error::new(err_loc, "`target` field required"))?,
         })
     }
 }

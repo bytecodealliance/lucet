@@ -1288,9 +1288,7 @@ name = "lucet-wiggle-macro"
 version = "0.7.0-dev"
 dependencies = [
  "lucet-wiggle-generate",
- "quote 1.0.9",
  "syn 1.0.67",
- "wiggle-generate 0.26.0",
  "witx",
 ]
 
