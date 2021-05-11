@@ -11,6 +11,13 @@ macro_rules! async_hostcall_tests {
             assert_eq!(asynced_value, value);
         }
 
+
+        #[lucet_hostcall]
+        #[no_mangle]
+        pub fn hostcall_block_on_access_vmctx(vmctx: &Vmctx, address:usize, value: u8) {
+            vmctx.block_on(async move { vmctx.heap_mut()[address] = value });
+        }
+
         $(
             mod $region_id {
                 use lucet_runtime::{DlModule, Error, Limits, Region, RegionCreate, TerminationDetails};
