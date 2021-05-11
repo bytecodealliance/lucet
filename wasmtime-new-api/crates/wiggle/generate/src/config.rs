@@ -287,6 +287,14 @@ pub struct AsyncConf {
     functions: AsyncFunctions,
 }
 
+impl Parse for AsyncConf {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(AsyncConf {
+            functions: input.parse()?,
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum AsyncFunctions {
     Some(HashMap<String, Vec<String>>),

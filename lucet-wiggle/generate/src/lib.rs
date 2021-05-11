@@ -75,7 +75,8 @@ pub fn generate(
                 #[no_mangle]
                 pub fn #name(vmctx: &lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #ret_ty {
                     { #pre_hook }
-                    let memory = lucet_wiggle::runtime::LucetMemory::new(vmctx);
+                    let mut heap = vmctx.heap_mut();
+                    let memory = lucet_wiggle::runtime::LucetMemory::new(&mut *heap);
                     let mut ctx = #ctx_constructor;
                     let r = #body;
                     { #post_hook }
