@@ -1230,6 +1230,7 @@ dependencies = [
 name = "lucet-wiggle"
 version = "0.7.0-dev"
 dependencies = [
+ "futures-executor",
  "lucet-runtime",
  "lucet-wasi-sdk",
  "lucet-wiggle-generate",

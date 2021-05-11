@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 lucet_wiggle::from_witx!({
     witx: ["$CARGO_MANIFEST_DIR/tests/atoms.witx"],
     constructor: { crate::Ctx },
@@ -23,105 +25,76 @@ impl atoms::Atoms for Ctx {
         &self,
         an_int: u32,
     ) -> Result<types::AliasToFloat, types::Errno> {
+        println!("DOUBLE INT RETURN FLOAT: {}", an_int);
         Ok((an_int as f32) * 2.0)
     }
 }
-/*
+
+/// Test the above generated code by running Wasm code that calls into it.
 #[test]
-fn test_sync_host_func() {
-    let store = async_store();
+fn main() {
+    use tempfile::TempDir;
+    use std::path::PathBuf;
+    use lucetc::{Lucetc, LucetcOpts};
+    use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
+    // The `init` function ensures that all of the host call functions are
+    // linked into the executable.
+    crate::hostcalls::init();
+    // Same for lucet-runtime:
+    lucet_runtime::lucet_internal_ensure_linked();
 
-    let ctx = Rc::new(RefCell::new(Ctx));
-    let atoms = Atoms::new(&store, ctx.clone());
+    // Temporary directory for outputs.
+    let workdir = TempDir::new().expect("create working directory");
 
-    let shim_mod = shim_module(&store);
-    let mut linker = wasmtime::Linker::new(&store);
-    atoms.add_to_linker(&mut linker).unwrap();
-    let shim_inst = run(linker.instantiate_async(&shim_mod)).unwrap();
+    // We used lucet_wiggle to define the hostcall functions, so we must use
+    // it to define our bindings as well. This is a good thing! No more
+    // bindings json files to keep in sync with implementations.
+    let witx_path = PathBuf::from("tests/atoms.witx");
+    let witx_doc = lucet_wiggle::witx::load(&[witx_path]).expect("load atoms.witx");
+    let bindings = lucet_wiggle_generate::bindings(&witx_doc);
 
-    let results = run(shim_inst
-        .get_func("int_float_args_shim")
-        .unwrap()
-        .call_async(&[0i32.into(), 123.45f32.into()]))
-    .unwrap();
+    // Build a shared object with Lucetc:
+    let native_build = Lucetc::new("tests/atoms_async_guest.wat").with_bindings(bindings);
+    let so_file = workdir.path().join("out.so");
+    native_build
+        .shared_object_file(so_file.clone())
+        .expect("build so");
 
-    assert_eq!(results.len(), 1, "one return value");
+    // Load shared object into this executable.
+    let module = DlModule::load(so_file).expect("load so");
+
+    // Create an instance:
+    let region = MmapRegion::create(1, &Limits::default()).expect("create region");
+    let mut inst = region.new_instance(module).expect("create instance");
+    inst.run_start().expect("start section runs");
+
+    // Create a Ctx used by the host calls, an
+    let ctx = Ctx;
+    inst.insert_embed_ctx(ctx);
+
+    // Synchronously run a function that does not make an async hostcall.
+    let res = inst.run("int_float_args_shim", &[0i32.into(), 123.45f32.into()]).expect("run int_float_args_shim").unwrap_returned();
+
+    assert_eq!(res.as_u32(),types::Errno::Ok as u32);
+
+    inst.reset().expect("can reset instance");
+
+    let input = 123;
+    let result_location = 0;
+
+    let results = futures_executor::block_on(inst
+        .run_async("double_int_return_float_shim", &[input.into(), result_location.into()], Some(10000)))
+    .expect("run_async double_int_return_float_shim");
+
     assert_eq!(
-        results[0].unwrap_i32(),
-        types::Errno::Ok as i32,
-        "int_float_args errno"
-    );
-}
-
-#[test]
-fn test_async_host_func() {
-    let store = async_store();
-
-    let ctx = Rc::new(RefCell::new(Ctx));
-    let atoms = Atoms::new(&store, ctx.clone());
-
-    let shim_mod = shim_module(&store);
-    let mut linker = wasmtime::Linker::new(&store);
-    atoms.add_to_linker(&mut linker).unwrap();
-    let shim_inst = run(linker.instantiate_async(&shim_mod)).unwrap();
-
-    let input: i32 = 123;
-    let result_location: i32 = 0;
-
-    let results = run(shim_inst
-        .get_func("double_int_return_float_shim")
-        .unwrap()
-        .call_async(&[input.into(), result_location.into()]))
-    .unwrap();
-
-    assert_eq!(results.len(), 1, "one return value");
-    assert_eq!(
-        results[0].unwrap_i32(),
+        results.as_i32(),
         types::Errno::Ok as i32,
         "double_int_return_float errno"
     );
 
     // The actual result is in memory:
-    let mem = shim_inst.get_memory("memory").unwrap();
-    let mut result_bytes: [u8; 4] = [0, 0, 0, 0];
-    mem.read(result_location as usize, &mut result_bytes)
-        .unwrap();
-    let result = f32::from_le_bytes(result_bytes);
+    let r = result_location as usize..(result_location as usize + 4);
+    let result = f32::from_le_bytes(inst.heap()[r].try_into().unwrap());
     assert_eq!((input * 2) as f32, result);
-}
-fn async_store() -> wasmtime::Store {
-    let engine = wasmtime::Engine::default();
-    wasmtime::Store::new_async(&engine)
-}
 
-// Wiggle expects the caller to have an exported memory. Wasmtime can only
-// provide this if the caller is a WebAssembly module, so we need to write
-// a shim module:
-fn shim_module(store: &wasmtime::Store) -> wasmtime::Module {
-    wasmtime::Module::new(
-        store.engine(),
-        r#"
-        (module
-            (memory 1)
-            (export "memory" (memory 0))
-            (import "atoms" "int_float_args" (func $int_float_args (param i32 f32) (result i32)))
-            (import "atoms" "double_int_return_float" (func $double_int_return_float (param i32 i32) (result i32)))
-
-            (func $int_float_args_shim (param i32 f32) (result i32)
-                local.get 0
-                local.get 1
-                call $int_float_args
-            )
-            (func $double_int_return_float_shim (param i32 i32) (result i32)
-                local.get 0
-                local.get 1
-                call $double_int_return_float
-            )
-            (export "int_float_args_shim" (func $int_float_args_shim))
-            (export "double_int_return_float_shim" (func $double_int_return_float_shim))
-        )
-    "#,
-    )
-    .unwrap()
 }
-*/
