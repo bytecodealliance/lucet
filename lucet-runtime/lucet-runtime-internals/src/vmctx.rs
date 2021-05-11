@@ -145,8 +145,8 @@ impl Vmctx {
     /// argument of a function with the `#[lucet_hostcall]` attribute, which must have the type
     /// `&Vmctx`.
     pub unsafe fn from_raw(vmctx: *const lucet_vmctx) -> Vmctx {
+        instance_ensure_tls(vmctx);
         let inst = instance_from_vmctx(vmctx);
-        assert!(inst.valid_magic());
 
         let res = Vmctx {
             vmctx,
@@ -444,6 +444,10 @@ impl Vmctx {
         }
 
         HOST_CTX.with(|host_ctx| unsafe { Context::swap(&mut inst.ctx, &mut *host_ctx.get()) });
+
+        // Upon returning to this context, we may be on a different thread. Make sure that vmctx
+        // matches the instance in thread-local storage:
+        unsafe { instance_ensure_tls(self.vmctx) };
     }
 
     /// Take and return the value passed to
@@ -483,22 +487,19 @@ impl Vmctx {
     }
 }
 
-/// Get an `Instance` from the `vmctx` pointer.
+/// Ensure that the instance corresponding to the vmctx pointer matches the CURRENT_INSTANCE in
+/// thread-local storage.
 ///
-/// Only safe to call from within the guest context.
-pub unsafe fn instance_from_vmctx<'a>(vmctx: *const lucet_vmctx) -> &'a mut Instance {
-    assert!(!vmctx.is_null(), "vmctx is not null");
-
-    let inst_ptr = (vmctx as usize - instance_heap_offset()) as *mut Instance;
-
-    // We shouldn't actually need to access the thread local, only the exception handler should
-    // need to. But, as long as the thread local exists, we should make sure that the guest
-    // hasn't pulled any shenanigans and passed a bad vmctx. (Codegen should ensure the guest
-    // cant pull any shenanigans but there have been bugs before.)
+/// Vmctx shouldn't actually need to access the thread local, only the exception handler should
+/// need to. But, as long as the thread local exists, we should make sure that the guest
+/// hasn't pulled any shenanigans and passed a bad vmctx. (Codegen should ensure the guest
+/// cant pull any shenanigans but there have been bugs before.)
+unsafe fn instance_ensure_tls(vmctx: *const lucet_vmctx) {
+    let instance = instance_from_vmctx(vmctx);
     CURRENT_INSTANCE.with(|current_instance| {
         if let Some(current_inst_ptr) = current_instance.borrow().map(|nn| nn.as_ptr()) {
             assert_eq!(
-                inst_ptr, current_inst_ptr,
+                instance as *const Instance, current_inst_ptr,
                 "vmctx corresponds to current instance"
             );
         } else {
@@ -508,7 +509,14 @@ pub unsafe fn instance_from_vmctx<'a>(vmctx: *const lucet_vmctx) -> &'a mut Inst
             );
         }
     });
+}
 
+/// Get an `Instance` from the `vmctx` pointer.
+///
+/// Only safe to call from within the guest context.
+pub unsafe fn instance_from_vmctx<'a>(vmctx: *const lucet_vmctx) -> &'a mut Instance {
+    assert!(!vmctx.is_null(), "vmctx is not null");
+    let inst_ptr = (vmctx as usize - instance_heap_offset()) as *mut Instance;
     let inst = inst_ptr.as_mut().unwrap();
     assert!(inst.valid_magic());
     inst
