@@ -1134,7 +1134,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "userfaultfd",
- "wiggle 0.23.0",
+ "wiggle",
 ]
 
 [[package]]
@@ -1190,7 +1190,6 @@ dependencies = [
  "lucet-module",
  "lucet-runtime",
  "lucet-runtime-internals",
- "lucet-wasi-generate",
  "lucet-wasi-sdk",
  "lucet-wiggle",
  "lucet-wiggle-generate",
@@ -1198,11 +1197,12 @@ dependencies = [
  "nix",
  "rand 0.6.5",
  "tempfile",
+ "tokio",
  "tracing",
  "tracing-subscriber",
- "wasi-cap-std-sync",
  "wasi-common",
- "wiggle 0.26.0",
+ "wasi-tokio",
+ "wiggle",
 ]
 
 [[package]]
@@ -1230,18 +1230,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lucet-wasi-generate"
-version = "0.7.0-dev"
-dependencies = [
- "lucet-wiggle-generate",
- "proc-macro2 1.0.24",
- "quote 1.0.9",
- "syn 1.0.67",
- "wasi-common",
- "wiggle-generate 0.26.0",
-]
-
-[[package]]
 name = "lucet-wasi-sdk"
 version = "0.7.0-dev"
 dependencies = [
@@ -1265,7 +1253,7 @@ dependencies = [
  "lucet-wiggle-macro",
  "lucetc",
  "tempfile",
- "wiggle 0.26.0",
+ "wiggle",
  "wiggle-borrow",
  "wiggle-test",
 ]
@@ -1279,7 +1267,7 @@ dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.9",
  "syn 1.0.67",
- "wiggle-generate 0.26.0",
+ "wiggle-generate",
  "witx",
 ]
 
@@ -2682,7 +2670,7 @@ dependencies = [
  "libc",
  "thiserror",
  "tracing",
- "wiggle 0.26.0",
+ "wiggle",
  "winapi",
 ]
 
@@ -2707,7 +2695,7 @@ dependencies = [
  "unsafe-io",
  "wasi-cap-std-sync",
  "wasi-common",
- "wiggle 0.26.0",
+ "wiggle",
  "winapi",
 ]
 
@@ -2825,17 +2813,6 @@ dependencies = [
 
 [[package]]
 name = "wiggle"
-version = "0.23.0"
-dependencies = [
- "bitflags",
- "thiserror",
- "tracing",
- "wiggle-macro 0.23.0",
- "witx",
-]
-
-[[package]]
-name = "wiggle"
 version = "0.26.0"
 dependencies = [
  "async-trait",
@@ -2843,7 +2820,7 @@ dependencies = [
  "proptest",
  "thiserror",
  "tracing",
- "wiggle-macro 0.26.0",
+ "wiggle-macro",
  "wiggle-test",
  "witx",
 ]
@@ -2852,20 +2829,7 @@ dependencies = [
 name = "wiggle-borrow"
 version = "0.26.0"
 dependencies = [
- "wiggle 0.26.0",
-]
-
-[[package]]
-name = "wiggle-generate"
-version = "0.23.0"
-dependencies = [
- "anyhow",
- "heck",
- "proc-macro2 1.0.24",
- "quote 1.0.9",
- "shellexpand",
- "syn 1.0.67",
- "witx",
+ "wiggle",
 ]
 
 [[package]]
@@ -2883,23 +2847,13 @@ dependencies = [
 
 [[package]]
 name = "wiggle-macro"
-version = "0.23.0"
-dependencies = [
- "quote 1.0.9",
- "syn 1.0.67",
- "wiggle-generate 0.23.0",
- "witx",
-]
-
-[[package]]
-name = "wiggle-macro"
 version = "0.26.0"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.9",
  "syn 1.0.67",
- "wiggle 0.26.0",
- "wiggle-generate 0.26.0",
+ "wiggle",
+ "wiggle-generate",
  "witx",
 ]
 
@@ -2912,7 +2866,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "tracing-subscriber",
- "wiggle 0.26.0",
+ "wiggle",
  "wiggle-borrow",
 ]
 

@@ -11,7 +11,6 @@ members = [
   "lucet-runtime/lucet-runtime-tests",
   "lucet-spectest",
   "lucet-wasi",
-  "lucet-wasi/generate",
   "lucet-wasi-fuzz",
   "lucet-wasi-sdk",
   "lucet-wiggle",
