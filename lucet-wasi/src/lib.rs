@@ -4,8 +4,8 @@ pub mod c_api;
 pub mod runtime;
 
 pub use runtime::*;
-pub use wasi_cap_std_sync::WasiCtxBuilder;
 pub use wasi_common::WasiCtx;
+pub use wasi_tokio::WasiCtxBuilder;
 
 /// Wasi executables export the following symbol for the entry point:
 pub const START_SYMBOL: &str = "_start";

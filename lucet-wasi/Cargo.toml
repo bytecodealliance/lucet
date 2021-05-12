@@ -8,6 +8,7 @@ license = "Apache-2.0 WITH LLVM-exception"
 categories = ["wasm"]
 authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
+build = "build.rs"
 
 [dependencies]
 anyhow = "1"
@@ -17,18 +18,18 @@ human-size = "0.4"
 lucet-runtime = { path = "../lucet-runtime", version = "=0.7.0-dev"  }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "=0.7.0-dev" }
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
-lucet-wasi-generate = { path = "./generate", version = "=0.7.0-dev" }
 lucet-wiggle = { path = "../lucet-wiggle", version = "=0.7.0-dev" }
 lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.7.0-dev" }
 libc = "0.2.65"
 nix = "0.17"
 rand = "0.6"
 wasi-common = { path = "../wasmtime-new-api/crates/wasi-common", version = "0.26.0", default-features = false,  features = ["wiggle_metadata"] }
-wasi-cap-std-sync = { path = "../wasmtime-new-api/crates/wasi-common/cap-std-sync", version = "0.26.0"}
+wasi-tokio = { path = "../wasmtime-new-api/crates/wasi-common/tokio", version = "0.26.0"}
 wiggle = { path = "../wasmtime-new-api/crates/wiggle", version = "0.26.0" }
 tracing = "0.1.19"
 tracing-subscriber = "0.2.0"
 cap-std = "0.13"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"]}
 
 [dev-dependencies]
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
