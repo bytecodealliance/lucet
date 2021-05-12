@@ -1023,6 +1023,7 @@ dependencies = [
  "num_cpus",
  "rayon",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
