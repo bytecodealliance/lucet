@@ -1222,10 +1222,11 @@ dependencies = [
  "num_cpus",
  "progress",
  "rand 0.6.5",
- "rayon",
  "regex",
  "structopt",
+ "task-group",
  "tempfile",
+ "tokio",
  "wait-timeout",
  "wasi-common",
 ]
@@ -2285,6 +2286,15 @@ name = "target-lexicon"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "422045212ea98508ae3d28025bc5aaa2bd4a9cdaecd442a08da2ee620ee9ea95"
+
+[[package]]
+name = "task-group"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db74e4554fc0bcad5a5fcbb704a37d7aa6239b408ed0b2a4e69d314ff4f41e98"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "tempfile"

@@ -23,8 +23,9 @@ num_cpus = "1.10"
 progress = "0.2"
 rand = "0.6"
 regex = "1.1"
-rayon = "1.0"
 structopt = "0.3.3"
+task-group = "0.2"
 tempfile = "3.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 wait-timeout = "0.2"
 wasi-common = { path = "../wasmtime-new-api/crates/wasi-common" }
