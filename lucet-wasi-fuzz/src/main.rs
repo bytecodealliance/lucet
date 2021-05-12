@@ -64,7 +64,9 @@ the differences in alignment for `long long`s. See #445 for updates:
     match Config::from_args() {
         Config::Fuzz { num_tests } => run_many(num_tests).await,
         Config::Creduce { seed } => run_creduce_driver(seed),
-        Config::CreduceInteresting { creduce_src } => run_creduce_interestingness(creduce_src).await,
+        Config::CreduceInteresting { creduce_src } => {
+            run_creduce_interestingness(creduce_src).await
+        }
         Config::TestSeed { seed } => run_one_seed(seed).await,
     }
 }
@@ -220,20 +222,25 @@ async fn run_many(num_tests: usize) {
     for _ in 0..num_tests {
         let progress = progress.clone();
         let num_finished = num_finished.clone();
-        task_group.spawn("worker", async move { match run_one(None).await {
-            Ok(TestResult::Passed) | Ok(TestResult::Ignored) => {
-                let mut num_finished = num_finished.lock().unwrap();
-                *num_finished += 1;
-                let percentage = (*num_finished as f32 / num_tests as f32) * 100.0;
-                progress
-                    .lock()
-                    .unwrap()
-                    .reach_percent(percentage.floor() as i32);
-                Ok(())
-            }
-            Ok(fail) => Err(fail),
-            Err(error) => Err(TestResult::Errored { error }),
-        }}).await.expect("spawn task");
+        task_group
+            .spawn("worker", async move {
+                match run_one(None).await {
+                    Ok(TestResult::Passed) | Ok(TestResult::Ignored) => {
+                        let mut num_finished = num_finished.lock().unwrap();
+                        *num_finished += 1;
+                        let percentage = (*num_finished as f32 / num_tests as f32) * 100.0;
+                        progress
+                            .lock()
+                            .unwrap()
+                            .reach_percent(percentage.floor() as i32);
+                        Ok(())
+                    }
+                    Ok(fail) => Err(fail),
+                    Err(error) => Err(TestResult::Errored { error }),
+                }
+            })
+            .await
+            .expect("spawn task");
     }
 
     let res = task_manager.await;
@@ -241,17 +248,24 @@ async fn run_many(num_tests: usize) {
     progress.lock().unwrap().jobs_done();
 
     match res {
-        Err(task_group::RuntimeError::Application{ error: TestResult::Failed {
-            seed,
-            expected,
-            actual,
-        }, ..}) => {
+        Err(task_group::RuntimeError::Application {
+            error:
+                TestResult::Failed {
+                    seed,
+                    expected,
+                    actual,
+                },
+            ..
+        }) => {
             println!("test failed with seed {}\n", seed.unwrap());
             println!("native: {}", String::from_utf8_lossy(&expected));
             println!("lucet-wasi: {}", String::from_utf8_lossy(&actual));
             exit(1);
         }
-        Err(task_group::RuntimeError::Application{ error: TestResult::Errored { error }, ..}) => println!("test errored: {:?}", error),
+        Err(task_group::RuntimeError::Application {
+            error: TestResult::Errored { error },
+            ..
+        }) => println!("test errored: {:?}", error),
         Err(_) => unreachable!(),
         Ok(()) => println!("all tests passed"),
     }
