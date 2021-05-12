@@ -42,10 +42,10 @@ impl atoms::Atoms for Ctx {
 /// Test the above generated code by running Wasm code that calls into it.
 #[test]
 fn main() {
-    use tempfile::TempDir;
-    use std::path::PathBuf;
-    use lucetc::{Lucetc, LucetcOpts};
     use lucet_runtime::{DlModule, Limits, MmapRegion, Region};
+    use lucetc::{Lucetc, LucetcOpts};
+    use std::path::PathBuf;
+    use tempfile::TempDir;
     // The `init` function ensures that all of the host call functions are
     // linked into the executable.
     crate::hostcalls::init();
@@ -82,17 +82,23 @@ fn main() {
     inst.insert_embed_ctx(ctx);
 
     // Synchronously run a function that does not make an async hostcall.
-    let res = inst.run("int_float_args_shim", &[0i32.into(), 123.45f32.into()]).expect("run int_float_args_shim").unwrap_returned();
+    let res = inst
+        .run("int_float_args_shim", &[0i32.into(), 123.45f32.into()])
+        .expect("run int_float_args_shim")
+        .unwrap_returned();
 
-    assert_eq!(res.as_u32(),types::Errno::Ok as u32);
+    assert_eq!(res.as_u32(), types::Errno::Ok as u32);
 
     inst.reset().expect("can reset instance");
 
     let input = 123;
     let result_location = 0;
 
-    let results = futures_executor::block_on(inst
-        .run_async("double_int_return_float_shim", &[input.into(), result_location.into()], Some(10000)))
+    let results = futures_executor::block_on(inst.run_async(
+        "double_int_return_float_shim",
+        &[input.into(), result_location.into()],
+        Some(10000),
+    ))
     .expect("run_async double_int_return_float_shim");
 
     assert_eq!(
@@ -105,5 +111,4 @@ fn main() {
     let r = result_location as usize..(result_location as usize + 4);
     let result = f32::from_le_bytes(inst.heap()[r].try_into().unwrap());
     assert_eq!((input * 2) as f32, result);
-
 }
