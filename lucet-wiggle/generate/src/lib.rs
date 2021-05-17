@@ -72,11 +72,13 @@ pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
                 #[no_mangle]
                 pub fn #name(vmctx: &lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #ret_ty {
                     { #pre_hook }
-                    let mut heap = vmctx.heap_mut();
-                    let memory = lucet_wiggle::runtime::LucetMemory::new(&mut *heap);
-                    let mut ctx_ref: std::cell::RefMut<#ctx> = vmctx.get_embed_ctx_mut();
-                    let ctx: &mut #ctx = &mut *ctx_ref;
-                    let r = #body;
+                    let r = {
+                        let mut heap = vmctx.heap_mut();
+                        let memory = lucet_wiggle::runtime::LucetMemory::new(&mut *heap);
+                        let mut ctx_ref: std::cell::RefMut<#ctx> = vmctx.get_embed_ctx_mut();
+                        let ctx: &mut #ctx = &mut *ctx_ref;
+                        #body
+                    };
                     { #post_hook }
                     match r {
                         Ok(r) => { r },
