@@ -28,15 +28,12 @@ pub fn bindings(doc: &witx::Document) -> Bindings {
     Bindings::new(bs)
 }
 
-pub fn generate(
-    doc: &witx::Document,
-    ctx_type: &Ident,
-    ctx_constructor: &TokenStream,
-    wiggle_mod_path: &TokenStream,
-    pre_hook: &TokenStream,
-    post_hook: &TokenStream,
-) -> TokenStream {
-    let names = wiggle_generate::Names::new(ctx_type, quote!(lucet_wiggle));
+pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
+    let names = wiggle_generate::Names::new(quote!(lucet_wiggle));
+    let ctx = &config.ctx;
+    let pre_hook = &config.pre_hook;
+    let post_hook = &config.post_hook;
+    let target = &config.target;
     let fs = doc.modules().map(|m| {
         let fs = m.funcs().map(|f| {
             let name = format_ident!("{}", hostcall_name(&m, &f));
@@ -60,14 +57,28 @@ pub fn generate(
             };
             let mod_name = names.module(&m.name);
             let method_name = names.func(&f.name);
+
+            let body = if config.async_.is_async(m.name.as_str(), f.name.as_str()) {
+                quote!(vmctx.block_on(async move {
+                    #target::#mod_name::#method_name(ctx, &memory, #(#arg_names),*).await
+                }))
+            } else {
+                quote!(
+                    #target::#mod_name::#method_name(ctx, &memory, #(#arg_names),*)
+                )
+            };
             quote! {
                 #[lucet_hostcall]
                 #[no_mangle]
                 pub fn #name(vmctx: &lucet_runtime::vmctx::Vmctx, #(#func_args),*) -> #ret_ty {
                     { #pre_hook }
-                    let memory = lucet_wiggle::runtime::LucetMemory::new(vmctx);
-                    let mut ctx: #ctx_type = #ctx_constructor;
-                    let r = super::#mod_name::#method_name(&ctx, &memory, #(#arg_names),*);
+                    let r = {
+                        let mut heap = vmctx.heap_mut();
+                        let memory = lucet_wiggle::runtime::LucetMemory::new(&mut *heap);
+                        let mut ctx_ref: std::cell::RefMut<#ctx> = vmctx.get_embed_ctx_mut();
+                        let ctx: &mut #ctx = &mut *ctx_ref;
+                        #body
+                    };
                     { #post_hook }
                     match r {
                         Ok(r) => { r },
@@ -90,8 +101,7 @@ pub fn generate(
     quote! {
         pub mod hostcalls {
             use lucet_runtime::lucet_hostcall;
-            use super::#ctx_type;
-            use #wiggle_mod_path::types::*;
+            use #target::types::*;
             #(#fs)*
             /// Lucet-runtime expects hostcalls to be resolved by the runtime
             /// linker (dlopen). By calling `init` in your program, we ensure that

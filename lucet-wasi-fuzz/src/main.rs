@@ -7,7 +7,6 @@ use lucet_wasi::{types::Exitcode, WasiCtx, WasiCtxBuilder};
 use lucet_wasi_sdk::{CompileOpts, Link};
 use lucetc::{Lucetc, LucetcOpts};
 use rand::prelude::random;
-use rayon::prelude::*;
 use regex::Regex;
 use std::io::{Read, Write};
 use std::os::unix::prelude::OpenOptionsExt;
@@ -45,7 +44,8 @@ enum Config {
     TestSeed { seed: Seed },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     eprintln!(
         "⚠️⚠️⚠️ WARNING ⚠️⚠️⚠️
 
@@ -62,10 +62,12 @@ the differences in alignment for `long long`s. See #445 for updates:
     lucet_wasi::export_wasi_funcs();
 
     match Config::from_args() {
-        Config::Fuzz { num_tests } => run_many(num_tests),
+        Config::Fuzz { num_tests } => run_many(num_tests).await,
         Config::Creduce { seed } => run_creduce_driver(seed),
-        Config::CreduceInteresting { creduce_src } => run_creduce_interestingness(creduce_src),
-        Config::TestSeed { seed } => run_one_seed(seed),
+        Config::CreduceInteresting { creduce_src } => {
+            run_creduce_interestingness(creduce_src).await
+        }
+        Config::TestSeed { seed } => run_one_seed(seed).await,
     }
 }
 
@@ -134,10 +136,10 @@ fn run_creduce_driver(seed: Seed) {
     );
 }
 
-fn run_creduce_interestingness<P: AsRef<Path>>(src: P) {
+async fn run_creduce_interestingness<P: AsRef<Path>>(src: P) {
     let tmpdir = TempDir::new().unwrap();
 
-    match run_both(&tmpdir, src, None) {
+    match run_both(&tmpdir, src, None).await {
         Ok(TestResult::Passed) => println!("test passed"),
         Ok(TestResult::Ignored) => println!("native build/execution failed"),
         Ok(TestResult::Failed {
@@ -190,8 +192,8 @@ fn run_creduce_interestingness<P: AsRef<Path>>(src: P) {
     exit(1);
 }
 
-fn run_one_seed(seed: Seed) {
-    match run_one(Some(seed)) {
+async fn run_one_seed(seed: Seed) {
+    match run_one(Some(seed)).await {
         Ok(TestResult::Passed) => println!("test passed"),
         Ok(TestResult::Ignored) => println!("native build/execution failed"),
         Ok(TestResult::Failed {
@@ -209,44 +211,61 @@ fn run_one_seed(seed: Seed) {
     }
 }
 
-fn run_many(num_tests: usize) {
+async fn run_many(num_tests: usize) {
     let mut progress = progress::Bar::new();
     progress.set_job_title(&format!("Running {} tests", num_tests));
 
     let progress = Arc::new(Mutex::new(progress));
     let num_finished = Arc::new(Mutex::new(0));
 
-    let res = (0..num_tests)
-        .into_par_iter()
-        .try_for_each(|_| match run_one(None) {
-            Ok(TestResult::Passed) | Ok(TestResult::Ignored) => {
-                let mut num_finished = num_finished.lock().unwrap();
-                *num_finished += 1;
-                let percentage = (*num_finished as f32 / num_tests as f32) * 100.0;
-                progress
-                    .lock()
-                    .unwrap()
-                    .reach_percent(percentage.floor() as i32);
-                Ok(())
-            }
-            Ok(fail) => Err(fail),
-            Err(error) => Err(TestResult::Errored { error }),
-        });
+    let (task_group, task_manager) = task_group::TaskGroup::new();
+    for _ in 0..num_tests {
+        let progress = progress.clone();
+        let num_finished = num_finished.clone();
+        task_group
+            .spawn("worker", async move {
+                match run_one(None).await {
+                    Ok(TestResult::Passed) | Ok(TestResult::Ignored) => {
+                        let mut num_finished = num_finished.lock().unwrap();
+                        *num_finished += 1;
+                        let percentage = (*num_finished as f32 / num_tests as f32) * 100.0;
+                        progress
+                            .lock()
+                            .unwrap()
+                            .reach_percent(percentage.floor() as i32);
+                        Ok(())
+                    }
+                    Ok(fail) => Err(fail),
+                    Err(error) => Err(TestResult::Errored { error }),
+                }
+            })
+            .await
+            .expect("spawn task");
+    }
+
+    let res = task_manager.await;
 
     progress.lock().unwrap().jobs_done();
 
     match res {
-        Err(TestResult::Failed {
-            seed,
-            expected,
-            actual,
+        Err(task_group::RuntimeError::Application {
+            error:
+                TestResult::Failed {
+                    seed,
+                    expected,
+                    actual,
+                },
+            ..
         }) => {
             println!("test failed with seed {}\n", seed.unwrap());
             println!("native: {}", String::from_utf8_lossy(&expected));
             println!("lucet-wasi: {}", String::from_utf8_lossy(&actual));
             exit(1);
         }
-        Err(TestResult::Errored { error }) => println!("test errored: {:?}", error),
+        Err(task_group::RuntimeError::Application {
+            error: TestResult::Errored { error },
+            ..
+        }) => println!("test errored: {:?}", error),
         Err(_) => unreachable!(),
         Ok(()) => println!("all tests passed"),
     }
@@ -263,7 +282,7 @@ fn gen_c<P: AsRef<Path>>(gen_c_path: P, seed: Seed) -> Result<(), Error> {
     Ok(())
 }
 
-fn run_both<P: AsRef<Path>>(
+async fn run_both<P: AsRef<Path>>(
     tmpdir: &TempDir,
     src: P,
     seed: Option<Seed>,
@@ -274,7 +293,7 @@ fn run_both<P: AsRef<Path>>(
         return Ok(TestResult::Ignored);
     };
 
-    let (exitcode, wasm_stdout) = run_with_stdout(&tmpdir, src.as_ref())?;
+    let (exitcode, wasm_stdout) = run_with_stdout(&tmpdir, src.as_ref()).await?;
 
     assert_eq!(exitcode, 0);
 
@@ -362,7 +381,7 @@ enum TestResult {
     },
 }
 
-fn run_one(seed: Option<Seed>) -> Result<TestResult, Error> {
+async fn run_one(seed: Option<Seed>) -> Result<TestResult, Error> {
     let tmpdir = TempDir::new().unwrap();
 
     let gen_c_path = tmpdir.path().join("gen.c");
@@ -370,10 +389,10 @@ fn run_one(seed: Option<Seed>) -> Result<TestResult, Error> {
     let seed = seed.unwrap_or(random::<Seed>());
     gen_c(&gen_c_path, seed)?;
 
-    run_both(&tmpdir, &gen_c_path, Some(seed))
+    run_both(&tmpdir, &gen_c_path, Some(seed)).await
 }
 
-fn run_with_stdout<P: AsRef<Path>>(
+async fn run_with_stdout<P: AsRef<Path>>(
     tmpdir: &TempDir,
     path: P,
 ) -> Result<(Exitcode, Vec<u8>), Error> {
@@ -383,7 +402,7 @@ fn run_with_stdout<P: AsRef<Path>>(
         .stdout(Box::new(stdout.clone()))
         .build()?;
 
-    let exitcode = run(tmpdir, path, ctx)?;
+    let exitcode = run(tmpdir, path, ctx).await?;
 
     Ok((
         exitcode,
@@ -394,7 +413,7 @@ fn run_with_stdout<P: AsRef<Path>>(
     ))
 }
 
-fn run<P: AsRef<Path>>(tmpdir: &TempDir, path: P, ctx: WasiCtx) -> Result<Exitcode, Error> {
+async fn run<P: AsRef<Path>>(tmpdir: &TempDir, path: P, ctx: WasiCtx) -> Result<Exitcode, Error> {
     let region = MmapRegion::create(1, &Limits::default())?;
     let module = wasi_test(tmpdir, path)?;
 
@@ -403,7 +422,7 @@ fn run<P: AsRef<Path>>(tmpdir: &TempDir, path: P, ctx: WasiCtx) -> Result<Exitco
         .with_embed_ctx(ctx)
         .build()?;
 
-    match inst.run("_start", &[]) {
+    match inst.run_async("_start", &[], None).await {
         // normal termination implies 0 exit code
         Ok(_) => Ok(0),
         Err(lucet_runtime::Error::RuntimeTerminated(

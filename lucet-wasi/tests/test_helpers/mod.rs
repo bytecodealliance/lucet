@@ -98,12 +98,16 @@ pub fn run<P: AsRef<Path>>(path: P, ctx: WasiCtx) -> Result<Exitcode, Error> {
         .with_embed_ctx(ctx)
         .build()?;
 
-    match inst.run("_start", &[]) {
+    let r = tokio::runtime::Runtime::new()
+        .expect("create runtime")
+        .block_on(async move { inst.run_async("_start", &[], None).await });
+
+    match r {
         // normal termination implies 0 exit code
         Ok(_) => Ok(0),
-        Err(lucet_runtime::Error::RuntimeTerminated(details)) => Ok(details
+        Err(lucet_runtime::Error::RuntimeTerminated(details)) => details
             .as_exitcode()
-            .expect("termination yields an exitcode")),
+            .ok_or_else(|| anyhow!("expected exitcode, got: {:?}", details,)),
         Err(e) => bail!("runtime error: {}", e),
     }
 }

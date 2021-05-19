@@ -233,7 +233,10 @@ fn run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
 /// Run a trivial WASI program.
 fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
     fn body(inst: &mut InstanceHandle) {
-        inst.run("_start", &[]).unwrap();
+        tokio::runtime::Runtime::new()
+            .expect("create runtime")
+            .block_on(inst.run_async("_start", &[], None))
+            .unwrap();
     }
 
     let workdir = TempDir::new().expect("create working directory");

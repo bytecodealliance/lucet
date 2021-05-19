@@ -11,7 +11,6 @@ members = [
   "lucet-runtime/lucet-runtime-tests",
   "lucet-spectest",
   "lucet-wasi",
-  "lucet-wasi/generate",
   "lucet-wasi-fuzz",
   "lucet-wasi-sdk",
   "lucet-wiggle",
@@ -19,6 +18,13 @@ members = [
   "lucet-wiggle/generate",
   "lucetc",
   "fuzz",
+  "wasmtime-new-api/crates/wiggle",
+  "wasmtime-new-api/crates/wiggle/borrow",
+  "wasmtime-new-api/crates/wiggle/generate",
+  "wasmtime-new-api/crates/wiggle/macro",
+  "wasmtime-new-api/crates/wasi-common",
+  "wasmtime-new-api/crates/wasi-common/cap-std-sync",
+  "wasmtime-new-api/crates/wasi-common/tokio",
 ]
 exclude = ["wasmtime", "sightglass"]
 

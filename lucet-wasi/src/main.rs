@@ -6,7 +6,7 @@ extern crate clap;
 use anyhow::{format_err, Error};
 use cap_std::fs::Dir;
 use clap::Arg;
-use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region, RunResult};
+use lucet_runtime::{self, DlModule, Limits, MmapRegion, Module, PublicKey, Region};
 use lucet_wasi::{self, WasiCtxBuilder};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -36,7 +36,8 @@ fn parse_humansized(desc: &str) -> Result<u64, Error> {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     tracing_subscriber::FmtSubscriber::builder()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
@@ -202,10 +203,10 @@ fn main() {
         pk_path,
     };
 
-    run(config)
+    run(config).await
 }
 
-fn run(config: Config<'_>) {
+async fn run(config: Config<'_>) {
     let exitcode = {
         // doing all of this in a block makes sure everything gets dropped before exiting
         let pk = match (config.verify, config.pk_path) {
@@ -258,11 +259,9 @@ fn run(config: Config<'_>) {
 
         inst.run_start().expect("Wasm start function runs");
 
-        match inst.run(config.entrypoint, &[]) {
+        match inst.run_async(config.entrypoint, &[], None).await {
             // normal termination implies 0 exit code
-            Ok(RunResult::Returned(_)) => 0,
-            // none of the WASI hostcalls use yield yet, so this shouldn't happen
-            Ok(RunResult::Yielded(_)) => panic!("lucet-wasi unexpectedly yielded"),
+            Ok(_) => 0,
             Err(lucet_runtime::Error::RuntimeTerminated(
                 lucet_runtime::TerminationDetails::Remote,
             )) => {

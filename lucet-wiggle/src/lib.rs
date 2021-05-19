@@ -1,20 +1,19 @@
-pub use lucet_wiggle_macro::from_witx;
+pub use lucet_wiggle_macro::lucet_integration;
 pub use wiggle::*;
 
 pub mod runtime {
-    use lucet_runtime::vmctx::Vmctx;
     use wiggle::{BorrowHandle, GuestError, GuestMemory, Region};
     use wiggle_borrow::BorrowChecker;
 
     pub struct LucetMemory<'a> {
-        vmctx: &'a Vmctx,
+        memory: &'a mut [u8],
         bc: BorrowChecker,
     }
 
     impl<'a> LucetMemory<'a> {
-        pub fn new(vmctx: &'a Vmctx) -> LucetMemory {
+        pub fn new(memory: &'a mut [u8]) -> LucetMemory {
             LucetMemory {
-                vmctx,
+                memory,
                 // Safety: we only construct a LucetMemory at the entry point of hostcalls, and
                 // hostcalls are not re-entered, therefore there is exactly one BorrowChecker per
                 // memory.
@@ -25,9 +24,8 @@ pub mod runtime {
 
     unsafe impl<'a> GuestMemory for LucetMemory<'a> {
         fn base(&self) -> (*mut u8, u32) {
-            let mem = self.vmctx.heap_mut();
-            let len = mem.len() as u32;
-            let ptr = mem.as_ptr();
+            let len = self.memory.len() as u32;
+            let ptr = self.memory.as_ptr();
             (ptr as *mut u8, len)
         }
         fn has_outstanding_borrows(&self) -> bool {
