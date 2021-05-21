@@ -7,6 +7,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{DataContext, DataId, Module as ClifModule};
 use cranelift_wasm::{TableElementType, TableIndex};
+use std::convert::TryInto;
 use std::io::Cursor;
 
 /// This symbol will be used to reference the `tables` field in `Module` - a sequence of tables.
@@ -41,20 +42,31 @@ fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
 
         let final_len = initializer
             .offset
-            .checked_add(initializer.elements.len())
+            .checked_add(
+                initializer
+                    .elements
+                    .len()
+                    .try_into()
+                    .expect("table elements overflowed u32"),
+            )
             // `offset` comes from a Wasm i32, so it can't be very big. To observe overflow,
             // `initializer.elements.len()` would have to be greater than `usize::MAX - u32::MAX`,
             // which would require an unfeasibly large Wasm binary
-            .expect("table length overflowed usize");
+            .expect("table length overflowed u32");
 
-        if final_len > elems.len() {
+        if final_len
+            > elems
+                .len()
+                .try_into()
+                .expect("table elements overflowed u32")
+        {
             return Err(Error::ElementInitializerOutOfRange(
                 initializer.clone(),
                 *decl.table,
             ));
         }
         for (ix, func_ix) in initializer.elements.iter().enumerate() {
-            elems[initializer.offset + ix] = Elem::Func(*func_ix);
+            elems[initializer.offset as usize + ix] = Elem::Func(*func_ix);
         }
     }
 
