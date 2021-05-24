@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 pub use lucet_module::SparseData;
 
-const PAGE_SIZE: u32 = 4096;
+const PAGE_SIZE: u64 = 4096;
 
 fn linear_memory_range<'a>(di: &DataInitializer<'a>, start: u32, end: u32) -> &'a [u8] {
     let offs = di.offset;
@@ -25,34 +25,37 @@ fn linear_memory_range<'a>(di: &DataInitializer<'a>, start: u32, end: u32) -> &'
     &di.data[((start - offs) as usize)..((end - offs) as usize)]
 }
 
-// XXX when changing the start/end/offsets from usize to u32 i introduced a bug here! fix it on
-// monday
-fn split<'a>(di: &DataInitializer<'a>) -> Vec<(u32, DataInitializer<'a>)> {
+// If the data initializer contains indexes that are out of range for a 32 bit linear
+// memory, this function will return Err(TryFromIntError)
+fn split<'a>(
+    di: &DataInitializer<'a>,
+) -> Result<Vec<(u32, DataInitializer<'a>)>, std::num::TryFromIntError> {
+    use std::convert::TryInto;
     // Divide a data initializer for linear memory into a set of data initializers for pages, and
     // the index of the page they cover.
     // The input initializer can cover many pages. Each output initializer covers exactly one.
-    let start = di.offset;
-    let end = start + di.data.len() as u32;
+    let start = di.offset as u64;
+    let end = start + di.data.len() as u64;
     let mut offs = start;
     let mut out = Vec::new();
 
     while offs < end {
         let page = offs / PAGE_SIZE;
         let page_offs = offs % PAGE_SIZE;
-        let next = u32::min((page + 1) * PAGE_SIZE, end);
+        let next = u64::min((page + 1) * PAGE_SIZE, end);
 
-        let subslice = linear_memory_range(di, offs, next);
+        let subslice = linear_memory_range(di, offs.try_into()?, next.try_into()?);
         out.push((
-            page,
+            page.try_into()?,
             DataInitializer {
                 base: None,
-                offset: page_offs,
+                offset: page_offs.try_into()?,
                 data: subslice,
             },
         ));
         offs = next;
     }
-    out
+    Ok(out)
 }
 
 pub fn owned_sparse_data_from_initializers<'a>(
@@ -67,9 +70,9 @@ pub fn owned_sparse_data_from_initializers<'a>(
                 "cannot create sparse data: data initializer uses global as base".to_owned();
             return Err(Error::Unsupported(message));
         }
-        let chunks = split(initializer);
+        let chunks = split(initializer).map_err(|_| Error::InitData)?;
         for (pagenumber, chunk) in chunks {
-            if pagenumber > heap.initial_size as u32 / PAGE_SIZE {
+            if pagenumber as u64 > heap.initial_size / PAGE_SIZE {
                 return Err(Error::InitData);
             }
             let base = chunk.offset as usize;
