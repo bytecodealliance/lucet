@@ -386,16 +386,15 @@ checksum = "8aebca1129a03dc6dc2b127edd729435bbc4a37e1d5f4d7513165089ceb02634"
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.70.0"
+version = "0.74.0"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.70.0"
+version = "0.74.0"
 dependencies = [
- "byteorder",
  "cranelift-bforest",
  "cranelift-codegen-meta",
  "cranelift-codegen-shared",
@@ -404,13 +403,12 @@ dependencies = [
  "log",
  "regalloc",
  "smallvec",
- "target-lexicon",
- "thiserror",
+ "target-lexicon 0.12.0",
 ]
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.70.0"
+version = "0.74.0"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
@@ -418,56 +416,55 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.70.0"
+version = "0.74.0"
 
 [[package]]
 name = "cranelift-entity"
-version = "0.70.0"
+version = "0.74.0"
 
 [[package]]
 name = "cranelift-frontend"
-version = "0.70.0"
+version = "0.74.0"
 dependencies = [
  "cranelift-codegen",
  "log",
  "smallvec",
- "target-lexicon",
+ "target-lexicon 0.12.0",
 ]
 
 [[package]]
 name = "cranelift-module"
-version = "0.70.0"
+version = "0.74.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
  "cranelift-entity",
  "log",
- "thiserror",
 ]
 
 [[package]]
 name = "cranelift-native"
-version = "0.70.0"
+version = "0.74.0"
 dependencies = [
  "cranelift-codegen",
- "target-lexicon",
+ "target-lexicon 0.12.0",
 ]
 
 [[package]]
 name = "cranelift-object"
-version = "0.70.0"
+version = "0.74.0"
 dependencies = [
  "anyhow",
  "cranelift-codegen",
  "cranelift-module",
  "log",
- "object 0.23.0",
- "target-lexicon",
+ "object 0.24.0",
+ "target-lexicon 0.12.0",
 ]
 
 [[package]]
 name = "cranelift-wasm"
-version = "0.70.0"
+version = "0.74.0"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -476,7 +473,7 @@ dependencies = [
  "log",
  "smallvec",
  "thiserror",
- "wasmparser 0.75.0",
+ "wasmparser 0.78.2",
 ]
 
 [[package]]
@@ -821,9 +818,9 @@ dependencies = [
 
 [[package]]
 name = "gimli"
-version = "0.23.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6503fe142514ca4799d4c26297c4248239fe8838d827db6bd6065c6ed29a6ce"
+checksum = "0e4075386626662786ddb0ec9081e7c7eeb1ba31951f447ca780ef9f5d568189"
 dependencies = [
  "indexmap",
 ]
@@ -1171,7 +1168,7 @@ dependencies = [
  "lucetc",
  "serde",
  "serde_json",
- "target-lexicon",
+ "target-lexicon 0.11.2",
  "tempfile",
  "thiserror",
  "wabt",
@@ -1239,7 +1236,7 @@ dependencies = [
  "lucet-module",
  "lucet-wasi",
  "lucetc",
- "target-lexicon",
+ "target-lexicon 0.11.2",
  "tempfile",
  "thiserror",
 ]
@@ -1305,12 +1302,12 @@ dependencies = [
  "lucet-wiggle-generate",
  "memoffset 0.5.6",
  "minisign",
- "object 0.23.0",
+ "object 0.24.0",
  "raw-cpuid",
  "rayon",
  "serde",
  "serde_json",
- "target-lexicon",
+ "target-lexicon 0.12.0",
  "tempfile",
  "thiserror",
  "wabt",
@@ -1484,9 +1481,9 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.23.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9a7ab5d64814df0fe4a4b5ead45ed6c5f181ee3ff04ba344313a6c80446c5d4"
+checksum = "1a5b3dd1c072ee7963717671d1ca129f1048fda25edea6b752bfc71ac8854170"
 dependencies = [
  "crc32fast",
  "indexmap",
@@ -2288,6 +2285,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "422045212ea98508ae3d28025bc5aaa2bd4a9cdaecd442a08da2ee620ee9ea95"
 
 [[package]]
+name = "target-lexicon"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64ae3b39281e4b14b8123bdbaddd472b7dfe215e444181f2f9d2443c2444f834"
+
+[[package]]
 name = "task-group"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2799,9 +2802,9 @@ checksum = "a950e6a618f62147fd514ff445b2a0b53120d382751960797f85f058c7eda9b9"
 
 [[package]]
 name = "wasmparser"
-version = "0.75.0"
+version = "0.78.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4580b6be7329cfc3277131fc8363044990effb57b3ce93ef304ca70ad4339c64"
+checksum = "52144d4c78e5cf8b055ceab8e5fa22814ce4315d6002ad32cfd914f37c12fd65"
 
 [[package]]
 name = "wast"

@@ -42,14 +42,14 @@ impl<'a, T> Exportable<'a, T> {
 #[derive(Debug, Clone)]
 pub struct TableElems {
     pub base: Option<GlobalIndex>,
-    pub offset: usize,
+    pub offset: u32,
     pub elements: Box<[UniqueFuncIndex]>,
 }
 
 #[derive(Debug, Clone)]
 pub struct DataInitializer<'a> {
     pub base: Option<GlobalIndex>,
-    pub offset: usize,
+    pub offset: u32,
     pub data: &'a [u8],
 }
 
@@ -216,12 +216,20 @@ impl<'a> TargetEnvironment for ModuleValidation<'a> {
 }
 
 impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
-    fn declare_type_func(
-        &mut self,
-        wasm_func_type: WasmFuncType,
-        sig: ir::Signature,
-    ) -> WasmResult<()> {
-        self.info.declare_type_func(wasm_func_type, sig)
+    fn declare_type_func(&mut self, wasm: WasmFuncType) -> WasmResult<()> {
+        let mut sig = ir::Signature::new(self.info.target_config.default_call_conv);
+        let cvt = |ty: &WasmType| {
+            ir::AbiParam::new(match ty {
+                WasmType::I32 => ir::types::I32,
+                WasmType::I64 => ir::types::I64,
+                WasmType::F32 => ir::types::F32,
+                WasmType::F64 => ir::types::F64,
+                _ => unimplemented!(),
+            })
+        };
+        sig.params.extend(wasm.params.iter().map(&cvt));
+        sig.returns.extend(wasm.returns.iter().map(&cvt));
+        self.info.declare_type_func(wasm, sig)
     }
     fn declare_func_import(
         &mut self,
@@ -423,7 +431,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         &mut self,
         table_index: TableIndex,
         base: Option<GlobalIndex>,
-        offset: usize,
+        offset: u32,
         elements: Box<[FuncIndex]>,
     ) -> WasmResult<()> {
         let elements_vec: Vec<FuncIndex> = elements.into();
@@ -466,7 +474,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         &mut self,
         memory_index: MemoryIndex,
         base: Option<GlobalIndex>,
-        offset: usize,
+        offset: u32,
         data: &'a [u8],
     ) -> WasmResult<()> {
         let data_init = DataInitializer { base, offset, data };
