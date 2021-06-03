@@ -61,6 +61,7 @@ mod module_data {
             None,
             false,
             None,
+            false,
         )
         .expect("compiling exported_import");
         let mdata = c.module_data().unwrap();
@@ -557,6 +558,7 @@ mod validate {
             Some(v),
             false,
             None,
+            false,
         )
         .expect("compile");
         let _obj = c.object_file().expect("codegen");
@@ -736,5 +738,15 @@ mod validate {
             }
             e => panic!("expected FunctionTranslation error, got {:?}", e),
         }
+    }
+
+    #[test]
+    fn veriwasm() {
+        let m = load_wat_module("fibonacci");
+        let b = super::test_bindings();
+        let mut builder = Compiler::builder();
+        builder.veriwasm(true);
+        let c = builder.create(&m, &b).expect("creating compiler");
+        let _ = c.object_file().expect("compiling with VeriWasm enabled");
     }
 }

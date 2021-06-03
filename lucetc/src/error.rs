@@ -20,6 +20,8 @@ pub enum Error {
     LucetModule(#[from] LucetModuleError),
     #[error("Lucet validation errors: {0:?}")]
     LucetValidation(Vec<ValidationError>),
+    #[error("VeriWasm error in {0}")]
+    VeriWasm(String),
     #[error("I/O: {0}")]
     IOError(#[from] std::io::Error),
     #[error("Converting to Wasm signature: {0}")]
