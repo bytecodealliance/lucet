@@ -2,8 +2,7 @@ pub use lucet_wiggle_macro::lucet_integration;
 pub use wiggle::*;
 
 pub mod runtime {
-    use wiggle::{BorrowHandle, GuestError, GuestMemory, Region};
-    use wiggle_borrow::BorrowChecker;
+    use wiggle::{borrow::BorrowChecker, BorrowHandle, GuestError, GuestMemory, Region};
 
     pub struct LucetMemory<'a> {
         memory: &'a mut [u8],

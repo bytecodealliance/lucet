@@ -28,4 +28,4 @@ task-group = "0.2"
 tempfile = "3.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 wait-timeout = "0.2"
-wasi-common = { path = "../wasmtime-new-api/crates/wasi-common" }
+wasi-common = { path = "../wasmtime/crates/wasi-common" }

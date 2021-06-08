@@ -243,7 +243,7 @@ async fn run(config: Config<'_>) {
         }
         let mut inst = region
             .new_instance_builder(module as Arc<dyn Module>)
-            .with_embed_ctx(builder.build().expect("WASI ctx can be created"))
+            .with_embed_ctx(builder.build())
             .build()
             .expect("instance can be created");
 

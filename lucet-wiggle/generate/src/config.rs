@@ -18,16 +18,28 @@ mod kw {
 
 pub struct Config {
     pub witx: w::WitxConf,
-    pub async_: w::AsyncConf,
+    pub async_: w::AsyncFunctions,
     pub ctx: TokenStream,
     pub pre_hook: TokenStream,
     pub post_hook: TokenStream,
     pub target: syn::Path,
 }
 
+impl Config {
+    pub fn is_async(&self, module: &str, field: &str) -> bool {
+        match &self.async_ {
+            w::AsyncFunctions::Some(fs) => fs
+                .get(module)
+                .and_then(|fs| fs.iter().find(|f| *f == field))
+                .is_some(),
+            w::AsyncFunctions::All => true,
+        }
+    }
+}
+
 pub enum ConfigField {
     Witx(w::WitxConf),
-    Async(w::AsyncConf),
+    Async(w::AsyncFunctions),
     Ctx(TokenStream),
     PreHook(TokenStream),
     PostHook(TokenStream),
@@ -129,7 +141,7 @@ impl Config {
             witx: witx
                 .take()
                 .ok_or_else(|| Error::new(err_loc, "`witx` field required"))?,
-            async_: async_.take().unwrap_or_else(w::AsyncConf::default),
+            async_: async_.take().unwrap_or_else(w::AsyncFunctions::default),
             ctx: ctx
                 .take()
                 .ok_or_else(|| Error::new(err_loc, "`ctx` field required"))?,

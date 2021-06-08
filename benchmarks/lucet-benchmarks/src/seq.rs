@@ -252,9 +252,8 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
             || {
                 let ctx = WasiCtxBuilder::new()
                     .args(&["hello".to_owned()])
-                    .unwrap()
-                    .build()
-                    .expect("build WasiCtx");
+                    .expect("hello is a valid arg")
+                    .build();
                 region
                     .new_instance_builder(module.clone())
                     .with_embed_ctx(ctx)

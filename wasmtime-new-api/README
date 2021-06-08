@@ -1,6 +1,0 @@
-these files are vendored from https://github.com/alexcrichton/wasmtime branch: new-api
-at 97b64ae3c583fb92fbeadbee74e1287362d3ea70
-
-They should be removed after the new-api branch is merged into wasmtime main.
-
-Modifications have been made to Cargo.toml and build.rs scripts to point to wasmtime submodule's witx crate and WASI witx files.
