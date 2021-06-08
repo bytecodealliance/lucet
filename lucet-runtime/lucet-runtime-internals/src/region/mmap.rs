@@ -507,7 +507,7 @@ mod tests2 {
             pub mem_size: usize,
             pub mem_align: usize,
             pub offset: usize,
-        };
+        }
 
         let tests = vec![
             TestProps {

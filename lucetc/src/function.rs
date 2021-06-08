@@ -209,7 +209,7 @@ impl<'a> FuncInfo<'a> {
             let new_instr_count = builder.ins().iadd(cur_instr_count, update_const);
             builder.def_var(environ.instr_count_var, new_instr_count);
             environ.scope_costs.last_mut().unwrap().cost = 0;
-        };
+        }
 
         fn do_check(environ: &mut FuncInfo<'_>, builder: &mut FunctionBuilder<'_>) {
             let yield_block = builder.create_block();

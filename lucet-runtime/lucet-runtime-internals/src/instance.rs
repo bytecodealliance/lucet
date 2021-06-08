@@ -27,6 +27,7 @@ use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
+use std::panic::panic_any;
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
 
@@ -1042,7 +1043,7 @@ impl Instance {
     pub fn grow_memory_from_hostcall(&mut self, additional_pages: u32) -> Result<u32, Error> {
         let res = self.grow_memory(additional_pages);
         if self.terminate_on_heap_oom() && res.is_err() {
-            panic!(TerminationDetails::HeapOutOfMemory)
+            panic_any(TerminationDetails::HeapOutOfMemory)
         } else {
             res
         }

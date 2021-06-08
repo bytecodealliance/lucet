@@ -119,7 +119,7 @@ pub fn run_with_stdout<P: AsRef<Path>>(
     let stdout = wasi_common::pipe::WritePipe::new_in_memory();
     ctx = ctx.stdout(Box::new(stdout.clone()));
 
-    let ctx = ctx.build()?;
+    let ctx = ctx.build();
 
     let run_result = run(path, ctx);
 
@@ -146,7 +146,7 @@ pub fn run_with_null_stdin<P: AsRef<Path>>(
     let stdin = wasi_common::pipe::ReadPipe::new(std::io::empty());
     ctx = ctx.stdin(Box::new(stdin));
 
-    let ctx = ctx.build()?;
+    let ctx = ctx.build();
 
     let exitcode = run(path, ctx)?;
 

@@ -4,7 +4,8 @@ lucet_wiggle::from_witx!({
     witx: ["$CARGO_MANIFEST_DIR/tests/atoms.witx"],
     async: {
         atoms::double_int_return_float
-    }
+    },
+    wasmtime: false,
 });
 
 lucet_wiggle::lucet_integration!({

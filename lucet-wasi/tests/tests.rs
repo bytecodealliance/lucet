@@ -78,8 +78,7 @@ fn exitcode() {
     let ctx = WasiCtxBuilder::new()
         .args(&["exitcode".to_owned()])
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
 
     let exitcode = run("exitcode.c", ctx).unwrap();
 
@@ -104,8 +103,7 @@ fn gettimeofday() {
     let ctx = WasiCtxBuilder::new()
         .args(&["gettimeofday".to_owned()])
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
 
     let exitcode = run("gettimeofday.c", ctx).unwrap();
 
@@ -118,8 +116,7 @@ fn getentropy() {
     let ctx = WasiCtxBuilder::new()
         .args(&["getentropy".to_owned()])
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
 
     let exitcode = run("getentropy.c", ctx).unwrap();
 
@@ -154,8 +151,7 @@ fn preopen_populates() {
         .unwrap()
         .preopened_dir(preopen_dir, "/preopen")
         .unwrap()
-        .build()
-        .expect("can build WasiCtx");
+        .build();
 
     let exitcode = run("preopen_populates.c", ctx).unwrap();
 
@@ -176,8 +172,7 @@ fn write_file() {
         .unwrap()
         .preopened_dir(preopen_dir, "/sandbox")
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
 
     let exitcode = run("write_file.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
@@ -296,8 +291,7 @@ fn notdir() {
         .unwrap()
         .preopened_dir(preopen_dir, "/sandbox")
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
 
     let exitcode = run("notdir.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
@@ -363,8 +357,7 @@ fn symlink_loop() {
         .unwrap()
         .preopened_dir(preopen_dir, "/sandbox")
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
 
     let exitcode = run("symlink_loop.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
@@ -396,8 +389,7 @@ fn symlink_escape() {
         .unwrap()
         .preopened_dir(preopen_dir, "/sandbox")
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
 
     let exitcode = run("symlink_escape.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
@@ -452,8 +444,7 @@ fn stat() {
         .unwrap()
         .preopened_dir(preopen_dir, "/sandbox")
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
     let exitcode = run("stat.c", ctx).unwrap();
     assert_eq!(exitcode, 0);
 }

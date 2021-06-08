@@ -5,6 +5,7 @@ use crate::val::{UntypedRetVal, Val};
 use crate::vmctx::{Vmctx, VmctxInternal};
 use std::any::Any;
 use std::future::Future;
+use std::panic::panic_any;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -57,7 +58,7 @@ impl Vmctx {
         match self.instance().state {
             State::Running { async_context } => {
                 if !async_context {
-                    panic!(TerminationDetails::BlockOnNeedsAsync)
+                    panic_any(TerminationDetails::BlockOnNeedsAsync)
                 }
             }
             _ => unreachable!("Access to vmctx implies instance is Running"),
