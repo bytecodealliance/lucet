@@ -11,7 +11,7 @@ fn main() {
     // instantiate the module in the memory region
     let mut instance = region.new_instance(dl_module).unwrap();
     // prepare the WASI context, inheriting stdio handles from the host executable
-    let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build().unwrap();
+    let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build();
     instance.insert_embed_ctx(wasi_ctx);
     // run the WASI main function
     instance.run("main", &[]).unwrap();

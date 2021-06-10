@@ -400,7 +400,7 @@ async fn run_with_stdout<P: AsRef<Path>>(
     let ctx = WasiCtxBuilder::new()
         .args(&["gen".to_owned()])?
         .stdout(Box::new(stdout.clone()))
-        .build()?;
+        .build();
 
     let exitcode = run(tmpdir, path, ctx).await?;
 

@@ -18,13 +18,6 @@ members = [
   "lucet-wiggle/generate",
   "lucetc",
   "fuzz",
-  "wasmtime-new-api/crates/wiggle",
-  "wasmtime-new-api/crates/wiggle/borrow",
-  "wasmtime-new-api/crates/wiggle/generate",
-  "wasmtime-new-api/crates/wiggle/macro",
-  "wasmtime-new-api/crates/wasi-common",
-  "wasmtime-new-api/crates/wasi-common/cap-std-sync",
-  "wasmtime-new-api/crates/wasi-common/tokio",
 ]
 exclude = ["wasmtime", "sightglass"]
 

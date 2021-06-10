@@ -10,8 +10,8 @@ cleanup() {
 }
 trap cleanup 1 2 3 6 15
 
-# rust 1.50.0 ships with rustfmt 1.4.30-stable
-RUSTFMT_VERSION=1.4.30-stable
+# rust 1.52.1 ships with rustfmt 1.4.36-stable
+RUSTFMT_VERSION=1.4.36-stable
 
 if ! rustfmt --version | grep -q "rustfmt $RUSTFMT_VERSION"; then
 	echo "indent requires rustfmt $RUSTFMT_VERSION"

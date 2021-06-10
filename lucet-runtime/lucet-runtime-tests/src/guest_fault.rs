@@ -9,6 +9,7 @@ macro_rules! guest_fault_common_defs {
             use lucet_module::{FunctionPointer, TrapCode, TrapSite};
             use lucet_runtime::vmctx::{lucet_vmctx, Vmctx};
             use lucet_runtime::{lucet_hostcall, lucet_hostcall_terminate, DlModule, Module};
+            use std::panic::panic_any;
             use std::sync::Arc;
             use tempfile::TempDir;
             use $crate::build::test_module_wasm;
@@ -33,7 +34,7 @@ macro_rules! guest_fault_common_defs {
             #[lucet_hostcall]
             #[no_mangle]
             pub fn raise_other_panic(_vmctx: &Vmctx) {
-                panic!(OtherPanicPayload);
+                panic_any(OtherPanicPayload);
             }
 
             pub static mut RECOVERABLE_PTR: *mut libc::c_char = std::ptr::null_mut();

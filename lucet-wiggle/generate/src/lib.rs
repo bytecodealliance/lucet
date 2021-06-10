@@ -58,7 +58,7 @@ pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
             let mod_name = names.module(&m.name);
             let method_name = names.func(&f.name);
 
-            let body = if config.async_.is_async(m.name.as_str(), f.name.as_str()) {
+            let body = if config.is_async(m.name.as_str(), f.name.as_str()) {
                 quote!(vmctx.block_on(async move {
                     #target::#mod_name::#method_name(ctx, &memory, #(#arg_names),*).await
                 }))
