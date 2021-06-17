@@ -9,9 +9,9 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-wiggle-generate = { path = "../../wasmtime/crates/wiggle/generate", version = "0.27.0" }
+wiggle-generate = "0.28.0"
 lucet-module = { path = "../../lucet-module", version = "0.7.0-dev" }
-witx = { path = "../../wasmtime/crates/wasi-common/WASI/tools/witx", version = "0.9" }
+witx = "0.9.0"
 quote = "1.0"
 proc-macro2 = "1.0"
 heck = "*"
