@@ -1,6 +1,3 @@
-[submodule "wasmtime"]
-	path = wasmtime
-	url = https://github.com/bytecodealliance/wasmtime
 [submodule "lucet-spectest/spec"]
 	path = lucet-spectest/spec
 	url = https://github.com/webassembly/spec
