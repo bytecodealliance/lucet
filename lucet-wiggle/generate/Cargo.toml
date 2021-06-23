@@ -11,7 +11,7 @@ edition = "2018"
 [dependencies]
 wiggle-generate = "0.28.0"
 lucet-module = { path = "../../lucet-module", version = "0.7.0-dev" }
-witx = "0.9.0"
+witx = "0.9.1"
 quote = "1.0"
 proc-macro2 = "1.0"
 heck = "*"
