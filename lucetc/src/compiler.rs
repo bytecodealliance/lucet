@@ -113,6 +113,7 @@ pub struct CompilerBuilder {
     heap_settings: HeapSettings,
     count_instructions: bool,
     canonicalize_nans: bool,
+    veriwasm: bool,
     validator: Option<Validator>,
     target_version: TargetVersion,
     version_info: Option<VersionInfo>,
@@ -138,6 +139,7 @@ impl CompilerBuilder {
             heap_settings: HeapSettings::default(),
             count_instructions: false,
             canonicalize_nans: false,
+            veriwasm: false,
             validator: None,
             target_version: TargetVersion::default(),
             version_info: None,
@@ -232,6 +234,15 @@ impl CompilerBuilder {
         self
     }
 
+    pub fn veriwasm(&mut self, veriwasm: bool) {
+        self.veriwasm = veriwasm;
+    }
+
+    pub fn with_veriwasm(mut self, veriwasm: bool) -> Self {
+        self.veriwasm(veriwasm);
+        self
+    }
+
     pub fn validator(&mut self, validator: Option<Validator>) {
         self.validator = validator;
     }
@@ -267,6 +278,7 @@ impl CompilerBuilder {
             self.validator.clone(),
             self.canonicalize_nans,
             self.version_info.clone(),
+            self.veriwasm,
         )
     }
 }
@@ -283,6 +295,7 @@ pub struct Compiler<'a> {
     function_bodies:
         HashMap<UniqueFuncIndex, (FuncValidator<ValidatorResources>, FunctionBody<'a>)>,
     version_info: Option<VersionInfo>,
+    veriwasm: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -298,6 +311,7 @@ impl<'a> Compiler<'a> {
         validator: Option<Validator>,
         canonicalize_nans: bool,
         version_info: Option<VersionInfo>,
+        veriwasm: bool,
     ) -> Result<Self, Error> {
         let mk_isa = || {
             Self::target_isa(
@@ -306,6 +320,7 @@ impl<'a> Compiler<'a> {
                 opt_level,
                 &cpu_features,
                 canonicalize_nans,
+                veriwasm,
             )
         };
 
@@ -317,7 +332,7 @@ impl<'a> Compiler<'a> {
 
         module_validation.validation_errors()?;
 
-        let codegen_context = CodegenContext::new(isa, mk_isa()?)?;
+        let codegen_context = CodegenContext::new(isa, mk_isa()?, veriwasm)?;
 
         let runtime = Runtime::lucet(frontend_config);
         let decls = ModuleDecls::new(
@@ -339,6 +354,7 @@ impl<'a> Compiler<'a> {
             canonicalize_nans,
             function_bodies: module_validation.function_bodies,
             version_info,
+            veriwasm,
         })
     }
 
@@ -611,6 +627,7 @@ impl<'a> Compiler<'a> {
                 self.opt_level,
                 &self.cpu_features,
                 self.canonicalize_nans,
+                self.veriwasm,
             )?,
         ))
     }
@@ -621,6 +638,7 @@ impl<'a> Compiler<'a> {
         opt_level: OptLevel,
         cpu_features: &CpuFeatures,
         canonicalize_nans: bool,
+        veriwasm: bool,
     ) -> Result<Box<dyn TargetIsa>, Error> {
         let mut flags_builder = settings::builder();
         let isa_builder = cpu_features.isa_builder(target, variant)?;
@@ -636,6 +654,9 @@ impl<'a> Compiler<'a> {
         flags_builder.set("opt_level", opt_level.to_flag()).unwrap();
         if canonicalize_nans {
             flags_builder.enable("enable_nan_canonicalization").unwrap();
+        }
+        if veriwasm {
+            flags_builder.enable("machine_code_cfg_info").unwrap();
         }
         Ok(isa_builder.finish(settings::Flags::new(flags_builder)))
     }
@@ -653,6 +674,7 @@ pub struct CodegenContext {
     // `UniqueFuncIndex` references the hostcall being trampoline'd to.
     trampolines: Mutex<HashMap<String, (FuncId, UniqueFuncIndex)>>,
     clif_module: Mutex<ObjectModule>,
+    veriwasm: bool,
 }
 
 impl CodegenContext {
@@ -663,6 +685,7 @@ impl CodegenContext {
     pub fn new(
         isa: Box<dyn TargetIsa>,
         isa_copy: Box<dyn TargetIsa>,
+        veriwasm: bool,
     ) -> Result<CodegenContext, Error> {
         let libcalls = Box::new(move |libcall| match libcall {
             ir::LibCall::Probestack => stack_probe::STACK_PROBE_SYM.to_owned(),
@@ -675,6 +698,7 @@ impl CodegenContext {
             isa,
             trampolines: Mutex::new(HashMap::new()),
             clif_module: Mutex::new(clif_module),
+            veriwasm,
         })
     }
 
@@ -726,6 +750,18 @@ impl CodegenContext {
                 &mut stack_map_sink,
             )
         };
+
+        if self.veriwasm {
+            if let Some((bbs, edges)) = clif.get_code_bb_layout() {
+                veriwasm::validate_heap(
+                    &code[..],
+                    &bbs[..],
+                    &edges[..],
+                    veriwasm::HeapStrategy::HeapPtrFirstArgWithGuards,
+                )
+                .map_err(|_| Error::VeriWasm(symbol.to_string()))?
+            }
+        }
 
         let compiled = self
             .module()

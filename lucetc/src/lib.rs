@@ -121,6 +121,8 @@ pub trait LucetcOpts {
     fn with_count_instructions(self, enable_count: bool) -> Self;
     fn canonicalize_nans(&mut self, enable_canonicalize_nans: bool);
     fn with_canonicalize_nans(self, enable_canonicalize_nans: bool) -> Self;
+    fn veriwasm(&mut self, veriwasm: bool);
+    fn with_veriwasm(self, veriwasm: bool) -> Self;
     fn translate_wat(&mut self, enable_translate_wat: bool);
     fn with_translate_wat(self, enable_translate_wat: bool) -> Self;
 }
@@ -310,6 +312,15 @@ impl<T: AsLucetc> LucetcOpts for T {
 
     fn with_translate_wat(mut self, enable_translate_wat: bool) -> Self {
         self.translate_wat(enable_translate_wat);
+        self
+    }
+
+    fn veriwasm(&mut self, veriwasm: bool) {
+        self.as_lucetc().builder.veriwasm(veriwasm);
+    }
+
+    fn with_veriwasm(mut self, veriwasm: bool) -> Self {
+        self.veriwasm(veriwasm);
         self
     }
 }

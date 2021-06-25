@@ -158,6 +158,10 @@ pub fn run(opts: &Options) -> Result<(), Error> {
         c.count_instructions(true);
     }
 
+    if opts.veriwasm {
+        c.veriwasm(true);
+    }
+
     c.translate_wat(opts.translate_wat);
 
     match opts.codegen {

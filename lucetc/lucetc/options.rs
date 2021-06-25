@@ -127,6 +127,7 @@ pub struct Options {
     pub target_version: TargetVersion,
     pub translate_wat: bool,
     pub version_info: Option<VersionInfo>,
+    pub veriwasm: bool,
 }
 
 impl Options {
@@ -232,6 +233,7 @@ impl Options {
         let version_info = m
             .value_of("version_info")
             .map(|v| VersionInfo::from_str(v).expect("parsing version-info"));
+        let veriwasm = m.is_present("veriwasm");
 
         let error_style = match m.value_of("error_style") {
             None => ErrorStyle::default(),
@@ -265,6 +267,7 @@ impl Options {
             target_version,
             translate_wat,
             version_info,
+            veriwasm,
         })
     }
     pub fn get() -> Result<Self, Error> {
@@ -484,6 +487,12 @@ SSE3 but not AVX:
                     .long("--count-instructions")
                     .takes_value(false)
                     .help("Instrument the produced binary to count the number of wasm operations the translated program executes")
+            )
+            .arg(
+                Arg::with_name("veriwasm")
+                    .long("--veriwasm")
+                    .takes_value(false)
+                    .help("Run VeriWasm's heap-access verifier on the produced binary")
             )
             .arg(
                 Arg::with_name("error_style")
