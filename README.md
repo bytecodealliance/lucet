@@ -16,7 +16,7 @@ Check out our [announcement post on the Fastly blog][announce-blog].
 
 Lucet uses, and is developed in collaboration with, the Bytecode Alliance's
 [Cranelift](http://github.com/bytecodealliance/cranelift) code generator. It powers Fastly's
-[Terrarium](https://wasm.fastlylabs.com) platform.
+[Compute@Edge](https://www.fastly.com/products/edge-compute/serverless) platform.
 
 [![asciicast](https://asciinema.org/a/249302.svg)](https://asciinema.org/a/249302)
 
