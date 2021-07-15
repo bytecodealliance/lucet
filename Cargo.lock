@@ -1135,6 +1135,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "env_logger 0.8.4",
  "libfuzzer-sys",
  "lucet-module",
  "lucet-runtime",
