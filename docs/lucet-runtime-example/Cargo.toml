@@ -6,6 +6,7 @@ edition = "2018"
 [dependencies]
 lucet-runtime = { path = "../../lucet-runtime" }
 lucet-wasi = { path = "../../lucet-wasi" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 # or, if compiling against released crates.io versions:
 # lucet-runtime = "0.5.1"
