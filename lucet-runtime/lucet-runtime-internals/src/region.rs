@@ -6,7 +6,7 @@ pub mod uffd;
 use crate::alloc::{Alloc, AllocStrategy, Limits, Slot};
 use crate::embed_ctx::CtxMap;
 use crate::error::Error;
-use crate::instance::InstanceHandle;
+use crate::instance::{InstanceHandle, ResourceLimiter};
 use crate::module::Module;
 use std::any::Any;
 use std::sync::Arc;
@@ -98,6 +98,7 @@ pub struct NewInstanceArgs {
     pub heap_memory_size_limit: usize,
     pub alloc_strategy: AllocStrategy,
     pub terminate_on_heap_oom: bool,
+    pub resource_limiter: Option<Box<dyn ResourceLimiter>>,
 }
 
 impl<'a> InstanceBuilder<'a> {
@@ -110,6 +111,7 @@ impl<'a> InstanceBuilder<'a> {
                 heap_memory_size_limit: region.get_limits().heap_memory_size,
                 alloc_strategy: AllocStrategy::Linear,
                 terminate_on_heap_oom: false,
+                resource_limiter: None,
             },
         }
     }
@@ -154,6 +156,16 @@ impl<'a> InstanceBuilder<'a> {
     /// `panic!()` is called, etc. Terminating allows the error to be more directly identifiable.
     pub fn with_terminate_on_heap_oom(mut self, terminate_on_heap_oom: bool) -> Self {
         self.args.terminate_on_heap_oom = terminate_on_heap_oom;
+        self
+    }
+
+    /// Add a resource limiter to the built instance.
+    ///
+    /// This call is optional. It can be used to add additional checks when the instance requests
+    /// additional resources, e.g. when growing memory. These checks are useful to take dynamic,
+    /// non-WebAssembly-related concerns into account.
+    pub fn with_resource_limiter(mut self, limiter: impl ResourceLimiter + 'static) -> Self {
+        self.args.resource_limiter = Some(Box::new(limiter));
         self
     }
 

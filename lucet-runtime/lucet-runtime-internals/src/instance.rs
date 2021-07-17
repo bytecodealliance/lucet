@@ -77,6 +77,7 @@ pub fn new_instance_handle(
     module: Arc<dyn Module>,
     alloc: Alloc,
     embed_ctx: CtxMap,
+    limiter: Option<Box<dyn ResourceLimiter>>,
 ) -> Result<InstanceHandle, Error> {
     let inst = NonNull::new(instance)
         .ok_or_else(|| lucet_format_err!("instance pointer is null; this is a bug"))?;
@@ -91,7 +92,7 @@ pub fn new_instance_handle(
         needs_inst_drop: false,
     };
 
-    let inst = Instance::new(alloc, module, embed_ctx);
+    let inst = Instance::new(alloc, module, embed_ctx, limiter);
 
     unsafe {
         // this is wildly unsafe! you must be very careful to not let the drop impls run on the
@@ -276,6 +277,8 @@ pub struct Instance {
     /// fails, but this same instruction might also appear when other types of assertions fail,
     /// `panic!()` is called, etc. Terminating allows the error to be more directly identifiable.
     terminate_on_heap_oom: bool,
+
+    resource_limiter: Option<Box<dyn ResourceLimiter>>,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -711,6 +714,16 @@ impl Instance {
         let additional_bytes = additional_pages
             .checked_mul(WASM_PAGE_SIZE)
             .ok_or_else(|| lucet_format_err!("additional pages larger than wasm address space",))?;
+
+        if let Some(limiter) = &self.resource_limiter {
+            let current = self.alloc.heap_accessible_size as u32;
+            let desired = current + additional_bytes;
+            let limit = self.alloc.heap_memory_size_limit as u32;
+            limiter
+                .memory_growing(self, current, desired, limit)
+                .map_err(|err| Error::LimitsExceeded(err))?;
+        }
+
         let orig_len = self
             .alloc
             .expand_heap(additional_bytes, self.module.as_ref())?;
@@ -993,7 +1006,12 @@ impl Instance {
 
 // Private API
 impl Instance {
-    fn new(alloc: Alloc, module: Arc<dyn Module>, embed_ctx: CtxMap) -> Self {
+    fn new(
+        alloc: Alloc,
+        module: Arc<dyn Module>,
+        embed_ctx: CtxMap,
+        resource_limiter: Option<Box<dyn ResourceLimiter>>,
+    ) -> Self {
         let globals_ptr = alloc.slot().globals as *mut i64;
 
         #[cfg(feature = "concurrent_testpoints")]
@@ -1022,6 +1040,7 @@ impl Instance {
             entrypoint: None,
             resumed_val: None,
             terminate_on_heap_oom: false,
+            resource_limiter,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
@@ -1611,4 +1630,26 @@ pub(crate) struct EmptyYieldVal;
 
 fn default_fatal_handler(inst: &Instance) -> ! {
     panic!("> instance {:p} had fatal error: {}", inst, inst.state);
+}
+
+/// Used by hosts to limit resource consumption of instances.
+///
+/// An instance can be configured with a resource limiter so that hosts can take into account non-WebAssembly
+/// resource usage to determine if linear memory should be permitted to grow.
+pub trait ResourceLimiter {
+    /// Called when the the instance's linear memory has been requested to grow.
+    ///
+    /// * `current` gives the current size of the linear memory, in bytes.
+    /// * `desired` gives the desired new size of the linear memory, in bytes.
+    /// * `limit` gives the configured maximum size of the linear memory, in bytes.
+    ///
+    /// Returning `Ok` signals that the memory should be permitted to grow; returning an `Err(err)` prevents
+    /// the growth from occurring, yielding an `Error::LimitsExceeded(err)` from the call to grow the memory.
+    fn memory_growing(
+        &self,
+        instance: &Instance,
+        current: u32,
+        desired: u32,
+        limit: u32,
+    ) -> Result<(), String>;
 }
