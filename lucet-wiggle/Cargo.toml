@@ -14,7 +14,7 @@ edition = "2018"
 lucet-wiggle-macro = { path = "./macro", version = "0.7.0-dev" }
 lucet-wiggle-generate = { path = "./generate", version = "0.7.0-dev" }
 lucet-runtime = { path = "../lucet-runtime", version = "0.7.0-dev" }
-wiggle =  { version = "0.28.0", default-features = false }
+wiggle =  { version = "0.29.0", default-features = false }
 
 [dev-dependencies]
 tempfile = "3.1"
