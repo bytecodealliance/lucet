@@ -16,13 +16,13 @@ path = "lucetc/main.rs"
 [dependencies]
 anyhow = "1"
 bincode = "1.1.4"
-cranelift-codegen = { version = "0.75.0", features = ["x86" ] }
-cranelift-entity = "0.75.0"
-cranelift-native = "0.75.0"
-cranelift-frontend = "0.75.0"
-cranelift-module =  "0.75.0"
-cranelift-object =  "0.75.0"
-cranelift-wasm = "0.75.0"
+cranelift-codegen = { version = "0.76.0", features = ["x86" ] }
+cranelift-entity = "0.76.0"
+cranelift-native = "0.76.0"
+cranelift-frontend = "0.76.0"
+cranelift-module =  "0.76.0"
+cranelift-object =  "0.76.0"
+cranelift-wasm = "0.76.0"
 target-lexicon = "0.12"
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.7.0-dev" }
@@ -32,7 +32,7 @@ clap = "2.32"
 
 log = "0.4"
 env_logger = "0.6"
-object = { version = "0.25.2", default-features = false, features = ["write"] }
+object = { version = "0.26.0", default-features = false, features = ["write"] }
 byteorder = "1.2"
 wabt = "0.9.1"
 tempfile = "3.0"
