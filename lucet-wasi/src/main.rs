@@ -138,7 +138,9 @@ async fn main() {
                 if let [host_path, guest_path] =
                     preopen_dir.split(':').collect::<Vec<&str>>().as_slice()
                 {
-                    let host_dir = unsafe { Dir::open_ambient_dir(host_path) }.unwrap();
+                    let host_dir =
+                        Dir::open_ambient_dir(host_path, ambient_authority::ambient_authority())
+                            .unwrap();
                     (host_dir, *guest_path)
                 } else {
                     println!("Invalid directory specification: {}", preopen_dir);

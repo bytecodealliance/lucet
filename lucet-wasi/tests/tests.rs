@@ -142,7 +142,7 @@ fn stdin() {
 #[test]
 fn preopen_populates() {
     init_tracing();
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
@@ -163,7 +163,7 @@ fn preopen_populates() {
 #[test]
 fn write_file() {
     init_tracing();
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
@@ -192,7 +192,7 @@ fn write_file() {
 #[test]
 fn read_file() {
     const MESSAGE: &str = "hello from file!";
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
@@ -220,7 +220,7 @@ fn read_file() {
 fn read_file_twice() {
     init_tracing();
     const MESSAGE: &str = "hello from file!";
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
@@ -249,7 +249,7 @@ fn read_file_twice() {
 fn cant_dotdot() {
     init_tracing();
     const MESSAGE: &str = "hello from file!";
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
@@ -276,7 +276,7 @@ fn notdir() {
     init_tracing();
     const MESSAGE: &str = "hello from file!";
 
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
@@ -304,7 +304,7 @@ fn follow_symlink() {
     init_tracing();
     const MESSAGE: &str = "hello from file!";
 
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
@@ -339,7 +339,7 @@ fn follow_symlink() {
 #[test]
 fn symlink_loop() {
     init_tracing();
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
     preopen_dir.create_dir("subdir1").unwrap();
@@ -370,7 +370,7 @@ fn symlink_escape() {
     init_tracing();
     const MESSAGE: &str = "hello from file!";
 
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
     preopen_dir.create_dir("subdir").unwrap();
@@ -407,7 +407,11 @@ fn pseudoquine() {
         .args(&["pseudoquine".to_owned()])
         .unwrap()
         .preopened_dir(
-            unsafe { cap_std::fs::Dir::open_ambient_dir(examples_dir).unwrap() },
+            cap_std::fs::Dir::open_ambient_dir(
+                examples_dir,
+                ambient_authority::ambient_authority(),
+            )
+            .unwrap(),
             "/examples",
         )
         .unwrap();
@@ -435,7 +439,7 @@ fn poll() {
 #[test]
 fn stat() {
     init_tracing();
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
@@ -452,7 +456,7 @@ fn stat() {
 #[test]
 fn fs() {
     init_tracing();
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
@@ -468,7 +472,7 @@ fn fs() {
 #[test]
 fn readdir() {
     init_tracing();
-    let tmpdir = unsafe { cap_tempfile::tempdir().unwrap() };
+    let tmpdir = cap_tempfile::tempdir(ambient_authority::ambient_authority()).unwrap();
     tmpdir.create_dir("preopen").unwrap();
     let preopen_dir = tmpdir.open_dir("preopen").unwrap();
 
