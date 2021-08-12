@@ -710,9 +710,9 @@ impl Default for UffdConfig {
         UffdConfig {
             heap_page_size: HeapPageSize::Wasm,
             heap_init: Disposition::Lazy,
-            stack_init: Disposition::Lazy,
-            abort_on_handler_error: false,
-            enoent_retry_limit: 4,
+            stack_init: Disposition::Eager,
+            abort_on_handler_error: true,
+            enoent_retry_limit: 9,
         }
     }
 }
