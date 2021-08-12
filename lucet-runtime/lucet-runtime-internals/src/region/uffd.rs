@@ -365,16 +365,18 @@ impl RegionInternal for UffdRegion {
                     0,
                     "initial heap is page divisible"
                 );
-                // All associated host pages gets zeroed
-                unsafe {
-                    zeropage(
-                        &self.uffd,
-                        slot.heap,
-                        initial_size,
-                        false,
-                        self.config.enoent_retry_limit,
-                    )
-                    .map_err(|e| Error::InternalError(e.into()))?;
+                if initial_size > 0 {
+                    // All associated host pages gets zeroed
+                    unsafe {
+                        zeropage(
+                            &self.uffd,
+                            slot.heap,
+                            initial_size,
+                            false,
+                            self.config.enoent_retry_limit,
+                        )
+                        .map_err(|e| Error::InternalError(e.into()))?;
+                    }
                 }
 
                 let heap_pages = initial_size / host_page_size();
@@ -708,9 +710,9 @@ impl Default for UffdConfig {
         UffdConfig {
             heap_page_size: HeapPageSize::Wasm,
             heap_init: Disposition::Lazy,
-            stack_init: Disposition::Lazy,
-            abort_on_handler_error: false,
-            enoent_retry_limit: 4,
+            stack_init: Disposition::Eager,
+            abort_on_handler_error: true,
+            enoent_retry_limit: 9,
         }
     }
 }
