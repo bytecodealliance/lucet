@@ -14,20 +14,50 @@ cfg_if::cfg_if! {
 #[cfg(all(target_os = "linux", feature = "uffd"))]
 mod uffd_specific {
     use libc::{c_void, mincore};
-    use lucet_runtime::{Limits, Region};
-    use lucet_runtime::{UffdConfig, UffdRegion};
+    use lucet_runtime::{DlModule, Limits, Region};
+    use lucet_runtime::{UffdConfig, UffdDisposition, UffdRegion};
     use lucet_runtime_tests::build::test_module_wasm;
+    use std::sync::Arc;
 
     #[test]
     fn ensure_linked() {
         lucet_runtime::lucet_internal_ensure_linked();
     }
+
     #[test]
     fn lazy_memory() {
         let module = test_module_wasm("memory", "uffd_memory.wat")
             .expect("compile and load uffd_memory.wasm");
         let region = UffdRegion::create(1, &Limits::default(), UffdConfig::default())
             .expect("region can be created");
+        uffd_memory_test(module, &region);
+
+        let zero_memory = test_module_wasm("memory", "zero_memory.wat")
+            .expect("compile and load zero_memory.wasm");
+        zero_memory_test(zero_memory, &region);
+    }
+
+    #[test]
+    fn eager_memory() {
+        let module = test_module_wasm("memory", "uffd_memory.wat")
+            .expect("compile and load uffd_memory.wasm");
+        let region = UffdRegion::create(
+            1,
+            &Limits::default(),
+            UffdConfig {
+                heap_init: UffdDisposition::Eager,
+                ..UffdConfig::default()
+            },
+        )
+        .expect("region can be created");
+        uffd_memory_test(module, &region);
+
+        let zero_memory = test_module_wasm("memory", "zero_memory.wat")
+            .expect("compile and load zero_memory.wasm");
+        zero_memory_test(zero_memory, &region);
+    }
+
+    fn uffd_memory_test(module: Arc<DlModule>, region: &UffdRegion) {
         let mut inst = region
             .new_instance(module)
             .expect("instance can be created");
@@ -63,5 +93,16 @@ mod uffd_specific {
         assert_eq!(&result_vec[16..32], &[1; 16]);
         assert_eq!(&result_vec[32..48], &[0; 16]);
         assert_eq!(&result_vec[48..64], &[1; 16]);
+    }
+
+    fn zero_memory_test(module: Arc<DlModule>, region: &UffdRegion) {
+        let mut inst = region
+            .new_instance(module)
+            .expect("instance can be created");
+
+        inst.run("main", &[]).expect("instance runs");
+
+        let heap = inst.heap();
+        assert_eq!(heap.len(), 0);
     }
 }
