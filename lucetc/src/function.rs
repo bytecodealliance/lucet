@@ -4,6 +4,7 @@ use crate::decls::{FunctionDecl, ModuleDecls};
 use crate::module::UniqueFuncIndex;
 use crate::pointer::{NATIVE_POINTER, NATIVE_POINTER_SIZE};
 use crate::table::TABLE_REF_SIZE;
+use crate::types::value_type;
 use cranelift_codegen::cursor::FuncCursor;
 use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::ir::{self, condcodes::IntCC, InstBuilder};
@@ -472,7 +473,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         Ok(GlobalVariable::Memory {
             gv: global_base,
             offset,
-            ty: global.entity.ty,
+            ty: value_type(&global.entity.wasm_ty),
         })
     }
 
@@ -945,5 +946,9 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
         _: ir::Value,
     ) -> WasmResult<ir::Value> {
         unimplemented!("translate atomic verify");
+    }
+
+    fn unsigned_add_overflow_condition(&self) -> IntCC {
+        unimplemented!("unsigned_add_overflow_condition");
     }
 }

@@ -10,7 +10,7 @@ pub use lucet_module::SparseData;
 const PAGE_SIZE: u64 = 4096;
 
 fn linear_memory_range<'a>(di: &DataInitializer<'a>, start: u32, end: u32) -> &'a [u8] {
-    let offs = di.offset;
+    let offs = di.offset as u32;
     // The range of linear memory we're interested in is:
     // valid: end is past the start
     assert!(end >= start);

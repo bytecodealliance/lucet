@@ -18,7 +18,7 @@ pub fn bindings() -> lucet_module::bindings::Bindings {
 
 /// The witx document for the interface implemented by this crate. This is exposed as part of a
 /// transition path away from always loading witx documents from the filesystem.
-pub fn witx_document() -> lucet_wiggle::witx::Document {
+pub fn witx_document() -> witx::Document {
     wasi_common::snapshots::preview_1::metadata::document()
 }
 

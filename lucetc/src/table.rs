@@ -6,7 +6,7 @@ use crate::pointer::NATIVE_POINTER_SIZE;
 use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::entity::EntityRef;
 use cranelift_module::{DataContext, DataId, Module as ClifModule};
-use cranelift_wasm::{TableElementType, TableIndex};
+use cranelift_wasm::{TableIndex, WasmType};
 use std::convert::TryInto;
 use std::io::Cursor;
 
@@ -24,10 +24,10 @@ enum Elem {
 }
 
 fn table_elements(decl: &TableDecl<'_>) -> Result<Vec<Elem>, Error> {
-    match decl.table.ty {
-        TableElementType::Func => Ok(()),
+    match decl.table.wasm_ty {
+        WasmType::FuncRef => Ok(()),
         _ => {
-            let message = format!("table with non-function elements: {:?}", decl);
+            let message = format!("table with non-FuncRef elements: {:?}", decl);
             Err(Error::Unsupported(message))
         }
     }?;

@@ -1,3 +1,4 @@
+use cranelift_codegen::ir;
 use cranelift_wasm::{WasmFuncType, WasmType};
 use lucet_module::{Signature, ValueType};
 use std::fmt::{self, Display};
@@ -7,6 +8,18 @@ use thiserror::Error;
 pub enum ValueError {
     Unrepresentable,
     InvalidVMContext,
+}
+
+pub fn value_type(ty: &WasmType) -> ir::types::Type {
+    match ty {
+        WasmType::I32 => ir::types::I32,
+        WasmType::I64 => ir::types::I64,
+        WasmType::F32 => ir::types::F32,
+        WasmType::F64 => ir::types::F64,
+        WasmType::V128 => ir::types::I8X16,
+        WasmType::FuncRef | WasmType::ExternRef => ir::types::I64,
+        WasmType::ExnRef => unimplemented!(),
+    }
 }
 
 fn to_lucet_valuetype(ty: &WasmType) -> Result<ValueType, ValueError> {
@@ -33,14 +46,14 @@ impl Display for SignatureError {
 
 pub fn to_lucet_signature(func_type: &WasmFuncType) -> Result<Signature, SignatureError> {
     let params = func_type
-        .params
+        .params()
         .iter()
         .map(|paramtype| {
             to_lucet_valuetype(paramtype).map_err(|e| SignatureError::Type(*paramtype, e))
         })
         .collect::<Result<Vec<ValueType>, SignatureError>>()?;
 
-    let ret_ty: Option<ValueType> = match &*func_type.returns {
+    let ret_ty: Option<ValueType> = match &*func_type.returns() {
         &[] => None,
         &[ref ret_ty] => {
             let value_ty =
