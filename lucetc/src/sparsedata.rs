@@ -27,15 +27,15 @@ fn linear_memory_range<'a>(di: &DataInitializer<'a>, start: u32, end: u32) -> &'
 
 // If the data initializer contains indexes that are out of range for a 32 bit linear
 // memory, this function will return Err(TryFromIntError)
-fn split<'a>(
-    di: &DataInitializer<'a>,
-) -> Result<Vec<(u32, DataInitializer<'a>)>, std::num::TryFromIntError> {
+fn split<'a>(di: &DataInitializer<'a>) -> Result<Vec<(u32, DataInitializer<'a>)>, anyhow::Error> {
     use std::convert::TryInto;
     // Divide a data initializer for linear memory into a set of data initializers for pages, and
     // the index of the page they cover.
     // The input initializer can cover many pages. Each output initializer covers exactly one.
     let start = di.offset as u64;
-    let end = start + di.data.len() as u64;
+    let end = start
+        .checked_add(di.data.len() as u64)
+        .ok_or_else(|| anyhow::format_err!("overflow"))?;
     let mut offs = start;
     let mut out = Vec::new();
 
