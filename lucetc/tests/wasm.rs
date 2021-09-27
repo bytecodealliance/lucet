@@ -690,10 +690,10 @@ mod validate {
                     },
                     ValidationError::MissingRequiredExport {
                         field: "_start".to_owned(),
-                        type_: cranelift_wasm::WasmFuncType {
-                            params: vec![].into_boxed_slice(),
-                            returns: vec![].into_boxed_slice()
-                        }
+                        type_: cranelift_wasm::WasmFuncType::new(
+                            vec![].into_boxed_slice(),
+                            vec![].into_boxed_slice()
+                        )
                     }
                 ]
             ),

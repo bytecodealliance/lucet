@@ -32,10 +32,10 @@ impl Runtime {
                     returns: vec![AbiParam::new(types::I32)],
                     call_conv: target.default_call_conv,
                 },
-                wasm_func_type: WasmFuncType {
-                    params: vec![].into_boxed_slice(),
-                    returns: vec![WasmType::I32].into_boxed_slice(),
-                },
+                wasm_func_type: WasmFuncType::new(
+                    vec![].into_boxed_slice(),
+                    vec![WasmType::I32].into_boxed_slice(),
+                ),
             },
         );
         functions.insert(
@@ -49,10 +49,10 @@ impl Runtime {
                     returns: vec![AbiParam::new(types::I32)],
                     call_conv: target.default_call_conv,
                 },
-                wasm_func_type: WasmFuncType {
-                    params: vec![WasmType::I32].into_boxed_slice(),
-                    returns: vec![WasmType::I32].into_boxed_slice(),
-                },
+                wasm_func_type: WasmFuncType::new(
+                    vec![WasmType::I32].into_boxed_slice(),
+                    vec![WasmType::I32].into_boxed_slice(),
+                ),
             },
         );
         functions.insert(
@@ -64,10 +64,10 @@ impl Runtime {
                     returns: vec![],
                     call_conv: target.default_call_conv,
                 },
-                wasm_func_type: WasmFuncType {
-                    params: vec![].into_boxed_slice(),
-                    returns: vec![].into_boxed_slice(),
-                },
+                wasm_func_type: WasmFuncType::new(
+                    vec![].into_boxed_slice(),
+                    vec![].into_boxed_slice(),
+                ),
             },
         );
         Self { functions }

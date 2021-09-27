@@ -63,10 +63,10 @@ pub fn declare<'a>(
             codegen_context,
             STACK_PROBE_SYM.to_string(),
             Linkage::Local,
-            WasmFuncType {
-                params: vec![].into_boxed_slice(),
-                returns: vec![WasmType::I32].into_boxed_slice(),
-            },
+            WasmFuncType::new(
+                vec![].into_boxed_slice(),
+                vec![WasmType::I32].into_boxed_slice(),
+            ),
             Signature {
                 params: vec![],
                 returns: vec![AbiParam::new(types::I32)],

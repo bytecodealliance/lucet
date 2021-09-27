@@ -85,10 +85,8 @@ impl ValidatorBuilder {
     }
 
     pub fn build(self) -> Validator {
-        let no_params_no_returns = WasmFuncType {
-            params: vec![].into_boxed_slice(),
-            returns: vec![].into_boxed_slice(),
-        };
+        let no_params_no_returns =
+            WasmFuncType::new(vec![].into_boxed_slice(), vec![].into_boxed_slice());
         let exports = match self.wasi_mode {
             None => vec![],
             Some(WasiMode::Command) => vec![(
@@ -255,5 +253,5 @@ fn witx_to_functype(func: &witx::InterfaceFunc) -> WasmFuncType {
         1 => vec![atom_to_type(&results[0])].into_boxed_slice(),
         _ => unimplemented!("multiple result types"),
     };
-    WasmFuncType { params, returns }
+    WasmFuncType::new(params, returns)
 }

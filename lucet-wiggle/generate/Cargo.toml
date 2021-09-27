@@ -9,7 +9,7 @@ authors = ["Lucet team <lucet@fastly.com>"]
 edition = "2018"
 
 [dependencies]
-wiggle-generate = "0.29.0"
+wiggle-generate = "0.30.0"
 lucet-module = { path = "../../lucet-module", version = "0.7.0-dev" }
 witx = "0.9.1"
 quote = "1.0"

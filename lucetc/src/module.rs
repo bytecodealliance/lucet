@@ -8,8 +8,7 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_wasm::{
     wasmparser::{FuncValidator, FunctionBody, ValidatorResources},
     DataIndex, ElemIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex, ModuleEnvironment,
-    Table, TableElementType, TableIndex, TargetEnvironment, TypeIndex, WasmError, WasmFuncType,
-    WasmResult, WasmType,
+    Table, TableIndex, TargetEnvironment, TypeIndex, WasmError, WasmFuncType, WasmResult, WasmType,
 };
 use lucet_module::UniqueSignatureIndex;
 use std::collections::{hash_map::Entry, HashMap};
@@ -49,7 +48,7 @@ pub struct TableElems {
 #[derive(Debug, Clone)]
 pub struct DataInitializer<'a> {
     pub base: Option<GlobalIndex>,
-    pub offset: u32,
+    pub offset: u64,
     pub data: &'a [u8],
 }
 
@@ -227,8 +226,8 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
                 _ => unimplemented!(),
             })
         };
-        sig.params.extend(wasm.params.iter().map(&cvt));
-        sig.returns.extend(wasm.returns.iter().map(&cvt));
+        sig.params.extend(wasm.params().iter().map(&cvt));
+        sig.returns.extend(wasm.returns().iter().map(&cvt));
         self.info.declare_type_func(wasm, sig)
     }
     fn declare_func_import(
@@ -455,7 +454,6 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
             Entry::Vacant(vac) => {
                 if self.info.tables.is_empty() && table_index == TableIndex::new(0) {
                     let table = Table {
-                        ty: TableElementType::Func,
                         wasm_ty: WasmType::FuncRef,
                         minimum: 0,
                         maximum: None,
@@ -474,7 +472,7 @@ impl<'a> ModuleEnvironment<'a> for ModuleValidation<'a> {
         &mut self,
         memory_index: MemoryIndex,
         base: Option<GlobalIndex>,
-        offset: u32,
+        offset: u64,
         data: &'a [u8],
     ) -> WasmResult<()> {
         let data_init = DataInitializer { base, offset, data };
