@@ -1,3 +1,15 @@
+## Lucet is in Maintence Mode
+
+Since mid 2020, the Lucet team has been focusing our efforts on the
+[Wasmtime][wasmtime] project. Wasmtime now has support for all of the features
+that previously only Lucet had, such as ahead-of-time (AOT) compilation
+and a pooling userfaultfd-based memory allocator.
+
+We encourage all new projects to use [Wasmtime][wasmtime], and existing Lucet
+users to transition to Wasmtime.
+
+[wasmtime]: https://github.com/bytecodealliance/wasmtime
+
 # Lucet &nbsp; [![Build Status]][gh-actions]
 
 [Build Status]: https://github.com/bytecodealliance/lucet/workflows/CI/badge.svg
