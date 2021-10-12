@@ -440,8 +440,8 @@ fn link_so(
 
     if !run_ld.status.success() {
         let message = format!(
-            "ld of {} failed: {}",
-            objpath.as_ref().to_str().unwrap(),
+            "ld of `{:?}` failed: {}",
+            cmd_ld,
             String::from_utf8_lossy(&run_ld.stderr)
         );
         return Err(Error::LdError(message));
