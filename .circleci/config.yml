@@ -13,8 +13,8 @@ executors:
     resource_class: xlarge
   macos:
     macos:
-      # Latest non-beta as of this writing.
-      xcode: "11.4.1"
+      # uses macOS 11.4.0 under the hood. We no longer support macos < 11.
+      xcode: "12.5.1"
     resource_class: medium
 
 jobs:
