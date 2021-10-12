@@ -21,7 +21,7 @@ lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", v
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 lucet-wiggle = { path = "../lucet-wiggle", version = "=0.7.0-dev" }
 lucet-wiggle-generate = { path = "../lucet-wiggle/generate", version = "=0.7.0-dev" }
-libc = "0.2.65"
+libc = "0.2.103"
 nix = "0.23"
 rand = "0.6"
 wasi-common = { version = "0.30.0", default-features = false,  features = ["wiggle_metadata"] }

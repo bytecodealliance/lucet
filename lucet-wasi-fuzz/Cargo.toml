@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1"
 clap = "2.32"
-libc = "0.2.65"
+libc = "0.2.103"
 lucetc = { path = "../lucetc" }
 lucet-runtime = { path = "../lucet-runtime" }
 lucet-module = { path = "../lucet-module" }

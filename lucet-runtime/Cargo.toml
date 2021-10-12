@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 cfg-if = "0.1"
-libc = "0.2.65"
+libc = "0.2.103"
 lucet-runtime-internals = { path = "lucet-runtime-internals", version = "=0.7.0-dev" }
 lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 num-traits = "0.2"

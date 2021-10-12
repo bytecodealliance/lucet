@@ -14,4 +14,4 @@ lucet-module = { path = "../lucet-module", version = "=0.7.0-dev" }
 lucet-runtime = { path = "../lucet-runtime", version = "=0.7.0-dev", features = ["concurrent_testpoints"] }
 lucet-runtime-tests = { path = "../lucet-runtime/lucet-runtime-tests", version = "=0.7.0-dev" }
 lucet-runtime-internals = { path = "../lucet-runtime/lucet-runtime-internals", version = "=0.7.0-dev", features = ["concurrent_testpoints"] }
-libc = "0.2.65"
+libc = "0.2.103"
