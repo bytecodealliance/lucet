@@ -1064,9 +1064,9 @@ checksum = "3576a87f2ba00f6f106fdfcd16db1d698d648a26ad8e0573cad8537c3c362d2a"
 
 [[package]]
 name = "libc"
-version = "0.2.98"
+version = "0.2.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "320cfe77175da3a483efed4bc0adc1968ca050b098ce4f2f1c13a56626128790"
+checksum = "dd8f7255a17a627354f321ef0055d63b898c6fb27eff628af4d1b66b7331edf6"
 
 [[package]]
 name = "libfuzzer-sys"
@@ -1141,7 +1141,7 @@ dependencies = [
  "lucet-wasi",
  "lucet-wasi-sdk",
  "lucetc",
- "nix 0.17.0",
+ "nix 0.23.0",
  "num_cpus",
  "rayon",
  "tempfile",
@@ -1219,7 +1219,7 @@ dependencies = [
  "lucet-runtime-tests",
  "lucet-wasi-sdk",
  "lucetc",
- "nix 0.17.0",
+ "nix 0.23.0",
  "num-derive",
  "num-traits",
  "rayon",
@@ -1251,7 +1251,7 @@ dependencies = [
  "lucet-module",
  "lucet-runtime-macros",
  "memoffset 0.5.6",
- "nix 0.17.0",
+ "nix 0.23.0",
  "num-derive",
  "num-traits",
  "rand 0.7.3",
@@ -1320,7 +1320,7 @@ dependencies = [
  "lucet-wiggle",
  "lucet-wiggle-generate",
  "lucetc",
- "nix 0.17.0",
+ "nix 0.23.0",
  "rand 0.6.5",
  "tempfile",
  "tokio",
@@ -1344,7 +1344,7 @@ dependencies = [
  "lucet-wasi",
  "lucet-wasi-sdk",
  "lucetc",
- "nix 0.17.0",
+ "nix 0.23.0",
  "num_cpus",
  "progress",
  "rand 0.6.5",
@@ -1555,15 +1555,15 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.17.0"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50e4785f2c3b7589a0d0c1dd60285e1188adac4006e8abd6dd578e1567027363"
+checksum = "f305c2c2e4c39a82f7bf0bf65fb557f9070ce06781d4f2454295cc34b1c43188"
 dependencies = [
  "bitflags",
  "cc",
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "libc",
- "void",
+ "memoffset 0.6.4",
 ]
 
 [[package]]
@@ -2817,14 +2817,14 @@ dependencies = [
 
 [[package]]
 name = "userfaultfd"
-version = "0.3.2"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d0312d3964b9b5be18be4f4274319c1b613bdf7511d640f493bbf632afea5a9"
+checksum = "c0c5a19bdab0e8c45b0116ac7901e5a697e6b1bd40843e1a716b7da2ea6f9c91"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "libc",
- "nix 0.17.0",
+ "nix 0.23.0",
  "thiserror",
  "userfaultfd-sys",
 ]
