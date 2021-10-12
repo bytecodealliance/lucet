@@ -763,7 +763,7 @@ macro_rules! guest_fault_tests {
                     test_ex(|| {
                         // // make sure only one test using super::RECOVERABLE_PTR is running at once
                         let lock = super::RECOVERABLE_PTR_LOCK.lock().unwrap();
-                        match fork().expect("can fork") {
+                        match unsafe { fork() }.expect("can fork") {
                             ForkResult::Child => {
                                 let module = mock_traps_module();
                                 let region = <TestRegion as RegionCreate>::create(1, &Limits::default())
@@ -959,7 +959,7 @@ macro_rules! guest_fault_tests {
                 #[test]
                 fn handle_host_signal() {
                     test_ex(|| {
-                        match fork().expect("can fork") {
+                        match unsafe { fork() }.expect("can fork") {
                             ForkResult::Child => {
                                 unsafe {
                                     recoverable_ptr_setup();
@@ -1011,7 +1011,7 @@ macro_rules! guest_fault_tests {
                             .new_instance(module)
                             .expect("instance can be created");
 
-                        match fork().expect("can fork") {
+                        match unsafe { fork() }.expect("can fork") {
                             ForkResult::Child => {
                                 // Child code should run code that will make an OOB beyond the guard page. This will
                                 // cause the entire process to abort before returning from `run`
@@ -1039,7 +1039,7 @@ macro_rules! guest_fault_tests {
                     }
                     test_ex(|| {
                         let module = mock_traps_module();
-                        match fork().expect("can fork") {
+                        match unsafe { fork() }.expect("can fork") {
                             ForkResult::Child => {
                                 let region =
                                     <TestRegion as RegionCreate>::create(1, &Limits::default()).expect("region can be created");
@@ -1082,7 +1082,7 @@ macro_rules! guest_fault_tests {
                             .new_instance(module)
                             .expect("instance can be created");
 
-                        match fork().expect("can fork") {
+                        match unsafe { fork() }.expect("can fork") {
                             ForkResult::Child => {
                                 // Child code should run code that will make an OOB beyond the guard page. This will
                                 // cause the entire process to abort before returning from `run`
