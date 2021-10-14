@@ -35,6 +35,7 @@ impl ModuleSignature {
             Cursor::new(&raw_module_and_data.obj_bin),
             true,
             false,
+            false,
         )
         .map_err(ModuleSignatureError)
     }
@@ -45,7 +46,6 @@ impl ModuleSignature {
             None,
             sk,
             Cursor::new(&raw_module_and_data.obj_bin),
-            true,
             None,
             None,
         )
