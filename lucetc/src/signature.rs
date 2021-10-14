@@ -84,7 +84,7 @@ pub fn verify_source_code(
     signature_box: &SignatureBox,
     pk: &PublicKey,
 ) -> Result<(), Error> {
-    minisign::verify(pk, signature_box, Cursor::new(buf), false, false)
+    minisign::verify(pk, signature_box, Cursor::new(buf), false, false, false)
         .map_err(|e| Error::Signature(e.to_string()))
 }
 
