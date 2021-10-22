@@ -316,7 +316,6 @@ impl RegionInternal for UffdRegion {
             embed_ctx,
             heap_memory_size_limit,
             mut alloc_strategy,
-            terminate_on_heap_oom,
             ..
         }: NewInstanceArgs,
     ) -> Result<InstanceHandle, Error> {
@@ -418,10 +417,7 @@ impl RegionInternal for UffdRegion {
             invalid_pages: Vec::new(),
         };
 
-        let mut inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
-        inst.set_terminate_on_heap_oom(terminate_on_heap_oom);
-
-        Ok(inst)
+        new_instance_handle(inst_ptr, module, alloc, embed_ctx)
     }
 
     fn drop_alloc(&self, alloc: &mut Alloc) {

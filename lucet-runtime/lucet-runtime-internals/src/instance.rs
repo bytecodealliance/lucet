@@ -27,7 +27,6 @@ use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
-use std::panic::panic_any;
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
 
@@ -266,16 +265,6 @@ pub struct Instance {
     /// The value passed back to the guest when resuming a yielded instance.
     pub(crate) resumed_val: Option<Box<dyn Any + 'static>>,
 
-    /// Whether to terminate the guest when `memory.grow` fails, rather than returning `-1`;
-    /// disabled by default.
-    ///
-    /// This behavior deviates from the WebAssembly spec, but is useful in practice for determining
-    /// when guest programs fail due to an exhausted heap.
-    ///
-    /// Most languages will compile to code that includes an `unreachable` instruction if allocation
-    /// fails, but this same instruction might also appear when other types of assertions fail,
-    /// `panic!()` is called, etc. Terminating allows the error to be more directly identifiable.
-    terminate_on_heap_oom: bool,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -980,15 +969,6 @@ impl Instance {
         self.get_instance_implicits_mut().stack_limit = slot.stack as u64 + reservation as u64;
     }
 
-    #[inline]
-    pub fn terminate_on_heap_oom(&self) -> bool {
-        self.terminate_on_heap_oom
-    }
-
-    #[inline]
-    pub fn set_terminate_on_heap_oom(&mut self, terminate_on_heap_oom: bool) {
-        self.terminate_on_heap_oom = terminate_on_heap_oom;
-    }
 }
 
 // Private API
@@ -1021,7 +1001,6 @@ impl Instance {
             ensure_sigstack_installed: true,
             entrypoint: None,
             resumed_val: None,
-            terminate_on_heap_oom: false,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
@@ -1035,19 +1014,6 @@ impl Instance {
         inst
     }
 
-    /// Like `Instance::grow_memory()`, but terminates on out-of-memory if `terminate_on_heap_oom`
-    /// is set.
-    ///
-    /// This is exported only to support the implementation of the builtin `lucet_vmctx_grow_memory`
-    /// function, and should not be called by users.
-    pub fn grow_memory_from_hostcall(&mut self, additional_pages: u32) -> Result<u32, Error> {
-        let res = self.grow_memory(additional_pages);
-        if self.terminate_on_heap_oom() && res.is_err() {
-            panic_any(TerminationDetails::HeapOutOfMemory)
-        } else {
-            res
-        }
-    }
 
     // The globals pointer must be stored right before the end of the structure, padded to the page size,
     // so that it is 8 bytes before the heap.
@@ -1458,11 +1424,6 @@ pub enum TerminationDetails {
     /// The instance was terminated by `Vmctx::block_on` being called from an instance
     /// that isnt running in an async context
     BlockOnNeedsAsync,
-    /// A `memory.grow` instruction failed, and the `terminate_on_heap_oom` option was `true`.
-    ///
-    /// If `terminate_on_heap_oom` is `false`, this variant should never appear; `memory.grow` will
-    /// instead evaluate to `-1` within the Wasm guest.
-    HeapOutOfMemory,
 }
 
 impl TerminationDetails {
@@ -1542,7 +1503,6 @@ impl std::fmt::Debug for TerminationDetails {
             TerminationDetails::Remote => write!(f, "Remote"),
             TerminationDetails::OtherPanic(_) => write!(f, "OtherPanic(Any)"),
             TerminationDetails::BlockOnNeedsAsync => write!(f, "BlockOnNeedsAsync"),
-            TerminationDetails::HeapOutOfMemory => write!(f, "HeapOutOfMemory"),
         }
     }
 }

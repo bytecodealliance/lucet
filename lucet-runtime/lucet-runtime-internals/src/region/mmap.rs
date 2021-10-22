@@ -82,7 +82,6 @@ impl RegionInternal for MmapRegion {
             embed_ctx,
             heap_memory_size_limit,
             mut alloc_strategy,
-            terminate_on_heap_oom,
             ..
         }: NewInstanceArgs,
     ) -> Result<InstanceHandle, Error> {
@@ -144,12 +143,7 @@ impl RegionInternal for MmapRegion {
             invalid_pages: Vec::new(),
         };
 
-        // Though this is a potential early return from the function, the Drop impl
-        // on the Alloc will put the slot back on the freelist.
-        let mut inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
-        inst.set_terminate_on_heap_oom(terminate_on_heap_oom);
-
-        Ok(inst)
+        new_instance_handle(inst_ptr, module, alloc, embed_ctx)
     }
 
     fn drop_alloc(&self, alloc: &mut Alloc) {
