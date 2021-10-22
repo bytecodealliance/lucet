@@ -1,3 +1,9 @@
+// This crate uses several Criterion APIs which are deprecated. However, the
+// Lucet project is in maintence mode and we no longer really care about
+// maintaining and updating these interfaces, so we will ignore these
+// warnings:
+#![allow(deprecated)]
+
 mod compile;
 mod context;
 mod modules;
