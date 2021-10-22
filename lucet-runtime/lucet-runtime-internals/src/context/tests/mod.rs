@@ -31,7 +31,7 @@ fn init_rejects_unaligned() {
     let mut stack_unaligned = unsafe { slice::from_raw_parts_mut(ptr, len) };
 
     // now we have the unaligned stack, let's make sure it blows up right
-    let res = ContextHandle::create_and_init(&mut stack_unaligned, dummy as usize, &[]);
+    let res = ContextHandle::create_and_init(stack_unaligned, dummy as usize, &[]);
 
     if let Err(Error::UnalignedStack) = res {
         assert!(true);

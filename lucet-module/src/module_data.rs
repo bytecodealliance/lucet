@@ -248,11 +248,9 @@ impl OwnedModuleData {
     /// `OwnedModuleData`.
     pub fn to_ref<'a>(&'a self) -> ModuleData<'a> {
         ModuleData::new(
-            if let Some(ref owned_linear_memory) = self.linear_memory {
-                Some(owned_linear_memory.to_ref())
-            } else {
-                None
-            },
+            self.linear_memory
+                .as_ref()
+                .map(|owned_linear_memory| owned_linear_memory.to_ref()),
             self.globals_spec.iter().map(|gs| gs.to_ref()).collect(),
             self.function_info
                 .iter()

@@ -65,9 +65,10 @@ pub fn check_instruction_count_off() {
         inst.run("test_function", &[]).expect("instance runs");
 
         let instruction_count = inst.get_instruction_count();
-        if instruction_count.is_some() {
-            panic!("instruction count instrumentation was not expected from instance");
-        }
+        assert!(
+            !instruction_count.is_some(),
+            "instruction count instrumentation was not expected from instance"
+        );
     });
 }
 
@@ -177,9 +178,10 @@ fn check_instruction_count_with_periodic_yields_internal(want_start_function: bo
                     }
                     Poll::Pending => {
                         yields += 1;
-                        if yields > 1000 {
-                            panic!("Instruction-counting test ran for too long");
-                        }
+                        assert!(
+                            !(yields > 1000),
+                            "Instruction-counting test ran for too long"
+                        );
                     }
                 }
             }

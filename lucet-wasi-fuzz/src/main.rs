@@ -287,13 +287,13 @@ async fn run_both<P: AsRef<Path>>(
     src: P,
     seed: Option<Seed>,
 ) -> Result<TestResult, Error> {
-    let native_stdout = if let Some(stdout) = run_native(&tmpdir, src.as_ref())? {
+    let native_stdout = if let Some(stdout) = run_native(tmpdir, src.as_ref())? {
         stdout
     } else {
         return Ok(TestResult::Ignored);
     };
 
-    let (exitcode, wasm_stdout) = run_with_stdout(&tmpdir, src.as_ref()).await?;
+    let (exitcode, wasm_stdout) = run_with_stdout(tmpdir, src.as_ref()).await?;
 
     assert_eq!(exitcode, 0);
 

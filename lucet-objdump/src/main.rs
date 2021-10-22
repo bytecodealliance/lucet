@@ -332,7 +332,7 @@ fn summarize_module<'a, 'b: 'a>(summary: &'a ArtifactSummary<'a>, module: &Modul
 
         println!("    Start: {:#010x}", f.ptr().as_usize());
         println!("    Code length: {} bytes", f.code_len());
-        if let Some(trap_manifest) = parse_trap_manifest(&summary, f) {
+        if let Some(trap_manifest) = parse_trap_manifest(summary, f) {
             let trap_count = trap_manifest.traps.len();
 
             println!("    Trap information:");

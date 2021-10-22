@@ -203,7 +203,7 @@ fn run_null<R: RegionCreate + 'static>(c: &mut Criterion) {
     c.bench_function(&format!("run_null ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
             || region.new_instance(module.clone()).unwrap(),
-            |inst| body(inst),
+            body,
             criterion::BatchSize::PerIteration,
         )
     });
@@ -224,7 +224,7 @@ fn run_fib<R: RegionCreate + 'static>(c: &mut Criterion) {
     c.bench_function(&format!("run_fib ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
             || region.new_instance(module.clone()).unwrap(),
-            |inst| body(inst),
+            body,
             criterion::BatchSize::PerIteration,
         )
     });
@@ -260,7 +260,7 @@ fn run_hello<R: RegionCreate + 'static>(c: &mut Criterion) {
                     .build()
                     .unwrap()
             },
-            |inst| body(inst),
+            body,
             criterion::BatchSize::PerIteration,
         )
     });
@@ -354,7 +354,7 @@ fn run_many_args<R: RegionCreate + 'static>(c: &mut Criterion) {
     c.bench_function(&format!("run_many_args ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
             || region.new_instance(module.clone()).unwrap(),
-            |inst| body(inst),
+            body,
             criterion::BatchSize::PerIteration,
         )
     });
@@ -373,7 +373,7 @@ fn run_hostcall_wrapped<R: RegionCreate + 'static>(c: &mut Criterion) {
         move |b| {
             b.iter_batched_ref(
                 || region.new_instance(module.clone()).unwrap(),
-                |inst| body(inst),
+                body,
                 criterion::BatchSize::PerIteration,
             )
         },
@@ -391,7 +391,7 @@ fn run_hostcall_raw<R: RegionCreate + 'static>(c: &mut Criterion) {
     c.bench_function(&format!("run_hostcall_raw ({})", R::TYPE_NAME), move |b| {
         b.iter_batched_ref(
             || region.new_instance(module.clone()).unwrap(),
-            |inst| body(inst),
+            body,
             criterion::BatchSize::PerIteration,
         )
     });

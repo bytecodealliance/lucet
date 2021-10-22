@@ -139,13 +139,13 @@ impl UContextPtr {
 
     #[inline]
     pub fn set_ip(self, new_ip: *const c_void) {
-        let mcontext: &mut mcontext64 = unsafe { &mut (*self.0).uc_mcontext.as_mut().unwrap() };
+        let mcontext: &mut mcontext64 = unsafe { (*self.0).uc_mcontext.as_mut().unwrap() };
         mcontext.ss.rip = new_ip as u64;
     }
 
     #[inline]
     pub fn set_rdi(self, new_rdi: u64) {
-        let mcontext: &mut mcontext64 = unsafe { &mut (*self.0).uc_mcontext.as_mut().unwrap() };
+        let mcontext: &mut mcontext64 = unsafe { (*self.0).uc_mcontext.as_mut().unwrap() };
         mcontext.ss.rdi = new_rdi;
     }
 }
