@@ -87,7 +87,7 @@ bench:
 
 .PHONY: audit
 audit:
-	cargo audit
+	cargo audit --ignore RUSTSEC-2020-0159
 
 .PHONY: clean
 clean:

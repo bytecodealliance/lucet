@@ -133,7 +133,7 @@ jobs:
     - name: Install Rust (rustup)
       run: rustup update
     - run: cargo install cargo-audit
-    - run: cargo audit
+    - run: cargo audit --ignore RUSTSEC-2020-0159
 
   docs:
     name: Build docs
