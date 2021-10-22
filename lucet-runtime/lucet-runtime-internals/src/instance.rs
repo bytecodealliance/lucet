@@ -265,11 +265,18 @@ pub struct Instance {
     /// The value passed back to the guest when resuming a yielded instance.
     pub(crate) resumed_val: Option<Box<dyn Any + 'static>>,
 
+    pub(crate) memory_limiter: Option<Box<dyn MemoryLimiter>>,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
     /// It is also used to compute the size of the structure up to that point, i.e. without padding.
     _padding: (),
+}
+
+#[async_trait::async_trait]
+pub trait MemoryLimiter {
+    async fn memory_growing(&mut self, current: usize, desired: usize) -> bool;
+    fn memory_grow_failed(&mut self, _error: &Error) {}
 }
 
 /// Users of `Instance` must be very careful about when instances are dropped!
@@ -969,6 +976,12 @@ impl Instance {
         self.get_instance_implicits_mut().stack_limit = slot.stack as u64 + reservation as u64;
     }
 
+    /// Set a memory limiter for the instance.
+    ///
+    /// If set, this instance must be run asynchronously via [`InstanceHandle::run_async`]
+    pub fn set_memory_limiter(&mut self, limiter: Box<dyn MemoryLimiter>) {
+        self.memory_limiter = Some(limiter)
+    }
 }
 
 // Private API
@@ -1001,6 +1014,7 @@ impl Instance {
             ensure_sigstack_installed: true,
             entrypoint: None,
             resumed_val: None,
+            memory_limiter: None,
             _padding: (),
         };
         inst.set_globals_ptr(globals_ptr);
