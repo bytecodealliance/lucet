@@ -472,9 +472,15 @@ fn ldflags_default(target: &Triple, target_version: &TargetVersion) -> String {
         | OperatingSystem::Freebsd
         | OperatingSystem::Dragonfly
         | OperatingSystem::Netbsd
-        | OperatingSystem::Openbsd => "-shared",
+        | OperatingSystem::Openbsd => "-shared".to_string(),
         OperatingSystem::Darwin | OperatingSystem::MacOSX { .. } => {
-            "-dylib -dead_strip -export_dynamic -undefined dynamic_lookup"
+           let sdk_path = std::process::Command::new("xcrun")
+                .args(&["-sdk", "macosx", "--show-sdk-path"])
+                .output()
+                .expect("xcrun failed")
+                .stdout;
+                let sdk_path = std::str::from_utf8(&sdk_path).expect("invalid sdk_path").trim();
+                format!("-dylib -dead_strip -export_dynamic -undefined dynamic_lookup -L {}/usr/lib -lSystem", sdk_path)
         }
         _ => panic!(
             "Cannot determine default flags for {}.
