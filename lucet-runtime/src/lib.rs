@@ -410,8 +410,8 @@ pub use lucet_runtime_internals::instance::signals::{
     install_lucet_signal_handler, remove_lucet_signal_handler,
 };
 pub use lucet_runtime_internals::instance::{
-    FaultDetails, Instance, InstanceHandle, KillError, KillSuccess, KillSwitch, RunResult,
-    SignalBehavior, TerminationDetails, YieldedVal,
+    FaultDetails, Instance, InstanceHandle, KillError, KillSuccess, KillSwitch, MemoryLimiter,
+    RunResult, SignalBehavior, TerminationDetails, YieldedVal,
 };
 #[allow(deprecated)]
 pub use lucet_runtime_internals::lucet_hostcalls;
