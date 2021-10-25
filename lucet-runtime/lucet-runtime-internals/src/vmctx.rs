@@ -274,7 +274,10 @@ impl Vmctx {
     /// the instance with `TerminationDetails::BorrowError`.
     pub fn grow_memory(&self, additional_pages: u32) -> Result<u32, Error> {
         self.ensure_no_heap_borrows();
-        unsafe { self.instance_mut().grow_memory(additional_pages) }
+        unsafe {
+            let instance = self.instance_mut();
+            instance.grow_memory_from_hostcall(self, additional_pages)
+        }
     }
 
     /// Return the WebAssembly globals as a slice of `i64`s.

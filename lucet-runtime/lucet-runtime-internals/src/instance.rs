@@ -7,6 +7,7 @@ pub use crate::instance::execution::{KillError, KillState, KillSuccess, KillSwit
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 pub use crate::instance::state::State;
 
+use crate::vmctx::Vmctx;
 use crate::alloc::Alloc;
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
@@ -265,7 +266,7 @@ pub struct Instance {
     /// The value passed back to the guest when resuming a yielded instance.
     pub(crate) resumed_val: Option<Box<dyn Any + 'static>>,
 
-    pub(crate) memory_limiter: Option<Box<dyn MemoryLimiter>>,
+    pub(crate) memory_limiter: Option<Box<dyn MemoryLimiter + Send + Sync + 'static>>,
 
     /// `_padding` must be the last member of the structure.
     /// This marks where the padding starts to make the structure exactly 4096 bytes long.
@@ -713,6 +714,45 @@ impl Instance {
         Ok(orig_len / WASM_PAGE_SIZE)
     }
 
+
+
+    /// Grow memory from a hostcall context.
+    pub fn grow_memory_from_hostcall(
+        &mut self,
+        vmctx: &Vmctx,
+        additional_pages: u32,
+    ) -> Result<u32, Error> {
+        // Use a function so that we can report all Errs via memory_grow_failed.
+        fn aux (instance: &mut Instance, vmctx: &Vmctx, additional_pages: u32) -> Result<u32, Error> {
+            // Calculate current and desired bytes
+            let current_bytes = instance.alloc.heap_len();
+            let additional_bytes = additional_pages
+                .checked_mul(WASM_PAGE_SIZE)
+                .ok_or_else(|| lucet_format_err!("additional pages larger than wasm address space",))? as usize;
+            let desired_bytes = additional_bytes.checked_add(current_bytes).ok_or_else(|| lucet_format_err!("desired bytes overflow",))?;
+            // Let the limiter reject the grow
+            if let Some(ref mut limiter) = instance.memory_limiter {
+                if !vmctx.block_on(async move { limiter.memory_growing(current_bytes, desired_bytes).await } ) {
+                    lucet_bail!("memory limiter denied growth");
+                }
+            }
+            // Try the grow itself
+            instance.grow_memory(additional_pages)
+        }
+
+        match aux(self, vmctx, additional_pages) {
+            Ok(n) => Ok(n),
+            Err(e) => {
+                if let Some(ref mut limiter) = self.memory_limiter {
+                    limiter.memory_grow_failed(&e);
+                    Err(e)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
     /// Return the WebAssembly heap as a slice of bytes.
     pub fn heap(&self) -> &[u8] {
         unsafe { self.alloc.heap() }
@@ -979,7 +1019,7 @@ impl Instance {
     /// Set a memory limiter for the instance.
     ///
     /// If set, this instance must be run asynchronously via [`InstanceHandle::run_async`]
-    pub fn set_memory_limiter(&mut self, limiter: Box<dyn MemoryLimiter>) {
+    pub fn set_memory_limiter(&mut self, limiter: Box<dyn MemoryLimiter + Send + Sync + 'static>) {
         self.memory_limiter = Some(limiter)
     }
 }
@@ -1027,7 +1067,6 @@ impl Instance {
         assert!(unpadded_size <= HOST_PAGE_SIZE_EXPECTED - mem::size_of::<*mut i64>());
         inst
     }
-
 
     // The globals pointer must be stored right before the end of the structure, padded to the page size,
     // so that it is 8 bytes before the heap.
