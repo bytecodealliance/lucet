@@ -7,7 +7,6 @@ pub use crate::instance::execution::{KillError, KillState, KillSuccess, KillSwit
 pub use crate::instance::signals::{signal_handler_none, SignalBehavior, SignalHandler};
 pub use crate::instance::state::State;
 
-use crate::vmctx::Vmctx;
 use crate::alloc::Alloc;
 use crate::context::Context;
 use crate::embed_ctx::CtxMap;
@@ -18,6 +17,7 @@ use crate::module::{self, FunctionHandle, Global, GlobalValue, Module, TrapCode}
 use crate::region::RegionInternal;
 use crate::sysdeps::HOST_PAGE_SIZE_EXPECTED;
 use crate::val::{UntypedRetVal, Val};
+use crate::vmctx::Vmctx;
 use crate::WASM_PAGE_SIZE;
 use libc::{c_void, pthread_self, siginfo_t, uintptr_t};
 use lucet_module::InstanceRuntimeData;
@@ -714,8 +714,6 @@ impl Instance {
         Ok(orig_len / WASM_PAGE_SIZE)
     }
 
-
-
     /// Grow memory from a hostcall context.
     pub fn grow_memory_from_hostcall(
         &mut self,
@@ -723,16 +721,27 @@ impl Instance {
         additional_pages: u32,
     ) -> Result<u32, Error> {
         // Use a function so that we can report all Errs via memory_grow_failed.
-        fn aux (instance: &mut Instance, vmctx: &Vmctx, additional_pages: u32) -> Result<u32, Error> {
+        fn aux(
+            instance: &mut Instance,
+            vmctx: &Vmctx,
+            additional_pages: u32,
+        ) -> Result<u32, Error> {
             // Calculate current and desired bytes
             let current_bytes = instance.alloc.heap_len();
-            let additional_bytes = additional_pages
-                .checked_mul(WASM_PAGE_SIZE)
-                .ok_or_else(|| lucet_format_err!("additional pages larger than wasm address space",))? as usize;
-            let desired_bytes = additional_bytes.checked_add(current_bytes).ok_or_else(|| lucet_format_err!("desired bytes overflow",))?;
+            let additional_bytes =
+                additional_pages
+                    .checked_mul(WASM_PAGE_SIZE)
+                    .ok_or_else(|| {
+                        lucet_format_err!("additional pages larger than wasm address space",)
+                    })? as usize;
+            let desired_bytes = additional_bytes
+                .checked_add(current_bytes)
+                .ok_or_else(|| lucet_format_err!("desired bytes overflow",))?;
             // Let the limiter reject the grow
             if let Some(ref mut limiter) = instance.memory_limiter {
-                if !vmctx.block_on(async move { limiter.memory_growing(current_bytes, desired_bytes).await } ) {
+                if !vmctx.block_on(async move {
+                    limiter.memory_growing(current_bytes, desired_bytes).await
+                }) {
                     lucet_bail!("memory limiter denied growth");
                 }
             }
