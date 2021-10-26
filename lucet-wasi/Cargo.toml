@@ -28,8 +28,8 @@ wasi-common = { version = "0.30.0", default-features = false,  features = ["wigg
 wasi-tokio = "0.30.0"
 wiggle = "0.30.0"
 witx = "0.9.1"
-tracing = "0.1.19"
-tracing-subscriber = "0.2.0"
+tracing = "0.1.20"
+tracing-subscriber = { version = "0.3.1", features = ["env-filter"] }
 cap-std = "0.19.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"]}
 
