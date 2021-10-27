@@ -317,6 +317,7 @@ impl RegionInternal for UffdRegion {
             heap_memory_size_limit,
             mut alloc_strategy,
             terminate_on_heap_oom,
+            resource_limiter,
             ..
         }: NewInstanceArgs,
     ) -> Result<InstanceHandle, Error> {
@@ -418,7 +419,7 @@ impl RegionInternal for UffdRegion {
             invalid_pages: Vec::new(),
         };
 
-        let mut inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
+        let mut inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx, resource_limiter)?;
         inst.set_terminate_on_heap_oom(terminate_on_heap_oom);
 
         Ok(inst)

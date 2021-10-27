@@ -83,6 +83,7 @@ impl RegionInternal for MmapRegion {
             heap_memory_size_limit,
             mut alloc_strategy,
             terminate_on_heap_oom,
+            resource_limiter,
             ..
         }: NewInstanceArgs,
     ) -> Result<InstanceHandle, Error> {
@@ -146,7 +147,7 @@ impl RegionInternal for MmapRegion {
 
         // Though this is a potential early return from the function, the Drop impl
         // on the Alloc will put the slot back on the freelist.
-        let mut inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx)?;
+        let mut inst = new_instance_handle(inst_ptr, module, alloc, embed_ctx, resource_limiter)?;
         inst.set_terminate_on_heap_oom(terminate_on_heap_oom);
 
         Ok(inst)
