@@ -444,10 +444,8 @@ pub unsafe fn lucet_vmctx_current_memory(vmctx: &Vmctx) -> u32 {
 ///
 /// On success, returns the number of pages that existed before the call. On failure, returns `-1`.
 pub unsafe fn lucet_vmctx_grow_memory(vmctx: &Vmctx, additional_pages: u32) -> i32 {
-    if let Ok(old_pages) = vmctx
-        .instance_mut()
-        .grow_memory_from_hostcall(additional_pages)
-    {
+    let instance = vmctx.instance_mut();
+    if let Ok(old_pages) = instance.grow_memory_from_hostcall(vmctx, additional_pages) {
         old_pages as i32
     } else {
         -1

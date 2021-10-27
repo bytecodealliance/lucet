@@ -1196,6 +1196,7 @@ name = "lucet-runtime"
 version = "0.7.0-dev"
 dependencies = [
  "anyhow",
+ "async-trait",
  "byteorder",
  "cc",
  "cfg-if 0.1.10",
@@ -1212,6 +1213,7 @@ dependencies = [
  "num-traits",
  "rayon",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -1228,6 +1230,7 @@ name = "lucet-runtime-internals"
 version = "0.7.0-dev"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bincode",
  "bitflags",
  "byteorder",

@@ -328,10 +328,6 @@ pub mod lucet_result {
                                 reason: lucet_terminated_reason::BlockOnNeedsAsync,
                                 provided: std::ptr::null_mut(),
                             },
-                            TerminationDetails::HeapOutOfMemory => lucet_terminated {
-                                reason: lucet_terminated_reason::HeapOutOfMemory,
-                                provided: std::ptr::null_mut(),
-                            },
                         },
                     },
                 },
@@ -388,7 +384,6 @@ pub mod lucet_result {
         Remote,
         OtherPanic,
         BlockOnNeedsAsync,
-        HeapOutOfMemory,
     }
 
     #[repr(C)]

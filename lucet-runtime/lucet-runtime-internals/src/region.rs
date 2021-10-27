@@ -97,7 +97,6 @@ pub struct NewInstanceArgs {
     pub embed_ctx: CtxMap,
     pub heap_memory_size_limit: usize,
     pub alloc_strategy: AllocStrategy,
-    pub terminate_on_heap_oom: bool,
 }
 
 impl<'a> InstanceBuilder<'a> {
@@ -109,7 +108,6 @@ impl<'a> InstanceBuilder<'a> {
                 embed_ctx: CtxMap::default(),
                 heap_memory_size_limit: region.get_limits().heap_memory_size,
                 alloc_strategy: AllocStrategy::Linear,
-                terminate_on_heap_oom: false,
             },
         }
     }
@@ -140,20 +138,6 @@ impl<'a> InstanceBuilder<'a> {
     /// of the same type already exists, it is replaced by the new value.
     pub fn with_embed_ctx<T: Any>(mut self, ctx: T) -> Self {
         self.args.embed_ctx.insert(ctx);
-        self
-    }
-
-    /// Whether to terminate the guest with `TerminationDetails::HeapOutOfMemory` when `memory.grow`
-    /// fails, rather than returning `-1`; disabled by default.
-    ///
-    /// This behavior deviates from the WebAssembly spec, but is useful in practice for determining
-    /// when guest programs fail due to an exhausted heap.
-    ///
-    /// Most languages will compile to code that includes an `unreachable` instruction if allocation
-    /// fails, but this same instruction might also appear when other types of assertions fail,
-    /// `panic!()` is called, etc. Terminating allows the error to be more directly identifiable.
-    pub fn with_terminate_on_heap_oom(mut self, terminate_on_heap_oom: bool) -> Self {
-        self.args.terminate_on_heap_oom = terminate_on_heap_oom;
         self
     }
 

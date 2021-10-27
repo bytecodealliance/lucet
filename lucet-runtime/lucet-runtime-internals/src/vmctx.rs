@@ -275,8 +275,8 @@ impl Vmctx {
     pub fn grow_memory(&self, additional_pages: u32) -> Result<u32, Error> {
         self.ensure_no_heap_borrows();
         unsafe {
-            self.instance_mut()
-                .grow_memory_from_hostcall(additional_pages)
+            let instance = self.instance_mut();
+            instance.grow_memory_from_hostcall(self, additional_pages)
         }
     }
 

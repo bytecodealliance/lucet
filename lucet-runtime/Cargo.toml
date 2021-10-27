@@ -28,6 +28,8 @@ lucetc = { path = "../lucetc", version = "=0.7.0-dev" }
 nix = "0.23"
 rayon = "1.0"
 tempfile = "3.0"
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt", "time", "macros"] }
 
 [build-dependencies]
 # only used for tests

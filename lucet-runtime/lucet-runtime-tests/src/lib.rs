@@ -6,6 +6,7 @@ pub mod guest_fault;
 pub mod helpers;
 pub mod host;
 pub mod memory;
+pub mod memory_limiter;
 pub mod stack;
 pub mod start;
 pub mod strcmp;
