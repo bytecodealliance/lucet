@@ -34,7 +34,7 @@ log = "0.4"
 env_logger = "0.6"
 object = { version = "0.26.0", default-features = false, features = ["write"] }
 byteorder = "1.2"
-wabt = "0.9.1"
+wabt = "0.10.0"
 tempfile = "3.0"
 bimap = "0.2"
 human-size = "0.4"
@@ -45,7 +45,7 @@ serde_json = "1.0"
 thiserror = "1.0.4"
 raw-cpuid = "9.0.0"
 rayon = "1.5.0"
-veriwasm = "0.1.1"
+veriwasm = "0.1.4"
 
 [features]
 default = []
