@@ -48,23 +48,6 @@ jobs:
       - mac_ci:
           cache_target: false
 
-  ###################################################
-  # Linux `make test-ci` targets on old x64 backend #
-  ###################################################
-  old_backend_ci_branch:
-    executor: linux
-    steps:
-      - full_ci:
-          cache_target: true
-          old_cranelift_backend: true
-
-  old_backend_ci_main:
-    executor: linux
-    steps:
-      - full_ci:
-          cache_target: false
-          old_cranelift_backend: true
-
 workflows:
   build:
     jobs:
@@ -91,18 +74,6 @@ workflows:
             branches:
               only: main
 
-      ###################################################
-      # Linux `make test-ci` targets on old x64 backend #
-      ###################################################
-      - old_backend_ci_branch:
-          filters:
-            branches:
-              ignore: main
-      - old_backend_ci_main:
-          filters:
-            branches:
-              only: main
-
 commands:
   full_ci:
     description: "Run the full CI for Lucet"
@@ -110,20 +81,8 @@ commands:
       cache_target:
         type: boolean
         description: "If `true`, the target/ directory will be cached between builds"
-      old_cranelift_backend:
-        type: boolean
-        description: "If `true`, edit `lucetc/Cargo.toml` to select the old Cranelift x86-64 backend"
-        default: false
     steps:
       - checkout_recursively
-      - when:
-          condition: << parameters.old_cranelift_backend >>
-          steps:
-            - run:
-                name: "Switch lucetc to old Cranelift backend"
-                command: |
-                  set -x
-                  sed -i -e 's/default = \[\]/default = \["old-x64-backend"\]/' lucetc/Cargo.toml
       - when:
           condition: << parameters.cache_target >>
           steps:
@@ -150,12 +109,7 @@ commands:
           target: test-full
       - make_in_container:
           target: test-release test-release-executables
-      - when:
-          condition:
-            not:
-              << parameters.old_cranelift_backend >>
-          steps:
-            - ensure_sources_unchanged
+      - ensure_sources_unchanged
       - when:
           condition: << parameters.cache_target >>
           steps:
