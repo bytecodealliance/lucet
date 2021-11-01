@@ -21,12 +21,6 @@ arbitrary = { version = "0.4.1", features = ["derive"] }
 env_logger = "0.8.4"
 
 [[bin]]
-name = "differential_backends"
-path = "fuzz_targets/differential_backends.rs"
-test = false
-doc = false
-
-[[bin]]
 name = "veriwasm"
 path = "fuzz_targets/veriwasm.rs"
 test = false

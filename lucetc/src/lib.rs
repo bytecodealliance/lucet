@@ -35,9 +35,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 pub use validate::{Error as ValidationError, Validator, ValidatorBuilder, WasiMode};
 
-// Re-export `Triple` and `BackendVariant` so that clients can use these types
-// without needing a direct dependency on the respective source crates.
-pub use cranelift_codegen::isa::BackendVariant;
+// Re-export `Triple` so that clients can use the type without needing a
+// direct dependency on the respective source crates.
 pub use target_lexicon::Triple;
 
 enum LucetcInput {
@@ -75,9 +74,6 @@ pub trait LucetcOpts {
 
     fn target_version(&mut self, target: TargetVersion);
     fn with_target_version(self, target: TargetVersion) -> Self;
-
-    fn backend_variant(&mut self, variant: BackendVariant);
-    fn with_backend_variant(self, variant: BackendVariant) -> Self;
 
     fn opt_level(&mut self, opt_level: OptLevel);
     fn with_opt_level(self, opt_level: OptLevel) -> Self;
@@ -152,15 +148,6 @@ impl<T: AsLucetc> LucetcOpts for T {
 
     fn with_target_version(mut self, target_version: TargetVersion) -> Self {
         self.target_version(target_version);
-        self
-    }
-
-    fn backend_variant(&mut self, variant: BackendVariant) {
-        self.as_lucetc().builder.backend_variant(variant);
-    }
-
-    fn with_backend_variant(mut self, variant: BackendVariant) -> Self {
-        self.backend_variant(variant);
         self
     }
 
