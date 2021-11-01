@@ -25,7 +25,7 @@ impl CraneliftFuncs {
         let mut buffer = String::new();
         for (n, func) in self.funcs.iter() {
             buffer.push_str(&format!("; {}\n", n.symbol()));
-            write_function(&mut buffer, func, &Some(self.isa.as_ref()).into()).map_err(|e| {
+            write_function(&mut buffer, func).map_err(|e| {
                 let message = format!("{:?}", n);
                 Error::OutputFunction(e, message)
             })?
@@ -37,7 +37,7 @@ impl CraneliftFuncs {
 }
 
 pub struct ObjectFile {
-    object: Object,
+    object: Object<'static>,
 }
 impl ObjectFile {
     pub fn new(product: ObjectProduct) -> Result<Self, Error> {

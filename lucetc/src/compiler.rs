@@ -16,7 +16,6 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use cranelift_codegen::{
     binemit,
     ir::{self, InstBuilder},
-    isa::BackendVariant,
     isa::TargetIsa,
     settings::{self, Configurable},
     Context as ClifContext,
@@ -107,7 +106,6 @@ impl TargetVersion {
 
 pub struct CompilerBuilder {
     target: Triple,
-    variant: BackendVariant,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
     heap_settings: HeapSettings,
@@ -119,21 +117,10 @@ pub struct CompilerBuilder {
     version_info: Option<VersionInfo>,
 }
 
-#[cfg(feature = "old-x64-backend")]
-fn default_backend_variant() -> BackendVariant {
-    BackendVariant::Legacy
-}
-
-#[cfg(not(feature = "old-x64-backend"))]
-fn default_backend_variant() -> BackendVariant {
-    BackendVariant::MachInst
-}
-
 impl CompilerBuilder {
     pub fn new() -> Self {
         Self {
             target: Triple::host(),
-            variant: default_backend_variant(),
             opt_level: OptLevel::default(),
             cpu_features: CpuFeatures::default(),
             heap_settings: HeapSettings::default(),
@@ -169,15 +156,6 @@ impl CompilerBuilder {
 
     pub fn with_target_version(mut self, target_version: TargetVersion) -> Self {
         self.target_version(target_version);
-        self
-    }
-
-    pub fn backend_variant(&mut self, variant: BackendVariant) {
-        self.variant = variant;
-    }
-
-    pub fn with_backend_variant(mut self, variant: BackendVariant) -> Self {
-        self.backend_variant(variant);
         self
     }
 
@@ -269,7 +247,6 @@ impl CompilerBuilder {
         Compiler::new(
             wasm_binary,
             self.target.clone(),
-            self.variant,
             self.opt_level,
             self.cpu_features.clone(),
             bindings,
@@ -287,7 +264,6 @@ pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
     codegen_context: CodegenContext,
     target: Triple,
-    variant: BackendVariant,
     opt_level: OptLevel,
     cpu_features: CpuFeatures,
     count_instructions: bool,
@@ -302,7 +278,6 @@ impl<'a> Compiler<'a> {
     pub fn new(
         wasm_binary: &'a [u8],
         target: Triple,
-        variant: BackendVariant,
         opt_level: OptLevel,
         cpu_features: CpuFeatures,
         bindings: &'a Bindings,
@@ -316,7 +291,6 @@ impl<'a> Compiler<'a> {
         let mk_isa = || {
             Self::target_isa(
                 target.clone(),
-                variant,
                 opt_level,
                 &cpu_features,
                 canonicalize_nans,
@@ -350,7 +324,6 @@ impl<'a> Compiler<'a> {
             cpu_features,
             count_instructions,
             target,
-            variant,
             canonicalize_nans,
             function_bodies: module_validation.function_bodies,
             version_info,
@@ -623,7 +596,6 @@ impl<'a> Compiler<'a> {
             funcs,
             Self::target_isa(
                 self.target,
-                self.variant,
                 self.opt_level,
                 &self.cpu_features,
                 self.canonicalize_nans,
@@ -634,14 +606,13 @@ impl<'a> Compiler<'a> {
 
     fn target_isa(
         target: Triple,
-        variant: BackendVariant,
         opt_level: OptLevel,
         cpu_features: &CpuFeatures,
         canonicalize_nans: bool,
         veriwasm: bool,
     ) -> Result<Box<dyn TargetIsa>, Error> {
         let mut flags_builder = settings::builder();
-        let isa_builder = cpu_features.isa_builder(target, variant)?;
+        let isa_builder = cpu_features.isa_builder(target)?;
         let enable_verifier = if cfg!(debug_assertions) {
             "true"
         } else {
@@ -743,7 +714,6 @@ impl CodegenContext {
         let mut traps = TrapSites::new();
         unsafe {
             clif.emit_to_memory(
-                &*self.isa,
                 code.as_mut_ptr(),
                 &mut reloc_sink,
                 &mut traps,
@@ -866,7 +836,7 @@ fn synthesize_trampoline(
         stack_check_fail,
         &[],
     );
-    builder.ins().fallthrough(hostcall_block, &trampoline_args);
+    builder.ins().jump(hostcall_block, &trampoline_args);
 
     builder.switch_to_block(hostcall_block);
     let hostcall_args = builder.block_params(hostcall_block).to_vec();
@@ -1037,31 +1007,5 @@ impl binemit::RelocSink for ObjectRelocSink {
             addend,
             name: name.clone(),
         });
-    }
-
-    fn reloc_jt(
-        &mut self,
-        _offset: binemit::CodeOffset,
-        reloc: binemit::Reloc,
-        _jt: ir::JumpTable,
-    ) {
-        match reloc {
-            // skipped in cranelift-object so we do too
-            binemit::Reloc::X86PCRelRodata4 => {}
-            _ => panic!("Unhandled reloc"),
-        }
-    }
-
-    fn reloc_constant(
-        &mut self,
-        _offset: binemit::CodeOffset,
-        reloc: binemit::Reloc,
-        _jt: ir::ConstantOffset,
-    ) {
-        match reloc {
-            // skipped in cranelift-object so we do too
-            binemit::Reloc::X86PCRelRodata4 => {}
-            _ => panic!("Unhandled reloc"),
-        }
     }
 }
