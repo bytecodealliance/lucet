@@ -263,15 +263,11 @@ impl CompilerBuilder {
 pub struct Compiler<'a> {
     decls: ModuleDecls<'a>,
     codegen_context: CodegenContext,
-    target: Triple,
-    opt_level: OptLevel,
     cpu_features: CpuFeatures,
     count_instructions: bool,
-    canonicalize_nans: bool,
     function_bodies:
         HashMap<UniqueFuncIndex, (FuncValidator<ValidatorResources>, FunctionBody<'a>)>,
     version_info: Option<VersionInfo>,
-    veriwasm: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -320,14 +316,10 @@ impl<'a> Compiler<'a> {
         Ok(Self {
             decls,
             codegen_context,
-            opt_level,
             cpu_features,
             count_instructions,
-            target,
-            canonicalize_nans,
             function_bodies: module_validation.function_bodies,
             version_info,
-            veriwasm,
         })
     }
 
@@ -592,16 +584,7 @@ impl<'a> Compiler<'a> {
 
             funcs.insert(func.name.clone(), clif_context.func);
         }
-        Ok(CraneliftFuncs::new(
-            funcs,
-            Self::target_isa(
-                self.target,
-                self.opt_level,
-                &self.cpu_features,
-                self.canonicalize_nans,
-                self.veriwasm,
-            )?,
-        ))
+        Ok(CraneliftFuncs::new(funcs))
     }
 
     fn target_isa(
