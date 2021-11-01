@@ -234,7 +234,7 @@ dependencies = [
  "ipnet",
  "maybe-owned",
  "once_cell",
- "rsix 0.23.9",
+ "rsix",
  "rustc_version 0.4.0",
  "unsafe-io",
  "winapi",
@@ -261,7 +261,7 @@ dependencies = [
  "cap-primitives",
  "io-lifetimes",
  "ipnet",
- "rsix 0.23.9",
+ "rsix",
  "rustc_version 0.4.0",
  "unsafe-io",
 ]
@@ -285,7 +285,7 @@ checksum = "aea5319ada3a9517fc70eafe9cf3275f04da795c53770ebc5d91f4a33f4dd2b5"
 dependencies = [
  "cap-primitives",
  "once_cell",
- "rsix 0.23.9",
+ "rsix",
  "winx",
 ]
 
@@ -876,12 +876,12 @@ dependencies = [
 
 [[package]]
 name = "fs-set-times"
-version = "0.12.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7b9ea8f5ff96d007af6b31fbd9aa560cf4a45e544ae1d550d8f72829c5119e1"
+checksum = "807e3ef0de04fbe498bebd560ae041e006d97bf9f726dc0b485a86316be0ebc8"
 dependencies = [
  "io-lifetimes",
- "rsix 0.24.1",
+ "rsix",
  "winapi",
 ]
 
@@ -1231,12 +1231,6 @@ name = "linux-raw-sys"
 version = "0.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "687387ff42ec7ea4f2149035a5675fedb675d26f98db90a1846ac63d3addb5f5"
-
-[[package]]
-name = "linux-raw-sys"
-version = "0.0.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373555fbb6dbd7a7a9e6527215899c7715f89f1ffa7921eb4ee983642afb8c65"
 
 [[package]]
 name = "lock_api"
@@ -2434,22 +2428,8 @@ dependencies = [
  "io-lifetimes",
  "itoa",
  "libc",
- "linux-raw-sys 0.0.28",
+ "linux-raw-sys",
  "once_cell",
- "rustc_version 0.4.0",
-]
-
-[[package]]
-name = "rsix"
-version = "0.24.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e268eabe3c80f980a3dd21ca34a813cf506f4f2ce3a5ccdc493259f3f382889"
-dependencies = [
- "bitflags",
- "errno",
- "io-lifetimes",
- "libc",
- "linux-raw-sys 0.0.29",
  "rustc_version 0.4.0",
 ]
 
@@ -2841,7 +2821,7 @@ dependencies = [
  "cap-fs-ext",
  "cap-std",
  "io-lifetimes",
- "rsix 0.23.9",
+ "rsix",
  "rustc_version 0.4.0",
  "winapi",
  "winx",
@@ -3276,7 +3256,7 @@ dependencies = [
  "fs-set-times",
  "io-lifetimes",
  "lazy_static",
- "rsix 0.23.9",
+ "rsix",
  "system-interface",
  "tracing",
  "wasi-common",
@@ -3294,7 +3274,7 @@ dependencies = [
  "cap-rand",
  "cap-std",
  "io-lifetimes",
- "rsix 0.23.9",
+ "rsix",
  "thiserror",
  "tracing",
  "wiggle",
@@ -3315,7 +3295,7 @@ dependencies = [
  "fs-set-times",
  "io-lifetimes",
  "lazy_static",
- "rsix 0.23.9",
+ "rsix",
  "system-interface",
  "tokio",
  "tracing",
@@ -3511,7 +3491,7 @@ dependencies = [
  "more-asserts",
  "rand 0.8.4",
  "region",
- "rsix 0.23.9",
+ "rsix",
  "thiserror",
  "wasmtime-environ",
  "winapi",
