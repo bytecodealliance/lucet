@@ -430,8 +430,7 @@ dependencies = [
 [[package]]
 name = "cranelift-bforest"
 version = "0.78.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc0cb7df82c8cf8f2e6a8dd394a0932a71369c160cc9b027dca414fced242513"
+source = "git+https://github.com/bytecodealliance/wasmtime?rev=b0246038666464837ffeb08fd85fb5d75e5a682b#b0246038666464837ffeb08fd85fb5d75e5a682b"
 dependencies = [
  "cranelift-entity 0.78.0",
 ]
@@ -439,8 +438,7 @@ dependencies = [
 [[package]]
 name = "cranelift-codegen"
 version = "0.78.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe4463c15fa42eee909e61e5eac4866b7c6d22d0d8c621e57a0c5380753bfa8c"
+source = "git+https://github.com/bytecodealliance/wasmtime?rev=b0246038666464837ffeb08fd85fb5d75e5a682b#b0246038666464837ffeb08fd85fb5d75e5a682b"
 dependencies = [
  "cranelift-bforest",
  "cranelift-codegen-meta",
@@ -456,8 +454,7 @@ dependencies = [
 [[package]]
 name = "cranelift-codegen-meta"
 version = "0.78.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "793f6a94a053a55404ea16e1700202a88101672b8cd6b4df63e13cde950852bf"
+source = "git+https://github.com/bytecodealliance/wasmtime?rev=b0246038666464837ffeb08fd85fb5d75e5a682b#b0246038666464837ffeb08fd85fb5d75e5a682b"
 dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity 0.78.0",
@@ -466,8 +463,7 @@ dependencies = [
 [[package]]
 name = "cranelift-codegen-shared"
 version = "0.78.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44aa1846df275bce5eb30379d65964c7afc63c05a117076e62a119c25fe174be"
+source = "git+https://github.com/bytecodealliance/wasmtime?rev=b0246038666464837ffeb08fd85fb5d75e5a682b#b0246038666464837ffeb08fd85fb5d75e5a682b"
 
 [[package]]
 name = "cranelift-entity"
@@ -478,8 +474,7 @@ checksum = "057e78f3dba2f41e2ff2723cce197b18f5ffa603fb67fbabf57aca8d2b55cb95"
 [[package]]
 name = "cranelift-entity"
 version = "0.78.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3a45d8d6318bf8fc518154d9298eab2a8154ec068a8885ff113f6db8d69bb3a"
+source = "git+https://github.com/bytecodealliance/wasmtime?rev=b0246038666464837ffeb08fd85fb5d75e5a682b#b0246038666464837ffeb08fd85fb5d75e5a682b"
 dependencies = [
  "serde",
 ]
