@@ -108,12 +108,10 @@ pub fn generate(doc: &witx::Document, config: &Config) -> TokenStream {
             /// each hostcall is reachable and not garbage-collected by the
             /// compile-time linker (ld).
             pub fn init() {
-                let funcs: &[*const extern "C" fn()] = &[
+                let funcs: Vec<*const extern "C" fn()> = vec![
                     #(#init),*
                 ];
-                for func in funcs {
-                    assert_ne!(*func, std::ptr::null(), "hostcall address is not null");
-                }
+                std::mem::forget(funcs);
             }
         }
     }
