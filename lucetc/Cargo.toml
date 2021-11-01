@@ -46,7 +46,3 @@ thiserror = "1.0.4"
 raw-cpuid = "9.0.0"
 rayon = "1.5.0"
 veriwasm = "0.1.4"
-
-[features]
-default = []
-old-x64-backend = []
