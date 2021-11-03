@@ -3106,9 +3106,9 @@ dependencies = [
 
 [[package]]
 name = "userfaultfd"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0c5a19bdab0e8c45b0116ac7901e5a697e6b1bd40843e1a716b7da2ea6f9c91"
+checksum = "3b738009e099b4ded1ecf19dfb7631f69c24f16e0af6d29fd9b3f54a092aca46"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -3120,9 +3120,9 @@ dependencies = [
 
 [[package]]
 name = "userfaultfd-sys"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e04ee739156569105b2203aa22feabf08d14f2e1fab2fb42af2420f1c811cd20"
+checksum = "1f03138f85fb1a85b1324bd34f29491c6592fff9bcc8fb7d4176d2166185d2de"
 dependencies = [
  "bindgen",
  "cc",
