@@ -115,10 +115,10 @@ pub enum ModuleError {
 #[macro_export]
 macro_rules! lucet_bail {
     ($e:expr) => {
-        return Err(lucet_format_err!($e));
+        return Err(lucet_format_err!($e))
     };
     ($fmt:expr, $($arg:tt)*) => {
-        return Err(lucet_format_err!($fmt, $($arg)*));
+        return Err(lucet_format_err!($fmt, $($arg)*))
     };
 }
 
