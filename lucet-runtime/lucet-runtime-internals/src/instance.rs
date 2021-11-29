@@ -14,7 +14,6 @@ use crate::error::Error;
 #[cfg(feature = "concurrent_testpoints")]
 use crate::lock_testpoints::LockTestpoints;
 use crate::module::{self, FunctionHandle, Global, GlobalValue, Module, TrapCode};
-use crate::region::RegionInternal;
 use crate::sysdeps::HOST_PAGE_SIZE_EXPECTED;
 use crate::val::{UntypedRetVal, Val};
 use crate::vmctx::Vmctx;
@@ -27,6 +26,7 @@ use std::cell::{BorrowError, BorrowMutError, Ref, RefCell, RefMut, UnsafeCell};
 use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::mem;
+use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{self, NonNull};
 use std::sync::Arc;
@@ -147,20 +147,29 @@ impl Drop for InstanceHandle {
             unsafe {
                 let inst = self.inst.as_mut();
 
-                // Grab a handle to the region to ensure it outlives `inst`.
+                // The `inst.alloc` field manages the memory of the instance
+                // itself. Note, though, that this field is in a `ManuallyDrop`
+                // so it won't get dropped automatically in `drop_in_place`.
+                // This is the point where we take over that precise drop.
                 //
-                // This ensures that the region won't be dropped by `inst` being
-                // dropped, which could result in `inst` being unmapped by the
-                // Region *during* drop of the Instance's fields.
-                let region: Arc<dyn RegionInternal> = inst.alloc().region.clone();
+                // By using `take` here we're basically calling `ptr::read`
+                // which "duplicates" the `alloc` since the `alloc` local
+                // variable here is the exact same as `inst.alloc`. All we do
+                // with `inst`, though, is call `drop_in_place`, which
+                // invalidates every other field in `inst`.
+                let alloc: Alloc = ManuallyDrop::take(&mut inst.alloc);
 
                 // drop the actual instance
                 std::ptr::drop_in_place(inst);
 
-                // and now we can drop what may be the last Arc<Region>. If it is
-                // it can safely do what it needs with memory; we're not running
-                // destructors on it anymore.
-                mem::drop(region);
+                // Now that we're 100% done with the instance, destructors and
+                // all, we can release the memory of the instance back to the
+                // original allocator from whence it came (be it mmap or uffd
+                // based). This will run the "official" destructor for `Alloc`
+                // which internally does the release. Note that after this
+                // operation the `inst` pointer is invalid and can no longer be
+                // used.
+                drop(alloc);
             }
         }
     }
@@ -233,8 +242,12 @@ pub struct Instance {
     /// Conditionally-present helpers to force permutations of possible races in testing.
     pub lock_testpoints: Arc<LockTestpoints>,
 
-    /// The memory allocated for this instance
-    alloc: Alloc,
+    /// The memory allocated for this instance.
+    ///
+    /// Note that this is in a `ManuallyDrop` because this manages the memory of
+    /// this `Instance` itself. To have precise control over this memory we
+    /// handle this in `Drop for InstanceHandle`.
+    alloc: ManuallyDrop<Alloc>,
 
     /// Handler run for signals that do not arise from a known WebAssembly trap, or that involve
     /// memory outside of the current instance.
@@ -1055,7 +1068,7 @@ impl Instance {
             kill_state,
             #[cfg(feature = "concurrent_testpoints")]
             lock_testpoints,
-            alloc,
+            alloc: ManuallyDrop::new(alloc),
             fatal_handler: default_fatal_handler,
             c_fatal_handler: None,
             signal_handler: Box::new(signal_handler_none) as Box<SignalHandler>,
