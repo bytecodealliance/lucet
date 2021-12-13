@@ -37,7 +37,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"]}
 lucet-wasi-sdk = { path = "../lucet-wasi-sdk" }
 lucetc = { path = "../lucetc" }
 tempfile = "3.0"
-cap-tempfile = "0.19"
+cap-tempfile = "0.21"
 
 [lib]
 name = "lucet_wasi"
