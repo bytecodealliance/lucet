@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 lucet-module = { path = "../../lucet-module", version = "=0.7.0-dev" }
 lucet-runtime-macros = { path = "../lucet-runtime-macros", version = "=0.7.0-dev" }
-wiggle = { version = "0.31.0", default-features = false }
+wiggle = { version = "0.32.0", default-features = false }
 
 anyhow = "1.0"
 async-trait = "0.1"

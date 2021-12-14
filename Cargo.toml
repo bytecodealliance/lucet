@@ -23,12 +23,3 @@ exclude = ["wasmtime", "sightglass"]
 
 [profile.test]
 rpath = true
-
-
-# wasmtime 0.31 / cranelift 0.78 was released missing the ifcmp_sp
-# instruction, which lucet requires. cfallin added it back in with
-# https://github.com/bytecodealliance/wasmtime/pull/3502. This patch
-# points to where that commit was merged into `main`.
-[patch.'crates-io']
-cranelift-codegen = { git = "https://github.com/bytecodealliance/wasmtime", rev = "b0246038666464837ffeb08fd85fb5d75e5a682b" }
-cranelift-entity = { git = "https://github.com/bytecodealliance/wasmtime", rev = "b0246038666464837ffeb08fd85fb5d75e5a682b" }
