@@ -1,4 +1,5 @@
 #![deny(bare_trait_objects)]
+#![allow(dead_code)]
 
 use lucet_module::{
     FunctionSpec, Module, ModuleData, SerializedModule, TableElement, TrapManifest, TrapSite,

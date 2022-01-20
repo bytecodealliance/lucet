@@ -27,28 +27,28 @@ macro_rules! with_ffi_arcs {
         assert_nonnull!($name);
         let $name = Arc::from_raw($name as *const Arc<dyn $ty>);
         let res = $body;
-        Arc::into_raw($name);
+        let _ = Arc::into_raw($name);
         res
     }};
     ( [ $name:ident : $ty:ty ], $body:block ) => {{
         assert_nonnull!($name);
         let $name = Arc::from_raw($name as *const $ty);
         let res = $body;
-        Arc::into_raw($name);
+        let _ = Arc::into_raw($name);
         res
     }};
     ( [ $name:ident : dyn $ty:ident, $($tail:tt)* ], $body:block ) => {{
         assert_nonnull!($name);
         let $name = Arc::from_raw($name as *const Arc<dyn $ty>);
         let rec = with_ffi_arcs!([$($tail)*], $body);
-        Arc::into_raw($name);
+        let _ = Arc::into_raw($name);
         rec
     }};
     ( [ $name:ident : $ty:ty, $($tail:tt)* ], $body:block ) => {{
         assert_nonnull!($name);
         let $name = Arc::from_raw($name as *const $ty);
         let rec = with_ffi_arcs!([$($tail)*], $body);
-        Arc::into_raw($name);
+        let _ = Arc::into_raw($name);
         rec
     }};
 }
