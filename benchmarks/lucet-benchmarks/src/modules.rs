@@ -208,7 +208,6 @@ pub fn many_args_mock() -> Arc<dyn Module> {
 
 pub fn hostcalls_mock() -> Arc<dyn Module> {
     #[lucet_hostcall]
-    #[inline(never)]
     #[no_mangle]
     pub unsafe fn hostcall_wrapped(
         vmctx: &Vmctx,
