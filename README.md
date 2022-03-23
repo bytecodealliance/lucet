@@ -1,12 +1,12 @@
-## Lucet is in Maintence Mode
+# Lucet has reached End-of-life
 
-Since mid 2020, the Lucet team has been focusing our efforts on the
-[Wasmtime][wasmtime] project. Wasmtime now has support for all of the features
-that previously only Lucet had, such as ahead-of-time (AOT) compilation
-and a pooling userfaultfd-based memory allocator.
+Lucet has reached end-of-life, and maintence has ceased. All Lucet users
+should transition to [Wasmtime][wasmtime].
 
-We encourage all new projects to use [Wasmtime][wasmtime], and existing Lucet
-users to transition to Wasmtime.
+In mid-2020, the Lucet team switched focus to working on the
+[Wasmtime][wasmtime] engine. We have added all of the features to Wasmtime
+which previously only Lucet had, such as ahead-of-time (AOT) compilation and a
+pooling userfaultfd-based memory allocator.
 
 [wasmtime]: https://github.com/bytecodealliance/wasmtime
 
