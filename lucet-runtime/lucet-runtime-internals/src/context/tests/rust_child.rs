@@ -66,9 +66,9 @@ extern "C" fn arg_printing_child(arg0: *mut c_void, arg1: *mut c_void) {
     let arg0_val = unsafe { *(arg0 as *mut c_int) };
     let arg1_val = unsafe { *(arg1 as *mut c_int) };
 
-    write!(
+    writeln!(
         OUTPUT_STRING.lock().unwrap(),
-        "hello from the child! my args were {} and {}\n",
+        "hello from the child! my args were {} and {}",
         arg0_val,
         arg1_val
     )
@@ -80,9 +80,9 @@ extern "C" fn arg_printing_child(arg0: *mut c_void, arg1: *mut c_void) {
     let arg0_val = unsafe { *(arg0 as *mut c_int) };
     let arg1_val = unsafe { *(arg1 as *mut c_int) };
 
-    write!(
+    writeln!(
         OUTPUT_STRING.lock().unwrap(),
-        "now they are {} and {}\n",
+        "now they are {} and {}",
         arg0_val,
         arg1_val
     )
@@ -133,9 +133,9 @@ fn call_child_twice() {
 }
 
 extern "C" fn context_set_child() {
-    write!(
+    writeln!(
         OUTPUT_STRING.lock().unwrap(),
-        "hello from the child! setting context to parent...\n",
+        "hello from the child! setting context to parent...",
     )
     .unwrap();
     unsafe {
@@ -168,9 +168,9 @@ fn call_child_setcontext_twice() {
 }
 
 extern "C" fn returning_child() {
-    write!(
+    writeln!(
         OUTPUT_STRING.lock().unwrap(),
-        "hello from the child! returning...\n",
+        "hello from the child! returning...",
     )
     .unwrap();
 }

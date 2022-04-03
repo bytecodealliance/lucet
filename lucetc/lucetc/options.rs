@@ -196,7 +196,7 @@ impl Options {
 
         let target = match m.value_of("target") {
             None => Triple::host(),
-            Some(t) => match Triple::from_str(&t) {
+            Some(t) => match Triple::from_str(t) {
                 Ok(triple) => triple,
                 Err(_) => panic!("specified target is invalid"),
             },
@@ -219,9 +219,10 @@ impl Options {
             m.values_of("target-feature").unwrap_or_default(),
         )?;
 
-        if target.architecture != Architecture::X86_64 {
-            panic!("architectures other than x86-64 are unsupported");
-        }
+        assert!(
+            !(target.architecture != Architecture::X86_64),
+            "architectures other than x86-64 are unsupported"
+        );
 
         let keygen = m.is_present("keygen");
         let sign = m.is_present("sign");

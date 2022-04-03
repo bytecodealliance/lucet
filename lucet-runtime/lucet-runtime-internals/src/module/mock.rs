@@ -287,7 +287,7 @@ impl ModuleInternal for MockModule {
     }
 
     fn get_sparse_page_data(&self, page: usize) -> Option<&[u8]> {
-        if let Some(ref sparse_data) = self.module_data.sparse_data() {
+        if let Some(sparse_data) = self.module_data.sparse_data() {
             *sparse_data.get_page(page)
         } else {
             None

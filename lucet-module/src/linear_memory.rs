@@ -179,10 +179,7 @@ impl OwnedSparseData {
         SparseData::new(
             self.pages
                 .iter()
-                .map(|c| match c {
-                    Some(data) => Some(data.as_slice()),
-                    None => None,
-                })
+                .map(|c| c.as_ref().map(|data| data.as_slice()))
                 .collect(),
         )
         .expect("SparseData invariant enforced by OwnedSparseData constructor")

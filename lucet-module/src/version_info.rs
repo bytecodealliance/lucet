@@ -80,10 +80,7 @@ mod test {
         assert_eq!(v.patch, 6666);
         assert_eq!(
             v.version_hash,
-            [
-                'a' as u8, 'b' as u8, 'c' as u8, 'd' as u8, 'e' as u8, 'f' as u8, '1' as u8,
-                '2' as u8
-            ]
+            [b'a', b'b', b'c', b'd', b'e', b'f', b'1', b'2']
         );
     }
 

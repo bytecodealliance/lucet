@@ -141,7 +141,7 @@ impl Config {
             witx: witx
                 .take()
                 .ok_or_else(|| Error::new(err_loc, "`witx` field required"))?,
-            async_: async_.take().unwrap_or_else(w::AsyncFunctions::default),
+            async_: async_.take().unwrap_or_default(),
             ctx: ctx
                 .take()
                 .ok_or_else(|| Error::new(err_loc, "`ctx` field required"))?,
@@ -160,6 +160,6 @@ impl Parse for Config {
         let _lbrace = braced!(contents in input);
         let fields: Punctuated<ConfigField, Token![,]> =
             contents.parse_terminated(ConfigField::parse)?;
-        Ok(Config::build(fields.into_iter(), input.span())?)
+        Config::build(fields.into_iter(), input.span())
     }
 }

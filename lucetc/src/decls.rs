@@ -513,11 +513,7 @@ impl<'a> ModuleDecls<'a> {
     }
 
     pub fn get_module_data(&self, features: ModuleFeatures) -> Result<ModuleData<'_>, Error> {
-        let linear_memory = if let Some(ref spec) = self.linear_memory_spec {
-            Some(spec.to_ref())
-        } else {
-            None
-        };
+        let linear_memory = self.linear_memory_spec.as_ref().map(|spec| spec.to_ref());
 
         let mut functions: Vec<FunctionMetadata<'_>> = Vec::new();
         let mut start_func = None;

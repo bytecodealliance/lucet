@@ -245,7 +245,7 @@ fn witx_to_functype(func: &witx::InterfaceFunc) -> WasmFuncType {
     let (params, results) = func.wasm_signature();
     let params = params
         .iter()
-        .map(|a| atom_to_type(&a))
+        .map(atom_to_type)
         .collect::<Vec<_>>()
         .into_boxed_slice();
     let returns = match results.len() {

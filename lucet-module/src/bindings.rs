@@ -33,12 +33,12 @@ impl Bindings {
 
     pub fn from_str(s: &str) -> Result<Bindings, Error> {
         let top: Value = serde_json::from_str(s)?;
-        Ok(Self::from_json(&top)?)
+        Self::from_json(&top)
     }
 
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Bindings, Error> {
         let contents = fs::read_to_string(path.as_ref())?;
-        Ok(Self::from_str(&contents)?)
+        Self::from_str(&contents)
     }
 
     pub fn extend(&mut self, other: &Bindings) -> Result<(), Error> {

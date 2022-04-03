@@ -155,13 +155,13 @@ async fn main() {
     let heap_memory_size = matches
         .value_of("heap_memory_size")
         .ok_or_else(|| format_err!("missing heap memory size"))
-        .and_then(|v| parse_humansized(v))
+        .and_then(parse_humansized)
         .unwrap() as usize;
 
     let heap_address_space_size = matches
         .value_of("heap_address_space_size")
         .ok_or_else(|| format_err!("missing heap address space size"))
-        .and_then(|v| parse_humansized(v))
+        .and_then(parse_humansized)
         .unwrap() as usize;
 
     if heap_memory_size > heap_address_space_size {
@@ -173,7 +173,7 @@ async fn main() {
     let stack_size = matches
         .value_of("stack_size")
         .ok_or_else(|| format_err!("missing stack size"))
-        .and_then(|v| parse_humansized(v))
+        .and_then(parse_humansized)
         .unwrap() as usize;
 
     let timeout = matches

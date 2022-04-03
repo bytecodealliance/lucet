@@ -61,7 +61,7 @@ impl wasm_smith::Config for WasmSmithConfig {
 fn build(with_veriwasm: bool, bytes: &[u8], tempdir: &TempDir, suffix: &str) -> Result<(), Error> {
     let lucetc = Lucetc::try_from_bytes(bytes)?.with_veriwasm(with_veriwasm);
     let so_file = tempdir.path().join(format!("out_{}.so", suffix));
-    lucetc.shared_object_file(so_file.clone())?;
+    lucetc.shared_object_file(so_file)?;
     Ok(())
 }
 

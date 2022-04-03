@@ -503,12 +503,12 @@ impl<'a> Compiler<'a> {
 
         fn write_slice(
             codegen_context: &CodegenContext,
-            mut ctx: &mut ClifDataContext,
+            ctx: &mut ClifDataContext,
             bytes: &mut Cursor<Vec<u8>>,
             id: DataId,
             len: usize,
         ) -> Result<(), Error> {
-            let data_ref = codegen_context.module().declare_data_in_data(id, &mut ctx);
+            let data_ref = codegen_context.module().declare_data_in_data(id, ctx);
             let offset = bytes.position() as u32;
             ctx.write_data_addr(offset, data_ref, 0);
             bytes.write_u64::<LittleEndian>(0_u64)?;
@@ -935,7 +935,7 @@ impl cranelift_codegen::binemit::TrapSink for TrapSites {
 
 fn write_function_spec(
     codegen_context: &CodegenContext,
-    mut manifest_ctx: &mut ClifDataContext,
+    manifest_ctx: &mut ClifDataContext,
     manifest_bytes: &mut Cursor<Vec<u8>>,
     func_id: FuncId,
     metadata: Option<&TrapMetadata>,
@@ -946,7 +946,7 @@ fn write_function_spec(
     // Write a (ptr, len) pair with relocation for the code.
     let func_ref = codegen_context
         .module()
-        .declare_func_in_data(func_id, &mut manifest_ctx);
+        .declare_func_in_data(func_id, manifest_ctx);
     let offset = manifest_bytes.position() as u32;
     manifest_ctx.write_function_addr(offset, func_ref);
     manifest_bytes.write_u64::<LittleEndian>(0_u64)?;
@@ -956,7 +956,7 @@ fn write_function_spec(
         if m.trap_len > 0 {
             let data_ref = codegen_context
                 .module()
-                .declare_data_in_data(m.trap_data_id, &mut manifest_ctx);
+                .declare_data_in_data(m.trap_data_id, manifest_ctx);
             let offset = manifest_bytes.position() as u32;
             manifest_ctx.write_data_addr(offset, data_ref, 0);
         }

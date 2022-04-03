@@ -96,12 +96,12 @@ impl<'a> FuncInfo<'a> {
                 .get_runtime(runtime_func)
                 .expect("runtime function not available");
             let signature = func.import_signature(decl.signature().to_owned());
-            let fref = func.import_function(ir::ExtFuncData {
+
+            func.import_function(ir::ExtFuncData {
                 name: decl.name.into(),
                 signature,
                 colocated: false,
-            });
-            fref
+            })
         })
     }
 
@@ -228,7 +228,7 @@ impl<'a> FuncInfo<'a> {
             builder.switch_to_block(yield_block);
             environ.save_instr_count(builder);
             let yield_hostcall =
-                environ.get_runtime_func(RuntimeFunc::YieldAtBoundExpiration, &mut builder.func);
+                environ.get_runtime_func(RuntimeFunc::YieldAtBoundExpiration, builder.func);
             let vmctx_gv = environ.get_vmctx(builder.func);
             let addr = builder.ins().global_value(environ.pointer_type(), vmctx_gv);
             builder.ins().call(yield_hostcall, &[addr]);
@@ -629,7 +629,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
             func_decl.name.into()
         } else {
             get_trampoline_func(
-                &self.codegen_context,
+                self.codegen_context,
                 unique_index,
                 &func_decl,
                 &func.dfg.signatures[signature],
@@ -670,7 +670,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     ) -> WasmResult<ir::Value> {
         assert!(index == MemoryIndex::new(0));
         // TODO memory grow function doesnt take heap index as argument
-        let mem_grow_func = self.get_runtime_func(RuntimeFunc::MemGrow, &mut pos.func);
+        let mem_grow_func = self.get_runtime_func(RuntimeFunc::MemGrow, pos.func);
         let vmctx = pos
             .func
             .special_param(ir::ArgumentPurpose::VMContext)
@@ -687,7 +687,7 @@ impl<'a> FuncEnvironment for FuncInfo<'a> {
     ) -> WasmResult<ir::Value> {
         assert!(index == MemoryIndex::new(0));
         // TODO memory size function doesnt take heap index as argument
-        let mem_size_func = self.get_runtime_func(RuntimeFunc::MemSize, &mut pos.func);
+        let mem_size_func = self.get_runtime_func(RuntimeFunc::MemSize, pos.func);
         let vmctx = pos
             .func
             .special_param(ir::ArgumentPurpose::VMContext)

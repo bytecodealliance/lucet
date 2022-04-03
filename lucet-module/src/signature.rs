@@ -20,7 +20,7 @@ impl ModuleSignature {
         module_data: &ModuleData<'_>,
     ) -> Result<(), Error> {
         let signature_box: SignatureBox =
-            SignatureBones::from_bytes(&module_data.get_module_signature())
+            SignatureBones::from_bytes(module_data.get_module_signature())
                 .map_err(ModuleSignatureError)?
                 .into();
 
@@ -30,7 +30,7 @@ impl ModuleSignature {
         raw_module_and_data.patch_module_data(&cleared_module_data_bin);
 
         minisign::verify(
-            &pk,
+            pk,
             &signature_box,
             Cursor::new(&raw_module_and_data.obj_bin),
             true,
@@ -117,7 +117,7 @@ impl RawModuleAndData {
     }
 
     pub fn patch_module_data(&mut self, module_data_bin: &[u8]) {
-        self.module_data_bin_mut().copy_from_slice(&module_data_bin);
+        self.module_data_bin_mut().copy_from_slice(module_data_bin);
     }
 
     pub fn write_patched_module_data<P: AsRef<Path>>(
@@ -130,7 +130,7 @@ impl RawModuleAndData {
             .create_new(false)
             .open(&path)?;
         fp.seek(SeekFrom::Start(self.module_data_offset as u64))?;
-        fp.write_all(&patched_module_data_bin)?;
+        fp.write_all(patched_module_data_bin)?;
         Ok(())
     }
 

@@ -87,7 +87,7 @@ impl RegionInternal for MmapRegion {
     ) -> Result<InstanceHandle, Error> {
         let limits = self.get_limits();
 
-        module.validate_runtime_spec(&limits, heap_memory_size_limit)?;
+        module.validate_runtime_spec(limits, heap_memory_size_limit)?;
 
         // Use the supplied alloc_strategy to get the next available slot
         // for this new instance.
@@ -152,9 +152,10 @@ impl RegionInternal for MmapRegion {
             .take()
             .expect("alloc didn't have a slot during drop; dropped twice?");
 
-        if slot.heap as usize % host_page_size() != 0 {
-            panic!("heap is not page-aligned");
-        }
+        assert!(
+            !(slot.heap as usize % host_page_size() != 0),
+            "heap is not page-aligned"
+        );
 
         // clear and disable access to the heap, stack, globals, and sigstack
         for (ptr, len) in [

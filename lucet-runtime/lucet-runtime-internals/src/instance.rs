@@ -526,7 +526,7 @@ impl Instance {
     /// in the future.
     pub fn run(&mut self, entrypoint: &str, args: &[Val]) -> Result<RunResult, Error> {
         let func = self.module.get_export_func(entrypoint)?;
-        Ok(self.run_func(func, &args, false, None)?.unwrap())
+        Ok(self.run_func(func, args, false, None)?.unwrap())
     }
 
     /// Run a function with arguments in the guest context from the [WebAssembly function
@@ -542,7 +542,7 @@ impl Instance {
         args: &[Val],
     ) -> Result<RunResult, Error> {
         let func = self.module.get_func_from_idx(table_idx, func_idx)?;
-        Ok(self.run_func(func, &args, false, None)?.unwrap())
+        Ok(self.run_func(func, args, false, None)?.unwrap())
     }
 
     /// Resume execution of an instance that has yielded without providing a value to the guest.
@@ -1317,7 +1317,7 @@ impl Instance {
             }
             State::Terminating { details, .. } => {
                 self.state = State::Terminated;
-                Err(Error::RuntimeTerminated(details).into())
+                Err(Error::RuntimeTerminated(details))
             }
             State::Yielding { val, expecting } => {
                 self.state = State::Yielded { expecting };
@@ -1360,7 +1360,7 @@ impl Instance {
                 } else {
                     // leave the full fault details in the instance state, and return the
                     // higher-level info to the user
-                    Err(Error::RuntimeFault(details).into())
+                    Err(Error::RuntimeFault(details))
                 }
             }
             State::BoundExpired => {
