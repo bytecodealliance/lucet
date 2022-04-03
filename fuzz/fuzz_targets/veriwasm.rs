@@ -77,7 +77,9 @@ fn run_test(bytes: &[u8]) -> Result<(), Error> {
         return Ok(());
     }
 
-    build(/* with_veriwasm = */ true, bytes, &tempdir, "veriwasm")?;
+    if build(/* with_veriwasm = */ true, bytes, &tempdir, "veriwasm").is_err(){
+        panic!("Veriwasm returned an error!");
+    }
 
     Ok(())
 }
